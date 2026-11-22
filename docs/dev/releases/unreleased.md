@@ -10,6 +10,23 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 
+- **Controllers, reworked.** Every connected controller is ready, and the one
+  you pick up takes over. Stick aim is set in degrees per second with a dead
+  zone for each stick, an optional turn boost and three response presets;
+  gyro aim has its own settings and a calibrate button; and optional aim
+  assist for sticks is off unless you turn it on (servers decide in
+  multiplayer). Votes, Ready, chat, buying and quick save have buttons, with
+  Bumper Jumper and one-handed layouts to choose from. Triggers, a
+  DualSense's trigger resistance and the controller's light join in where the
+  controller has them. A **Test Controller** panel shows what the game sees
+  from your sticks, triggers, buttons and gyro, and selecting a text field
+  with a controller brings up an on-screen keyboard with every letter the
+  game's languages use. Your current dead zone and sensitivity carry over, so
+  nothing changes until you change it. See
+  [Input Settings](../../user/input-settings.md#controllers). No physical
+  controller has been through the [hardware checklist](../controller-qualification.md)
+  yet, and the new menu text is machine-translated outside English.
+
 - **Startup and loading screens that never stutter.** Both screens now
   animate at your display's refresh rate, in even steps, for the whole time the
   game starts or a level loads, instead of about 25 frames a second on average

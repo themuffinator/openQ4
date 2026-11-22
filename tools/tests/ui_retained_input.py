@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 SUPPORT = r'''
 #include "src/framework/NativeInputDispatch.h"
+#include "src/framework/ControllerLook.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -75,6 +76,8 @@ bool IsWeaponSelectionImpulse(int) { return false; }
 int latencyFlashArms=0; void Usercmd_ArmLatencyFlash() { ++latencyFlashArms; }
 struct idUsercmdGenLocal {
     int buttonState[UB_MAX_BUTTONS]={};
+    // PAD-06 and PAD-02: the action each held key pressed, and the look stick's turn boost
+    int keyAction[K_LAST_KEY]={}; openq4::TurnBoostState turnBoost;
     bool keyState[K_LAST_KEY]={}, directButtonState[UB_MAX_BUTTONS]={};
     bool retainedKeyBlocked[K_LAST_KEY]={}, retainedDirectBlocked[UB_MAX_BUTTONS]={}, retainedAxisBlocked[MAX_JOYSTICK_AXIS]={};
     int joystickAxis[MAX_JOYSTICK_AXIS]={};

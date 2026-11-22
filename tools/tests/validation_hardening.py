@@ -875,6 +875,8 @@ def validate_validation_wiring() -> None:
         # Campaign runtime checks require user-supplied retail/expansion assets.
         "campaign_runtime.py",
         "campaign_selection_runtime.py",
+        # Controller runtime checks drive SDL virtual controllers in the staged client on retail assets.
+        "controller_runtime.py",
         "awakening_m01_cinematic.py",
         "awakening_status_runtime.py",
         "monster_hit_materials.py",

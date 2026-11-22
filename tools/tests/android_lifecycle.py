@@ -41,10 +41,10 @@ static int SDL_GetAtomicInt(SDL_AtomicInt* value){return value->value;}
 static int SDL_SetAtomicInt(SDL_AtomicInt* value,int replacement){int old=value->value;value->value=replacement;return old;}
 static bool SDL_CompareAndSwapAtomicInt(SDL_AtomicInt* value,int expected,int replacement){if(value->value!=expected)return false;value->value=replacement;return true;}
 static constexpr int SDL3_LIFECYCLE_PENDING_BACKGROUND=1,SDL3_LIFECYCLE_PENDING_FOREGROUND=2,SDL3_LIFECYCLE_PENDING_LOW_MEMORY=4;
-static constexpr int SDL_SENSOR_GYRO=1,SDL_WINDOW_MOUSE_FOCUS=1,CVAR_ARCHIVE=1,MAX_KEYS=8;
+static constexpr int SDL_SENSOR_GYRO=1,SDL_SENSOR_ACCEL=2,SDL_WINDOW_MOUSE_FOCUS=1,CVAR_ARCHIVE=1,MAX_KEYS=8;
 static constexpr const char* CONFIG_FILE="test.cfg";
 static bool engineThread=true,s_sdlAppInBackground=false,s_sdlAppSuspendedSinceQuery=false;
-static bool s_menuMouseInsideWindow=true,s_gamepadGyroEnabled=true,s_sdlFocusInputReleased=false;
+static bool s_menuMouseInsideWindow=true,s_gamepadGyroEnabled=true,s_gamepadAccelEnabled=true,s_sdlFocusInputReleased=false;
 static int pad=1,window=1;static int* s_sdlGamepad=&pad;static int* s_sdlJoystick=nullptr;static int* s_sdlWindow=&window;
 static int s_retainedKeyOwners[4]={};
 static int writes=0,inputReleases=0,usercmdClears=0,rumbleStops=0,menus=0,resumes=0;
@@ -90,7 +90,7 @@ static bool SDL_SetGamepadSensorEnabled(int*,int,bool){return true;}
 static void SDL3_UpdateCursorVisibility(){}
 static bool Sys_SDL_IsGameWindowFocused(){return !s_sdlAppInBackground && s_sdlWindow;}
 static int SDL_GetWindowFlags(int*){return SDL_WINDOW_MOUSE_FOCUS;}
-static void SDL3_OpenFirstController(){}
+static void SDL3_OpenAllControllers(){}
 static void SDL3_UpdateGamepadSensorState(bool){}
 static void SDL3_UpdateGamepadAxes(int){}
 static void SDL3_UpdateJoystickAxes(){}

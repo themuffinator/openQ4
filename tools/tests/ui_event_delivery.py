@@ -81,6 +81,11 @@ struct idSessionLocal {
     void UpdateRetainedSettingsPage() {}
     void PrefetchRetainedNextPages() {}
     void UpdateBrowserTooltip() {}
+    // The controller's notices, test panel and on-screen keyboard (PAD-01, PAD-07, PAD-05) have their own tests.
+    void UpdateControllerNotices() {}
+    void UpdateControllerTestPanel() {}
+    void UpdateOnScreenKeyboard() {}
+    bool OnScreenKeyboardEvent(const sysEvent_t*) { return false; }
     void PrecacheRetainedLevelshots(bool) {}
     bool RetainedSubpageEvent(const sysEvent_t*) { return false; }
     void HandleRetainedSessionRequest(idUserInterface*,const char*) { assert(false); }

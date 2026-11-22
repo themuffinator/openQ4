@@ -73,6 +73,8 @@ bool CopyEvent(const SDL_Event& e,const OQ4_NativeQueueRecord& tag,OwnedNativeQu
         out.header.gtouchpad=e.gtouchpad; return true;
     case SDL_EVENT_GAMEPAD_SENSOR_UPDATE: out.header.gsensor=e.gsensor; return true;
     case SDL_EVENT_JOYSTICK_ADDED: case SDL_EVENT_JOYSTICK_REMOVED: out.header.jdevice=e.jdevice; return true;
+    // The battery's notices and the controller's power readout follow this event (PAD-01).
+    case SDL_EVENT_JOYSTICK_BATTERY_UPDATED: out.header.jbattery=e.jbattery; return true;
     case SDL_EVENT_JOYSTICK_BUTTON_DOWN: case SDL_EVENT_JOYSTICK_BUTTON_UP: out.header.jbutton=e.jbutton; return true;
     case SDL_EVENT_JOYSTICK_HAT_MOTION: out.header.jhat=e.jhat; return true;
     case SDL_EVENT_JOYSTICK_AXIS_MOTION: out.header.jaxis=e.jaxis; return true;
@@ -86,7 +88,7 @@ bool CopyEvent(const SDL_Event& e,const OQ4_NativeQueueRecord& tag,OwnedNativeQu
     case SDL_EVENT_KEYBOARD_ADDED: case SDL_EVENT_KEYBOARD_REMOVED:
     case SDL_EVENT_SCREEN_KEYBOARD_SHOWN: case SDL_EVENT_SCREEN_KEYBOARD_HIDDEN:
     case SDL_EVENT_MOUSE_ADDED: case SDL_EVENT_MOUSE_REMOVED:
-    case SDL_EVENT_JOYSTICK_BALL_MOTION: case SDL_EVENT_JOYSTICK_BATTERY_UPDATED: case SDL_EVENT_JOYSTICK_UPDATE_COMPLETE:
+    case SDL_EVENT_JOYSTICK_BALL_MOTION: case SDL_EVENT_JOYSTICK_UPDATE_COMPLETE:
     case SDL_EVENT_GAMEPAD_UPDATE_COMPLETE: case SDL_EVENT_AUDIO_DEVICE_ADDED: case SDL_EVENT_AUDIO_DEVICE_REMOVED:
     case SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED: case SDL_EVENT_SENSOR_UPDATE:
     case SDL_EVENT_RENDER_TARGETS_RESET: case SDL_EVENT_RENDER_DEVICE_RESET: case SDL_EVENT_RENDER_DEVICE_LOST:

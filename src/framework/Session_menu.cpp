@@ -37,6 +37,8 @@ If you have questions concerning this license or the applicable additional terms
 #include "SessionPresetCheck.h"
 #include "NativeInputPublications.h"
 #include "../ui/Rectangle.h"
+#include "../sys/ControllerRoster.h"
+#include "OnScreenKeyboard.h"
 #include "ArenaCampaign.h"
 #include "../ui/ListGUILocal.h"
 #include "../ui/RetainedUI.h"
@@ -102,6 +104,18 @@ idCVar ui_retainedMultiplayer( "ui_retainedMultiplayer", "0", CVAR_GUI | CVAR_BO
 // to (see idSessionLocal::FindRetainedGui). While it is 0 no session route
 // creates a retained view and the stock GUIs present every screen. Archived,
 // so an explicit player preference persists across launches.
+// openQ4 (PAD-01): multiplayer cannot pause, so its HUD says what happened to
+// the controller in use. The session sets this; the game shows it.
+// openQ4 (PAD-05): the on-screen keyboard for retained text and number fields.
+static idCVar ui_onScreenKeyboard( "ui_onScreenKeyboard", "1", CVAR_GUI | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NOCHEAT,
+	"on-screen keyboard for text fields: 0 = never, 1 = when a controller or touch edits a field and the system has no keyboard of its own, 2 = whenever a field is edited", 0, 2 );
+// openQ4 (PAD-07): the controller families whose first-connection notice this
+// profile has seen (bits: Xbox, PlayStation, Nintendo, Steam Deck, generic).
+static idCVar in_joystickFamiliesSeen( "in_joystickFamiliesSeen", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NOCHEAT,
+	"controller families already introduced by the first-connection notice (bits)" );
+static const int CONTROLLER_TEST_BUTTONS = 22;	// K_JOY1..K_JOY22, the CONTROLLER TEST panel's
+idCVar ui_controllerNotice( "ui_controllerNotice", "0", CVAR_GUI | CVAR_INTEGER | CVAR_ROM | CVAR_NOCHEAT,
+	"set by the session for the multiplayer HUD: 0 nothing, 1 the controller in use disconnected, 2 its battery is low, 3 it started charging", 0, 3 );
 idCVar ui_retained( "ui_retained", "1", CVAR_GUI | CVAR_BOOL | CVAR_ARCHIVE, "use the retained interface by default; 0 selects the stock interface" );
 idCVar ui_hudScale( "ui_hudScale", "1", CVAR_GUI | CVAR_FLOAT | CVAR_ARCHIVE, "retained status bar scale, independent of menus", .5f, 2.0f );
 idCVar ui_browserView( "ui_browserView", "0", CVAR_GUI | CVAR_INTEGER | CVAR_ARCHIVE, "the server browser's list: 0 rows, 1 tiles with each map's levelshot", 0, 1 );
@@ -379,6 +393,7 @@ static const int RETAINED_GAME_LANGUAGE_COUNT = sizeof( RETAINED_GAME_LANGUAGES 
 // The retained CONTROLS page (tools/ui/retained_controls.py): its document and
 // the bindings of its rows, in its order (the stock page's tabs in turn).
 static const char *const RETAINED_CONTROLS_GUI = "guis/menu/settings/controls.rui";
+static const char *const RETAINED_KEYBOARD_GUI = "guis/menu/keyboard.rui";
 static const char *const RETAINED_CONTROLS_BINDINGS[] = {
 	"_forward", "_back", "_moveleft", "_moveright", "_moveUp", "_moveDown", "_left", "_right", "_strafe", "_speed", "_impulse0",
 	"_impulse1", "_impulse2", "_impulse3", "_impulse4", "_impulse5", "_impulse6", "_impulse7", "_impulse8", "_impulse9",
@@ -3178,6 +3193,26 @@ void idSessionLocal::HandleRetainedControlsRequest( idUserInterface *gui, const 
 		if ( Session_AndroidSetupAvailable() ) {
 			Session_OpenAndroidSetup( ANDROID_SETUP_TOUCH_LAYOUT );
 		}
+		return;
+	}
+	// openQ4 (PAD-06, PAD-04): each reset restores its own device and leaves
+	// the other alone; the gyro's hold-still calibration starts from its row.
+	const bool resetController = !idStr::Icmp( request, "controlsResetController" );
+	if ( resetController || !idStr::Icmp( request, "controlsResetKeyboard" ) ) {
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, resetController ? "resetController\n" : "resetKeyboardMouse\n" );
+		if ( guiMainMenu != NULL ) {
+			guiMainMenu->SetKeyBindingNames();
+		}
+		PublishRetainedControls( gui );
+		return;
+	}
+	if ( !idStr::Icmp( request, "controlsCalibrateGyro" ) ) {
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "calibrateGyro\n" );
+		return;
+	}
+	// openQ4 (PAD-07): the test panel's rumble test
+	if ( !idStr::Icmp( request, "controlsRumbleTest" ) ) {
+		Sys_StartControllerRumbleTest();
 		return;
 	}
 	const bool bind = !idStr::Icmp( request, "controlsBind" );
@@ -6078,6 +6113,12 @@ void idSessionLocal::MenuEvent( const sysEvent_t *event ) {
 		return;
 	}
 
+	// The on-screen keyboard takes the controller and the pointer over it
+	// while it types into a field; a real keyboard still reaches the field.
+	if ( OnScreenKeyboardEvent( event ) ) {
+		return;
+	}
+
 	// A change between the Single Player page and its sub-page: Back reverses
 	// a change going deeper, and other input waits for the other level.
 	if ( RetainedSubpageEvent( event ) ) {
@@ -6198,6 +6239,9 @@ void idSessionLocal::GuiFrameEvents() {
 	UpdateRetainedJoinGame();
 	UpdateRetainedSettingsPage();
 	PrefetchRetainedNextPages();
+	UpdateControllerNotices();
+	UpdateControllerTestPanel();
+	UpdateOnScreenKeyboard();
 	UpdateRetainedNotices();
 	UpdateBrowserTooltip();
 	PrecacheRetainedLevelshots( false );
@@ -8173,6 +8217,11 @@ void idSessionLocal::ShowSaveRestoreFailure( const char *saveName ) {
 
 void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const char *request ) {
 #ifndef ID_DEDICATED
+	// The on-screen keyboard's keys (PAD-05).
+	if ( request != NULL && gui != NULL && gui == guiOnScreenKeyboard ) {
+		HandleOnScreenKeyboardRequest( request, gui->State().GetInt( "osk.pick", "-1" ) );
+		return;
+	}
 	// The system check's answers (Session_presetcheck.cpp).
 	if ( request != NULL && Session_PresetCheckOwns( gui ) ) {
 		Session_PresetCheckRequest( gui, request );
@@ -10565,6 +10614,402 @@ void idSessionLocal::ResolveRetainedNotices( int kind ) {
 			retainedNotices[ i ].resolved = true;
 		}
 	}
+}
+
+/*
+===============
+idSessionLocal::UpdateControllerNotices
+
+openQ4 (PAD-01), every frame, beside the menus' notices.
+
+The controller in use went away during play and no other took over
+(in_gamepadFamily became "none"): single-player pauses on the pause menu,
+which shows the persistent notice UpdateRetainedNotices raises, and
+reconnecting never resumes play by itself. Multiplayer cannot pause, so its
+HUD says so until a controller returns (ui_controllerNotice). A pad that goes
+to sleep on the desk while the keyboard plays does neither.
+
+The battery: one notice when the controller in use reaches
+in_joystickLowBatteryNotice on battery, one when it starts charging, in the
+menus' stack and, in a match, on the HUD for the stack's hold.
+===============
+*/
+void idSessionLocal::UpdateControllerNotices() {
+#ifndef ID_DEDICATED
+	static idStr lastFamily;
+	static int hudNoticeUntil = 0;		// when the HUD's battery notice leaves (0: none, or until resolved)
+	static openq4::ControllerBatteryState battery;
+	const int hold = 4000;
+	const int now = common->GetPresentationTime();
+	const idStr gamepad = cvarSystem->GetCVarString( "in_gamepadFamily" );
+	const idStr family = gamepad.Length() > 0 ? gamepad : idStr( "none" );
+
+	if ( lastFamily.Length() > 0 && family.Icmp( lastFamily ) != 0 ) {
+		if ( !family.Icmp( "none" ) ) {
+			if ( mapSpawned && guiActive == NULL && !console->Active() && idKeyInput::LastInputWasController() ) {
+				if ( IsMultiplayer() ) {
+					ui_controllerNotice.SetInteger( 1 );
+					hudNoticeUntil = 0;
+				} else {
+					common->Printf( "controller: disconnected during play; pausing\n" );
+					StartMenu();
+				}
+			}
+		} else if ( ui_controllerNotice.GetInteger() == 1 ) {
+			ui_controllerNotice.SetInteger( 0 );
+		}
+	}
+	// openQ4 (PAD-07): the first time a family of controller connects on this
+	// profile, two notices name the rows that choose its symbols: Prompt Style
+	// and Swap Confirm and Back. The family's bit is kept, so it is said once.
+	if ( family.Icmp( lastFamily ) != 0 ) {
+		static const char *const families[] = { "xbox", "playstation", "nintendo", "steamdeck", "generic" };
+		for ( int i = 0; i < 5; ++i ) {
+			if ( family.Icmp( families[ i ] ) == 0 && ( in_joystickFamiliesSeen.GetInteger() & ( 1 << i ) ) == 0 ) {
+				in_joystickFamiliesSeen.SetInteger( in_joystickFamiliesSeen.GetInteger() | ( 1 << i ) );
+				// the stack shows the newest on top: Prompt Style reads first, Swap Confirm and Back under it
+				PushRetainedNotice( "#str_232770", RETAINED_NOTICE_NEW_CONTROLLER, "", "", RETAINED_NOTICE_UNDO_NONE, false );
+				PushRetainedNotice( "#str_232769", RETAINED_NOTICE_NEW_CONTROLLER, "", "", RETAINED_NOTICE_UNDO_NONE, false );
+				common->Printf( "controller: first %s controller on this profile\n", families[ i ] );
+			}
+		}
+	}
+	lastFamily = family;
+
+	const char *powerName = cvarSystem->GetCVarString( "in_gamepadPower" );
+	const openq4::ControllerPower power = !idStr::Icmp( powerName, "battery" ) ? openq4::ControllerPower::OnBattery :
+		!idStr::Icmp( powerName, "charging" ) ? openq4::ControllerPower::Charging :
+		!idStr::Icmp( powerName, "charged" ) ? openq4::ControllerPower::Charged :
+		!idStr::Icmp( powerName, "wired" ) ? openq4::ControllerPower::Wired : openq4::ControllerPower::Unknown;
+	const openq4::ControllerBatteryNotice batteryNotice = openq4::UpdateControllerBattery( battery,
+		static_cast<std::uint32_t>( cvarSystem->GetCVarInteger( "in_gamepadInstance" ) ), power,
+		cvarSystem->GetCVarInteger( "in_gamepadBattery" ), cvarSystem->GetCVarInteger( "in_joystickLowBatteryNotice" ) );
+	if ( batteryNotice != openq4::ControllerBatteryNotice::None ) {
+		const bool low = batteryNotice == openq4::ControllerBatteryNotice::Low;
+		PushRetainedNotice( low ? "#str_232700" : "#str_232701", RETAINED_NOTICE_BATTERY, "", "", RETAINED_NOTICE_UNDO_NONE, false );
+		common->Printf( "controller: %s\n", low ? "battery low" : "charging" );
+		if ( mapSpawned && IsMultiplayer() && ui_controllerNotice.GetInteger() != 1 ) {
+			ui_controllerNotice.SetInteger( low ? 2 : 3 );
+			hudNoticeUntil = now + hold;
+		}
+	}
+	if ( hudNoticeUntil != 0 && now - hudNoticeUntil >= 0 ) {
+		hudNoticeUntil = 0;
+		if ( ui_controllerNotice.GetInteger() > 1 ) {
+			ui_controllerNotice.SetInteger( 0 );
+		}
+	}
+	if ( !mapSpawned && ui_controllerNotice.GetInteger() != 0 ) {
+		ui_controllerNotice.SetInteger( 0 );
+		hudNoticeUntil = 0;
+	}
+#endif
+}
+
+/*
+===============
+The on-screen keyboard (openQ4, PAD-05)
+
+A retained text or number field takes text from a keyboard, or from the
+system's keyboard where SDL shows one. For a player with only a controller,
+or a touch screen with no system keyboard, the session shows a keyboard of
+its own (guis/menu/keyboard.rui) over whichever retained screen holds the
+field being edited.
+
+A field's edit lives only while the field keeps the focus in its own screen,
+so the keyboard is a screen of its own: the controller's buttons and the
+pointer over its panel go to it, and what its keys ask for goes to the
+field's open edit (UI_RetainedFieldInput): a character, any Unicode scalar
+value, or an editing command, the calls a real keyboard's events end in. A
+real keyboard still types into the field directly.
+
+It shows while a field's edit is open and ui_onScreenKeyboard allows: 1, the
+last input was a controller or touch and the platform offers no keyboard; 2,
+always; 0, never. DONE commits the field and, once its screen has answered,
+ends the edit a real keyboard's Enter would leave open; Back cancels it;
+either closes the keyboard, as does the edit ending any other way.
+===============
+*/
+idUserInterface *idSessionLocal::OnScreenKeyboardOwner() {
+	if ( guiActive == NULL ) {
+		return NULL;
+	}
+	// the screen that takes the menus' input (MenuEvent)
+	if ( guiRetainedHome != NULL && guiActive == guiMainMenu ) {
+		return guiRetainedHome;
+	}
+	if ( RetainedMultiplayerCovers() ) {
+		return guiRetainedMultiplayer;
+	}
+	return guiActive;
+}
+
+void idSessionLocal::PublishOnScreenKeyboard() {
+#ifndef ID_DEDICATED
+	idUserInterface *gui = guiOnScreenKeyboard;
+	if ( gui == NULL ) {
+		return;
+	}
+	for ( int i = 0; i < openq4::OSK_KEYS; ++i ) {
+		gui->SetStateString( va( "osk.key%d", i ), openq4::OskUtf8( openq4::OskKey( oskLayer, i, oskShift ) ).c_str() );
+	}
+	gui->SetStateBool( "osk.shift", oskShift );
+	// the layer key names the layer it leads to
+	gui->SetStateString( "osk.layerName", openq4::OskLayerName( openq4::OskNextLayer( oskLayer ) ) );
+	gui->StateChanged( common->GetPresentationTime() );
+#endif
+}
+
+void idSessionLocal::UpdateOnScreenKeyboard() {
+#ifndef ID_DEDICATED
+	const int time = common->GetPresentationTime();
+	const int mode = ui_onScreenKeyboard.GetInteger();
+	idUserInterface *owner = mode != 0 ? OnScreenKeyboardOwner() : NULL;
+	float fieldCentre = 0.0f;
+	const int edit = owner != NULL && owner != guiOnScreenKeyboard ? UI_RetainedFieldEdit( owner, &fieldCentre ) : 0;
+	if ( oskEnding ) {
+		// DONE committed the field. Its screen has answered when no value waits;
+		// the edit a real keyboard's Enter leaves open then ends. The value is
+		// committed, so ending the edit loses nothing.
+		if ( edit == 0 || owner != oskOwner ) {
+			oskEnding = false;
+		} else if ( UI_RetainedFieldSettled( owner ) ) {
+			UI_RetainedFieldInput( owner, UI_FIELD_CANCEL, 0 );
+			oskEnding = false;
+		}
+		// the keyboard is away from the moment DONE was pressed
+		if ( guiOnScreenKeyboard != NULL && oskOwner != NULL ) {
+			guiOnScreenKeyboard->Activate( false, time );
+		}
+		if ( !oskEnding ) {
+			oskOwner = NULL;
+		}
+		return;
+	}
+	const bool wanted = edit != 0 && ( mode == 2 ||
+		( ( idKeyInput::LastInputWasController() || idKeyInput::LastPointerWasTouch() ) && !Sys_HasScreenKeyboardSupport() ) );
+	if ( !wanted ) {
+		if ( oskOwner != NULL ) {
+			oskOwner = NULL;
+			if ( guiOnScreenKeyboard != NULL ) {
+				guiOnScreenKeyboard->Activate( false, time );
+			}
+		}
+		return;
+	}
+	if ( guiOnScreenKeyboard != NULL && UI_RetainedViewFailed( guiOnScreenKeyboard ) ) {
+		guiOnScreenKeyboard = NULL;
+	}
+	if ( guiOnScreenKeyboard == NULL ) {
+		guiOnScreenKeyboard = FindRetainedGui( RETAINED_KEYBOARD_GUI, true, false );
+		if ( guiOnScreenKeyboard == NULL ) {
+			return;
+		}
+	}
+	idUserInterface *gui = guiOnScreenKeyboard;
+	if ( oskOwner != owner ) {
+		// a new edit: its first layer, no shift, the middle key focused
+		oskOwner = owner;
+		oskShift = false;
+		oskLayer = openq4::OskFirstLayer( cvarSystem->GetCVarString( "sys_lang" ), edit == 3 );
+		PublishOnScreenKeyboard();
+		gui->Activate( true, time );
+		common->DPrintf( "on-screen keyboard: shown for a %s field\n", edit == 3 ? "number" : edit == 2 ? "masked" : "text" );
+	}
+	// The panel keeps clear of the field: at the view's head while the field
+	// is in its lower half.
+	gui->SetStateBool( "osk.top", fieldCentre > 0.5f );
+	// the pointer the player sees is the field's screen's: the keyboard's follows it
+	gui->SetCursor( owner->CursorX(), owner->CursorY() );
+	gui->StateChanged( time );
+#endif
+}
+
+bool idSessionLocal::OnScreenKeyboardEvent( const sysEvent_t *event ) {
+#ifdef ID_DEDICATED
+	return false;
+#else
+	idUserInterface *gui = guiOnScreenKeyboard;
+	if ( event == NULL || gui == NULL || oskOwner == NULL || oskEnding || oskOwner != OnScreenKeyboardOwner() ) {
+		return false;
+	}
+	const int time = common->GetPresentationTime();
+	bool mine = false;
+	if ( event->evType == SE_MOUSE ) {
+		// the field's screen moves the pointer as ever; the keyboard hears where it went
+		const char *moved = oskOwner->HandleEvent( event, time );
+		if ( moved != NULL && moved[0] ) {
+			DispatchCommand( oskOwner, moved );
+		}
+		if ( guiOnScreenKeyboard == NULL || oskOwner == NULL ) {
+			return true;
+		}
+		gui->SetCursor( oskOwner->CursorX(), oskOwner->CursorY() );
+		sysEvent_t still = *event;
+		still.evValue = 0;
+		still.evValue2 = 0;
+		gui->HandleEvent( &still, time );
+		return true;
+	}
+	if ( event->evType == SE_KEY ) {
+		const int key = event->evValue;
+		if ( key >= K_JOY1 && key <= K_JOY32 ) {
+			mine = true;
+		} else if ( key >= K_MOUSE1 && key <= K_MWHEELUP ) {
+			// a click or a tap on the panel; elsewhere it is the screen's
+			mine = UI_RetainedPointerOver( gui, "osk-panel" );
+		}
+	}
+	if ( !mine ) {
+		return false;
+	}
+	const char *command = gui->HandleEvent( event, time );
+	if ( command != NULL && command[0] ) {
+		DispatchCommand( gui, command );
+	}
+	return true;
+#endif
+}
+
+void idSessionLocal::HandleOnScreenKeyboardRequest( const char *request, int key ) {
+#ifndef ID_DEDICATED
+	idUserInterface *owner = oskOwner;
+	if ( request == NULL || owner == NULL || oskEnding || owner != OnScreenKeyboardOwner() ) {
+		return;
+	}
+	if ( !idStr::Icmp( request, "oskKey" ) ) {
+		const char32_t character = openq4::OskKey( oskLayer, key, oskShift );
+		if ( character != 0 ) {
+			UI_RetainedFieldInput( owner, UI_FIELD_TYPE, static_cast<int>( character ) );
+			if ( oskShift ) {
+				// shift is for one letter
+				oskShift = false;
+				PublishOnScreenKeyboard();
+			}
+		}
+	} else if ( !idStr::Icmp( request, "oskSpace" ) ) {
+		UI_RetainedFieldInput( owner, UI_FIELD_TYPE, ' ' );
+	} else if ( !idStr::Icmp( request, "oskBackspace" ) ) {
+		UI_RetainedFieldInput( owner, UI_FIELD_BACKSPACE, 0 );
+	} else if ( !idStr::Icmp( request, "oskLeft" ) ) {
+		UI_RetainedFieldInput( owner, UI_FIELD_LEFT, 0 );
+	} else if ( !idStr::Icmp( request, "oskRight" ) ) {
+		UI_RetainedFieldInput( owner, UI_FIELD_RIGHT, 0 );
+	} else if ( !idStr::Icmp( request, "oskShift" ) ) {
+		oskShift = !oskShift;
+		PublishOnScreenKeyboard();
+	} else if ( !idStr::Icmp( request, "oskLayer" ) ) {
+		oskLayer = openq4::OskNextLayer( oskLayer );
+		oskShift = false;
+		PublishOnScreenKeyboard();
+	} else if ( !idStr::Icmp( request, "oskDone" ) ) {
+		// The field commits as for Enter, and the keyboard leaves at once. The
+		// edit ends when the commit has settled (UpdateOnScreenKeyboard). A
+		// value the field refuses keeps the edit, and the keyboard, as they were.
+		if ( UI_RetainedFieldInput( owner, UI_FIELD_COMMIT, 0 ) ) {
+			oskEnding = true;
+		}
+	} else if ( !idStr::Icmp( request, "oskCancel" ) ) {
+		UI_RetainedFieldInput( owner, UI_FIELD_CANCEL, 0 );
+	}
+	// What the field's screen asks of the session in answer (a committed
+	// field's action) is dispatched as after any input it took itself. It may
+	// close the screen; nothing above is used after it.
+	DispatchCommand( owner, "openq4-retained-actions" );
+#endif
+}
+
+/*
+===============
+Session_OnScreenKeyboard_f
+
+openq4_onScreenKeyboard: the keyboard's state, and its keys pressed without a
+device, as openq4_retainedGui does for a screen. A harness in a hidden window
+has no focused window for a controller's buttons to reach a screen through.
+===============
+*/
+void Session_OnScreenKeyboard_f( const idCmdArgs &args ) {
+#ifndef ID_DEDICATED
+	static const char *const verbs[][2] = { { "shift", "oskShift" }, { "layer", "oskLayer" }, { "space", "oskSpace" },
+		{ "left", "oskLeft" }, { "right", "oskRight" }, { "delete", "oskBackspace" }, { "done", "oskDone" }, { "cancel", "oskCancel" } };
+	const char *verb = args.Argv( 1 );
+	const bool shown = sessLocal.oskOwner != NULL && !sessLocal.oskEnding && sessLocal.oskOwner == sessLocal.OnScreenKeyboardOwner();
+	if ( !idStr::Icmp( verb, "report" ) && args.Argc() == 2 ) {
+		idUserInterface *owner = sessLocal.OnScreenKeyboardOwner();
+		common->Printf( "ON_SCREEN_KEYBOARD shown=%d layer=%d shift=%d edit=%d top=%d focus=%s\n", shown ? 1 : 0, sessLocal.oskLayer,
+			sessLocal.oskShift ? 1 : 0, owner != NULL ? UI_RetainedFieldEdit( owner ) : 0,
+			shown && sessLocal.guiOnScreenKeyboard->State().GetBool( "osk.top" ) ? 1 : 0,
+			shown ? UI_RetainedFocusedControl( sessLocal.guiOnScreenKeyboard ).c_str() : "" );
+		return;
+	}
+	if ( !idStr::Icmp( verb, "key" ) && args.Argc() == 3 && shown ) {
+		sessLocal.HandleOnScreenKeyboardRequest( "oskKey", atoi( args.Argv( 2 ) ) );
+		return;
+	}
+	for ( int i = 0; i < static_cast<int>( sizeof( verbs ) / sizeof( verbs[ 0 ] ) ); ++i ) {
+		if ( !idStr::Icmp( verb, verbs[ i ][ 0 ] ) && args.Argc() == 2 && shown ) {
+			sessLocal.HandleOnScreenKeyboardRequest( verbs[ i ][ 1 ], -1 );
+			return;
+		}
+	}
+	common->Printf( "openq4_onScreenKeyboard: report | key <0-43> | shift | layer | space | left | right | delete | done | cancel (the keys need the keyboard shown)\n" );
+#endif
+}
+
+void idSessionLocal::DrawOnScreenKeyboard( int presentationTime ) {
+#ifndef ID_DEDICATED
+	if ( guiOnScreenKeyboard != NULL && oskOwner != NULL && !oskEnding && oskOwner == OnScreenKeyboardOwner() ) {
+		guiOnScreenKeyboard->Redraw( presentationTime );
+	}
+#endif
+}
+
+/*
+===============
+idSessionLocal::UpdateControllerTestPanel
+
+openQ4 (PAD-07), every frame the Controls page shows: what the active
+controller is doing, for the page's CONTROLLER TEST panel. Sticks and triggers
+in hundredths, each button's state beside its key state (the glyph the active
+family draws), its name, power and battery, the gyro's calibration state and
+its asked view rate against half a turn a second, the
+rumble test's running motor and whether Steam Input withholds the gyro or
+touchpad. Values that did not change cost nothing.
+===============
+*/
+void idSessionLocal::UpdateControllerTestPanel() {
+#ifndef ID_DEDICATED
+	idUserInterface *gui = guiRetainedControls;
+	if ( gui == NULL || guiActive != gui ) {
+		return;
+	}
+	controllerTestState_t state;
+	Sys_GetControllerTestState( state );
+	const auto hundredths = []( float value ) { return idMath::Rint( value * 100.0f ) * 0.01f; };
+	gui->SetStateBool( "controllerTest.present", state.present );
+	gui->SetStateString( "controllerTest.name", cvarSystem->GetCVarString( "in_gamepadName" ) );
+	const char *powerName = cvarSystem->GetCVarString( "in_gamepadPower" );
+	gui->SetStateInt( "controllerTest.power", !state.present ? 0 : !idStr::Icmp( powerName, "battery" ) ? 1 :
+		!idStr::Icmp( powerName, "charging" ) ? 2 : !idStr::Icmp( powerName, "charged" ) ? 3 : !idStr::Icmp( powerName, "wired" ) ? 4 : 0 );
+	gui->SetStateInt( "controllerTest.battery", state.present ? cvarSystem->GetCVarInteger( "in_gamepadBattery" ) : -1 );
+	gui->SetStateInt( "controllerTest.calibration", state.hasGyro ? cvarSystem->GetCVarInteger( "in_gyroCalibrationState" ) : 0 );
+	gui->SetStateFloat( "controllerTest.lx", hundredths( state.leftX ) );
+	gui->SetStateFloat( "controllerTest.ly", hundredths( state.leftY ) );
+	gui->SetStateFloat( "controllerTest.rx", hundredths( state.rightX ) );
+	gui->SetStateFloat( "controllerTest.ry", hundredths( state.rightY ) );
+	gui->SetStateFloat( "controllerTest.lt", hundredths( state.leftTrigger ) );
+	gui->SetStateFloat( "controllerTest.rt", hundredths( state.rightTrigger ) );
+	for ( int i = 0; i < CONTROLLER_TEST_BUTTONS; ++i ) {
+		gui->SetStateString( va( "controllerTest.key%d", i + 1 ), va( "^ik%02x", ( K_JOY1 + i ) & 0xff ) );
+		gui->SetStateBool( va( "controllerTest.b%d", i + 1 ), ( state.buttons & ( 1u << i ) ) != 0 );
+	}
+	gui->SetStateBool( "controllerTest.gyro", state.hasGyro );
+	gui->SetStateFloat( "controllerTest.gyroX", hundredths( idMath::ClampFloat( -1.0f, 1.0f, -state.gyroYaw / 180.0f ) ) );
+	gui->SetStateFloat( "controllerTest.gyroY", hundredths( idMath::ClampFloat( -1.0f, 1.0f, state.gyroPitch / 180.0f ) ) );
+	gui->SetStateInt( "controllerTest.motor", state.motor );
+	gui->SetStateBool( "controllerTest.steam", state.steamInput );
+	gui->StateChanged( common->GetPresentationTime() );
+#endif
 }
 
 /*

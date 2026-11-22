@@ -1143,3 +1143,28 @@ bool Sys_GetJoystickAxisState( int axis, int &value ) {
 bool Sys_SetJoystickRumble( float lowFrequency, float highFrequency, int durationMsec ) {
 	return false;
 }
+
+bool Sys_GetGyroLook( float &yaw, float &pitch, bool consume ) {
+	yaw = 0.0f;
+	pitch = 0.0f;
+	return false;
+}
+
+bool Sys_SetJoystickTriggerRumble( float left, float right, int durationMsec ) {
+	return false;
+}
+
+void Sys_SetControllerPlayerState( int weaponFeel, int health, int team ) {
+}
+
+bool Sys_GetControllerTestState( controllerTestState_t &state ) {
+	memset( &state, 0, sizeof( state ) );
+	return false;
+}
+
+void Sys_StartControllerRumbleTest( void ) {
+}
+
+bool Sys_HasScreenKeyboardSupport( void ) {
+	return false;
+}

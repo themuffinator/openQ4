@@ -279,7 +279,8 @@ static const std::set<std::string> SessionCommands = {"continue","singlePlayer",
 	"createMapsOlder","createBanList","createBanPick","createBanRemove",
 	"joinBack","joinPick","joinServer","joinSpectate","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet","joinSourceLan",
 	"joinClearSort","joinSortFavorite","joinSortLocked","joinSortName","joinSortPing","joinSortPlayers","joinSortGameType","joinSortMap",
-	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","controlsTouchLayout","settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults","joinConnect","joinSearch","joinSearchClear","joinSortNext",
+	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsResetController","controlsResetKeyboard","controlsCalibrateGyro","controlsRumbleTest",
+	"oskKey","oskShift","oskLayer","oskSpace","oskLeft","oskRight","oskBackspace","oskDone","oskCancel","controlsClear","controlsBack","controlsTouchLayout","settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults","joinConnect","joinSearch","joinSearchClear","joinSortNext",
 	"mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction","mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction",
 	"mpVoteYes","mpVoteNo","mpCallVote","mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpSettingsAudio","weaponOrderOpen","weaponOrderPick",
 		"weaponOrderReset","mpMatch","mpMatchSelect",
@@ -321,7 +322,9 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","hud_hitSound
 	"ui_reducedFlashing","ui_retainedOpaqueBacking","g_corpseSink","con_allowConsole","r_screenshotFormat","g_autoSkipCinematics","ui_cinematicShake","g_screenShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
 	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","g_viewKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
 	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch",
-	"vr_playSpace","vr_body"};
+	"vr_playSpace","vr_body",
+	// openQ4 (PAD): the Controller and Aim tabs
+	"in_aimAssist","in_alwaysRun","in_gyroActivation","in_gyroDeadZone","in_gyroInvertPitch","in_gyroInvertYaw","in_gyroMenuPointer","in_gyroPitchRatio","in_gyroSpace","in_gyroYawRatio","in_joystickAdaptiveTriggers","in_joystickContextActions","in_joystickDevicePin","in_joystickDirectionalRumble","in_joystickLayout","in_joystickLight","in_joystickLookDeadZone","in_joystickLookOuterDeadZone","in_joystickLowBatteryNotice","in_joystickMoveCurve","in_joystickMoveDeadZone","in_joystickMoveDeadZoneAxial","in_joystickMoveOuterDeadZone","in_joystickPitchSpeed","in_joystickPlayerLight","in_joystickResponse","in_joystickTriggerRumble","in_joystickTurnBoost","in_joystickYawSpeed","in_toggleCrouch"};
 
 static void CheckSessionActions(const Document& document) {
 	for (const auto& [id,action] : document.Model().actions) {
@@ -4773,7 +4776,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 			"each binding row asks the session to wait for a key");
 	}
 	Check(!document.Model().FindNode("controls_bind_51"),"the stock page's 49 bindings, the Classic ruleset's hook and Last Weapon, no more");
-	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other","tab-mouse","tab-controller"})
+	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other","tab-mouse","tab-controller","tab-aim"})
 		Check(document.Model().FindNode(tab) != nullptr,"the stock tabs, then the devices'");
 	CheckCvarRows(document,{{"controls_freelook","in_freeLook"},{"controls_togglezoom","in_toggleZoom"},
 		{"controls_scopesensitivity","pm_zoomedSlow"},{"controls_msensitivity","sensitivity"},{"controls_invertmouse","m_pitch"},
@@ -4861,7 +4864,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(!runtime.FocusControl("controls_bind_0",0.77),"another tab's rows take no focus");
 	Check(runtime.RunEvent("onTabPrevious",0.78,effects,error) && runtime.RunEvent("onTabPrevious",0.79,effects,error),"back past the first tab");
 	runtime.Frame(viewport,0.8);
-	Check(tab() == 5 && runtime.FocusedControl() == "controls_controller","the tabs wrap to the last, CONTROLLER");
+	Check(tab() == 6 && runtime.FocusedControl() == "controls_response","the tabs wrap to the last, AIM");
 	Check(runtime.RunEvent("tab_other",0.801,effects,error),"choose OTHER");
 	runtime.Frame(viewport,0.811);
 	Check(tab() == 3 && runtime.FocusedControl() == "controls_bind_38","OTHER opens on its first binding");
@@ -4944,25 +4947,146 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,1.0);
 	Check(tab() == 5 && runtime.FocusedControl() == "controls_controller","CONTROLLER opens on Controller");
 	Check(!runtime.FocusControl("controls_freelook",1.01),"MOUSE's rows rest while CONTROLLER is current");
-	const auto sticks = bounds("controls_controller"), trigger = bounds("controls_trigger"), gyro = bounds("controls_gyro");
-	Check(trigger.x > sticks.x+sticks.width && std::abs(trigger.y-sticks.y) < .5f && std::abs(gyro.x-trigger.x) < .5f &&
-		gyro.y > trigger.y,"STICKS beside TRIGGERS AND RUMBLE, GYRO AND TOUCH under them");
+	const auto sticks = bounds("controls_controller"), rumble = bounds("controls_rumble"), light = bounds("controls_light");
+	Check(rumble.x > sticks.x+sticks.width && std::abs(rumble.y-sticks.y) < .5f && std::abs(light.x-rumble.x) < .5f &&
+		light.y > rumble.y,"STICKS beside RUMBLE, LIGHTS AND NOTICES under it");
 	Check(runtime.FocusControl("controls_promptstyle",1.02),"focus the prompt style");
 	runtime.TakeActions();
 	press(MenuInput::Right,1.03);
 	Check(std::get<double>(TakeOneAction(runtime,"set.in_promptStyle").arguments.at("value")) == 1,"Right offers the next prompt style");
-	Check(runtime.RunEvent("tab_other",1.05,effects,error),"back to OTHER");
-	runtime.Frame(viewport,1.06);
-	Check(runtime.RunEvent("onBack",1.1,effects,error) && effects.actions.size() == 1 &&
+	// CONTROLLER TEST (PAD-07): the row opens the panel on TEST RUMBLE. What
+	// the session publishes moves a stick's dot, fills a trigger's bar and
+	// lights a held button; TEST RUMBLE asks the session for the motors and
+	// leaves the panel open; CLOSE closes it onto its row.
+	Check(runtime.FocusControl("controls_test",1.04),"focus Test Controller");
+	Check(runtime.RunEvent("controllerTestModalShow",1.05,effects,error) && effects.actions.empty(),"the row's event opens the panel by itself");
+	runtime.Frame(viewport,1.07);
+	runtime.Frame(viewport,1.35);
+	runtime.Frame(viewport,1.4);
+	Check(text("controllerTestModal","display") == "block","Test Controller opens the panel");
+	Check(runtime.FocusedControl() == "controllerTestModal_yes","the panel opens on TEST RUMBLE");
+	const auto shown = [&](const std::string& node, const char* property, int index) {
+		const auto found = runtime.PresentedValue(node,property); return found ? static_cast<float>(found->data[index]) : -999.f;
+	};
+	Check(Near(shown("test-button-6","opacity",0),.3f,.001f) && bounds("test-lt-fill").width < .5f &&
+		text("test-gyro","display") == "none" && text("test-steam","display") == "none","the panel rests until the session speaks");
+	Check(runtime.SetState({{"controllerTest.present",true},{"controllerTest.lx",0.5},{"controllerTest.ly",-1.0},{"controllerTest.lt",0.8},
+		{"controllerTest.b6",true},{"controllerTest.gyro",true},{"controllerTest.steam",true}},error,1.41),"the session publishes the controller");
+	runtime.Frame(viewport,1.42);
+	Check(Near(shown("test-button-6","opacity",0),1,.001f) && Near(shown("test-button-5","opacity",0),.3f,.001f),
+		"a held button lights and the others stay dim");
+	Check(Near(bounds("test-lt-fill").width,.8f*195,.5f) && bounds("test-rt-fill").width < .5f,"a trigger's bar follows its travel");
+	Check(Near(shown("test-left-dot","transform",0),32,.01f) && Near(shown("test-left-dot","transform",1),-64,.01f) &&
+		Near(shown("test-right-dot","transform",0),0,.01f),"a stick's dot stands where the device says");
+	Check(text("test-gyro","display") == "block" && text("test-steam","display") == "block","the gyro's box and the Steam Input line show when told");
+	// The zones follow the AIM tab's settings: Southpaw moves the look stick's to the left.
+	const float leftZone = shown("test-left-dead","transform",2), rightZone = shown("test-right-dead","transform",2);
+	Check(leftZone >= .02f && leftZone <= .95f && rightZone >= .02f && rightZone <= .95f &&
+		Near(shown("test-left-outer","transform",2),1,.501f),"each stick draws its dead zone and outer limit");
+	runtime.TakeActions();
+	Check(runtime.RunEvent("controllerTestRumble",1.43,effects,error) && effects.actions.size() == 1 &&
+		effects.actions[0].action == "controlsRumbleTest","TEST RUMBLE asks the session for the motors");
+	runtime.Frame(viewport,1.45);
+	Check(text("controllerTestModal","display") == "block","the test leaves the panel open");
+	Check(runtime.RunEvent("controllerTestModalHide",1.5,effects,error),"CLOSE, and Back");
+	runtime.Frame(viewport,1.52);
+	runtime.Frame(viewport,1.9);
+	runtime.Frame(viewport,1.95);
+	Check(text("controllerTestModal","display") == "none","Back closes the panel");
+	Check(runtime.FocusedControl() == "controls_test","and the focus returns to its row");
+	runtime.TakeActions();
+	Check(runtime.RunEvent("tab_other",2.05,effects,error),"back to OTHER");
+	runtime.Frame(viewport,2.06);
+	Check(runtime.RunEvent("onBack",2.1,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "controlsBack","Back asks the session to return");
 	const auto portrait = SettingsViewport(document,540,960);
-	runtime.Frame(portrait,1.2);
+	runtime.Frame(portrait,2.2);
 	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_50");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"controls_bind_44","controls_bind_45","controls_bind_50","controls-other-rows",1.3);
-	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_44","controls_bind_45","controls_bind_50",1.4);
+	CheckSettingsPortrait(runtime,document,"controls_bind_44","controls_bind_45","controls_bind_50","controls-other-rows",2.3);
+	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_44","controls_bind_45","controls_bind_50",2.4);
 	host.cvars = saved;
+}
+
+// The on-screen keyboard (tools/ui/retained_keyboard.py, PAD-05): four rows of
+// eleven keys whose characters the session publishes, and the function row.
+// A key names itself in osk.pick and asks the session to type; every function
+// asks by its own verb, from its key and from the controller button drawn on
+// it; Back cancels. The directions move between keys and rows, the panel
+// stands at the view's foot or, told so, at its head.
+static void CheckKeyboard(ScreenHost& host, const char* path) {
+	const auto source = Read(path);
+	Document document; std::vector<Diagnostic> diagnostics;
+	if (!document.Load(source,diagnostics)) for (const auto& d : diagnostics) std::fprintf(stderr,"%u:%u %s %s\n",unsigned(d.line),unsigned(d.column),d.pointer.c_str(),d.message.c_str());
+	Check(diagnostics.empty() && document.Model().id == "openq4.keyboard" && document.Model().canvasHeight == 720,
+		"the keyboard validates on the 4:3 canvas");
+	CheckSessionActions(document);
+	for (int key = 0; key < 44; ++key) {
+		const auto* node = document.Model().FindNode("osk-key-"+std::to_string(key));
+		Check(node && node->control && node->control->role == ControlRole::Button && node->control->event == "oskkey"+std::to_string(key),
+			"each of the 44 keys is a button with its own event");
+	}
+	Check(!document.Model().FindNode("osk-key-44"),"four rows of eleven keys, no more");
+	Runtime runtime(host);
+	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/keyboard.rui",diagnostics),"the keyboard loads into a runtime");
+	auto viewport = SettingsViewport(document); std::string error; Runtime::EventEffects effects;
+	const auto press = [&](MenuInput input, double at) { runtime.MenuAction(input,true,at); runtime.MenuAction(input,false,at+.01); };
+	const auto text = [&](const std::string& node, const char* property) {
+		const auto found = runtime.PresentedValue(node,property); return found ? found->text : std::string("?");
+	};
+	const auto bounds = [&](const std::string& id) { Bounds b; Check(runtime.GetBounds(id,b),"a keyboard node is laid out"); return b; };
+	runtime.Frame(viewport,0.05);
+	Check(runtime.RunEvent("onActivate",0.1,effects,error),"activation");
+	runtime.Frame(viewport,0.2);
+	// The activation's focus step is the adapter's to apply (the client run checks it); here the key takes it directly.
+	Check(runtime.FocusControl("osk-key-27",0.2) && runtime.FocusedControl() == "osk-key-27","the third row's middle key takes the focus");
+	// The session publishes a layer: the keys show it.
+	Check(runtime.SetState({{"osk.key27",std::string("h")},{"osk.key28",std::string("\xC5\x91")},{"osk.layerName",std::string("abc")}},error,0.21),
+		"the session publishes the keys");
+	runtime.Frame(viewport,0.22);
+	Check(text("osk-key-27-label","text") == "h" && text("osk-key-28-label","text") == "\xC5\x91" && text("osk-layer-label","text") == "abc",
+		"a key shows its character, in any script, and the layer key the next layer");
+	// A key names itself and asks the session to type it.
+	Check(runtime.RunEvent("oskKey28",0.3,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "oskKey" &&
+		std::get<double>(runtime.GetState().at("osk.pick")) == 28,"a key names itself to the session");
+	// The grid: right and down move by a key and a row; the function row is under the fourth.
+	const auto first = bounds("osk-key-0"), second = bounds("osk-key-1"), under = bounds("osk-key-11"), last = bounds("osk-key-43");
+	Check(Near(second.x-first.x,54,.5f) && Near(under.y-first.y,42,.5f) && Near(second.y,first.y,.01f) && Near(under.x,first.x,.01f),
+		"eleven keys to a row, 54 dp apart, rows 42 dp apart");
+	press(MenuInput::Right,0.4); runtime.Frame(viewport,0.42);
+	Check(runtime.FocusedControl() == "osk-key-28","Right moves a key on");
+	press(MenuInput::Down,0.5); runtime.Frame(viewport,0.52);
+	Check(runtime.FocusedControl() == "osk-key-39","Down moves a row down");
+	press(MenuInput::Down,0.6); runtime.Frame(viewport,0.62);
+	const auto function = runtime.FocusedControl();
+	Check(function.rfind("osk-",0) == 0 && function.rfind("osk-key-",0) != 0,"and then into the function row");
+	Check(bounds("osk-done").y > last.y && Near(bounds("osk-done").x+bounds("osk-done").width,last.x+last.width,.5f) &&
+		Near(bounds("osk-shift").x,first.x,.5f),"the function row spans the keys under them");
+	// Every function: its key's event, and the controller button's document event.
+	const std::vector<std::array<const char*,3>> functions = {{"oskShiftPressed","onSectionPrevious","oskShift"},
+		{"oskLayerPressed","onSectionNext","oskLayer"},{"oskSpacePressed","onTertiary","oskSpace"},{"oskLeftPressed","onTabPrevious","oskLeft"},
+		{"oskRightPressed","onTabNext","oskRight"},{"oskBackspacePressed","onSecondary","oskBackspace"},{"oskDonePressed","onMenuButton","oskDone"}};
+	double at = 0.7;
+	for (const auto& [key, button, verb] : functions) {
+		Check(runtime.RunEvent(key,at,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == verb,"a function key asks by its verb");
+		Check(runtime.RunEvent(button,at+.01,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == verb,
+			"and the controller's button for it asks the same");
+		at += .02;
+	}
+	Check(runtime.RunEvent("onBack",0.9,effects,error) && effects.actions.size() == 1 && effects.actions[0].action == "oskCancel","Back cancels the edit");
+	// SHIFT lights while it is on.
+	Check(text("osk-shift-selected","display") == "none","SHIFT rests unlit");
+	Check(runtime.SetState({{"osk.shift",true}},error,0.91),"the session turns shift on");
+	runtime.Frame(viewport,0.92);
+	Check(text("osk-shift-selected","display") == "block","SHIFT lights while on");
+	// The panel stands at the foot, or at the head while the field is below.
+	const auto foot = bounds("osk-panel");
+	Check(foot.y+foot.height > viewport.height*.9f && foot.y > viewport.height*.5f,"the panel stands at the view's foot");
+	Check(runtime.SetState({{"osk.top",true}},error,0.93),"the session moves it clear of a low field");
+	runtime.Frame(viewport,0.94);
+	const auto head = bounds("osk-panel");
+	Check(head.y < viewport.height*.1f && head.y+head.height < viewport.height*.5f && Near(head.height,foot.height,.01f),"then it stands at the head");
 }
 
 // The retained GAME OPTIONS page (tools/ui/retained_game.py): five tabs of
@@ -6235,6 +6359,10 @@ int main(int argc, char** argv) {
  if (argc == 3 && std::string(argv[1]) == "--controls") {
      ScreenHost host; CheckControlsPage(host,argv[2]);
      std::printf("retained CONTROLS page: %d checks passed\n",checks); return 0;
+ }
+ if (argc == 3 && std::string(argv[1]) == "--keyboard") {
+     ScreenHost host; CheckKeyboard(host,argv[2]);
+     std::printf("on-screen keyboard: %d checks passed\n",checks); return 0;
  }
  if (argc == 3 && std::string(argv[1]) == "--game") {
      ScreenHost host; CheckGamePage(host,argv[2]);

@@ -8,9 +8,9 @@ This guide shows how to set up your keyboard, mouse and controller in openQ4: ch
 
 - To change what a key or button does, open **Settings → Controls**.
 - To tune the mouse, open **Settings → Controls → Mouse**.
-- To tune a controller, open **Settings → Controls → Controller**. Start with **Stick Dead Zone** and **Look Sensitivity** before changing anything else.
+- To tune a controller, open **Settings → Controls** and use its **Controller** and **Aim** tabs. Start with **Response** and **Turn Speed** on **Aim** before changing anything else.
 - Press `` ` `` or `~` to open the console.
-- If your controls get into a mess, choose **Load Defaults** on the Settings page. This also resets your custom bindings, so back them up first with `writeConfig my-input-backup.cfg`.
+- If your controls get into a mess, choose **Reset Controller** or **Reset Keyboard and Mouse** on **Settings → Controls → Controller**. Each restores its own device and leaves the other alone. **Load Defaults** on the Settings page resets everything, bindings included, so back them up first with `writeConfig my-input-backup.cfg`.
 
 **New in 0.15.0:** the mouse and controller settings, with **Free Look**, **Toggle Zoom** and **Scope Sensitivity**, are on the **Mouse** and **Controller** tabs of **Settings → Controls**, beside the key bindings. In 0.14.1 they are on **Settings → Game Options**: its **Mouse Input** and **Controller** tabs, and the three aim settings on **General**.
 
@@ -28,6 +28,7 @@ Open **Settings → Controls**. Its tabs group the actions:
 | **Other** | Quick save and load, chat and team chat, voting, multiplayer statistics, ready status, emotes and voice chat. |
 | **Mouse** | Not bindings: the [mouse settings](#mouse-settings), led by Free Look, Toggle Zoom and Scope Sensitivity. **New in 0.15.0.** |
 | **Controller** | Not bindings: the [controller settings](#controller-settings). **New in 0.15.0.** |
+| **Aim** | More controller settings: [stick aim](#stick-aim) and [gyro, touchpad and touchscreen](#gyro-touchpad-and-touchscreen). Not in 0.15.0. |
 
 To bind an action, select its row and press the key, mouse button or controller button you want. Analogue sticks are set up in the controller settings rather than bound as buttons.
 
@@ -100,36 +101,147 @@ openQ4 supports Xbox, PlayStation, Nintendo Switch, Steam Deck and other control
 
 ### Controller settings
 
-Tune your controller on **Settings → Controls → Controller**.
+> The **Aim** tab, and the rows marked *new*, are in the development builds after 0.15.0. In 0.15.0 the **Controller** tab holds **Stick Dead Zone**, **Look Sensitivity**, **Look Curve** and the gyro and touchpad rows instead.
+
+Tune your controller on **Settings → Controls**. The **Controller** tab holds the controller itself, its buttons, and its [rumble, triggers and lights](#rumble-triggers-and-lights):
 
 | Menu setting | Console setting | Default | What it does |
 |---|---|---:|---|
 | Controller | `in_joystick` | On | Turns controller input on or off. |
+| Active Controller *new* | `in_joystickDevice` | Automatic | **Automatic** uses whichever controller you used last. **This Controller** keeps the one in your hands. See [More than one controller](#more-than-one-controller). |
+| Test Controller *new* | | | Opens a panel that shows what the controller is doing. See [Testing your controller](#testing-your-controller). |
 | Stick Layout | `in_joystickSouthpaw` | Default | **Southpaw** swaps the movement and look sticks. |
-| Stick Dead Zone | `in_joystickDeadZone` | `0.18` | How much of the stick's centre is ignored. |
-| Look Sensitivity | `in_joystickLookSensitivity` | `0.75` | How fast the view turns at full stick. |
 | Wheel Sensitivity | `in_weaponWheelSensitivity` | `4.0` | Cursor speed on the classic interface's weapon wheel, `0.25` to `16`. The new interface's wheel follows the stick's direction once you push it past about a third. |
 | Wheel Offset (0=center) | `ui_weaponWheelOffset` | `27` | Moves the weapon wheel sideways, as a percentage of screen width from the centre, `-40` to `40`. `0` centres it; `27` keeps the usual right-hand position. |
-| Look Curve | `in_joystickLookCurve` | `1.35` | Higher values make small stick movements gentler for fine aim; full-stick speed stays set by Look Sensitivity. |
-| Invert Look | `in_joystickInvertLook` | Off | Flips vertical look. It does not affect the menus. |
-| Trigger Press | `in_joystickTriggerThreshold` | `0.35` | How far a trigger must be pressed to count. |
-| Rumble | `in_joystickRumble` | On | Vibration, on controllers that have it. |
-| Rumble Strength | `in_joystickRumbleScale` | `1.0` | Vibration strength, `0` to `2`. |
-| Low Battery Rumble | `in_joystickLowBatteryRumbleThreshold` | `0` (`20` on Steam Deck) | Battery percentage at or below which vibration is limited; `0` never limits it. |
-| Low Battery Cap | `in_joystickLowBatteryRumbleScale` | `0.75` | The most vibration allowed while the battery is low. Your Rumble Strength setting is kept. |
 | Prompt Style | `in_promptStyle` | Automatic | Which controller's button pictures the menus and HUD show. See [Button prompts](#button-prompts). |
 | Swap Confirm and Back | `in_swapConfirmBack` | Automatic | Which face button confirms in menus. See [Confirm and back](#confirm-and-back). |
+| Button Layout *new* | `in_joystickLayout` | Classic | Rebinds the controller's buttons to a layout. See [Button layouts](#button-layouts). |
+| Trigger Press | `in_joystickTriggerThreshold` | `0.35` | How far a trigger must be pressed to count. |
+| Toggle Crouch *new* | `in_toggleCrouch` | Off | Crouch toggles instead of holding. |
+| Always Run *new* | `in_alwaysRun` | On | Run by default; the Run / walk button walks. |
+| Context Buttons *new* | `in_joystickContextActions` | On | Buttons take the vote, match and quick save commands at the right moment. See [Context buttons](#context-buttons). |
+| Reset Controller *new* | `resetController` | | Restores the controller's buttons and settings. Keyboard and mouse are left alone. |
+| Reset Keyboard and Mouse *new* | `resetKeyboardMouse` | | Restores the keyboard's and mouse's bindings and the mouse settings. The controller is left alone. |
 
-The gyro, touchpad and touchscreen rows are described in [Gyro, touchpad and touchscreen](#gyro-touchpad-and-touchscreen).
+### Stick aim
+
+The **Aim** tab sets how the look stick turns the view. Its right-hand column holds the [gyro and touchpad](#gyro-touchpad-and-touchscreen) settings.
+
+| Menu setting | Console setting | Default | What it does |
+|---|---|---:|---|
+| Response | `in_joystickResponse` | Classic | A preset for the look curve, the dead zones and the turn boost together. **Classic** is how every earlier release aimed. **Precise** has a smaller dead zone and a gentler centre. **Dynamic** adds a fast turn when you hold the stick over. Changing any of those settings afterwards shows **Custom**. |
+| Turn Speed | `in_joystickYawSpeed` | `157.5` | How fast the view turns at full stick, in degrees per second. |
+| Look Up/Down Speed | `in_joystickPitchSpeed` | `157.5` | The same for looking up and down. |
+| Invert Look | `in_joystickInvertLook` | Off | Flips vertical look. It does not affect the menus. |
+| Look Curve | `in_joystickLookCurve` | `1.35` | Higher values make small stick movements gentler for fine aim; full-stick speed is unchanged. |
+| Turn Boost | `in_joystickTurnBoost` | `0` | Extra turn speed, in degrees per second, once the stick has been held fully sideways for a moment. It never applies while zoomed. |
+| Aim Assist | `in_aimAssist` | Off | See [Aim assist](#aim-assist). |
+| Look Stick Dead Zone | `in_joystickLookDeadZone` | `0.18` | How much of the look stick's centre is ignored. |
+| Look Stick Outer Zone | `in_joystickLookOuterDeadZone` | `0` | How much of the look stick's travel at the rim counts as fully over. Raise it if a worn stick no longer reaches full speed. |
+| Move Stick Dead Zone | `in_joystickMoveDeadZone` | `0.18` | How much of the movement stick's centre is ignored. |
+| Move Stick Outer Zone | `in_joystickMoveOuterDeadZone` | `0` | The same at the movement stick's rim. |
+| Move Dead Zone Shape | `in_joystickMoveDeadZoneAxial` | Radial | **Per Axis** keeps you walking in a straight line when the stick wanders slightly sideways. |
+| Move Curve | `in_joystickMoveCurve` | `1.0` | Higher values make slow walking easier near the stick's centre but need more stick travel for full speed. |
+
+Turning speed no longer drops while you walk: only the keyboard's turn keys change with running.
+
+If you upgrade from 0.15.0 or earlier, your **Stick Dead Zone** and **Look Sensitivity** carry over into these settings the first time you start, so your controller feels the same. The old console settings `in_joystickDeadZone` and `in_joystickLookSensitivity` still work: changing one sets both sticks or both speeds.
 
 **Tuning tips:**
 
-- View or movement drifts on its own: raise **Stick Dead Zone** a little.
-- Aim feels sluggish: raise **Look Sensitivity**.
-- Small aim corrections are twitchy: raise **Look Curve** or **Stick Dead Zone**.
-- Full turn speed is hard to reach comfortably: lower **Look Curve** towards `1.0`.
+- View or movement drifts on its own: raise that stick's **Dead Zone** a little.
+- Aim feels sluggish: raise **Turn Speed**, or try **Response → Dynamic**.
+- Small aim corrections are twitchy: raise **Look Curve**, or try **Response → Precise**.
+- Full turn speed is hard to reach: raise **Look Stick Outer Zone**, or lower **Look Curve** towards `1.0`.
 - Triggers fire too easily: raise **Trigger Press**. Triggers feel unresponsive: lower it.
-- Walking slowly is hard: `in_joystickMoveCurve` (default `1.0`, linear) works like Look Curve for movement. Higher values make slow walking easier near the stick's centre but need more stick travel for full speed.
+
+### Aim assist
+
+**Aim Assist** helps stick aim in two ways and no others:
+
+- The stick turns the view more slowly while the crosshair is on or beside an enemy, so a pass across one is easier to stop.
+- While you move a stick, the view follows part of that enemy's own movement, so an enemy strafing past does not slide out from under your crosshair.
+
+It never moves the crosshair onto an enemy, and with both sticks at rest it does nothing. It is for sticks only: the mouse and gyro aiming are never assisted. It ignores allies, corpses and anything behind a wall, and it also steadies the stick over terminals and lift panels.
+
+**Off** is the default. **Low**, **Standard** and **High** are progressively stronger. In multiplayer the server decides how much is allowed (`si_aimAssist`, off by default, and always off in competitive rulesets); your own setting is never raised by a server, only capped.
+
+### More than one controller
+
+Every connected controller is ready to use. With **Active Controller** on **Automatic**, the one in charge is whichever you used last: press a button or push a stick on another and it takes over, with the prompts changing to its buttons. Anything the first controller was holding is released.
+
+Set **Active Controller** to **This Controller** to keep the one in your hands in charge whatever else is connected, for example a Steam Deck with an external pad, or a remapping tool that shows a second, virtual controller. While that controller is unplugged the others work as usual, and it takes charge again when it comes back.
+
+If the controller you are playing with disconnects, single-player pauses on the pause menu, and reconnecting does not resume the game for you. A multiplayer match cannot pause: its HUD tells you until a controller is back.
+
+You get one notice when the controller's battery reaches 15% (**Low Battery Notice** on the **Controller** tab) and one when it starts charging.
+
+`listControllers` lists every connected controller and marks the active one.
+
+### Testing your controller
+
+**Settings → Controls → Controller → Test Controller** opens a panel that shows what the game receives from the controller in use:
+
+- Both sticks, each with a dot where the stick is. The filled circle at the centre is that stick's dead zone and the orange ring near the rim is its outer limit, at the sizes set on **Aim**. A dot that rests outside the filled circle means the stick drifts: raise its dead zone until the dot rests inside.
+- Each trigger's travel as a bar, with a mark at **Trigger Press**.
+- Every button, drawn the way your controller labels it. A button lights while you hold it.
+- The gyro, where the controller has one: a dot that moves as you turn the controller, and whether the gyro is calibrated. The dot moves only while **Gyro** or **Gyro Menu Pointer** is on.
+- The controller's name, whether it is on battery, charging or wired, and its battery level where it reports one.
+
+**Test Rumble** runs each motor the controller has for a moment, one after another: the strong motor, the light motor, then each trigger's motor on controllers that have them. It works whatever **Rumble** is set to. The panel opens with **Test Rumble** selected, so pressing Confirm starts it.
+
+Back closes the panel, so the Back button is the one button it cannot show.
+
+If Steam Input is managing the controller and no gyro or touchpad reaches the game, the panel says so. See the [Steam Deck guide](steam-deck.md).
+
+The first time you connect a kind of controller, two notices in the menus name the settings that choose its button pictures: **Prompt Style** and **Swap Confirm and Back**.
+
+### Button layouts
+
+**Button Layout** rebinds the controller's buttons in one step. It changes nothing until you choose a layout, and it shows **Custom** once you rebind any controller button yourself.
+
+| Layout | What it does |
+|---|---|
+| Classic | The [default buttons](#default-controller-buttons). |
+| Bumper Jumper | Jump on the left bumper and crouch on the right, so both thumbs stay on the sticks. The weapon wheel moves to the bottom face button and Last weapon to the right one. |
+| One-Handed (Left) | Everything on the left half. The left stick looks (Southpaw), the left bumper walks forward while held, the left trigger fires, the left stick click jumps, and the D-pad reloads (up), crouches (down), opens the weapon wheel (left) and zooms (right). View opens the menu. |
+| One-Handed (Right) | Everything on the right half. The right stick looks, the right bumper walks forward while held, the right trigger fires, the right stick click jumps, and the face buttons reload, crouch, zoom and open the weapon wheel. |
+
+The one-handed layouts also turn on **Toggle Crouch** and **Toggle Zoom**, because a thumb on the stick cannot hold another button, and they work well with [gyro aiming](#gyro-touchpad-and-touchscreen) for turning while you walk.
+
+From the console: `controllerLayout classic`, `bumperjumper`, `onehandedleft` or `onehandedright`.
+
+### Context buttons
+
+A controller has fewer buttons than the game has commands. With **Context Buttons** on, a few buttons do something else at the moment it is useful:
+
+| When | Buttons |
+|---|---|
+| A vote is open and you have not voted | D-pad left votes Yes, D-pad right votes No |
+| You hold the scoreboard button (View) in a match | A Ready, X Spectate, Y Chat, B Team chat, RB Buy menu |
+| You hold the objectives button (View) in the campaign | A Quick save, X Quick load |
+| In a match | D-pad up is voice chat; View still shows the scores |
+
+If you bind one of those commands to a controller button of your own, that button is used instead. The letters are the Xbox names; the game shows your controller's own.
+
+### Rumble, triggers and lights
+
+The right-hand column of the **Controller** tab:
+
+| Menu setting | Console setting | Default | What it does |
+|---|---|---:|---|
+| Rumble | `in_joystickRumble` | On | Vibration, on controllers that have it. Off also stops the trigger effects below. |
+| Rumble Strength | `in_joystickRumbleScale` | `1.0` | Vibration strength, `0` to `2`. |
+| Trigger Rumble | `in_joystickTriggerRumble` | On | The trigger you fire with pulses with each shot, on controllers with trigger motors (Xbox One and later). |
+| Adaptive Triggers | `in_joystickAdaptiveTriggers` | On | On a DualSense, the trigger's resistance follows your weapon: light for automatic weapons, firm for the shotgun, launchers and railgun, a hum for the lightning gun and gauntlet. |
+| Directional Hits | `in_joystickDirectionalRumble` | On | A hit rumbles more on the side it came from. |
+| Low Battery Rumble | `in_joystickLowBatteryRumbleThreshold` | `0` (`20` on Steam Deck) | Battery percentage at or below which vibration is limited; `0` never limits it. |
+| Low Battery Cap | `in_joystickLowBatteryRumbleScale` | `0.75` | The most vibration allowed while the battery is low. Your Rumble Strength setting is kept. |
+| Controller Light | `in_joystickLight` | On | The controller's light shows your team in a team match and your health in single-player, green through amber to red. |
+| Player Light | `in_joystickPlayerLight` | On | The controller's player lights show player 1 on the controller in use. |
+| Low Battery Notice | `in_joystickLowBatteryNotice` | `15` | Battery percentage at which you get a notice; `0` never shows one. |
+
+Each of these is used only on controllers that have it.
 
 ### Default controller buttons
 
@@ -144,7 +256,7 @@ Controller buttons have fixed names (`JOY1`, `JOY2` and so on) so bindings work 
 | Top face button (Y, Triangle) | `JOY5` | Flashlight |
 | Left face button (X, Square) | `JOY6` | Reload |
 | Menu (Start, Options, +) | `JOY7` | Menu |
-| View (Back, Select, −) | `JOY8` | Scores or objectives while held |
+| View (Back, Select, −) | `JOY8` | Scores or objectives while held, and the button for [context buttons](#context-buttons) |
 | D-pad up | `JOY9` | Objectives or scores |
 | D-pad down | `JOY10` | Quick-chat wheel (multiplayer) |
 | D-pad right | `JOY11` | Previous weapon |
@@ -170,6 +282,30 @@ Extra buttons on some controllers (`JOY23` to `JOY32`, and `AUX1` to `AUX16` on 
 - The **View** button hides or shows the server details on Join Game. While a dialog or an open list is showing, the Menu and View buttons close that first, as Back does.
 - In a multiplayer match's menu, your bumpers switch tabs. On the Match and Admin pages, the triggers step through the sections.
 - Using the controller hides the mouse pointer and clears the mouse highlight; moving or clicking the mouse brings the pointer back. Navigation follows what is on screen, in either direction, and wraps at the ends.
+
+### Typing with a controller
+
+When you select a text field with a controller, such as a save's name, your player name, a server's address or a password, and press Confirm, an on-screen keyboard appears. On a Steam Deck in game mode, Android and other systems that show their own keyboard, you get that one instead.
+
+| Controller | Does |
+|---|---|
+| D-pad or left stick | Moves between keys |
+| Confirm | Types the selected key |
+| West face button (X on Xbox, Square on PlayStation) | Deletes the character before the caret |
+| North face button (Y, Triangle) | Adds a space |
+| Bumpers | Move the caret left and right |
+| Left trigger | Shift, for the next letter |
+| Right trigger | The next set of characters |
+| Menu / Start | Done |
+| Back | Cancels the edit |
+
+Every function is also a key on the keyboard, and with touch or a mouse you can press the keys directly. The right trigger steps through five sets: Latin letters and digits; accented letters for French, German, Italian, Spanish and Portuguese; accented letters for Polish, Czech, Hungarian and Turkish; Cyrillic for Russian and Ukrainian; and symbols. With the game in Russian or Ukrainian it opens on Cyrillic, and a number field opens on the digits.
+
+**Done** accepts what you typed, exactly as Enter does on a keyboard. On the Save Game page that saves the game under the name.
+
+`ui_onScreenKeyboard` controls it: `1` (default) shows it when you last used a controller or touch and the system has no keyboard of its own, `2` shows it whenever a field is edited, and `0` turns it off.
+
+The in-game chat line and the console still need a keyboard, and this keyboard is part of the new interface only.
 
 ### Confirm and back
 
@@ -221,18 +357,28 @@ Flight sticks and other devices that are not standard gamepads use raw axes. ope
 
 ## Gyro, touchpad and touchscreen
 
-Controllers with motion sensors or a touchpad (PlayStation controllers, Switch Pro controllers, the Steam Deck and others) can aim with gyro and use the touchpad. Set them up on **Settings → Controls → Controller** with the **Gyro**, **Gyro Sensitivity**, **Touchpad Mode**, **Touchpad Sensitivity** and **Touchscreen** rows. The Steam Deck profile turns gyro aiming and the touchpad menu cursor on for you.
+Controllers with motion sensors or a touchpad (PlayStation controllers, Switch Pro controllers, the Steam Deck and others) can aim with gyro and use the touchpad. Set them up in the right-hand column of **Settings → Controls → Aim**. The Steam Deck profile turns gyro aiming and the touchpad menu cursor on for you.
 
-| Console setting | Default | What it does |
-|---|---:|---|
-| `in_gyro` | `0` (`1` on Steam Deck) | Aims with the controller's gyro during play, as if moving a mouse. |
-| `in_gyroSensitivity` | `1.0` (`0.20` on Steam Deck) | Gyro aiming speed, on top of your mouse sensitivity. |
-| `in_gyroDeadZone` | `0.015` | Ignores very small, slow movements. |
-| `in_gyroYawAxis` / `in_gyroPitchAxis` | `2` / `0` | Which sensor axes turn and tilt the view. |
-| `in_gyroInvertYaw` / `in_gyroInvertPitch` | `0` / `0` | Flips gyro turning or tilting if it feels backwards. |
-| `in_touchpadMode` | `0` (`1` on Steam Deck) | `0` Off, `1` Menu Cursor (moves the menu and console pointer), `2` Mouse Look during play, `3` Button Only (no motion, but touchpad clicks still work). |
-| `in_touchpadSensitivity` | `1.0` | Touchpad pointer speed. |
-| `in_touchscreen` | `1` | Taps and drags on a touchscreen work the menus, the console and the loading screen's continue prompt. |
+> In 0.15.0 gyro aiming went through the mouse settings and had only **Gyro** and **Gyro Sensitivity**. The settings below are in the development builds after 0.15.0. If you already aimed with gyro, your speed carries over the first time you start.
+
+| Menu setting | Console setting | Default | What it does |
+|---|---|---:|---|
+| Gyro | `in_gyro` | Off (On on Steam Deck) | Aims with the controller's gyro during play. |
+| Gyro Turn Ratio | `in_gyroYawRatio` | `1.0` | How far the view turns for each degree you turn the controller. `1` is one to one. |
+| Gyro Tilt Ratio | `in_gyroPitchRatio` | `1.0` | The same for looking up and down. |
+| Gyro Turning | `in_gyroSpace` | Player Space | Which movement turns the view. **Yaw**: spinning the controller as if it lay flat on a table. **Roll**: tilting it like a steering wheel. **Player Space**: turning it about the real vertical however you hold it, which suits a tilted handheld; it needs an accelerometer and otherwise acts as Yaw. |
+| Gyro Active | `in_gyroActivation` | Always | When the gyro aims: **Always**; **Off While Held**, which pauses it while you hold the gyro button so you can bring the controller back to centre; **Only While Held**; or **While Zoomed**. Bind the gyro button with `bind <button> _gyro`. |
+| Invert Gyro Turn | `in_gyroInvertYaw` | Off | Flips gyro turning if it feels backwards. |
+| Invert Gyro Tilt | `in_gyroInvertPitch` | Off | Flips gyro looking up and down. |
+| Gyro Tightening | `in_gyroDeadZone` | `0.015` | Scales down very slow movement so a still hand does not drift, while a deliberate slow turn still moves. |
+| (console only) | `in_gyroSmoothing` | `0` | Averages very slow movement to hide sensor noise; faster movement stays direct. `0` is off, and `0.05` is a gentle setting. |
+| Gyro Menu Pointer | `in_gyroMenuPointer` | Off | Moves the menu pointer with the gyro. |
+| Calibrate Gyro | `calibrateGyro` | | Set the controller down, choose this and leave it still for two seconds. Use it if the view drifts with the controller at rest. The game also corrects slowly whenever the controller has been still for a moment, and remembers the result for each controller. |
+| Touchpad Mode | `in_touchpadMode` | Off (Menu Cursor on Steam Deck) | **Off**, **Menu Cursor** (moves the menu and console pointer), **Mouse Look** during play, or **Button Only** (no motion, but touchpad clicks still work). |
+| Touchpad Sensitivity | `in_touchpadSensitivity` | `1.0` | Touchpad pointer speed. |
+| Touchscreen | `in_touchscreen` | On | Taps and drags on a touchscreen work the menus, the console and the loading screen's continue prompt. |
+
+Gyro aiming has its own speed. Mouse Sensitivity, Mouse CPI, Smooth Mouse, View Filter and mouse acceleration no longer change it, and it works with the mouse turned off.
 
 If gyro or the touchpad does nothing, run `listControllers` to see whether the game can see them, and check that Steam Input is not turning them into mouse movement first (see the [Steam Deck guide](steam-deck.md)).
 
@@ -294,7 +440,10 @@ The platform profile is chosen at launch with `+set com_platformProfile steamdec
 | `unbind <key>` | Removes the binding from one key or button. |
 | `unbindall` | Clears every binding. Use with care. |
 | `listBinds` | Prints your current bindings. |
-| `listControllers` | Prints details of connected controllers: type, battery, gyro and touchpad support, touchscreen use, low-battery rumble state and the prompt style. |
+| `listControllers` | Prints every connected controller with the active one marked, and its details: type, battery, gyro and touchpad support, what its motors and lights can do, touchscreen use and the prompt style. |
+| `controllerLayout <name>` | Rebinds the controller's buttons to a [layout](#button-layouts). |
+| `resetController`, `resetKeyboardMouse` | Restore one device's bindings and settings and leave the other alone. |
+| `calibrateGyro` | Measures the gyro's bias: hold the controller still for two seconds. |
 | `writeConfig <filename>` | Saves your current settings and bindings to a `.cfg` file, for a backup. |
 
 ```cfg
@@ -338,6 +487,15 @@ seta in_joystickTriggerThreshold 0.40
 seta in_joystickRumbleScale 0.50
 ```
 
+Gyro aiming at twice the controller's turn, paused while the right bumper is held:
+
+```cfg
+seta in_gyro 1
+seta in_gyroYawRatio 2
+seta in_gyroActivation 1
+bind JOY2 "_gyro"
+```
+
 ## Platform notes
 
 Controller support is first-class in SDL3 builds on Windows, Linux, and macOS. SDL3 is the cross-platform library openQ4 uses for windows, keyboard, mouse and controllers, and the openQ4 downloads are built with it. During play the mouse is captured for raw movement, and on Linux openQ4 asks for unscaled movement where your desktop supports it.
@@ -352,14 +510,18 @@ Builds made with the older native Linux, native macOS or Win32 input paths suppo
 |---|---|
 | Console does not open | Check **Console Access** on **Settings → Game Options → General**, or bind a key to the console on **Settings → Controls**. |
 | Controller is not detected | Make sure **Controller** is on, reconnect the controller, and check whether Steam Input is remapping it. Run `listControllers`. |
-| View or movement drifts | Raise **Stick Dead Zone** until it stops. |
-| Aim is too fast | Lower **Look Sensitivity**; if tiny stick movements are the problem, raise **Look Curve**. |
-| Aim is too slow | Raise **Look Sensitivity**. |
-| Aim is twitchy near the centre | Raise **Look Curve** or **Stick Dead Zone**. |
+| A button, stick or trigger seems not to work | Open **Test Controller** on the **Controller** tab and watch whether the game sees it. |
+| View or movement drifts | Raise that stick's **Dead Zone** on **Aim** until it stops. **Test Controller** shows where the stick rests. |
+| Aim is too fast | Lower **Turn Speed**; if tiny stick movements are the problem, raise **Look Curve**. |
+| Aim is too slow | Raise **Turn Speed**, or try **Response → Dynamic**. |
+| Aim is twitchy near the centre | Raise **Look Curve** or **Look Stick Dead Zone**, or try **Response → Precise**. |
+| The wrong controller is in charge | Press a button on the one you want, or set **Active Controller** to **This Controller**. Run `listControllers`. |
+| The view drifts with gyro on and the controller at rest | Choose **Calibrate Gyro** and leave the controller still for two seconds. |
+| Gyro turns or tilts the wrong way | Turn on **Invert Gyro Turn** or **Invert Gyro Tilt**. |
 | Triggers fire by accident, or feel unresponsive | Raise or lower **Trigger Press**. |
 | No rumble | Turn on **Rumble**, set **Rumble Strength** above `0`, check that the controller can vibrate, and set `s_controllerRumble 1` if it was changed from the console. |
 | Rumble gets weaker at low battery | Raise **Low Battery Cap**, lower **Low Battery Rumble**, or set it to `0` to remove the limit. |
-| Gyro does nothing | Turn on **Gyro**, run `listControllers`, and make sure Steam Input is not hiding the gyro from the game. |
+| Gyro does nothing | Turn on **Gyro**, check **Gyro Active**, run `listControllers`, and make sure Steam Input is not hiding the gyro from the game. |
 | The touchpad moves your aim instead of the menu pointer | Set **Touchpad Mode** to **Menu Cursor** (`in_touchpadMode 1`); use **Mouse Look** only if you want touchpad aiming. Run `listControllers` if the touchpad is not detected. |
 | Vertical look is backwards | Change **Invert Mouse** for the mouse or **Invert Look** for a controller. |
 | A binding change did not stick | Quit the game normally so `openQ4Config.cfg` is saved, or put the binding in `autoexec.cfg`. |

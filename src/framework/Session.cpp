@@ -4366,6 +4366,11 @@ void idSessionLocal::Clear() {
 	retainedGameParent = NULL;
 	retainedGameParentHandle = NULL;
 	guiRetainedControls = NULL;
+	guiOnScreenKeyboard = NULL;
+	oskOwner = NULL;
+	oskLayer = 0;
+	oskShift = false;
+	oskEnding = false;
 	retainedControlsParent = NULL;
 	retainedControlsParentHandle = NULL;
 	retainedControlsCapture = -1;
@@ -5180,6 +5185,8 @@ static void Session_OpenQ4GuiFocus_f( const idCmdArgs &args ) {
 	}
 	common->Printf( "GUI_FOCUS %s\n", report.c_str() );
 }
+
+void Session_OnScreenKeyboard_f( const idCmdArgs &args );	// Session_menu.cpp
 
 static void Session_RetainedGui_f( const idCmdArgs &args ) {
 #ifndef ID_DEDICATED
@@ -9872,8 +9879,12 @@ bool idSessionLocal::ProcessEvent( const sysEvent_t *event ) {
 	// hitting escape anywhere brings up the menu
 	// openQ4: except with the console down, where Escape first puts away the
 	// console (idConsoleLocal::KeyDownEvent); a second press brings up the menu
+	// The controller's Menu button does the same whatever it is bound to, so a
+	// pad can always reach the menu. The View button does not (PAD-06): in play
+	// it follows its binding, the scoreboard or the objectives while held, as
+	// the shipped layout and section 13.5 have it; inside a menu it goes back.
 	if ( !guiActive && !guiTest && !RetainedUI_IsOpen() && event->evType == SE_KEY && event->evValue2 == 1 &&
-		( ( event->evValue == K_ESCAPE && !console->Active() ) || event->evValue == K_JOY7 || event->evValue == K_JOY8 ) ) {
+		( ( event->evValue == K_ESCAPE && !console->Active() ) || event->evValue == K_JOY7 ) ) {
 		console->Close();
 		if (!NativeInput_SessionCurrent()) return true;
 		if ( IsDemoPlaybackActive() ) {
@@ -10652,6 +10663,9 @@ void idSessionLocal::Draw() {
 		guiLoadingHold->Redraw( presentationTime );
 	}
 
+	// the on-screen keyboard stands over whichever screen holds the field it types into
+	DrawOnScreenKeyboard( presentationTime );
+
 	// draw the wipe material on top of this if it hasn't completed yet
 	RetainedUI_Draw();
 	DrawWipeModel();
@@ -11262,6 +11276,7 @@ void idSessionLocal::Init() {
 	cmdSystem->AddCommand( "testGUI", Session_TestGUI_f, CMD_FL_SYSTEM, "tests a gui" );
 #ifndef ID_DEDICATED
 	cmdSystem->AddCommand( "openq4_retainedGui", Session_RetainedGui_f, CMD_FL_SYSTEM, "inspect a normal retained GUI or submit semantic diagnostics without device input" );
+	cmdSystem->AddCommand( "openq4_onScreenKeyboard", Session_OnScreenKeyboard_f, CMD_FL_SYSTEM, "report the on-screen keyboard or press its keys without device input" );
 	cmdSystem->AddCommand( "openq4_summaryChat", Session_SummaryChat_f, CMD_FL_SYSTEM, "type, move the caret in, stop or send the match summary card's chat entry without device input" );
 	cmdSystem->AddCommand( "openq4_system", Session_SystemSettings_f, CMD_FL_SYSTEM, "open, return or inspect the opt-in normal SYSTEM child without device input" );
 	cmdSystem->AddCommand( "ui_retainedStatus", Session_RetainedStatus_f, CMD_FL_SYSTEM, "report the ui_retained gate and the live retained screens" );

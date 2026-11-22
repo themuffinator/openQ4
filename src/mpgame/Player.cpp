@@ -11657,7 +11657,188 @@ void idPlayer::UpdateIntentDir( void ) {
 idPlayer::UpdateHud
 ==============
 */
+/*
+===============
+idPlayer::UpdateControllerState
+
+openQ4 (PAD-08): what the local player's controller shows and feels. Its
+light follows the team in a team match and health in single-player, and a
+DualSense's trigger takes the held weapon's feel: a hum for the lightning gun
+and the gauntlet, firm for the shotgun, the launchers and the railgun, light
+for the rest. The engine decides what the controller can do with it.
+===============
+*/
+void idPlayer::UpdateControllerState( void ) const {
+	if ( gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame ) {
+		return;
+	}
+	int feel = CONTROLLER_FEEL_NONE;
+	if ( !spectating && health > 0 && currentWeapon >= 0 ) {
+		idStr weaponName = spawnArgs.GetString( va( "def_weapon%d", currentWeapon ) );
+		weaponName.ToLower();
+		if ( weaponName.Length() == 0 ) {
+			feel = CONTROLLER_FEEL_NONE;
+		} else if ( weaponName.Find( "lightning" ) >= 0 || weaponName.Find( "gauntlet" ) >= 0 ) {
+			feel = CONTROLLER_FEEL_BEAM;
+		} else if ( weaponName.Find( "shotgun" ) >= 0 || weaponName.Find( "rocket" ) >= 0 || weaponName.Find( "grenade" ) >= 0 ||
+				weaponName.Find( "railgun" ) >= 0 || weaponName.Find( "dmg" ) >= 0 || weaponName.Find( "napalm" ) >= 0 ) {
+			feel = CONTROLLER_FEEL_HEAVY;
+		} else {
+			feel = CONTROLLER_FEEL_LIGHT;
+		}
+	}
+	const bool teamMatch = gameLocal.isMultiplayer && gameLocal.IsTeamGame();
+	sys->ControllerSetPlayerState( feel,
+		gameLocal.isMultiplayer ? -1 : idMath::ClampInt( 0, 100, health ),
+		( teamMatch && !spectating ) ? team : -1 );
+}
+
+/*
+===============
+idPlayer::AimAssistTargets
+
+Whether aim assistance may take the entity as its target: a live opposing
+player in this player's instance who can be seen. Team mates, spectators and
+a player under invisibility never are.
+===============
+*/
+bool idPlayer::AimAssistTargets( idEntity *ent ) const {
+	if ( !ent->IsType( idPlayer::GetClassType() ) ) {
+		return false;
+	}
+	const idPlayer *other = static_cast<const idPlayer *>( ent );
+	if ( other->spectating || other->instance != instance || other->PowerUpActive( POWERUP_INVISIBILITY ) ) {
+		return false;
+	}
+	return !gameLocal.IsTeamGame() || other->team != team;
+}
+
+/*
+===============
+idPlayer::UpdateAimAssist
+
+openQ4 (PAD-03): aim assistance for the local player's controller sticks. The
+target is the live enemy nearest the crosshair, in range and in sight: never
+an ally, a corpse or a scripted actor, and nothing behind a wall. The engine
+gets a speed scale for the stick (also while the crosshair is the cursor of a
+world screen) and a share of the target's motion to follow, and applies both
+to the stick alone, only while a stick moves. See ControllerAimAssist.h.
+===============
+*/
+void idPlayer::UpdateAimAssist( void ) {
+	static openq4::AimAssistTrack track;
+	static float publishedSlow = 1.0f, publishedYaw = 0.0f, publishedPitch = 0.0f;
+	if ( gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame ) {
+		return;
+	}
+
+	int strength = cvarSystem->GetCVarInteger( "in_aimAssist" );
+	if ( gameLocal.isMultiplayer && gameLocal.serverInfo.GetInt( "si_arenaCampaign" ) == 0 ) {
+		// A match: the server allows it up to a cap (si_aimAssist), none by
+		// default, and never under a competitive ruleset. An Arena match is
+		// the single-player campaign's, and the player's choice stands.
+		int cap = gameLocal.serverInfo.GetInt( "si_aimAssist", "0" );
+		if ( idStr::Icmpn( gameLocal.serverInfo.GetString( "g_matchProfile" ), "competitive", 11 ) == 0 ) {
+			cap = 0;
+		}
+		strength = openq4::AimAssistAllowed( strength, cap );
+	}
+	const openq4::AimAssistLevel level = openq4::AimAssistForStrength( strength );
+	const float seconds = MS2SEC( gameLocal.GetMSec() );
+
+	float slow = 1.0f;
+	openq4::AimAssistFollow follow;
+	int targetNumber = -1;
+	float targetYaw = 0.0f, targetPitch = 0.0f;
+	// pm_showAimAssist 1: what was considered, once a second
+	int considered = 0, inReach = 0;
+	const char *blockedBy = "";
+	if ( level.range > 0.0f && !spectating && health > 0 ) {
+		const idVec3 eye = GetEyePosition();
+		const idVec3 forward = viewAngles.ToForward();
+		idEntity *best = NULL;
+		idVec3 bestCenter = vec3_origin;
+		openq4::AimAssistTarget bestTarget;
+		float bestScore = idMath::INFINITY;
+		for ( idEntity *ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
+			if ( ent == this || ent->health <= 0 || ent->IsHidden() || !AimAssistTargets( ent ) ) {
+				continue;
+			}
+			const idBounds &bounds = ent->GetPhysics()->GetAbsBounds();
+			const idVec3 center = bounds.GetCenter();
+			idVec3 toTarget = center - eye;
+			const float distance = toTarget.Normalize();
+			if ( distance < 8.0f || distance > level.range ) {
+				continue;
+			}
+			++considered;
+			const float cosine = toTarget * forward;
+			if ( cosine < 0.9f ) {
+				// more than 25 degrees off the crosshair
+				continue;
+			}
+			const idVec3 size = bounds[1] - bounds[0];
+			openq4::AimAssistTarget target;
+			target.offset = RAD2DEG( idMath::ACos( idMath::ClampFloat( -1.0f, 1.0f, cosine ) ) );
+			target.radius = RAD2DEG( idMath::ATan( ( size.x + size.y + size.z ) / 6.0f, distance ) );
+			target.distance = distance;
+			if ( !openq4::AimAssistInReach( level, target ) ) {
+				continue;
+			}
+			++inReach;
+			const float score = target.offset - target.radius;
+			if ( score < bestScore ) {
+				bestScore = score;
+				best = ent;
+				bestCenter = center;
+				bestTarget = target;
+			}
+		}
+		if ( best != NULL ) {
+			// in sight: the line to its centre reaches it
+			trace_t tr;
+			gameLocal.TracePoint( this, tr, eye, bestCenter, MASK_SHOT_BOUNDINGBOX, this );
+			if ( tr.fraction >= 1.0f || tr.c.entityNum == best->entityNumber ) {
+				const idAngles direction = ( bestCenter - eye ).ToAngles();
+				targetNumber = best->entityNumber;
+				targetYaw = direction.yaw;
+				targetPitch = direction.pitch;
+				slow = openq4::AimAssistSlowdown( level, bestTarget );
+			} else {
+				const idEntity *blocker = gameLocal.entities[ tr.c.entityNum ];
+				blockedBy = blocker != NULL ? blocker->name.c_str() : "the world";
+			}
+		}
+		if ( cvarSystem->GetCVarBool( "pm_showAimAssist" ) && ( gameLocal.framenum % 60 ) == 0 ) {
+			gameLocal.Printf( "aim assist: strength %d, %d enemies in range, %d in reach, target %s (offset %.1f radius %.1f distance %.0f)%s%s, slow %.2f\n",
+				strength, considered, inReach, best != NULL ? best->name.c_str() : "none", bestTarget.offset, bestTarget.radius,
+				bestTarget.distance, blockedBy[0] != '\0' ? ", behind " : "", blockedBy, slow );
+		}
+	}
+	follow = openq4::UpdateAimAssistFollow( track, level, targetNumber, targetYaw, targetPitch, seconds );
+
+	// the crosshair as the cursor of a terminal or a lift panel: steadier
+	if ( focusType == FOCUS_GUI && focusUI != NULL && level.guiSlow < slow ) {
+		slow = level.guiSlow;
+	}
+
+	if ( slow != publishedSlow ) {
+		publishedSlow = slow;
+		cvarSystem->SetCVarFloat( "in_aimAssistSlow", slow );
+	}
+	if ( follow.yaw != publishedYaw ) {
+		publishedYaw = follow.yaw;
+		cvarSystem->SetCVarFloat( "in_aimAssistYaw", follow.yaw );
+	}
+	if ( follow.pitch != publishedPitch ) {
+		publishedPitch = follow.pitch;
+		cvarSystem->SetCVarFloat( "in_aimAssistPitch", follow.pitch );
+	}
+}
+
 void idPlayer::UpdateHud( void ) {
+	UpdateControllerState();
+	UpdateAimAssist();
 	if ( !hud ) {
 		return;
 	}
@@ -14116,14 +14297,23 @@ high-frequency motor, the other hand the heavy low-frequency one, and
 in_joystickRumble turns it off with the sound-driven rumble.
 ===============
 */
-void idPlayer::VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const {
+void idPlayer::VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec, float direction ) const {
 	if ( gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame ) {
 		return;
 	}
 	if ( vrSystem == NULL || !vrSystem->IsActive() ) {
+		if ( weaponHand && otherHand ) {
+			// openQ4 (PAD-08): a hit, felt more on the side it came from
+			sys->ControllerDirectionalPulse( amplitude, direction, durationMsec );
+			return;
+		}
 		const float high = weaponHand ? amplitude : amplitude * 0.5f;
 		const float low = otherHand ? amplitude : amplitude * 0.5f;
 		sys->ControllerRumblePulse( low, high, durationMsec );
+		if ( weaponHand ) {
+			// a shot, or a held weapon's hum, in the firing trigger's own motor
+			sys->ControllerTriggerPulse( amplitude, durationMsec );
+		}
 		return;
 	}
 	vrFrameState_t frame;
@@ -18119,8 +18309,13 @@ void idPlayer::ClientDamageEffects ( const idDict& damageDef, const idVec3& dir,
 			playerView.DamageImpulse( localDir, &damageDef, damage, damageDefName );
 		}
 // RAVEN END
-		// openQ4 VR: a hit shakes both hands, harder for bigger hits
-		VRVibrate( true, true, Min( 1.0f, 0.3f + static_cast<float>( damage ) / 50.0f ), 90 );
+		// openQ4 VR: a hit shakes both hands, harder for bigger hits. On a
+		// gamepad it rumbles more on the side it came from (PAD-08): dir is the
+		// way the damage travelled, so one moving to the player's left came
+		// from the right.
+		const float sideways = idMath::Sqrt( localDir.x * localDir.x + localDir.y * localDir.y );
+		VRVibrate( true, true, Min( 1.0f, 0.3f + static_cast<float>( damage ) / 50.0f ), 90,
+			sideways > 0.001f ? localDir.y / sideways : 0.0f );
 	}
 
 	// Visual effects

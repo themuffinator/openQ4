@@ -39,6 +39,19 @@ idUserInterface* UI_RetainedLoaded(const char* path);
 bool UI_RetainedPrefetchReady(const char* path);
 // Read semantic focus so a refreshed catalog can follow the same entry.
 std::string UI_RetainedFocusedControl(idUserInterface* gui);
+// The focused field's open edit, for the on-screen keyboard (PAD-05): 0 none,
+// 1 a text field, 2 a masked one (a password), 3 a number. `centre` receives
+// the field's vertical centre as a fraction of the view's height.
+int UI_RetainedFieldEdit(idUserInterface* gui, float* centre = nullptr);
+// Whether the pointer stands over a node of this screen.
+bool UI_RetainedPointerOver(idUserInterface* gui, const char* node);
+// The on-screen keyboard's keys on the focused field's open edit: a character
+// (any Unicode scalar value) or an editing command, the calls a real keyboard's
+// events end in. Returns whether the edit took it. UI_RetainedFieldSettled:
+// no committed value of the field is still waiting for its answer.
+enum { UI_FIELD_TYPE = 0, UI_FIELD_BACKSPACE, UI_FIELD_LEFT, UI_FIELD_RIGHT, UI_FIELD_COMMIT, UI_FIELD_CANCEL };
+bool UI_RetainedFieldInput(idUserInterface* gui, int operation, int character);
+bool UI_RetainedFieldSettled(idUserInterface* gui);
 // The right stick's vertical deflection in a retained menu (section 13.5),
 // past the rest zone in -1..1, held for `seconds`: it scrolls the detail area.
 // Whether the area moved.
@@ -56,6 +69,10 @@ class idUserInterfaceRetained final : public idUserInterfaceManaged {
 	friend bool UI_RetainedWarm(idUserInterface*, bool&);
 	friend idUserInterface* UI_RetainedLoaded(const char*);
 	friend std::string UI_RetainedFocusedControl(idUserInterface*);
+	friend int UI_RetainedFieldEdit(idUserInterface*, float*);
+	friend bool UI_RetainedPointerOver(idUserInterface*, const char*);
+	friend bool UI_RetainedFieldInput(idUserInterface*, int, int);
+	friend bool UI_RetainedFieldSettled(idUserInterface*);
 	friend bool UI_RetainedDetailStick(idUserInterface*, float, float);
 public:
 	explicit idUserInterfaceRetained(bool managed = true);

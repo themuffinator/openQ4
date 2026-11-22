@@ -51,6 +51,7 @@ public:
     bool RetainedSubpageEvent(const sysEvent_t*){return false;}
     // So is the CONTROLS page's wait for a key.
     bool RetainedControlsKey(const sysEvent_t*){return false;}
+    bool OnScreenKeyboardEvent(const sysEvent_t*){return false;}
     // So is the multiplayer card, which never covers a menu here.
     idUserInterface* guiRetainedMultiplayer=nullptr;bool RetainedMultiplayerCovers() const{return false;}
     bool RetainedSummaryChatEvent(const sysEvent_t*){return false;}
@@ -89,7 +90,7 @@ public:
     bool retainedDirectBlocked[UB_MAX_BUTTONS]={},nativeUnknownKeyBlocked[K_LAST_KEY]={};
     struct nativeHeldSource_t {std::uint64_t route=0,window=0,device=0;unsigned source=0;int key=0;bool down=false;} nativeHeldSources[512];
     bool nativeSourceExhausted=false;
-    int buttonState[UB_MAX_BUTTONS]={},joystickAxis[8]={};
+    int buttonState[UB_MAX_BUTTONS]={},joystickAxis[8]={},keyAction[K_LAST_KEY]={};
     int inhibitCommands=0,mouseDx=0,mouseDy=0,continuousMouseX=0,continuousMouseY=0,mouseButton=0;
     bool mouseDown=false;usercmd_t cmd;
 } localUsercmdGen;

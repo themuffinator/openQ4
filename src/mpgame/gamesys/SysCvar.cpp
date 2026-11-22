@@ -55,6 +55,10 @@ idCVar si_motd(						"si_motd",					"",					CVAR_GAME | CVAR_SERVERINFO | PC_CVA
 idCVar si_isBuyingEnabled(			"si_isBuyingEnabled",			"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "enable buying in current mode" );
 idCVar si_dropWeaponsInBuyingModes(	"si_dropWeaponsInBuyingModes",	"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "dead players drop weapons, even in Buying game modes" );
 // openQ4: the rules a buying server sells by: 0 Quake 4 (retail), 1 The Awakening (mp/Buying.h)
+// openQ4 (PAD-03): the most controller aim assistance this server allows its
+// players. The player's own in_aimAssist is clamped to it, competitive
+// rulesets allow none whatever it says, and bots never use it.
+idCVar si_aimAssist(				"si_aimAssist",					"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "controller stick aim assistance allowed on this server: 0 none, 1 low, 2 standard, 3 high; never under a competitive ruleset", 0, 3 );
 idCVar si_buyingRules(				"si_buyingRules",				"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "buying rules when si_isBuyingEnabled is set: 0 Quake 4, 1 The Awakening", 0, 1 );
 // RITUAL END
 // RAVEN BEGIN

@@ -3141,6 +3141,10 @@ void idGameLocal::InstanceClear( void ) {
 ====idGameLocal::MapShutdown
 =====*/
 void idGameLocal::MapShutdown( void ) {
+	// openQ4 (PAD-03): no aim assistance outlives the map
+	cvarSystem->SetCVarFloat( "in_aimAssistSlow", 1.0f );
+	cvarSystem->SetCVarFloat( "in_aimAssistYaw", 0.0f );
+	cvarSystem->SetCVarFloat( "in_aimAssistPitch", 0.0f );
 	idSaveGame::ClearDictionaryCache();
 	Printf( "------------ Game Map Shutdown --------------\n" );
 	

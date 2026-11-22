@@ -222,6 +222,11 @@ public:
 
 	static void			SetBinding( int keyNum, const char *binding );
 	static const char *	GetBinding( int keyNum );
+	// openQ4 (PAD-06): the command a controller button takes while a context
+	// is open (a vote, the held scoreboard or objectives), or NULL; and the
+	// layout chooser's upkeep, once a frame.
+	static const char *	ContextBinding( int keyNum );
+	static void			UpdateControllerLayout( void );
 	static bool			UnbindBinding( const char *bind );
 	static int			NumBinds( const char *binding );
 	static bool			ExecKeyBinding( int keyNum );

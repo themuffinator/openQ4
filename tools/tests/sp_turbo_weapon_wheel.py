@@ -41,6 +41,8 @@ HARNESS = r'''
 #include <map>
 #include <string>
 #include <vector>
+#include "@CONTROLLER_LOOK@"
+#include "@CONTROLLER_AIM_ASSIST@"
 struct idMath {
     static int ClampInt(int a,int b,int v){return std::clamp(v,a,b);}
     static int ClampChar(int v){return ClampInt(-128,127,v);}
@@ -69,11 +71,21 @@ struct CVars {
     void SetCVarInteger(const char* n,int v){values[n]=std::to_string(v);}
     void SetCVarBool(const char* n,bool v){SetCVarInteger(n,v);}
     void SetCVarFloat(const char* n,float v){values[n]=std::to_string(v);}
+    struct idCVar* Find(const char* n);
 } vars, *cvarSystem=&vars;
+// A registered cvar, as StickLookRate caches it: absent until a test sets it.
+struct idCVar {std::string name;float GetFloat()const{return vars.GetCVarFloat(name.c_str());}};
+idCVar* CVars::Find(const char* n) {
+    static std::map<std::string,idCVar> found;
+    if(!values.count(n))return nullptr;
+    idCVar& cvar=found[n];cvar.name=n;return &cvar;
+}
 struct idKeyInput {static bool controller;static bool LastInputWasController(){return controller;}static bool LastPointerWasTouch(){return false;}};
 bool idKeyInput::controller=false;
 struct CVar {float v=0; bool GetBool()const{return v!=0;} float GetFloat()const{return v;}};
-CVar g_turboMode, in_angleSpeedKey{1.5f}, in_yawSpeed{140}, in_pitchSpeed{140};
+CVar g_turboMode, in_angleSpeedKey{1.5f}, in_yawSpeed{140}, in_pitchSpeed{140}, in_alwaysRun{1};
+// aim assistance (PAD-03) as the game publishes it: none here
+CVar in_aimAssistSlow{1}, in_aimAssistYaw{0}, in_aimAssistPitch{0};
 struct UserInfo { bool GetBool(const char*)const{return true;} };
 struct Game {bool isMultiplayer=false,isClient=false;int time=1000;UserInfo userInfo[1];float aspect=16.0f/9.0f;float GetScreenAspectRatio()const{return aspect;}} gameLocal;
 struct Common {float seconds=1.0f/60;float GetUserCmdSec()const{return seconds;}
@@ -144,7 +156,7 @@ struct idUserInterface {
     }
 };
 @MENU_OPTION@
-enum {PITCH,YAW,ROLL,AXIS_ROLL=0,AXIS_SIDE,AXIS_FORWARD,AXIS_YAW,AXIS_PITCH,AXIS_UP,UB_STRAFE};
+enum {PITCH,YAW,ROLL,AXIS_ROLL=0,AXIS_SIDE,AXIS_FORWARD,AXIS_YAW,AXIS_PITCH,AXIS_UP,MAX_JOYSTICK_AXIS,UB_STRAFE};
 constexpr int BUTTON_WEAPONWHEEL=512,BUTTON_QUICKCHAT=2048,BUTTON_VRAIM=4096;
 static int Sys_Milliseconds(){return 0;}
 constexpr float JOYSTICK_AXIS_LOOK_SCALE=1.0f/127.0f;
@@ -175,6 +187,10 @@ struct idUsercmdGenLocal {
     bool scoreboardScrolls=false;int scoreboardStickDirection=0,scoreboardStickRepeat=0,scrolled=0;
     bool IsRunButtonActive(){return run;}bool ButtonState(int){return strafe;}
     float GetZoomLookSensitivityScale(){return zoom;}void JoystickMove();
+    openq4::TurnBoostState turnBoost;
+    // no View Filter in this harness: controller look is the plain sum
+    void AddControllerLook(float yaw,float pitch){viewangles[YAW]+=yaw;viewangles[PITCH]+=pitch;}
+    bool StickLookRate(const int axes[MAX_JOYSTICK_AXIS],bool radial,openq4::TurnBoostState& boost,float& yawRate,float& pitchRate);
     bool ScoreboardScrolls(){return scoreboardScrolls;}void ScrollScoreboard(int rows){scrolled+=rows;}
 };
 @JOYSTICK@
@@ -262,7 +278,8 @@ int main() {
         gen.joystickAxis[AXIS_ROLL]=1;gen.joystickAxis[AXIS_SIDE]=127;
         auto sampled=[&](Sint16 x,Sint16 y) {
             SDL3_PublishRadialStick(x,y);
-            SDL3_NormalizeStickAxes(x,y,deadzone,curve,1.0f,gen.joystickAxis[AXIS_SIDE],gen.joystickAxis[AXIS_FORWARD]);
+            openq4::StickShape shape;shape.innerDeadZone=deadzone;shape.curve=curve;
+            SDL3_NormalizeStickAxes(x,y,shape,gen.joystickAxis[AXIS_SIDE],gen.joystickAxis[AXIS_FORWARD]);
             if(inverted)gen.joystickAxis[AXIS_FORWARD]=-gen.joystickAxis[AXIS_FORWARD];
             gen.JoystickMove();player.UpdateWeaponWheelCursor();
         };
@@ -294,7 +311,27 @@ int main() {
         vars.values["com_activeGameModule"]=module;vars.values["in_joystickLookSensitivity"]="0.5";
         idUsercmdGenLocal gen;gen.cmd.buttons=0;
         gen.joystickAxis[AXIS_ROLL]=1;gen.joystickAxis[AXIS_SIDE]=127;common->seconds=1.0f/60;
-        gen.JoystickMove();assert(std::fabs(gen.viewangles[YAW]+140.0f*.5f/60)<.001f);
+        // Look Sensitivity x the turn-key speed x the run scale, walking or not (PAD-02)
+        for(bool run:{false,true}) {
+            idUsercmdGenLocal walking;walking.cmd.buttons=0;walking.run=run;
+            walking.joystickAxis[AXIS_ROLL]=1;walking.joystickAxis[AXIS_SIDE]=127;
+            walking.JoystickMove();assert(std::fabs(walking.viewangles[YAW]+140.0f*.5f*1.5f/60)<.001f);
+        }
+        gen.JoystickMove();assert(std::fabs(gen.viewangles[YAW]+140.0f*.5f*1.5f/60)<.001f);
+        // a look speed in degrees per second replaces the classic product
+        vars.values["in_joystickYawSpeed"]="240";
+        idUsercmdGenLocal explicitSpeed;explicitSpeed.joystickAxis[AXIS_ROLL]=1;explicitSpeed.joystickAxis[AXIS_SIDE]=127;
+        explicitSpeed.JoystickMove();assert(std::fabs(explicitSpeed.viewangles[YAW]+240.0f/60)<.001f);
+        // zoom scales it, and never boosts
+        vars.values["in_joystickTurnBoost"]="200";
+        idUsercmdGenLocal zoomed;zoomed.zoom=.5f;zoomed.joystickAxis[AXIS_ROLL]=1;zoomed.joystickAxis[AXIS_SIDE]=127;
+        for(int i=0;i<120;++i)zoomed.JoystickMove();
+        assert(std::fabs(zoomed.viewangles[YAW]+120.0f*120/60)<.01f);
+        // unzoomed, the boost arrives after the stick is held over
+        idUsercmdGenLocal boosted;boosted.joystickAxis[AXIS_ROLL]=1;boosted.joystickAxis[AXIS_SIDE]=127;
+        for(int i=0;i<120;++i)boosted.JoystickMove();
+        assert(boosted.viewangles[YAW]<-240.0f*120/60-100.0f);
+        vars.values.erase("in_joystickYawSpeed");vars.values["in_joystickTurnBoost"]="0";
     }
     // The quick-chat wheel steers like the weapon wheel: no slow aim, zoom or run.
     {
@@ -353,9 +390,13 @@ def main():
                  function(player, "static void WeaponWheelAdvanceCursor(") + "\n" +
                  function(player, "void idPlayer::UpdateWeaponWheelCursor(") + "\n" +
                  function(player, "int idPlayer::GetClosestAvailableWeaponWheelSlot("),
-        "JOYSTICK": function(read(ROOT / "src/framework/UsercmdGen.cpp"), "void idUsercmdGenLocal::JoystickMove("),
+        "JOYSTICK": "\n".join(function(read(ROOT / "src/framework/UsercmdGen.cpp"), signature) for signature in (
+            "static float Usercmd_ControllerSetting(", "bool idUsercmdGenLocal::StickLookRate(",
+            "void idUsercmdGenLocal::JoystickMove(")),
+        "CONTROLLER_LOOK": (ROOT / "src/framework/ControllerLook.h").as_posix(),
+        "CONTROLLER_AIM_ASSIST": (ROOT / "src/framework/ControllerAimAssist.h").as_posix(),
         "RADIAL": "\n".join(function(read(ROOT / "src/sys/sdl3/sdl3_backend.cpp"), signature) for signature in (
-            "static int SDL3_ClampJoystickValue(", "static float SDL3_ClampRange(", "static float SDL3_ClampUnit(",
+            "static int SDL3_ClampJoystickValue(",
             "static float SDL3_NormalizeSignedAxisFloat(", "static void SDL3_PublishRadialStick(",
             "static int SDL3_AxisFloatToJoystickValue(", "static void SDL3_NormalizeStickAxes(")),
     }

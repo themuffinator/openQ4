@@ -531,6 +531,8 @@ const char *idKeyInput::KeyNumToString( int keynum, bool localized ) {
 idKeyInput::SetBinding
 ===================
 */
+static void Key_NoteLayoutChanged( void );
+
 void idKeyInput::SetBinding( int keynum, const char *binding ) {
 	if ( !Key_IsValidKeyNum( keynum ) ) {
 		return;
@@ -544,6 +546,8 @@ void idKeyInput::SetBinding( int keynum, const char *binding ) {
 
 	// find the action for the async command generation
 	keys[keynum].usercmdAction = usercmdGen->CommandStringUsercmdData( binding );
+	// the layout chooser shows what the buttons are after any rebinding
+	Key_NoteLayoutChanged();
 
 	// consider this like modifying an archived cvar, so the
 	// file write will be triggered at the next oportunity
@@ -574,6 +578,12 @@ int idKeyInput::GetUsercmdAction( int keynum ) {
 		return 0;
 	}
 
+	// openQ4 (PAD-06): a context action takes the button's place
+	const char *context = ContextBinding( keynum );
+	if ( context != NULL ) {
+		return usercmdGen->CommandStringUsercmdData( context );
+	}
+
 	return keys[ keynum ].usercmdAction;
 }
 
@@ -584,6 +594,178 @@ static bool Key_IsControllerKey( int keynum ) {
 
 static bool Key_IsMouseKey( int keynum ) {
 	return keynum >= K_MOUSE1 && keynum <= K_MWHEELUP;
+}
+
+/*
+==============================================================
+
+	Controller context actions (PAD-06)
+
+	The default layout has no button for voting, Ready, spectating, chat,
+	the buy menu, voice chat or quick save and load: there are more commands
+	than buttons. A context gives a few buttons one of those commands while
+	it lasts, without spending a button for good:
+
+	  a vote is open            D-pad left votes Yes, D-pad right votes No
+	  scoreboard held, in a     A Ready, X Spectate, Y Chat, B Team chat,
+	  match                     RB Buy menu
+	  objectives held, in the   A Quick save, X Quick load
+	  campaign
+	  in a match                D-pad up is voice chat, while the View button
+	                            still shows the scores
+
+	A command the player has put on a controller button of their own is left
+	to that button, and in_joystickContextActions 0 turns them all off.
+
+==============================================================
+*/
+
+static idCVar in_joystickContextActions( "in_joystickContextActions", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
+	"controller buttons take the vote, match and quick save commands while a vote is open or the scoreboard or objectives button is held" );
+// The game sets this while a vote is open and this player has not voted.
+static idCVar ui_voteOpen( "ui_voteOpen", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_ROM | CVAR_NOCHEAT,
+	"set by the game while a vote is open and waiting for this player" );
+
+struct keyContextAction_t {
+	int				key;
+	const char *	binding;
+};
+
+static const keyContextAction_t key_voteActions[] = {
+	{ K_JOY12, "_impulse28" },			// D-pad left: vote yes
+	{ K_JOY11, "_impulse29" },			// D-pad right: vote no
+};
+static const keyContextAction_t key_matchActions[] = {
+	{ K_JOY3, "_impulse17" },			// A: ready
+	{ K_JOY6, "_impulse22" },			// X: spectate
+	{ K_JOY5, "clientMessageMode" },	// Y: chat
+	{ K_JOY4, "clientMessageMode 1" },	// B: team chat
+	{ K_JOY2, "buymenu" },				// RB: buy menu
+};
+static const keyContextAction_t key_campaignActions[] = {
+	{ K_JOY3, "savegame quick" },		// A: quick save
+	{ K_JOY6, "loadgame quick" },		// X: quick load
+};
+static const keyContextAction_t key_voiceActions[] = {
+	{ K_JOY9, "_voicechat" },			// D-pad up: voice chat
+};
+
+// A controller button the player bound to the command themselves, or -1.
+static int Key_ControllerKeyFor( const char *binding ) {
+	for ( int i = 0; i < MAX_KEYS; i++ ) {
+		if ( Key_IsControllerKey( i ) && BindingsEquivalent( keys[i].binding.c_str(), binding ) ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+static bool Key_IsScoresBinding( const char *binding ) {
+	return BindingsEquivalent( binding, "_impulse19" ) || BindingsEquivalent( binding, "_showScores" );
+}
+
+// The controller button held for the scoreboard or the objectives, or -1.
+static int Key_HeldScoresKey( void ) {
+	for ( int i = 0; i < MAX_KEYS; i++ ) {
+		if ( keys[i].down && Key_IsControllerKey( i ) && Key_IsScoresBinding( keys[i].binding.c_str() ) ) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+// A second controller button for the scores, so D-pad up can be spared.
+static bool Key_ScoresHasSpareKey( int key ) {
+	if ( !Key_IsValidKeyNum( key ) || !Key_IsScoresBinding( keys[key].binding.c_str() ) ) {
+		return false;
+	}
+	for ( int i = 0; i < MAX_KEYS; i++ ) {
+		if ( i != key && Key_IsControllerKey( i ) && Key_IsScoresBinding( keys[i].binding.c_str() ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static const char *Key_FindContextAction( const keyContextAction_t *actions, int count, int keynum ) {
+	for ( int i = 0; i < count; i++ ) {
+		if ( actions[i].key == keynum && Key_ControllerKeyFor( actions[i].binding ) < 0 ) {
+			return actions[i].binding;
+		}
+	}
+	return NULL;
+}
+
+/*
+===================
+idKeyInput::ContextBinding
+===================
+*/
+const char *idKeyInput::ContextBinding( int keynum ) {
+	if ( !in_joystickContextActions.GetBool() || !Key_IsValidKeyNum( keynum ) || !Key_IsControllerKey( keynum ) ) {
+		return NULL;
+	}
+	const bool match = idAsyncNetwork::IsActive();
+	if ( match && ui_voteOpen.GetBool() ) {
+		const char *vote = Key_FindContextAction( key_voteActions, sizeof( key_voteActions ) / sizeof( key_voteActions[0] ), keynum );
+		if ( vote != NULL ) {
+			return vote;
+		}
+	}
+	const int held = Key_HeldScoresKey();
+	if ( held >= 0 && held != keynum ) {
+		const char *layer = match ?
+			Key_FindContextAction( key_matchActions, sizeof( key_matchActions ) / sizeof( key_matchActions[0] ), keynum ) :
+			Key_FindContextAction( key_campaignActions, sizeof( key_campaignActions ) / sizeof( key_campaignActions[0] ), keynum );
+		if ( layer != NULL ) {
+			return layer;
+		}
+	}
+	if ( match && Key_ScoresHasSpareKey( keynum ) ) {
+		return Key_FindContextAction( key_voiceActions, sizeof( key_voiceActions ) / sizeof( key_voiceActions[0] ), keynum );
+	}
+	return NULL;
+}
+
+// For a prompt: the context button that reaches a command, and the button to
+// hold with it (-1: none), when the player's own bindings give it no
+// controller button. The prompt names the buttons a controller player can press.
+static int Key_ContextKeyForPrompt( const char *bind, int &holdKey ) {
+	holdKey = -1;
+	if ( !in_joystickContextActions.GetBool() || bind == NULL || bind[0] == '\0' ) {
+		return -1;
+	}
+	const bool match = idAsyncNetwork::IsActive();
+	if ( match ) {
+		for ( int i = 0; i < static_cast<int>( sizeof( key_voteActions ) / sizeof( key_voteActions[0] ) ); i++ ) {
+			if ( BindingsEquivalent( key_voteActions[i].binding, bind ) ) {
+				return key_voteActions[i].key;
+			}
+		}
+		for ( int i = 0; i < static_cast<int>( sizeof( key_voiceActions ) / sizeof( key_voiceActions[0] ) ); i++ ) {
+			if ( BindingsEquivalent( key_voiceActions[i].binding, bind ) && Key_ScoresHasSpareKey( key_voiceActions[i].key ) ) {
+				return key_voiceActions[i].key;
+			}
+		}
+	}
+	const keyContextAction_t *layer = match ? key_matchActions : key_campaignActions;
+	const int count = match ? static_cast<int>( sizeof( key_matchActions ) / sizeof( key_matchActions[0] ) ) :
+		static_cast<int>( sizeof( key_campaignActions ) / sizeof( key_campaignActions[0] ) );
+	for ( int i = 0; i < count; i++ ) {
+		if ( BindingsEquivalent( layer[i].binding, bind ) ) {
+			// held with the scores or objectives button: View where it is still bound there
+			for ( int key = 0; key < MAX_KEYS; key++ ) {
+				if ( Key_IsControllerKey( key ) && key != layer[i].key && Key_IsScoresBinding( keys[key].binding.c_str() ) ) {
+					holdKey = key;
+					if ( key == K_JOY8 ) {
+						break;
+					}
+				}
+			}
+			return holdKey >= 0 ? layer[i].key : -1;
+		}
+	}
+	return -1;
 }
 
 static idStr &Key_NextBindingPresentationBuffer( void ) {
@@ -639,6 +821,258 @@ void Key_Unbindall_f( const idCmdArgs &args ) {
 	for ( i = 0; i < MAX_KEYS; i++ ) {
 		idKeyInput::SetBinding( i, "" );
 	}
+}
+
+/*
+==============================================================
+
+	Controller layouts and separate resets (PAD-06)
+
+	default.cfg holds the shipped bindings for every device. Reset Controller
+	and Reset Keyboard and Mouse each restore their own half of it and leave
+	the other half alone; exec default.cfg would reset both, and the player's
+	name with them. The layout presets are small configs of controller binds,
+	applied only when the player chooses one.
+
+==============================================================
+*/
+
+static const char *const key_layoutNames[] = { "custom", "classic", "bumperjumper", "onehandedleft", "onehandedright" };
+static const int KEY_LAYOUT_COUNT = sizeof( key_layoutNames ) / sizeof( key_layoutNames[0] );
+static idCVar in_joystickLayout( "in_joystickLayout", "1", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT,
+	"controller button layout: 1 classic, 2 bumper jumper, 3 one-handed (left), 4 one-handed (right); 0 = custom, shown when the "
+	"buttons match none of them. Choosing one rebinds the controller's buttons.", 0, KEY_LAYOUT_COUNT - 1 );
+static bool key_layoutDirty = true;
+static bool key_layoutReady = false;
+
+static void Key_NoteLayoutChanged( void ) {
+	key_layoutDirty = true;
+}
+
+// The settings a layout or a reset may write besides bindings.
+static bool Key_LayoutMaySet( const char *name ) {
+	return !idStr::Icmp( name, "in_joystickSouthpaw" ) || !idStr::Icmp( name, "in_toggleZoom" ) || !idStr::Icmp( name, "in_toggleCrouch" );
+}
+
+/*
+===================
+Key_ApplyConfigBinds
+
+Runs the bind lines of a config for one device family: the controller's keys,
+or every other key. With settings, the few seta lines a layout may carry are
+run too. With bindings given, nothing is run and the binds are collected
+instead, for comparing a layout with what is bound now.
+===================
+*/
+static bool Key_ApplyConfigBinds( const char *fileName, bool controller, bool settings, idStr *bindings ) {
+	char *buffer = NULL;
+	const int length = fileSystem->ReadFile( fileName, (void **)&buffer, NULL );
+	if ( length < 0 || buffer == NULL ) {
+		return false;
+	}
+	idStr text( buffer, 0, length );
+	fileSystem->FreeFile( buffer );
+	int start = 0;
+	while ( start < text.Length() ) {
+		int end = text.Find( '\n', start );
+		if ( end < 0 ) {
+			end = text.Length();
+		}
+		idStr line = text.Mid( start, end - start );
+		start = end + 1;
+		const int comment = line.Find( "//" );
+		if ( comment >= 0 ) {
+			line.CapLength( comment );
+		}
+		line.StripTrailingWhitespace();
+		idCmdArgs args;
+		args.TokenizeString( line.c_str(), false );
+		if ( args.Argc() >= 3 && !idStr::Icmp( args.Argv( 0 ), "bind" ) ) {
+			const int key = idKeyInput::StringToKeyNum( args.Argv( 1 ) );
+			if ( key < 0 || Key_IsControllerKey( key ) != controller ) {
+				continue;
+			}
+			if ( bindings != NULL ) {
+				bindings[key] = args.Args( 2 );
+			} else {
+				idKeyInput::SetBinding( key, args.Args( 2 ) );
+			}
+		} else if ( settings && bindings == NULL && args.Argc() >= 3 && !idStr::Icmp( args.Argv( 0 ), "seta" ) && Key_LayoutMaySet( args.Argv( 1 ) ) ) {
+			cvarSystem->SetCVarString( args.Argv( 1 ), args.Argv( 2 ) );
+		}
+	}
+	return true;
+}
+
+static const char *Key_LayoutFile( int layout ) {
+	return va( "controller_layout_%s.cfg", key_layoutNames[ layout ] );
+}
+
+static void Key_UnbindFamily( bool controller ) {
+	for ( int i = 0; i < MAX_KEYS; i++ ) {
+		if ( Key_IsControllerKey( i ) == controller && keys[i].binding.Length() > 0 ) {
+			idKeyInput::SetBinding( i, "" );
+		}
+	}
+}
+
+// Classic is the shipped default layout; the others are their own configs.
+static bool Key_LayoutBindings( int layout, idStr *bindings ) {
+	if ( layout == 1 ) {
+		const bool found = Key_ApplyConfigBinds( "default.cfg", true, false, bindings );
+		(void)Key_ApplyConfigBinds( "openq4_defaults.cfg", true, false, bindings );
+		return found;
+	}
+	return Key_ApplyConfigBinds( Key_LayoutFile( layout ), true, false, bindings );
+}
+
+static void Key_ApplyControllerLayout( int layout ) {
+	if ( layout <= 0 || layout >= KEY_LAYOUT_COUNT ) {
+		return;
+	}
+	Key_UnbindFamily( true );
+	if ( layout == 1 ) {
+		(void)Key_ApplyConfigBinds( "default.cfg", true, false, NULL );
+		(void)Key_ApplyConfigBinds( "openq4_defaults.cfg", true, false, NULL );
+	} else if ( !Key_ApplyConfigBinds( Key_LayoutFile( layout ), true, true, NULL ) ) {
+		common->Warning( "controller layout '%s' is missing; restoring the classic layout", key_layoutNames[ layout ] );
+		(void)Key_ApplyConfigBinds( "default.cfg", true, false, NULL );
+	}
+	key_layoutDirty = true;
+	common->Printf( "controller: %s layout\n", key_layoutNames[ layout ] );
+}
+
+// Which layout the controller's buttons are now, or 0 for none of them.
+static int Key_CurrentControllerLayout( void ) {
+	static idStr wanted[MAX_KEYS];
+	for ( int layout = 1; layout < KEY_LAYOUT_COUNT; layout++ ) {
+		for ( int i = 0; i < MAX_KEYS; i++ ) {
+			wanted[i].Clear();
+		}
+		if ( !Key_LayoutBindings( layout, wanted ) ) {
+			continue;
+		}
+		bool same = true;
+		for ( int i = 0; same && i < MAX_KEYS; i++ ) {
+			if ( !Key_IsControllerKey( i ) ) {
+				continue;
+			}
+			same = wanted[i].Length() == 0 ? keys[i].binding.Length() == 0 : BindingsEquivalent( wanted[i].c_str(), keys[i].binding.c_str() );
+		}
+		if ( same ) {
+			return layout;
+		}
+	}
+	return 0;
+}
+
+/*
+===================
+idKeyInput::UpdateControllerLayout
+
+Once a frame. A layout chosen in the menu is applied; after any rebinding the
+chooser shows the layout the buttons now are, or Custom.
+===================
+*/
+void idKeyInput::UpdateControllerLayout( void ) {
+	if ( !key_layoutReady ) {
+		// the first frame after the configs ran: show what the profile has
+		key_layoutReady = true;
+		in_joystickLayout.ClearModified();
+		key_layoutDirty = true;
+	}
+	if ( in_joystickLayout.IsModified() ) {
+		in_joystickLayout.ClearModified();
+		Key_ApplyControllerLayout( in_joystickLayout.GetInteger() );
+	}
+	if ( key_layoutDirty ) {
+		key_layoutDirty = false;
+		const int layout = Key_CurrentControllerLayout();
+		if ( layout != in_joystickLayout.GetInteger() ) {
+			in_joystickLayout.SetInteger( layout );
+		}
+		in_joystickLayout.ClearModified();
+	}
+}
+
+/*
+===================
+Key_ControllerLayout_f
+===================
+*/
+static void Key_ControllerLayout_f( const idCmdArgs &args ) {
+	for ( int layout = 1; layout < KEY_LAYOUT_COUNT; layout++ ) {
+		if ( !idStr::Icmp( args.Argv( 1 ), key_layoutNames[ layout ] ) ) {
+			Key_ApplyControllerLayout( layout );
+			return;
+		}
+	}
+	common->Printf( "usage: controllerLayout <classic|bumperjumper|onehandedleft|onehandedright>\n"
+		"current: %s\n", key_layoutNames[ idMath::ClampInt( 0, KEY_LAYOUT_COUNT - 1, Key_CurrentControllerLayout() ) ] );
+}
+
+// Settings each reset returns to its default. The controller's are every
+// in_joystick*, in_gyro* and in_touchpad* setting and the prompt choices.
+static const char *const key_controllerSettings[] = {
+	"in_joystick", "in_joystickDevice", "in_joystickSouthpaw", "in_joystickDeadZone", "in_joystickLookDeadZone",
+	"in_joystickMoveDeadZone", "in_joystickLookOuterDeadZone", "in_joystickMoveOuterDeadZone", "in_joystickMoveDeadZoneAxial",
+	"in_joystickLookSensitivity", "in_joystickYawSpeed", "in_joystickPitchSpeed", "in_joystickLookCurve", "in_joystickMoveCurve",
+	"in_joystickTurnBoost", "in_joystickTurnBoostRamp", "in_joystickResponse", "in_joystickInvertLook",
+	"in_joystickTriggerThreshold", "in_joystickRumble", "in_joystickRumbleScale", "in_joystickLowBatteryRumbleThreshold",
+	"in_joystickLowBatteryRumbleScale", "in_joystickLowBatteryNotice", "in_joystickTriggerRumble", "in_joystickAdaptiveTriggers",
+	"in_joystickDirectionalRumble", "in_joystickLight", "in_joystickPlayerLight", "in_joystickContextActions",
+	"in_joystickUseDedicatedLookAxes", "in_joystickMoveAxisX", "in_joystickMoveAxisY", "in_joystickLookAxisX",
+	"in_joystickLookAxisY", "in_joystickUpAxis", "in_joystickUpAxisNegative",
+	"in_gyro", "in_gyroSensitivity", "in_gyroYawRatio", "in_gyroPitchRatio", "in_gyroDeadZone", "in_gyroSmoothing",
+	"in_gyroSpace", "in_gyroActivation", "in_gyroMenuPointer", "in_gyroInvertYaw", "in_gyroInvertPitch",
+	"in_touchpadMode", "in_touchpadSensitivity", "in_promptStyle", "in_swapConfirmBack", "in_weaponWheelSensitivity",
+	"in_aimAssist",
+};
+static const char *const key_keyboardMouseSettings[] = {
+	"sensitivity", "m_pitch", "m_yaw", "m_smooth", "m_strafeSmooth", "m_strafeScale", "m_cpi", "m_filter", "m_maxMouseDelta",
+	"cl_mouseAccel", "cl_mouseAccelOffset", "cl_mouseAccelPower", "cl_mouseSensCap", "in_freeLook",
+};
+
+static void Key_ResetSettings( const char *const *names, int count ) {
+	for ( int i = 0; i < count; i++ ) {
+		// a build without the controller layer has no such setting
+		if ( cvarSystem->Find( names[i] ) != NULL ) {
+			cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "reset %s\n", names[i] ) );
+		}
+	}
+}
+
+/*
+===================
+Key_ResetController_f
+
+Reset Controller: the controller's buttons and settings as shipped. Keyboard
+and mouse bindings and settings are left as they are. The measured gyro
+calibrations are kept: they describe the hardware, not a preference.
+===================
+*/
+static void Key_ResetController_f( const idCmdArgs &args ) {
+	(void)args;
+	Key_ResetSettings( key_controllerSettings, sizeof( key_controllerSettings ) / sizeof( key_controllerSettings[0] ) );
+	Key_ApplyControllerLayout( 1 );
+	common->Printf( "controller: bindings and settings reset\n" );
+}
+
+/*
+===================
+Key_ResetKeyboardMouse_f
+
+Reset Keyboard and Mouse: the keyboard's and mouse's bindings and the mouse
+settings as shipped. Controller buttons and settings are left as they are.
+===================
+*/
+static void Key_ResetKeyboardMouse_f( const idCmdArgs &args ) {
+	(void)args;
+	Key_ResetSettings( key_keyboardMouseSettings, sizeof( key_keyboardMouseSettings ) / sizeof( key_keyboardMouseSettings[0] ) );
+	Key_UnbindFamily( false );
+	(void)Key_ApplyConfigBinds( "default.cfg", false, false, NULL );
+	(void)Key_ApplyConfigBinds( "openq4_defaults.cfg", false, false, NULL );
+	common->Printf( "keyboard and mouse: bindings and settings reset\n" );
 }
 
 /*
@@ -768,6 +1202,29 @@ idKeyInput::KeysFromBinding
 returns the localized name of the key for the binding
 ============
 */
+/*
+============
+Key_AppendContextPrompt
+
+openQ4 (PAD-06): the context buttons that reach a command, as a prompt: the
+button to hold, where the context is a held one, then the button itself.
+False where no context gives the command a button.
+============
+*/
+static bool Key_AppendContextPrompt( idStr &keyName, const char *bind, bool emphasized ) {
+	int holdKey = -1;
+	const int contextKey = Key_ContextKeyForPrompt( bind, holdKey );
+	if ( contextKey < 0 ) {
+		return false;
+	}
+	if ( holdKey >= 0 ) {
+		Key_AppendBindingPresentation( keyName, holdKey, emphasized );
+		keyName += " + ";
+	}
+	Key_AppendBindingPresentation( keyName, contextKey, emphasized );
+	return true;
+}
+
 static const char *Key_KeysFromBinding( const char *bind, bool emphasized ) {
 	// GUI text understands ^ikHH as a procedural key presentation, where HH is
 	// the full eight-bit id key number.  ^iKHH carries the same key with the
@@ -808,6 +1265,13 @@ static const char *Key_KeysFromBinding( const char *bind, bool emphasized ) {
 		if ( selected < 0 ) {
 			selected = firstController;
 		}
+	}
+
+	// openQ4 (PAD-06): a controller player with no button of their own for the
+	// command is shown the context buttons that reach it
+	if ( key_lastInputFamily == KEY_INPUT_FAMILY_CONTROLLER && firstController < 0 &&
+			Key_AppendContextPrompt( keyName, bind, emphasized ) ) {
+		return keyName.c_str();
 	}
 
 	if ( selected >= 0 ) {
@@ -1049,6 +1513,17 @@ bool idKeyInput::ExecKeyBinding( int keynum ) {
 		return false;
 	}
 
+	// openQ4 (PAD-06): a context action takes the button's place
+	const char *context = ContextBinding( keynum );
+	if ( context != NULL ) {
+		if ( usercmdGen->CommandStringUsercmdData( context ) ) {
+			return false;
+		}
+		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, context );
+		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "\n" );
+		return true;
+	}
+
 	// commands that are used by the async thread
 	// don't add text
 	if ( keys[keynum].usercmdAction ) {
@@ -1100,6 +1575,9 @@ void idKeyInput::Init( void ) {
 	cmdSystem->AddCommand( "bindunbindtwo", Key_BindUnBindTwo_f, CMD_FL_SYSTEM, "binds a key but unbinds it first if there are more than two binds" );
 	cmdSystem->AddCommand( "unbind", Key_Unbind_f, CMD_FL_SYSTEM, "unbinds any command from a key", idKeyInput::ArgCompletion_KeyName );
 	cmdSystem->AddCommand( "unbindall", Key_Unbindall_f, CMD_FL_SYSTEM, "unbinds any commands from all keys" );
+	cmdSystem->AddCommand( "controllerLayout", Key_ControllerLayout_f, CMD_FL_SYSTEM, "rebinds the controller's buttons to a layout: classic, bumperjumper, onehandedleft or onehandedright" );
+	cmdSystem->AddCommand( "resetController", Key_ResetController_f, CMD_FL_SYSTEM, "restores the controller's shipped bindings and settings; keyboard and mouse are left alone" );
+	cmdSystem->AddCommand( "resetKeyboardMouse", Key_ResetKeyboardMouse_f, CMD_FL_SYSTEM, "restores the keyboard's and mouse's shipped bindings and the mouse settings; the controller is left alone" );
 	cmdSystem->AddCommand( "listBinds", Key_ListBinds_f, CMD_FL_SYSTEM, "lists key bindings" );
 	cmdSystem->AddCommand( "testPromptDevice", Key_TestPromptDevice_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "sets the device prompts name until the next input: controller or desktop" );
 }

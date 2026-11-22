@@ -625,6 +625,8 @@ public:
     int retainedLoadingTip = -1, retainedLoadingTipSlot = 0, retainedLoadingTipAt = 0; void PublishRetainedLoadingTip(bool);
     void BeginRetainedSubpage(idUserInterface*, bool, retainedSubpage_t = RETAINED_SUBPAGE_CAMPAIGN); void UpdateRetainedSubpage();
     bool RetainedSubpageEvent(const sysEvent_t*);
+    // PAD-05: the on-screen keyboard's requests are its own; no page of this harness shows it.
+    idUserInterface* guiOnScreenKeyboard = nullptr; void HandleOnScreenKeyboardRequest(const char*, int) {}
     void PresentRetainedSubpage(bool, retainedSubpage_t); retainedSubpage_t retainedSubpageKind = RETAINED_SUBPAGE_CAMPAIGN;
     // Single Player's Arena sub-page.
     idUserInterface* guiRetainedArena = nullptr; idUserInterface* RetainedArenaPage();
@@ -4687,9 +4689,12 @@ def check_prompt_glyphs(compiler: str, directory: Path) -> None:
     assert 'ui_promptStyle' not in retained, 'the menus take the HUD\'s in_promptStyle'
     assert re.search(r'#if defined\(USE_SDL3\)\n[^#]*int Sys_SDL_GamepadGlyphFamily\(int faceLabels\[4\]\);\n#endif', retained)
     assert 'cvarSystem->GetCVarInteger( "in_promptStyle" )' in function_body(keys, 'bool idKeyInput::MenuConfirmSwapped(')
-    assert 'in_gamepadFamily.SetString(SDL3_GamepadFamily(pad));' in function_body(backend, 'static bool SDL3_OpenGamepad(')
-    assert 'in_gamepadFamily.SetString("generic");' in function_body(backend, 'static bool SDL3_OpenJoystick(')
-    for signature in ('static void SDL3_CloseGamepad(', 'static void SDL3_CloseJoystick('):
+    # PAD-01: the family follows the active controller, and "none" means the
+    # active one went away with no other connected.
+    activate = function_body(backend, 'static void SDL3_ActivateController(')
+    assert 'in_gamepadFamily.SetString(SDL3_GamepadFamily(controller->pad));' in activate
+    assert 'in_gamepadFamily.SetString("generic");' in activate
+    for signature in ('static void SDL3_ApplyControllerChange(', 'static void SDL3_CloseAllControllers('):
         assert 'in_gamepadFamily.SetString("none");' in function_body(backend, signature), signature
     # The adapter publishes before the frame draws, so the frame that follows
     # a change shows it.
@@ -4785,7 +4790,8 @@ def check_prompt_glyphs(compiler: str, directory: Path) -> None:
     # Welcome, summary and buy cards, the Arena pause card and the CONTROLS, GAME
     # OPTIONS, DISPLAY (SYSTEM) and AUDIO sub-pages: 29. The Awakening's pause,
     # Load, Save and Restart pages and its SETTINGS and four sub-pages: 9 more.
-    assert documents == 38, documents
+    # The on-screen keyboard draws the controller's button on each function key (PAD-05): 1.
+    assert documents == 39, documents
     # The cards' and the settings sub-pages' tab keys take the shoulders, as do
     # the Escape, Welcome and buy cards' Tabs prompts, Player Setup's tab strip
     # on the Multiplayer page and Create Server's tab strip (3f3665233): 24, and
@@ -5606,7 +5612,9 @@ def main() -> int:
                        'guis/menu/multiplayer.rui', 'guis/menu/createserver.rui', 'guis/menu/joingame.rui',
                        'guis/menu/arena_pause.rui', 'guis/menu/settings/audio.rui', 'guis/menu/settings/game.rui',
                        'guis/menu/settings/controls.rui', 'guis/menu/settings.rui', 'guis/menu/msgbox.rui',
-                       'guis/menu/mp_buy.rui'}
+                       'guis/menu/mp_buy.rui',
+                       # PAD-05: the on-screen keyboard, shown only over a retained screen's field
+                       'guis/menu/keyboard.rui'}
             assert path in allowed, f'{name} names an ungated retained document {path}'
     # The message box presents the retained pop-up only behind the gate, found
     # through FindRetainedGui; the download progress keeps the stock box.
@@ -5697,7 +5705,25 @@ def main() -> int:
         gated = (ROOT / source).read_text(encoding='utf-8', errors='replace')
         assert gate in gated and 'cvarSystem->Find( "ui_retained" )' in gated, f'{cvar} is not gated on ui_retained'
         assert not re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} has a stock row: drop its exemption'
+    # The controller's Aim, Gyro and Feedback tabs (PAD-01 to PAD-08) are on
+    # the retained page first. The stock page keeps the three controller rows
+    # they refine (Stick Dead Zone, Look Sensitivity and Gyro Sensitivity,
+    # which still set both sticks, both speeds and both ratios) and owes
+    # players a row for each setting named here: the roadmap's PAD rows list
+    # "stock-menu rows" as remaining work. Take a name out when its stock row
+    # lands; a name that already has one fails here.
+    STOCK_ROWS_PENDING = {
+        'in_joystickDevicePin', 'in_joystickLayout', 'in_toggleCrouch', 'in_alwaysRun', 'in_joystickContextActions',
+        'in_joystickResponse', 'in_joystickYawSpeed', 'in_joystickPitchSpeed', 'in_joystickTurnBoost', 'in_aimAssist',
+        'in_joystickLookDeadZone', 'in_joystickLookOuterDeadZone', 'in_joystickMoveDeadZone', 'in_joystickMoveOuterDeadZone',
+        'in_joystickMoveDeadZoneAxial', 'in_joystickMoveCurve', 'in_gyroYawRatio', 'in_gyroPitchRatio', 'in_gyroSpace',
+        'in_gyroActivation', 'in_gyroInvertYaw', 'in_gyroInvertPitch', 'in_gyroDeadZone', 'in_gyroMenuPointer',
+        'in_joystickTriggerRumble', 'in_joystickAdaptiveTriggers', 'in_joystickDirectionalRumble', 'in_joystickLight',
+        'in_joystickPlayerLight', 'in_joystickLowBatteryNotice'}
+    for cvar in sorted(STOCK_ROWS_PENDING):
+        assert not re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} has a stock row: drop it from STOCK_ROWS_PENDING'
     import retained_controls
+    assert STOCK_ROWS_PENDING <= {cvar for cvar, _kind, _extra in retained_controls.setting_rows()}, 'a pending stock row names no retained setting'
     controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.rui').read_text(encoding='utf-8'), flags=re.M))
     # The stock page's mouse and controller rows, with Free Look, Toggle Zoom
     # and Scope Sensitivity, stand on the CONTROLS page's device tabs (issue
@@ -5710,7 +5736,8 @@ def main() -> int:
             action = document['actions'][f'set.{cvar}']
             assert action['operation'] == 'settings.player.set' and action['arguments'] == {'cvar': cvar, 'value': {'input': 'value'}}, cvar
             assert cvar in rules and (kind != 'choice' or not isinstance(extra[1][0], str) or rules[cvar] == list(extra[1])), cvar
-            assert cvar in RETAINED_ONLY_GAME_SETTINGS or re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
+            assert cvar in RETAINED_ONLY_GAME_SETTINGS or cvar in STOCK_ROWS_PENDING or \
+                re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
     # The CONTROLS page: the button's and the multiplayer menu's routes as
     # GAME OPTIONS'; its rows are the stock page's bindings in its order, the
     # session's table follows them; a binding keeps at most two keys, as the
@@ -5744,7 +5771,11 @@ def main() -> int:
     assert {name: action['arguments']['command'] for name, action in controls_document['actions'].items()
             if action['operation'] != 'settings.player.set'} == \
         {'controlsBind': 'controlsBind', 'controlsClear': 'controlsClear', 'controlsTouchLayout': 'controlsTouchLayout',
-         'back': 'controlsBack'}
+         # PAD-06 and PAD-04: each reset restores one device, and the gyro's hold-still calibration
+         'controlsResetController': 'controlsResetController', 'controlsResetKeyboard': 'controlsResetKeyboard',
+         'controlsCalibrateGyro': 'controlsCalibrateGyro',
+         # PAD-07: the CONTROLLER TEST panel's rumble test
+         'controlsRumbleTest': 'controlsRumbleTest', 'back': 'controlsBack'}
     # A new key joins its action's keys through the menus' shared rule, two
     # keys of each device family (idKeyInput::BindForMenu): a keyboard key
     # never clears the action's controller buttons. The stock page binds the

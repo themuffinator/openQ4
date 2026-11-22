@@ -93,7 +93,7 @@ def main() -> None:
         "// 42: durable server MVD publication results for competitive match evidence",
         "append-only MVD result ABI history",
     )
-    require(game_api_h, "GAME_API_VERSION\t\t= 61", "current game-module ABI version")
+    require(game_api_h, "GAME_API_VERSION\t\t= 62", "current game-module ABI version")
 
     forwarding = (
         "multiViewDemo.StartNamedRecording( name )",

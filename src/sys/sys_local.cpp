@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 
 #include "sys_local.h"
+#include "../framework/KeyInput.h"
 
 const char * sysLanguageNames[] = {
 	"english", "spanish", "italian", "german", "french", "russian",
@@ -138,6 +139,67 @@ void Sys_PulseJoystickRumble( float lowFrequency, float highFrequency, int durat
 		sysRumblePulseEnd = end;
 	}
 	Sys_SendMixedJoystickRumble( "pulse" );
+}
+
+/*
+==============================================================
+
+	Haptics beyond the two motors (PAD-08)
+
+==============================================================
+*/
+
+idCVar in_joystickDirectionalRumble( "in_joystickDirectionalRumble", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "a hit rumbles more on the side it came from" );
+
+/*
+==============
+Sys_PulseJoystickRumbleDirected
+
+A hit felt from its side. The heavy low-frequency motor sits in the left grip
+and the light high-frequency one in the right, so a hit from the left keeps
+the left motor whole and quiets the right, and the other way round. A hit
+from straight ahead or behind, or with in_joystickDirectionalRumble off,
+rumbles both alike, as every hit did before.
+==============
+*/
+void Sys_PulseJoystickRumbleDirected( float strength, float direction, int durationMsec ) {
+	float low = strength;
+	float high = strength;
+	if ( in_joystickDirectionalRumble.GetBool() && direction == direction ) {
+		const float side = direction < -1.0f ? -1.0f : ( direction > 1.0f ? 1.0f : direction );
+		if ( side > 0.0f ) {
+			low *= 1.0f - 0.75f * side;
+		} else {
+			high *= 1.0f + 0.75f * side;
+		}
+	}
+	Sys_PulseJoystickRumble( low, high, durationMsec );
+}
+
+/*
+==============
+Sys_PulseJoystickTriggerRumble
+
+A shot in the trigger that fired it: whichever trigger is bound to attack, so
+a player who fires with the left trigger feels it there. Controllers without
+trigger motors, and in_joystickTriggerRumble off, do nothing.
+==============
+*/
+void Sys_PulseJoystickTriggerRumble( float strength, int durationMsec ) {
+	const float level = Sys_ClampRumble( strength );
+	if ( durationMsec <= 0 || level <= SYS_RUMBLE_STOP_THRESHOLD ) {
+		return;
+	}
+	const bool left = idStr::Icmp( idKeyInput::GetBinding( K_JOY16 ), "_attack" ) == 0;
+	const bool right = idStr::Icmp( idKeyInput::GetBinding( K_JOY15 ), "_attack" ) == 0;
+	if ( !left && !right ) {
+		return;
+	}
+	const bool sent = Sys_SetJoystickTriggerRumble( left ? level : 0.0f, right ? level : 0.0f, durationMsec < 2000 ? durationMsec : 2000 );
+	if ( in_joystickRumbleLog.GetBool() ) {
+		common->Printf( "rumble: trigger %s%s %.2f for %d ms, %s\n", left ? "left" : "", right ? "right" : "", level, durationMsec,
+			sent ? "sent" : "not sent" );
+	}
 }
 
 // engine-owned window state; written by the platform window layer, read by

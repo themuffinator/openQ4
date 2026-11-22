@@ -239,7 +239,9 @@ const int MAX_LOGGED_USERCMDS		= 60*60*60;	// one hour of single player, 15 minu
 // undoes (::undo).
 enum {
 	RETAINED_NOTICE_FAVORITE = 1,		// the favorite's star
-	RETAINED_NOTICE_CONTROLLER = 2		// a controller crossed out
+	RETAINED_NOTICE_CONTROLLER = 2,		// a controller crossed out
+	RETAINED_NOTICE_BATTERY = 3,		// a controller: its battery is low, or it started charging
+	RETAINED_NOTICE_NEW_CONTROLLER = 4	// a controller family's first connection: where its prompts are chosen
 };
 enum {
 	RETAINED_NOTICE_UNDO_NONE,
@@ -533,6 +535,15 @@ public:
 							bool persistent );
 	void				ResolveRetainedNotices( int kind );
 	void				UpdateRetainedNotices();
+	void				UpdateControllerNotices();	// openQ4 (PAD-01): pause or HUD notice on loss, battery notices
+	void				UpdateControllerTestPanel();	// openQ4 (PAD-07): the Controls page's live controller state
+	// openQ4 (PAD-05): the on-screen keyboard over the retained screen whose field is being edited
+	idUserInterface *	OnScreenKeyboardOwner();
+	void				UpdateOnScreenKeyboard();
+	void				PublishOnScreenKeyboard();
+	bool				OnScreenKeyboardEvent( const sysEvent_t *event );
+	void				HandleOnScreenKeyboardRequest( const char *request, int key );
+	void				DrawOnScreenKeyboard( int presentationTime );
 	void				HandleRetainedNoticeAction( idUserInterface *gui, int slot );
 	// The stock browser's server tooltip, kept for the hovered row while the
 	// classic main menu runs (idServerScan::GUIUpdateHover).
@@ -953,6 +964,11 @@ public:
 	idUserInterface *	retainedGameParent;			// the screen it returns to, and that screen's handler
 	HandleGuiCommand_t	retainedGameParentHandle;
 	idUserInterface *	guiRetainedControls;		// the retained CONTROLS settings page (NULL until it loads)
+	idUserInterface *	guiOnScreenKeyboard;		// the retained on-screen keyboard (NULL until a field first needs it)
+	idUserInterface *	oskOwner;					// the screen whose field it types into while it shows, else NULL
+	int					oskLayer;					// its layer (OnScreenKeyboard.h)
+	bool				oskShift;					// capitals until the next letter
+	bool				oskEnding;					// DONE committed the field: its edit ends once the commit settles
 	idUserInterface *	retainedControlsParent;		// the screen it returns to, and that screen's handler
 	HandleGuiCommand_t	retainedControlsParentHandle;
 	int					retainedControlsCapture;	// the row waiting for a key, or -1

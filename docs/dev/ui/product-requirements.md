@@ -877,7 +877,7 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **124 partial, 233 pending and 0 verified requirements**, counting the
+There are **126 partial, 231 pending and 0 verified requirements**, counting the
 42 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
@@ -1332,3 +1332,20 @@ a page's scroll out on Back, the high-contrast and power-saving variants and
 the acceptance captures remain. The increment re-binds the retained screens
 notes. All normative requirements, constraints, dependencies, historical rows
 and acceptance gates remain unchanged.
+
+## 22 November 2026: The on-screen keyboard
+
+[The on-screen keyboard](retained-screens.md#the-on-screen-keyboard-22-november-2026)
+adds bounded evidence (`controller-on-screen-keyboard`) to `WID-022` and
+`INP-012`, which move from pending to partial: a retained text or number
+field shows openQ4's own vector keyboard over its screen when its edit opens
+by controller or touch and the platform has no keyboard, with five layers
+covering every shipped language's letters and the specification's controller
+functions, and types UTF-8 into the field. Native tests check the layouts and
+the document; an engine run named and saved a game through its keys without a
+device. Device buttons and touch on the keys, each language's captures,
+composition, `INP-012`'s other clauses and every acceptance gate remain. The
+increment re-binds the retained screens notes, which also record the
+CONTROLLER and AIM tabs and the CONTROLLER TEST panel. All normative
+requirements, constraints, dependencies, historical rows and acceptance gates
+remain unchanged.

@@ -36,11 +36,14 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../sys_public.h"
 #include "../WindowSettings.h"
 #include "../DisplayModeRule.h"
+#include "../ControllerRoster.h"
 #include "../KeyEventMetadata.h"
 #include "../EventQueueContinuity.h"
 #include "InputDisposition.h"
 #include <limits>
 #include "../../framework/Common.h"
+#include "../../framework/ControllerLook.h"
+#include "../../framework/ControllerGyro.h"
 #include "../../framework/Console.h"
 #include "../../framework/FileSystem.h"
 #include "../../framework/licensee.h"
@@ -162,6 +165,18 @@ static SDL_Gamepad *s_sdlGamepad = NULL;
 static SDL_Joystick *s_sdlJoystick = NULL;
 static SDL_JoystickID s_sdlGamepadId = 0;
 static SDL_JoystickID s_sdlJoystickId = 0;
+// openQ4 (PAD-01): every connected controller is open, and the roster decides
+// which one is active. s_sdlGamepad or s_sdlJoystick above is that active
+// device, so the buttons, axes, prompts, rumble, gyro, touchpad and battery all
+// follow it. MP-25's seats build on this table, not on a second one.
+struct sdlController_t {
+	SDL_JoystickID	id;
+	SDL_Gamepad *	pad;		// a mapped gamepad, or
+	SDL_Joystick *	joystick;	// a plain joystick
+};
+static sdlController_t s_controllers[openq4::CONTROLLER_ROSTER_MAX];
+static int s_controllerCount = 0;
+static openq4::ControllerRoster s_controllerRoster;
 static bool s_sdlDiagnosticCommandsRegistered = false;
 static bool s_sdlDisplaySummaryLogged = false;
 static bool s_sdlVideoDriverSummaryLogged = false;
@@ -183,11 +198,48 @@ static idCVar in_gamepadFamily("in_gamepadFamily", "none", CVAR_SYSTEM | CVAR_RO
 	"face layout of the active controller, which the automatic menu confirm follows: none, xbox, playstation, "
 	"nintendo, steamdeck or generic");
 int Sys_SDL_GamepadGlyphFamily(int faceLabels[4]);
+static idCVar in_joystickDevice("in_joystickDevice", "", CVAR_SYSTEM | CVAR_ARCHIVE,
+	"the controller to use: empty = automatic, the last one used; otherwise a device identity from listControllers, "
+	"which keeps charge while that device is connected");
+// The Controller page's device row: Automatic, or keep the controller in use
+// now. It reads and writes in_joystickDevice, which holds the device.
+static idCVar in_joystickDevicePin("in_joystickDevicePin", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_NOCHEAT,
+	"the menu's controller choice: 1 keeps the controller in use now as the one to use (it writes in_joystickDevice), 0 is automatic");
+static idCVar in_joystickLowBatteryNotice("in_joystickLowBatteryNotice", "15", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
+	"controller battery percent at which a notice is shown (0 = never)", 0, 100);
+// What the active controller is, for the menus' and the HUD's notices and the
+// Controller page. CVAR_NOCHEAT for the reason in_gamepadFamily has it.
+static idCVar in_gamepadInstance("in_gamepadInstance", "0", CVAR_SYSTEM | CVAR_ROM | CVAR_NOCHEAT | CVAR_INTEGER,
+	"instance number of the active controller; 0 while there is none");
+static idCVar in_gamepadName("in_gamepadName", "", CVAR_SYSTEM | CVAR_ROM | CVAR_NOCHEAT, "name of the active controller");
+static idCVar in_gamepadCount("in_gamepadCount", "0", CVAR_SYSTEM | CVAR_ROM | CVAR_NOCHEAT | CVAR_INTEGER, "number of connected controllers");
+static idCVar in_gamepadPower("in_gamepadPower", "unknown", CVAR_SYSTEM | CVAR_ROM | CVAR_NOCHEAT,
+	"power state of the active controller: unknown, battery, charging, charged or wired");
+static idCVar in_gamepadBattery("in_gamepadBattery", "-1", CVAR_SYSTEM | CVAR_ROM | CVAR_NOCHEAT | CVAR_INTEGER,
+	"battery percent of the active controller; -1 when it reports none");
+static idCVar in_joystickPowerProbe("in_joystickPowerProbe", "", CVAR_SYSTEM | CVAR_CHEAT,
+	"development probe: the power state the active controller reports, as '<battery|charging|charged|wired> <percent>', "
+	"for the battery notices, which a virtual test controller cannot raise; requires cheats");
 static idCVar in_joystickDeadZone("in_joystickDeadZone", "0.18", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "joystick axis dead zone", 0.0f, 0.95f);
 static idCVar in_joystickTriggerThreshold("in_joystickTriggerThreshold", "0.35", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "trigger button press threshold", 0.0f, 1.0f);
 static idCVar in_joystickLookSensitivity("in_joystickLookSensitivity", "0.75", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "controller look sensitivity scale", 0.1f, 4.0f);
 static idCVar in_joystickLookCurve("in_joystickLookCurve", "1.35", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "controller look response curve", 1.0f, 3.0f);
 static idCVar in_joystickMoveCurve("in_joystickMoveCurve", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "controller movement response curve", 1.0f, 3.0f);
+// openQ4 (PAD-02): each stick has its own inner and outer dead zone. The -1
+// defaults and the 0 speeds are filled in once from in_joystickDeadZone and
+// in_joystickLookSensitivity, the settings every release up to 0.15.0 had, so
+// an existing profile keeps its feel; after that those two set both sticks
+// and both speeds whenever they are changed.
+static idCVar in_joystickLookDeadZone("in_joystickLookDeadZone", "-1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "look stick dead zone at the centre (-1 = take it from in_joystickDeadZone)", -1.0f, 0.95f);
+static idCVar in_joystickMoveDeadZone("in_joystickMoveDeadZone", "-1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "movement stick dead zone at the centre (-1 = take it from in_joystickDeadZone)", -1.0f, 0.95f);
+static idCVar in_joystickLookOuterDeadZone("in_joystickLookOuterDeadZone", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "share of the look stick's travel ignored at the rim, so a worn stick still reaches full speed", 0.0f, 0.5f);
+static idCVar in_joystickMoveOuterDeadZone("in_joystickMoveOuterDeadZone", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "share of the movement stick's travel ignored at the rim, so a worn stick still reaches full speed", 0.0f, 0.5f);
+static idCVar in_joystickMoveDeadZoneAxial("in_joystickMoveDeadZoneAxial", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "movement stick dead zone per axis instead of by distance from the centre: holds a straight line against a stick that wanders sideways");
+static idCVar in_joystickYawSpeed("in_joystickYawSpeed", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "controller turn speed at full stick, in degrees per second (0 = take it from in_joystickLookSensitivity)", 0.0f, 720.0f);
+static idCVar in_joystickPitchSpeed("in_joystickPitchSpeed", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "controller look up and down speed at full stick, in degrees per second (0 = take it from in_joystickLookSensitivity)", 0.0f, 720.0f);
+static idCVar in_joystickTurnBoost("in_joystickTurnBoost", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "extra controller turn speed, in degrees per second, once the look stick is held near full sideways travel; 0 = off; never applied while zoomed", 0.0f, 720.0f);
+static idCVar in_joystickTurnBoostRamp("in_joystickTurnBoostRamp", "0.3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "seconds the turn boost takes to reach in_joystickTurnBoost", 0.0f, 2.0f);
+static idCVar in_joystickResponse("in_joystickResponse", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "controller stick response preset, setting the look curve, the dead zones and the turn boost together: 1 classic, 2 precise, 3 dynamic; 0 = custom, shown after any of them is edited", 0, 3);
 static idCVar in_joystickInvertLook("in_joystickInvertLook", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "invert controller look pitch");
 static idCVar in_joystickSouthpaw("in_joystickSouthpaw", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "swap controller movement and look sticks");
 static idCVar in_joystickUseDedicatedLookAxes("in_joystickUseDedicatedLookAxes", "-1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "raw joystick look axes mode (-1 = auto, 0 = off, 1 = on)", -1, 1);
@@ -199,15 +251,30 @@ static idCVar in_joystickUpAxis("in_joystickUpAxis", "-1", CVAR_SYSTEM | CVAR_AR
 static idCVar in_joystickUpAxisNegative("in_joystickUpAxisNegative", "-1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "raw joystick negative vertical/throttle axis (-1 = auto)", -1, 31);
 static idCVar in_joystickRumble("in_joystickRumble", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "enable controller rumble/haptic feedback");
 static idCVar in_joystickRumbleScale("in_joystickRumbleScale", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "controller rumble strength scale", 0.0f, 2.0f);
+// openQ4 (PAD-08): haptics and lights beyond the two motors, each where the
+// controller has it. The haptic ones answer to in_joystickRumble as well.
+static idCVar in_joystickTriggerRumble("in_joystickTriggerRumble", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "the firing trigger's own motor pulses with each shot, on controllers with trigger motors");
+static idCVar in_joystickAdaptiveTriggers("in_joystickAdaptiveTriggers", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "the trigger's resistance follows the held weapon, on a DualSense");
+static idCVar in_joystickLight("in_joystickLight", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "the controller's light shows your team in multiplayer and your health in single-player");
+static idCVar in_joystickPlayerLight("in_joystickPlayerLight", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "the controller's player lights show player 1 on the controller in use");
 static idCVar in_joystickLowBatteryRumbleThreshold("in_joystickLowBatteryRumbleThreshold", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "controller battery percent where rumble output is capped (0 = disabled)", 0, 100);
 static idCVar in_joystickLowBatteryRumbleScale("in_joystickLowBatteryRumbleScale", "0.75", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "maximum effective controller rumble scale below the low-battery threshold", 0.0f, 2.0f);
-static idCVar in_gyro("in_gyro", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "enable SDL gamepad gyro as mouse-look input");
-static idCVar in_gyroSensitivity("in_gyroSensitivity", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "SDL gamepad gyro mouse-look sensitivity", 0.0f, 8.0f);
-static idCVar in_gyroDeadZone("in_gyroDeadZone", "0.015", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "ignore SDL gamepad gyro rates below this radians-per-second threshold", 0.0f, 2.0f);
-static idCVar in_gyroYawAxis("in_gyroYawAxis", "2", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "SDL gamepad gyro data index used for yaw", 0, 2);
-static idCVar in_gyroPitchAxis("in_gyroPitchAxis", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "SDL gamepad gyro data index used for pitch", 0, 2);
-static idCVar in_gyroInvertYaw("in_gyroInvertYaw", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "invert SDL gamepad gyro yaw");
-static idCVar in_gyroInvertPitch("in_gyroInvertPitch", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "invert SDL gamepad gyro pitch");
+// openQ4 (PAD-04): gyro aims on its own terms. Motion becomes degrees of view
+// by a ratio of its own and never passes through the mouse path, so no mouse
+// setting changes it.
+static idCVar in_gyro("in_gyro", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "aim with the controller's gyro");
+static idCVar in_gyroSensitivity("in_gyroSensitivity", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "the gyro sensitivity of releases up to 0.15.0, relative to the mouse; it sets in_gyroYawRatio and in_gyroPitchRatio when changed", 0.0f, 8.0f);
+static idCVar in_gyroYawRatio("in_gyroYawRatio", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "degrees the view turns for each degree the controller turns (0 = set once from the settings a profile already has)", 0.0f, 20.0f);
+static idCVar in_gyroPitchRatio("in_gyroPitchRatio", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "degrees the view looks up or down for each degree the controller tips (0 = set once from the settings a profile already has)", 0.0f, 20.0f);
+static idCVar in_gyroDeadZone("in_gyroDeadZone", "0.015", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "gyro tightening: motion slower than this, in radians per second, is scaled down in proportion, so a still hand does not drift and a slow turn still moves", 0.0f, 2.0f);
+static idCVar in_gyroSmoothing("in_gyroSmoothing", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "gyro smoothing: motion slower than this, in radians per second, is averaged to hide sensor noise; faster motion stays direct; 0 = off", 0.0f, 0.5f);
+static idCVar in_gyroSpace("in_gyroSpace", "2", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "which controller motion turns the view: 0 yaw (spinning it flat), 1 roll (steering it), 2 player space (turning it about the real vertical however it is held; needs an accelerometer, else yaw)", 0, 2);
+static idCVar in_gyroActivation("in_gyroActivation", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "when the gyro aims: 0 always, 1 paused while the _gyro button is held, 2 only while the _gyro button is held, 3 only while zoomed", 0, 3);
+static idCVar in_gyroMenuPointer("in_gyroMenuPointer", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "move the menu pointer with the controller's gyro");
+static idCVar in_gyroInvertYaw("in_gyroInvertYaw", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "invert gyro turning");
+static idCVar in_gyroInvertPitch("in_gyroInvertPitch", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "invert gyro looking up and down");
+static idCVar in_gyroCalibration("in_gyroCalibration", "", CVAR_SYSTEM | CVAR_ARCHIVE, "measured gyro bias for each controller, written by calibrateGyro and by the correction made while a controller rests");
+static idCVar in_gyroCalibrationState("in_gyroCalibrationState", "0", CVAR_SYSTEM | CVAR_ROM | CVAR_NOCHEAT | CVAR_INTEGER, "the active controller's gyro: 0 no gyro or off, 1 not calibrated, 2 calibrating (hold it still), 3 calibrated");
 static idCVar in_touchpadMode("in_touchpadMode", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "SDL gamepad touchpad mode: 0=off, 1=menu cursor, 2=mouse-look, 3=button-only", 0, 3);
 static idCVar in_touchpadSensitivity("in_touchpadSensitivity", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "SDL gamepad touchpad motion sensitivity", 0.0f, 8.0f);
 static idCVar in_touchscreen("in_touchscreen", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "route SDL touchscreen events to menu and loading UI mouse input");
@@ -338,6 +405,19 @@ static bool s_gamepadButtonsDown[SDL_GAMEPAD_BUTTON_COUNT] = { false };
 static bool s_gamepadLeftTriggerDown = false;
 static bool s_gamepadRightTriggerDown = false;
 static bool s_joystickRumbleActive = false;
+// PAD-08: what the trigger motors last got, what the game last said about the
+// player, and what the active controller's light and triggers last showed.
+static Uint16 s_triggerRumbleLeft = 0;
+static Uint16 s_triggerRumbleRight = 0;
+static int s_triggerRumbleUntilTime = 0;
+static int s_triggerRumbleLastUpdateTime = 0;
+static int s_feedbackFeel = 0;
+static int s_feedbackHealth = -1;
+static int s_feedbackTeam = -1;
+static int s_feedbackStateTime = 0;
+static int s_feedbackSentFeel = -1;
+static int s_feedbackSentColor = -1;
+static int s_feedbackColorTime = 0;
 static Uint16 s_joystickRumbleLow = 0;
 static Uint16 s_joystickRumbleHigh = 0;
 static int s_joystickRumbleUntilTime = 0;
@@ -350,8 +430,28 @@ static bool s_joystickButtonsDown[SDL3_MAX_JOYSTICK_BUTTONS] = { false };
 static Uint8 s_joystickHatState = SDL_HAT_CENTERED;
 static bool s_gamepadGyroEnabled = false;
 static Uint64 s_gamepadGyroLastTimestamp = 0;
-static float s_gamepadGyroRemainderX = 0.0f;
+static float s_gamepadGyroRemainderX = 0.0f;	// the gyro menu pointer's sub-pixel remainders
 static float s_gamepadGyroRemainderY = 0.0f;
+static bool s_gamepadAccelEnabled = false;
+static openq4::GyroCalibration s_gyroCalibration;
+static openq4::GyroFilterState s_gyroFilter;
+static openq4::GyroGravity s_gyroGravity;
+static openq4::GyroVector s_gyroAccel;
+static bool s_gyroHaveAccel = false;
+static char s_gyroIdentity[openq4::CONTROLLER_IDENTITY_CHARS] = { 0 };	// whose calibration is loaded
+// View rotation gyro motion has earned and the usercmd has not taken yet, in
+// degrees. Protected by CRITICAL_SECTION_ONE.
+static float s_gyroLookYaw = 0.0f;
+static float s_gyroLookPitch = 0.0f;
+// The test panel (PAD-07): the gyro's last asked view rate in degrees a
+// second and when, and the rumble test's start (0: none) and running step.
+static float s_gyroTestYaw = 0.0f;
+static float s_gyroTestPitch = 0.0f;
+static int s_gyroTestTime = 0;
+static int s_rumbleTestStart = 0;
+static int s_rumbleTestStep = 0;
+static const int SDL3_RUMBLE_TEST_STEP_MSEC = 600;	// each motor's turn
+static const int SDL3_RUMBLE_TEST_ON_MSEC = 400;	// of which it runs
 static bool s_gamepadTouchpadFingerActive = false;
 static int s_gamepadTouchpadIndex = -1;
 static int s_gamepadTouchpadFinger = -1;
@@ -1681,6 +1781,27 @@ static float SDL3_ClampRumbleScale(float value) {
 
 static SDL_PowerState SDL3_GetControllerPowerInfo(int &percent) {
 	percent = -1;
+	const char *probe = in_joystickPowerProbe.GetString();
+	if (probe[0] != '\0' && (s_sdlGamepad || s_sdlJoystick)) {
+		// in_joystickPowerProbe: "<state> <percent>"
+		idCmdArgs args;
+		args.TokenizeString(probe, false);
+		percent = args.Argc() > 1 ? idMath::ClampInt(0, 100, atoi(args.Argv(1))) : -1;
+		if (!idStr::Icmp(args.Argv(0), "battery")) {
+			return SDL_POWERSTATE_ON_BATTERY;
+		}
+		if (!idStr::Icmp(args.Argv(0), "charging")) {
+			return SDL_POWERSTATE_CHARGING;
+		}
+		if (!idStr::Icmp(args.Argv(0), "charged")) {
+			return SDL_POWERSTATE_CHARGED;
+		}
+		if (!idStr::Icmp(args.Argv(0), "wired")) {
+			return SDL_POWERSTATE_NO_BATTERY;
+		}
+		percent = -1;
+		return SDL_POWERSTATE_UNKNOWN;
+	}
 	if (s_sdlGamepad) {
 		return SDL_GetGamepadPowerInfo(s_sdlGamepad, &percent);
 	}
@@ -1751,45 +1872,47 @@ static int SDL3_AxisFloatToJoystickValue(float value) {
 	return SDL3_ClampJoystickValue(static_cast<int>(roundf(value * 127.0f)));
 }
 
-static void SDL3_NormalizeStickAxes(Sint16 rawX, Sint16 rawY, float deadZone, float curve, float scale, int &outX, int &outY) {
-	const float x = SDL3_NormalizeSignedAxisFloat(rawX);
-	const float y = SDL3_NormalizeSignedAxisFloat(rawY);
-	const float length = sqrtf(x * x + y * y);
-	const float clampedDeadZone = SDL3_ClampRange(deadZone, 0.0f, 0.95f);
-
-	if (length <= clampedDeadZone) {
-		outX = 0;
-		outY = 0;
-		return;
-	}
-
-	const float normalizedLength = (length > 1.0f) ? 1.0f : length;
-	float adjustedLength = (normalizedLength - clampedDeadZone) / (1.0f - clampedDeadZone);
-	adjustedLength = SDL3_ClampUnit(adjustedLength);
-
-	const float responseCurve = SDL3_ClampRange(curve, 1.0f, 3.0f);
-	if (responseCurve != 1.0f && adjustedLength > 0.0f) {
-		adjustedLength = powf(adjustedLength, responseCurve);
-	}
-
-	adjustedLength = SDL3_ClampUnit(adjustedLength * SDL3_ClampRange(scale, 0.1f, 4.0f));
-
-	const float unitScale = adjustedLength / length;
-	outX = SDL3_AxisFloatToJoystickValue(x * unitScale);
-	outY = SDL3_AxisFloatToJoystickValue(y * unitScale);
+// openQ4 (PAD-02): both sticks go through openq4::ShapeStick (ControllerLook.h).
+static float SDL3_StickDeadZone(const idCVar &stick) {
+	const float own = stick.GetFloat();
+	return SDL3_ClampRange(own >= 0.0f ? own : in_joystickDeadZone.GetFloat(), 0.0f, 0.95f);
 }
 
-static int SDL3_NormalizeSignedAxis(Sint16 value, float deadZone) {
-	int x = 0;
-	int y = 0;
-	SDL3_NormalizeStickAxes(value, 0, deadZone, 1.0f, 1.0f, x, y);
-	return x;
+static openq4::StickShape SDL3_MoveStickShape(void) {
+	openq4::StickShape shape;
+	shape.innerDeadZone = SDL3_StickDeadZone(in_joystickMoveDeadZone);
+	shape.outerDeadZone = in_joystickMoveOuterDeadZone.GetFloat();
+	shape.curve = in_joystickMoveCurve.GetFloat();
+	shape.axial = in_joystickMoveDeadZoneAxial.GetBool();
+	return shape;
 }
 
-static int SDL3_NormalizeSignedAxis(Sint16 value, float deadZone, float curve, float scale) {
+static openq4::StickShape SDL3_LookStickShape(void) {
+	openq4::StickShape shape;
+	shape.innerDeadZone = SDL3_StickDeadZone(in_joystickLookDeadZone);
+	shape.outerDeadZone = in_joystickLookOuterDeadZone.GetFloat();
+	shape.curve = in_joystickLookCurve.GetFloat();
+	return shape;
+}
+
+// A throttle or other lone axis: the movement stick's dead zones, no curve.
+static openq4::StickShape SDL3_LoneAxisShape(void) {
+	openq4::StickShape shape = SDL3_MoveStickShape();
+	shape.curve = 1.0f;
+	shape.axial = false;
+	return shape;
+}
+
+static void SDL3_NormalizeStickAxes(Sint16 rawX, Sint16 rawY, const openq4::StickShape &shape, int &outX, int &outY) {
+	const openq4::StickValue shaped = openq4::ShapeStick(SDL3_NormalizeSignedAxisFloat(rawX), SDL3_NormalizeSignedAxisFloat(rawY), shape);
+	outX = SDL3_AxisFloatToJoystickValue(shaped.x);
+	outY = SDL3_AxisFloatToJoystickValue(shaped.y);
+}
+
+static int SDL3_NormalizeSignedAxis(Sint16 value, const openq4::StickShape &shape) {
 	int x = 0;
 	int y = 0;
-	SDL3_NormalizeStickAxes(value, 0, deadZone, curve, scale, x, y);
+	SDL3_NormalizeStickAxes(value, 0, shape, x, y);
 	return x;
 }
 
@@ -1833,7 +1956,7 @@ static Sint16 SDL3_GetJoystickAxisOrZero(int axis) {
 	return axis >= 0 ? SDL_GetJoystickAxis(s_sdlJoystick, axis) : 0;
 }
 
-static void SDL3_NormalizeJoystickAxisPair(int axisX, int axisY, float deadZone, float curve, float scale, int &outX, int &outY) {
+static void SDL3_NormalizeJoystickAxisPair(int axisX, int axisY, const openq4::StickShape &shape, int &outX, int &outY) {
 	outX = 0;
 	outY = 0;
 
@@ -1841,15 +1964,13 @@ static void SDL3_NormalizeJoystickAxisPair(int axisX, int axisY, float deadZone,
 		SDL3_NormalizeStickAxes(
 			SDL3_GetJoystickAxisOrZero(axisX),
 			SDL3_GetJoystickAxisOrZero(axisY),
-			deadZone,
-			curve,
-			scale,
+			shape,
 			outX,
 			outY);
 	} else if (axisX >= 0) {
-		outX = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(axisX), deadZone, curve, scale);
+		outX = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(axisX), shape);
 	} else if (axisY >= 0) {
-		outY = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(axisY), deadZone, curve, scale);
+		outY = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(axisY), shape);
 	}
 }
 
@@ -1949,8 +2070,169 @@ static void SDL3_StopControllerRumble(void) {
 	if (SDL3_HasRumbleTarget()) {
 		(void)SDL3_SendControllerRumble(0, 0, 0);
 	}
+	if (s_sdlGamepad && (s_triggerRumbleLeft != 0 || s_triggerRumbleRight != 0)) {
+		(void)SDL_RumbleGamepadTriggers(s_sdlGamepad, 0, 0, 0);
+	}
+	s_triggerRumbleLeft = 0;
+	s_triggerRumbleRight = 0;
+	s_triggerRumbleUntilTime = 0;
 	SDL3_ResetRumbleState();
 }
+
+static bool SDL3_ActiveGamepadHas(const char *capability) {
+	return s_sdlGamepad != NULL && SDL_GetBooleanProperty(SDL_GetGamepadProperties(s_sdlGamepad), capability, false);
+}
+
+/*
+===============
+SDL3_SendTriggerFeel
+
+A DualSense's adaptive triggers (PAD-08): the trigger's resistance follows
+the held weapon. The 47-byte state is the DualSense output report SDL passes
+through SDL_SendGamepadEffect; bit 0x04 of its first byte writes the right
+trigger's 11-byte effect at offset 10 and bit 0x08 the left trigger's at 21.
+Effect 0x05 clears, 0x01 is resistance from a start position at a force, and
+0x06 is a vibration at a frequency and strength from a start position. Both
+triggers get the weapon's feel; the one not firing is zoom, lighter.
+===============
+*/
+static void SDL3_SendTriggerFeel(int feel) {
+	if (!s_sdlGamepad || SDL_GetRealGamepadType(s_sdlGamepad) != SDL_GAMEPAD_TYPE_PS5) {
+		return;
+	}
+	static const Uint8 effects[4][11] = {
+		{ 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },		// none
+		{ 0x01, 0, 60, 0, 0, 0, 0, 0, 0, 0, 0 },	// light: a little resistance all the way
+		{ 0x01, 0, 160, 0, 0, 0, 0, 0, 0, 0, 0 },	// heavy: firm resistance all the way
+		{ 0x06, 15, 63, 128, 0, 0, 0, 0, 0, 0, 0 },	// beam: resistance and a hum once pulled
+	};
+	static const Uint8 clear[11] = { 0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+	const int index = idMath::ClampInt(0, 3, feel);
+	// the weapon's feel goes on whichever trigger fires; the other is cleared
+	const bool leftFires = idStr::Icmp(idKeyInput::GetBinding(K_JOY16), "_attack") == 0;
+	Uint8 state[47];
+	memset(state, 0, sizeof(state));
+	state[0] = 0x04 | 0x08;
+	memcpy(state + 10, leftFires ? clear : effects[index], 11);
+	memcpy(state + 21, leftFires ? effects[index] : clear, 11);
+	(void)SDL_SendGamepadEffect(s_sdlGamepad, state, sizeof(state));
+}
+
+// Before the active controller stops being it, and when play stops: the
+// triggers go slack.
+static void SDL3_ClearControllerFeedback(void) {
+	if (s_sdlGamepad && s_feedbackSentFeel > 0 && SDL_GamepadConnected(s_sdlGamepad)) {
+		SDL3_SendTriggerFeel(CONTROLLER_FEEL_NONE);
+	}
+	s_feedbackSentFeel = -1;
+	s_feedbackSentColor = -1;
+}
+
+/*
+===============
+SDL3_UpdateControllerFeedback
+
+Once a frame (PAD-08): the active controller's light and trigger feel follow
+what the game last said about the player. The light shows the team in a team
+match, health in single-player (green through amber to red) and openQ4's
+orange otherwise. The trigger feel is the held weapon's during play and
+nothing in a menu, the console or once the game stops saying.
+===============
+*/
+static void SDL3_UpdateControllerFeedback(void) {
+	if (!s_sdlGamepad) {
+		return;
+	}
+	const int now = Sys_Milliseconds();
+	const bool playing = now - s_feedbackStateTime < 500 && !SDL3_ShouldRouteMenuMouse();
+
+	if (in_joystickLight.GetBool() && SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_RGB_LED_BOOLEAN)) {
+		int red = 255, green = 96, blue = 0;
+		if (playing && s_feedbackTeam == 0) {
+			red = 40; green = 255; blue = 40;		// Marine
+		} else if (playing && s_feedbackTeam == 1) {
+			red = 255; green = 60; blue = 0;		// Strogg
+		} else if (playing && s_feedbackHealth >= 0) {
+			const float health = idMath::ClampFloat(0.0f, 1.0f, s_feedbackHealth / 100.0f);
+			red = health >= 0.5f ? static_cast<int>(255.0f * (1.0f - health) * 2.0f) : 255;
+			green = health >= 0.5f ? 255 : static_cast<int>(255.0f * health * 2.0f);
+			// coarse steps: a light that changes with every point of health floods the controller
+			red = (red / 32) * 32;
+			green = (green / 32) * 32;
+			blue = 0;
+		}
+		const int color = (red << 16) | (green << 8) | blue;
+		if (color != s_feedbackSentColor && now - s_feedbackColorTime >= 150) {
+			(void)SDL_SetGamepadLED(s_sdlGamepad, static_cast<Uint8>(red), static_cast<Uint8>(green), static_cast<Uint8>(blue));
+			s_feedbackSentColor = color;
+			s_feedbackColorTime = now;
+		}
+	}
+
+	const int feel = (playing && in_joystick.GetBool() && in_joystickRumble.GetBool() && in_joystickAdaptiveTriggers.GetBool()) ?
+		s_feedbackFeel : CONTROLLER_FEEL_NONE;
+	if (feel != s_feedbackSentFeel) {
+		if (feel != CONTROLLER_FEEL_NONE || s_feedbackSentFeel > 0) {
+			SDL3_SendTriggerFeel(feel);
+		}
+		s_feedbackSentFeel = feel;
+	}
+}
+
+
+/*
+===============
+SDL3_UpdateRumbleTest
+
+Once a frame (PAD-07): the rumble test's steps. Each motor the active
+controller has runs for SDL3_RUMBLE_TEST_ON_MSEC of its turn, strong, light,
+left trigger, right trigger, and the test ends after the last. It drives SDL
+directly: the Rumble switch, its strength and the menus' silence are for play.
+===============
+*/
+static void SDL3_UpdateRumbleTest(void) {
+	if (s_rumbleTestStart == 0) {
+		return;
+	}
+	if (!s_sdlGamepad) {
+		s_rumbleTestStart = 0;
+		s_rumbleTestStep = 0;
+		return;
+	}
+	const bool motors = SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN);
+	const bool triggers = SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_TRIGGER_RUMBLE_BOOLEAN);
+	int steps[4];
+	int count = 0;
+	if (motors) {
+		steps[count++] = 1;
+		steps[count++] = 2;
+	}
+	if (triggers) {
+		steps[count++] = 3;
+		steps[count++] = 4;
+	}
+	const int elapsed = Sys_Milliseconds() - s_rumbleTestStart;
+	const int turn = elapsed / SDL3_RUMBLE_TEST_STEP_MSEC;
+	const bool done = elapsed < 0 || turn >= count;
+	const int step = (!done && elapsed % SDL3_RUMBLE_TEST_STEP_MSEC < SDL3_RUMBLE_TEST_ON_MSEC) ? steps[turn] : 0;
+	if (step != s_rumbleTestStep) {
+		const Uint16 level = 0xA000;
+		if (motors) {
+			(void)SDL_RumbleGamepad(s_sdlGamepad, step == 1 ? level : 0, step == 2 ? level : 0,
+				step == 1 || step == 2 ? SDL3_RUMBLE_TEST_ON_MSEC : 0);
+		}
+		if (triggers) {
+			(void)SDL_RumbleGamepadTriggers(s_sdlGamepad, step == 3 ? level : 0, step == 4 ? level : 0,
+				step == 3 || step == 4 ? SDL3_RUMBLE_TEST_ON_MSEC : 0);
+		}
+		s_rumbleTestStep = step;
+	}
+	if (done) {
+		s_rumbleTestStart = 0;
+		s_rumbleTestStep = 0;
+	}
+}
+
 
 static bool SDL3_ShouldSkipRumbleUpdate(Uint16 low, Uint16 high, int now, int untilTime) {
 	return s_joystickRumbleActive &&
@@ -2027,8 +2309,6 @@ static void SDL3_UpdateGamepadAxes(int eventTime) {
 		return;
 	}
 
-	const float deadZone = SDL3_ClampUnit(in_joystickDeadZone.GetFloat());
-
 	const bool southpaw = in_joystickSouthpaw.GetBool();
 	const SDL_GamepadAxis moveAxisX = southpaw ? SDL_GAMEPAD_AXIS_RIGHTX : SDL_GAMEPAD_AXIS_LEFTX;
 	const SDL_GamepadAxis moveAxisY = southpaw ? SDL_GAMEPAD_AXIS_RIGHTY : SDL_GAMEPAD_AXIS_LEFTY;
@@ -2045,17 +2325,13 @@ static void SDL3_UpdateGamepadAxes(int eventTime) {
 	SDL3_NormalizeStickAxes(
 		SDL_GetGamepadAxis(s_sdlGamepad, moveAxisX),
 		SDL_GetGamepadAxis(s_sdlGamepad, moveAxisY),
-		deadZone,
-		in_joystickMoveCurve.GetFloat(),
-		1.0f,
+		SDL3_MoveStickShape(),
 		moveX,
 		moveY);
 	SDL3_NormalizeStickAxes(
 		rawLookX,
 		rawLookY,
-		deadZone,
-		in_joystickLookCurve.GetFloat(),
-		1.0f,
+		SDL3_LookStickShape(),
 		lookX,
 		lookY);
 
@@ -2089,7 +2365,7 @@ static void SDL3_UpdateJoystickAxes(void) {
 		return;
 	}
 
-	const float deadZone = SDL3_ClampUnit(in_joystickDeadZone.GetFloat());
+	const openq4::StickShape loneAxis = SDL3_LoneAxisShape();
 	const int numAxes = SDL_GetNumJoystickAxes(s_sdlJoystick);
 	int moveAxisX = SDL3_ResolveJoystickAxis(in_joystickMoveAxisX, 0, numAxes);
 	int moveAxisY = SDL3_ResolveJoystickAxis(in_joystickMoveAxisY, 1, numAxes);
@@ -2120,9 +2396,7 @@ static void SDL3_UpdateJoystickAxes(void) {
 	SDL3_NormalizeJoystickAxisPair(
 		moveAxisX,
 		moveAxisY,
-		deadZone,
-		in_joystickMoveCurve.GetFloat(),
-		1.0f,
+		SDL3_MoveStickShape(),
 		moveX,
 		moveY);
 	moveY = -moveY;
@@ -2131,9 +2405,7 @@ static void SDL3_UpdateJoystickAxes(void) {
 		SDL3_NormalizeJoystickAxisPair(
 			lookAxisX,
 			lookAxisY,
-			deadZone,
-			in_joystickLookCurve.GetFloat(),
-			1.0f,
+			SDL3_LookStickShape(),
 			lookX,
 			lookY);
 		if (in_joystickInvertLook.GetBool()) {
@@ -2142,13 +2414,13 @@ static void SDL3_UpdateJoystickAxes(void) {
 	}
 
 	if (upAxis >= 0 && upAxisNegative >= 0 && upAxis != upAxisNegative) {
-		const int upPositive = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(upAxis), deadZone);
-		const int upNegative = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(upAxisNegative), deadZone);
+		const int upPositive = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(upAxis), loneAxis);
+		const int upNegative = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(upAxisNegative), loneAxis);
 		up = SDL3_ClampJoystickValue(upPositive - upNegative);
 	} else if (upAxis >= 0) {
-		up = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(upAxis), deadZone);
+		up = SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(upAxis), loneAxis);
 	} else if (upAxisNegative >= 0) {
-		up = -SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(upAxisNegative), deadZone);
+		up = -SDL3_NormalizeSignedAxis(SDL3_GetJoystickAxisOrZero(upAxisNegative), loneAxis);
 	}
 
 	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
@@ -2163,6 +2435,151 @@ static void SDL3_UpdateJoystickAxes(void) {
 	const int activity = Max(Max(idMath::Abs(moveX), idMath::Abs(moveY)),
 		Max(Max(idMath::Abs(lookX), idMath::Abs(lookY)), idMath::Abs(up)));
 	SDL3_QueueControllerActivity(Sys_Milliseconds(), activity);
+}
+
+/*
+===============
+SDL3_UpdateStickResponseSettings
+
+openQ4 (PAD-02): keeps the stick-response settings consistent, once a frame.
+
+The first call, after the configs have run, fills the per-stick dead zones and
+the look speeds in from the two classic settings, so an existing profile keeps
+its feel and the menus have real values to show. Afterwards the classic
+settings still work as before: changing in_joystickDeadZone sets both sticks,
+and changing in_joystickLookSensitivity sets both look speeds.
+
+Choosing a preset writes its curve, dead zones and boost; editing any of
+those shows Custom (0) when the result matches no preset. Returns whether the
+shaped axes need sampling again.
+===============
+*/
+static bool s_stickResponseReady = false;
+
+static float SDL3_ClassicLookSpeed(const char *turnKeySpeed) {
+	// Full-stick speed through 0.15.0: the turn-key speed x Look Sensitivity x
+	// the run scale, which always-run applied all the time.
+	const float sensitivity = SDL3_ClampRange(in_joystickLookSensitivity.GetFloat(), 0.1f, 4.0f);
+	const float runScale = cvarSystem->GetCVarBool("in_alwaysRun") ? cvarSystem->GetCVarFloat("in_anglespeedkey") : 1.0f;
+	return SDL3_ClampRange(cvarSystem->GetCVarFloat(turnKeySpeed) * sensitivity * runScale, 1.0f, 720.0f);
+}
+
+static openq4::StickResponseValues SDL3_CurrentStickResponse(void) {
+	openq4::StickResponseValues values;
+	values.lookInnerDeadZone = in_joystickLookDeadZone.GetFloat();
+	values.lookOuterDeadZone = in_joystickLookOuterDeadZone.GetFloat();
+	values.moveInnerDeadZone = in_joystickMoveDeadZone.GetFloat();
+	values.moveOuterDeadZone = in_joystickMoveOuterDeadZone.GetFloat();
+	values.lookCurve = in_joystickLookCurve.GetFloat();
+	values.boostSpeed = in_joystickTurnBoost.GetFloat();
+	values.boostRamp = in_joystickTurnBoostRamp.GetFloat();
+	return values;
+}
+
+static bool SDL3_UpdateStickResponseSettings(void) {
+	bool changed = false;
+
+	if (!s_stickResponseReady) {
+		s_stickResponseReady = true;
+		if (in_joystickLookDeadZone.GetFloat() < 0.0f) {
+			in_joystickLookDeadZone.SetFloat(SDL3_ClampRange(in_joystickDeadZone.GetFloat(), 0.0f, 0.95f));
+		}
+		if (in_joystickMoveDeadZone.GetFloat() < 0.0f) {
+			in_joystickMoveDeadZone.SetFloat(SDL3_ClampRange(in_joystickDeadZone.GetFloat(), 0.0f, 0.95f));
+		}
+		if (in_joystickYawSpeed.GetFloat() <= 0.0f) {
+			in_joystickYawSpeed.SetFloat(SDL3_ClassicLookSpeed("in_yawspeed"));
+		}
+		if (in_joystickPitchSpeed.GetFloat() <= 0.0f) {
+			in_joystickPitchSpeed.SetFloat(SDL3_ClassicLookSpeed("in_pitchspeed"));
+		}
+		changed = true;
+	} else {
+		if (in_joystickDeadZone.IsModified()) {
+			const float deadZone = SDL3_ClampRange(in_joystickDeadZone.GetFloat(), 0.0f, 0.95f);
+			in_joystickLookDeadZone.SetFloat(deadZone);
+			in_joystickMoveDeadZone.SetFloat(deadZone);
+			changed = true;
+		}
+		if (in_joystickLookSensitivity.IsModified()) {
+			in_joystickYawSpeed.SetFloat(SDL3_ClassicLookSpeed("in_yawspeed"));
+			in_joystickPitchSpeed.SetFloat(SDL3_ClassicLookSpeed("in_pitchspeed"));
+			changed = true;
+		}
+		if (in_joystickResponse.IsModified()) {
+			openq4::StickResponseValues preset;
+			if (openq4::StickResponsePresetValues(in_joystickResponse.GetInteger(), preset)) {
+				in_joystickLookDeadZone.SetFloat(preset.lookInnerDeadZone);
+				in_joystickLookOuterDeadZone.SetFloat(preset.lookOuterDeadZone);
+				in_joystickMoveDeadZone.SetFloat(preset.moveInnerDeadZone);
+				in_joystickMoveOuterDeadZone.SetFloat(preset.moveOuterDeadZone);
+				in_joystickLookCurve.SetFloat(preset.lookCurve);
+				in_joystickTurnBoost.SetFloat(preset.boostSpeed);
+				in_joystickTurnBoostRamp.SetFloat(preset.boostRamp);
+			}
+			changed = true;
+		}
+		if (in_joystickLookDeadZone.GetFloat() < 0.0f || in_joystickMoveDeadZone.GetFloat() < 0.0f) {
+			// reset to the default by a console reset or Load Defaults: take the classic value again
+			const float deadZone = SDL3_ClampRange(in_joystickDeadZone.GetFloat(), 0.0f, 0.95f);
+			if (in_joystickLookDeadZone.GetFloat() < 0.0f) {
+				in_joystickLookDeadZone.SetFloat(deadZone);
+			}
+			if (in_joystickMoveDeadZone.GetFloat() < 0.0f) {
+				in_joystickMoveDeadZone.SetFloat(deadZone);
+			}
+			changed = true;
+		}
+		if (in_joystickYawSpeed.GetFloat() <= 0.0f) {
+			in_joystickYawSpeed.SetFloat(SDL3_ClassicLookSpeed("in_yawspeed"));
+			changed = true;
+		}
+		if (in_joystickPitchSpeed.GetFloat() <= 0.0f) {
+			in_joystickPitchSpeed.SetFloat(SDL3_ClassicLookSpeed("in_pitchspeed"));
+			changed = true;
+		}
+		changed = changed || in_joystickLookDeadZone.IsModified() || in_joystickMoveDeadZone.IsModified() ||
+			in_joystickLookOuterDeadZone.IsModified() || in_joystickMoveOuterDeadZone.IsModified() ||
+			in_joystickMoveDeadZoneAxial.IsModified() || in_joystickLookCurve.IsModified() ||
+			in_joystickYawSpeed.IsModified() || in_joystickPitchSpeed.IsModified() ||
+			in_joystickTurnBoost.IsModified() || in_joystickTurnBoostRamp.IsModified();
+	}
+
+	if (!changed) {
+		return false;
+	}
+
+	in_joystickResponse.SetInteger(openq4::StickResponsePresetFor(SDL3_CurrentStickResponse()));
+
+	// The classic settings follow where one value can still say it: the dead
+	// zone while both sticks agree, Look Sensitivity for the turn speed.
+	if (openq4::StickResponseNear(in_joystickLookDeadZone.GetFloat(), in_joystickMoveDeadZone.GetFloat()) &&
+			!openq4::StickResponseNear(in_joystickDeadZone.GetFloat(), in_joystickLookDeadZone.GetFloat())) {
+		in_joystickDeadZone.SetFloat(in_joystickLookDeadZone.GetFloat());
+	}
+	const float turnKeySpeed = cvarSystem->GetCVarFloat("in_yawspeed") *
+		(cvarSystem->GetCVarBool("in_alwaysRun") ? cvarSystem->GetCVarFloat("in_anglespeedkey") : 1.0f);
+	if (turnKeySpeed > 0.0f) {
+		const float sensitivity = SDL3_ClampRange(in_joystickYawSpeed.GetFloat() / turnKeySpeed, 0.1f, 4.0f);
+		if (fabsf(sensitivity - in_joystickLookSensitivity.GetFloat()) > 0.0005f) {
+			in_joystickLookSensitivity.SetFloat(sensitivity);
+		}
+	}
+
+	in_joystickDeadZone.ClearModified();
+	in_joystickLookSensitivity.ClearModified();
+	in_joystickResponse.ClearModified();
+	in_joystickLookDeadZone.ClearModified();
+	in_joystickMoveDeadZone.ClearModified();
+	in_joystickLookOuterDeadZone.ClearModified();
+	in_joystickMoveOuterDeadZone.ClearModified();
+	in_joystickMoveDeadZoneAxial.ClearModified();
+	in_joystickLookCurve.ClearModified();
+	in_joystickYawSpeed.ClearModified();
+	in_joystickPitchSpeed.ClearModified();
+	in_joystickTurnBoost.ClearModified();
+	in_joystickTurnBoostRamp.ClearModified();
+	return true;
 }
 
 static void SDL3_SetJoystickHat(Uint8 newHat, int eventTime) {
@@ -2225,55 +2642,45 @@ static void SDL3_ReleaseJoystickState(int eventTime) {
 	SDL3_SetJoystickHat(SDL_HAT_CENTERED, eventTime);
 }
 
-static void SDL3_CloseGamepad(int eventTime) {
-	if (!s_sdlGamepad) {
+/*
+===============
+SDL3_DeactivateController
+
+The active controller stops being it (PAD-01): its rumble stops and every
+button, trigger and axis it held releases, so nothing stays down across a
+handover or a loss. The device stays open; closing is SDL3_CloseController's.
+===============
+*/
+static void SDL3_DeactivateController(int eventTime) {
+	if (!s_sdlGamepad && !s_sdlJoystick) {
 		return;
 	}
 
 	SDL3_StopControllerRumble();
-	SDL3_ReleaseGamepadState(eventTime);
-	if (s_gamepadGyroEnabled) {
-		(void)SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_GYRO, false);
+	SDL3_ClearControllerFeedback();
+	if (s_sdlGamepad) {
+		SDL3_ReleaseGamepadState(eventTime);
+		if (in_joystickPlayerLight.GetBool() && SDL_GamepadConnected(s_sdlGamepad)) {
+			(void)SDL_SetGamepadPlayerIndex(s_sdlGamepad, -1);
+		}
+		if (s_gamepadGyroEnabled) {
+			(void)SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_GYRO, false);
+		}
+		if (s_gamepadAccelEnabled) {
+			(void)SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_ACCEL, false);
+		}
+	} else {
+		SDL3_ReleaseJoystickState(eventTime);
 	}
-	SDL_CloseGamepad(s_sdlGamepad);
 	s_sdlGamepad = NULL;
 	s_sdlGamepadId = 0;
-	in_gamepadFamily.SetString("none");
+	s_sdlJoystick = NULL;
+	s_sdlJoystickId = 0;
 	s_gamepadGyroEnabled = false;
+	s_gamepadAccelEnabled = false;
 	s_gamepadGyroLastTimestamp = 0;
 	s_gamepadTouchpadFingerActive = false;
 	SDL3_ClearJoystickState();
-}
-
-static void SDL3_CloseJoystick(int eventTime) {
-	if (!s_sdlJoystick) {
-		return;
-	}
-
-	SDL3_StopControllerRumble();
-	SDL3_ReleaseJoystickState(eventTime);
-	SDL_CloseJoystick(s_sdlJoystick);
-	s_sdlJoystick = NULL;
-	s_sdlJoystickId = 0;
-	in_gamepadFamily.SetString("none");
-	SDL3_ClearJoystickState();
-}
-
-static int SDL3_ClampSensorAxisIndex(int axis) {
-	if (axis < 0) {
-		return 0;
-	}
-	if (axis > 2) {
-		return 2;
-	}
-	return axis;
-}
-
-static float SDL3_ApplyDeadZone(float value, float deadZone) {
-	if (fabsf(value) < deadZone) {
-		return 0.0f;
-	}
-	return value;
 }
 
 static Uint64 SDL3_GamepadSensorTimestamp(const SDL_GamepadSensorEvent &event) {
@@ -2283,35 +2690,168 @@ static Uint64 SDL3_GamepadSensorTimestamp(const SDL_GamepadSensorEvent &event) {
 	return event.timestamp;
 }
 
-static void SDL3_UpdateGamepadSensorState(bool logCapabilities) {
-	s_gamepadGyroEnabled = false;
+static sdlController_t *SDL3_FindController(SDL_JoystickID id);
+static void SDL3_ControllerIdentity(const sdlController_t &controller, char *identity, int identitySize);
+
+/*
+===============
+Gyro calibration storage
+
+in_gyroCalibration holds "<identity>,<x>,<y>,<z>" for up to eight
+controllers, newest first, separated by semicolons: the bias each one's gyro
+reports at rest, in radians per second.
+===============
+*/
+static const int SDL3_MAX_GYRO_CALIBRATIONS = 8;
+
+static bool SDL3_ParseGyroCalibration(const idStr &entry, idStr &identity, openq4::GyroVector &offset) {
+	idStr fields[4];
+	int field = 0;
+	int start = 0;
+	for (int i = 0; i <= entry.Length() && field < 4; ++i) {
+		if (i == entry.Length() || entry[i] == ',') {
+			fields[field++] = entry.Mid(start, i - start);
+			start = i + 1;
+		}
+	}
+	if (field != 4 || fields[0].Length() == 0) {
+		return false;
+	}
+	identity = fields[0];
+	offset.x = static_cast<float>(atof(fields[1].c_str()));
+	offset.y = static_cast<float>(atof(fields[2].c_str()));
+	offset.z = static_cast<float>(atof(fields[3].c_str()));
+	return openq4::GyroFinite(offset) && openq4::GyroLength(offset) < 1.0f;
+}
+
+static bool SDL3_FindGyroCalibration(const char *wanted, openq4::GyroVector &offset) {
+	const idStr stored = in_gyroCalibration.GetString();
+	int start = 0;
+	while (start < stored.Length()) {
+		int end = stored.Find(';', start);
+		if (end < 0) {
+			end = stored.Length();
+		}
+		idStr identity;
+		openq4::GyroVector entryOffset;
+		if (SDL3_ParseGyroCalibration(stored.Mid(start, end - start), identity, entryOffset) && identity == wanted) {
+			offset = entryOffset;
+			return true;
+		}
+		start = end + 1;
+	}
+	return false;
+}
+
+static void SDL3_StoreGyroCalibration(const char *identity, const openq4::GyroVector &offset) {
+	if (identity[0] == '\0' || strchr(identity, ',') != NULL || strchr(identity, ';') != NULL) {
+		return;
+	}
+	openq4::GyroVector storedOffset;
+	if (SDL3_FindGyroCalibration(identity, storedOffset) &&
+			fabsf(storedOffset.x - offset.x) < 0.002f && fabsf(storedOffset.y - offset.y) < 0.002f &&
+			fabsf(storedOffset.z - offset.z) < 0.002f) {
+		// the stored value is as good; do not rewrite the config for sensor noise
+		return;
+	}
+	idStr updated = va("%s,%.4f,%.4f,%.4f", identity, offset.x, offset.y, offset.z);
+	const idStr stored = in_gyroCalibration.GetString();
+	int kept = 1;
+	int start = 0;
+	while (start < stored.Length() && kept < SDL3_MAX_GYRO_CALIBRATIONS) {
+		int end = stored.Find(';', start);
+		if (end < 0) {
+			end = stored.Length();
+		}
+		const idStr entry = stored.Mid(start, end - start);
+		idStr entryIdentity;
+		openq4::GyroVector entryOffset;
+		if (SDL3_ParseGyroCalibration(entry, entryIdentity, entryOffset) && entryIdentity != identity) {
+			updated += ";";
+			updated += entry;
+			++kept;
+		}
+		start = end + 1;
+	}
+	in_gyroCalibration.SetString(updated.c_str());
+}
+
+static void SDL3_PublishGyroCalibrationState(void) {
+	int state = 0;
+	if (s_sdlGamepad && s_gamepadGyroEnabled) {
+		state = s_gyroCalibration.manual ? 2 : (s_gyroCalibration.measured ? 3 : 1);
+	}
+	if (in_gyroCalibrationState.GetInteger() != state) {
+		in_gyroCalibrationState.SetInteger(state);
+	}
+}
+
+static void SDL3_ResetGyroMotion(void) {
 	s_gamepadGyroLastTimestamp = 0;
 	s_gamepadGyroRemainderX = 0.0f;
 	s_gamepadGyroRemainderY = 0.0f;
+	s_gyroFilter = openq4::GyroFilterState();
+	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
+	s_gyroLookYaw = 0.0f;
+	s_gyroLookPitch = 0.0f;
+	Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
+}
+
+static void SDL3_UpdateGamepadSensorState(bool logCapabilities) {
+	s_gamepadGyroEnabled = false;
+	s_gamepadAccelEnabled = false;
+	SDL3_ResetGyroMotion();
 
 	if (!s_sdlGamepad) {
+		SDL3_PublishGyroCalibrationState();
 		return;
 	}
 
 	const int touchpadCount = SDL_GetNumGamepadTouchpads(s_sdlGamepad);
 	const bool hasGyro = SDL_GamepadHasSensor(s_sdlGamepad, SDL_SENSOR_GYRO);
+	const bool hasAccel = SDL_GamepadHasSensor(s_sdlGamepad, SDL_SENSOR_ACCEL);
 	if (logCapabilities) {
-		common->Printf("controller: SDL gamepad capabilities: touchpads=%d gyro=%s\n", touchpadCount, hasGyro ? "yes" : "no");
+		common->Printf("controller: SDL gamepad capabilities: touchpads=%d gyro=%s accelerometer=%s\n", touchpadCount,
+			hasGyro ? "yes" : "no", hasAccel ? "yes" : "no");
 	}
 
 	if (!hasGyro) {
+		SDL3_PublishGyroCalibrationState();
 		return;
 	}
 
-	const bool wantsGyro = in_joystick.GetBool() && in_gyro.GetBool();
+	// the calibration belongs to the device: load this one's when it takes charge
+	const sdlController_t *controller = SDL3_FindController(s_sdlGamepadId);
+	char identity[openq4::CONTROLLER_IDENTITY_CHARS] = { 0 };
+	if (controller != NULL) {
+		SDL3_ControllerIdentity(*controller, identity, sizeof(identity));
+	}
+	if (idStr::Cmp(identity, s_gyroIdentity) != 0) {
+		idStr::Copynz(s_gyroIdentity, identity, sizeof(s_gyroIdentity));
+		s_gyroCalibration = openq4::GyroCalibration();
+		s_gyroGravity = openq4::GyroGravity();
+		s_gyroHaveAccel = false;
+		openq4::GyroVector stored;
+		if (SDL3_FindGyroCalibration(identity, stored)) {
+			s_gyroCalibration.offset = stored;
+			s_gyroCalibration.measured = true;
+		}
+	}
+
+	const bool wantsGyro = in_joystick.GetBool() && (in_gyro.GetBool() || in_gyroMenuPointer.GetBool());
 	if (!SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_GYRO, wantsGyro)) {
 		if (wantsGyro) {
 			common->Printf("controller: failed to enable SDL gamepad gyro: %s\n", SDL_GetError());
 		}
+		SDL3_PublishGyroCalibrationState();
 		return;
 	}
-
 	s_gamepadGyroEnabled = wantsGyro;
+	// the accelerometer tells Player Space which way is down, and rest from motion
+	if (hasAccel && SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_ACCEL, wantsGyro)) {
+		s_gamepadAccelEnabled = wantsGyro;
+	}
+
 	if (logCapabilities && wantsGyro) {
 		const float dataRate = SDL_GetGamepadSensorDataRate(s_sdlGamepad, SDL_SENSOR_GYRO);
 		if (dataRate > 0.0f) {
@@ -2320,10 +2860,65 @@ static void SDL3_UpdateGamepadSensorState(bool logCapabilities) {
 			common->Printf("controller: SDL gamepad gyro enabled\n");
 		}
 	}
+	SDL3_PublishGyroCalibrationState();
 }
 
-static void SDL3_HandleGamepadGyroEvent(const SDL_GamepadSensorEvent &event, int eventTime) {
-	if (!in_joystick.GetBool() || !in_gyro.GetBool() || !s_sdlGamepad || event.which != s_sdlGamepadId || event.sensor != SDL_SENSOR_GYRO) {
+/*
+===============
+SDL3_UpdateGyroSettings
+
+The gyro ratios are filled in once (PAD-04). A profile that already aimed
+with gyro starts from what the mouse path made of it, so its feel is kept;
+one that never did starts at 1:1. Changing in_gyroSensitivity afterwards
+sets both ratios, as it always set the gyro speed.
+===============
+*/
+static bool s_gyroSettingsReady = false;
+
+static float SDL3_LegacyGyroRatio(const char *mouseScale) {
+	return openq4::LegacyGyroRatio(in_gyroSensitivity.GetFloat(), cvarSystem->GetCVarFloat("sensitivity"),
+		cvarSystem->GetCVarFloat(mouseScale));
+}
+
+static void SDL3_UpdateGyroSettings(void) {
+	const bool first = !s_gyroSettingsReady;
+	s_gyroSettingsReady = true;
+	if (!first && in_gyroSensitivity.IsModified()) {
+		in_gyroYawRatio.SetFloat(SDL3_LegacyGyroRatio("m_yaw"));
+		in_gyroPitchRatio.SetFloat(SDL3_LegacyGyroRatio("m_pitch"));
+	}
+	const bool usedGyro = in_gyro.GetBool() || fabsf(in_gyroSensitivity.GetFloat() - 1.0f) > 0.0005f;
+	if (in_gyroYawRatio.GetFloat() <= 0.0f) {
+		in_gyroYawRatio.SetFloat(usedGyro ? SDL3_LegacyGyroRatio("m_yaw") : 1.0f);
+	}
+	if (in_gyroPitchRatio.GetFloat() <= 0.0f) {
+		in_gyroPitchRatio.SetFloat(usedGyro ? SDL3_LegacyGyroRatio("m_pitch") : 1.0f);
+	}
+	in_gyroSensitivity.ClearModified();
+}
+
+/*
+===============
+SDL3_HandleGamepadSensorEvent
+
+Every gyro sample of the active controller: calibration, the small-motion
+filters, the turning space and the ratio, then to play as degrees of view
+(Sys_GetGyroLook) or, in a menu, to the pointer. The accelerometer only
+informs the calibration and Player Space.
+===============
+*/
+static void SDL3_HandleGamepadSensorEvent(const SDL_GamepadSensorEvent &event, int eventTime) {
+	if (!in_joystick.GetBool() || !s_sdlGamepad || event.which != s_sdlGamepadId) {
+		return;
+	}
+	if (event.sensor == SDL_SENSOR_ACCEL) {
+		s_gyroAccel.x = event.data[0];
+		s_gyroAccel.y = event.data[1];
+		s_gyroAccel.z = event.data[2];
+		s_gyroHaveAccel = openq4::GyroFinite(s_gyroAccel);
+		return;
+	}
+	if (event.sensor != SDL_SENSOR_GYRO || !(in_gyro.GetBool() || in_gyroMenuPointer.GetBool())) {
 		return;
 	}
 	if (!s_gamepadGyroEnabled) {
@@ -2331,12 +2926,6 @@ static void SDL3_HandleGamepadGyroEvent(const SDL_GamepadSensorEvent &event, int
 		if (!s_gamepadGyroEnabled) {
 			return;
 		}
-	}
-	if (!SDL3_IsMouseCaptured() || SDL3_ShouldRouteMenuMouse()) {
-		s_gamepadGyroLastTimestamp = SDL3_GamepadSensorTimestamp(event);
-		s_gamepadGyroRemainderX = 0.0f;
-		s_gamepadGyroRemainderY = 0.0f;
-		return;
 	}
 
 	const Uint64 sensorTimestamp = SDL3_GamepadSensorTimestamp(event);
@@ -2354,32 +2943,124 @@ static void SDL3_HandleGamepadGyroEvent(const SDL_GamepadSensorEvent &event, int
 		return;
 	}
 
-	const int yawAxis = SDL3_ClampSensorAxisIndex(in_gyroYawAxis.GetInteger());
-	const int pitchAxis = SDL3_ClampSensorAxisIndex(in_gyroPitchAxis.GetInteger());
-	const float deadZone = SDL3_ClampRange(in_gyroDeadZone.GetFloat(), 0.0f, 2.0f);
-	const float sensitivity = SDL3_ClampRange(in_gyroSensitivity.GetFloat(), 0.0f, 8.0f);
-	if (sensitivity <= 0.0f) {
+	openq4::GyroVector raw;
+	raw.x = event.data[0];
+	raw.y = event.data[1];
+	raw.z = event.data[2];
+	if (!openq4::GyroFinite(raw)) {
 		return;
 	}
 
-	float yawRate = SDL3_ApplyDeadZone(event.data[yawAxis], deadZone);
-	float pitchRate = SDL3_ApplyDeadZone(event.data[pitchAxis], deadZone);
-	if (in_gyroInvertYaw.GetBool()) {
-		yawRate = -yawRate;
+	// calibration runs on every sample, in play and in menus alike
+	static const openq4::GyroCalibrationSettings calibrationSettings;
+	const openq4::GyroCalibrationEvent calibrationEvent = openq4::UpdateGyroCalibration(s_gyroCalibration, raw,
+		s_gyroHaveAccel ? &s_gyroAccel : NULL, deltaSeconds, calibrationSettings);
+	if (calibrationEvent == openq4::GyroCalibrationEvent::ManualDone) {
+		common->Printf("controller: gyro calibrated (bias %.4f %.4f %.4f rad/s)\n",
+			s_gyroCalibration.offset.x, s_gyroCalibration.offset.y, s_gyroCalibration.offset.z);
+	} else if (calibrationEvent == openq4::GyroCalibrationEvent::ManualMoved) {
+		common->Printf("controller: gyro calibration: the controller moved; hold it still\n");
 	}
-	if (in_gyroInvertPitch.GetBool()) {
-		pitchRate = -pitchRate;
+	if (calibrationEvent == openq4::GyroCalibrationEvent::ManualDone || calibrationEvent == openq4::GyroCalibrationEvent::RestCorrected) {
+		SDL3_StoreGyroCalibration(s_gyroIdentity, s_gyroCalibration.offset);
+	}
+	if (calibrationEvent != openq4::GyroCalibrationEvent::None) {
+		SDL3_PublishGyroCalibrationState();
+	}
+	if (s_gyroCalibration.manual) {
+		// while the player holds it still to calibrate, nothing aims
+		return;
 	}
 
-	static const float RADIANS_TO_CLASSIC_MOUSE_COUNTS = 2600.0f;
-	const float yawCounts = yawRate * deltaSeconds * RADIANS_TO_CLASSIC_MOUSE_COUNTS * sensitivity;
-	const float pitchCounts = pitchRate * deltaSeconds * RADIANS_TO_CLASSIC_MOUSE_COUNTS * sensitivity;
-	const int dx = SDL3_ConsumeMouseDelta(yawCounts, s_gamepadGyroRemainderX);
-	const int dy = SDL3_ConsumeMouseDelta(pitchCounts, s_gamepadGyroRemainderY);
-	SDL3_QueueMouseDelta(dx, dy, eventTime);
-	if (dx != 0 || dy != 0) {
+	const openq4::GyroVector calibrated = openq4::ApplyGyroCalibration(s_gyroCalibration, raw);
+	if (s_gyroHaveAccel) {
+		openq4::UpdateGyroGravity(s_gyroGravity, calibrated, s_gyroAccel, deltaSeconds);
+	}
+
+	openq4::GyroFilterSettings filterSettings;
+	filterSettings.tightening = SDL3_ClampRange(in_gyroDeadZone.GetFloat(), 0.0f, 2.0f);
+	filterSettings.smoothing = SDL3_ClampRange(in_gyroSmoothing.GetFloat(), 0.0f, 0.5f);
+	const openq4::GyroVector filtered = openq4::FilterGyro(s_gyroFilter, calibrated, deltaSeconds, filterSettings);
+
+	openq4::GyroLookSettings lookSettings;
+	lookSettings.yawRatio = in_gyroYawRatio.GetFloat() > 0.0f ? in_gyroYawRatio.GetFloat() : 1.0f;
+	lookSettings.pitchRatio = in_gyroPitchRatio.GetFloat() > 0.0f ? in_gyroPitchRatio.GetFloat() : 1.0f;
+	lookSettings.invertYaw = in_gyroInvertYaw.GetBool();
+	lookSettings.invertPitch = in_gyroInvertPitch.GetBool();
+	const openq4::GyroTurn look = openq4::ComputeGyroLook(
+		openq4::ComputeGyroTurn(filtered, s_gyroGravity, in_gyroSpace.GetInteger()), deltaSeconds, lookSettings);
+	// the test panel's trace (PAD-07): the view rate this sample asks for
+	s_gyroTestYaw = look.yaw / deltaSeconds;
+	s_gyroTestPitch = look.pitch / deltaSeconds;
+	s_gyroTestTime = eventTime;
+
+	// a deliberate turn (20 degrees a second) is controller use; sensor noise is not
+	const bool deliberate = openq4::GyroLength(filtered) > 0.35f;
+
+	// Play takes gyro aim whenever no menu or console has the pointer. It does
+	// not wait for the mouse to be captured: a player with the mouse turned off
+	// still aims with the gyro. What arrives while the game is not taking
+	// input is dropped by the usercmd generator.
+	if (SDL3_ShouldRouteMenuMouse()) {
+		// In a menu the gyro can move the pointer: a 40 degree sweep crosses the window.
+		Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
+		s_gyroLookYaw = 0.0f;
+		s_gyroLookPitch = 0.0f;
+		Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
+		if (!in_gyroMenuPointer.GetBool()) {
+			s_gamepadGyroRemainderX = 0.0f;
+			s_gamepadGyroRemainderY = 0.0f;
+			return;
+		}
+		int windowWidth = SCREEN_WIDTH;
+		int windowHeight = SCREEN_HEIGHT;
+		if (s_sdlWindow) {
+			(void)SDL_GetWindowSize(s_sdlWindow, &windowWidth, &windowHeight);
+		}
+		const float pixelsPerDegree = static_cast<float>(Max(windowWidth, 1)) / 40.0f;
+		const int dx = SDL3_ConsumeMouseDelta(-look.yaw * pixelsPerDegree, s_gamepadGyroRemainderX);
+		const int dy = SDL3_ConsumeMouseDelta(look.pitch * pixelsPerDegree, s_gamepadGyroRemainderY);
+		SDL3_QueueMouseDelta(dx, dy, eventTime);
+		if (deliberate && (dx != 0 || dy != 0)) {
+			SDL3_QueueControllerActivity(eventTime, 127);
+		}
+		return;
+	}
+	if (!in_gyro.GetBool()) {
+		return;
+	}
+
+	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
+	// what the usercmd has not taken stays bounded: a stalled frame must not spin the view
+	s_gyroLookYaw = idMath::ClampFloat(-360.0f, 360.0f, s_gyroLookYaw + look.yaw);
+	s_gyroLookPitch = idMath::ClampFloat(-180.0f, 180.0f, s_gyroLookPitch + look.pitch);
+	Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
+	if (deliberate) {
 		SDL3_QueueControllerActivity(eventTime, 127);
 	}
+}
+
+/*
+===============
+SDL3_CalibrateGyro_f
+
+calibrateGyro: the hold-still calibration. The controller rests on a table
+or in still hands for two seconds; moving it starts the two seconds again.
+===============
+*/
+static void SDL3_CalibrateGyro_f(const idCmdArgs &args) {
+	(void)args;
+	if (!s_sdlGamepad || !SDL_GamepadHasSensor(s_sdlGamepad, SDL_SENSOR_GYRO)) {
+		common->Printf("calibrateGyro: the active controller has no gyro\n");
+		return;
+	}
+	if (!s_gamepadGyroEnabled) {
+		common->Printf("calibrateGyro: turn Gyro on first (in_gyro 1)\n");
+		return;
+	}
+	openq4::BeginGyroCalibration(s_gyroCalibration);
+	SDL3_PublishGyroCalibrationState();
+	common->Printf("controller: gyro calibration started; hold the controller still\n");
 }
 
 static bool SDL3_GamepadTouchpadEventMatchesTrackedFinger(const SDL_GamepadTouchpadEvent &event) {
@@ -2388,7 +3069,7 @@ static bool SDL3_GamepadTouchpadEventMatchesTrackedFinger(const SDL_GamepadTouch
 		event.finger == s_gamepadTouchpadFinger;
 }
 
-static void SDL3_OpenFirstController(void);
+static void SDL3_OpenAllControllers(void);
 static bool SDL3_IsSteamDeckPlatformProfile(void);
 
 static void SDL3_HandleGamepadTouchpadEvent(const SDL_GamepadTouchpadEvent &event, int eventTime) {
@@ -2757,6 +3438,10 @@ static void SDL3_HandleAppBackgroundTransition(int eventTime, const char *reason
 		(void)SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_GYRO, false);
 		s_gamepadGyroEnabled = false;
 	}
+	if (s_sdlGamepad && s_gamepadAccelEnabled) {
+		(void)SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_ACCEL, false);
+		s_gamepadAccelEnabled = false;
+	}
 	SDL3_UpdateCursorVisibility();
 	if (session != NULL) {
 		session->SetPlayingSoundWorld();
@@ -2798,7 +3483,7 @@ static void SDL3_HandleAppForegroundTransition(int eventTime, const char *reason
 	idKeyInput::ClearStates();
 
 	common->Printf("SDL3: application returned to foreground (%s); reacquiring input.\n", reason);
-	SDL3_OpenFirstController();
+	SDL3_OpenAllControllers();
 	if (s_sdlGamepad) {
 		SDL3_UpdateGamepadSensorState(false);
 		SDL3_UpdateGamepadAxes(eventTime);
@@ -2849,92 +3534,309 @@ static const char *SDL3_GamepadFamily(SDL_Gamepad *pad) {
 	}
 }
 
-static bool SDL3_OpenGamepad(SDL_JoystickID instanceId) {
-	SDL_Gamepad *pad = SDL_OpenGamepad(instanceId);
-	if (!pad) {
-		return false;
+static sdlController_t *SDL3_FindController(SDL_JoystickID id) {
+	for (int i = 0; id != 0 && i < s_controllerCount; ++i) {
+		if (s_controllers[i].id == id) {
+			return &s_controllers[i];
+		}
 	}
-
-	SDL3_CloseJoystick(Sys_Milliseconds());
-
-	s_sdlGamepad = pad;
-	s_sdlGamepadId = instanceId;
-	in_gamepadFamily.SetString(SDL3_GamepadFamily(pad));
-	SDL3_ClearControllerTrackingState();
-
-	SDL3_UpdateGamepadAxes(Sys_Milliseconds());
-	SDL3_UpdateGamepadSensorState(true);
-
-	const char *name = SDL_GetGamepadName(pad);
-	if (name && name[0] != '\0') {
-		common->Printf("controller: opened SDL gamepad '%s'\n", name);
-	} else {
-		common->Printf("controller: opened SDL gamepad\n");
-	}
-	return true;
+	return NULL;
 }
 
-static bool SDL3_OpenJoystick(SDL_JoystickID instanceId) {
-	if (SDL_IsGamepad(instanceId)) {
-		return false;
-	}
-
-	SDL_Joystick *joystick = SDL_OpenJoystick(instanceId);
-	if (!joystick) {
-		return false;
-	}
-
-	s_sdlJoystick = joystick;
-	s_sdlJoystickId = instanceId;
-	// A joystick SDL cannot map as a gamepad reports no labels.
-	in_gamepadFamily.SetString("generic");
-	SDL3_ClearControllerTrackingState();
-
-	SDL3_UpdateJoystickAxes();
-
-	const char *name = SDL_GetJoystickName(joystick);
-	const int numAxes = SDL_GetNumJoystickAxes(joystick);
-	const int numButtons = SDL_GetNumJoystickButtons(joystick);
-	const int numHats = SDL_GetNumJoystickHats(joystick);
-	const char *dedicatedLook = SDL3_ShouldUseDedicatedJoystickLookAxes(numAxes) ? "yes" : "no";
-	if (name && name[0] != '\0') {
-		common->Printf("controller: opened SDL joystick '%s' (axes=%d, buttons=%d, hats=%d, dedicatedLook=%s)\n", name, numAxes, numButtons, numHats, dedicatedLook);
-	} else {
-		common->Printf("controller: opened SDL joystick (axes=%d, buttons=%d, hats=%d, dedicatedLook=%s)\n", numAxes, numButtons, numHats, dedicatedLook);
-	}
-	return true;
+static const char *SDL3_ControllerName(const sdlController_t &controller) {
+	const char *name = controller.pad ? SDL_GetGamepadName(controller.pad) : SDL_GetJoystickName(controller.joystick);
+	return (name != NULL && name[0] != '\0') ? name : "controller";
 }
 
-static void SDL3_OpenFirstController(void) {
-	if (!in_joystick.GetBool() || s_sdlGamepad || s_sdlJoystick) {
+// What stays the same when a device reconnects: its GUID, and its serial
+// number where it reports one, which tells two pads of one model apart.
+static void SDL3_ControllerIdentity(const sdlController_t &controller, char *identity, int identitySize) {
+	char guid[64];
+	guid[0] = '\0';
+	SDL_GUIDToString(SDL_GetJoystickGUIDForID(controller.id), guid, sizeof(guid));
+	const char *serial = controller.pad ? SDL_GetGamepadSerial(controller.pad) : SDL_GetJoystickSerial(controller.joystick);
+	if (serial != NULL && serial[0] != '\0') {
+		idStr::snPrintf(identity, identitySize, "%s/%s", guid, serial);
+	} else {
+		idStr::snPrintf(identity, identitySize, "%s", guid);
+	}
+}
+
+static const char *SDL3_ControllerPowerName(SDL_PowerState state) {
+	switch (state) {
+		case SDL_POWERSTATE_ON_BATTERY: return "battery";
+		case SDL_POWERSTATE_CHARGING: return "charging";
+		case SDL_POWERSTATE_CHARGED: return "charged";
+		case SDL_POWERSTATE_NO_BATTERY: return "wired";
+		default: return "unknown";
+	}
+}
+
+// The active controller's identity and power, for the notices and the menus.
+static void SDL3_PublishControllerState(void) {
+	if (cvarSystem == NULL || !cvarSystem->IsInitialized()) {
+		// the last controllers close after the cvars have gone
 		return;
 	}
+	const sdlController_t *controller = SDL3_FindController(s_controllerRoster.Active());
+	in_gamepadCount.SetInteger(s_controllerCount);
+	if (controller == NULL || (!s_sdlGamepad && !s_sdlJoystick)) {
+		in_gamepadInstance.SetInteger(0);
+		in_gamepadName.SetString("");
+		in_gamepadPower.SetString("unknown");
+		in_gamepadBattery.SetInteger(-1);
+		return;
+	}
+	int percent = -1;
+	const SDL_PowerState power = SDL3_GetControllerPowerInfo(percent);
+	in_gamepadInstance.SetInteger(static_cast<int>(controller->id));
+	in_gamepadName.SetString(SDL3_ControllerName(*controller));
+	in_gamepadPower.SetString(SDL3_ControllerPowerName(power));
+	in_gamepadBattery.SetInteger(percent);
+}
+
+/*
+===============
+SDL3_ActivateController
+
+An open controller takes charge: the prompts' family, Confirm and Back, the
+axes, rumble, gyro, touchpad and battery are its from here.
+===============
+*/
+static void SDL3_ActivateController(SDL_JoystickID id, int eventTime) {
+	sdlController_t *controller = SDL3_FindController(id);
+	if (controller == NULL) {
+		in_gamepadFamily.SetString("none");
+		return;
+	}
+
+	SDL3_ClearControllerTrackingState();
+	if (controller->pad) {
+		s_sdlGamepad = controller->pad;
+		s_sdlGamepadId = id;
+		in_gamepadFamily.SetString(SDL3_GamepadFamily(controller->pad));
+		SDL3_UpdateGamepadAxes(eventTime);
+		SDL3_UpdateGamepadSensorState(true);
+		// the controller in use is player 1 (PAD-08); MP-25's seats number the rest
+		if (in_joystickPlayerLight.GetBool()) {
+			(void)SDL_SetGamepadPlayerIndex(controller->pad, 0);
+		}
+		s_feedbackSentFeel = -1;
+		s_feedbackSentColor = -1;
+	} else {
+		s_sdlJoystick = controller->joystick;
+		s_sdlJoystickId = id;
+		// A joystick SDL cannot map as a gamepad reports no labels.
+		in_gamepadFamily.SetString("generic");
+		SDL3_UpdateJoystickAxes();
+	}
+	common->Printf("controller: '%s' is the active controller\n", SDL3_ControllerName(*controller));
+}
+
+static void SDL3_ApplyControllerChange(openq4::ControllerChange change, int eventTime) {
+	if (change == openq4::ControllerChange::None) {
+		return;
+	}
+	// the outgoing device's held buttons and axes release before the new one speaks
+	SDL3_DeactivateController(eventTime);
+	if (change == openq4::ControllerChange::Lost) {
+		in_gamepadFamily.SetString("none");
+		common->Printf("controller: the active controller disconnected and no other is connected\n");
+	} else {
+		SDL3_ActivateController(s_controllerRoster.Active(), eventTime);
+	}
+	SDL3_PublishControllerState();
+}
+
+/*
+===============
+SDL3_OpenController
+
+Opens a device that connected and adds it to the roster. A gamepad is opened
+as one; anything SDL cannot map opens as a plain joystick. Whether it takes
+charge is the roster's decision: the first device does, a gamepad does over a
+plain joystick, and the saved device (in_joystickDevice) always does.
+===============
+*/
+static bool SDL3_OpenController(SDL_JoystickID id, int eventTime) {
+	if (!in_joystick.GetBool() || id == 0 || SDL3_FindController(id) != NULL) {
+		return false;
+	}
+	if (s_controllerCount >= openq4::CONTROLLER_ROSTER_MAX) {
+		common->Printf("controller: more than %d controllers connected; ignoring the newest\n", openq4::CONTROLLER_ROSTER_MAX);
+		return false;
+	}
+
+	sdlController_t controller = { id, NULL, NULL };
+	if (SDL_IsGamepad(id)) {
+		controller.pad = SDL_OpenGamepad(id);
+	} else {
+		controller.joystick = SDL_OpenJoystick(id);
+	}
+	if (!controller.pad && !controller.joystick) {
+		common->Printf("controller: could not open device %u: %s\n", static_cast<unsigned int>(id), SDL_GetError());
+		return false;
+	}
+
+	char identity[openq4::CONTROLLER_IDENTITY_CHARS];
+	SDL3_ControllerIdentity(controller, identity, sizeof(identity));
+	openq4::ControllerChange change = openq4::ControllerChange::None;
+	if (!s_controllerRoster.Add(static_cast<std::uint32_t>(id), controller.pad != NULL, identity, change)) {
+		if (controller.pad) {
+			SDL_CloseGamepad(controller.pad);
+		} else {
+			SDL_CloseJoystick(controller.joystick);
+		}
+		return false;
+	}
+	s_controllers[s_controllerCount++] = controller;
+
+	if (controller.pad) {
+		common->Printf("controller: opened SDL gamepad '%s'\n", SDL3_ControllerName(controller));
+	} else {
+		const int numAxes = SDL_GetNumJoystickAxes(controller.joystick);
+		common->Printf("controller: opened SDL joystick '%s' (axes=%d, buttons=%d, hats=%d, dedicatedLook=%s)\n",
+			SDL3_ControllerName(controller), numAxes, SDL_GetNumJoystickButtons(controller.joystick),
+			SDL_GetNumJoystickHats(controller.joystick), SDL3_ShouldUseDedicatedJoystickLookAxes(numAxes) ? "yes" : "no");
+	}
+	SDL3_ApplyControllerChange(change, eventTime);
+	SDL3_PublishControllerState();
+	return true;
+}
+
+/*
+===============
+SDL3_CloseController
+
+A device went away. When it was the active one, what it held releases and
+another connected controller takes over; with none left the family becomes
+"none", which the menus' notice and the single-player pause follow.
+===============
+*/
+static void SDL3_CloseController(SDL_JoystickID id, int eventTime) {
+	sdlController_t *controller = SDL3_FindController(id);
+	if (controller == NULL) {
+		return;
+	}
+	if (id == s_sdlGamepadId || id == s_sdlJoystickId) {
+		SDL3_DeactivateController(eventTime);
+	}
+	if (controller->pad) {
+		SDL_CloseGamepad(controller->pad);
+	} else {
+		SDL_CloseJoystick(controller->joystick);
+	}
+	const int index = static_cast<int>(controller - s_controllers);
+	for (int i = index; i + 1 < s_controllerCount; ++i) {
+		s_controllers[i] = s_controllers[i + 1];
+	}
+	--s_controllerCount;
+	SDL3_ApplyControllerChange(s_controllerRoster.Remove(static_cast<std::uint32_t>(id)), eventTime);
+	SDL3_PublishControllerState();
+}
+
+static void SDL3_CloseAllControllers(int eventTime) {
+	if (s_controllerCount == 0 && !s_sdlGamepad && !s_sdlJoystick) {
+		// nothing was open: leave the cvars alone, as shutdown runs this late
+		s_controllerRoster.Clear();
+		return;
+	}
+	SDL3_DeactivateController(eventTime);
+	for (int i = 0; i < s_controllerCount; ++i) {
+		if (s_controllers[i].pad) {
+			SDL_CloseGamepad(s_controllers[i].pad);
+		} else {
+			SDL_CloseJoystick(s_controllers[i].joystick);
+		}
+	}
+	s_controllerCount = 0;
+	s_controllerRoster.Clear();
+	if (cvarSystem != NULL && cvarSystem->IsInitialized()) {
+		in_gamepadFamily.SetString("none");
+	}
+	SDL3_PublishControllerState();
+}
+
+// Every gamepad, then every joystick SDL cannot map as one.
+static void SDL3_OpenAllControllers(void) {
+	if (!in_joystick.GetBool()) {
+		return;
+	}
+	const int eventTime = Sys_Milliseconds();
+	(void)s_controllerRoster.SetPreference(in_joystickDevice.GetString());
 
 	int gamepadCount = 0;
 	SDL_JoystickID *gamepads = SDL_GetGamepads(&gamepadCount);
 	if (gamepads) {
 		for (int i = 0; i < gamepadCount; ++i) {
-			if (SDL3_OpenGamepad(gamepads[i])) {
-				break;
-			}
+			(void)SDL3_OpenController(gamepads[i], eventTime);
 		}
 		SDL_free(gamepads);
-	}
-
-	if (s_sdlGamepad) {
-		return;
 	}
 
 	int joystickCount = 0;
 	SDL_JoystickID *joysticks = SDL_GetJoysticks(&joystickCount);
 	if (joysticks) {
 		for (int i = 0; i < joystickCount; ++i) {
-			if (SDL3_OpenJoystick(joysticks[i])) {
-				break;
+			if (!SDL_IsGamepad(joysticks[i])) {
+				(void)SDL3_OpenController(joysticks[i], eventTime);
 			}
 		}
 		SDL_free(joysticks);
 	}
+}
+
+// Use is a button press, or a stick or trigger moved past its dead zone:
+// what hands charge to a connected controller that is not the active one.
+static void SDL3_NoteControllerUse(SDL_JoystickID id, int eventTime) {
+	if (id == 0 || id == s_sdlGamepadId || id == s_sdlJoystickId) {
+		return;
+	}
+	// SDL re-centres a device's axes as it disconnects; those last events are
+	// not use, and a departing device must not take charge on its way out.
+	const sdlController_t *controller = SDL3_FindController(id);
+	if (controller == NULL || !(controller->pad ? SDL_GamepadConnected(controller->pad) : SDL_JoystickConnected(controller->joystick))) {
+		return;
+	}
+	SDL3_ApplyControllerChange(s_controllerRoster.NoteUse(static_cast<std::uint32_t>(id)), eventTime);
+}
+
+static bool SDL3_GamepadAxisIsUse(SDL_Gamepad *pad, Uint8 axis) {
+	if (axis == SDL_GAMEPAD_AXIS_LEFT_TRIGGER || axis == SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) {
+		const int pressThreshold = Max(1, static_cast<int>(roundf(SDL3_ClampUnit(in_joystickTriggerThreshold.GetFloat()) * 127.0f)));
+		return SDL3_NormalizeTriggerAxis(SDL_GetGamepadAxis(pad, static_cast<SDL_GamepadAxis>(axis))) >= pressThreshold;
+	}
+	const bool southpaw = in_joystickSouthpaw.GetBool();
+	int x = 0;
+	int y = 0;
+	SDL3_NormalizeStickAxes(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTX), SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_LEFTY),
+		southpaw ? SDL3_LookStickShape() : SDL3_MoveStickShape(), x, y);
+	if (x != 0 || y != 0) {
+		return true;
+	}
+	SDL3_NormalizeStickAxes(SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTX), SDL_GetGamepadAxis(pad, SDL_GAMEPAD_AXIS_RIGHTY),
+		southpaw ? SDL3_MoveStickShape() : SDL3_LookStickShape(), x, y);
+	return x != 0 || y != 0;
+}
+
+// A plain joystick's sticks; a throttle resting off-centre is not use.
+static bool SDL3_JoystickAxisIsUse(SDL_Joystick *joystick) {
+	const int numAxes = SDL_GetNumJoystickAxes(joystick);
+	const int axes[4] = {
+		SDL3_ResolveJoystickAxis(in_joystickMoveAxisX, 0, numAxes), SDL3_ResolveJoystickAxis(in_joystickMoveAxisY, 1, numAxes),
+		SDL3_ResolveJoystickAxis(in_joystickLookAxisX, 2, numAxes), SDL3_ResolveJoystickAxis(in_joystickLookAxisY, 3, numAxes) };
+	for (int pair = 0; pair < 2; ++pair) {
+		int x = 0;
+		int y = 0;
+		SDL3_NormalizeStickAxes(
+			axes[pair * 2] >= 0 ? SDL_GetJoystickAxis(joystick, axes[pair * 2]) : 0,
+			axes[pair * 2 + 1] >= 0 ? SDL_GetJoystickAxis(joystick, axes[pair * 2 + 1]) : 0,
+			pair == 0 ? SDL3_MoveStickShape() : SDL3_LookStickShape(), x, y);
+		if (x != 0 || y != 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 static const char *SDL3_PowerStateName(SDL_PowerState state) {
@@ -3042,6 +3944,12 @@ static void SDL3_PrintActiveGamepadDetails(void) {
 	int powerPercent = -1;
 	const SDL_PowerState powerState = SDL_GetGamepadPowerInfo(s_sdlGamepad, &powerPercent);
 	SDL3_PrintControllerPowerLine("    power: ", powerState, powerPercent);
+	common->Printf("    haptics and lights: rumble=%s triggerMotors=%s adaptiveTriggers=%s light=%s playerLights=%s\n",
+		SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN) ? "yes" : "no",
+		SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_TRIGGER_RUMBLE_BOOLEAN) ? (in_joystickTriggerRumble.GetBool() ? "yes" : "yes (off)") : "no",
+		SDL_GetRealGamepadType(s_sdlGamepad) == SDL_GAMEPAD_TYPE_PS5 ? (in_joystickAdaptiveTriggers.GetBool() ? "yes" : "yes (off)") : "no",
+		SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_RGB_LED_BOOLEAN) ? (in_joystickLight.GetBool() ? "yes" : "yes (off)") : "no",
+		SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_PLAYER_LED_BOOLEAN) ? (in_joystickPlayerLight.GetBool() ? "yes" : "yes (off)") : "no");
 
 	const int touchpadCount = SDL_GetNumGamepadTouchpads(s_sdlGamepad);
 	common->Printf("    touchpads: %d\n", touchpadCount);
@@ -3051,15 +3959,24 @@ static void SDL3_PrintActiveGamepadDetails(void) {
 
 	SDL3_PrintGamepadSensorLine(s_sdlGamepad, SDL_SENSOR_GYRO, "gyro");
 	SDL3_PrintGamepadSensorLine(s_sdlGamepad, SDL_SENSOR_ACCEL, "accelerometer");
-	common->Printf("    gyro route: cvar=%s enabled=%s sensitivity=%.3f deadZone=%.3f yawAxis=%d pitchAxis=%d invertYaw=%s invertPitch=%s\n",
+	static const char *const gyroSpaces[3] = { "yaw", "roll", "player" };
+	static const char *const gyroActivations[4] = { "always", "off while held", "on while held", "while zoomed" };
+	common->Printf("    gyro route: cvar=%s enabled=%s yawRatio=%.3f pitchRatio=%.3f space=%s%s activation=%s tightening=%.3f smoothing=%.3f invertYaw=%s invertPitch=%s menuPointer=%s\n",
 		in_gyro.GetBool() ? "on" : "off",
 		s_gamepadGyroEnabled ? "yes" : "no",
-		in_gyroSensitivity.GetFloat(),
+		in_gyroYawRatio.GetFloat(),
+		in_gyroPitchRatio.GetFloat(),
+		gyroSpaces[idMath::ClampInt(0, 2, in_gyroSpace.GetInteger())],
+		(in_gyroSpace.GetInteger() == 2 && !s_gyroGravity.valid) ? " (no accelerometer reading yet: yaw)" : "",
+		gyroActivations[idMath::ClampInt(0, 3, in_gyroActivation.GetInteger())],
 		in_gyroDeadZone.GetFloat(),
-		SDL3_ClampSensorAxisIndex(in_gyroYawAxis.GetInteger()),
-		SDL3_ClampSensorAxisIndex(in_gyroPitchAxis.GetInteger()),
+		in_gyroSmoothing.GetFloat(),
 		in_gyroInvertYaw.GetBool() ? "yes" : "no",
-		in_gyroInvertPitch.GetBool() ? "yes" : "no");
+		in_gyroInvertPitch.GetBool() ? "yes" : "no",
+		in_gyroMenuPointer.GetBool() ? "on" : "off");
+	common->Printf("    gyro calibration: %s bias=%.4f %.4f %.4f rad/s\n",
+		s_gyroCalibration.manual ? "calibrating" : (s_gyroCalibration.measured ? "measured" : "not measured"),
+		s_gyroCalibration.offset.x, s_gyroCalibration.offset.y, s_gyroCalibration.offset.z);
 	common->Printf("    touchpad route: mode=%d sensitivity=%.3f trackedFinger=%s\n",
 		in_touchpadMode.GetInteger(),
 		in_touchpadSensitivity.GetFloat(),
@@ -3136,6 +4053,20 @@ static void SDL3_ListControllers_f(const idCmdArgs &args) {
 		SDL3_HintString(SDL_HINT_JOYSTICK_MFI));
 #endif
 
+	// every open controller, the active one marked, and the saved choice
+	const char *choice = in_joystickDevice.GetString();
+	common->Printf("  open controllers (%d), device choice: %s%s\n", s_controllerCount,
+		choice[0] != '\0' ? choice : "automatic (the last one used)",
+		choice[0] == '\0' ? "" : (s_controllerRoster.PreferenceConnected() ? " (connected)" : " (not connected; automatic until it returns)"));
+	for (int i = 0; i < s_controllerCount; ++i) {
+		const sdlController_t &controller = s_controllers[i];
+		char identity[openq4::CONTROLLER_IDENTITY_CHARS];
+		SDL3_ControllerIdentity(controller, identity, sizeof(identity));
+		common->Printf("    [%d] id=%u%s %s name=%s identity=%s\n", i, static_cast<unsigned int>(controller.id),
+			static_cast<std::uint32_t>(controller.id) == s_controllerRoster.Active() ? " active" : "",
+			controller.pad ? "gamepad" : "joystick", SDL3_ControllerName(controller), identity);
+	}
+
 	SDL3_PrintActiveGamepadDetails();
 	SDL3_PrintActiveJoystickDetails();
 
@@ -3178,12 +4109,13 @@ static void SDL3_ListControllers_f(const idCmdArgs &args) {
 	}
 }
 
+#include "VirtualController.inl"
+
 static void SDL3_InitControllerSubsystems(void) {
 	SDL3_SetControllerHintDefaults();
 
 	if (!in_joystick.GetBool()) {
-		SDL3_CloseGamepad(Sys_Milliseconds());
-		SDL3_CloseJoystick(Sys_Milliseconds());
+		SDL3_CloseAllControllers(Sys_Milliseconds());
 		SDL3_ClearControllerTrackingState();
 		return;
 	}
@@ -3206,12 +4138,12 @@ static void SDL3_InitControllerSubsystems(void) {
 		}
 	}
 
-	SDL3_OpenFirstController();
+	SDL3_OpenAllControllers();
 }
 
 static void SDL3_ShutdownControllerSubsystems(void) {
-	SDL3_CloseGamepad(Sys_Milliseconds());
-	SDL3_CloseJoystick(Sys_Milliseconds());
+	SDL3_CloseAllControllers(Sys_Milliseconds());
+	SDL3_DetachVirtualControllers();
 
 	if (s_sdlGamepadSubsystemActive) {
 		SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
@@ -5412,6 +6344,44 @@ bool Sys_SDL_PumpEvents(void) {
 		}
 		in_joystick.ClearModified();
 	}
+	SDL3_VirtualControllerFrame();
+	SDL3_UpdateControllerFeedback();
+	SDL3_UpdateRumbleTest();
+	idKeyInput::UpdateControllerLayout();
+	if (in_joystickLight.IsModified() || in_joystickPlayerLight.IsModified()) {
+		s_feedbackSentColor = -1;
+		if (s_sdlGamepad) {
+			(void)SDL_SetGamepadPlayerIndex(s_sdlGamepad, in_joystickPlayerLight.GetBool() ? 0 : -1);
+		}
+		in_joystickLight.ClearModified();
+		in_joystickPlayerLight.ClearModified();
+	}
+	if (in_joystickDevicePin.IsModified()) {
+		in_joystickDevicePin.ClearModified();
+		const sdlController_t *active = SDL3_FindController(s_controllerRoster.Active());
+		if (in_joystickDevicePin.GetBool() && active != NULL) {
+			char identity[openq4::CONTROLLER_IDENTITY_CHARS];
+			SDL3_ControllerIdentity(*active, identity, sizeof(identity));
+			in_joystickDevice.SetString(identity);
+		} else {
+			in_joystickDevice.SetString("");
+		}
+	}
+	if (in_joystickDevicePin.GetBool() != (in_joystickDevice.GetString()[0] != '\0')) {
+		// the row shows what in_joystickDevice says, however it was set
+		in_joystickDevicePin.SetBool(in_joystickDevice.GetString()[0] != '\0');
+		in_joystickDevicePin.ClearModified();
+	}
+	if (in_joystickDevice.IsModified()) {
+		// the saved device takes charge at once when it is connected
+		SDL3_ApplyControllerChange(s_controllerRoster.SetPreference(in_joystickDevice.GetString()), Sys_Milliseconds());
+		SDL3_PublishControllerState();
+		in_joystickDevice.ClearModified();
+	}
+	if (in_joystickPowerProbe.IsModified()) {
+		SDL3_PublishControllerState();
+		in_joystickPowerProbe.ClearModified();
+	}
 	if (in_joystickRumble.IsModified() || in_joystickRumbleScale.IsModified() ||
 			in_joystickLowBatteryRumbleThreshold.IsModified() || in_joystickLowBatteryRumbleScale.IsModified()) {
 		if (!in_joystickRumble.GetBool() || in_joystickRumbleScale.GetFloat() <= 0.0f) {
@@ -5424,15 +6394,12 @@ bool Sys_SDL_PumpEvents(void) {
 		in_joystickLowBatteryRumbleThreshold.ClearModified();
 		in_joystickLowBatteryRumbleScale.ClearModified();
 	}
-	if (in_gyro.IsModified() || in_gyroSensitivity.IsModified() || in_gyroDeadZone.IsModified() ||
-			in_gyroYawAxis.IsModified() || in_gyroPitchAxis.IsModified() ||
-			in_gyroInvertYaw.IsModified() || in_gyroInvertPitch.IsModified() ||
+	SDL3_UpdateGyroSettings();
+	if (in_gyro.IsModified() || in_gyroMenuPointer.IsModified() || in_gyroSpace.IsModified() ||
 			in_touchpadMode.IsModified() || in_touchpadSensitivity.IsModified() ||
 			in_touchscreen.IsModified()) {
+		// the sensors follow the two switches; the other gyro settings are read with each sample
 		SDL3_UpdateGamepadSensorState(false);
-		s_gamepadGyroLastTimestamp = 0;
-		s_gamepadGyroRemainderX = 0.0f;
-		s_gamepadGyroRemainderY = 0.0f;
 		s_gamepadTouchpadFingerActive = false;
 		s_gamepadTouchpadRemainderX = 0.0f;
 		s_gamepadTouchpadRemainderY = 0.0f;
@@ -5443,18 +6410,13 @@ bool Sys_SDL_PumpEvents(void) {
 #endif
 		}
 		in_gyro.ClearModified();
-		in_gyroSensitivity.ClearModified();
-		in_gyroDeadZone.ClearModified();
-		in_gyroYawAxis.ClearModified();
-		in_gyroPitchAxis.ClearModified();
-		in_gyroInvertYaw.ClearModified();
-		in_gyroInvertPitch.ClearModified();
+		in_gyroMenuPointer.ClearModified();
+		in_gyroSpace.ClearModified();
 		in_touchpadMode.ClearModified();
 		in_touchpadSensitivity.ClearModified();
 		in_touchscreen.ClearModified();
 	}
-	if (in_joystickDeadZone.IsModified() || in_joystickTriggerThreshold.IsModified() ||
-			in_joystickLookSensitivity.IsModified() || in_joystickLookCurve.IsModified() ||
+	if (SDL3_UpdateStickResponseSettings() || in_joystickTriggerThreshold.IsModified() ||
 			in_joystickMoveCurve.IsModified() || in_joystickInvertLook.IsModified() ||
 			in_joystickSouthpaw.IsModified() || in_joystickUseDedicatedLookAxes.IsModified() ||
 			in_joystickMoveAxisX.IsModified() || in_joystickMoveAxisY.IsModified() ||
@@ -5466,10 +6428,7 @@ bool Sys_SDL_PumpEvents(void) {
 		} else if (s_sdlJoystick) {
 			SDL3_UpdateJoystickAxes();
 		}
-		in_joystickDeadZone.ClearModified();
 		in_joystickTriggerThreshold.ClearModified();
-		in_joystickLookSensitivity.ClearModified();
-		in_joystickLookCurve.ClearModified();
 		in_joystickMoveCurve.ClearModified();
 		in_joystickInvertLook.ClearModified();
 		in_joystickSouthpaw.ClearModified();
@@ -5509,9 +6468,11 @@ bool Sys_SDL_PumpEvents(void) {
 			SDL3_HandleWindowEvent(event.window, eventTime);
 			continue;
 		}
-		if (!win32.activeApp && SDL3_IsUserInputEvent(event.type)) {
+		if (!win32.activeApp && SDL3_IsUserInputEvent(event.type) && !SDL3_IsVirtualControllerEvent(event)) {
 			// Events already queued when focus was lost can arrive after the
 			// focus event. Do not relatch input until the game window is active.
+			// A virtual test controller lives in this process, not on the
+			// desktop, and a hidden test window never has the focus.
 			continue;
 		}
 #if defined(__ANDROID__) && !defined(OPENQ4_SIGMATOUCH)
@@ -5761,19 +6722,12 @@ bool Sys_SDL_PumpEvents(void) {
 			}
 
 			case SDL_EVENT_GAMEPAD_ADDED:
-				// Prefer gamepads over plain joysticks. SDL3_OpenGamepad releases any
-				// open joystick only after the gamepad opens, so a failed open keeps
-				// the current device usable.
-				if (in_joystick.GetBool() && !s_sdlGamepad) {
-					(void)SDL3_OpenGamepad(event.gdevice.which);
-				}
+				// Every gamepad opens (PAD-01); the roster decides whether it takes charge.
+				(void)SDL3_OpenController(event.gdevice.which, eventTime);
 				break;
 
 			case SDL_EVENT_GAMEPAD_REMOVED:
-				if (s_sdlGamepad && event.gdevice.which == s_sdlGamepadId) {
-					SDL3_CloseGamepad(eventTime);
-					SDL3_OpenFirstController();
-				}
+				SDL3_CloseController(event.gdevice.which, eventTime);
 				break;
 
 			case SDL_EVENT_GAMEPAD_REMAPPED:
@@ -5786,21 +6740,35 @@ bool Sys_SDL_PumpEvents(void) {
 
 			case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
 			case SDL_EVENT_GAMEPAD_BUTTON_UP:
-				if (in_joystick.GetBool() && s_sdlGamepad && event.gbutton.which == s_sdlGamepadId) {
-					const int button = static_cast<int>(event.gbutton.button);
-					if (button >= 0 && button < SDL_GAMEPAD_BUTTON_COUNT) {
-						const bool down = event.gbutton.down;
-						if (s_gamepadButtonsDown[button] != down) {
-							s_gamepadButtonsDown[button] = down;
-							SDL3_PostControllerKeyEvent(SDL3_MapGamepadButton(event.gbutton.button), down, eventTime);
+				if (in_joystick.GetBool()) {
+					if (event.gbutton.down) {
+						// a press on a waiting controller hands charge to it, then counts
+						SDL3_NoteControllerUse(event.gbutton.which, eventTime);
+					}
+					if (s_sdlGamepad && event.gbutton.which == s_sdlGamepadId) {
+						const int button = static_cast<int>(event.gbutton.button);
+						if (button >= 0 && button < SDL_GAMEPAD_BUTTON_COUNT) {
+							const bool down = event.gbutton.down;
+							if (s_gamepadButtonsDown[button] != down) {
+								s_gamepadButtonsDown[button] = down;
+								SDL3_PostControllerKeyEvent(SDL3_MapGamepadButton(event.gbutton.button), down, eventTime);
+							}
 						}
 					}
 				}
 				break;
 
 			case SDL_EVENT_GAMEPAD_AXIS_MOTION:
-				if (in_joystick.GetBool() && s_sdlGamepad && event.gaxis.which == s_sdlGamepadId) {
-					SDL3_UpdateGamepadAxes(eventTime);
+				if (in_joystick.GetBool()) {
+					if (event.gaxis.which != s_sdlGamepadId) {
+						const sdlController_t *waiting = SDL3_FindController(event.gaxis.which);
+						if (waiting != NULL && waiting->pad != NULL && SDL3_GamepadAxisIsUse(waiting->pad, event.gaxis.axis)) {
+							SDL3_NoteControllerUse(event.gaxis.which, eventTime);
+						}
+					}
+					if (s_sdlGamepad && event.gaxis.which == s_sdlGamepadId) {
+						SDL3_UpdateGamepadAxes(eventTime);
+					}
 				}
 				break;
 
@@ -5811,45 +6779,67 @@ bool Sys_SDL_PumpEvents(void) {
 				break;
 
 			case SDL_EVENT_GAMEPAD_SENSOR_UPDATE:
-				SDL3_HandleGamepadGyroEvent(event.gsensor, eventTime);
+				SDL3_HandleGamepadSensorEvent(event.gsensor, eventTime);
 				break;
 
 			case SDL_EVENT_JOYSTICK_ADDED:
-				if (in_joystick.GetBool() && !s_sdlGamepad && !s_sdlJoystick && !SDL_IsGamepad(event.jdevice.which)) {
-					(void)SDL3_OpenJoystick(event.jdevice.which);
+				// a gamepad opens on its SDL_EVENT_GAMEPAD_ADDED
+				if (!SDL_IsGamepad(event.jdevice.which)) {
+					(void)SDL3_OpenController(event.jdevice.which, eventTime);
 				}
 				break;
 
 			case SDL_EVENT_JOYSTICK_REMOVED:
-				if (s_sdlJoystick && event.jdevice.which == s_sdlJoystickId) {
-					SDL3_CloseJoystick(eventTime);
-					SDL3_OpenFirstController();
+				SDL3_CloseController(event.jdevice.which, eventTime);
+				break;
+
+			case SDL_EVENT_JOYSTICK_BATTERY_UPDATED:
+				if (event.jbattery.which == s_sdlGamepadId || event.jbattery.which == s_sdlJoystickId) {
+					SDL3_PublishControllerState();
 				}
 				break;
 
 			case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
 			case SDL_EVENT_JOYSTICK_BUTTON_UP:
-				if (in_joystick.GetBool() && s_sdlJoystick && event.jbutton.which == s_sdlJoystickId) {
-					const int button = static_cast<int>(event.jbutton.button);
-					if (button >= 0 && button < SDL3_MAX_JOYSTICK_BUTTONS) {
-						const bool down = event.jbutton.down;
-						if (s_joystickButtonsDown[button] != down) {
-							s_joystickButtonsDown[button] = down;
-							SDL3_PostControllerKeyEvent(SDL3_JoyKeyFromOrdinal(button), down, eventTime);
+				if (in_joystick.GetBool()) {
+					if (event.jbutton.down) {
+						SDL3_NoteControllerUse(event.jbutton.which, eventTime);
+					}
+					if (s_sdlJoystick && event.jbutton.which == s_sdlJoystickId) {
+						const int button = static_cast<int>(event.jbutton.button);
+						if (button >= 0 && button < SDL3_MAX_JOYSTICK_BUTTONS) {
+							const bool down = event.jbutton.down;
+							if (s_joystickButtonsDown[button] != down) {
+								s_joystickButtonsDown[button] = down;
+								SDL3_PostControllerKeyEvent(SDL3_JoyKeyFromOrdinal(button), down, eventTime);
+							}
 						}
 					}
 				}
 				break;
 
 			case SDL_EVENT_JOYSTICK_HAT_MOTION:
-				if (in_joystick.GetBool() && s_sdlJoystick && event.jhat.which == s_sdlJoystickId) {
-					SDL3_SetJoystickHat(event.jhat.value, eventTime);
+				if (in_joystick.GetBool()) {
+					if (event.jhat.value != SDL_HAT_CENTERED) {
+						SDL3_NoteControllerUse(event.jhat.which, eventTime);
+					}
+					if (s_sdlJoystick && event.jhat.which == s_sdlJoystickId) {
+						SDL3_SetJoystickHat(event.jhat.value, eventTime);
+					}
 				}
 				break;
 
 			case SDL_EVENT_JOYSTICK_AXIS_MOTION:
-				if (in_joystick.GetBool() && s_sdlJoystick && event.jaxis.which == s_sdlJoystickId) {
-					SDL3_UpdateJoystickAxes();
+				if (in_joystick.GetBool()) {
+					if (event.jaxis.which != s_sdlJoystickId) {
+						const sdlController_t *waiting = SDL3_FindController(event.jaxis.which);
+						if (waiting != NULL && waiting->joystick != NULL && SDL3_JoystickAxisIsUse(waiting->joystick)) {
+							SDL3_NoteControllerUse(event.jaxis.which, eventTime);
+						}
+					}
+					if (s_sdlJoystick && event.jaxis.which == s_sdlJoystickId) {
+						SDL3_UpdateJoystickAxes();
+					}
 				}
 				break;
 
@@ -6258,12 +7248,8 @@ void Sys_InitInput(void) {
 	in_joystickLowBatteryRumbleThreshold.ClearModified();
 	in_joystickLowBatteryRumbleScale.ClearModified();
 	in_gyro.ClearModified();
-	in_gyroSensitivity.ClearModified();
-	in_gyroDeadZone.ClearModified();
-	in_gyroYawAxis.ClearModified();
-	in_gyroPitchAxis.ClearModified();
-	in_gyroInvertYaw.ClearModified();
-	in_gyroInvertPitch.ClearModified();
+	in_gyroMenuPointer.ClearModified();
+	in_gyroSpace.ClearModified();
 	in_touchpadMode.ClearModified();
 	in_touchpadSensitivity.ClearModified();
 	in_touchscreen.ClearModified();
@@ -6665,8 +7651,135 @@ bool Sys_GetJoystickAxisState(int axis, int &value) {
 	return true;
 }
 
+/*
+===============
+Sys_GetGyroLook
+
+openQ4 (PAD-04): the view rotation gyro motion has earned since the usercmd
+last took it, in degrees of the engine's view angles (yaw to the left, pitch
+downwards), with the gyro's own ratio and inversion applied. The usercmd
+consumes it; the late-look path peeks.
+===============
+*/
+bool Sys_GetGyroLook(float &yaw, float &pitch, bool consume) {
+	Sys_EnterCriticalSection(CRITICAL_SECTION_ONE);
+	yaw = s_gyroLookYaw;
+	pitch = s_gyroLookPitch;
+	if (consume) {
+		s_gyroLookYaw = 0.0f;
+		s_gyroLookPitch = 0.0f;
+	}
+	Sys_LeaveCriticalSection(CRITICAL_SECTION_ONE);
+	return yaw != 0.0f || pitch != 0.0f;
+}
+
+/*
+===============
+Sys_SetJoystickTriggerRumble
+
+openQ4 (PAD-08): the trigger motors, on controllers that have them. Under
+in_joystickRumble, its strength and its low-battery cap, with a switch of
+its own.
+===============
+*/
+bool Sys_HasScreenKeyboardSupport(void) {
+	return SDL_HasScreenKeyboardSupport();
+}
+
+void Sys_StartControllerRumbleTest(void) {
+	if (!in_joystick.GetBool() || !s_sdlGamepad) {
+		return;
+	}
+	SDL3_StopControllerRumble();
+	s_rumbleTestStart = Sys_Milliseconds();
+	if (s_rumbleTestStart == 0) {
+		s_rumbleTestStart = 1;
+	}
+	s_rumbleTestStep = 0;
+	common->Printf("controller: rumble test\n");
+}
+
+bool Sys_GetControllerTestState(controllerTestState_t &state) {
+	memset(&state, 0, sizeof(state));
+	if (!in_joystick.GetBool() || !s_sdlGamepad) {
+		return false;
+	}
+	state.present = true;
+	state.leftX = SDL3_ClampRange(SDL_GetGamepadAxis(s_sdlGamepad, SDL_GAMEPAD_AXIS_LEFTX) / 32767.0f, -1.0f, 1.0f);
+	state.leftY = SDL3_ClampRange(SDL_GetGamepadAxis(s_sdlGamepad, SDL_GAMEPAD_AXIS_LEFTY) / 32767.0f, -1.0f, 1.0f);
+	state.rightX = SDL3_ClampRange(SDL_GetGamepadAxis(s_sdlGamepad, SDL_GAMEPAD_AXIS_RIGHTX) / 32767.0f, -1.0f, 1.0f);
+	state.rightY = SDL3_ClampRange(SDL_GetGamepadAxis(s_sdlGamepad, SDL_GAMEPAD_AXIS_RIGHTY) / 32767.0f, -1.0f, 1.0f);
+	state.leftTrigger = SDL3_ClampUnit(SDL_GetGamepadAxis(s_sdlGamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) / 32767.0f);
+	state.rightTrigger = SDL3_ClampUnit(SDL_GetGamepadAxis(s_sdlGamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) / 32767.0f);
+	for (int button = 0; button < SDL_GAMEPAD_BUTTON_COUNT; ++button) {
+		const int key = SDL3_MapGamepadButton(static_cast<Uint8>(button));
+		if (key >= K_JOY1 && key - K_JOY1 < 32 && SDL_GetGamepadButton(s_sdlGamepad, static_cast<SDL_GamepadButton>(button))) {
+			state.buttons |= 1u << (key - K_JOY1);
+		}
+	}
+	// the triggers press as buttons past Trigger Press: the left is K_JOY16
+	const float threshold = SDL3_ClampUnit(in_joystickTriggerThreshold.GetFloat());
+	if (state.leftTrigger > 0.0f && state.leftTrigger >= threshold) {
+		state.buttons |= 1u << (K_JOY16 - K_JOY1);
+	}
+	if (state.rightTrigger > 0.0f && state.rightTrigger >= threshold) {
+		state.buttons |= 1u << (K_JOY15 - K_JOY1);
+	}
+	state.hasGyro = SDL_GamepadHasSensor(s_sdlGamepad, SDL_SENSOR_GYRO);
+	state.hasRumble = SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_RUMBLE_BOOLEAN);
+	state.hasTriggerRumble = SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_TRIGGER_RUMBLE_BOOLEAN);
+	state.steamInput = SDL_GetGamepadSteamHandle(s_sdlGamepad) != 0 &&
+		(!state.hasGyro || SDL_GetNumGamepadTouchpads(s_sdlGamepad) <= 0);
+	if (state.hasGyro && Sys_Milliseconds() - s_gyroTestTime < 100) {
+		state.gyroYaw = s_gyroTestYaw;
+		state.gyroPitch = s_gyroTestPitch;
+	}
+	state.motor = s_rumbleTestStep;
+	return true;
+}
+
+bool Sys_SetJoystickTriggerRumble(float left, float right, int durationMsec) {
+	if (s_rumbleTestStart != 0) {
+		return false;
+	}
+	if (!in_joystick.GetBool() || !in_joystickRumble.GetBool() || !in_joystickTriggerRumble.GetBool() || durationMsec <= 0 ||
+			!SDL3_ActiveGamepadHas(SDL_PROP_GAMEPAD_CAP_TRIGGER_RUMBLE_BOOLEAN)) {
+		return false;
+	}
+	const float scale = SDL3_GetEffectiveRumbleScale();
+	const Uint16 leftLevel = SDL3_ClampRumbleValue(SDL3_ClampUnit(left) * scale);
+	const Uint16 rightLevel = SDL3_ClampRumbleValue(SDL3_ClampUnit(right) * scale);
+	const int now = Sys_Milliseconds();
+	const int untilTime = now + durationMsec;
+	if (leftLevel == s_triggerRumbleLeft && rightLevel == s_triggerRumbleRight && now < s_triggerRumbleUntilTime &&
+			now < s_triggerRumbleLastUpdateTime + SDL3_RUMBLE_DEBOUNCE_MSEC &&
+			untilTime <= s_triggerRumbleUntilTime + SDL3_RUMBLE_DEBOUNCE_MSEC) {
+		return true;
+	}
+	if (!SDL_RumbleGamepadTriggers(s_sdlGamepad, leftLevel, rightLevel, static_cast<Uint32>(durationMsec))) {
+		return false;
+	}
+	s_triggerRumbleLeft = leftLevel;
+	s_triggerRumbleRight = rightLevel;
+	s_triggerRumbleUntilTime = untilTime;
+	s_triggerRumbleLastUpdateTime = now;
+	return true;
+}
+
+// What the active controller's light and trigger feel follow; the game says
+// it every frame of play, and SDL3_UpdateControllerFeedback applies it.
+void Sys_SetControllerPlayerState(int weaponFeel, int health, int team) {
+	s_feedbackFeel = idMath::ClampInt(CONTROLLER_FEEL_NONE, CONTROLLER_FEEL_BEAM, weaponFeel);
+	s_feedbackHealth = health;
+	s_feedbackTeam = team;
+	s_feedbackStateTime = Sys_Milliseconds();
+}
+
 bool Sys_SetJoystickRumble(float lowFrequency, float highFrequency, int durationMsec) {
 	const int now = Sys_Milliseconds();
+	if (s_rumbleTestStart != 0) {
+		return false;
+	}
 
 	if (!in_joystick.GetBool() || !in_joystickRumble.GetBool() || durationMsec <= 0) {
 		if (s_joystickRumbleActive) {
@@ -6985,6 +8098,8 @@ static bool SDL3_WindowServices_PrepareWindowSystem(void) {
 		cmdSystem->AddCommand("listDisplays", SDL3_ListDisplays_f, CMD_FL_SYSTEM, "lists SDL3 displays and monitor indices");
 		cmdSystem->AddCommand("listDisplayModes", SDL3_ListDisplayModes_f, CMD_FL_SYSTEM, "lists SDL3 fullscreen display modes (optional display index)");
 		cmdSystem->AddCommand("listControllers", SDL3_ListControllers_f, CMD_FL_SYSTEM, "lists SDL3 controller, sensor, touchpad, and battery diagnostics");
+		cmdSystem->AddCommand("calibrateGyro", SDL3_CalibrateGyro_f, CMD_FL_SYSTEM, "measures the active controller's gyro bias: hold it still for two seconds");
+		cmdSystem->AddCommand("virtualController", SDL3_VirtualController_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "development: attach and drive SDL virtual controllers inside this process, so the controller layer can be tested without hardware or operating-system input; requires cheats");
 		cmdSystem->AddCommand("sdl3MouseCaptureDiagnostics", SDL3_MouseCaptureDiagnostics_f, CMD_FL_SYSTEM, "toggles SDL3 mouse capture and prints backend state; optional repeat count is clamped to 1..8");
 		cmdSystem->AddCommand("windowMinimizeTest", SDL3_WindowMinimizeTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "development: minimize the game window, as leaving full screen does, so the frame cap of a window that shows nothing can be measured without input; requires cheats");
 		cmdSystem->AddCommand("windowFocusTest", SDL3_WindowFocusTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "development: request foreground focus once for an already visible windowed game window, or use report to identify it without changing focus; requires cheats and separate permission when automated");

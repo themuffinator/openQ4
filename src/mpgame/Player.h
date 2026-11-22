@@ -702,7 +702,10 @@ public:
 	float					VRZoomScale( void );
 	// A pulse in the local player's weapon hand, other hand, or both; without
 	// a headset, a gamepad rumble (weapon hand high motor, other hand low).
-	void					VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec ) const;
+	void					VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec, float direction = 0.0f ) const;
+	void					UpdateControllerState( void ) const;	// openQ4 (PAD-08): the controller's light and trigger feel
+	void					UpdateAimAssist( void );				// openQ4 (PAD-03): aim assistance for controller sticks
+	bool					AimAssistTargets( idEntity *ent ) const;
 	// The body in the headset (vr_body). BeginVRBody poses the trunk and legs
 	// for this draw; the view weapon then asks where each of its forearms
 	// meets the body (SolveVRViewArm); FinishVRBody poses the arms and submits

@@ -223,15 +223,19 @@ def validate_controller_contract() -> None:
     controller_hints = function_body(source, "static void SDL3_SetControllerHintDefaults(void) {")
     init_controllers = function_body(source, "static void SDL3_InitControllerSubsystems(void) {")
     list_controllers = function_body(source, "static void SDL3_ListControllers_f(const idCmdArgs &args) {")
-    open_first = function_body(source, "static void SDL3_OpenFirstController(void) {")
-    open_gamepad = function_body(source, "static bool SDL3_OpenGamepad(SDL_JoystickID instanceId) {")
-    open_joystick = function_body(source, "static bool SDL3_OpenJoystick(SDL_JoystickID instanceId) {")
+    open_all = function_body(source, "static void SDL3_OpenAllControllers(void) {")
+    open_controller = function_body(source, "static bool SDL3_OpenController(SDL_JoystickID id, int eventTime) {")
+    close_controller = function_body(source, "static void SDL3_CloseController(SDL_JoystickID id, int eventTime) {")
+    activate_controller = function_body(source, "static void SDL3_ActivateController(SDL_JoystickID id, int eventTime) {")
+    deactivate_controller = function_body(source, "static void SDL3_DeactivateController(int eventTime) {")
+    apply_change = function_body(source, "static void SDL3_ApplyControllerChange(openq4::ControllerChange change, int eventTime) {")
+    note_use = function_body(source, "static void SDL3_NoteControllerUse(SDL_JoystickID id, int eventTime) {")
     gamepad_axes = function_body(source, "static void SDL3_UpdateGamepadAxes(int eventTime) {")
     joystick_axes = function_body(source, "static void SDL3_UpdateJoystickAxes(void) {")
     map_gamepad_button = function_body(source, "static int SDL3_MapGamepadButton(Uint8 button) {")
     joy_from_ordinal = function_body(source, "static int SDL3_JoyKeyFromOrdinal(int ordinal) {")
     set_hat = function_body(source, "static void SDL3_SetJoystickHat(Uint8 newHat, int eventTime) {")
-    gyro = function_body(source, "static void SDL3_HandleGamepadGyroEvent(const SDL_GamepadSensorEvent &event, int eventTime) {")
+    gyro = function_body(source, "static void SDL3_HandleGamepadSensorEvent(const SDL_GamepadSensorEvent &event, int eventTime) {")
     touchpad = function_body(source, "static void SDL3_HandleGamepadTouchpadEvent(const SDL_GamepadTouchpadEvent &event, int eventTime) {")
     finger = function_body(source, "static void SDL3_HandleFingerEvent(const SDL_TouchFingerEvent &event, int eventTime) {")
     clamp_range = function_body(source, "static float SDL3_ClampRange(float value, float minValue, float maxValue) {")
@@ -270,7 +274,7 @@ def validate_controller_contract() -> None:
     require(init_controllers, "SDL_SetGamepadEventsEnabled(true)", "SDL3 gamepad event enable")
     require(init_controllers, "SDL_InitSubSystem(SDL_INIT_JOYSTICK)", "SDL3 joystick subsystem init")
     require(init_controllers, "SDL_SetJoystickEventsEnabled(true)", "SDL3 joystick event enable")
-    require(init_controllers, "SDL3_OpenFirstController();", "SDL3 first controller open")
+    require(init_controllers, "SDL3_OpenAllControllers();", "SDL3 opens every controller")
 
     for token in (
         "SDL controller hints:",
@@ -284,13 +288,28 @@ def validate_controller_contract() -> None:
     ):
         require(list_controllers, token, "SDL3 controller diagnostics")
 
-    require(open_first, "SDL_GetGamepads(&gamepadCount)", "SDL3 gamepad enumeration")
-    require(open_first, "SDL_GetJoysticks(&joystickCount)", "SDL3 joystick fallback enumeration")
-    require_order(open_first, "SDL_GetGamepads(&gamepadCount)", "SDL_GetJoysticks(&joystickCount)", "prefer SDL gamepads before raw joysticks")
-    require(open_gamepad, "SDL_OpenGamepad(instanceId)", "SDL3 gamepad open")
-    require(open_gamepad, "SDL3_UpdateGamepadSensorState(true)", "SDL3 gamepad sensor capability update")
-    require(open_joystick, "SDL_OpenJoystick(instanceId)", "SDL3 joystick open")
-    require(open_joystick, "if (SDL_IsGamepad(instanceId))", "SDL3 joystick fallback excludes gamepads")
+    require(open_all, "SDL_GetGamepads(&gamepadCount)", "SDL3 gamepad enumeration")
+    require(open_all, "SDL_GetJoysticks(&joystickCount)", "SDL3 joystick fallback enumeration")
+    require_order(open_all, "SDL_GetGamepads(&gamepadCount)", "SDL_GetJoysticks(&joystickCount)", "prefer SDL gamepads before raw joysticks")
+    require(open_all, "if (!SDL_IsGamepad(joysticks[i]))", "SDL3 joystick fallback excludes gamepads")
+    require(open_all, "s_controllerRoster.SetPreference(in_joystickDevice.GetString())", "PAD-01 saved device choice")
+    reject(open_all, "break;", "PAD-01: every controller opens, not the first")
+    require(open_controller, "SDL_OpenGamepad(id)", "SDL3 gamepad open")
+    require(open_controller, "SDL_OpenJoystick(id)", "SDL3 joystick open")
+    require(open_controller, "if (SDL_IsGamepad(id))", "SDL3 joystick fallback excludes gamepads")
+    require(open_controller, "s_controllerRoster.Add(", "PAD-01: the roster decides who takes charge")
+    require(open_controller, "SDL3_ApplyControllerChange(change, eventTime);", "PAD-01: the roster decides who takes charge")
+    require(activate_controller, "SDL3_UpdateGamepadSensorState(true)", "SDL3 gamepad sensor capability update")
+    require(activate_controller, "in_gamepadFamily.SetString(SDL3_GamepadFamily(controller->pad));", "PAD-01: prompts follow the active controller")
+    # PAD-01: the outgoing controller's held state releases before the new one speaks
+    for token in ("SDL3_StopControllerRumble();", "SDL3_ReleaseGamepadState(eventTime);", "SDL3_ReleaseJoystickState(eventTime);",
+                  "SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_GYRO, false)", "SDL3_ClearJoystickState();"):
+        require(deactivate_controller, token, "PAD-01 release on handover")
+    reject(deactivate_controller, "SDL_CloseGamepad", "PAD-01: a handover leaves the device open")
+    require_order(apply_change, "SDL3_DeactivateController(eventTime);", "SDL3_ActivateController(s_controllerRoster.Active(), eventTime);", "PAD-01 release before handover")
+    require(apply_change, 'in_gamepadFamily.SetString("none");', "PAD-01: a loss with no successor reaches the notice")
+    require(close_controller, "s_controllerRoster.Remove(", "PAD-01: the roster picks the successor")
+    require(note_use, "s_controllerRoster.NoteUse(", "PAD-01 use-to-switch")
     require(clamp_range, "if (!std::isfinite(value))", "SDL3 controller float clamp finite guard")
     require(clamp_unit, "return SDL3_ClampRange(value, 0.0f, 1.0f);", "SDL3 unit clamp finite guard")
     require(clamp_rumble, "if (!std::isfinite(value) || value <= 0.0f)", "SDL3 rumble value finite guard")
@@ -340,8 +359,31 @@ def validate_controller_contract() -> None:
         "SDL3_QueueMouseDelta(dx, dy, eventTime);",
     ):
         require(source, token, "SDL3 gyro support")
-    require(gyro, "SDL3_IsMouseCaptured()", "SDL3 gyro gameplay routing")
+    reject(gyro, "!SDL3_IsMouseCaptured()", "PAD-04: gyro aim does not wait for the mouse to be captured")
     require(gyro, "SDL3_ShouldRouteMenuMouse()", "SDL3 gyro menu suppression")
+    # PAD-04: calibration, filtering, the turning space and the gyro's own
+    # ratio, in that order; play receives degrees of view, not mouse counts.
+    for first, second in (
+        ("openq4::UpdateGyroCalibration(s_gyroCalibration, raw,", "openq4::ApplyGyroCalibration(s_gyroCalibration, raw)"),
+        ("openq4::ApplyGyroCalibration(s_gyroCalibration, raw)", "openq4::FilterGyro(s_gyroFilter, calibrated, deltaSeconds, filterSettings)"),
+        ("openq4::FilterGyro(s_gyroFilter, calibrated, deltaSeconds, filterSettings)", "openq4::ComputeGyroTurn(filtered, s_gyroGravity, in_gyroSpace.GetInteger())"),
+        ("openq4::ComputeGyroTurn(filtered, s_gyroGravity, in_gyroSpace.GetInteger())", "s_gyroLookYaw = idMath::ClampFloat("),
+    ):
+        require_order(gyro, first, second, "PAD-04 gyro sample path")
+    for token in ("in_gyroYawRatio.GetFloat()", "in_gyroPitchRatio.GetFloat()", "in_gyroInvertYaw.GetBool()", "in_gyroInvertPitch.GetBool()",
+                  "in_gyroDeadZone.GetFloat()", "in_gyroSmoothing.GetFloat()", "SDL3_StoreGyroCalibration(s_gyroIdentity, s_gyroCalibration.offset);"):
+        require(gyro, token, "PAD-04 gyro settings")
+    for token in ('cvarSystem->GetCVarFloat("sensitivity")', "m_cpi", "m_smooth", "m_filter", "cl_mouseAccel", "RADIANS_TO_CLASSIC_MOUSE_COUNTS"):
+        reject(gyro, token, "PAD-04: no mouse setting touches gyro aim")
+    look = function_body(source, "bool Sys_GetGyroLook(float &yaw, float &pitch, bool consume) {")
+    require(look, "if (consume) {", "PAD-04: the late-look path peeks without taking")
+    usercmd = read("src/framework/UsercmdGen.cpp")
+    gyro_move = function_body(usercmd, "void idUsercmdGenLocal::GyroMove( void ) {")
+    require_order(gyro_move, "Sys_GetGyroLook( yaw, pitch, true )", "GyroLookActive()", "PAD-04: motion made while the gyro is off is dropped, not saved")
+    require(gyro_move, "GetZoomLookSensitivityScale()", "PAD-04: zoom scales gyro aim")
+    for token in ("sensitivity.GetFloat()", "m_yaw", "m_pitch", "NormalizeMouseDeltasForCpi", "CalculateMouseSensitivity", "mouseDx"):
+        reject(gyro_move, token, "PAD-04: no mouse setting touches gyro aim")
+    require(usercmd, '{ "_gyro",\t\t\tUB_GYRO },', "PAD-04 _gyro binding")
 
     for token in (
         "SDL_EVENT_GAMEPAD_TOUCHPAD_DOWN",
@@ -385,9 +427,23 @@ def validate_controller_contract() -> None:
     ):
         require(pump, token, "SDL3 controller event pump")
 
+    # PAD-01: a press, or a stick or trigger past its dead zone, on a waiting controller
+    for token in (
+        "SDL3_NoteControllerUse(event.gbutton.which, eventTime);",
+        "SDL3_GamepadAxisIsUse(waiting->pad, event.gaxis.axis)",
+        "SDL3_NoteControllerUse(event.jbutton.which, eventTime);",
+        "SDL3_JoystickAxisIsUse(waiting->joystick)",
+        "SDL_EVENT_JOYSTICK_BATTERY_UPDATED",
+        "(void)SDL3_OpenController(event.gdevice.which, eventTime);",
+        "SDL3_CloseController(event.gdevice.which, eventTime);",
+    ):
+        require(pump, token, "PAD-01 controller event pump")
+    require_order(pump, "SDL3_NoteControllerUse(event.gbutton.which, eventTime);", "SDL3_PostControllerKeyEvent(SDL3_MapGamepadButton(event.gbutton.button), down, eventTime);",
+                  "PAD-01: the press that hands charge over still counts")
+
     require(background, "SDL3_ReleaseFocusInputState(eventTime);", "SDL3 background input release")
     for token in (
-        "SDL3_OpenFirstController();",
+        "SDL3_OpenAllControllers();",
         "SDL3_UpdateGamepadSensorState(false);",
         "SDL3_UpdateGamepadAxes(eventTime);",
         "SDL3_UpdateJoystickAxes();",

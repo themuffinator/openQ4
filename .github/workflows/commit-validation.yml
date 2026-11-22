@@ -172,6 +172,7 @@ jobs:
             tools/tests/log_write_failure.py \
             tools/tests/campaign_runtime.py \
             tools/tests/campaign_selection_runtime.py \
+            tools/tests/controller_runtime.py \
             tools/tests/clang_tidy_input_safety.py \
             tools/tests/cmdargs_append_contract.py \
             tools/tests/console_completion_contract.py \

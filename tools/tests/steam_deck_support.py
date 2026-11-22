@@ -159,7 +159,7 @@ def validate_filesystem_discovery() -> None:
 
 def validate_sdl3_input_and_lifecycle() -> None:
     source = read("src/sys/sdl3/sdl3_backend.cpp")
-    gyro = function_body(source, "static void SDL3_HandleGamepadGyroEvent(const SDL_GamepadSensorEvent &event, int eventTime) {")
+    gyro = function_body(source, "static void SDL3_HandleGamepadSensorEvent(const SDL_GamepadSensorEvent &event, int eventTime) {")
     touchpad = function_body(source, "static void SDL3_HandleGamepadTouchpadEvent(const SDL_GamepadTouchpadEvent &event, int eventTime) {")
     finger = function_body(source, "static void SDL3_HandleFingerEvent(const SDL_TouchFingerEvent &event, int eventTime) {")
     pump = function_body(source, "bool Sys_SDL_PumpEvents(void) {")
@@ -201,9 +201,13 @@ def validate_sdl3_input_and_lifecycle() -> None:
     require(source, "SDL_GamepadHasSensor(s_sdlGamepad, SDL_SENSOR_GYRO)", "gyro capability detection")
     require(source, "SDL_SetGamepadSensorEnabled(s_sdlGamepad, SDL_SENSOR_GYRO, wantsGyro)", "gyro sensor enable")
     require(gyro, "SDL_SENSOR_GYRO", "gyro event filtering")
-    require(gyro, "SDL3_IsMouseCaptured()", "gyro gameplay routing")
+    reject(gyro, "!SDL3_IsMouseCaptured()", "PAD-04: gyro aim does not wait for the mouse to be captured")
     require(gyro, "SDL3_ShouldRouteMenuMouse()", "gyro menu suppression")
-    require(gyro, "SDL3_QueueMouseDelta(dx, dy, eventTime);", "gyro mouse delta queueing")
+    # PAD-04: gyro aim reaches play as degrees of view, never as mouse counts;
+    # the mouse path carries only the optional gyro menu pointer.
+    require(gyro, "s_gyroLookYaw = idMath::ClampFloat(-360.0f, 360.0f, s_gyroLookYaw + look.yaw);", "gyro aim in its own units")
+    require(gyro, "if (!in_gyroMenuPointer.GetBool()) {", "gyro menu pointer is opt-in")
+    require(source, "bool Sys_GetGyroLook(float &yaw, float &pitch, bool consume) {", "gyro aim hand-off to the usercmd")
 
     require(touchpad, "in_touchpadMode.GetInteger()", "touchpad mode gate")
     require(touchpad, "mode == 1", "touchpad menu cursor mode")
@@ -260,7 +264,7 @@ def validate_sdl3_input_and_lifecycle() -> None:
     for token in (
         "SDL3_InvalidateMenuMouseRouting();",
         "SDL3_ClearInputQueues();",
-        "SDL3_OpenFirstController();",
+        "SDL3_OpenAllControllers();",
         "SDL3_UpdateGamepadSensorState(false);",
         "Sys_GrabMouseCursor(true);",
         "SDL3_UpdateCursorVisibility();",

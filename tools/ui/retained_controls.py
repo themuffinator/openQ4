@@ -39,12 +39,26 @@ from __future__ import annotations
 
 from build_retained_screens import (ORANGE, U, Document, absolute, group, keyword, label, length,
                                     number, path, rgb, solid, text_width, typeface, vector)
+from retained_controller_test import ROW_LABEL as TEST_LABEL, SHOW as TEST_SHOW, controller_test_modal
 from retained_key_glyphs import bound_keys, em
 from retained_mp_menus import PLACEHOLDER, any_text, row_face, row_states
 from retained_settings_rows import (COLUMN_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, heading, row_chrome,
                                     rows_value_column, settings_subpage, slider, toggle, value_column)
 
 PREFIX = "controls"
+
+
+def button(ident: str, label_key: str, action: str) -> tuple:
+    """A device tab's row that is one button running a session action."""
+    return ("button", ident, label_key, action, None)
+
+
+def opener(ident: str, label_key: str, event: str) -> tuple:
+    """A device tab's row that is one button running one of the page's own
+    events: it opens a panel."""
+    return ("opener", ident, label_key, event, None)
+
+
 # Each section: its id, heading (the stock tab) and rows (label, binding), in
 # the stock page's order; the session's RETAINED_CONTROLS_BINDINGS follows it.
 SECTIONS = (
@@ -95,33 +109,78 @@ DEVICES = (
          slider("controls_maccelpower", "#str_229940", "cl_mouseAccelPower", 1, 8, 0.05, 2),
          slider("controls_msenscap", "#str_229941", "cl_mouseSensCap", 0, 100, 0.1, 1)),
     )),
+    # The controller has two tabs: the strip has room for one more beside the
+    # stock tabs in every language. CONTROLLER holds the device, its buttons,
+    # what its motors and lights do and the prompts; AIM holds how the stick
+    # and the gyro turn the view. Gyro smoothing stays a console setting.
+    # Test Controller opens the CONTROLLER TEST panel (retained_controller_test).
     ("controller", "#str_229924", (
         (heading("#str_232557"),
          toggle("controls_controller", "#str_229925", "in_joystick"),
+         choice("controls_device", "#str_232750", "in_joystickDevicePin", "#str_232751", (0, 1)),
+         opener("controls_test", TEST_LABEL, TEST_SHOW),
          choice("controls_southpaw", "#str_229930", "in_joystickSouthpaw", "#str_229934", (0, 1)),
-         slider("controls_deadzone", "#str_229926", "in_joystickDeadZone", 0, 0.95, 0.01, 2),
-         slider("controls_looksensitivity", "#str_229931", "in_joystickLookSensitivity", 0.1, 4, 0.05, 2),
-         slider("controls_lookcurve", "#str_229932", "in_joystickLookCurve", 1, 3, 0.05, 2),
-         toggle("controls_invertlook", "#str_229933", "in_joystickInvertLook"),
          slider("controls_wheelsensitivity", "#str_42840", "in_weaponWheelSensitivity", 0.25, 16, 0.25, 2),
          slider("controls_wheeloffset", "#str_230140", "ui_weaponWheelOffset", -40, 40, 1),
+         heading("#str_232749"),
+         choice("controls_layout", "#str_232742", "in_joystickLayout", "#str_232743", (0, 1, 2, 3, 4)),
+         slider("controls_trigger", "#str_229927", "in_joystickTriggerThreshold", 0, 1, 0.01, 2),
+         toggle("controls_togglecrouch", "#str_232745", "in_toggleCrouch"),
+         toggle("controls_alwaysrun", "#str_232746", "in_alwaysRun"),
+         toggle("controls_context", "#str_232744", "in_joystickContextActions"),
+         button("controls_resetcontroller", "#str_232747", "controlsResetController"),
+         button("controls_resetkeyboard", "#str_232748", "controlsResetKeyboard")),
+        (heading("#str_232734"),
+         toggle("controls_rumble", "#str_229928", "in_joystickRumble"),
+         slider("controls_rumblescale", "#str_229929", "in_joystickRumbleScale", 0, 2, 0.05, 2),
+         toggle("controls_triggerrumble", "#str_232736", "in_joystickTriggerRumble"),
+         toggle("controls_adaptivetriggers", "#str_232737", "in_joystickAdaptiveTriggers"),
+         toggle("controls_directionalhits", "#str_232738", "in_joystickDirectionalRumble"),
+         slider("controls_batterythreshold", "#str_229970", "in_joystickLowBatteryRumbleThreshold", 0, 100, 1),
+         slider("controls_batteryscale", "#str_229971", "in_joystickLowBatteryRumbleScale", 0, 2, 0.05, 2),
+         heading("#str_232735"),
+         toggle("controls_light", "#str_232739", "in_joystickLight"),
+         toggle("controls_playerlight", "#str_232740", "in_joystickPlayerLight"),
+         slider("controls_batterynotice", "#str_232741", "in_joystickLowBatteryNotice", 0, 100, 1),
          heading("#str_232560"),
          choice("controls_promptstyle", "#str_231526", "in_promptStyle", "#str_231527", (0, 1, 2, 3, 4, 5)),
          choice("controls_swapconfirm", "#str_231528", "in_swapConfirmBack", "#str_231529", (0, 1, 2))),
-        (heading("#str_232558"),
-         slider("controls_trigger", "#str_229927", "in_joystickTriggerThreshold", 0, 1, 0.01, 2),
-         toggle("controls_rumble", "#str_229928", "in_joystickRumble"),
-         slider("controls_rumblescale", "#str_229929", "in_joystickRumbleScale", 0, 2, 0.05, 2),
-         slider("controls_batterythreshold", "#str_229970", "in_joystickLowBatteryRumbleThreshold", 0, 100, 1),
-         slider("controls_batteryscale", "#str_229971", "in_joystickLowBatteryRumbleScale", 0, 2, 0.05, 2),
-         heading("#str_232559"),
+    )),
+    ("aim", "#str_232702", (
+        (heading("#str_232705"),
+         choice("controls_response", "#str_232707", "in_joystickResponse", "#str_232708", (0, 1, 2, 3)),
+         slider("controls_turnspeed", "#str_232709", "in_joystickYawSpeed", 30, 720, 5, 1),
+         slider("controls_pitchspeed", "#str_232710", "in_joystickPitchSpeed", 30, 720, 5, 1),
+         slider("controls_lookcurve", "#str_229932", "in_joystickLookCurve", 1, 3, 0.05, 2),
+         toggle("controls_invertlook", "#str_229933", "in_joystickInvertLook"),
+         slider("controls_turnboost", "#str_232711", "in_joystickTurnBoost", 0, 400, 10),
+         choice("controls_aimassist", "#str_232712", "in_aimAssist", "#str_232713", (0, 1, 2, 3)),
+         heading("#str_232706"),
+         slider("controls_lookdeadzone", "#str_232714", "in_joystickLookDeadZone", 0, 0.95, 0.01, 2),
+         slider("controls_lookouterzone", "#str_232715", "in_joystickLookOuterDeadZone", 0, 0.5, 0.01, 2),
+         slider("controls_movedeadzone", "#str_232716", "in_joystickMoveDeadZone", 0, 0.95, 0.01, 2),
+         slider("controls_moveouterzone", "#str_232717", "in_joystickMoveOuterDeadZone", 0, 0.5, 0.01, 2),
+         choice("controls_moveshape", "#str_232718", "in_joystickMoveDeadZoneAxial", "#str_232719", (0, 1)),
+         slider("controls_movecurve", "#str_232720", "in_joystickMoveCurve", 1, 3, 0.05, 2)),
+        (heading("#str_232752"),
          toggle("controls_gyro", "#str_229964", "in_gyro"),
-         slider("controls_gyrosensitivity", "#str_229965", "in_gyroSensitivity", 0, 8, 0.05, 2),
+         slider("controls_gyroturn", "#str_232721", "in_gyroYawRatio", 0.1, 8, 0.05, 2),
+         slider("controls_gyrotilt", "#str_232722", "in_gyroPitchRatio", 0.1, 8, 0.05, 2),
+         choice("controls_gyrospace", "#str_232723", "in_gyroSpace", "#str_232724", (0, 1, 2)),
+         choice("controls_gyroactive", "#str_232725", "in_gyroActivation", "#str_232726", (0, 1, 2, 3)),
+         toggle("controls_gyroinvertturn", "#str_232727", "in_gyroInvertYaw"),
+         toggle("controls_gyroinverttilt", "#str_232728", "in_gyroInvertPitch"),
+         slider("controls_gyrotightening", "#str_232729", "in_gyroDeadZone", 0, 0.2, 0.005, 3),
+         toggle("controls_gyropointer", "#str_232731", "in_gyroMenuPointer"),
+         button("controls_gyrocalibrate", "#str_232732", "controlsCalibrateGyro"),
+         heading("#str_232733"),
          choice("controls_touchpad", "#str_229966", "in_touchpadMode", "#str_229967", (0, 1, 2, 3)),
          slider("controls_touchpadsensitivity", "#str_229968", "in_touchpadSensitivity", 0, 8, 0.05, 2),
          toggle("controls_touchscreen", "#str_229969", "in_touchscreen")),
     )),
 )
+# The session actions the device tabs' buttons run (HandleRetainedControlsRequest).
+DEVICE_ACTIONS = ("controlsResetController", "controlsResetKeyboard", "controlsCalibrateGyro")
 TOUCH_LAYOUT_ROW, TOUCH_LAYOUT_LABEL = "controls_touch_layout", "#str_231762"
 CAPTURE = "controls.capture"              # the row waiting for a key, or -1
 WAITING_TEXT = "#str_107000"              # "Press any key...", the stock field's
@@ -218,13 +277,26 @@ def controls_document() -> dict:
         tabs.append((section, heading_key, [built[:half], built[half:]]))
     # The device tabs share one value column, as GAME OPTIONS' rows do.
     value_x = rows_value_column(device_rows())
+    for action in DEVICE_ACTIONS:
+        doc.session(action, action)
+
+    def device_row(item):
+        if item[0] == "heading":
+            return item
+        if item[0] == "button":
+            _kind, ident, label_key, action, _extra = item
+            return button_row(doc, ident, label_key, value_x, None, {"action": action})
+        if item[0] == "opener":
+            _kind, ident, label_key, event, _extra = item
+            return button_row(doc, ident, label_key, value_x, None, {"event": event})
+        return cvar_row(doc, item, value_x)
+
     for ident, key, columns in DEVICES:
-        tabs.append((ident, key, [[item if item[0] == "heading" else cvar_row(doc, item, value_x) for item in column]
-                                  for column in columns]))
+        tabs.append((ident, key, [[device_row(item) for item in column] for column in columns]))
     # The west face button clears the focused row, as Delete does.
     doc.events["onSecondary"] = [{"op": "action", "action": "controlsClear"}]
     # The prompt bar (section 13.4): Accept reads CHANGE on a row; while the
     # page waits for a key, Accept is the key itself and leaves the bar.
     prompts = {"verbs": (VERB_CHANGE,), "accept_shown": {"op": "<", "args": [{"state": CAPTURE}, 0]}}
     note = {section: "#str_231545" for section, _heading, _rows in SECTIONS}
-    return settings_subpage(doc, PREFIX, "#str_200083", tabs, note=note, prompts=prompts)
+    return settings_subpage(doc, PREFIX, "#str_200083", tabs, note=note, prompts=prompts, overlays=[controller_test_modal(doc)])

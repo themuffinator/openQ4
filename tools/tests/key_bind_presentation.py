@@ -104,6 +104,11 @@ def validate_binding_formatter() -> None:
     require(compact, "selected = firstMouse >= 0 ? firstMouse : firstKeyboard", "desktop-family representative")
     require(compact, "if ( selected < 0 )", "other-family fallback")
     require(compact, "Key_AppendBindingPresentation( keyName, selected, emphasized )", "single compact token emission")
+    # PAD-06: a controller with no button for the command is shown its context buttons instead, composed apart
+    require(compact, "Key_AppendContextPrompt( keyName, bind, emphasized )", "context buttons for a controller without a binding")
+    context = body_of(source, "static bool Key_AppendContextPrompt(", "KeyInput.cpp")
+    require(context, "Key_ContextKeyForPrompt( bind, holdKey )", "context prompt lookup")
+    require(context, 'keyName += " + "', "held-context prompt joins its two buttons")
     require(compact, '"#str_07133"', "compact localized unbound fallback")
     if compact.count("Key_AppendBindingPresentation(") != 1:
         raise AssertionError("Compact HUD formatting must emit exactly one representative binding")
@@ -185,7 +190,8 @@ def validate_active_input_tracking() -> None:
         require(axes, "SDL3_QueueControllerActivity", context)
 
     for signature, context in (
-        ("static void SDL3_HandleGamepadGyroEvent(", "gamepad gyro mouse emulation"),
+        # PAD-04: one handler takes the gyro and accelerometer; in a menu the gyro may move the pointer
+        ("static void SDL3_HandleGamepadSensorEvent(", "gamepad gyro menu pointer"),
         ("static void SDL3_HandleGamepadTouchpadEvent(", "gamepad touchpad mouse emulation"),
     ):
         emulation = body_of(sdl, signature, "sdl3_backend.cpp")

@@ -3,6 +3,7 @@
 
 #include "../framework/PresentationClock.h"
 #include "../framework/PresentationLook.h"
+#include "../framework/ControllerAimAssist.h"
 
 // RAVEN BEGIN
 // jsinger: attempt to eliminate cross-DLL allocation issues

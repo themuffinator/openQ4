@@ -29,6 +29,9 @@ If you have questions concerning this license or the applicable additional terms
 
 
 
+#include "ControllerAimAssist.h"
+#include "ControllerGyro.h"
+#include "ControllerLook.h"
 #include "NativeInputDispatch.h"
 #include "PresentationLook.h"
 #include "Session_local.h"
@@ -58,6 +61,22 @@ static idCVar ui_radialCancel( "ui_radialCancel", "0", CVAR_SYSTEM | CVAR_BOOL |
 // rows than it shows (ui-visual-design.md 14.14). The weapon-cycle controls
 // and the right stick then scroll it through the game's scoreboardScroll
 // command, on this client alone, and never reach the server as weapon changes.
+// openQ4 (PAD-03): aim assistance for controller sticks. in_aimAssist is the
+// player's choice; a multiplayer server may allow less (si_aimAssist). The
+// game module picks the target and publishes what the stick takes: a speed
+// scale while the crosshair is on or beside a live enemy or on a world
+// screen, and a follow rate that is a share of the target's own motion. Only
+// idUsercmdGenLocal::StickLookRate reads them, so the mouse and the gyro are
+// never assisted, and the result travels as ordinary usercmd angles.
+static idCVar in_aimAssist( "in_aimAssist", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
+	"controller stick aim assistance: 0 off, 1 low, 2 standard, 3 high; slows the stick near an enemy and follows a share of the "
+	"enemy's motion while a stick moves; never the mouse or the gyro, and never more than a multiplayer server allows", 0, 3 );
+static idCVar in_aimAssistSlow( "in_aimAssistSlow", "1", CVAR_SYSTEM | CVAR_FLOAT | CVAR_ROM | CVAR_NOCHEAT,
+	"set by the game: the look stick's speed scale from aim assistance, 1 for none", 0.1f, 1.0f );
+static idCVar in_aimAssistYaw( "in_aimAssistYaw", "0", CVAR_SYSTEM | CVAR_FLOAT | CVAR_ROM | CVAR_NOCHEAT,
+	"set by the game: the yaw, in degrees per second, aim assistance adds while a stick moves" );
+static idCVar in_aimAssistPitch( "in_aimAssistPitch", "0", CVAR_SYSTEM | CVAR_FLOAT | CVAR_ROM | CVAR_NOCHEAT,
+	"set by the game: the pitch, in degrees per second, aim assistance adds while a stick moves" );
 static idCVar ui_scoreboardScrolls( "ui_scoreboardScrolls", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_ROM | CVAR_NOCHEAT,
 	"set by the game while the held scoreboard scrolls: the weapon-cycle controls and the right stick scroll it" );
 
@@ -127,6 +146,7 @@ typedef enum {
 	UB_WEAPONWHEEL,
 	UB_QUICKCHAT,
 	UB_HOOK,
+	UB_GYRO,
 
 	UB_IMPULSE0,
 	UB_IMPULSE1,
@@ -223,6 +243,7 @@ userCmdString_t	userCmdStrings[] = {
 	{ "_weaponWheel",	UB_WEAPONWHEEL },
 	{ "_quickChat",		UB_QUICKCHAT },
 	{ "_hook",			UB_HOOK },		// openQ4: Classic ruleset grappling hook
+	{ "_gyro",			UB_GYRO },		// openQ4 (PAD-04): pauses or enables gyro aim, by in_gyroActivation
 	{ "_altattack",		UB_ZOOM },		// the Awakening's name for zoom / alternate fire
 	{ "_ingameStats",	UB_BUTTON5 },
 	{ "_voiceChat",		UB_BUTTON6 },
@@ -424,6 +445,9 @@ private:
 	void			AdjustAngles( void );
 	void			KeyMove( void );
 	void			JoystickMove( void );
+	void			GyroMove( void );
+	void			AddControllerLook( float yaw, float pitch );
+	bool			GyroLookActive( void );
 	void			MouseMove( void );
 	float			NormalizeMouseDeltasForCpi( float &mx, float &my, float &strafeMx, float &strafeMy ) const;
 	float			CalculateMouseSensitivity( float mx, float my, float *debugRate, float *debugPower ) const;
@@ -441,6 +465,7 @@ private:
 	void			MouseProbe( void );
 	int				MovementProbe( void );
 	bool			PresentationLookRate( float &yawRate, float &pitchRate );
+	bool			StickLookRate( const int axes[MAX_JOYSTICK_AXIS], bool radial, openq4::TurnBoostState &boost, float &yawRate, float &pitchRate );
     void MouseEvent(int action,int value);
 	void			Keyboard( void );
 	void			Joystick( void );
@@ -475,6 +500,7 @@ private:
 	bool			retainedKeyBlocked[K_LAST_KEY];
 	bool			retainedDirectBlocked[UB_MAX_BUTTONS];
 	bool			retainedAxisBlocked[MAX_JOYSTICK_AXIS];
+	int				keyAction[K_LAST_KEY];		// the action each held key pressed (PAD-06 context actions)
 
 	int				inhibitCommands;	// true when in console or menu locally
 	int				lastCommandTime;
@@ -503,6 +529,7 @@ private:
 	int				joystickAxis[MAX_JOYSTICK_AXIS];	// set by joystick events
 	int				scoreboardStickDirection;			// the right stick's scroll of the held scoreboard
 	int				scoreboardStickRepeat;				// when the held stick scrolls again
+	openq4::TurnBoostState	turnBoost;					// how long the look stick has been held hard over (PAD-02)
 
 	static idCVar	in_yawSpeed;
 	static idCVar	in_pitchSpeed;
@@ -1148,24 +1175,136 @@ void idUsercmdGenLocal::MouseMove( void ) {
 
 /*
 =================
+idUsercmdGenLocal::AddControllerLook
+
+openQ4: view rotation from the stick or the gyro. The mouse's View Filter
+(m_filter) rebuilds the view each tick from its own base and history, which
+used to throw away everything that was not the mouse, so a controller could
+not turn at all while it was on. Controller look moves the filter's base and
+history with the view: it arrives whole and unfiltered, and the mouse's part
+is filtered as before.
+=================
+*/
+void idUsercmdGenLocal::AddControllerLook( float yaw, float pitch ) {
+	viewangles[YAW] += yaw;
+	viewangles[PITCH] += pitch;
+	if ( GetMouseFilterSamples() > 0 ) {
+		mouseFilterBaseYaw += yaw;
+		mouseFilterBasePitch += pitch;
+		for ( int i = 0; i < MOUSE_FILTER_SAMPLES; i++ ) {
+			mouseFilterYaw[i] += yaw;
+			mouseFilterPitch[i] += pitch;
+		}
+	}
+}
+
+/*
+=================
+Usercmd_ControllerSetting
+
+The stick-response cvars belong to the platform layer (sdl3_backend.cpp),
+which also fills the look speeds in from the classic settings at startup. A
+build without that layer has no controller and none of them.
+=================
+*/
+static float Usercmd_ControllerSetting( idCVar *&cvar, const char *name, float fallback ) {
+	if ( cvar == NULL ) {
+		cvar = cvarSystem->Find( name );
+	}
+	return cvar != NULL ? cvar->GetFloat() : fallback;
+}
+
+/*
+=================
+idUsercmdGenLocal::StickLookRate
+
+openQ4 (PAD-02): the one stick-look transform. Degrees per second the look
+stick turns the view by, from the axes the caller sampled. The usercmd
+(JoystickMove) integrates it over its tick and advances the turn boost; the
+late-look path (PresentationLookRate) passes a copy of the boost, so it shows
+what the next usercmd will apply and changes nothing.
+
+Full-stick speed is in_joystickYawSpeed and in_joystickPitchSpeed, in degrees
+per second. Walking and running do not scale it: only the keyboard turn keys
+keep retail's in_anglespeedkey. Until the platform layer has filled the speeds
+in they are the classic product, in_yawspeed x Look Sensitivity x the run scale
+that always-run applied.
+A radial selector takes the stick as a cursor at its own fixed speed.
+=================
+*/
+bool idUsercmdGenLocal::StickLookRate( const int axes[MAX_JOYSTICK_AXIS], bool radial, openq4::TurnBoostState &boost, float &yawRate, float &pitchRate ) {
+	static idCVar *yawSpeedCVar = NULL, *pitchSpeedCVar = NULL, *sensitivityCVar = NULL, *invertCVar = NULL;
+	static idCVar *boostCVar = NULL, *boostRampCVar = NULL;
+	yawRate = 0.0f;
+	pitchRate = 0.0f;
+
+	// AXIS_ROLL is used as a backend capability flag: non-zero means dedicated look axes are available.
+	const bool hasDedicatedLookAxis = axes[AXIS_ROLL] != 0;
+	const float lookAxisX = ( hasDedicatedLookAxis ? axes[AXIS_SIDE] : axes[AXIS_YAW] ) * JOYSTICK_AXIS_LOOK_SCALE;
+	float lookAxisY = ( hasDedicatedLookAxis ? axes[AXIS_FORWARD] : -axes[AXIS_PITCH] ) * JOYSTICK_AXIS_LOOK_SCALE;
+	if ( !hasDedicatedLookAxis && Usercmd_ControllerSetting( invertCVar, "in_joystickInvertLook", 0.0f ) != 0.0f ) {
+		// backends only apply invert to dedicated look axes; the shared move/look axis is inverted here
+		lookAxisY = -lookAxisY;
+	}
+	if ( hasDedicatedLookAxis && ScoreboardScrolls() ) {
+		// the right stick scrolls the held scoreboard instead of pitching
+		lookAxisY = 0.0f;
+	}
+	if ( !hasDedicatedLookAxis && ButtonState( UB_STRAFE ) ) {
+		// a single stick held with the strafe button moves instead of turning
+		boost = openq4::TurnBoostState();
+		return false;
+	}
+
+	openq4::StickLookSettings settings;
+	openq4::TurnBoostSettings boostSettings;
+	bool boostAllowed = false;
+	if ( radial ) {
+		// Wheel navigation has its own sensitivity and must not inherit slow
+		// aiming, zoom or boost.
+		settings.yawSpeed = settings.pitchSpeed = 140.0f;
+	} else {
+		const float sensitivity = idMath::ClampFloat( 0.1f, 4.0f, Usercmd_ControllerSetting( sensitivityCVar, "in_joystickLookSensitivity", 0.75f ) );
+		const float yawSpeed = Usercmd_ControllerSetting( yawSpeedCVar, "in_joystickYawSpeed", 0.0f );
+		const float pitchSpeed = Usercmd_ControllerSetting( pitchSpeedCVar, "in_joystickPitchSpeed", 0.0f );
+		const float classicRunScale = in_alwaysRun.GetBool() ? in_angleSpeedKey.GetFloat() : 1.0f;
+		settings.yawSpeed = yawSpeed > 0.0f ? yawSpeed : in_yawSpeed.GetFloat() * sensitivity * classicRunScale;
+		settings.pitchSpeed = pitchSpeed > 0.0f ? pitchSpeed : in_pitchSpeed.GetFloat() * sensitivity * classicRunScale;
+		const float zoomScale = GetZoomLookSensitivityScale();
+		// aim assistance slows the stick, and only the stick (PAD-03)
+		settings.scale = zoomScale * idMath::ClampFloat( 0.1f, 1.0f, in_aimAssistSlow.GetFloat() );
+		settings.boostSpeed = Usercmd_ControllerSetting( boostCVar, "in_joystickTurnBoost", 0.0f );
+		boostSettings.ramp = Usercmd_ControllerSetting( boostRampCVar, "in_joystickTurnBoostRamp", boostSettings.ramp );
+		// off while zoomed
+		boostAllowed = settings.boostSpeed > 0.0f && zoomScale >= 1.0f;
+	}
+
+	const float share = openq4::AdvanceTurnBoost( boost, lookAxisX, common->GetUserCmdSec(), boostAllowed, boostSettings );
+	const openq4::StickLookRate rate = openq4::ComputeStickLookRate( lookAxisX, lookAxisY, settings, share );
+	yawRate = rate.yaw;
+	pitchRate = rate.pitch;
+	if ( !radial ) {
+		// The follow: a share of the target's own motion, while a stick is
+		// moving. With both sticks at rest the view never moves by itself.
+		const float moveAxisX = hasDedicatedLookAxis ? axes[AXIS_YAW] * JOYSTICK_AXIS_LOOK_SCALE : 0.0f;
+		const float moveAxisY = hasDedicatedLookAxis ? axes[AXIS_PITCH] * JOYSTICK_AXIS_LOOK_SCALE : 0.0f;
+		if ( openq4::AimAssistStickMoving( lookAxisX, lookAxisY, moveAxisX, moveAxisY ) ) {
+			yawRate += idMath::ClampFloat( -60.0f, 60.0f, in_aimAssistYaw.GetFloat() );
+			pitchRate += idMath::ClampFloat( -60.0f, 60.0f, in_aimAssistPitch.GetFloat() );
+		}
+	}
+	return yawRate != 0.0f || pitchRate != 0.0f;
+}
+
+/*
+=================
 idUsercmdGenLocal::JoystickMove
 =================
 */
 void idUsercmdGenLocal::JoystickMove( void ) {
-	float	anglespeed;
 	const float usercmdSeconds = common->GetUserCmdSec();
 	// AXIS_ROLL is used as a backend capability flag: non-zero means dedicated look axes are available.
 	const bool hasDedicatedLookAxis = joystickAxis[AXIS_ROLL] != 0;
-	const float lookAxisX = ( hasDedicatedLookAxis ?
-		joystickAxis[AXIS_SIDE] :
-		joystickAxis[AXIS_YAW] ) * JOYSTICK_AXIS_LOOK_SCALE;
-	float lookAxisY = ( hasDedicatedLookAxis ?
-		joystickAxis[AXIS_FORWARD] :
-		-joystickAxis[AXIS_PITCH] ) * JOYSTICK_AXIS_LOOK_SCALE;
-	if ( !hasDedicatedLookAxis && cvarSystem->GetCVarBool( "in_joystickInvertLook" ) ) {
-		// backends only apply invert to dedicated look axes; the shared move/look axis is inverted here
-		lookAxisY = -lookAxisY;
-	}
 	const int moveAxisX = joystickAxis[AXIS_YAW];
 	const int moveAxisY = joystickAxis[AXIS_PITCH];
 	cvarSystem->SetCVarBool( "ui_radialStickActive", idKeyInput::LastInputWasController() );
@@ -1173,8 +1312,10 @@ void idUsercmdGenLocal::JoystickMove( void ) {
 	// openQ4: while the held scoreboard scrolls (ui-visual-design.md 14.14),
 	// the right stick scrolls it a row on each push past half its travel, then
 	// every 120 ms while held, the way the stick points whatever the look
-	// inversion, and leaves the view's pitch alone.
+	// inversion, and leaves the view's pitch alone (StickLookRate).
 	if ( hasDedicatedLookAxis && ScoreboardScrolls() ) {
+		// the platform layer already applied the inversion to a dedicated look axis
+		const float lookAxisY = joystickAxis[AXIS_FORWARD] * JOYSTICK_AXIS_LOOK_SCALE;
 		const float stickY = cvarSystem->GetCVarBool( "in_joystickInvertLook" ) ? -lookAxisY : lookAxisY;
 		const int direction = stickY > 0.5f ? 1 : ( stickY < -0.5f ? -1 : 0 );
 		const int now = Sys_Milliseconds();
@@ -1185,35 +1326,17 @@ void idUsercmdGenLocal::JoystickMove( void ) {
 			scoreboardStickRepeat = now + ( direction != scoreboardStickDirection ? 400 : 120 );
 			scoreboardStickDirection = direction;
 		}
-		lookAxisY = 0.0f;
 	} else {
 		scoreboardStickDirection = 0;
 	}
 
-	if ( IsRunButtonActive() ) {
-		anglespeed = usercmdSeconds * in_angleSpeedKey.GetFloat();
-	} else {
-		anglespeed = usercmdSeconds;
-	}
-
-	float joystickLookSensitivity = cvarSystem->GetCVarFloat( "in_joystickLookSensitivity" );
-	if ( joystickLookSensitivity <= 0.0f ) {
-		joystickLookSensitivity = 1.0f;
-	}
-	joystickLookSensitivity = idMath::ClampFloat( 0.1f, 4.0f, joystickLookSensitivity ) * GetZoomLookSensitivityScale();
-	const bool weaponWheel = ( cmd.buttons & ( BUTTON_WEAPONWHEEL | BUTTON_QUICKCHAT ) ) != 0;
-	if ( weaponWheel ) {
-		// Wheel navigation has its own sensitivity and must not inherit slow
-		// aiming, zoom or run modifiers. These deltas use the unscaled input tic.
-		anglespeed = usercmdSeconds;
-		joystickLookSensitivity = 1.0f;
-	}
-
-	if ( hasDedicatedLookAxis || !ButtonState( UB_STRAFE ) ) {
-		// positive axis values mean stick right/down; turning right decreases yaw and
-		// looking down increases pitch, matching the mouse and keyboard handling above
-		viewangles[YAW] -= anglespeed * ( weaponWheel ? 140.0f : in_yawSpeed.GetFloat() ) * joystickLookSensitivity * lookAxisX;
-		viewangles[PITCH] += anglespeed * ( weaponWheel ? 140.0f : in_pitchSpeed.GetFloat() ) * joystickLookSensitivity * lookAxisY;
+	// positive axis values mean stick right/down; turning right decreases yaw and
+	// looking down increases pitch, matching the mouse and keyboard handling above
+	const bool radial = ( cmd.buttons & ( BUTTON_WEAPONWHEEL | BUTTON_QUICKCHAT ) ) != 0;
+	float yawRate = 0.0f;
+	float pitchRate = 0.0f;
+	if ( StickLookRate( joystickAxis, radial, turnBoost, yawRate, pitchRate ) ) {
+		AddControllerLook( yawRate * usercmdSeconds, pitchRate * usercmdSeconds );
 	}
 
 	if ( hasDedicatedLookAxis ) {
@@ -1227,6 +1350,47 @@ void idUsercmdGenLocal::JoystickMove( void ) {
 	}
 
 	cmd.upmove = idMath::ClampChar( cmd.upmove + joystickAxis[AXIS_UP] );
+}
+
+/*
+=================
+idUsercmdGenLocal::GyroLookActive
+
+openQ4 (PAD-04): whether gyro motion aims now. in_gyroActivation chooses
+always, paused while the _gyro button is held, only while it is held, or only
+while zoomed.
+=================
+*/
+bool idUsercmdGenLocal::GyroLookActive( void ) {
+	static idCVar *activationCVar = NULL;
+	const int activation = static_cast<int>( Usercmd_ControllerSetting( activationCVar, "in_gyroActivation", 0.0f ) );
+	const bool zoomed = toggled_zoom.on != 0 || in_presentationViewProbeZoom.GetBool();
+	return openq4::GyroActive( activation, ButtonState( UB_GYRO ) != 0, zoomed );
+}
+
+/*
+=================
+idUsercmdGenLocal::GyroMove
+
+openQ4 (PAD-04): gyro aim. The platform layer hands over degrees of view,
+already at the gyro's own ratio, so the mouse's sensitivity, CPI, smoothing,
+filter and acceleration never touch it; zoom scales it as it scales every
+other look input. The motion is taken whether or not it is used: what the
+controller did while the gyro was off (the ratchet) or while a radial selector
+was open is dropped, not saved up.
+=================
+*/
+void idUsercmdGenLocal::GyroMove( void ) {
+	float yaw = 0.0f;
+	float pitch = 0.0f;
+	if ( !Sys_GetGyroLook( yaw, pitch, true ) ) {
+		return;
+	}
+	if ( ( cmd.buttons & ( BUTTON_WEAPONWHEEL | BUTTON_QUICKCHAT ) ) != 0 || !GyroLookActive() ) {
+		return;
+	}
+	const float scale = GetZoomLookSensitivityScale();
+	AddControllerLook( yaw * scale, pitch * scale );
 }
 
 /*
@@ -1342,6 +1506,13 @@ void idUsercmdGenLocal::MakeCurrent( void ) {
 #endif
 #endif
 	
+	if ( Inhibited() ) {
+		// openQ4 (PAD-04): gyro motion made while a menu, the console or a
+		// load holds the input is dropped, not saved up for the first usercmd
+		float droppedYaw = 0.0f;
+		float droppedPitch = 0.0f;
+		(void)Sys_GetGyroLook( droppedYaw, droppedPitch, true );
+	}
 	if ( !Inhibited() ) {
 #ifdef __ANDROID__
 		if ( touch.impulse >= 0 ) TriggerImpulse( touch.impulse );
@@ -1367,6 +1538,9 @@ void idUsercmdGenLocal::MakeCurrent( void ) {
 
 		// get basic movement from joystick
 		JoystickMove();
+
+		// gyro aim, in its own units
+		GyroMove();
 #ifdef __ANDROID__
 		cmd.rightmove = idMath::ClampChar( cmd.rightmove + idMath::FtoiFast( touch.side * 127.0f ) );
 		cmd.forwardmove = idMath::ClampChar( cmd.forwardmove + idMath::FtoiFast( touch.forward * 127.0f ) );
@@ -1509,6 +1683,7 @@ void idUsercmdGenLocal::Clear( void ) {
 	memset( retainedKeyBlocked, false, sizeof( retainedKeyBlocked ) );
 	memset( retainedDirectBlocked, false, sizeof( retainedDirectBlocked ) );
 	memset( retainedAxisBlocked, false, sizeof( retainedAxisBlocked ) );
+	memset( keyAction, 0, sizeof( keyAction ) );
 	toggled_zoom.Clear();
 
 	inhibitCommands = false;
@@ -1519,6 +1694,7 @@ void idUsercmdGenLocal::Clear( void ) {
 
 	scoreboardStickDirection = 0;
 	scoreboardStickRepeat = 0;
+	turnBoost = openq4::TurnBoostState();
 }
 
 /*
@@ -1595,7 +1771,11 @@ void idUsercmdGenLocal::Key( int keyNum, bool down ) {
 	}
 	keyState[ keyNum ] = down;
 
-	int action = idKeyInput::GetUsercmdAction( keyNum );
+	// openQ4 (PAD-06): a context can end while its button is still held (the
+	// vote closes, the scoreboard button comes up). The release is for the
+	// action the press began, never the button's other meaning.
+	int action = down ? idKeyInput::GetUsercmdAction( keyNum ) : keyAction[ keyNum ];
+	keyAction[ keyNum ] = down ? action : 0;
 	if ( action < 0 || action >= UB_MAX_BUTTONS ) {
 		return;
 	}
@@ -2105,6 +2285,10 @@ bool idUsercmdGenLocal::GetPresentationViewAngles( float &yaw, float &pitch ) {
 	const bool strafe = ButtonState( UB_STRAFE ) != 0;
 	const bool mouseLook = ( ButtonState( UB_MLOOK ) ^ in_freeLook.GetInteger() ) != 0;
 	const bool haveRate = !radial && PresentationLookRate( yawRate, pitchRate );
+	// gyro motion the next usercmd will take: looked at, never taken
+	float gyroYaw = 0.0f;
+	float gyroPitch = 0.0f;
+	const bool haveGyro = !radial && GyroLookActive() && Sys_GetGyroLook( gyroYaw, gyroPitch, false );
 	Sys_LeaveCriticalSection();
 
 	if ( radial || builtMsec < 0.0 ) {
@@ -2114,8 +2298,8 @@ bool idUsercmdGenLocal::GetPresentationViewAngles( float &yaw, float &pitch ) {
 	yaw = builtAngles[YAW];
 	pitch = builtAngles[PITCH];
 
-	// Mouse and gyro motion not yet in a usercmd, scaled exactly as MouseMove
-	// will scale it. m_smooth 1 makes its history average the raw delta.
+	// Mouse motion not yet in a usercmd, scaled exactly as MouseMove will scale
+	// it. m_smooth 1 makes its history average the raw delta.
 	const int maxMouseDelta = m_maxMouseDelta.GetInteger();
 	if ( maxMouseDelta > 0 && ( idMath::Fabs( mx ) > maxMouseDelta || idMath::Fabs( my ) > maxMouseDelta ) ) {
 		mx = my = 0.0f;
@@ -2131,6 +2315,13 @@ bool idUsercmdGenLocal::GetPresentationViewAngles( float &yaw, float &pitch ) {
 				pitch += m_pitch.GetFloat() * mouseAxisScale * my * mouseSensitivity;
 			}
 		}
+	}
+
+	// Gyro motion not yet in a usercmd, scaled exactly as GyroMove will scale it.
+	if ( haveGyro ) {
+		const float gyroScale = GetZoomLookSensitivityScale();
+		yaw += gyroYaw * gyroScale;
+		pitch += gyroPitch * gyroScale;
 	}
 
 	// Look keys and stick deflection are rates the next usercmd integrates over
@@ -2155,8 +2346,9 @@ bool idUsercmdGenLocal::GetPresentationViewAngles( float &yaw, float &pitch ) {
 idUsercmdGenLocal::PresentationLookRate
 
 Degrees per second the next usercmd would turn by from held look keys
-(AdjustAngles) and stick deflection (JoystickMove's look branch outside the
-radial selectors). It reads current key and axis state without consuming it.
+(AdjustAngles) and stick deflection (StickLookRate, as JoystickMove applies it
+outside the radial selectors). It reads current key and axis state without
+consuming it.
 Called with the async lock held.
 ================
 */
@@ -2180,24 +2372,14 @@ bool idUsercmdGenLocal::PresentationLookRate( float &yawRate, float &pitchRate )
 		}
 		axes[axis] = idMath::ClampChar( value );
 	}
-	const bool hasDedicatedLookAxis = axes[AXIS_ROLL] != 0;
-	const float lookAxisX = ( hasDedicatedLookAxis ? axes[AXIS_SIDE] : axes[AXIS_YAW] ) * JOYSTICK_AXIS_LOOK_SCALE;
-	float lookAxisY = ( hasDedicatedLookAxis ? axes[AXIS_FORWARD] : -axes[AXIS_PITCH] ) * JOYSTICK_AXIS_LOOK_SCALE;
-	if ( !hasDedicatedLookAxis && cvarSystem->GetCVarBool( "in_joystickInvertLook" ) ) {
-		lookAxisY = -lookAxisY;
-	}
-	if ( hasDedicatedLookAxis && ScoreboardScrolls() ) {
-		// the right stick scrolls the held scoreboard instead of pitching
-		lookAxisY = 0.0f;
-	}
-	float joystickLookSensitivity = cvarSystem->GetCVarFloat( "in_joystickLookSensitivity" );
-	if ( joystickLookSensitivity <= 0.0f ) {
-		joystickLookSensitivity = 1.0f;
-	}
-	joystickLookSensitivity = idMath::ClampFloat( 0.1f, 4.0f, joystickLookSensitivity ) * GetZoomLookSensitivityScale();
-	if ( hasDedicatedLookAxis || !ButtonState( UB_STRAFE ) ) {
-		yawRate -= runScale * in_yawSpeed.GetFloat() * joystickLookSensitivity * lookAxisX;
-		pitchRate += runScale * in_pitchSpeed.GetFloat() * joystickLookSensitivity * lookAxisY;
+	// The stick, through the transform the next usercmd applies; the boost is
+	// read from a copy, so this path advances nothing.
+	openq4::TurnBoostState boostPreview = turnBoost;
+	float stickYawRate = 0.0f;
+	float stickPitchRate = 0.0f;
+	if ( StickLookRate( axes, false, boostPreview, stickYawRate, stickPitchRate ) ) {
+		yawRate += stickYawRate;
+		pitchRate += stickPitchRate;
 	}
 	return yawRate != 0.0f || pitchRate != 0.0f;
 }

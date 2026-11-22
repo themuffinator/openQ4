@@ -491,6 +491,47 @@ int				Sys_ReturnJoystickInputEvent( const int n, int &axis, int &value );
 void			Sys_EndJoystickInputEvents( void );
 bool			Sys_GetJoystickAxisState( int axis, int &value );
 bool			Sys_SetJoystickRumble( float lowFrequency, float highFrequency, int durationMsec );
+// openQ4 (PAD-04): view rotation gyro motion has earned since the usercmd last
+// took it, in degrees of the view angles (yaw to the left, pitch downwards),
+// already scaled by the gyro's own ratio. consume false only looks (late look).
+bool			Sys_GetGyroLook( float &yaw, float &pitch, bool consume );
+// openQ4 (PAD-08): haptics and lights beyond the two rumble motors, each where
+// the controller has it and each with its own switch. The trigger motors
+// (0..1 each), and what the controller's light and trigger feel follow: the
+// held weapon's feel (CONTROLLER_FEEL_*), health 0..100 and team, -1 for none.
+bool			Sys_SetJoystickTriggerRumble( float left, float right, int durationMsec );
+void			Sys_SetControllerPlayerState( int weaponFeel, int health, int team );
+// openQ4 (PAD-07): what the active controller is doing right now, for the
+// Controls page's test panel. Sticks as the device reports them (-1..1, y
+// down) before any dead zone; buttons as bits, bit n for K_JOY1 + n, the
+// triggers' two among them once past Trigger Press; the gyro as the view rate
+// it asks for in degrees a second (zero while gyro aiming and the gyro pointer
+// are both off). motor is the rumble test's running step: 1 strong, 2 light,
+// 3 left trigger, 4 right trigger, 0 none. steamInput: Steam stands between
+// the game and the controller and passes no gyro or no touchpad on.
+struct controllerTestState_t {
+	bool			present;
+	float			leftX, leftY, rightX, rightY;
+	float			leftTrigger, rightTrigger;
+	unsigned int	buttons;
+	bool			hasGyro, hasRumble, hasTriggerRumble, steamInput;
+	float			gyroYaw, gyroPitch;
+	int				motor;
+};
+bool			Sys_GetControllerTestState( controllerTestState_t &state );
+// Runs each motor the active controller has for a moment, one after another,
+// whatever the Rumble switch says: the player asked to feel them.
+void			Sys_StartControllerRumbleTest( void );
+// openQ4 (PAD-05): whether the platform shows a keyboard of its own when a
+// text field takes input (Android, a Steam Deck in game mode, a touch tablet).
+// Where it does, the game's on-screen keyboard stays away.
+bool			Sys_HasScreenKeyboardSupport( void );
+enum {
+	CONTROLLER_FEEL_NONE = 0,	// no trigger effect
+	CONTROLLER_FEEL_LIGHT,		// automatic and light weapons: a little resistance
+	CONTROLLER_FEEL_HEAVY,		// shotgun, launchers, railgun: firm resistance
+	CONTROLLER_FEEL_BEAM		// lightning gun, gauntlet: a hum under the finger
+};
 // openQ4: controller rumble comes from two places. The sound system sends the
 // rumble of what the player hears once a frame (Sys_UpdateJoystickRumble), and
 // gameplay adds short pulses of its own, a shot or a hit (Sys_PulseJoystickRumble,
@@ -499,6 +540,10 @@ bool			Sys_SetJoystickRumble( float lowFrequency, float highFrequency, int durat
 // apply to both.
 void			Sys_UpdateJoystickRumble( float soundLowFrequency, float soundHighFrequency, int soundDurationMsec );
 void			Sys_PulseJoystickRumble( float lowFrequency, float highFrequency, int durationMsec );
+// a shot in the trigger that fires (whichever trigger is bound to attack), and
+// a hit felt from its side: direction -1 from the left .. 1 from the right
+void			Sys_PulseJoystickTriggerRumble( float strength, int durationMsec );
+void			Sys_PulseJoystickRumbleDirected( float strength, float direction, int durationMsec );
 // openQ4 VR: delivers a tracked-controller button exactly like a gamepad
 // button, to the event queue (menus, console) and the key poll queue (usercmd
 // bindings); mouse buttons are the menu pointer's clicks and take the mouse's
@@ -772,6 +817,12 @@ public:
 	// openQ4: a short gamepad rumble from gameplay (0..1 per motor), mixed with
 	// the sound system's rumble until it ends; see Sys_PulseJoystickRumble.
 	virtual void			ControllerRumblePulse( float lowFrequency, float highFrequency, int durationMsec ) = 0;
+	// openQ4 (PAD-08): a shot in the firing trigger's motor, a hit felt from
+	// its side (direction -1 left .. 1 right), and the state the controller's
+	// light and trigger feel follow; see Sys_SetControllerPlayerState.
+	virtual void			ControllerTriggerPulse( float strength, int durationMsec ) = 0;
+	virtual void			ControllerDirectionalPulse( float strength, float direction, int durationMsec ) = 0;
+	virtual void			ControllerSetPlayerState( int weaponFeel, int health, int team ) = 0;
 };
 
 extern idSys *				sys;

@@ -2241,6 +2241,128 @@ rows and their settings are gone, and that View Weapon stands under Crosshair.
 The gate keeps each stock GAME OPTIONS setting on one page and pins the
 binding-row-only Delete.
 
+## CONTROLLER and AIM on CONTROLS, and CONTROLLER TEST (22 November 2026)
+
+The controller experience work (roadmap PAD-01 to PAD-08) outgrew the one
+CONTROLLER tab. The strip has room for one more short tab in every language
+(804.5 dp; German and Turkish leave about 78 dp), so the controller has two:
+
+- **CONTROLLER**: STICKS (Controller, Active Controller, Test Controller,
+  Southpaw, the weapon wheel's two rows) and LAYOUT (Button Layout, Trigger
+  Press, Toggle Crouch, Always Run, Context Buttons, Reset Controller, Reset
+  Keyboard and Mouse) beside RUMBLE, LIGHTS AND NOTICES and PROMPTS.
+- **AIM**: RESPONSE (the preset, turn and look up/down speed in degrees a
+  second, Look Curve, Invert Look, Turn Boost, Aim Assist) and DEAD ZONES
+  beside GYRO and TOUCH.
+
+Both columns of CONTROLLER hold the sub-page's fourteen slots, so a further
+row there means moving one. Reset Controller, Reset Keyboard and Mouse and
+Calibrate Gyro are button rows that ask the session (`controlsResetController`,
+`controlsResetKeyboard`, `controlsCalibrateGyro`).
+
+**CONTROLLER TEST** (PAD-07, `tools/ui/retained_controller_test.py`) is a
+pop-up the Test Controller row opens with the page's own event, 620 dp wide in
+the stock confirmation's frame. It shows the controller's name, how it is
+powered and its battery where it reports one; both sticks, each a ring for the
+full throw with the dead zone filled at its centre and the outer limit drawn
+in orange inside the rim, at the sizes the AIM tab sets (the look stick's on
+the right, or on the left with Southpaw), and an orange dot where the device
+says the stick is before any dead zone; each trigger's travel as a bar with a
+mark at Trigger Press; the gyro's dot, moving with the turn it asks for,
+beside its calibration state; the motor the rumble test is running; and a row
+of the controller's buttons in the active family's glyphs
+(`retained_key_glyphs.pad_slot`), dim at 0.30 and lit while held. Where Steam
+Input manages the controller and passes no gyro or touchpad on, a line says so
+and names the Steam Deck guide.
+
+TEST RUMBLE (`controlsRumbleTest`) has the focus as the panel opens and runs
+each motor the controller has for 400 ms of a 600 ms turn: strong, light, left
+trigger, right trigger. CLOSE or Back closes the panel, so Back is the one
+input it cannot show held, and Accept is seen lit as it starts the motors.
+The dots and zones are bound transforms on decorative nodes, the bars bound
+widths: nothing in the panel lays out again as a stick moves. The session
+publishes `controllerTest.*` each frame the page shows
+(`idSessionLocal::UpdateControllerTestPanel`), from
+`Sys_GetControllerTestState`.
+
+The first time a controller family connects on a profile, two notices name the
+rows that choose its symbols, Prompt Style and Swap Confirm and Back
+(`#str_232769`, `#str_232770`, built from each language's own row labels;
+`in_joystickFamiliesSeen` keeps what has been said).
+
+Sixty-eight strings (`#str_232700` to `#str_232770`, three ids unused) are in
+all twelve languages; the eleven non-English tables are machine translations
+awaiting native review. The classic menus (`ui_retained 0`) keep their three
+controller rows; the new settings have no stock rows yet
+(`STOCK_ROWS_PENDING` in `tools/tests/ui_retained_gate.py`).
+`openq4-ui-retained-controls` drives the tabs and the panel (its event, a
+published stick, trigger and button, the rumble action, closing);
+`tools/tests/controller_runtime.py --scenario menu` and `--scenario
+testpanel` drive them in the client with an SDL virtual controller. Not yet
+captured: each family's glyph set in the panel, and any language but English.
+(Seventy-two strings with the [on-screen keyboard](#the-on-screen-keyboard-22-november-2026)'s four.)
+
+## The on-screen keyboard (22 November 2026)
+
+Roadmap PAD-05; the register's WID-022 and the text-entry part of INP-012
+([ui-visual-design.md](../ui-visual-design.md), Text entry). A retained text or
+number field took text only from a keyboard, or from the system's keyboard
+where SDL shows one. `guis/menu/keyboard.rui`
+(`tools/ui/retained_keyboard.py`) is openQ4's own, for a controller or a touch
+screen where the platform offers none.
+
+- **A screen of its own.** A field's edit lives only while the field keeps the
+  focus in its own document, so the keyboard cannot be controls beside it. The
+  session draws it over whichever retained screen holds the field
+  (`idSessionLocal::UpdateOnScreenKeyboard`, `DrawOnScreenKeyboard`): the page,
+  the retained home, the multiplayer card or the message box. The
+  controller's buttons, and the pointer or a finger over its panel, go to it;
+  a real keyboard still types into the field.
+- **Keys.** Four rows of eleven show the current layer, published by the
+  session from `src/framework/OnScreenKeyboard.h`: Latin letters and digits;
+  the accented letters of French, German, Italian, Spanish and Portuguese;
+  those of Polish, Czech, Hungarian and Turkish; Russian and Ukrainian
+  Cyrillic; symbols. Under them: SHIFT (lit while on, for one letter), the
+  layer key, which names the next layer, SPACE, the caret's two arrows, DELETE
+  and DONE. A field opens on Latin, on Cyrillic where the language is Russian
+  or Ukrainian, and a number field on symbols, where the digits are.
+- **Controller.** The D-pad or left stick moves between keys and Accept types.
+  West deletes, north adds a space, the bumpers move the caret, the left
+  trigger is SHIFT, the right trigger the next layer, Menu is DONE and Back
+  cancels the edit, each drawn on its key in the controller family's art while
+  a controller is in use.
+- **Typing.** A key's character, any Unicode scalar value, goes to the field's
+  open edit (`UI_RetainedFieldInput`), as do DELETE, the arrows, DONE (the
+  field's commit, as Enter) and Back (its cancel). The field stores UTF-8, so
+  the platform character event's U+00FF limit does not apply. DONE closes the
+  keyboard at once and ends the edit when the field's screen has answered the
+  commit; a value the field refuses keeps both.
+- **When.** While a field's edit is open and `ui_onScreenKeyboard` allows: 1
+  (default), the last input was a controller or touch and
+  `SDL_HasScreenKeyboardSupport` reports no system keyboard; 2, whenever a
+  field is edited; 0, never.
+- **Where.** The panel, 614 dp wide with 45-degree corners and the opaque black
+  frame, stands at the view's foot, or at its head while the field being
+  edited is in the lower half, so the field is never under it.
+
+Not built: field defaults that save typing (recent server addresses); the
+stock chat line, the console and the summary card's chat, which are not
+retained fields and stay keyboard-only; a per-language first layer beyond
+Cyrillic. Four strings (`#str_232771` to `#str_232774`) are in all twelve
+languages, machine-translated outside English.
+
+`openq4-on-screen-keyboard` checks the layouts (every letter each shipped
+language writes, small and capital, is on a key); `openq4-ui-on-screen-keyboard`
+the document (its 44 keys, the grid's navigation, every function from its key
+and from its controller button, SHIFT's light, the panel's two places);
+`tools/tests/controller_runtime.py --scenario keyboard` types a save's name in
+the client through `openq4_onScreenKeyboard`, with a capital, an accented
+letter and a Cyrillic one, edits it with the caret and DELETE, and saves under
+it with DONE. Not exercised: a physical controller or a touch screen on the
+keys (a hidden test window takes no device buttons), the player name, a
+server password, a number field, each language's captures, and Steam Deck
+game mode still showing Steam's keyboard.
+
 ## The multiplayer menu tree audit (20 November 2026)
 
 A review of every multiplayer page, its options and their widgets, against

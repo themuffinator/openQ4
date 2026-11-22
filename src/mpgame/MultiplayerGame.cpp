@@ -23294,6 +23294,29 @@ void idMultiplayerGame::DrawScoreBoard( idPlayer *player ) {
 		remasteredScoreboardScrolls = scrolls;
 		cvarSystem->SetCVarBool( "ui_scoreboardScrolls", scrolls );
 	}
+	// openQ4 (PAD-01): a match cannot pause, so the HUD says when the
+	// controller in use disconnects (until one returns), when its battery runs
+	// low and when it starts charging. The session publishes which in
+	// ui_controllerNotice, on this client alone.
+	// openQ4 (PAD-06): while a vote waits for this player, the controller's
+	// D-pad votes (idKeyInput::ContextBinding)
+	static bool voteOpenPublished = false;
+	const bool voteOpen = vote != VOTE_NONE && !voted;
+	if ( voteOpen != voteOpenPublished ) {
+		voteOpenPublished = voteOpen;
+		cvarSystem->SetCVarBool( "ui_voteOpen", voteOpen );
+	}
+	static int controllerNoticeShown = 0;
+	const int controllerNotice = cvarSystem->GetCVarInteger( "ui_controllerNotice" );
+	if ( controllerNotice != controllerNoticeShown ) {
+		static const char *const noticeText[4] = { "", "#str_231541", "#str_232700", "#str_232701" };
+		if ( controllerNotice >= 1 && controllerNotice <= 3 ) {
+			player->GUIMainNotice( common->GetLocalizedString( noticeText[ controllerNotice ] ), controllerNotice == 1 );
+		} else if ( controllerNoticeShown == 1 ) {
+			player->GUIMainNotice( "" );
+		}
+		controllerNoticeShown = controllerNotice;
+	}
 }
 
 /*

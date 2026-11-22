@@ -262,6 +262,8 @@ bool SessionMenuCommand(const std::string& command) {
         "joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters",
         "msgLeft","msgRight","msgMid","presetCheckApply","presetCheckKeep","presetCheckLater",
         "noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","controlsTouchLayout",
+        "controlsResetController","controlsResetKeyboard","controlsCalibrateGyro","controlsRumbleTest",
+        "oskKey","oskShift","oskLayer","oskSpace","oskLeft","oskRight","oskBackspace","oskDone","oskCancel",
         "settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults",
         "joinConnect","joinSearch","joinSearchClear","joinSortNext",
         "mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction",
@@ -411,7 +413,23 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"in_gyroSensitivity",{0,0,8,false}},{"in_touchpadMode",{0,0,3,true,{},{0,1,2,3}}},{"in_touchpadSensitivity",{0,0,8,false}},
 		{"in_touchscreen",{1}},{"in_joystickLowBatteryRumbleThreshold",{0,0,100,true}},
 		{"in_joystickLowBatteryRumbleScale",{0,0,2,false}},{"in_promptStyle",{0,0,5,true,{},{0,1,2,3,4,5}}},
-		{"in_swapConfirmBack",{0,0,2,true,{},{0,1,2}}},{"g_crosshairCustom",{2,0,0,false,{"0","1"}}},
+		{"in_swapConfirmBack",{0,0,2,true,{},{0,1,2}}},
+		// The controller's own tabs on CONTROLS (PAD-01 to PAD-08): the device
+		// and layout, the stick response, gyro, and haptics and lights.
+		{"in_joystickDevicePin",{0,0,1,true,{},{0,1}}},{"in_joystickLayout",{0,0,4,true,{},{0,1,2,3,4}}},
+		{"in_toggleCrouch",{1}},{"in_alwaysRun",{1}},{"in_joystickContextActions",{1}},
+		{"in_joystickResponse",{0,0,3,true,{},{0,1,2,3}}},{"in_joystickYawSpeed",{0,30,720,false}},
+		{"in_joystickPitchSpeed",{0,30,720,false}},{"in_joystickTurnBoost",{0,0,400,false}},
+		{"in_aimAssist",{0,0,3,true,{},{0,1,2,3}}},{"in_joystickLookDeadZone",{0,0,0.95,false}},
+		{"in_joystickLookOuterDeadZone",{0,0,0.5,false}},{"in_joystickMoveDeadZone",{0,0,0.95,false}},
+		{"in_joystickMoveOuterDeadZone",{0,0,0.5,false}},{"in_joystickMoveDeadZoneAxial",{0,0,1,true,{},{0,1}}},
+		{"in_joystickMoveCurve",{0,1,3,false}},{"in_gyroYawRatio",{0,0.1,8,false}},{"in_gyroPitchRatio",{0,0.1,8,false}},
+		{"in_gyroSpace",{0,0,2,true,{},{0,1,2}}},{"in_gyroActivation",{0,0,3,true,{},{0,1,2,3}}},
+		{"in_gyroInvertYaw",{1}},{"in_gyroInvertPitch",{1}},{"in_gyroDeadZone",{0,0,0.2,false}},
+		{"in_gyroSmoothing",{0,0,0.2,false}},{"in_gyroMenuPointer",{1}},{"in_joystickTriggerRumble",{1}},
+		{"in_joystickAdaptiveTriggers",{1}},{"in_joystickDirectionalRumble",{1}},{"in_joystickLight",{1}},
+		{"in_joystickPlayerLight",{1}},{"in_joystickLowBatteryNotice",{0,0,100,true}},
+		{"g_crosshairCustom",{2,0,0,false,{"0","1"}}},
 		{"g_crosshairSize",{0,16,48,true,{},{16,24,32,40,48}}},
 		{"g_crosshairColor",{2,0,0,false,{"1 1 1 1","1 0 0 1","1 0.5 0 1","1 1 0 1","0 1 0 1","0 1 1 1","0 0 1 1","1 0 0.5 1"}}},
 		{"hud_hitMarker",{1}},{"hud_crosshairAnimated",{1}},{"ui_hudLayout",{0,0,3,true,{},{0,1,2,3}}},{"ui_hudScale",{0,0.5,2,false}},
@@ -2437,6 +2455,72 @@ std::string UI_RetainedFocusedControl(idUserInterface* gui) {
 	if (found == diagnosticViews.end()) return {};
 	const auto* runtime = (*found)->impl->RuntimeView();
 	return runtime ? runtime->FocusedControl() : std::string();
+}
+
+int UI_RetainedFieldEdit(idUserInterface* gui, float* centre) {
+	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
+	if (found == diagnosticViews.end()) return 0;
+	auto& impl = *(*found)->impl;
+	auto* runtime = impl.RuntimeView();
+	// An open edit is the field's own state: it does not wait on the window's
+	// focus, which only decides whether a device's keys reach the screen.
+	if (!runtime || !impl.active) return 0;
+	const auto id = runtime->FocusedControl();
+	const auto widget = runtime->GetWidgetState(id);
+	if (!widget || widget->role != ControlRole::Number || !widget->number || !widget->number->active) return 0;
+	const auto* node = impl.document.Model().FindNode(id);
+	const auto* field = node && node->control ? std::get_if<NumberSpec>(&node->control->widget) : nullptr;
+	if (centre) {
+		Viewport viewport; Bounds bounds;
+		*centre = RetainedUI_DefaultViewport(viewport) && viewport.height > 0 && runtime->GetBounds(id,bounds) ?
+			(bounds.y+bounds.height*.5f)/viewport.height : 0.f;
+	}
+	return !field || !field->textField ? 3 : field->masked ? 2 : 1;
+}
+
+bool UI_RetainedFieldInput(idUserInterface* gui, int operation, int character) {
+	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
+	if (found == diagnosticViews.end()) return false;
+	auto& impl = *(*found)->impl;
+	auto* runtime = impl.RuntimeView();
+	if (!runtime || !impl.active) return false;
+	const auto id = runtime->FocusedControl();
+	const auto widget = runtime->GetWidgetState(id);
+	if (!widget || widget->role != ControlRole::Number || !widget->number || !widget->number->active) return false;
+	const auto identity = widget->number->identity;
+	std::string error; const double now = RetainedUI_PresentationTime();
+	switch (operation) {
+		case UI_FIELD_TYPE: impl.TypeCharacter(character); return true;
+		case UI_FIELD_BACKSPACE: return runtime->NumberCommand(id,identity,TextEditCommand::Backspace,false,error,now);
+		case UI_FIELD_LEFT: return runtime->NumberCommand(id,identity,TextEditCommand::Left,false,error,now);
+		case UI_FIELD_RIGHT: return runtime->NumberCommand(id,identity,TextEditCommand::Right,false,error,now);
+		// A commit's proposal and the field's action reach the session as the
+		// diagnostics' commit does: collected here, dispatched by the caller.
+		case UI_FIELD_COMMIT: if (!runtime->CommitNumberEdit(id,identity,error,now)) return false; impl.CollectActions(true); return true;
+		case UI_FIELD_CANCEL: return runtime->CancelNumberEdit(id,identity,now);
+		default: return false;
+	}
+}
+
+bool UI_RetainedFieldSettled(idUserInterface* gui) {
+	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
+	if (found == diagnosticViews.end()) return true;
+	auto* runtime = (*found)->impl->RuntimeView();
+	if (!runtime) return true;
+	const auto widget = runtime->GetWidgetState(runtime->FocusedControl());
+	return !widget || !widget->pending;
+}
+
+bool UI_RetainedPointerOver(idUserInterface* gui, const char* node) {
+	const auto found = std::find(diagnosticViews.begin(),diagnosticViews.end(),gui);
+	if (found == diagnosticViews.end() || !node) return false;
+	auto& impl = *(*found)->impl;
+	auto* runtime = impl.RuntimeView();
+	Viewport viewport; Bounds bounds;
+	if (!runtime || !RetainedUI_DefaultViewport(viewport) || !runtime->GetBounds(node,bounds)) return false;
+	const CursorTransform transform(viewport);
+	const float px = impl.cursorX*transform.sx+transform.ox, py = impl.cursorY*transform.sy+transform.oy;
+	return px >= bounds.x && px < bounds.x+bounds.width && py >= bounds.y && py < bounds.y+bounds.height;
 }
 
 bool UI_RetainedDetailStick(idUserInterface* gui, float y, float seconds) {

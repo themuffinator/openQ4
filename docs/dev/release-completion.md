@@ -12,6 +12,96 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Controllers: the one in your hands, aim in degrees, gyro, layouts and haptics, 22 November 2026
+
+- **The controller in your hands is the one in charge.** Every connected
+  controller is ready: press a button or push a stick on another and it takes
+  over, with the prompts changing to its buttons and anything the first one
+  held released. **Settings → Controls → Controller → Active Controller** can
+  keep one controller in charge instead, which helps with a Steam Deck and an
+  external pad, or a remapping tool's second, virtual controller.
+- **Losing your controller no longer leaves you helpless.** In single-player
+  the game pauses, and plugging back in does not resume it for you. A
+  multiplayer match cannot pause, so its HUD tells you. You also get one
+  notice when the battery reaches 15% and one when it starts charging.
+- **Stick aim you can set in real units.** A new **Aim** tab has turn speed
+  and look up/down speed in degrees per second, a dead zone for each stick at
+  its centre and at its rim (so a worn stick still reaches full speed), an
+  optional turn boost for fast half turns, and three **Response** presets:
+  Classic (how openQ4 has always aimed), Precise and Dynamic. Turning no
+  longer slows down while you walk.
+- **Aim assist for sticks, off unless you turn it on.** It slows the stick
+  over an enemy and follows part of an enemy's movement while you move a
+  stick. It never pulls the crosshair onto anything, never helps the mouse or
+  gyro, and ignores allies and anything behind a wall. Servers decide how much
+  is allowed in multiplayer: none by default, and never in competitive
+  rulesets.
+- **Gyro aiming with its own settings.** The **Aim** tab also sets how far the
+  view turns for each degree you turn the controller, which movement turns it
+  (Yaw, Roll or Player Space), when it is active (including a button that
+  pauses it so you can re-centre), and a **Calibrate Gyro** button if the view
+  drifts. Mouse settings no longer change gyro aim.
+- **Buttons for everything.** With a vote open the D-pad votes. Holding View
+  with the scoreboard up gives Ready, Spectate, Chat, Team chat and the Buy
+  menu; in the campaign it gives Quick save and Quick load. Voice chat is on
+  D-pad up in a match. **Button Layout** offers Bumper Jumper and two
+  one-handed layouts, and **Reset Controller** and **Reset Keyboard and
+  Mouse** each reset one device without touching the other.
+- **More to feel.** On the **Controller** tab: the trigger you fire with
+  pulses on controllers with trigger motors, a DualSense's trigger resistance
+  follows your weapon, a hit rumbles more on the side it came from, and the
+  controller's light shows your team or your health.
+- **Fixed.** In play, the View button now shows the scoreboard or objectives
+  while held, as the default layout and the guide always said; it used to open
+  the menu. A controller could not turn the view while the mouse's View Filter
+  was on; it can now. Gyro aiming works with the mouse turned off.
+- **What to do.** Nothing. Your dead zone, look sensitivity and gyro speed
+  carry over the first time you start, so your controller feels the same until
+  you change it. If gyro turning or tilting feels reversed, turn on **Invert
+  Gyro Turn** or **Invert Gyro Tilt**: the direction now follows the standard
+  convention and has not yet been checked on every controller.
+- **See what your controller is doing.** **Settings → Controls → Controller →
+  Test Controller** shows both sticks with their dead zones drawn, how far
+  each trigger is pressed, every button lighting as you hold it, the gyro, the
+  battery, and a **Test Rumble** button that runs each motor in turn. If a
+  stick drifts or a button seems dead, this shows whether the game sees it.
+  The first time you connect a kind of controller, two notices point you to
+  **Prompt Style** and **Swap Confirm and Back**.
+- **Type with only a controller.** Select a text field with a controller,
+  such as a save's name, your player name or a server password, press Confirm
+  and an on-screen keyboard appears. It has every letter the game's twelve
+  languages use, and the controller's buttons delete, add a space, move the
+  caret and finish without leaving the keys. Touch and the mouse work on it
+  too. Systems that show their own keyboard (a Steam Deck in game mode,
+  Android) keep using that one.
+- **Not in this increment:** the in-game chat line and the console still need
+  a keyboard, and the new controller settings are not in the classic
+  (`ui_retained 0`) menus, where the three existing controller rows keep
+  working.
+- **Evidence.** Four native policy tests (`openq4-controller-roster`,
+  `-look`, `-gyro`, `-aim-assist`) and twelve scenarios of
+  `tools/tests/controller_runtime.py`, which drive SDL virtual controllers
+  inside the client on `game/airdefense1`: handover and release, pause on
+  loss, both battery notices, turn rates of 157, 90 and 357 degrees per second
+  (Classic, a set speed, Dynamic's boost), gyro turning 90 degrees for a
+  quarter turn whatever the mouse settings, calibration removing an injected
+  bias, the ratchet, haptics and lights reaching a virtual DualSense and not a
+  virtual Xbox pad's triggers, the layouts and resets, aim assist ignoring
+  allies and slowing to 0.45 and 0.75 on a live enemy, and the Controller and
+  Aim tabs driven row by row (a layout, a preset, aim assist and Reset
+  Controller taking effect), and the test panel showing a virtual DualSense's
+  stick, trigger and held button and running its four motors in order, and
+  the on-screen keyboard naming a save with a capital, an accented letter and
+  a Cyrillic one and saving under it. Three more native tests cover the
+  keyboard's layouts and document and the test panel. **Not verified:** any
+  physical controller; a multiplayer session (the HUD notice, the vote and
+  match buttons, the server cap); device buttons or touch on the on-screen
+  keyboard's keys, which the hidden test window cannot take; how any of it
+  feels. The translations of the
+  new menu text are machine-made and await native review.
+- **Developer detail:** [controller experience](controller-experience.md);
+  the hardware checklist is [controller qualification](controller-qualification.md).
+
 ## The opening's QUAKE 4 logo shines over the stars again, 22 November 2026
 
 - **No black box behind the title.** With the new interface on, the opening

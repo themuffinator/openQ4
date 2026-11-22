@@ -815,6 +815,31 @@ if get_option('build_native_tests')
     include_directories: root_include_dir, install: false,
   )
   test('openq4-presentation-look', presentation_look_test, timeout: 30)
+  controller_look_test = executable(
+    'openq4-controller-look-test', files('tools/tests/native/ControllerLookTest.cpp'),
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-controller-look', controller_look_test, timeout: 30)
+  on_screen_keyboard_test = executable(
+    'openq4-on-screen-keyboard-test', files('tools/tests/native/OnScreenKeyboardTest.cpp'),
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-on-screen-keyboard', on_screen_keyboard_test, timeout: 30)
+  controller_roster_test = executable(
+    'openq4-controller-roster-test', files('tools/tests/native/ControllerRosterTest.cpp'),
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-controller-roster', controller_roster_test, timeout: 30)
+  controller_gyro_test = executable(
+    'openq4-controller-gyro-test', files('tools/tests/native/ControllerGyroTest.cpp'),
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-controller-gyro', controller_gyro_test, timeout: 30)
+  controller_aim_assist_test = executable(
+    'openq4-controller-aim-assist-test', files('tools/tests/native/ControllerAimAssistTest.cpp'),
+    include_directories: root_include_dir, install: false,
+  )
+  test('openq4-controller-aim-assist', controller_aim_assist_test, timeout: 30)
   presentation_pacing_test = executable(
     'openq4-presentation-pacing-test', files('tools/tests/native/PresentationPacingTest.cpp'),
     include_directories: root_include_dir, install: false,
@@ -1720,6 +1745,9 @@ if build_engine or get_option('build_native_tests')
     # The retained CONTROLS settings page (UI-01).
     test('openq4-ui-retained-controls', openq4_ui_retained_screens_test,
       args: ['--controls', meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/settings/controls.rui'], timeout: 120)
+    # The on-screen keyboard (PAD-05).
+    test('openq4-ui-on-screen-keyboard', openq4_ui_retained_screens_test,
+      args: ['--keyboard', meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/keyboard.rui'], timeout: 120)
     # The retained GAME OPTIONS settings page (UI-01).
     test('openq4-ui-retained-game', openq4_ui_retained_screens_test,
       args: ['--game', meson.project_source_root() / 'content/baseoq4/pak0/guis/menu/settings/game.rui'], timeout: 120)

@@ -526,6 +526,8 @@ struct idClipModel { static void ClearTraceModelCache(){} };
 // attachment teardown are exercised by savegame_restore_cleanup.py.
 struct idRestoreGame { static void PrepareMapShutdown(){} static void DeleteOrphanedObjects(){} };
 struct idSaveGame { static void ClearDictionaryCache(){} };
+// No aim assistance outlives the map (PAD-03): the teardown resets its cvars.
+struct CVarSystem { int floats=0; void SetCVarFloat(const char*,float){++floats;} } cvars, *cvarSystem=&cvars;
 // The Classic ruleset's definition overlay comes off at teardown (ClassicRules.cpp).
 struct rvClassicRules { static void RevertDefinitions(){} };
 // A multiplayer server that stops gives its map's database settings back (MapDatabaseHost.cpp).

@@ -66,6 +66,7 @@ OUTPUTS = {
     "mp_summary": PAK0 / "guis" / "menu" / "mp_summary.rui",
     "mp_buy": PAK0 / "guis" / "menu" / "mp_buy.rui",
     "arena_pause": PAK0 / "guis" / "menu" / "arena_pause.rui",
+    "keyboard": PAK0 / "guis" / "menu" / "keyboard.rui",
 }
 
 U = 1.5            # dp per stock source unit at the 720 dp canvas
@@ -5423,6 +5424,7 @@ def main() -> int:
     from retained_audio import audio_document
     from retained_game import game_document
     from retained_controls import controls_document
+    from retained_keyboard import keyboard_document
     from retained_settings_page import settings_page_document
     from retained_system import system_document
     documents = {"title": title_document(), "pause": pause_document(), "pause_strogg": pause_document(strogg=True),
@@ -5443,7 +5445,7 @@ def main() -> int:
                  "createserver": create_server_document(),
                  "joingame": join_game_document(),
                  "mp_escape": escape_document(), "mp_welcome": welcome_document(), "mp_summary": summary_document(),
-                 "mp_buy": buy_document(),
+                 "mp_buy": buy_document(), "keyboard": keyboard_document(),
                  "arena_pause": arena_pause_document(), "audio": audio_document(),
                  "game": game_document(), "controls": controls_document(), "system": system_document(),
                  "settings": settings_page_document()}

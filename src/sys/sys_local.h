@@ -83,6 +83,15 @@ public:
 	virtual void			ControllerRumblePulse( float lowFrequency, float highFrequency, int durationMsec ) {
 		Sys_PulseJoystickRumble( lowFrequency, highFrequency, durationMsec );
 	}
+	virtual void			ControllerTriggerPulse( float strength, int durationMsec ) {
+		Sys_PulseJoystickTriggerRumble( strength, durationMsec );
+	}
+	virtual void			ControllerDirectionalPulse( float strength, float direction, int durationMsec ) {
+		Sys_PulseJoystickRumbleDirected( strength, direction, durationMsec );
+	}
+	virtual void			ControllerSetPlayerState( int weaponFeel, int health, int team ) {
+		Sys_SetControllerPlayerState( weaponFeel, health, team );
+	}
 };
 
 #endif /* !__SYS_LOCAL__ */

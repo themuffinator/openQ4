@@ -743,7 +743,10 @@ extern rvGameLog *				gameLog;
 //     a facing the server set from the weapon hand's usercmd.
 // 61: idSys appends ControllerRumblePulse: the game's weapon fire and hits
 //     rumble a gamepad, mixed with the sound system's rumble.
-const int GAME_API_VERSION		= 61;
+// 62: idSys appends ControllerTriggerPulse, ControllerDirectionalPulse and
+//     ControllerSetPlayerState: trigger motors, side-biased hits and the
+//     controller's light and trigger feel (PAD-08)
+const int GAME_API_VERSION		= 62;
 
 struct gameImport_t {
 
