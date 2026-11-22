@@ -482,6 +482,11 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- The Strogg HUD draws without offscreen passes. The moving static on its ammo,
+  health and armor gauges is one fixed panel with a scrolling texture instead of
+  ten sliding tiles, so the HUD no longer renders each gauge through three
+  offscreen targets a frame or rebuilds itself every frame after the conversion.
+  It looks and moves as before.
 - The startup and loading screens animate at the display's refresh rate (or
   half or a third of it on high-refresh displays, at most 90 frames a second)
   throughout startup and level loads. Loading Air Defense 1 used to present a

@@ -191,10 +191,14 @@ canvas margins; the missile warning has its own small chevron. Restarting
 either hit-flash timeline restores its initial color before fading, including
 when Reduced Flashing changes between hits. Multiplayer award medals retain
 their approved stock bitmap artwork and are registered during level precache.
-Remastered Strogg gauges tile the installed `s_static` grain across the full
-moving area under each fill mask, with the stock additive `#161616` tint.
-The two-second translation loops without exposing an empty part of the mask;
-reduced motion holds it still. This installed-art exception is recorded in the
+Remastered Strogg gauges show the installed `s_static` grain under each fill
+mask, with the stock additive `#161616` tint. Like the EKG, the grain is one
+stationary quad whose repeating texture coordinates scroll, one column left
+and four rows down every two seconds, so no part of the mask is ever bare;
+reduced motion holds it still. A sheet of translated tiles drew the same
+picture but needed composition targets and rebuilt the HUD every frame
+([performance report, section 18](../performance-report.md#18-the-retained-huds-composition-fps-06-22-november-2026)).
+This installed-art exception is recorded in the
 [implementation inventory](inventory-report.md); it adds no extracted asset.
 
 The on-foot ammo, health and armor numbers use the legacy TTF renderer for

@@ -2084,6 +2084,99 @@ renderer-gl `442ea68d...`, renderer-vk `acc6f425...`), built from `main` at
 (`combat_bse_render.cfg`, `ab.py`, `phases_render.py`); the raw runs were not
 kept.
 
+## 18. The retained HUD's composition (FPS-06), 22 November 2026
+
+Section 6 attributed storage2's equal-settings difference to the retained HUD: 17
+two-dimensional views and 34 render-target commands a frame against the classic HUD's 7
+and 17. This section finds what composed them, removes it, and records what was and was
+not measured.
+
+**What it was.** A trace of every composition target the retained renderer allocates
+(`AllocateSlot` in `src/ui/retained/Runtime.cpp`) showed six a frame in storage2, all from
+one element, twice: the static grain on the Strogg gauges. Storage 2 comes after the
+player's conversion, so its HUD is the Strogg one, which is why the Marine scenes of the
+suite never showed the cost. The grain was authored as a sheet of ten translated tiles
+(two columns by five rows of the installed `s_static` texture) under each gauge's fill
+mask. A moving textured sheet under a mask can be neither cached nor drawn directly, so
+each visible gauge took the general path every frame: a target for the tiles, a scratch
+copy, a target for the mask, the mask applied and the result composited, which is five
+target switches, three clears and five flushed 2D batches per gauge. The moving transform
+also kept the whole Strogg HUD document from replaying its settled frame, so RmlUi
+traversed and resubmitted it every frame.
+
+**The change.** The grain is now authored as the EKG already was: one stationary quad
+over the gauge whose repeating texture coordinates scroll (`image-offset-x` 0 to 1 and
+`image-offset-y` 0 to -4 over the same two seconds; `tools/ui/remastered_hud_status.py`,
+which regenerates `remastered_strogg.rui` and `remastered_strogg_awakening.rui`). A single
+additive image that covers its mask is textured straight through the mask's cells with
+no target, and a scrolling texture coordinate advances inside a replayed frame. No engine
+code changed.
+
+**Counts.** Hidden-window launches at the 0.13.2 settings on OpenGL, `r_rendererMetrics 2`,
+most frequent per-frame value in a 2.5 s window:
+
+| Scene | 2D views / target commands, retained HUD | classic HUD (`ui_retained 0`) |
+|---|---:|---:|
+| indoor_storage2, before | 17 / 34 | 7 / 17 |
+| indoor_storage2 | 7 / 18 | 7 / 17 |
+| indoor_hub2 | 7 / 18 | 7 / 17 |
+| outdoor_airdefense1 | 7 / 18 | 7 / 17 |
+| outdoor_convoy1 | 7 / 18 | 7 / 17 |
+| combat_airdefense1 | 7 / 18 | 7 / 17 |
+| effects_airdefense1 | 7 / 18 | 7 / 17 |
+| vehicle_walker | 7 / 18 | 7 / 17 |
+
+The retained HUD now adds no 2D view in any suite scene. Its one extra target command is
+the root's own bind of the window before it draws; no batch is pending there, so it
+flushes no view.
+
+**The HUD's own main-thread time.** `ui_retainedProfile 30` in storage2 with the grain
+moving, three hidden-window launches of each runtime (the same engine build; only the two
+documents differ):
+
+| | before | after |
+|---|---:|---:|
+| Retained HUD submission, median per frame | 0.37, 0.84, 0.94 ms | 0.19, 0.30, 0.33 ms |
+| The Strogg HUD document alone, mean per frame | 0.38, 0.82, 1.07 ms | 0.21, 0.23, 0.25 ms |
+| HUD documents replayed from their settled frame | 2.8-3.0 of 4 | 3.9-4.0 of 4 |
+
+These are self-timed sections of the main thread, taken while other work shared the
+machine, so the spread between launches is contention; the ordering held in every pair.
+They cover the retained front end only. The backend's share of the ten extra views and
+sixteen target commands, and the GPU's on Vulkan, are on top of it and were not measured.
+
+**Pictures.** With reduced motion holding the grain at its rest position and the game
+stopped (`g_stopTime 1`, `ui_retainedReplay 0`), the ammo gauge, whose only moving part is
+the grain, was compared over 61,600 pixels at 2538x1312 without MSAA. The old and new
+documents differ in 15,170 of them, 12,974 by one level of 255 and none by more than
+seven: the single quad sits a fraction of a pixel from where RmlUi snapped each tile.
+OpenGL and Vulkan draw identical pixels for each document. With motion on, two shots a few
+frames apart show the grain moving 5 px left and 18-19 px down in 46-56 ms on the new
+document and 5-6 px left and 19-22 px down in 53-69 ms on the old one: the same four rows
+down and one column left every two seconds.
+
+**Set aside: cutting the mask to each tile in the engine.** The first attempt kept the
+tiles and taught the direct path to texture, for each tile, the mask cells inside it, cut
+along the tile's edges. It removed the targets (7 views and 18 target commands, pictures
+within one level of the general path on both backends) but cut and resubmitted about
+10,000 vertices every frame, and the HUD's own time rose from 0.6-0.9 ms to 1.0-1.7 ms.
+With the grain re-authored nothing in the HUD needs it, so it was not kept. The Strogg
+pause menu's level block still tiles the same grain under a mask; it is a menu, outside
+this category's frame-rate scenes, and can take the same re-authoring.
+
+**Not measured.** Frame times. The suite's fullscreen launches need the machine and its
+display to themselves, and neither was available: other sessions were building and
+running clients throughout, and a hidden-window GPU ladder attempted alongside them
+moved by more than a millisecond between identical windows. FPS-06's closure test (within
+3% average and 10% p99 of 0.13.2 on every suite scene on both backends) is therefore still
+open for storage2, as is the Vulkan soft-particle depth capture.
+
+Runtimes: a worktree build of `main` at 590f2a20e (`debugoptimized`, `b_ndebug=true`,
+client `137d167db54f59af...` with the documents as committed there and
+`bb8e051175a7ed0f...` with the regenerated ones; the client embeds its pack's hash, so
+the two differ by that alone). Scripts and raw runs: `.tmp/fps06/` (`phases.py`,
+`pictures2.py`, `final.sh`, `final/`).
+
 ## Appendix: artifacts
 
 Everything below lives in the repository's ignored `.tmp/` tree on the measurement machine;

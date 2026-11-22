@@ -254,9 +254,12 @@ static void CheckRemasteredHudSafeArea(ScreenHost& host, const char* path) {
 	host.cvars = savedCVars;
 }
 
-// Grain must cover the full swept area, including the instant either side
-// of its loop boundary. A sparse sheet that scrolls out of the mask passes
-// a first-frame screenshot but leaves the gauges bare for most of the loop.
+// Grain must cover the whole mask throughout its loop, including the instant
+// either side of the loop boundary. A sparse sheet that scrolls out of the
+// mask passes a first-frame screenshot but leaves the gauges bare for most of
+// the loop; a sheet of translated tiles covers it but rebuilds the HUD every
+// frame. Like the EKG, the grain is one stationary quad whose repeating
+// texture coordinates scroll: four rows down and one column left per loop.
 static void CheckStroggGaugeGrain(ScreenHost& host, const std::string& source) {
 	const bool previousReducedMotion=host.reducedMotion;
 	host.reducedMotion=false;
@@ -272,47 +275,45 @@ static void CheckStroggGaugeGrain(ScreenHost& host, const std::string& source) {
 	for (double phase : {.1,.5,1.0,1.5,1.99,2.01}) {
 		host.draws.clear();
 		runtime.Frame(RemasteredViewport(1280,720),phase);
+		const double turn=phase<2 ? phase/2 : (phase-2)/2;
 		for (const char* kind : {"ammo","health","armor"}) {
-			const std::string prefix=std::string(kind)+"-static";
-			Bounds mask;
-			const auto translation=runtime.PresentedValue(prefix,"transform");
-			Check(translation && runtime.GetBounds(prefix+"-mask",mask) && Near(mask.width,129*1.5f,.1f) && Near(mask.height,67*1.5f,.1f),
+			const std::string grain=std::string(kind)+"-static";
+			Bounds mask, bounds;
+			Check(runtime.GetBounds(grain+"-mask",mask) && Near(mask.width,129*1.5f,.1f) && Near(mask.height,67*1.5f,.1f),
 				"every grain mask retains the complete gauge rectangle");
-			float left=1e9f,top=1e9f,right=-1e9f,bottom=-1e9f;
-			for (int row=0;row<5;++row) for (int column=0;column<2;++column) {
-				const std::string tile=prefix+"-r"+std::to_string(row)+"-c"+std::to_string(column);
-				Bounds bounds;
-				Check(runtime.GetBounds(tile,bounds) && Near(bounds.width,mask.width,.1f) && Near(bounds.height,mask.height,.1f) &&
-					Near(bounds.x,mask.x+column*mask.width,.1f) && Near(bounds.y,mask.y+(row-4)*mask.height,.1f),
-					"the grain images form a contiguous two-column five-row tile sheet");
-				const auto image=runtime.PresentedValue(tile,"image"), blend=runtime.PresentedValue(tile,"image-blend"),
-					tint=runtime.PresentedValue(tile,"image-color");
-				Check(image && image->text=="gfx/guis/hud/s_static" && blend && blend->text=="additive" && tint &&
-					Near(float(tint->data[0]),22/255.f,.001f) && Near(float(tint->data[1]),22/255.f,.001f) &&
-					Near(float(tint->data[2]),22/255.f,.001f) && Near(float(tint->data[3]),1,.001f),
-					"Strogg grain uses installed stock noise with additive #161616 tint");
-				left=std::min(left,bounds.x+float(translation->data[0]));
-				top=std::min(top,bounds.y+float(translation->data[1]));
-				right=std::max(right,bounds.x+bounds.width+float(translation->data[0]));
-				bottom=std::max(bottom,bounds.y+bounds.height+float(translation->data[1]));
-			}
-			Check(left<=mask.x+.1f && top<=mask.y+.1f && right>=mask.x+mask.width-.1f && bottom>=mask.y+mask.height-.1f,
-				"animated grain covers the entire local mask at every sampled phase");
+			Check(runtime.GetBounds(grain,bounds) && Near(bounds.x,mask.x,.1f) && Near(bounds.y,mask.y,.1f) &&
+				Near(bounds.width,mask.width,.1f) && Near(bounds.height,mask.height,.1f),
+				"the stationary grain quad covers the entire local mask at every sampled phase");
+			const auto image=runtime.PresentedValue(grain,"image"), blend=runtime.PresentedValue(grain,"image-blend"),
+				tint=runtime.PresentedValue(grain,"image-color");
+			Check(image && image->text=="gfx/guis/hud/s_static" && blend && blend->text=="additive" && tint &&
+				Near(float(tint->data[0]),22/255.f,.001f) && Near(float(tint->data[1]),22/255.f,.001f) &&
+				Near(float(tint->data[2]),22/255.f,.001f) && Near(float(tint->data[3]),1,.001f),
+				"Strogg grain uses installed stock noise with additive #161616 tint");
+			const auto offsetX=runtime.PresentedValue(grain,"image-offset-x"), offsetY=runtime.PresentedValue(grain,"image-offset-y");
+			Check(offsetX && offsetY && Near(float(offsetX->data[0]),float(turn),.002f) && Near(float(offsetY->data[0]),float(-4*turn),.008f),
+				"the grain scrolls one column left and four rows down per two-second loop");
 		}
 	}
-	Check(std::find(host.materials.begin(),host.materials.end(),"q4-add/gfx/guis/hud/s_static")!=host.materials.end(),
-		"the grain resolves through the installed additive material");
+	Check(std::find(host.materials.begin(),host.materials.end(),"q4-add/_repeat/gfx/guis/hud/s_static")!=host.materials.end(),
+		"the grain resolves through the installed additive material, repeating");
 	host.reducedMotion=true;
 	runtime.SetReducedMotion(true,2.1);
 	runtime.Frame(RemasteredViewport(1280,720),2.2);
-	std::vector<Value> still;
-	for (const char* kind : {"ammo","health","armor"}) still.push_back(*runtime.PresentedValue(std::string(kind)+"-static","transform"));
+	std::vector<std::array<double,2>> still;
+	for (const char* kind : {"ammo","health","armor"}) {
+		const auto offsetX=runtime.PresentedValue(std::string(kind)+"-static","image-offset-x");
+		const auto offsetY=runtime.PresentedValue(std::string(kind)+"-static","image-offset-y");
+		Check(offsetX && offsetY,"reduced motion keeps the grain's sampling values");
+		still.push_back({offsetX ? offsetX->data[0] : 0,offsetY ? offsetY->data[0] : 0});
+	}
 	runtime.Frame(RemasteredViewport(1280,720),3.2);
 	int index=0;
 	for (const char* kind : {"ammo","health","armor"}) {
-		const auto transform=runtime.PresentedValue(std::string(kind)+"-static","transform");
-		Check(transform && Near(float(transform->data[0]),float(still[index].data[0]),.001f) &&
-			Near(float(transform->data[1]),float(still[index].data[1]),.001f),"reduced motion leaves the grain translation still");
+		const auto offsetX=runtime.PresentedValue(std::string(kind)+"-static","image-offset-x");
+		const auto offsetY=runtime.PresentedValue(std::string(kind)+"-static","image-offset-y");
+		Check(offsetX && offsetY && Near(float(offsetX->data[0]),float(still[index][0]),.001f) &&
+			Near(float(offsetY->data[0]),float(still[index][1]),.001f),"reduced motion leaves the grain still");
 		++index;
 	}
 	Check(host.errors==0,"Strogg grain phases produce no runtime diagnostics");

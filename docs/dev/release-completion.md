@@ -12,6 +12,30 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The Strogg HUD draws without offscreen passes, 22 November 2026
+
+- **The static on the Strogg gauges costs far less to draw.** After the
+  player's conversion, the HUD's ammo, health and armor gauges carry a moving
+  grain. It was built as a sheet of ten sliding tiles under each gauge's
+  outline, which made the HUD render every gauge through three offscreen
+  targets each frame and rebuild itself every frame. It is now one fixed
+  panel whose texture scrolls, as the heartbeat trace already was. The picture
+  and its motion are the same.
+- **What it changes.** In Storage Terminal 2 a frame with the new HUD now
+  carries 7 two-dimensional views and 18 render-target commands, against 17
+  and 34 before and the classic HUD's 7 and 17; the Marine HUD was already
+  there. The HUD's own share of the main thread fell from 0.37-0.94 ms to
+  0.19-0.33 ms a frame in a hidden-window profile on a shared machine.
+- **What is not shown yet.** Frame rates. The fullscreen comparison against
+  0.13.2 that FPS-06 closes on needs the measurement machine to itself and
+  has not been run, so no frame-rate figure is claimed.
+- **Checks.** The Remastered HUD document test covers the grain's rectangle,
+  texture, tint, scroll rate and reduced-motion rest on both Strogg documents;
+  captures on OpenGL and Vulkan agree with each other pixel for pixel and with
+  the tiled sheet within seven levels of 255.
+- **Developer detail:** [performance report, section 18](performance-report.md#18-the-retained-huds-composition-fps-06-22-november-2026)
+  and FPS-06 in the [roadmap](roadmap.md).
+
 ## Server bans that work, mutes and chat limits, 22 November 2026
 
 - **A ban now keeps the player out.** In Quake 4, and in openQ4 up to 0.15.0,

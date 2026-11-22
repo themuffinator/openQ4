@@ -527,18 +527,20 @@ def strogg_gauge(doc: HudDocument, kind: str, gx: float, gy: float) -> dict:
     plate.append(fill_window(doc, kind + "-fill", w, h, pct, fills, 5.1, 119, 124))
     # This complex stock noise is a bitmap exception (design section 6),
     # loaded from the installation like the existing Strogg pause-page grain.
-    # Repeat it across the entire swept area: the previous sparse dot sheet
-    # moved out of the mask and left the gauge bare for most of each loop.
+    # Like the EKG it scrolls repeating UVs over one stationary quad, so the
+    # sheet covers the mask throughout the loop, the HUD needs no composition
+    # target for it and a settled frame replays with only the sampling
+    # advanced (a sheet of translated tiles rebuilt the whole HUD every frame).
     # The two-second loop ends exactly four rows down and one column left,
     # so its restart has the same texels under every point of the mask.
-    grain = [ui.picture(f"{kind}-static-r{row + 4}-c{column}", "gfx/guis/hud/s_static",
-                        {**ui.absolute(left=u(column*w), top=u(row*h), width=u(w), height=u(h)),
-                         "image-blend": ui.keyword("additive"),
-                         "image-color": ui.colour(rgb(STROGG["static"]))}, fit="fill")
-             for row in range(-4, 1) for column in range(2)]
-    grain_node = full(kind + "-static", grain, transform=ui.transform())
-    run = doc.timeline(kind + "-static-run", 2000, [tr(grain_node["id"], "transform",
-                                                       [(0, transform_value(0, 0)), (2000, transform_value(u(-w), u(4 * h)))])],
+    grain_node = ui.picture(kind + "-static", "gfx/guis/hud/s_static",
+                            {**ui.absolute(left=0, top=0, width=u(w), height=u(h)),
+                             "image-blend": ui.keyword("additive"),
+                             "image-color": ui.colour(rgb(STROGG["static"])),
+                             "image-offset-x": num(0), "image-offset-y": num(0)}, fit="fill")
+    run = doc.timeline(kind + "-static-run", 2000,
+                       [tr(grain_node["id"], "image-offset-x", [(0, num(0)), (2000, num(1))]),
+                        tr(grain_node["id"], "image-offset-y", [(0, num(0)), (2000, num(-4))])],
                        iterations=0)
     doc.joins.append(play(run))
     plate.append(full(kind + "-static-mask", [grain_node],
