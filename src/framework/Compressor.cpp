@@ -429,7 +429,15 @@ int idCompressor_BitStream::ReadBits( int numBits ) {
 		if ( get > (numBits - valueBits) ) {
 			get = (numBits - valueBits);
 		}
-		fraction = readData[readByte - 1];
+		// openQ4: compressing, a read that ran past the input's last byte and was
+		// partly unread (UnreadBits) can resume inside the byte after it. That
+		// byte was never input: read it as zero rather than past the caller's
+		// buffer (ASan: a 1-byte input to RunLength_ZeroBased::Write).
+		if ( readData != buffer && readByte > readLength ) {
+			fraction = 0;
+		} else {
+			fraction = readData[readByte - 1];
+		}
 		fraction >>= readBit;
 		fraction &= ( 1 << get ) - 1;
 		value |= fraction << valueBits;
