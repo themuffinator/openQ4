@@ -52,7 +52,7 @@ def main():
     support = support.replace('#include <vector>', '#include <vector>\n#include <functional>\n#include <memory>\n#include <set>')
     support = support.replace('const char* GetName() const', 'int GetState()const{return 0;} const char* GetName() const')
     support = support.replace('idMaterial solid{"_retainedSolid"}; const idMaterial* FindMaterial(const char*){return &solid;}',
-                              'std::unordered_map<std::string,idMaterial> materials; const idMaterial* FindMaterial(const char* name){if(reentry && !std::strncmp(name,"_retainedAtlas/",15))reentry();return &materials.try_emplace(name,idMaterial{name}).first->second;}')
+                              'std::unordered_map<std::string,idMaterial> materials; const idMaterial* FindMaterial(const char* name){if(reentry && !std::strncmp(name,"_retainedAtlas/",15))Reenter();return &materials.try_emplace(name,idMaterial{name}).first->second;}')
     support = support.replace('struct Renderer {', r'''
 enum {FMT_RGBA8, TF_NEAREST, DS_DEFAULTED=9};
 struct idImageOpts {int width=0,height=0,format=0,numLevels=0;bool isPersistant=false;};
@@ -60,8 +60,10 @@ struct idImage {};
 const char* va(const char* format,unsigned index){static char text[128];std::snprintf(text,sizeof(text),format,index);return text;}
 // A print (a decl load, a warning) inside a map change redraws the loading
 // screen, a retained root of its own (PacifierUpdate): the test's hook.
+// The hook may clear itself; it runs as a copy, so its closure outlives that.
 std::function<void()> reentry;
-struct Common {int warnings=0;void Warning(const char*,...){++warnings;if(reentry)reentry();}} commonObject;
+void Reenter(){if(auto hook=reentry)hook();}
+struct Common {int warnings=0;void Warning(const char*,...){++warnings;Reenter();}} commonObject;
 Common* common=&commonObject;
 // The job system's double: lists run when the test says the workers have.
 enum class idJobSubmitResult {ACCEPTED,EXECUTED_SYNCHRONOUSLY,QUEUE_FULL,INVALID_STATE};
