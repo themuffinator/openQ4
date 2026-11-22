@@ -316,12 +316,44 @@ static bool Posix_SplashVideoReady( void ) {
 	return ( SDL_WasInit( SDL_INIT_VIDEO ) & SDL_INIT_VIDEO ) != 0;
 }
 
+/*
+The splash and the system console draw through SDL's software 2D renderer.
+Outside WSL, SDL backs such a window with a hidden OpenGL renderer of its own
+(its "texture framebuffer"): creating, presenting or destroying the window's
+renderer makes that renderer's GL context current on this thread, and
+destroying it leaves no context current at all. The game's renderer owns the
+thread's GL binding, and its calls are silently dropped while the binding is
+gone, so every support-window operation hands the binding back as it found it.
+*/
+class Posix_SupportGLBindingScope {
+public:
+	Posix_SupportGLBindingScope() :
+		window( Posix_SplashVideoReady() ? SDL_GL_GetCurrentWindow() : NULL ),
+		context( Posix_SplashVideoReady() ? SDL_GL_GetCurrentContext() : NULL ) {}
+	~Posix_SupportGLBindingScope() {
+		if ( !Posix_SplashVideoReady() ) {
+			return;
+		}
+		if ( SDL_GL_GetCurrentContext() != context || SDL_GL_GetCurrentWindow() != window ) {
+			(void)SDL_GL_MakeCurrent( window, context );
+		}
+	}
+
+private:
+	Posix_SupportGLBindingScope( const Posix_SupportGLBindingScope & ) = delete;
+	Posix_SupportGLBindingScope &operator=( const Posix_SupportGLBindingScope & ) = delete;
+
+	SDL_Window *window;
+	SDL_GLContext context;
+};
+
 static SDL_Renderer *Posix_CreateSupportRenderer( SDL_Window *window, const char *purpose ) {
 	if ( window == NULL ) {
 		return NULL;
 	}
 
 	const char *purposeName = purpose != NULL ? purpose : "support";
+	const Posix_SupportGLBindingScope glBinding;
 
 #if defined( MACOS_X ) && defined( OPENQ4_MACOS_METAL_BRIDGE )
 	SDL_Renderer *renderer = SDL_CreateRenderer( window, NULL );
@@ -521,6 +553,7 @@ static void Posix_SplashRender( void ) {
 	if ( s_splashWindow.window == NULL || s_splashWindow.renderer == NULL ) {
 		return;
 	}
+	const Posix_SupportGLBindingScope glBinding;
 
 	if ( s_splashWindow.texture != NULL ) {
 		(void)SDL_SetRenderDrawColor( s_splashWindow.renderer, 0x00, 0x00, 0x00, 0xff );
@@ -541,6 +574,9 @@ static void Posix_SplashRender( void ) {
 }
 
 static void Posix_SplashDestroy( void ) {
+	// Retired after the game's first presented frame, with the game's GL
+	// context current: destroying the renderer must not take it away.
+	const Posix_SupportGLBindingScope glBinding;
 	const SDL_WindowID destroyedWindowID = s_splashWindow.windowID;
 	if ( s_splashWindow.texture != NULL ) {
 		SDL_DestroyTexture( s_splashWindow.texture );
@@ -1368,6 +1404,7 @@ static void Posix_ConsoleRender( void ) {
 	if ( s_consoleWindow.window == NULL || s_consoleWindow.renderer == NULL || !s_consoleWindow.visible ) {
 		return;
 	}
+	const Posix_SupportGLBindingScope glBinding;
 
 	Posix_ConsoleUpdateLayout();
 
@@ -1882,6 +1919,7 @@ void Posix_ShutdownConsole( void ) {
 	Posix_SplashDestroy();
 	Posix_ConsoleStopTextInput();
 	if ( s_consoleWindow.renderer != NULL ) {
+		const Posix_SupportGLBindingScope glBinding;
 		SDL_DestroyRenderer( s_consoleWindow.renderer );
 		s_consoleWindow.renderer = NULL;
 	}
