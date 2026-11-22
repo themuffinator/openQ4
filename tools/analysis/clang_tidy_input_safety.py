@@ -389,6 +389,11 @@ def clang_tidy_command(
         # already carry it, but this keeps the gate correct even if clang-tidy
         # resolves a command from somewhere other than our sanitized database.
         command.append(f"--extra-arg-before={MSVC_DRIVER_MODE}")
+        # clang-tidy parses with its own clang, whose version may trail the
+        # MSVC STL's floor (STL1000: MSVC 14.52 wants Clang 22 while the CI
+        # image ships LLVM 20). The STL's escape hatch keeps the gate on our
+        # code; it changes nothing when the versions already match.
+        command.append("--extra-arg=-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH")
     command += [
         f"--checks={','.join(CHECKS)}",
         "--warnings-as-errors=*",
