@@ -1275,6 +1275,7 @@ jobs:
     timeout-minutes: 150
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+      OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER: ${{ matrix.test_timeout_multiplier }}
     strategy:
       fail-fast: false
       matrix:
@@ -1316,6 +1317,11 @@ jobs:
             python_tests: false
             macos_graphics_bridge: opengl
             macos_openal_provider: system
+            # The Intel image runs the UI matrices 2-4x slower than the
+            # arm64 macOS runners, and which ones overran their bound
+            # changed from run to run (menus, pointer reach, mp pages,
+            # settings journals), so every bound is scaled here.
+            test_timeout_multiplier: "3"
     steps:
       - name: Checkout
         uses: actions/checkout@v7

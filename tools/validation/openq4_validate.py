@@ -382,7 +382,19 @@ def install_args(build_dir: Path) -> list[str]:
 
 
 def test_args(build_dir: Path) -> list[str]:
-    return ["test", "-C", str(build_dir), "--print-errorlogs"]
+    args = ["test", "-C", str(build_dir), "--print-errorlogs"]
+    # A runner that is slow across the board (the hosted macOS Intel image)
+    # scales every test's hang guard instead of raising them one by one.
+    multiplier = os.environ.get("OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER", "").strip()
+    if multiplier:
+        try:
+            factor = float(multiplier)
+        except ValueError:
+            raise SystemExit(f"OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER must be a number, not {multiplier!r}")
+        if factor <= 0:
+            raise SystemExit("OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER must be greater than zero")
+        args += ["--timeout-multiplier", multiplier]
+    return args
 
 
 def validation_env(args: argparse.Namespace, root: Path) -> dict[str, str]:
