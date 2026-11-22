@@ -986,11 +986,12 @@ rasterized frame, then a full path-traced mode. The current Vulkan baseline
 VMA) enables descriptor indexing and buffer device addresses at device creation
 but uses neither yet; the
 [gap review](#what-quake-ii-rtx-does-and-what-id-tech-4-changes) below lists what
-ray tracing still needs. Every item honors five product rules:
+ray tracing still needs. Every item honors six product rules:
 
-1. **Opt-in and isolated.** An archived CVar (proposed `r_rayTracing`: `0` off,
-   `1` hybrid effects, `2` path tracing; default `0`) with localized Settings rows
-   in the retained and stock interfaces selects the mode. Value `0` runs the
+1. **Gated behind a CVar.** The archived CVar `r_rayTracing` (`0` off, `1` hybrid
+   effects, `2` path tracing; default `0`) is the only switch, with localized
+   Settings rows in the retained and stock interfaces. Nothing turns it on
+   implicitly: presets leave it at `0` unless RT-07 decides otherwise. Value `0` runs the
    current Vulkan renderer unchanged, with byte-identical captures. OpenGL, GLES,
    dedicated servers and devices without the required extensions are never
    affected; they show the rows as unavailable instead of failing.
@@ -1016,6 +1017,17 @@ ray tracing still needs. Every item honors five product rules:
    file by file for GPLv3 compatibility before code is ported; incompatible code
    is reimplemented from published techniques, and proprietary SDKs stay
    optional decisions. Credits follow the attribution rules.
+6. **Faithful to the authored lighting.** Required 22 November 2026. A level
+   must read as it does in the classic renderer. Each light's authored color,
+   intensity, projection, falloff and bounds stay the direct term, and what ray
+   tracing adds (traced shadows, bounce light, emitters, soft penumbrae) is
+   calibrated so that no area becomes drastically darker or brighter than the
+   original. The engine derives that calibration from each level's own lights
+   and materials when the map loads, never from hand-written per-map tables.
+   Fidelity is measured as well as reviewed: at fixed viewpoints and the classic
+   exposure, with automatic exposure off, the ray-traced frame's luminance is
+   compared with the classic capture as a whole and by screen region, against
+   the tolerances RT-01 records.
 
 ### What Quake II RTX does and what id Tech 4 changes
 
@@ -1029,6 +1041,7 @@ decisions.
 
 | Area | Quake II RTX | openQ4 today | Needed (task) |
 | --- | --- | --- | --- |
+| Look | Relights the game with new physically based textures, a physical sky and automatic exposure. Matching the original brightness was not a goal. | The authored lighting is the product, and stock views stay display-referred (6 November decision). | Rule 6: authored lights as the direct term, calibrated additions and a luminance comparison against classic (RT-01, RT-03, RT-04, RT-07). |
 | Geometry on the device | The static world sits in one device buffer and a compute pass writes animated models into a per-frame buffer. Static and per-frame bottom-level structures feed one top-level structure a frame. | The Vulkan module keeps the vertex cache in CPU memory and copies each frame's drawn surfaces into per-frame rings (96 MiB of vertices, 8 MiB of indexes). No geometry persists on the device, no buffer has a device address and VMA is created without its device-address flag. | Persistent device geometry for static world and model surfaces; a per-frame buffer for skinned, deformed and generated surfaces with their previous positions; build-input usage on both (RT-02). |
 | Scene extent | The whole map and every entity are in the structure, so geometry behind the camera casts shadows and shows in reflections. | The front end instantiates dynamic models and runs entity callbacks only for entities the view's portal walk, or a light visible in it, reaches. | A ray-tracing scene set that reaches beyond the view, bounded by area connectivity and distance, with its CPU cost priced (RT-02). |
 | Textures and materials | Every image is in one global texture array (8,192 slots) with one material record per surface. Physically based properties come from replacement textures NVIDIA ships. | Descriptor sets are bound per draw; nothing is bindless. Materials are multi-stage scripts with per-entity expression registers, texture matrices, vertex color, alpha-test thresholds, authored programs and deforms. | A bindless image array and a per-frame material table holding evaluated registers (RT-02). Rules that derive roughness, metalness and emission from stock stages, since replacement textures are excluded (RT-01). |
@@ -1052,13 +1065,13 @@ not credited RT progress.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| RT-01 — Decision pending | Product rules, mode CVar and capability gate proposed. Gap review against Q2RTX and the Vulkan backend recorded (22 November). | Reference hardware and budgets, Q2RTX/SDK licence review, material/light translation rules, the primary-visibility, double-counting and ray-interface decisions, Settings contract and reference scenes. |
+| RT-01 — Decision pending | Product rules, mode CVar and capability gate proposed. Gap review against Q2RTX and the Vulkan backend recorded (22 November). | Reference hardware and budgets, Q2RTX/SDK licence review, material/light translation rules, the primary-visibility, double-counting and ray-interface decisions, rule 6's luminance measure, tolerances and load-time calibration, Settings contract and reference scenes. |
 | RT-02 — Not started | Vulkan 1.3 baseline with VMA exists; descriptor indexing and buffer device addresses are enabled but unused. | Extension admission and fallback; persistent device geometry, a bindless image array, material and light tables and a scene set beyond the view; BLAS/TLAS for world, entities, skinned and deformed surfaces; memory budgets and lifetime across map change, restart and device loss. |
 | RT-03 — Not started | Shadow maps, stencil shadows and SSAO provide the rasterized references. | Ray-traced shadows for interaction lights, ambient occlusion and reflections on the raster frame, each with its own fallback. |
 | RT-04 — Not started | Specified only. | Path-traced mode: id Tech 4 lights and derived emitters, sky, indirect bounces, translucency, water and glass, in-world screens as textures, raster overlays for GUIs, particles and the view weapon, and a converged reference mode. |
 | RT-05 — Not started | TAAU, motion vectors and reactive coverage exist. | Light sampling, temporal and spatial denoising checked against the converged reference, reconstruction with TAAU and dynamic resolution, and an open upscaler. |
 | RT-06 — Not started | Specified only. | Captures, HDR, subviews and mirrors, VR stereo, render demos, BSE, MP and the Settings UI in all language tables. |
-| RT-07 — Not started | Specified only. | Budgets on reference hardware from at least two vendors, image review against classic, SP/Awakening/MP coverage, Linux, soaks and the availability decision. |
+| RT-07 — Not started | Specified only. | Budgets on reference hardware from at least two vendors, the luminance comparison on every stock map, image review against classic, SP/Awakening/MP coverage, Linux, soaks and the availability decision. |
 
 ### RT task evidence and acceptance
 
@@ -1079,7 +1092,12 @@ not credited RT progress.
   double counting once bounce light is traced; whether lights gain a size for
   soft shadows while keeping their authored bounds; and how shadow flags and
   per-view suppression map to instance masks. Budgets assume the 8 GB reference
-  card. Define the CVar and Settings contract and
+  card. Define rule 6's fidelity measure: the reference viewpoints for each map,
+  the statistic (proposed: mean log luminance of the frame and of each cell of
+  an 8 by 8 grid), the tolerances (proposed: the frame within a third of a stop
+  and every cell within one stop of classic, each exception recorded with its
+  cause) and the load-time calibration that keeps bounce light and emitters
+  inside them. Define the CVar and Settings contract and
   where hybrid effects replace rather than add to raster ones. Close when the
   contract is recorded in a ray-tracing reference doc and the reference scenes
   have classic captures.
@@ -1112,7 +1130,8 @@ not credited RT progress.
   Each effect has a developer CVar and falls back to its raster equivalent.
   Gate: the reference scenes show no missing, detached or light-leaking shadows
   against the classic reference, view-weapon and subview cases included, within
-  the RT-01 budget.
+  the RT-01 budget, and every reference viewpoint stays inside the RT-01
+  luminance tolerances.
 - [ ] **RT-04 — P3, implementation: path-traced mode.** In mode `2`, replace
   rasterized lighting with a path tracer in the manner of Q2RTX: primary
   visibility, direct light from every id Tech 4 light type and from derived
@@ -1126,8 +1145,9 @@ not credited RT progress.
   path tracer cannot own are composited from the raster path with correct
   depth. A reference mode accumulates frames into a converged image for
   comparison. Gate: every stock SP and MP map renders without missing surfaces,
-  black materials or uncovered pixels on the reference hardware, and the
-  reference mode converges on the reference scenes.
+  black materials or uncovered pixels on the reference hardware, the
+  reference mode converges on the reference scenes, and every reference
+  viewpoint stays inside the RT-01 luminance tolerances.
 - [ ] **RT-05 — P2, implementation: sampling, denoising and reconstruction.**
   Importance sampling for many lights and emitters (for example a ReSTIR-style
   reservoir scheme), a temporal and spatial denoiser that separates direct,
@@ -1149,8 +1169,9 @@ not credited RT progress.
 - [ ] **RT-07 — P2, qualification and decision: availability.** On the RT-01
   reference hardware, under Windows x64 and Linux x64, run the FPS suite, the
   reference scenes, stock SP progression samples including Awakening `q4xbase`,
-  MP with bots, and a long-session soak in each mode. Review images against
-  classic at play speed. Decide whether each mode is offered as experimental or
+  MP with bots, and a long-session soak in each mode. Run the rule 6 luminance
+  comparison on every stock map and review images against classic at play
+  speed. Decide whether each mode is offered as experimental or
   supported, and whether any preset enables mode `1`; `0` stays the default and
   a supported fallback. Update the capability matrix, platform support and
   release notes with the decision.
