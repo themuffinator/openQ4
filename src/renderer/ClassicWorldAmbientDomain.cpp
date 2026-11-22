@@ -1481,7 +1481,11 @@ bool RendererClassicWorldAmbientDomain_RunSelfTest( void ) {
 				"deformContract" )
 			|| ForbiddenPassCategory( RENDER_PASS_DEPTH )
 			|| ForbiddenPassCategory( RENDER_PASS_AMBIENT )
-			|| !ForbiddenPassCategory( RENDER_PASS_ARB2_INTERACTION )
+			// The domain owns its walks beside the classic light passes (REN-01);
+			// the modern executors and in-world GUI still decline the view.
+			|| ForbiddenPassCategory( RENDER_PASS_ARB2_INTERACTION )
+			|| !ForbiddenPassCategory( RENDER_PASS_FORWARD_PLUS )
+			|| !ForbiddenPassCategory( RENDER_PASS_GUI )
 			|| !ForbiddenPassCategory( static_cast<renderPassCategory_t>(
 				0x7fffffff ) ) ) {
 		return false;
