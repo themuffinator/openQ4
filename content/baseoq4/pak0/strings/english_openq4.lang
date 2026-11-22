@@ -1847,4 +1847,11 @@
 	"#str_232648"	"MUTE PLAYER %s"
 	"#str_232649"	"Usage: callvote mute <player name>"
 	"#str_232650"	"That player is already muted."
+	"#str_232651"	"You are now a server admin."
+	"#str_232652"	"You are no longer a server admin."
+	"#str_232653"	"The server refused the admin login."
+	"#str_232654"	"You are not logged in as a server admin."
+	"#str_232655"	"Done: "
+	"#str_232656"	"Refused: that cannot be done to that player."
+	"#str_232657"	"Admins cannot ban on this server."
 }

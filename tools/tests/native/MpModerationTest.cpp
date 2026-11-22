@@ -566,6 +566,71 @@ static void TestLog( void ) {
 	CHECK( text.find( '\n' ) == text.size() - 1 );
 }
 
+static void TestAdmins( void ) {
+	// an admin's ban always ends, and never outlasts the host's limit
+	CHECK( MPModAdminBanSeconds( 0, 1440 ) == 86400 );
+	CHECK( MPModAdminBanSeconds( -5, 60 ) == 3600 );
+	CHECK( MPModAdminBanSeconds( 3600, 1440 ) == 3600 );
+	CHECK( MPModAdminBanSeconds( 86400, 1440 ) == 86400 );
+	CHECK( MPModAdminBanSeconds( 86401, 1440 ) == 86400 );
+	CHECK( MPModAdminBanSeconds( 10LL * 24 * 3600, 5 ) == 300 );
+	CHECK( MPModAdminBanSeconds( 3600, 0 ) == 0 );
+	CHECK( MPModAdminBanSeconds( 3600, -1 ) == 0 );
+	CHECK( MPModAdminBanSeconds( 0, 0x7fffffff ) == MP_MOD_MAX_DURATION_SECONDS );
+
+	CHECK( MPModAdminVerbHasTarget( MP_MOD_ADMIN_KICK ) && MPModAdminVerbHasTarget( MP_MOD_ADMIN_MUTE ) );
+	CHECK( MPModAdminVerbHasTarget( MP_MOD_ADMIN_UNMUTE ) && MPModAdminVerbHasTarget( MP_MOD_ADMIN_BAN ) );
+	CHECK( !MPModAdminVerbHasTarget( MP_MOD_ADMIN_LOGOUT ) && !MPModAdminVerbHasTarget( MP_MOD_ADMIN_NONE ) );
+	CHECK( !MPModAdminVerbHasTarget( MP_MOD_ADMIN_VERB_COUNT ) && !MPModAdminVerbHasTarget( 255 ) );
+	CHECK( std::strcmp( MPModAdminVerbName( MP_MOD_ADMIN_BAN ), "ban" ) == 0 );
+	CHECK( std::strcmp( MPModAdminVerbName( 99 ), "" ) == 0 );
+	// the wire carries these numbers: they are appended to, never renumbered
+	CHECK( MP_MOD_ADMIN_KICK == 1 && MP_MOD_ADMIN_MUTE == 2 && MP_MOD_ADMIN_UNMUTE == 3 && MP_MOD_ADMIN_BAN == 4 &&
+		MP_MOD_ADMIN_LOGOUT == 5 );
+
+	mpModAdminTarget_t player;
+	std::memset( &player, 0, sizeof( player ) );
+	player.connected = true;
+	player.current = true;
+	for ( int verb = MP_MOD_ADMIN_KICK; verb <= MP_MOD_ADMIN_BAN; verb++ ) {
+		CHECK( MPModAdminCheck( verb, 3, 5, player, 1440 ) == MP_MOD_ADMIN_OK );
+		// nobody there, or somebody else by now
+		mpModAdminTarget_t gone = player;
+		gone.connected = false;
+		CHECK( MPModAdminCheck( verb, 3, 5, gone, 1440 ) == MP_MOD_ADMIN_REFUSED_TARGET );
+		mpModAdminTarget_t replaced = player;
+		replaced.current = false;
+		CHECK( MPModAdminCheck( verb, 3, 5, replaced, 1440 ) == MP_MOD_ADMIN_REFUSED_TARGET );
+		CHECK( MPModAdminCheck( verb, 3, -1, player, 1440 ) == MP_MOD_ADMIN_REFUSED_TARGET );
+		CHECK( MPModAdminCheck( verb, 3, 3, player, 1440 ) == MP_MOD_ADMIN_REFUSED_SELF );
+		mpModAdminTarget_t host = player;
+		host.host = true;
+		CHECK( MPModAdminCheck( verb, 3, 5, host, 1440 ) == MP_MOD_ADMIN_REFUSED_HOST );
+		mpModAdminTarget_t admin = player;
+		admin.admin = true;
+		CHECK( MPModAdminCheck( verb, 3, 5, admin, 1440 ) == MP_MOD_ADMIN_REFUSED_ADMIN );
+		mpModAdminTarget_t bot = player;
+		bot.bot = true;
+		CHECK( MPModAdminCheck( verb, 3, 5, bot, 1440 ) == MP_MOD_ADMIN_REFUSED_BOT );
+	}
+	// only a ban answers to the host's limit and to the admin's own address
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_BAN, 3, 5, player, 0 ) == MP_MOD_ADMIN_REFUSED_BANS_OFF );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_KICK, 3, 5, player, 0 ) == MP_MOD_ADMIN_OK );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_MUTE, 3, 5, player, 0 ) == MP_MOD_ADMIN_OK );
+	mpModAdminTarget_t housemate = player;
+	housemate.sameAddress = true;
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_BAN, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_REFUSED_SELF );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_KICK, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_OK );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_MUTE, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_OK );
+	// a logout needs no target; anything else is not a request
+	mpModAdminTarget_t nobody;
+	std::memset( &nobody, 0, sizeof( nobody ) );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_LOGOUT, 3, 0, nobody, 0 ) == MP_MOD_ADMIN_OK );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_NONE, 3, 5, player, 1440 ) == MP_MOD_ADMIN_REFUSED_VERB );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_VERB_COUNT, 3, 5, player, 1440 ) == MP_MOD_ADMIN_REFUSED_VERB );
+	CHECK( MPModAdminCheck( 200, 3, 5, player, 1440 ) == MP_MOD_ADMIN_REFUSED_VERB );
+}
+
 int main( void ) {
 	TestAddresses();
 	TestDurations();
@@ -575,6 +640,7 @@ int main( void ) {
 	TestFlood();
 	TestNames();
 	TestLog();
+	TestAdmins();
 	if ( failures != 0 ) {
 		std::printf( "%d moderation core check(s) failed\n", failures );
 		return 1;

@@ -1903,4 +1903,11 @@
 	"#str_232648"	"WYCISZ GRACZA %s"
 	"#str_232649"	"Użycie: callvote mute <nazwa gracza>"
 	"#str_232650"	"Ten gracz jest już wyciszony."
+	"#str_232651"	"Jesteś teraz administratorem serwera."
+	"#str_232652"	"Nie jesteś już administratorem serwera."
+	"#str_232653"	"Serwer odrzucił logowanie administratora."
+	"#str_232654"	"Nie jesteś zalogowany jako administrator serwera."
+	"#str_232655"	"Gotowe: "
+	"#str_232656"	"Odmowa: tego nie można zrobić temu graczowi."
+	"#str_232657"	"Administratorzy nie mogą banować na tym serwerze."
 }

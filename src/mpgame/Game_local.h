@@ -366,6 +366,9 @@ enum {
 	// openQ4: a player's request to the map database, client to server: the
 	// map queue (mymap) and the end-of-match pick (mappick).
 	GAME_RELIABLE_MESSAGE_MAPDB,
+	// openQ4 (MP-18): a logged-in admin's request to kick, mute or ban a
+	// connected player, client to server (mp/Moderation.h).
+	GAME_RELIABLE_MESSAGE_MODERATION,
 	// Insert future wire messages before this sentinel; never serialize COUNT.
 	GAME_RELIABLE_MESSAGE_COUNT,
 };
@@ -413,6 +416,8 @@ typedef enum {
 	RELIABLE_FLOOD_EMOTE,
 	// a queued map is announced to every client
 	RELIABLE_FLOOD_MAPDB,
+	// an admin's request writes the admin log and can rewrite the ban list
+	RELIABLE_FLOOD_MODERATION,
 
 	RELIABLE_FLOOD_NUM
 } reliableFloodClass_t;
@@ -425,6 +430,7 @@ const int RELIABLE_FLOOD_VOTEMAPS_DELAY	= 2000;
 const int RELIABLE_FLOOD_EVENT_DELAY	= 5000;
 const int RELIABLE_FLOOD_EMOTE_DELAY	= 500;
 const int RELIABLE_FLOOD_MAPDB_DELAY	= 1000;
+const int RELIABLE_FLOOD_MODERATION_DELAY	= 500;
 
 // "has never sent one of these".  It cannot be 0: gameLocal.time starts at 0 on
 // every map load, so a zero stamp reads as "sent just now" and swallows each
@@ -1579,6 +1585,11 @@ public:
 	static void				Unban_f( const idCmdArgs &args );
 	static void				BanList_f( const idCmdArgs &args );
 	static void				Mute_f( const idCmdArgs &args );
+	// admins (net_serverAdminPassword): the typed request a logged-in client sends
+	void					ServerModerationRequest( int clientNum, const idBitMsg &msg );
+	bool					ClientModerationRequest( int verb, int clientNum, mpModTime_t seconds, const char *reason );
+	static void				Admin_f( const idCmdArgs &args );
+	static void				ClientKick_f( const idCmdArgs &args );
 	static void				Status_f( const idCmdArgs &args );
 	// graceful shutdown: tell the players, let the match end or a time run out, stop
 	void					ScheduleServerShutdown( bool afterMatch, mpModTime_t seconds, const char *reason, const char *by );
@@ -1608,6 +1619,7 @@ private:
 	mpModMuteList_t			modMutes;				// mutes by address, so a reconnect keeps one
 	mpModFlood_t			modChatFlood[ MAX_CLIENTS ];
 	int						modNoticeTime[ MAX_CLIENTS ];	// game time of the next "you are muted" notice
+	int						modActorClient;			// the admin whose request is being carried out, or -1
 	mpModAddress_t			modLastRefused;			// the last banned address the admin log recorded
 	mpModTime_t				modLastRefusedTime;
 	int						modShutdownMode;		// MOD_SHUTDOWN_* in Game_network.cpp

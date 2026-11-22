@@ -551,6 +551,9 @@ struct idGameLocal {
     // multiplayer's per-map entityDef lookup cache (55ab256ff) is dropped at teardown
     mutable int entityDefCacheClears=0;
     void ClearEntityDefCache() const {++entityDefCacheClears;}
+    // MP-18: a multiplayer server whose map ends forgets a serverShutdown that already stopped it
+    int shutdownMapsEnded=0;
+    void ServerShutdownMapEnded(){++shutdownMapsEnded;}
     void MapShutdown();
 } gameLocal;
 bool idMultiplayerGame::FinalizeMatchEvidence(bool aborted) {
@@ -572,6 +575,7 @@ int main() {
         gameLocal.MapShutdown();
         assert(gameLocal.mpGame.seals==expected);
         assert(mpMapHost.shutdowns==databaseShutdowns+((mask&3)==3 ? 1:0));
+        assert(gameLocal.shutdownMapsEnded==((mask&3)==3 ? 1:0));
         assert(gameLocal.warnings==((mask==7) ? 1:0));
         assert(!gameLocal.entitiesAlive && gameLocal.mapFileName.empty());
         assert(gameLocal.gamestate==GAMESTATE_NOMAP);

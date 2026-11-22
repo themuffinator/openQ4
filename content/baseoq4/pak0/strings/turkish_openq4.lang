@@ -1847,4 +1847,11 @@
 	"#str_232648"	"OYUNCUYU SUSTUR: %s"
 	"#str_232649"	"Kullanım: callvote mute <oyuncu adı>"
 	"#str_232650"	"Bu oyuncu zaten susturulmuş."
+	"#str_232651"	"Artık sunucu yöneticisisin."
+	"#str_232652"	"Artık sunucu yöneticisi değilsin."
+	"#str_232653"	"Sunucu yönetici girişini reddetti."
+	"#str_232654"	"Sunucu yöneticisi olarak giriş yapmadın."
+	"#str_232655"	"Tamam: "
+	"#str_232656"	"Reddedildi: bu oyuncuya bu yapılamaz."
+	"#str_232657"	"Yöneticiler bu sunucuda yasaklama yapamaz."
 }

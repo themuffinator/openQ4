@@ -1847,4 +1847,11 @@
 	"#str_232648"	"SPIELER %s STUMMSCHALTEN"
 	"#str_232649"	"Verwendung: callvote mute <Spielername>"
 	"#str_232650"	"Dieser Spieler ist bereits stummgeschaltet."
+	"#str_232651"	"Du bist jetzt Server-Admin."
+	"#str_232652"	"Du bist kein Server-Admin mehr."
+	"#str_232653"	"Der Server hat die Admin-Anmeldung abgelehnt."
+	"#str_232654"	"Du bist nicht als Server-Admin angemeldet."
+	"#str_232655"	"Erledigt: "
+	"#str_232656"	"Abgelehnt: Das ist bei diesem Spieler nicht möglich."
+	"#str_232657"	"Admins können auf diesem Server nicht bannen."
 }

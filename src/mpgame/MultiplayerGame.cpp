@@ -1218,6 +1218,12 @@ idMultiplayerGame::idMultiplayerGame() {
 	ClearMatchTerminalResult();
 	matchRefereeCredentialInitialized = false;
 	matchRefereeCredentialIsReal = false;
+	matchAdminCredentialInitialized = false;
+	matchAdminCredentialIsReal = false;
+	matchAdminAuthenticationReady = false;
+	pendingRefereePasswordIsAdmin = false;
+	memset( matchAdminConnection, 0, sizeof( matchAdminConnection ) );
+	memset( matchAdminRefusalNotice, 0, sizeof( matchAdminRefusalNotice ) );
 	memset( pendingRefereePassword, 0, sizeof( pendingRefereePassword ) );
 	pendingRefereePasswordLength = 0;
 	pendingRefereePasswordDeadline = 0;
@@ -1732,6 +1738,16 @@ static bool CompetitionSeriesMapMatchesRuntime(
 static const int MP_REFEREE_AUTH_REQUEST_BYTES = 9;
 static const char MP_REFEREE_AUTH_REQUEST_TOKEN[] = "challenge";
 static const int MP_REFEREE_AUTH_PROOF_CREDENTIAL_BYTES = 84;
+// openQ4 (MP-18): an admin's login is the same operation and the same proof
+// with its own request word and proof tag, answered by the admin password's
+// own service. A referee proof never opens the admin grant, or the reverse.
+static const int MP_ADMIN_AUTH_REQUEST_BYTES = 15;
+// The engine declares both passwords (AsyncNetwork.cpp) so they are private
+// whichever game module is loaded when they are typed.
+#define MP_ADMIN_SERVER_PASSWORD_CVAR	"net_serverAdminPassword"
+static const char MP_ADMIN_AUTH_REQUEST_TOKEN[] = "challenge:admin";
+static const char MP_REFEREE_AUTH_PROOF_TAG = 'v';
+static const char MP_ADMIN_AUTH_PROOF_TAG = 'a';
 
 static unsigned char MatchAuthHexValue( char value, bool &valid ) {
 	if ( value >= '0' && value <= '9' ) {
@@ -1754,9 +1770,25 @@ static bool MatchAuthIsChallengeRequest( const mpMatchOperationArgument_t *crede
 			MP_REFEREE_AUTH_REQUEST_BYTES ) == 0;
 }
 
+static bool MatchAuthIsAdminChallengeRequest( const mpMatchOperationArgument_t *credential ) {
+	return credential != NULL && credential->value.type == MP_MATCH_VALUE_STRING &&
+		credential->value.stringLength == MP_ADMIN_AUTH_REQUEST_BYTES &&
+		memcmp( credential->value.stringValue, MP_ADMIN_AUTH_REQUEST_TOKEN,
+			MP_ADMIN_AUTH_REQUEST_BYTES ) == 0;
+}
+
+// True for the admin kind of either step: its challenge request or its proof.
+static bool MatchAuthIsAdminCredential( const mpMatchOperationArgument_t *credential ) {
+	return MatchAuthIsAdminChallengeRequest( credential ) ||
+		( credential != NULL && credential->value.type == MP_MATCH_VALUE_STRING &&
+			credential->value.stringLength == MP_REFEREE_AUTH_PROOF_CREDENTIAL_BYTES &&
+			credential->value.stringValue[ 0 ] == MP_ADMIN_AUTH_PROOF_TAG );
+}
+
 static bool ParseMatchAuthProofCredential(
 		const mpMatchOperationArgument_t *credential,
-		uint64_t &challengeGeneration, mpRefereeAuthProof &proof ) {
+		uint64_t &challengeGeneration, mpRefereeAuthProof &proof,
+		char tag = MP_REFEREE_AUTH_PROOF_TAG ) {
 	challengeGeneration = 0;
 	MPRefereeAuthSecureZero( proof.bytes, sizeof( proof.bytes ) );
 	if ( credential == NULL || credential->value.type != MP_MATCH_VALUE_STRING ||
@@ -1764,7 +1796,7 @@ static bool ParseMatchAuthProofCredential(
 		return false;
 	}
 	const char *text = credential->value.stringValue;
-	if ( text[ 0 ] != 'v' || text[ 1 ] != '1' || text[ 2 ] != ':' ||
+	if ( text[ 0 ] != tag || text[ 1 ] != '1' || text[ 2 ] != ':' ||
 		text[ 19 ] != ':' || text[ MP_REFEREE_AUTH_PROOF_CREDENTIAL_BYTES ] != '\0' ) {
 		return false;
 	}
@@ -1785,13 +1817,14 @@ static bool ParseMatchAuthProofCredential(
 
 static bool BuildMatchAuthProofCredential( uint64_t challengeGeneration,
 		const mpRefereeAuthProof &proof,
-		char output[ MP_MATCH_PROTOCOL_MAX_STRING_BYTES + 1 ] ) {
+		char output[ MP_MATCH_PROTOCOL_MAX_STRING_BYTES + 1 ],
+		char tag = MP_REFEREE_AUTH_PROOF_TAG ) {
 	if ( challengeGeneration == 0 ) {
 		return false;
 	}
 	static const char digits[] = "0123456789abcdef";
 	memset( output, 0, MP_MATCH_PROTOCOL_MAX_STRING_BYTES + 1 );
-	output[ 0 ] = 'v';
+	output[ 0 ] = tag;
 	output[ 1 ] = '1';
 	output[ 2 ] = ':';
 	for ( int index = 0; index < 16; ++index ) {
@@ -3642,6 +3675,7 @@ void idMultiplayerGame::ClearPendingRefereePassword( void ) {
 		sizeof( pendingRefereePassword ) );
 	pendingRefereePasswordLength = 0;
 	pendingRefereePasswordDeadline = 0;
+	pendingRefereePasswordIsAdmin = false;
 }
 
 bool idMultiplayerGame::InitializeRefereeAuthentication( void ) {
@@ -3713,6 +3747,259 @@ bool idMultiplayerGame::InitializeRefereeAuthentication( void ) {
 
 	return matchRefereeAuthentication.BeginSession( matchSession.GetSessionId(),
 		Max( 0, gameLocal.time ) );
+}
+
+/*
+================
+idMultiplayerGame::InitializeAdminAuthentication
+
+openQ4 (MP-18): net_serverAdminPassword is read the way g_refPassword is. The
+cvar is where the host hands the password over, never where it is kept: it is
+turned into a verifier and cleared. A server without one still answers a login with a
+challenge nobody can satisfy, so the exchange does not say whether a password
+exists. False leaves admin logins refused; the match itself goes on.
+================
+*/
+bool idMultiplayerGame::InitializeAdminAuthentication( void ) {
+	matchAdminAuthenticationReady = false;
+	memset( matchAdminConnection, 0, sizeof( matchAdminConnection ) );
+
+	char configured[ MP_REFEREE_AUTH_MAX_PASSWORD_BYTES + 1 ];
+	memset( configured, 0, sizeof( configured ) );
+	const char *source = cvarSystem->GetCVarString( MP_ADMIN_SERVER_PASSWORD_CVAR );
+	int length = 0;
+	if ( source != NULL ) {
+		while ( length <= MP_REFEREE_AUTH_MAX_PASSWORD_BYTES &&
+			source[ length ] != '\0' ) {
+			++length;
+		}
+	}
+	if ( length > MP_REFEREE_AUTH_MAX_PASSWORD_BYTES ) {
+		gameLocal.Warning( "ignored an admin password longer than %d bytes",
+			static_cast<int>( MP_REFEREE_AUTH_MAX_PASSWORD_BYTES ) );
+		cvarSystem->SetCVarString( MP_ADMIN_SERVER_PASSWORD_CVAR, "" );
+		length = 0;
+	} else if ( length > 0 ) {
+		memcpy( configured, source, static_cast<size_t>( length ) );
+		configured[ length ] = '\0';
+		cvarSystem->SetCVarString( MP_ADMIN_SERVER_PASSWORD_CVAR, "" );
+	}
+
+	if ( length > 0 ) {
+		mpRefereeAuthSalt salt;
+		memset( &salt, 0, sizeof( salt ) );
+		const bool randomReady = sys->SecureRandomBytes( salt.bytes,
+			sizeof( salt.bytes ) );
+		const bool installed = randomReady &&
+			matchAdminAuthentication.InstallCredentialFromPassword(
+				configured, static_cast<size_t>( length ), salt );
+		MPRefereeAuthSecureZero( &salt, sizeof( salt ) );
+		MPRefereeAuthSecureZero( configured, sizeof( configured ) );
+		if ( !installed ) {
+			gameLocal.Warning( "could not install the admin password securely" );
+			return false;
+		}
+		matchAdminCredentialInitialized = true;
+		matchAdminCredentialIsReal = true;
+	} else {
+		MPRefereeAuthSecureZero( configured, sizeof( configured ) );
+	}
+
+	if ( !matchAdminCredentialInitialized ) {
+		mpRefereeAuthSalt salt;
+		mpRefereeAuthVerifier verifier;
+		memset( &salt, 0, sizeof( salt ) );
+		memset( &verifier, 0, sizeof( verifier ) );
+		const bool randomReady = sys->SecureRandomBytes( salt.bytes,
+			sizeof( salt.bytes ) ) && sys->SecureRandomBytes( verifier.bytes,
+			sizeof( verifier.bytes ) );
+		const bool installed = randomReady &&
+			matchAdminAuthentication.InstallCredentialVerifier( salt, verifier );
+		MPRefereeAuthSecureZero( &salt, sizeof( salt ) );
+		MPRefereeAuthSecureZero( &verifier, sizeof( verifier ) );
+		if ( !installed ) {
+			gameLocal.Warning( "could not initialize opaque admin authentication" );
+			return false;
+		}
+		matchAdminCredentialInitialized = true;
+		matchAdminCredentialIsReal = false;
+	}
+
+	matchAdminAuthenticationReady = matchAdminAuthentication.BeginSession(
+		matchSession.GetSessionId(), Max( 0, gameLocal.time ) );
+	return matchAdminAuthenticationReady;
+}
+
+/*
+================
+idMultiplayerGame::ServerAdminLogout
+
+Ends a connection's admin grant. The referee role an admin was given while
+watching goes with it. False when the connection held no grant.
+================
+*/
+bool idMultiplayerGame::ServerAdminLogout( int clientNum ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return false;
+	}
+	const bool held = IsServerAdmin( clientNum );
+	matchAdminConnection[ clientNum ] = 0;
+	matchAdminAuthentication.InvalidateSlot( clientNum );
+	if ( !held || !gameLocal.isServer || !matchSessionOperational ) {
+		return held;
+	}
+	uint32_t generation = 0;
+	mpParticipantId participant;
+	if ( matchSession.GetSlotGeneration( clientNum, generation ) &&
+		matchSession.ResolveSlotBinding( clientNum, generation, participant ) ) {
+		const mpMatchParticipantState *state = matchSession.FindParticipant( participant );
+		if ( state != NULL &&
+			( state->roles & MPMatchRoleBit( MP_MATCH_ROLE_REFEREE ) ) != 0 ) {
+			const mpMatchRoleMask_t playerRoles =
+				( state->roles & ~MPMatchRoleBit( MP_MATCH_ROLE_REFEREE ) ) |
+				MPMatchRoleBit( MP_MATCH_ROLE_PLAYER );
+			matchSession.SetParticipantRoles( state->id, playerRoles,
+				matchSession.GetSessionRevision() );
+			matchRefereeAuthentication.InvalidateSlot( clientNum );
+		}
+	}
+	return true;
+}
+
+/*
+================
+idMultiplayerGame::ApplyAdminAuthentication
+
+The admin kind of MP_OPERATION_CONTINUATION_REFEREE_AUTHENTICATE. Unlike a
+referee an admin may be playing: the grant is the connection's right to ask
+the server to kick, mute or ban (idGameLocal::ServerModerationRequest), and
+carries no view of the match. An admin who is watching, with no roster seat,
+is made a referee as well; one who is playing is not, for the reason a referee
+login is refused to a player.
+================
+*/
+bool idMultiplayerGame::ApplyAdminAuthentication( int clientNum,
+		const mpMatchOperationRequest_t &request,
+		mpOperationExecutionResult_t &execution ) {
+	const mpMatchParticipantState *actor =
+		matchSession.FindParticipant( execution.continuation.actor );
+	const mpMatchOperationArgument_t *credential = MatchOperationArgument(
+		request, MP_MATCH_ARG_CREDENTIAL );
+	if ( actor == NULL || actor->slot != clientNum ||
+		actor->slotGeneration != request.actorBindingGeneration ||
+		!actor->human || credential == NULL || !matchAdminAuthenticationReady ||
+		clientNum < 0 || clientNum >= MAX_CLIENTS ||
+		matchConnectionId[ clientNum ] == 0 ) {
+		execution.outcome = MP_OPERATION_REJECTED;
+		execution.reason = MP_OPERATION_REASON_NOT_AUTHORIZED;
+		execution.protocolReason = MP_MATCH_PROTOCOL_REASON_NOT_AUTHORIZED;
+		execution.continuation.Clear();
+		return false;
+	}
+
+	mpRefereeAuthBinding binding;
+	binding.sessionId = matchSession.GetSessionId();
+	binding.participantSequence = actor->id.SequencePart();
+	binding.slot = clientNum;
+	binding.slotGeneration = actor->slotGeneration;
+	const int64_t now = Max( 0, gameLocal.time );
+
+	// The login is exempt from the operation cooldown, so what a refusal writes
+	// is paced here: one chat line and one admin log line in two seconds for a
+	// connection, however fast it asks.
+	auto refused = [this, clientNum]( const char *why, bool wrongProof ) {
+		static const int ADMIN_REFUSAL_NOTICE_MSEC = 2000;
+		const int gameNow = Max( 0, gameLocal.time );
+		int &next = matchAdminRefusalNotice[ clientNum ];
+		if ( gameNow < next && next - gameNow <= ADMIN_REFUSAL_NOTICE_MSEC ) {
+			return;
+		}
+		next = gameNow + ADMIN_REFUSAL_NOTICE_MSEC;
+		if ( wrongProof ) {
+			gameLocal.ModerationLogClient( "admin_login_failed", "server", clientNum, why, 0 );
+		}
+		gameLocal.ServerSendChatMessage( clientNum, "server", "#str_232653", "" );
+	};
+
+	if ( MatchAuthIsAdminChallengeRequest( credential ) ) {
+		mpRefereeAuthNonce nonce;
+		memset( &nonce, 0, sizeof( nonce ) );
+		if ( !sys->SecureRandomBytes( nonce.bytes, sizeof( nonce.bytes ) ) ) {
+			execution.outcome = MP_OPERATION_REJECTED;
+			execution.reason = MP_OPERATION_REASON_INVARIANT;
+			execution.protocolReason = MP_MATCH_PROTOCOL_REASON_INTERNAL;
+			execution.continuation.Clear();
+			return false;
+		}
+		mpRefereeAuthChallenge challenge;
+		challenge.Clear();
+		const mpRefereeAuthChallengeResult_t issued =
+			matchAdminAuthentication.IssueChallenge( binding, now, nonce,
+				challenge );
+		MPRefereeAuthSecureZero( &nonce, sizeof( nonce ) );
+		if ( issued == MP_REFEREE_AUTH_CHALLENGE_ISSUED &&
+			SendRefereeAuthChallenge( clientNum, challenge ) ) {
+			challenge.Clear();
+			execution.continuation.Clear();
+			return true;
+		}
+		challenge.Clear();
+		refused( "", false );
+		execution.outcome = MP_OPERATION_REJECTED;
+		execution.reason = MP_OPERATION_REASON_NOT_AUTHORIZED;
+		execution.protocolReason = issued == MP_REFEREE_AUTH_CHALLENGE_THROTTLED ?
+			MP_MATCH_PROTOCOL_REASON_COOLDOWN :
+			MP_MATCH_PROTOCOL_REASON_NOT_AUTHORIZED;
+		execution.continuation.Clear();
+		return false;
+	}
+
+	uint64_t challengeGeneration = 0;
+	mpRefereeAuthProof proof;
+	MPRefereeAuthSecureZero( proof.bytes, sizeof( proof.bytes ) );
+	const bool parsed = ParseMatchAuthProofCredential( credential,
+		challengeGeneration, proof, MP_ADMIN_AUTH_PROOF_TAG );
+	const mpRefereeAuthVerifyResult_t verified =
+		matchAdminAuthentication.VerifyProof( binding, now,
+			parsed ? challengeGeneration : 0, proof );
+	MPRefereeAuthSecureZero( proof.bytes, sizeof( proof.bytes ) );
+	challengeGeneration = 0;
+	if ( verified != MP_REFEREE_AUTH_VERIFY_AUTHENTICATED ) {
+		refused( verified == MP_REFEREE_AUTH_VERIFY_THROTTLED ? "locked out" : "", true );
+		execution.outcome = MP_OPERATION_REJECTED;
+		execution.reason = MP_OPERATION_REASON_NOT_AUTHORIZED;
+		execution.protocolReason = verified == MP_REFEREE_AUTH_VERIFY_THROTTLED ?
+			MP_MATCH_PROTOCOL_REASON_COOLDOWN :
+			MP_MATCH_PROTOCOL_REASON_NOT_AUTHORIZED;
+		execution.continuation.Clear();
+		return false;
+	}
+
+	const bool wasAdmin = IsServerAdmin( clientNum );
+	matchAdminConnection[ clientNum ] = matchConnectionId[ clientNum ];
+	if ( !wasAdmin ) {
+		common->Printf( "client %d (%s^0) logged in as an admin\n", clientNum,
+			gameLocal.userInfo[ clientNum ].GetString( "ui_name" ) );
+		gameLocal.ModerationLogClient( "admin_login", "server", clientNum, "", 0 );
+	}
+	gameLocal.ServerSendChatMessage( clientNum, "server", "#str_232651", "" );
+
+	execution.outcome = MP_OPERATION_NO_CHANGE;
+	execution.reason = MP_OPERATION_REASON_NONE;
+	if ( !actor->active && matchSession.FindRosterSeat( actor->id ) < 0 ) {
+		const mpMatchRoleMask_t refereeRoles =
+			( actor->roles & ~MPMatchRosterPrincipalRoleMask() &
+				~MPMatchRoleBit( MP_MATCH_ROLE_BROADCASTER ) ) |
+			MPMatchRoleBit( MP_MATCH_ROLE_REFEREE );
+		const mpMatchMutationResult mutation = matchSession.SetParticipantRoles(
+			actor->id, refereeRoles, matchSession.GetSessionRevision() );
+		if ( mutation.WasApplied() ) {
+			execution.outcome = MP_OPERATION_APPLIED;
+			execution.resultingSessionRevision = matchSession.GetSessionRevision();
+		}
+	}
+	execution.continuation.Clear();
+	return true;
 }
 
 bool idMultiplayerGame::SendRefereeAuthChallenge( int clientNum,
@@ -3796,6 +4083,8 @@ bool idMultiplayerGame::CompleteRefereeAuthChallenge(
 	MPRefereeAuthSecureZero( proof.bytes, sizeof( proof.bytes ) );
 	const bool proofReady = MPRefereeAuthBuildProofFromPassword( challenge,
 		pendingRefereePassword, static_cast<size_t>( pendingRefereePasswordLength ), proof );
+	const char proofTag = pendingRefereePasswordIsAdmin ?
+		MP_ADMIN_AUTH_PROOF_TAG : MP_REFEREE_AUTH_PROOF_TAG;
 	ClearPendingRefereePassword();
 	if ( !proofReady ) {
 		MPRefereeAuthSecureZero( proof.bytes, sizeof( proof.bytes ) );
@@ -3803,7 +4092,7 @@ bool idMultiplayerGame::CompleteRefereeAuthChallenge(
 	}
 	char credential[ MP_MATCH_PROTOCOL_MAX_STRING_BYTES + 1 ];
 	const bool credentialReady = BuildMatchAuthProofCredential(
-		challenge.challengeGeneration, proof, credential );
+		challenge.challengeGeneration, proof, credential, proofTag );
 	MPRefereeAuthSecureZero( proof.bytes, sizeof( proof.bytes ) );
 	if ( !credentialReady ) {
 		MPRefereeAuthSecureZero( credential, sizeof( credential ) );
@@ -3851,6 +4140,54 @@ bool idMultiplayerGame::RequestRefereeAuthentication( const char *password ) {
 	request.arguments[ 0 ].fieldId = MP_MATCH_ARG_CREDENTIAL;
 	if ( !request.arguments[ 0 ].value.SetString( MP_REFEREE_AUTH_REQUEST_TOKEN,
 		MP_REFEREE_AUTH_REQUEST_BYTES ) ) {
+		ClearPendingRefereePassword();
+		return false;
+	}
+	const bool submitted = SubmitMatchOperation( request );
+	ClearMatchOperationSensitiveArguments( request );
+	if ( !submitted ) {
+		ClearPendingRefereePassword();
+	}
+	return submitted;
+}
+
+/*
+================
+idMultiplayerGame::RequestAdminAuthentication
+
+The client's half of an admin login: keep the password only until the
+server's challenge arrives, and never send it.
+================
+*/
+bool idMultiplayerGame::RequestAdminAuthentication( const char *password ) {
+	if ( password == NULL ) {
+		return false;
+	}
+	int length = 0;
+	while ( length <= MP_REFEREE_AUTH_MAX_PASSWORD_BYTES && password[ length ] != '\0' ) {
+		++length;
+	}
+	if ( length <= 0 || length > MP_REFEREE_AUTH_MAX_PASSWORD_BYTES ) {
+		return false;
+	}
+	ClearPendingRefereePassword();
+	memcpy( pendingRefereePassword, password, static_cast<size_t>( length ) );
+	pendingRefereePasswordLength = length;
+	pendingRefereePasswordIsAdmin = true;
+	const int now = Max( 0, gameLocal.time );
+	const int lifetime = static_cast<int>( MP_REFEREE_AUTH_CHALLENGE_LIFETIME_MSEC ) + 5000;
+	pendingRefereePasswordDeadline = now > 0x7fffffff - lifetime ?
+		0x7fffffff : now + lifetime;
+	pendingRefereeChallenge.Clear();
+	pendingRefereeChallengeValid = false;
+
+	mpMatchOperationRequest_t request;
+	request.Clear();
+	request.opcode = MP_MATCH_OP_REF_AUTHENTICATE;
+	request.argumentCount = 1;
+	request.arguments[ 0 ].fieldId = MP_MATCH_ARG_CREDENTIAL;
+	if ( !request.arguments[ 0 ].value.SetString( MP_ADMIN_AUTH_REQUEST_TOKEN,
+		MP_ADMIN_AUTH_REQUEST_BYTES ) ) {
 		ClearPendingRefereePassword();
 		return false;
 	}
@@ -5118,6 +5455,9 @@ void idMultiplayerGame::ClearMatchOperationTransportSlot( int clientNum ) {
 	// disconnect raced participant binding so the next occupant cannot inherit
 	// a privileged result, cooldown, challenge, or suppressed initial view.
 	matchRefereeAuthentication.InvalidateSlot( clientNum );
+	matchAdminAuthentication.InvalidateSlot( clientNum );
+	matchAdminConnection[ clientNum ] = 0;
+	matchAdminRefusalNotice[ clientNum ] = 0;
 	matchViewSentRevision[ clientNum ] = 0;
 }
 
@@ -5140,6 +5480,11 @@ bool idMultiplayerGame::ApplyMatchOperationContinuation( int clientNum,
 			matchSession.FindParticipant( execution.continuation.actor );
 		const mpMatchOperationArgument_t *credential = MatchOperationArgument(
 			request, MP_MATCH_ARG_CREDENTIAL );
+		// openQ4 (MP-18): an admin's login answers to the admin password and
+		// may come from a player; nothing below is reached by it
+		if ( MatchAuthIsAdminCredential( credential ) ) {
+			return ApplyAdminAuthentication( clientNum, request, execution );
+		}
 		if ( actor == NULL || actor->slot != clientNum ||
 			actor->slotGeneration != request.actorBindingGeneration ||
 			!actor->human || actor->active ||
@@ -9250,6 +9595,8 @@ bool idMultiplayerGame::BeginMatchSession( void ) {
 	if ( !InitializeRefereeAuthentication() ) {
 		return false;
 	}
+	// openQ4 (MP-18): a server that cannot set up admin logins still plays
+	InitializeAdminAuthentication();
 	mpProposalCooldownPolicy_t proposalCooldowns;
 	proposalCooldowns.Clear();
 	proposalCooldowns.durationMsec[ MP_MATCH_COOLDOWN_INTERACTION ] = 2000;

@@ -1856,4 +1856,11 @@
 	"#str_232648"	"RENDRE MUET JOUEUR %s"
 	"#str_232649"	"Utilisation : callvote mute <nom du joueur>"
 	"#str_232650"	"Ce joueur est déjà réduit au silence."
+	"#str_232651"	"Vous êtes maintenant administrateur du serveur."
+	"#str_232652"	"Vous n'êtes plus administrateur du serveur."
+	"#str_232653"	"Le serveur a refusé la connexion administrateur."
+	"#str_232654"	"Vous n'êtes pas connecté en tant qu'administrateur du serveur."
+	"#str_232655"	"Fait : "
+	"#str_232656"	"Refusé : cela ne peut pas être fait à ce joueur."
+	"#str_232657"	"Les administrateurs ne peuvent pas bannir sur ce serveur."
 }

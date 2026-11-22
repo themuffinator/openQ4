@@ -23,6 +23,12 @@ The run must show:
   written to `banlist.txt`, and lifted by `unban`;
 * `net_serverMaxClientsPerAddress` refusing a second client from one address;
 * `kick <slot>` typed at the console recorded like every other removal;
+* a player with the server's admin password (`net_serverAdminPassword`) logging in after
+  a wrong password is refused, then muting, kicking and banning connected
+  players from their own console, the ban cut to `g_adminMaxBanMinutes`, with a
+  bot, the admin's own slot and everything that takes an address refused, each
+  action in the admin log beside the admin's name, and the right gone after
+  `admin logout`;
 * a vote to mute passing while kick votes are forbidden, and silencing its
   target for `g_voteMuteMinutes`;
 * `serverShutdown` announced, called off, and then waiting for the match to
@@ -32,7 +38,10 @@ The run must show:
   held one, begun with the UTC time and holding the match's kills and standings;
 * `banlist.txt` never left beside a half-written copy.
 
-Peers bind 127.0.0.1 only, so a runtime at a new path raises no firewall prompt.
+Peers bind loopback addresses only, so a runtime at a new path raises no firewall
+prompt. The players an admin acts on connect from 127.0.0.2: a ban is of an
+address, and one of 127.0.0.1 would remove the admin too (which the server
+refuses).
 """
 from __future__ import annotations
 
@@ -62,6 +71,14 @@ TEXT_SHUTDOWN_MATCH = "The server will shut down when this match ends."
 TEXT_SHUTDOWN_IN = "The server will shut down in "
 TEXT_SHUTDOWN_OFF = "The server shutdown was called off."
 TEXT_SHUTDOWN_NOW = "The server is shutting down."
+TEXT_ADMIN_NOW = "You are now a server admin."
+TEXT_ADMIN_GONE = "You are no longer a server admin."
+TEXT_ADMIN_REFUSED = "The server refused the admin login."
+TEXT_NOT_ADMIN = "You are not logged in as a server admin."
+TEXT_ADMIN_DONE = "Done: "
+TEXT_ADMIN_NO = "Refused: that cannot be done to that player."
+ADMIN_PASSWORD = "smoke-admin-password-1"
+OTHER_ADDRESS = "127.0.0.2"
 BANLIST_HEADER = "openq4-banlist 1"
 
 
@@ -92,6 +109,8 @@ def main() -> int:
     parser.add_argument("--startup-timeout", type=int, default=300)
     parser.add_argument("--skip-address-limit", action="store_true",
                         help="leave out the second client and the per-address connection limit")
+    parser.add_argument("--skip-admin", action="store_true",
+                        help="leave out the admin stage, which needs a second loopback address (127.0.0.2)")
     args = parser.parse_args()
     runtime, output, assets = args.runtime_dir.resolve(), args.output_dir.resolve(), args.basepath.resolve()
     verify_runtime_is_current(runtime)
@@ -111,7 +130,8 @@ def main() -> int:
         "runtime_dir": str(runtime), "runtime_sha256": {key: digest(path) for key, path in paths.items()},
         "checks": [], "commands": {}, "exit_codes": {}, "failures": [], "admin_log": [],
     }
-    names = ("server", "client", "banned", "returning", "kicked") + (() if args.skip_address_limit else ("second",))
+    names = (("server", "client", "banned", "returning", "kicked") + (() if args.skip_address_limit else ("second",))
+             + (() if args.skip_admin else ("target", "nuisance")))
     games = {role: output / role / "baseoq4" for role in names}
     for game in games.values():
         game.mkdir(parents=True)
@@ -201,11 +221,12 @@ def main() -> int:
                 raise RuntimeError(label + ": the client never became a player")
             time.sleep(0.75)
 
-    def start_client(name: str, player: str, port: int) -> None:
+    def start_client(name: str, player: str, port: int, ip: str = "127.0.0.1") -> None:
         """A fresh hidden client that connects at once; its console pump starts with it, joined or refused."""
         game = games[name]
         launch(name, dict(common | window, fs_savepath=str(game.parent), fs_devpath=str(game.parent),
-                          net_port=str(port), ui_name=player), ["+connect", address, "+exec", f"rot_{name}_start.cfg"])
+                          net_port=str(port), net_ip=ip, ui_name=player),
+               ["+connect", address, "+exec", f"rot_{name}_start.cfg"])
 
     def retire(name: str) -> None:
         """Quit a client on purpose, so the wait loop does not take its exit for a crash."""
@@ -233,7 +254,7 @@ def main() -> int:
         launch("server", dict(common, fs_savepath=str(games["server"].parent), fs_devpath=str(games["server"].parent),
                               net_port=str(args.port), net_serverDedicated="1", si_pure="1", si_name="MP18 moderation",
                               si_maxPlayers="8", si_warmup="0", si_timeLimit="0", si_fragLimit="0", si_mapCycle="",
-                              si_allowVoting="1", si_voteFlags="0",
+                              si_allowVoting="1", si_voteFlags="0", net_serverAdminPassword=ADMIN_PASSWORD,
                               g_autoExecAfterMapLoad="rot_server_start.cfg"), ["+spawnServer", "mp/q4dm1"])
         wait("server startup", lambda t: "\nROT_SERVER_READY" in t["server"], args.startup_timeout)
 
@@ -258,8 +279,16 @@ def main() -> int:
         check("status marks the bot", re.search(r"^\s*\d+\s+\d+\s+\S+\s+no\s+bot\s+-\s+\S", status, re.MULTILINE) is not None, status)
         check("status counts the player and both bots", "\n3 client(s)" in status, status)
         slot = row[1] if row else "0"
-        remote = step(client, "moderation commands on a client", ["ban 0", "mute 0", "status", "banlist"])
-        check("a client's console cannot ban, mute or list", remote.count("only the server runs this") == 4, remote)
+        remote = step(client, "server commands on a client", ["status", "banlist", "unban 1", "serverShutdown now"])
+        check("a client's console cannot list, lift a ban or stop the server", remote.count("only the server runs this") == 4, remote)
+        # ban, mute and gameKick typed on a client are an admin's request; this player never logged in
+        mark = len(read_log(client.log))
+        step(client, "an admin's commands without a login", ["mute 0", "waitMsec 900", "ban 0", "waitMsec 900", "gameKick 0", "waitMsec 900"])
+        wait("the server answers each request", lambda t: t["client"][mark:].count(TEXT_NOT_ADMIN) >= 3, 20)
+        check("without a login the server mutes, bans and kicks for nobody", True)
+        status = step(server, "status after the refused requests", ["status"])
+        check("the refused requests changed nothing", "\n3 client(s)" in status and re.search(r"\byes\s+bot\b", status) is None
+              and not events(), status)
 
         # --- chat and the text mute --------------------------------------------
         heard = say("chat before a mute", ["plainline1"])
@@ -380,6 +409,125 @@ def main() -> int:
               json.dumps(kicks))
         retire("kicked")
 
+        # --- an admin: a player with the server's second password ---------------
+        if not args.skip_admin:
+            admin, target = returning, roles["target"]
+
+            def answered(label: str, actions: list[str], expected: str, role: Role = admin, seconds: int = 30) -> str:
+                """Console actions on the admin's client, and what its console showed up to the server's answer."""
+                mark = len(read_log(role.log))
+                # the server takes one request in half a second from a connection and drops a faster one unanswered
+                step(role, label, ["waitMsec 700", *actions])
+                return wait(label + ": the answer", lambda t: expected in t[role.name][mark:], seconds)[role.name][mark:]
+
+            def listed(player: str, where: str, label: str) -> str:
+                status = step(server, label, ["status"])
+                row = re.search(r"^\s*(\d+)\s+\d+\s+\S+\s+\S+\s+" + re.escape(where) + r"\s+-\s+" + re.escape(player) + r"\s*$",
+                                status, re.MULTILINE)
+                check(f"{player} is listed from {where}", row is not None, status)
+                return status
+
+            start_client("target", "Troublemaker", args.second_port, ip=OTHER_ADDRESS)
+            wait("the admin's first target joins", lambda t: MAP_OPENED in t["target"], args.startup_timeout)
+            become_player("the admin's first target", target)
+            status = listed("Troublemaker", OTHER_ADDRESS, "status before the admin stage")
+            bot = re.search(r"^\s*\d+\s+\d+\s+\S+\s+no\s+bot\s+-\s+(\S+)\s*$", status, re.MULTILINE)
+            bot_name = bot[1] if bot else "nobody"
+
+            # the password never goes on the command line: the cvar is private, and the command reads it
+            wrong = answered("a wrong admin password", ['set net_clientAdminPassword "not-the-password"', "admin"], TEXT_ADMIN_REFUSED)
+            check("a wrong password is refused", TEXT_ADMIN_NOW not in wrong, wrong)
+            answered("a request after the refused login", ["mute Troublemaker"], TEXT_NOT_ADMIN)
+            check("a refused login gives no right", True)
+            step(admin, "wait before the next login", ["waitMsec 2500"])
+            right = answered("the admin password", [f'set net_clientAdminPassword "{ADMIN_PASSWORD}"', "admin"], TEXT_ADMIN_NOW)
+            check("the right password makes the player an admin", TEXT_ADMIN_REFUSED not in right, right)
+            check("the server's console names the new admin", "(ModPlayer^0) logged in as an admin" in read_log(server.log))
+            def holding(game: Path, secret: str) -> list[str]:
+                """The game's own files that hold the text; the harness's rot_*.cfg scripts are how it was typed."""
+                return [str(path.relative_to(game)) for path in game.rglob("*")
+                        if path.is_file() and not path.name.startswith("rot_") and secret.encode() in path.read_bytes()]
+
+            leaked = holding(games[admin.name], ADMIN_PASSWORD) + holding(games[admin.name], "not-the-password")
+            check("neither password reaches the client's log, console history or config", not leaked, " ".join(leaked))
+            leaked = holding(games["server"], ADMIN_PASSWORD)
+            check("the password is nowhere in the server's files once it is read", not leaked, " ".join(leaked))
+
+            # mute and unmute
+            mark = len(read_log(target.log))
+            said = answered("an admin mutes", ["mute Troublemaker 5m"], TEXT_ADMIN_DONE + "Troublemaker")
+            wait("the muted player is told", lambda t: TEXT_MUTED in t["target"][mark:], 20)
+            check("an admin's mute silences the player and tells them", True, said)
+            said = answered("an admin lifts the mute", ["unmute Troublemaker"], TEXT_ADMIN_DONE + "Troublemaker")
+            wait("the player is told the mute is lifted", lambda t: TEXT_UNMUTED in t["target"][mark:], 20)
+            said = answered("an admin lifts a mute twice", ["unmute Troublemaker"], TEXT_ADMIN_NO)
+            check("lifting a mute that is not there changes nothing and says so", True, said)
+
+            # who an admin cannot reach, and what an admin cannot do
+            answered("an admin mutes a bot", ["mute " + bot_name], TEXT_ADMIN_NO)
+            answered("an admin kicks themselves", ["gameKick ModPlayer"], TEXT_ADMIN_NO)
+            check("a bot and the admin's own slot are refused", True)
+            local = step(admin, "what an admin's console still cannot do",
+                         ["ban 192.0.2.7", "ban 192.0.2.0/24", "unban 1", "banlist", "status", "serverShutdown now"])
+            check("an admin bans connected players only: an address or a range is not sent",
+                  local.count("no connected player matches") == 2, local)
+            check("an admin cannot lift a ban, list bans, see addresses or stop the server",
+                  local.count("only the server runs this") == 4, local)
+            status = step(server, "status after the refusals", ["status", "banlist"])
+            check("the refusals changed nothing", "\n4 client(s)" in status and "\n0 ban(s)" in status
+                  and re.search(r"\byes\s", status.partition("client(s)")[0]) is None, status)
+
+            # kick, with a reason
+            mark = len(read_log(target.log))
+            answered("an admin kicks", ["gameKick Troublemaker spamming the chat"], TEXT_ADMIN_DONE + "Troublemaker")
+            wait("the kicked player is told", lambda t: TEXT_KICKED in t["target"][mark:], 30)
+            check("an admin's kick removes the player", True)
+            retire("target")
+
+            # a ban: of the player's address, no longer than the host allows
+            nuisance = roles["nuisance"]
+            start_client("nuisance", "Nuisance", args.second_port, ip=OTHER_ADDRESS)
+            wait("the admin's second target joins", lambda t: MAP_OPENED in t["nuisance"], args.startup_timeout)
+            become_player("the admin's second target", nuisance)
+            listed("Nuisance", OTHER_ADDRESS, "status before the admin's ban")
+            step(server, "forbid admin bans", ["set g_adminMaxBanMinutes 0"])
+            answered("an admin bans where the host forbids it", ["ban Nuisance 10m"], "Admins cannot ban on this server.")
+            step(server, "allow admins five minutes", ["set g_adminMaxBanMinutes 5"])
+            mark = len(read_log(nuisance.log))
+            answered("an admin bans for ever", ["ban Nuisance perm being a nuisance"], TEXT_ADMIN_DONE + "Nuisance")
+            wait("the banned player is dropped", lambda t: TEXT_BANNED in t["nuisance"][mark:], 30)
+            text = banlist.read_text(encoding="utf-8")
+            row = re.search(r'^ban address 127\.0\.0\.2/32 (\d+) (\d+) "Nuisance" "being a nuisance"$', text, re.MULTILINE)
+            check("an admin's ban is of the one address, with the reason", row is not None, text)
+            check("an admin's ban ends when the host's limit says, whatever was asked",
+                  row is not None and int(row[2]) - int(row[1]) == 300, text)
+            status = step(server, "status after the admin's ban", ["status"])
+            check("the admin, at another address, stays", "ModPlayer" in status and "Nuisance" not in status, status)
+            retire("nuisance")
+            lifted = step(server, "the host lifts the admin's ban", ["unban 1", "set g_adminMaxBanMinutes 1440"])
+            check("only the host lifts it", "unbanned 127.0.0.2/32" in lifted, lifted)
+
+            # giving the right up
+            answered("admin logout", ["admin logout"], TEXT_ADMIN_GONE)
+            answered("a request after the logout", ["mute " + bot_name], TEXT_NOT_ADMIN)
+            check("after a logout the player is no admin", True)
+
+            acts = [event for event in events() if "admin_slot" in event]
+            check("everything an admin did is logged beside who did it",
+                  [(event["event"], event.get("name")) for event in acts] == [
+                      ("mute", "Troublemaker"), ("unmute", "Troublemaker"), ("kick", "Troublemaker"),
+                      ("ban", "Nuisance"), ("kick", "Nuisance")]
+                  and all(event.get("by") == "admin" and event.get("admin_name") == "ModPlayer"
+                          and event.get("admin_address") == "127.0.0.1" for event in acts), json.dumps(acts))
+            check("the admin's mute, kick and ban carry their length and reasons",
+                  len(acts) == 5 and acts[0].get("seconds") == 300 and acts[2].get("reason") == "spamming the chat"
+                  and acts[3].get("reason") == "being a nuisance" and acts[3].get("range") == "127.0.0.2/32", json.dumps(acts))
+            logins = [(event["event"], event.get("name"), event.get("address")) for event in events()
+                      if event["event"].startswith("admin_")]
+            check("the failed login, the login and the logout are logged with the player's address",
+                  logins == [("admin_login_failed", "ModPlayer", "127.0.0.1"), ("admin_login", "ModPlayer", "127.0.0.1"),
+                             ("admin_logout", "ModPlayer", "127.0.0.1")], json.dumps(logins))
+
         # --- a vote to mute, with kick votes forbidden -------------------------
         step(server, "forbid kick votes", ["set si_voteFlags 16", "rescanSI"])
         status = step(server, "status before the vote", ["status"])
@@ -439,9 +587,10 @@ def main() -> int:
         kinds = [event["event"] for event in logged]
         check("every admin log line is one JSON object with a time", all(
             re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", event.get("time", "")) for event in logged) and len(logged) > 0)
+        admin_kinds = [] if args.skip_admin else ["admin_login_failed", "admin_login", "mute", "unmute", "ban", "unban", "admin_logout"]
         check("the log holds each kind of event in order",
               [kind for kind in kinds if kind != "kick"] == [
-                  "mute", "unmute", "flood", "ban", "ban", "unban", "unban", "ban", "refused", "unban", "mute",
+                  "mute", "unmute", "flood", "ban", "ban", "unban", "unban", "ban", "refused", "unban", *admin_kinds, "mute",
                   "shutdown_scheduled", "shutdown_cancelled", "shutdown_scheduled", "shutdown"], " ".join(kinds))
         ban = next((event for event in logged if event["event"] == "ban" and event.get("range") == "127.0.0.1/32"), {})
         check("a ban records who, what and until when", ban.get("by") == "console" and ban.get("name") == "ModPlayer"

@@ -1856,4 +1856,11 @@
 	"#str_232648"	"SILENZIA GIOCATORE %s"
 	"#str_232649"	"Uso: callvote mute <nome del giocatore>"
 	"#str_232650"	"Quel giocatore è già silenziato."
+	"#str_232651"	"Ora sei amministratore del server."
+	"#str_232652"	"Non sei più amministratore del server."
+	"#str_232653"	"Il server ha rifiutato l'accesso da amministratore."
+	"#str_232654"	"Non hai effettuato l'accesso come amministratore del server."
+	"#str_232655"	"Fatto: "
+	"#str_232656"	"Rifiutato: non è possibile farlo a quel giocatore."
+	"#str_232657"	"Gli amministratori non possono bandire su questo server."
 }

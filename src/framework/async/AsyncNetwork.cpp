@@ -73,6 +73,11 @@ idCVar				idAsyncNetwork::serverClientTimeout( "net_serverClientTimeout", "40", 
 idCVar				idAsyncNetwork::clientServerTimeout( "net_clientServerTimeout", "40", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "server time out in seconds" );
 idCVar				idAsyncNetwork::serverDrawClient( "net_serverDrawClient", "-1", CVAR_SYSTEM | CVAR_INTEGER, "number of client for which to draw view on server" );
 idCVar				idAsyncNetwork::serverRemoteConsolePassword( "net_serverRemoteConsolePassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private remote console password (rcon2 requires at least 12 bytes)" );
+// openQ4 (MP-18): the admin password is the game module's to check, and is declared here so
+// it is private from the moment the engine starts: a game cvar is unknown, and so not yet
+// private, while the other game module is loaded (the main menu runs the single-player one).
+idCVar				idAsyncNetwork::serverAdminPassword( "net_serverAdminPassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private password trusted players log in with as admins ('admin'); read when a map starts and then cleared, none leaves admin logins off" );
+idCVar				idAsyncNetwork::clientAdminPassword( "net_clientAdminPassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private admin password the 'admin' command logs in to a server with; it is never sent" );
 idCVar				idAsyncNetwork::serverAllowLegacyRcon( "net_serverAllowLegacyRcon", "0", CVAR_SYSTEM | CVAR_BOOL | CVAR_NOCHEAT, "allow the insecure legacy plaintext rcon protocol" );
 idCVar				idAsyncNetwork::clientPrediction( "net_clientPrediction", "16", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "additional client side prediction in milliseconds (legacy value 16 follows one exact base tic)" );
 idCVar				idAsyncNetwork::clientMaxPrediction( "net_clientMaxPrediction", "1000", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "maximum number of milliseconds a client can predict ahead of server." );

@@ -1847,4 +1847,11 @@
 	"#str_232648"	"JÁTÉKOS NÉMÍTÁSA: %s"
 	"#str_232649"	"Használat: callvote mute <játékos neve>"
 	"#str_232650"	"Ez a játékos már némítva van."
+	"#str_232651"	"Mostantól szerveradmin vagy."
+	"#str_232652"	"Már nem vagy szerveradmin."
+	"#str_232653"	"A szerver elutasította az adminbejelentkezést."
+	"#str_232654"	"Nem vagy bejelentkezve szerveradminként."
+	"#str_232655"	"Kész: "
+	"#str_232656"	"Elutasítva: ezzel a játékossal ez nem tehető meg."
+	"#str_232657"	"Az adminok ezen a szerveren nem tilthatnak ki játékost."
 }

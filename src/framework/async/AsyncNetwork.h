@@ -200,6 +200,8 @@ public:
 	static idCVar			clientServerTimeout;			// time out in seconds for server
 	static idCVar			serverDrawClient;				// the server draws the view of this client
 	static idCVar			serverRemoteConsolePassword;	// remote console password
+	static idCVar			serverAdminPassword;			// the game's admin password, read at map start and cleared
+	static idCVar			clientAdminPassword;			// the admin password this client logs in with
 	static idCVar			serverAllowLegacyRcon;			// explicit plaintext compatibility opt-in
 	static idCVar			clientPrediction;				// how many additional milliseconds the clients runs ahead
 	static idCVar			clientMaxPrediction;			// max milliseconds into the future a client can run prediction

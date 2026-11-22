@@ -1269,4 +1269,122 @@ inline void MPModLogEnd( mpModLogLine_t &line ) {
 	line.text[ line.length ] = '\0';
 }
 
+//----------------------------------------------------------------
+// Admins: players the host gave a second password (net_serverAdminPassword). They log
+// in through the referee's challenge and response and then ask the server to
+// kick, mute or ban a connected player. The request is a typed message, never
+// a console line, so an admin cannot reach a command the host did not grant:
+// no addresses, no ranges, no lifting of bans, no shutdown.
+//----------------------------------------------------------------
+
+typedef enum {
+	MP_MOD_ADMIN_NONE,
+	MP_MOD_ADMIN_KICK,
+	MP_MOD_ADMIN_MUTE,
+	MP_MOD_ADMIN_UNMUTE,
+	MP_MOD_ADMIN_BAN,
+	MP_MOD_ADMIN_LOGOUT,
+	MP_MOD_ADMIN_VERB_COUNT
+} mpModAdminVerb_t;
+
+typedef enum {
+	MP_MOD_ADMIN_OK,
+	MP_MOD_ADMIN_REFUSED_VERB,			// not a request this build knows
+	MP_MOD_ADMIN_REFUSED_TARGET,		// nobody is in that slot, or somebody else is by now
+	MP_MOD_ADMIN_REFUSED_SELF,
+	MP_MOD_ADMIN_REFUSED_HOST,			// a listen server's own player
+	MP_MOD_ADMIN_REFUSED_ADMIN,			// another admin: only the host removes one
+	MP_MOD_ADMIN_REFUSED_BOT,			// bots are the host's choice
+	MP_MOD_ADMIN_REFUSED_BANS_OFF,		// g_adminMaxBanMinutes is 0
+	MP_MOD_ADMIN_RESULT_COUNT
+} mpModAdminResult_t;
+
+typedef struct mpModAdminTarget_s {
+	bool	connected;		// a player is in the slot
+	bool	current;		// and is the player the admin chose (same spawn identity)
+	bool	host;
+	bool	admin;
+	bool	bot;
+	bool	sameAddress;	// connected from the admin's own address
+} mpModAdminTarget_t;
+
+inline bool MPModAdminVerbHasTarget( int verb ) {
+	return verb == MP_MOD_ADMIN_KICK || verb == MP_MOD_ADMIN_MUTE || verb == MP_MOD_ADMIN_UNMUTE || verb == MP_MOD_ADMIN_BAN;
+}
+
+inline const char *MPModAdminVerbName( int verb ) {
+	switch ( verb ) {
+		case MP_MOD_ADMIN_KICK:		return "kick";
+		case MP_MOD_ADMIN_MUTE:		return "mute";
+		case MP_MOD_ADMIN_UNMUTE:	return "unmute";
+		case MP_MOD_ADMIN_BAN:		return "ban";
+		case MP_MOD_ADMIN_LOGOUT:	return "logout";
+		default:					return "";
+	}
+}
+
+/*
+================
+MPModAdminBanSeconds
+
+How long a ban an admin asked for lasts. An admin's ban always ends: asking
+for none, for ever, or for longer than the host's limit gives the limit. Zero
+when the host lets admins ban nobody (g_adminMaxBanMinutes 0).
+================
+*/
+inline mpModTime_t MPModAdminBanSeconds( mpModTime_t requestedSeconds, int maxMinutes ) {
+	if ( maxMinutes <= 0 ) {
+		return 0;
+	}
+	mpModTime_t limit = static_cast<mpModTime_t>( maxMinutes ) * 60;
+	if ( limit > MP_MOD_MAX_DURATION_SECONDS ) {
+		limit = MP_MOD_MAX_DURATION_SECONDS;
+	}
+	if ( requestedSeconds <= 0 || requestedSeconds > limit ) {
+		return limit;
+	}
+	return requestedSeconds;
+}
+
+/*
+================
+MPModAdminCheck
+
+Whether an admin in actorSlot may do this to the player in targetSlot. The
+checks are ordered so the answer never tells an admin more than the scoreboard
+does.
+================
+*/
+inline mpModAdminResult_t MPModAdminCheck( int verb, int actorSlot, int targetSlot, const mpModAdminTarget_t &target, int maxBanMinutes ) {
+	if ( verb == MP_MOD_ADMIN_LOGOUT ) {
+		return MP_MOD_ADMIN_OK;
+	}
+	if ( !MPModAdminVerbHasTarget( verb ) ) {
+		return MP_MOD_ADMIN_REFUSED_VERB;
+	}
+	if ( targetSlot < 0 || !target.connected || !target.current ) {
+		return MP_MOD_ADMIN_REFUSED_TARGET;
+	}
+	if ( targetSlot == actorSlot ) {
+		return MP_MOD_ADMIN_REFUSED_SELF;
+	}
+	if ( target.host ) {
+		return MP_MOD_ADMIN_REFUSED_HOST;
+	}
+	if ( target.admin ) {
+		return MP_MOD_ADMIN_REFUSED_ADMIN;
+	}
+	if ( target.bot ) {
+		return MP_MOD_ADMIN_REFUSED_BOT;
+	}
+	if ( verb == MP_MOD_ADMIN_BAN && maxBanMinutes <= 0 ) {
+		return MP_MOD_ADMIN_REFUSED_BANS_OFF;
+	}
+	// a ban is of an address: this one would shut the admin out as well
+	if ( verb == MP_MOD_ADMIN_BAN && target.sameAddress ) {
+		return MP_MOD_ADMIN_REFUSED_SELF;
+	}
+	return MP_MOD_ADMIN_OK;
+}
+
 #endif /* !__GAME_MP_MODERATION_H__ */

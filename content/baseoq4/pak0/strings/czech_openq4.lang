@@ -1847,4 +1847,11 @@
 	"#str_232648"	"ZTLUMIT HRÁČE %s"
 	"#str_232649"	"Použití: callvote mute <jméno hráče>"
 	"#str_232650"	"Tento hráč je už ztlumen."
+	"#str_232651"	"Nyní jsi správcem serveru."
+	"#str_232652"	"Už nejsi správcem serveru."
+	"#str_232653"	"Server odmítl přihlášení správce."
+	"#str_232654"	"Nejsi přihlášen jako správce serveru."
+	"#str_232655"	"Hotovo: "
+	"#str_232656"	"Odmítnuto: tohle s tímto hráčem udělat nelze."
+	"#str_232657"	"Správci na tomto serveru nemohou udělovat bany."
 }

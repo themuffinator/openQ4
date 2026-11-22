@@ -749,6 +749,7 @@ void idGameLocal::Init( void ) {
 	memset( &modLastRefused, 0, sizeof( modLastRefused ) );
 	modLastRefusedTime = 0;
 	modShutdownMode = 0;
+	modActorClient = -1;
 	modShutdownAt = 0;
 	modShutdownNextNotice = -1;
 	modShutdownStopTime = 0;

@@ -34,6 +34,14 @@ COMMANDS = {
 }
 
 
+# the commands a logged-in admin may type on a client, and the request each becomes
+ADMIN_VERBS = {
+    "ban": "MP_MOD_ADMIN_BAN",
+    "mute": "mute ? MP_MOD_ADMIN_MUTE : MP_MOD_ADMIN_UNMUTE",
+    "unmute": "mute ? MP_MOD_ADMIN_MUTE : MP_MOD_ADMIN_UNMUTE",
+}
+
+
 def read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
 
@@ -117,7 +125,14 @@ def check_commands() -> None:
         require(registration is not None, f"{name} is a game command handled by {handler}")
         body = function_body(network, signature)
         call = body.find("ModerationServerCommand( " + guarded + " )")
-        require(0 <= call < 200, f"{name} checks that it runs on the server before anything else")
+        if name in ADMIN_VERBS:
+            # typed on a client these are a logged-in admin's request; nothing else of the command runs there
+            forward = body.find("if ( gameLocal.isMultiplayer && gameLocal.isClient ) {")
+            sent = body.find("ModerationClientCommand( " + ADMIN_VERBS[name] + ", args );")
+            require(0 <= forward < sent < body.find("return;", sent) < call < 420,
+                    f"{name} on a client is sent to the server as an admin's request, and runs only on the server")
+        else:
+            require(0 <= call < 200, f"{name} checks that it runs on the server before anything else")
     require('idMultiplayerGame::RemoveClientFromBanList_f' in cmds, "the older unban name is still registered")
     old = function_body(read("src/mpgame/MultiplayerGame.cpp"), "void idMultiplayerGame::RemoveClientFromBanList_f( const idCmdArgs& args )")
     require("idGameLocal::Unban_f( args );" in old and "GetClientGUID" not in old, "the older name does what unban does")
@@ -361,14 +376,165 @@ def check_match_log() -> None:
             "the match log follows the live stream: every frame, every death the server scores, closed with the map")
 
 
+def check_admins() -> None:
+    """A second password gives a player the right to ask for a kick, a mute or a short ban, and nothing else."""
+    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    engine = read("src/framework/async/AsyncNetwork.cpp")
+    for member, name in (("serverAdminPassword", "net_serverAdminPassword"), ("clientAdminPassword", "net_clientAdminPassword")):
+        password = re.search(r'^idCVar\s+idAsyncNetwork::' + member + r'\(.*$', engine, re.M)
+        require(password is not None and f'"{name}", "",' in password.group(0)
+                and "CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE" in password.group(0)
+                and "CVAR_ARCHIVE" not in password.group(0) and "CVAR_SERVERINFO" not in password.group(0),
+                f"{name} is private: never written to a config, never shown, never sent")
+    # a game cvar is not registered, so not private, while the other game module is loaded
+    for module in ("src/mpgame/gamesys/SysCvar.cpp", "src/game/gamesys/SysCvar.cpp"):
+        require("AdminPassword" not in read(module), "the admin passwords are engine cvars, private from startup")
+    limit = re.search(r'^idCVar g_adminMaxBanMinutes\(.*$', cvars, re.M)
+    require(limit is not None and '"1440"' in limit.group(0) and ", 0, 525600 )" in limit.group(0)
+            and "CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER" in limit.group(0), "an admin's ban lasts a day at most by default")
+    require("extern idCVar\tg_adminMaxBanMinutes;" in read("src/mpgame/gamesys/SysCvar.h"), "g_adminMaxBanMinutes is exported from SysCvar.h")
+
+    # the login: the referee's exchange, the admin password's own service
+    header = read("src/mpgame/MultiplayerGame.h")
+    mp = read("src/mpgame/MultiplayerGame.cpp")
+    require("mpRefereeAuthenticationService matchAdminAuthentication;" in header
+            and "uint64_t\t\tmatchAdminConnection[ MAX_CLIENTS ];" in header,
+            "the admin password has its own verifier, challenges and lockout")
+    require("matchAdminConnection[ clientNum ] != 0 &&" in header
+            and "matchAdminConnection[ clientNum ] == matchConnectionId[ clientNum ];" in header,
+            "a grant belongs to the connection that logged in, never to the slot")
+    require('static const char MP_ADMIN_AUTH_REQUEST_TOKEN[] = "challenge:admin";' in mp
+            and "static const char MP_ADMIN_AUTH_PROOF_TAG = 'a';" in mp and "static const char MP_REFEREE_AUTH_PROOF_TAG = 'v';" in mp,
+            "an admin login is its own kind of the exchange: a referee proof is not an admin proof")
+    setup = function_body(mp, "bool idMultiplayerGame::InitializeAdminAuthentication( void )")
+    require('#define MP_ADMIN_SERVER_PASSWORD_CVAR\t"net_serverAdminPassword"' in mp
+            and "cvarSystem->GetCVarString( MP_ADMIN_SERVER_PASSWORD_CVAR )" in setup
+            and setup.count('cvarSystem->SetCVarString( MP_ADMIN_SERVER_PASSWORD_CVAR, "" );') == 2
+            and "matchAdminAuthentication.InstallCredentialFromPassword(" in setup
+            and "matchAdminAuthentication.InstallCredentialVerifier( salt, verifier )" in setup
+            and "memset( matchAdminConnection, 0, sizeof( matchAdminConnection ) );" in setup
+            and "matchRefereeAuthentication" not in setup,
+            "the password is turned into a verifier and cleared; a server without one answers with a challenge nobody can satisfy")
+    session = function_body(mp, "bool idMultiplayerGame::BeginMatchSession( void )")
+    require(session.index("if ( !InitializeRefereeAuthentication() ) {") < session.index("InitializeAdminAuthentication();"),
+            "every match session sets the admin login up, and a failure there does not stop the match")
+    continuation = function_body(mp, "bool idMultiplayerGame::ApplyMatchOperationContinuation( int clientNum,")
+    dispatch = continuation.find("if ( MatchAuthIsAdminCredential( credential ) ) {")
+    require(0 < dispatch < continuation.find("!actor->human || actor->active ||")
+            and "return ApplyAdminAuthentication( clientNum, request, execution );" in continuation[dispatch:dispatch + 160],
+            "an admin login is handed to the admin service before the referee's checks, so a player may log in")
+    login = function_body(mp, "bool idMultiplayerGame::ApplyAdminAuthentication( int clientNum,")
+    verified = login.index("if ( verified != MP_REFEREE_AUTH_VERIFY_AUTHENTICATED ) {")
+    grant = login.index("matchAdminConnection[ clientNum ] = matchConnectionId[ clientNum ];")
+    require("matchRefereeAuthentication" not in login and "matchAdminAuthentication.IssueChallenge( binding, now, nonce," in login
+            and login.index("matchAdminAuthentication.VerifyProof( binding, now,") < verified < grant
+            and "MP_ADMIN_AUTH_PROOF_TAG" in login[:verified],
+            "the grant is given only after the admin password's own proof is verified")
+    require("!actor->human" in login[:login.index("mpRefereeAuthBinding binding;")]
+            and "actor->active" not in login[:login.index("mpRefereeAuthBinding binding;")],
+            "an admin may be playing; a bot may not log in")
+    pacing = login[login.index("auto refused = [this, clientNum]( const char *why, bool wrongProof ) {"):login.index("if ( MatchAuthIsAdminChallengeRequest( credential ) ) {")]
+    require(pacing.index("if ( gameNow < next && next - gameNow <= ADMIN_REFUSAL_NOTICE_MSEC ) {")
+            < pacing.index('gameLocal.ModerationLogClient( "admin_login_failed", "server", clientNum, why, 0 );')
+            < pacing.index('gameLocal.ServerSendChatMessage( clientNum, "server", "#str_232653", "" );'),
+            "a refused login is logged and answered at most once in two seconds: the login is exempt from the operation cooldown")
+    require('refused( verified == MP_REFEREE_AUTH_VERIFY_THROTTLED ? "locked out" : "", true );' in login[verified:grant]
+            and 'gameLocal.ModerationLogClient( "admin_login", "server", clientNum, "", 0 );' in login[grant:],
+            "logins and failed logins are in the admin log")
+    referee = login[grant:]
+    require(referee.index("if ( !actor->active && matchSession.FindRosterSeat( actor->id ) < 0 ) {")
+            < referee.index("MPMatchRoleBit( MP_MATCH_ROLE_REFEREE );"),
+            "an admin who is watching becomes a referee as well; one who is playing does not")
+    cleared = function_body(mp, "void idMultiplayerGame::ClearMatchOperationTransportSlot( int clientNum )")
+    require("matchAdminAuthentication.InvalidateSlot( clientNum );" in cleared and "matchAdminConnection[ clientNum ] = 0;" in cleared,
+            "a slot's next occupant inherits no grant")
+    logout = function_body(mp, "bool idMultiplayerGame::ServerAdminLogout( int clientNum )")
+    require("matchAdminConnection[ clientNum ] = 0;" in logout and "matchAdminAuthentication.InvalidateSlot( clientNum );" in logout
+            and "~MPMatchRoleBit( MP_MATCH_ROLE_REFEREE )" in logout, "a logout gives up the grant and the referee role that came with it")
+    proof = function_body(mp, "bool idMultiplayerGame::CompleteRefereeAuthChallenge(")
+    require(proof.index("pendingRefereePasswordIsAdmin ?") < proof.index("ClearPendingRefereePassword();", proof.index("MPRefereeAuthBuildProofFromPassword"))
+            and "challenge.challengeGeneration, proof, credential, proofTag );" in proof,
+            "the client tags its proof with the kind of login it asked for")
+    require("pendingRefereePasswordIsAdmin = false;" in function_body(mp, "void idMultiplayerGame::ClearPendingRefereePassword( void )"),
+            "a pending password forgets its kind when it is wiped")
+
+    # the request: typed, bounded, for connected players only
+    game = read("src/mpgame/Game_local.h")
+    require(game.index("GAME_RELIABLE_MESSAGE_MAPDB,") < game.index("GAME_RELIABLE_MESSAGE_MODERATION,") < game.index("GAME_RELIABLE_MESSAGE_COUNT,"),
+            "GAME_RELIABLE_MESSAGE_MODERATION is appended: the ordinals are the wire format")
+    require("RELIABLE_FLOOD_MODERATION," in game and "const int RELIABLE_FLOOD_MODERATION_DELAY\t= 500;" in game,
+            "an admin's requests are paced like chat")
+    network = read("src/mpgame/Game_network.cpp")
+    server = function_body(network, "void idGameLocal::ServerProcessReliableMessage( int clientNum, const idBitMsg &msg )")
+    case = server.index("case GAME_RELIABLE_MESSAGE_MODERATION: {")
+    require("CheckClientReliableFlood( clientNum, RELIABLE_FLOOD_MODERATION, RELIABLE_FLOOD_MODERATION_DELAY )" in server[case:case + 320]
+            and "ServerModerationRequest( clientNum, msg );" in server[case:case + 420],
+            "the server paces the request before it reads it")
+    require(network.count("case GAME_RELIABLE_MESSAGE_MODERATION: {") == 2, "the server handles the request and the repeater ignores it")
+    request = function_body(network, "void idGameLocal::ServerModerationRequest( int clientNum, const idBitMsg &msg )")
+    gate = request.index("if ( !mpGame.IsServerAdmin( clientNum ) ) {")
+    check = request.index("MPModAdminCheck( verb, clientNum, targetSlot, target, maxBanMinutes );")
+    act = request.index("switch ( verb ) {")
+    require(request.index("if ( msg.GetRemainingReadBits() != 0 ) {") < gate < check < act
+            and '"#str_232654"' in request[gate:gate + 160] and "return;" in request[gate:gate + 200],
+            "a request is read whole, then refused unless the connection is logged in, before anything is decided")
+    require("GetSpawnId( entities[ targetSlot ] ) == identity" in request[gate:check]
+            and "target.admin = mpGame.IsServerAdmin( targetSlot );" in request[gate:check]
+            and "target.host = targetSlot == localClientNum;" in request[gate:check]
+            and "target.bot = botManager.IsBot( targetSlot );" in request[gate:check]
+            and "MPModSameAddress( clientModAddress[ targetSlot ], clientModAddress[ clientNum ] )" in request[gate:check],
+            "the target is the player the admin chose, and the host, another admin, a bot and the admin's own address are refused")
+    require("MPModAdminBanSeconds( seconds, maxBanMinutes ), targetName.c_str(), reason, \"admin\" ) >= 0;" in request[act:]
+            and "ServerBan( address, MPModAddressBits( address )," in request[act:],
+            "an admin's ban is of the one address, for no longer than the host allows")
+    for forbidden in ("MPModParseAddress", "RemoveBan", "ScheduleServerShutdown", "MPModFormatAddress", "BufferCommandText( CMD_EXEC_NOW, reason",
+                      "GetBanListCount"):
+        require(forbidden not in request, f"an admin's request never reaches {forbidden}: no addresses, no unban, no shutdown")
+    require(request.count("cmdSystem->BufferCommandText(") == 1 and 'va( "kick %d\\n", targetSlot )' in request,
+            "the only console line an admin's request runs is the kick of the slot the server checked")
+    require(request.index("modActorClient = clientNum;") < act < request.index("modActorClient = -1;"),
+            "the admin log names the admin for what the request did, and for nothing after it")
+    log = function_body(network, "void idGameLocal::ModerationWriteLog( mpModLogLine_t &line )")
+    require(log.index('MPModLogNumber( line, "admin_slot", modActorClient );') < log.index("MPModLogEnd( line );")
+            and '"admin_name"' in log and '"admin_address"' in log, "the admin log records the admin's slot, name and address")
+    client = function_body(network, "bool idGameLocal::ClientModerationRequest( int verb, int clientNum, mpModTime_t seconds, const char *reason )")
+    require("identity = GetSpawnId( entities[ clientNum ] );" in client and "outMsg.WriteByte( GAME_RELIABLE_MESSAGE_MODERATION );" in client,
+            "the client names the player by slot and spawn identity")
+    forward = function_body(network, "static void ModerationClientCommand( int verb, const idCmdArgs &args )")
+    require("ModerationFindClient( args.Argv( 1 ) )" in forward and "MPModParseAddress" not in forward and "MPModJoinAddressArgs" not in forward,
+            "from a client the commands take a connected player, never an address")
+    for name, signature in (("unban", COMMANDS["unban"][1]), ("banlist", COMMANDS["banlist"][1]), ("status", COMMANDS["status"][1]),
+                            ("serverShutdown", COMMANDS["serverShutdown"][1])):
+        require("ModerationClientCommand" not in function_body(network, signature), f"{name} is never an admin's request")
+
+    cmds = read("src/mpgame/gamesys/SysCmds.cpp")
+    require(re.search(r'cmdSystem->AddCommand\( "admin",\s*idGameLocal::Admin_f,\s*CMD_FL_GAME,', cmds) is not None, "admin is a game command")
+    kick = function_body(cmds, "static void Cmd_Kick_f( const idCmdArgs &args )")
+    require(kick.index("if ( gameLocal.isClient ) {") < kick.index("idGameLocal::ClientKick_f( args );") < kick.index("gameLocal.GetClientByCmdArgs( args )"),
+            "gameKick on a client is an admin's request")
+    admin = function_body(network, "void idGameLocal::Admin_f( const idCmdArgs &args )")
+    require('const char *password = cvarSystem->GetCVarString( "net_clientAdminPassword" );' in admin and "RequestAdminAuthentication( password )" in admin
+            and "args.Argc() != 1" in admin and "RequestAdminAuthentication( args" not in admin,
+            "the password comes from the private cvar and never from the command line, which the console history keeps")
+    require("MP_MOD_ADMIN_LOGOUT" in admin, "admin logout gives the right up")
+
+    guide = read("docs/user/server-security.md")
+    for token in ("net_serverAdminPassword", "net_clientAdminPassword", "g_adminMaxBanMinutes", "admin logout", "admin_login",
+                  "admin_name", "gameKick"):
+        require(token in guide, f"the server security guide covers {token}")
+
+
 def check_text() -> None:
     expected = {"232640": None, "232641": None, "232642": None, "232643": None, "232644": None, "232645": None,
-                "232646": None, "232647": None, "232648": None, "232649": None, "232650": None}
+                "232646": None, "232647": None, "232648": None, "232649": None, "232650": None, "232651": None,
+                "232652": None, "232653": None, "232654": None, "232656": None, "232657": None}
     for language in LANGUAGES:
         table = read(f"content/baseoq4/pak0/strings/{language}_openq4.lang")
         for ident in expected:
             match = re.search(r'^\t"#str_' + ident + r'"\t"([^"\n]+)"$', table, re.M)
             require(match is not None and len(match.group(1)) > 8, f"{language}: #str_{ident} is present")
+        # the server puts the player's name after this one
+        require(re.search(r'^\t"#str_232655"\t"[^"\n]+: "$', table, re.M) is not None, f"{language}: #str_232655 ends where the name goes")
     english = read("content/baseoq4/pak0/strings/english_openq4.lang")
     require('"#str_232640"\t"Too many players are connected from your address."' in english, "the per-address refusal text")
     require('"#str_232641"\t"You are muted on this server. Your chat reaches nobody."' in english, "the mute notice")
@@ -395,6 +561,7 @@ def main() -> None:
     check_mute_vote()
     check_shutdown()
     check_match_log()
+    check_admins()
     check_text()
     print("mp_moderation: ok")
 

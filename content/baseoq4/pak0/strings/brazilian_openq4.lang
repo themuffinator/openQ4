@@ -1847,4 +1847,11 @@
 	"#str_232648"	"SILENCIAR JOGADOR %s"
 	"#str_232649"	"Uso: callvote mute <nome do jogador>"
 	"#str_232650"	"Esse jogador já está silenciado."
+	"#str_232651"	"Agora você é administrador do servidor."
+	"#str_232652"	"Você não é mais administrador do servidor."
+	"#str_232653"	"O servidor recusou o login de administrador."
+	"#str_232654"	"Você não está conectado como administrador do servidor."
+	"#str_232655"	"Feito: "
+	"#str_232656"	"Recusado: isso não pode ser feito com esse jogador."
+	"#str_232657"	"Administradores não podem banir neste servidor."
 }

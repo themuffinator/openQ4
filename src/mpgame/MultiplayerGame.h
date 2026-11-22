@@ -493,6 +493,15 @@ public:
 	void			ClientReceiveRefereeAuthChallenge( const idBitMsg &msg );
 	bool			SubmitMatchOperation( mpMatchOperationRequest_t &request );
 	bool			RequestRefereeAuthentication( const char *password );
+	// openQ4 (MP-18): admins log in with the server's second password through
+	// the same challenge and response; the grant belongs to the connection.
+	bool			RequestAdminAuthentication( const char *password );
+	bool			IsServerAdmin( int clientNum ) const {
+						return clientNum >= 0 && clientNum < MAX_CLIENTS && matchAdminConnection[ clientNum ] != 0 &&
+							matchAdminConnection[ clientNum ] == matchConnectionId[ clientNum ];
+					}
+	bool			AdminLoginAvailable( void ) const { return matchAdminCredentialIsReal; }
+	bool			ServerAdminLogout( int clientNum );
 
 
 	void			PrintMessageEvent( int to, msg_evt_t evt, int parm1 = -1, int parm2 = -1 );
@@ -1049,6 +1058,10 @@ private:
 	mpProposalService matchProposals;
 	mpMatchOperationExecutor matchOperationExecutor;
 	mpRefereeAuthenticationService matchRefereeAuthentication;
+	// openQ4 (MP-18): the admin password's own verifier, challenges and lockout
+	mpRefereeAuthenticationService matchAdminAuthentication;
+	uint64_t		matchAdminConnection[ MAX_CLIENTS ];	// the connection that logged in, or 0
+	int				matchAdminRefusalNotice[ MAX_CLIENTS ];	// game time before which a refused login is not reported again
 	mpMatchEvidence	matchEvidence;
 	mpMatchEvidenceObserver matchEvidenceObserver;
 	mpEvidenceStorageWorkspace matchEvidenceWorkspace;
@@ -1102,6 +1115,10 @@ private:
 	uint64_t		nextMatchSessionId;
 	bool			matchRefereeCredentialInitialized;
 	bool			matchRefereeCredentialIsReal;
+	bool			matchAdminCredentialInitialized;
+	bool			matchAdminCredentialIsReal;
+	bool			matchAdminAuthenticationReady;
+	bool			pendingRefereePasswordIsAdmin;	// the pending password answers the admin challenge
 	char			pendingRefereePassword[ MP_REFEREE_AUTH_MAX_PASSWORD_BYTES + 1 ];
 	int			pendingRefereePasswordLength;
 	int			pendingRefereePasswordDeadline;
@@ -1274,6 +1291,10 @@ private:
 						mpMatchOperationRequest_t &request,
 						mpOperationExecutionResult_t &execution );
 	bool			InitializeRefereeAuthentication( void );
+	bool			InitializeAdminAuthentication( void );
+	bool			ApplyAdminAuthentication( int clientNum,
+						const mpMatchOperationRequest_t &request,
+						mpOperationExecutionResult_t &execution );
 	bool			SendRefereeAuthChallenge( int clientNum,
 						const mpRefereeAuthChallenge &challenge );
 	bool			CompleteRefereeAuthChallenge( const mpRefereeAuthChallenge &challenge );

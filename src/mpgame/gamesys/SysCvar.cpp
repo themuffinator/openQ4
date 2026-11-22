@@ -891,6 +891,7 @@ idCVar g_chatFloodSeconds(			"g_chatFloodSeconds",		"4",			CVAR_GAME | CVAR_ARCH
 idCVar g_chatFloodWait(				"g_chatFloodWait",			"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a player who passed the chat flood window stays silenced", 0, 600 );
 idCVar g_adminLog(					"g_adminLog",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "write kicks, bans, mutes, chat floods and refused connections to logs/admin.ndjson in the save folder" );
 idCVar g_voteMuteMinutes(			"g_voteMuteMinutes",		"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "minutes a player stays silenced after a mute vote passes; 0 until unmute or a server restart", 0, 1440 );
+idCVar g_adminMaxBanMinutes(		"g_adminMaxBanMinutes",		"1440",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "the longest ban, in minutes, a logged-in admin may give a connected player; 0 lets admins ban nobody", 0, 525600 );
 idCVar g_reservedNames(				"g_reservedNames",			"admin;console;referee",	CVAR_GAME | CVAR_ARCHIVE, "player names nobody may take, separated by ';', whatever their case or colours; a player who asks for one gets it with '_' added" );
 
 idCVar g_mapCycle(					"g_mapCycle",				"mapcycle",		CVAR_GAME | CVAR_ARCHIVE, "map cycling script for multiplayer games - see mapcycle.scriptcfg" );

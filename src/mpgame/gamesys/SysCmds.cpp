@@ -1135,7 +1135,8 @@ static void Cmd_Kick_f( const idCmdArgs &args ) {
 	}
 
 	if ( gameLocal.isClient ) {
-		gameLocal.Printf( "You have no such power. This is a server command\n" );
+		// openQ4 (MP-18): from a client this is a logged-in admin's request
+		idGameLocal::ClientKick_f( args );
 		return;
 	}
 
@@ -4691,6 +4692,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "mute",					idGameLocal::Mute_f,		CMD_FL_GAME,	"stop a player's text chat reaching anyone: mute <client slot|name> [time]" );
 	cmdSystem->AddCommand( "unmute",				idGameLocal::Mute_f,		CMD_FL_GAME,	"lift a text mute: unmute <client slot|name>" );
 	cmdSystem->AddCommand( "status",				idGameLocal::Status_f,		CMD_FL_GAME,	"list the connected clients with their address, ping and mute state" );
+	cmdSystem->AddCommand( "admin",					idGameLocal::Admin_f,		CMD_FL_GAME,	"log in to the server as an admin with the password in net_clientAdminPassword; 'admin logout' gives the right up" );
 	cmdSystem->AddCommand( "serverShutdown",		idGameLocal::Shutdown_f,	CMD_FL_GAME,	"stop the server once the players are told: serverShutdown <match|now|time|cancel> [reason]" );
 
 #ifndef _XBOX

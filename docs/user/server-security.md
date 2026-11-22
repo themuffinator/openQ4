@@ -66,7 +66,7 @@ button only kicked. Bans now work, by network address.
 Run these on the server: at a dedicated server's console, in the host's console
 on a server started from the game, or from your own game with `rcon` in front
 (`rcon ban 3 2h spamming`). Typed on an ordinary player's console they do
-nothing.
+nothing, unless that player has logged in as an [admin](#admins).
 
 | Command | What it does |
 |---|---|
@@ -145,8 +145,9 @@ server's save folder, one line of JSON each:
 ```
 
 `by` says who acted: `console` (the console or rcon), `admin` (the Admin
-page), `vote` (a kick vote), `menu` (a ban lifted from a menu) or `server` (an
-automatic action). A banned address that keeps trying is logged once a minute.
+page, or a logged-in [admin](#admins)), `vote` (a kick or mute vote), `menu`
+(a ban lifted from a menu) or `server` (an automatic action). A banned
+address that keeps trying is logged once a minute.
 The log holds players' network addresses, so keep it as private as the rest
 of the server's files.
 
@@ -160,6 +161,75 @@ the game type, the players and the UTC time. It holds names and scores, and
 no network addresses. The lines are the ones the
 [live event stream](competitive-matches.md#feed-a-broadcast-overlay) writes
 for broadcast overlays, so the same tools read both.
+
+### Admins
+
+An admin is a player you trust to keep order while you are away. Admins get
+their own password, so you never hand out the rcon password, and they can do
+far less than rcon can.
+
+**Set it up.** Give the server an admin password before it starts a map, in
+its configuration file or on its command line:
+
+```text
+set net_serverAdminPassword "a long password only your admins know"
+```
+
+The server reads the password when a map starts and then forgets it, keeping
+only what it needs to check a login. It is never written to the
+configuration file and never shown. To change it, set it again; the new
+password applies from the next map. Without one, nobody can log in as an
+admin.
+
+**Logging in.** An admin stores the password in their own game, then asks to
+log in:
+
+```text
+set net_clientAdminPassword "a long password only your admins know"
+admin
+```
+
+Keep the password in the setting and type `admin` on its own. The setting is
+private: it stays out of the console history, the log and the configuration
+file, so it has to be set again each time the game is started. The password
+itself is never sent. The server sends a one-time challenge and the game
+answers with a proof, the same way a referee logs in. A login lasts until the
+map changes or restarts, or the admin leaves; after that, type `admin` again.
+`admin logout` gives the right up. Five wrong passwords in a minute lock that
+connection out of logging in for a minute.
+
+**What an admin can do**, from their own console, to players who are
+connected:
+
+| Command | What it does |
+|---|---|
+| `gameKick <slot\|name> [reason]` | Removes the player |
+| `mute <slot\|name> [time]`, `unmute <slot\|name>` | Stops, or restores, the player's text chat |
+| `ban <slot\|name> [time] [reason]` | Bans the player's address and removes them. The ban lasts at most `g_adminMaxBanMinutes`; asking for longer, or for a permanent ban, gives that limit |
+
+The server answers each command in the chat area. Put a name that has spaces
+in quotes. An admin who is watching rather than playing also gets the
+referee's controls in Match Control; an admin who is playing does not, for
+the same reason a player cannot log in as a referee. To referee, move to
+spectators and type `admin` again.
+
+**What an admin cannot do.** An admin cannot lift a ban, list the bans, see
+anyone's address (`status`), ban an address or a range, or stop the server.
+An admin cannot act on the host of a server started from the game, on another
+admin, or on a bot, and cannot ban a player who shares their own address,
+because that ban would shut the admin out as well. All of that stays with the
+console and rcon.
+
+| Setting | What it controls |
+|---|---|
+| `net_serverAdminPassword` | On the server, the password admins log in with; none (the default) turns admin logins off |
+| `net_clientAdminPassword` | In an admin's own game, the password `admin` logs in with |
+| `g_adminMaxBanMinutes` | The longest ban an admin may give, in minutes (default `1440`, a day); `0` lets admins ban nobody |
+
+Everything an admin does is in the admin log with `"by":"admin"` and the
+admin's own slot, name and address (`admin_slot`, `admin_name`,
+`admin_address`). Logins, wrong passwords and logouts are logged as
+`admin_login`, `admin_login_failed` and `admin_logout`.
 
 ### Stopping the server
 

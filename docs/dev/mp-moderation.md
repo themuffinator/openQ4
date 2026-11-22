@@ -126,9 +126,11 @@ reconnect would take over.
 `logs/admin.ndjson` in the save folder, one JSON object a line, appended and
 synced, on by default (`g_adminLog`). Events: `ban`, `unban`, `mute`,
 `unmute`, `kick`, `flood`, `refused`, `shutdown_scheduled`,
-`shutdown_cancelled`, `shutdown`. Fields as they apply: `time` (UTC),
+`shutdown_cancelled`, `shutdown`, `admin_login`, `admin_login_failed`,
+`admin_logout`. Fields as they apply: `time` (UTC),
 `event`, `by` (`console`, `admin`, `vote`, `menu`, `server`), `slot`, `name`,
-`address`, `range`, `reason`, `seconds`, `expires`, `when`. A value too long
+`address`, `range`, `reason`, `seconds`, `expires`, `when`, and for what a
+logged-in admin asked for `admin_slot`, `admin_name`, `admin_address`. A value too long
 for the 1,024-byte line is cut on a whole escape and the line stays valid
 JSON.
 
@@ -165,12 +167,72 @@ goodbye, arms a 1.5 second delay so the line can reach the players, and then
 appends `quit` on a dedicated server or `disconnect` on a listen server; the
 engine's own shutdown tells each client the server has shut down.
 
+### Admins
+
+A second password (`net_serverAdminPassword`) gives a player the right to ask the
+server to kick, mute or ban a connected player. The user's decision, 22
+November 2026: a referee's powers plus kick, mute and unmute, and bans of
+connected players only, capped in length; no lifting of bans, no addresses
+(`status`, `banlist`), no raw address or range bans, no shutdown.
+
+**Login.** It is the referee's challenge and response
+(`mp/match/MatchAuthentication`), unchanged: the same operation
+(`MP_MATCH_OP_REF_AUTHENTICATE`), the same challenge message, the same
+PBKDF2 proof. The admin kind has its own request word (`challenge:admin`)
+and its own proof tag (`a1:` where a referee's is `v1:`), and is answered by
+a second `mpRefereeAuthenticationService` with its own verifier, challenges
+and lockout, so a referee proof never opens the admin grant or the reverse.
+`ApplyMatchOperationContinuation` hands the admin kind to
+`ApplyAdminAuthentication` before the referee's checks run, because a
+referee login is refused to a player and an admin may be playing.
+`InitializeAdminAuthentication` reads the cvar the way
+`InitializeRefereeAuthentication` reads `g_refPassword`: turned into a
+verifier, then cleared, with an unknowable verifier installed when there is
+no password so the exchange does not say whether one exists.
+
+**The grant** is `matchAdminConnection[slot] == matchConnectionId[slot]`: it
+belongs to the connection, is cleared with the slot's other transport state,
+and is cleared for everyone when a match session begins. A match session
+begins on every map load and map restart, and the engine re-initialises
+every client on a map load, so a login lasts for one map, as a referee's
+does. An admin who is watching with no roster seat also gets the referee
+role, by the same role mutation; a playing admin does not.
+
+**The request** is a new client-to-server reliable message,
+`GAME_RELIABLE_MESSAGE_MODERATION` (appended), never a console line: a verb,
+the target's slot and spawn identity, a length and a reason
+(`idGameLocal::ServerModerationRequest`). `GAME_RELIABLE_MESSAGE_SERVER_ADMIN`
+still refuses remote clients. The rules are in the core and natively tested
+(`MPModAdminCheck`, `MPModAdminBanSeconds`): the target must be the player
+the admin chose and not the admin, the host, another admin or a bot; a ban
+needs `g_adminMaxBanMinutes` above 0, is always cut to it, and is refused
+when the target shares the admin's address, since a ban is of an address.
+The only console line a request can run is `kick <slot>` for the slot the
+server checked. The flood class is `RELIABLE_FLOOD_MODERATION` (500 ms).
+The login operation is exempt from the match operation cooldown, so what a
+refused login writes (one chat line, one log line) is paced to once in two
+seconds for a connection.
+
+**On the client** `ban`, `mute`, `unmute` and `gameKick` send the request
+instead of printing that only the server runs them; they take a connected
+player's slot or name and never an address. `admin` reads the password from
+the client's own `net_clientAdminPassword`, never from its arguments. Both
+password cvars are `CVAR_PRIVATE`, which the engine already keeps out of the
+console history, the parsed command line in the log, cvar listings and the
+config. They are declared in the engine (`AsyncNetwork.cpp`, beside the rcon
+passwords) and only read by the game: a game cvar is not registered, and so
+not yet private, while the other game module is loaded, and the main menu
+runs the single-player module, which is where a host or an admin is likely
+to type the password.
+
 ## Commands
 
-All are game commands that refuse to run anywhere but on the server (its
-console, a listen host, or rcon): `ban`, `unban`, `banlist [reload]`, `mute`,
-`unmute`, `status`, `serverShutdown`. `removeClientFromBanList` is kept as
-another name for `unban`.
+On the server (its console, a listen host, or rcon): `ban`, `unban`,
+`banlist [reload]`, `mute`, `unmute`, `status`, `serverShutdown`.
+`removeClientFromBanList` is kept as another name for `unban`. `unban`,
+`banlist`, `status` and `serverShutdown` refuse to run anywhere else. Typed
+on a client, `ban`, `mute`, `unmute` and `gameKick` are a logged-in admin's
+request, and `admin` / `admin logout` log in and out.
 
 **Words the console cuts apart.** `idCmdArgs` tokenizes with the script lexer,
 so `192.0.2.0/24` arrives as `192.0.2.0` and `/24`, `10m` as `10` and `m`, and
@@ -191,12 +253,18 @@ of the address.
   engine limit, the text in twelve languages and the guide. No assets.
 - `tools/tests/network_security.py`: pins the caps and policies.
 - `tools/tests/mp_moderation_smoke.py`: a pure dedicated server, two bots and
-  five hidden clients in turn over loopback (the player, one from the banned
+  seven hidden clients in turn over loopback (the player, one from the banned
   address, one after the ban is lifted, one sharing the address, one to
-  kick). Needs a staged runtime and retail assets, so CI compiles it and
-  does not run it. 22 November 2026, Windows x64, debugoptimized build of
-  this change over `b6f8c624c`: 77 checks pass and every process exits
-  cleanly, the server by itself after its last match. The same build passes
+  kick, and two for an admin to kick and to ban). Needs a staged runtime and
+  retail assets, so CI compiles it and does not run it. 22 November 2026,
+  Windows x64, debugoptimized build of the admin change over `66ef78793`:
+  102 checks pass and every process exits cleanly, the server by itself
+  after its last match. The players an admin acts on bind 127.0.0.2, so the
+  server sees a second address and the ban is a real one; `--skip-admin`
+  leaves the stage out where only 127.0.0.1 exists. The hidden clients take
+  their commands from scripts, so the console history's handling of the
+  private cvar is the engine's own (pinned in `network_security.py`), not
+  something this smoke types. The earlier build (77 checks) also passed
   `mp_map_rotation_smoke.py` (44 checks). Two things shape the harness. A
   client that was removed or refused waits in a dialog whose loop does not
   run its network client, so each later connection is a fresh process. And
@@ -208,7 +276,8 @@ of the address.
 
 - Bans by identity (waits for MP-17) and `status` showing an identity.
 - A row for the mute vote on the retained Vote page.
-- An admin role between referee and rcon.
+- An admin's login lasts one map; nothing logs the admin in again after a
+  map change. Admins have no menu: the commands are console only.
 - The retained Admin page still labels the range column as it did the GUID
   and does not show a ban's reason or expiry.
 - Linux, macOS and a real remote address: the smoke ran on Windows over

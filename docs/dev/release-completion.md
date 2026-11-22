@@ -105,6 +105,13 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **An optional limit on players from one address.**
   `net_serverMaxClientsPerAddress` stops one address filling the server. It is
   off by default, because players behind one router share an address.
+- **Admins: trusted players who can moderate without rcon.** Give the server
+  a second password (`net_serverAdminPassword`) and a player who knows it can
+  log in with `admin`, then kick, mute and ban connected players from their own
+  console. An admin's ban lasts a day at most (`g_adminMaxBanMinutes`), and
+  an admin cannot lift bans, see addresses, ban a range or stop the server.
+  The password is never sent over the network, and everything an admin does
+  is in the admin log beside their name.
 - **What to do.** Server hosts need to change nothing. Bans made before this
   never worked; a ban list left by Quake 4 is kept as comment lines in the new
   `banlist.txt`. Run the commands at the server's console, as the host of a
