@@ -87,10 +87,12 @@ static rvSoundShaderEditLocal localSoundShaderEdit;
 rvSoundShaderEdit* soundShaderEdit = &localSoundShaderEdit;
 
 static bool SND_IsMusicSamplePath( const idToken &token ) {
-	// retail keeps its score under sound/musical/; the Awakening expansion
-	// keeps its own under sound/music/
+	// retail keeps its score under sound/musical/ (all of it sound class 3, which
+	// is what retail's music volume follows); the Awakening expansion keeps its own
+	// under sound/music/ and never sets the class. The ambient drones under
+	// sound/ambience/musical/ are ordinary speakers in retail: they keep the speaker
+	// fraction and ignore the music volume.
 	return token.IcmpPrefixPath( "sound/musical/" ) == 0 ||
-		token.IcmpPrefixPath( "sound/ambience/musical/" ) == 0 ||
 		token.IcmpPrefixPath( "sound/music/" ) == 0;
 }
 

@@ -2708,7 +2708,8 @@ void idSessionLocal::HandleRetainedAudioRequest( idUserInterface *gui, const cha
 		return;
 	}
 	switch ( field ) {
-		case 0: cvarSystem->SetCVarFloat( "s_volume", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
+		// 0 to 200%, the stock Quake 4 slider's 0 to 2
+		case 0: cvarSystem->SetCVarFloat( "s_volume", idMath::ClampInt( 0, 200, value ) / 100.0f ); break;
 		case 1: cvarSystem->SetCVarFloat( "s_musicVolume", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
 		case 2: cvarSystem->SetCVarFloat( "s_dialogueVolume", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
 		case 3:

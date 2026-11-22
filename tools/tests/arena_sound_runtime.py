@@ -97,7 +97,7 @@ def main() -> int:
         "g_autoExecAfterMapLoad": "arena_probe.cfg", "g_autoExecAfterMapLoadDelayMs": "500",
     }
     if args.audio_output == "physical":
-        settings["s_volume_dB"] = "-12"
+        settings["s_volume"] = ".25"
     executable = runtime / ("openQ4-client_x64.exe" if os.name == "nt" else "openQ4-client_x64")
     command = [str(executable), *(part for key, value in settings.items() for part in ("+set", key, value)),
                "+exec", "arena_bootstrap.cfg"]

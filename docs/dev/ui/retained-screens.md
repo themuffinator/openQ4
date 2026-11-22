@@ -2388,7 +2388,7 @@ the stock order and with the stock text:
 
 | Section | Rows |
 | --- | --- |
-| LEVELS | Volume, Music Volume and Dialogue Volume, 0 to 100% |
+| LEVELS | Volume, 0 to 200% as the stock slider's 0 to 2; Music Volume and Dialogue Volume, 0 to 100% |
 | DEVICES | Sound System (Default, OpenAL) and Sound Device, the sound system's devices (up to 16) |
 | EFFECTS | EAX ADVANCED HD; Surround Speakers and Headphone HRTF (Auto, Off, On); Dialogue Subtitles; Subtitle Size, 100 to 200%; Subtitle Background, 0 to 100%; Speaker Names; Untranscribed Speech (AUD-07, 13 November 2026) |
 

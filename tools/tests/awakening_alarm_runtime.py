@@ -110,7 +110,7 @@ def main():
             ('com_gameMode', 'SP'), ('ui_autoJoin', '0'), ('ui_retained', '1'),
             ('sys_consoleWindow', '0'), ('r_fullscreenDesktop', '0'),
             ('com_fixedTic', '0'), ('s_noSound', '0'), ('s_muteUnfocused', '0'),
-            ('s_useOcclusion', '1'), ('s_volume', '1'), ('s_volume_dB', '0'), ('ai_disable', '1')])
+            ('s_useOcclusion', '1'), ('s_volume', '1'), ('ai_disable', '1')])
     runtime = args.runtime.resolve(strict=True)
     exe = runtime/'openQ4-client_x64.exe'
     identity = {name: sha256(runtime/name) for name in

@@ -1179,16 +1179,13 @@
       "label_key": "#str_201029",
       "target_type": "cvar",
       "target": "s_volume",
-      "default": "1.0",
+      "default": "0.5",
       "ui_range": {
         "low": "0",
-        "high": "1",
+        "high": "2",
         "step": "0.1"
       },
-      "cvar_range": {
-        "low": "0",
-        "high": "1"
-      },
+      "range_intent": "Quake 4 1.4.2 leaves s_volume unbounded and its own menu slider runs from 0 to 2; the mixer keeps each channel within its headroom.",
       "restart_required": false,
       "accessibility": "Slider with paired edit field."
     },

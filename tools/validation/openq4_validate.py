@@ -883,6 +883,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'sound_distance.py', []),
         (root / "tools" / "tests" / 'sound_distance_retail.py', []),
         (root / "tools" / "tests" / 'sound_retail_reverb_contract.py', []),
+        (root / "tools" / "tests" / 'sound_volume_retail_contract.py', []),
         (root / "tools" / "tests" / 'sound_screen_shake.py', []),
         (root / "tools" / "tests" / 'audio_decode_budget.py', []),
         (root / "tools" / "tests" / 'audio_memory.py', []),

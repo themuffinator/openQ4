@@ -569,7 +569,7 @@ def run_openq4(output: Path, install: Path, runtime: Path, cases: list[dict]) ->
         "r_customWidth": "960", "r_customHeight": "540", "r_windowWidth": "960", "r_windowHeight": "540",
         "com_maxfps": "60", "r_swapInterval": "0", "in_mouse": "0", "in_joystick": "0", "in_tty": "0",
         "sys_consoleWindow": "0", "s_noSound": "0", "s_muteUnfocused": "0", "s_deviceName": "",
-        "s_volume_dB": "0", "s_volume": "1", "s_speakerFraction": ".65", "s_quadraticFalloff": "0",
+        "s_volume": "1", "s_speakerFraction": ".65", "s_quadraticFalloff": "0",
         "s_sourceRadiusScale": ".5", "s_useOcclusion": "0", "s_useEAXReverb": "0", "s_airAbsorption": "0",
         "s_numberOfSpeakers": "0",
         # A fresh profile runs the one-time audio migration, which turns room

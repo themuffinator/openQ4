@@ -12,6 +12,23 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Volume settings that match Quake 4, 22 November 2026
+
+- **Master volume goes up to 2 again.** Quake 4's own slider runs from 0 to 2,
+  but openQ4 stopped at 1, so anyone who had turned the game up past that lost
+  the extra loudness. Both openQ4 menus now offer the full range. The retained
+  menu shows it as 0 to 200%, and the default is still 0.5 (50%).
+- **Ambient drones sound as they did in Quake 4.** The low musical drones in
+  levels such as Hub 1, Tram 1, Dispersal and the Waste Facility were treated as
+  music. They played 6 dB quieter than in the original, followed the Music
+  slider and ignored slow motion. They are level sounds again, as in Quake 4.
+  The score itself still follows the Music slider.
+- **What to do.** Nothing, unless you want it louder: openQ4 had already
+  saved any higher setting as 1, so raise it again in the Audio settings.
+  Players who type `s_volume_dB` in the console: it never did anything in
+  openQ4 and is gone; use `s_volume`.
+- **Developer detail:** [audio volume parity](audio-volume-parity.md).
+
 ## Texture recovery keeps every setting it watches, 21 November 2026
 
 - **No more out-of-bounds write when textures reload.** Texture recovery

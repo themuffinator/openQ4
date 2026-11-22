@@ -71,7 +71,7 @@ def scripts(output: Path, physical: bool, quadratic: bool) -> tuple[Path, list[d
     view = (LISTENER[0], LISTENER[1], LISTENER[2] - .5)
     commands = ["god", "notarget", "noclip",
                 f"setviewpos {' '.join(map(str, view))} 0 0 0", "waitMsec 1000",
-                "s_volume", "s_volume_dB", "s_speakerFraction", "s_quadraticFalloff", "s_sourceRadiusScale",
+                "s_volume", "s_speakerFraction", "s_quadraticFalloff", "s_sourceRadiusScale",
                 "echo DISTANCE_GAMEPLAY_READY", 'screenshot "screenshots/distance-fixture.tga"']
     cases = []
     for index, (name, (_, minimum, maximum, db)) in enumerate(SHADERS.items()):
@@ -211,7 +211,7 @@ def main() -> None:
         "r_customWidth": "960", "r_customHeight": "540", "r_windowWidth": "960", "r_windowHeight": "540",
         "com_maxfps": "60", "r_swapInterval": "0", "in_mouse": "0", "in_joystick": "0", "in_tty": "0",
         "sys_consoleWindow": "0", "s_noSound": "0", "s_muteUnfocused": "0", "s_deviceName": "",
-        "s_volume_dB": "-12" if physical else "0", "s_volume": "1", "s_speakerFraction": ".65",
+        "s_volume": ".25" if physical else "1", "s_speakerFraction": ".65",
         "s_quadraticFalloff": "1" if args.quadratic else "0", "s_sourceRadiusScale": ".5",
         "s_useOcclusion": "0", "s_useEAXReverb": "0", "s_airAbsorption": "0",
         # Without this, a fresh profile's one-time audio migration turns room

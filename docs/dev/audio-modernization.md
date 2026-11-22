@@ -13,6 +13,8 @@ remaining roadmap gates; this page's October 6 measurements remain historical.
 The [23 October round](#output-changes-and-memory-pressure-october-23) makes playback
 survive output loss and layout changes, adds the low-memory response and streams Ogg
 files without usable length metadata.
+The [22 November volume audit](audio-volume-parity.md) restores retail's master volume
+range and its music classification.
 
 ## Where openQ4 starts from
 

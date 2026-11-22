@@ -378,6 +378,18 @@ Generated on 2026-04-19.
 | `s_useEAXOcclusion` | src/sound/snd_system.cpp:1007 | sound/default/snd_system.cpp:2005<br>sound/default/snd_world.cpp:2179 | Implemented with the retail area reverb (EAX source occlusion); retail flags `SND ST AR`, default `1`. See [retail-audio-reverb.md](retail-audio-reverb.md). |
 | `s_muteEAXReverb` | src/sound/snd_system.cpp:1008 | sound/default/snd_world.cpp:2304<br>sound/default/snd_world.cpp:2563 | Implemented with the retail area reverb (mutes the listener slot's room level); retail flags `SND ST`, default `0`. |
 
+## 2b. Volume CVars Realigned After Snapshot (2026-11-22)
+
+Read from the static `idCVar` objects in the 1.4.2 `Quake4.exe` (the range fields follow the flags; min 1 and max -1 mean unbounded). See [audio-volume-parity.md](audio-volume-parity.md).
+
+| CVar | Retail 1.4.2 | openQ4 now |
+| --- | --- | --- |
+| `s_volume` | `0.5`, `SND ST AR`, unbounded; the stock menu slider runs 0 to 2 | Same flags and default, unbounded; both menus offer 0 to 2 |
+| `s_musicVolume` | `0.5`, `SND ST AR`, 0 to 1 | Unchanged match |
+| `s_voiceVolume` | `1.0`, `SND ST AR`, 0 to 1 | Unchanged match |
+| `s_doorDistanceAdd` | `150`, `SND ST AR` | Now archived as well |
+| `s_volume_dB` | Not present | Removed: the BFG CVar was defined but nothing read it |
+
 ## 3. Shared Names With Metadata Differences
 
 | CVar | Changed | Retail default | openQ4 default | Retail flags | openQ4 flags | Retail type/range | openQ4 type/range |

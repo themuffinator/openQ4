@@ -372,7 +372,7 @@ The Audio pane is `p_settings_audio`, included from `content/baseoq4/pak0/guis/m
 
 | Section | Label | Widget type | Value widget | Target | Values or range | Notes |
 |---|---|---|---|---|---|---|
-| Levels | Sound Volume | `sliderDef` + `editDef` | `set_audio_vol_slider`, `set_audio_vol_value` | `s_volume` | `0..1`, step `0.1` | Numeric edit field `maxchars 3`, matching the engine cvar range. |
+| Levels | Sound Volume | `sliderDef` + `editDef` | `set_audio_vol_slider`, `set_audio_vol_value` | `s_volume` | `0..2`, step `0.1` | Numeric edit field `maxchars 3`. The range is the stock Quake 4 slider's; retail leaves the cvar itself unbounded. |
 | Levels | Music Volume | `sliderDef` + `editDef` | `set_audio_music_slider`, `set_audio_music_value` | `s_musicVolume` | `0..1`, step `0.05` | Numeric edit field `maxchars 4` for exact music-volume entry. |
 | Devices | Sound System | `choiceDef` | `set_audio_backend_val` | `s_useOpenAL` | `0 Default`, `1 OpenAL` | Runs `sound drivar` on release. |
 | Devices | Sound Device | `choiceDef` | `set_audio_device_val` | `s_deviceName` | Runtime `gui::device_name` / `gui::device_value` | Disabled when OpenAL is off or failed to load. Runs `sound drivar` on release. |

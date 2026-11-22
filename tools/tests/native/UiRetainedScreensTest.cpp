@@ -5143,9 +5143,9 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 		if (!actions.empty() && actions[0].proposalToken) runtime.AcknowledgeControlProposal(actions[0].node,actions[0].proposalToken,true);
 		return invocation;
 	};
-	// The session's readback: 70% volume, the second of three devices, EAX on,
+	// The session's readback: 140% volume (of the stock 0 to 200%), the second of three devices, EAX on,
 	// 5.1 speakers and the subtitles at 150%.
-	Check(runtime.SetState({{"audio.volume",70.0},{"audio.music",40.0},{"audio.dialogue",100.0},{"audio.backend",1.0},
+	Check(runtime.SetState({{"audio.volume",140.0},{"audio.music",40.0},{"audio.dialogue",100.0},{"audio.backend",1.0},
 		{"audio.device.count",3.0},{"audio.device.0.label",std::string("Default device")},{"audio.device.1.label",std::string("Speakers")},
 		{"audio.device.2.label",std::string("Headset")},{"audio.device",1.0},{"audio.eax",true},{"audio.speakers",2.0},{"audio.hrtf",0.0},
 		{"audio.subtitles",true},{"audio.subtitleSize",150.0},{"audio.subtitleBackground",30.0},{"audio.subtitleSpeakers",false},
@@ -5155,7 +5155,7 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	runtime.Frame(viewport,0.5);
 	Check(runtime.FocusedControl() == "audio_volume","the first row takes the focus");
 	const auto track = bounds("audio_volume-track"), fill = bounds("audio_volume-fill");
-	Check(fill.width > track.width*.6f && fill.width < track.width*.8f,"the volume's fill runs to 70%");
+	Check(fill.width > track.width*.6f && fill.width < track.width*.8f,"140% of 200% fills 70% of the track");
 	// LEVELS and DEVICES lead; EFFECTS stands in the second column.
 	const auto volume = bounds("audio_volume"), eax = bounds("audio_eax");
 	Check(eax.x > volume.x+volume.width && std::abs(eax.y-volume.y) < .5f,"EFFECTS stands beside LEVELS");
@@ -5167,12 +5167,12 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	press(MenuInput::Back,0.56); runtime.Frame(viewport,0.58);
 	Check(!runtime.GetWidgetState("audio_device")->popupOpen && runtime.TakeActions().empty(),"Back folds the list without a request");
 	Check(runtime.FocusControl("audio_volume",0.59),"focus the volume again");
-	// A step to the right asks for 80%.
+	// A step to the right asks for 150%.
 	runtime.TakeActions();
 	press(MenuInput::Right,0.6);
 	auto invocation = taken("audioVolume");
 	Check(invocation.operation == "session.menuValue" && std::get<std::string>(invocation.arguments.at("command")) == "audioVolume" &&
-		std::get<double>(invocation.arguments.at("value")) == 80,"Right asks the session for 80%");
+		std::get<double>(invocation.arguments.at("value")) == 150,"Right asks the session for 150%");
 	// The check box asks for the other setting.
 	Check(runtime.FocusControl("audio_eax",0.7),"focus EAX");
 	press(MenuInput::Accept,0.71);

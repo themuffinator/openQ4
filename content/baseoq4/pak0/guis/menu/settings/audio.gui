@@ -59,7 +59,7 @@
 					forecolor	1,0.745,0.137,0.8
 					matcolor	1,0.745,0.137,0.8
 					low	0
-					high	1
+					high	2
 					step	0.1
 					thumbShader	"gfx/guis/mainmenu/slider_bar"
 					cvar	"s_volume"

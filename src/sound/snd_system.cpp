@@ -37,7 +37,9 @@ If you have questions concerning this license or the applicable additional terms
 // cheats resets every other unarchived CVar, which switched a dedicated server's
 // silence (and a player's own s_noSound) back off.
 idCVar s_noSound( "s_noSound", "0", CVAR_SOUND | CVAR_BOOL | CVAR_NOCHEAT, "returns NULL for all sounds loaded and does not update the sound rendering" );
-idCVar s_volume( "s_volume", "0.5", CVAR_ARCHIVE | CVAR_FLOAT, "master volume (0-1)", 0.0f, 1.0f );
+// Unbounded as in retail Quake4.exe 1.4.2, whose own menu slider runs from 0 to 2;
+// the mixer still keeps a channel's gain within its headroom.
+idCVar s_volume( "s_volume", "0.5", CVAR_SOUND | CVAR_ARCHIVE | CVAR_FLOAT, "master volume: 1 is full scale, and the menu goes up to 2 as Quake 4's did" );
 idCVar s_musicVolume( "s_musicVolume", "0.5", CVAR_ARCHIVE | CVAR_FLOAT, "music volume (0-1)", 0.0f, 1.0f );
 idCVar s_dialogueVolume( "s_dialogueVolume", "1", CVAR_ARCHIVE | CVAR_FLOAT, "spoken dialogue volume (0-1), independent of music and multiplayer voice chat", 0.0f, 1.0f );
 idCVar ui_subtitles( "ui_subtitles", "0", CVAR_GUI | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NOCHEAT, "show installed dialogue transcripts during playback" );

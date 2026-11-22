@@ -26,7 +26,7 @@ DEVICES = 16                               # the device list's rows (BuildMainMe
 # the slider's range and step or the choice's options).
 SECTIONS = (
     ("levels", "#str_41096", (
-        ("slider", "audio_volume", "#str_201029", "audioVolume", "audio.volume", (0, 100, 10)),
+        ("slider", "audio_volume", "#str_201029", "audioVolume", "audio.volume", (0, 200, 10)),
         ("slider", "audio_music", "#str_201006", "audioMusic", "audio.music", (0, 100, 5)),
         ("slider", "audio_dialogue", "#str_231300", "audioDialogue", "audio.dialogue", (0, 100, 5)),
     )),
