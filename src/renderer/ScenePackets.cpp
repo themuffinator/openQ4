@@ -6,6 +6,8 @@
 #include "RendererBootstrap.h"
 #include "MaterialResourceTable.h"
 
+#include <memory>
+
 static idScenePacketFrame rg_scenePacketFrames[2];
 static bool rg_scenePacketFramesOpen[2];
 static bool rg_scenePacketHistoryCommitted[2];
@@ -2893,7 +2895,11 @@ bool RendererScenePacket_RunSelfTest( void ) {
 	fxCmd.next = &swapCmd.commandId;
 	swapCmd.next = NULL;
 
-	idScenePacketFrame packetFrame;
+	// Each frame holds several MB of fixed-size records; three on the stack
+	// outgrew macOS's 8 MB main-thread stack once frames grew, so they live
+	// on the heap.
+	const std::unique_ptr<idScenePacketFrame> packetFrameStorage( new idScenePacketFrame );
+	idScenePacketFrame &packetFrame = *packetFrameStorage;
 	R_ScenePackets_BuildLegacyCommandStream( reinterpret_cast<const emptyCommand_t *>( &drawCmd ), packetFrame );
 	const scenePacketFrameStats_t &stats = packetFrame.Stats();
 	const bool expectedDepthEligible = tr.defaultMaterial != NULL
@@ -3001,7 +3007,8 @@ bool RendererScenePacket_RunSelfTest( void ) {
 	}
 	R_ScenePackets_EndFrame();
 
-	idScenePacketFrame postPacketFrame;
+	const std::unique_ptr<idScenePacketFrame> postPacketFrameStorage( new idScenePacketFrame );
+	idScenePacketFrame &postPacketFrame = *postPacketFrameStorage;
 	if ( !postPacketFrame.AddScene( &worldView, false ) ) {
 		common->Printf( "RendererScenePacket self-test failed: could not add post scene\n" );
 		return false;
@@ -3059,7 +3066,8 @@ bool RendererScenePacket_RunSelfTest( void ) {
 		pbrDrawSurf.material = pbrPacketMaterial;
 		pbrDrawSurf.sort = pbrPacketMaterial->GetSort();
 		{
-			idScenePacketFrame pbrPacketFrame;
+			const std::unique_ptr<idScenePacketFrame> pbrPacketFrameStorage( new idScenePacketFrame );
+			idScenePacketFrame &pbrPacketFrame = *pbrPacketFrameStorage;
 			pbrPacketValid = pbrPacketFrame.AddDrawPacket( &pbrDrawSurf, RENDER_PASS_AMBIENT, 0 );
 			const drawPacket_t *pbrDrawPacket = pbrPacketValid && pbrPacketFrame.NumDrawPackets() == 1
 				? &pbrPacketFrame.DrawPacket( 0 )
