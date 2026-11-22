@@ -442,12 +442,35 @@ def validate_cross_platform_parity() -> None:
         require(win_source, f"SYSCON_WIN_RGB({entry})", "Windows console shared palette use")
 
 
+def validate_posix_support_gl_binding() -> None:
+    """The splash and console renderers must hand back the game's GL binding.
+
+    Outside WSL, SDL backs a software renderer's window with a hidden OpenGL
+    renderer. Destroying the splash after the first loading frame used to leave
+    no GL context current, so the next frame's calls were dropped and its GPU
+    timer ended with no matching begin (GL_INVALID_OPERATION on Linux CI).
+    """
+    source = read("src/sys/posix/posix_syscon.cpp")
+    scope = function_body(source, "class Posix_SupportGLBindingScope {")
+    for needle in ("SDL_GL_GetCurrentWindow()", "SDL_GL_GetCurrentContext()",
+                   "SDL_GL_MakeCurrent( window, context )"):
+        require(scope, needle, "support-window GL binding scope")
+    for signature in ("static SDL_Renderer *Posix_CreateSupportRenderer(",
+                      "static void Posix_SplashRender(",
+                      "static void Posix_SplashDestroy(",
+                      "static void Posix_ConsoleRender(",
+                      "void Posix_ShutdownConsole("):
+        require(function_body(source, signature), "const Posix_SupportGLBindingScope glBinding;",
+                f"{signature} GL binding guard")
+
+
 def main() -> int:
     validate_theme_header()
     validate_layout_fits()
     validate_posix_console_presentation()
     validate_windows_console_presentation()
     validate_cross_platform_parity()
+    validate_posix_support_gl_binding()
     print("System console presentation checks passed.")
     return 0
 

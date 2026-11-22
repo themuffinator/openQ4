@@ -72,6 +72,7 @@ static void Posix_ConsoleHistory(int){}
 static void Posix_ConsoleHandleText(const char*){}
 static const char* Posix_ConsoleInputState(int& length,int& cursor){length=cursor=0;return "";}
 static void Posix_SplashDestroy(){}
+struct Posix_SupportGLBindingScope{};
 '''
 MAIN=r'''
 static void reset(int width=2340,int height=1080,float scale=3){

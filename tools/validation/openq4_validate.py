@@ -382,7 +382,19 @@ def install_args(build_dir: Path) -> list[str]:
 
 
 def test_args(build_dir: Path) -> list[str]:
-    return ["test", "-C", str(build_dir), "--print-errorlogs"]
+    args = ["test", "-C", str(build_dir), "--print-errorlogs"]
+    # A runner that is slow across the board (the hosted macOS Intel image)
+    # scales every test's hang guard instead of raising them one by one.
+    multiplier = os.environ.get("OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER", "").strip()
+    if multiplier:
+        try:
+            factor = float(multiplier)
+        except ValueError:
+            raise SystemExit(f"OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER must be a number, not {multiplier!r}")
+        if factor <= 0:
+            raise SystemExit("OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER must be greater than zero")
+        args += ["--timeout-multiplier", multiplier]
+    return args
 
 
 def validation_env(args: argparse.Namespace, root: Path) -> dict[str, str]:
@@ -697,6 +709,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "mp_bot_hazards.py",
         root / "tools" / "tests" / "mp_bot_server_menu.py",
         root / "tools" / "tests" / "mp_instagib_contract.py",
+        root / "tools" / "tests" / "mp_casual_match_flow_contract.py",
+        root / "tools" / "tests" / "mp_classic_grapple_contract.py",
         root / "tools" / "tests" / "mp_modifiers_contract.py",
         root / "tools" / "tests" / "mp_map_database_contract.py",
         root / "tools" / "tests" / "mp_client_combat_effects.py",

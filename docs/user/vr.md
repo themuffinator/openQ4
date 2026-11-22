@@ -1,6 +1,6 @@
 # Virtual reality
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 openQ4 can play Quake 4 on a PC VR headset through OpenXR, the cross-vendor VR
 standard. You see the game in 3D at your headset's resolution, look around with
@@ -52,7 +52,7 @@ on the same tab. If nothing appears in the headset, see
   Windows Mixed Reality's own runtime does not support OpenGL; with a WMR
   headset, play through SteamVR instead.
 
-  **Not in 0.14.1:** a standalone build for Meta Quest is being prepared; see
+  **New in 0.15.0:** a standalone build for Meta Quest is being prepared; see
   [Meta Quest without a PC](#meta-quest-without-a-pc).
 - Either renderer: **OpenGL** or **Vulkan**. On Vulkan the runtime picks the
   graphics card your headset is connected to, so the first time you turn VR on
@@ -99,7 +99,7 @@ launch with `+set vr_enable 1`.
 - If VR fails during play, openQ4 releases any controls you were holding and
   carries on in the desktop window. It tries again after three seconds, or
   waits for `vr_restart` if the runtime itself stopped.
-- **Not in 0.14.1:** a runtime that stalls for a moment costs a frame, not
+- **New in 0.15.0:** a runtime that stalls for a moment costs a frame, not
   your VR session: openQ4 waits up to a second before giving up. A failure in
   something VR can do without, such as vibration or a headset's refresh-rate
   setting, is reported in the console and VR carries on.
@@ -163,7 +163,7 @@ pointing at, so it stays sharp near or far. It dims when something between you
 and the target hides it. Set `vr_aimMode 0` to aim with your head instead; the
 HUD crosshair only shows when you aim with your head.
 
-**Not in 0.14.1:**
+**New in 0.15.0:**
 
 - The gun is where your hand is: put your hand behind a door frame or a crate
   and the gun is hidden behind it, instead of being drawn over everything.
@@ -187,7 +187,7 @@ railgun: your whole view magnifies as the scope would, and the laser dot is
 your crosshair. Keep zooming short if magnified head movement makes you uneasy.
 
 The controllers vibrate: your weapon hand with every shot, and both hands when
-you are hit, harder for bigger hits. **Not in 0.14.1:** the lightning gun's
+you are hit, harder for bigger hits. **New in 0.15.0:** the lightning gun's
 beam and the gauntlet's blade hum in your hand too.
 
 | Setting | Default | What it does |
@@ -200,7 +200,7 @@ beam and the gauntlet's blade hum in your hand too.
 
 ### Your body
 
-> **Not in 0.14.1.** It arrives in the next release.
+> **New in 0.15.0.**
 
 Look down and you see yourself: a chest, legs and feet standing where you
 stand, and arms that run from your shoulders to your hands.
@@ -290,7 +290,7 @@ enter `vr_recenter`. Your headset's own recenter (for example holding the
 Oculus button) does the same, at the moment the headset applies it, so the
 view doesn't jump. openQ4 also recentres by itself the first time your headset
 hands it the controllers and at the start of every level, so a level begins
-facing the way you face. **Not in 0.14.1:** the stick hold and the automatic
+facing the way you face. **New in 0.15.0:** the stick hold and the automatic
 recentre; there, use `vr_recenter` (it helps to bind it to a key, for example
 `bind F12 vr_recenter`).
 
@@ -334,10 +334,10 @@ and the size of your play area.
 | `vr_screenDistance` | 2.5 | menu and cinematic screen distance in metres |
 | `vr_screenWidth` | 3.0 | menu and cinematic screen width in metres |
 | `vr_mirror` | 1 | desktop window: 0 black, 1 left eye, 2 the floating screen |
-| `vr_refreshRate` | 0 | **Not in 0.14.1:** headset refresh rate in Hz, where the headset lets a game choose (Meta Quest, also over Link): the fastest rate it offers up to this; 0 keeps the headset's own |
-| `vr_performanceLevel` | 3 | **Not in 0.14.1:** CPU and GPU clocks the headset holds, where it lets a game choose (Meta Quest): 1 power savings, 2 sustained low, 3 sustained high, 0 leaves it to the headset from the next `vr_restart` |
+| `vr_refreshRate` | 0 | **New in 0.15.0:** headset refresh rate in Hz, where the headset lets a game choose (Meta Quest, also over Link): the fastest rate it offers up to this; 0 keeps the headset's own |
+| `vr_performanceLevel` | 3 | **New in 0.15.0:** CPU and GPU clocks the headset holds, where it lets a game choose (Meta Quest): 1 power savings, 2 sustained low, 3 sustained high, 0 leaves it to the headset from the next `vr_restart` |
 
-**Not in 0.14.1:** a faster refresh rate is smoother but leaves less time for
+**New in 0.15.0:** a faster refresh rate is smoother but leaves less time for
 each frame; if the game can't keep up, the headset fills in frames and motion
 looks less steady. `vr_status` lists the rate in use and any heat warning the
 headset reports. Most PC runtimes offer neither setting, and then both do
@@ -426,7 +426,7 @@ your hand. Damage numbers rise on the HUD from the player you hit.
 Servers older than 0.14.1 can leave your shots a fixed angle above or below the
 laser after you respawn or teleport. 0.14.1 servers keep shots on the laser.
 
-**Not in 0.14.1:** after you respawn or go through a teleporter, your head
+**New in 0.15.0:** after you respawn or go through a teleporter, your head
 faces the way the game sends you, as in single player; before, your gun did,
 wherever your hand hung. Your character in other players' view no longer spins
 on the spot while you point your gun straight up or down.
@@ -440,7 +440,7 @@ turrets and vehicles seat you as described in
 
 ## Meta Quest without a PC
 
-> **Not in 0.14.1.** It arrives in the next release.
+> **Not published yet.** The Quest build can only be built from source for now.
 
 openQ4's Android version can also be built as a **standalone Meta Quest app**
 (Quest 2, Quest Pro, Quest 3 and 3S). Setup, where you add your Quake 4 files,
@@ -475,7 +475,7 @@ resolution and refresh rate openQ4 is using. `vr_debug 1` logs session events.
   openQ4 needs (sRGB). Report your headset and runtime.
 - **Valve Index: weapons switch or the weapon wheel opens while you only hold
   the controllers** (0.14.1): the grip there answered your fingers resting on
-  it. **Not in 0.14.1:** it now takes a real squeeze.
+  it. **New in 0.15.0:** it now takes a real squeeze.
 - **Everything is too high, too low or off to one side**: recentre by holding
   the weapon-hand stick in for a second, standing where and facing how you
   want to play.
@@ -517,7 +517,10 @@ for each eye separately if you suspect a problem there.
 ## Reporting a problem
 
 Please report how VR runs on your headset, good or bad, on the project's
-[issue tracker](https://github.com/themuffinator/openQ4/issues). Include:
+[issue tracker](https://github.com/themuffinator/openQ4/issues). The
+[VR headset report form](https://github.com/themuffinator/openQ4/issues/new?template=vr-headset-report.yml)
+asks for everything below. A report that it all worked is as useful as a bug.
+Include:
 
 - your headset, controllers and OpenXR runtime (with its version), and whether
   you used OpenGL or Vulkan;

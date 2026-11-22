@@ -1386,34 +1386,42 @@ def validate_runtime_ipv4_selftest() -> None:
         "runtime exact-capacity datagram",
     )
 
-    oversize_receive = function_body(
+    # The platform read discards an oversized datagram and goes on to the next
+    # one, so the drain is not ended by it. The self-test reads until the marker
+    # arrives (at most twice) and fails if any read hands back other bytes.
+    marker_reads = function_body(
         body,
-        "if ( receiver.GetPacketBlocking( source, exactReceived, receivedSize, sizeof( exactReceived ), 1000 ) || receivedSize != 0 )",
-        "runtime oversized datagram rejection",
+        "for ( int markerRead = 0; markerRead < 2 && !markerReceived && !oversizeDelivered; ++markerRead )",
+        "runtime post-oversize marker receive",
     )
+    for token in (
+        "receivedSize = -1;",
+        "if ( !receiver.GetPacketBlocking( source, exactReceived, receivedSize, sizeof( exactReceived ), 1000 ) )",
+        "oversizeDelivered = receivedSize != 0;",
+        "receivedSize != sizeof( markerPacket )",
+        "memcmp( exactReceived, markerPacket, sizeof( markerPacket ) ) != 0",
+        "oversizeDelivered = true;",
+        "markerReceived = true;",
+    ):
+        require(marker_reads, token, "runtime post-oversize marker receive")
+    marker_verdict = function_body(body, "if ( oversizeDelivered )", "runtime oversized datagram rejection")
     require(
-        oversize_receive,
+        marker_verdict,
         'Common_NetIPv4SelfTestFailure( passed, "oversized UDP datagram was not rejected" );',
         "runtime oversized datagram rejection",
     )
-
-    # The first match is the exact-capacity branch. Find and scope the later
-    # marker branch from its unique size check instead.
-    marker_start = body.index("receivedSize != sizeof( markerPacket )")
-    marker_condition = body.rfind("if (", 0, marker_start)
-    marker_receive = function_body(body[marker_condition:], "if (", "runtime post-oversize marker receive")
-    for token in (
-        "receivedSize != sizeof( markerPacket )",
-        "memcmp( exactReceived, markerPacket, sizeof( markerPacket ) ) != 0",
+    marker_missing = function_body(body, "} else if ( !markerReceived )", "runtime post-oversize marker receive")
+    require(
+        marker_missing,
         'Common_NetIPv4SelfTestFailure( passed, "packet after oversized UDP datagram was not preserved" );',
-    ):
-        require(marker_receive, token, "runtime post-oversize marker receive")
+        "runtime post-oversize marker receive",
+    )
 
     oversize_send = body.index("sender.SendPacket( destination, oversizePacket")
     marker_send = body.index("sender.SendPacket( destination, markerPacket")
-    oversize_read = body.index("if ( receiver.GetPacketBlocking( source, exactReceived", marker_send)
-    marker_read = marker_condition
-    if not oversize_send < marker_send < oversize_read < marker_read:
+    marker_read = body.index("for ( int markerRead = 0;", marker_send)
+    verdict = body.index("if ( oversizeDelivered )", marker_read)
+    if not oversize_send < marker_send < marker_read < verdict:
         raise AssertionError("Runtime IPv4 self-test must reject oversize data before accepting its marker")
 
     lifecycle = function_body(

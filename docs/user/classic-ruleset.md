@@ -1,10 +1,10 @@
 # Classic Multiplayer Ruleset
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 > Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
 
-**Not in 0.14.1.** The Classic ruleset turns Quake 4 multiplayer into something
+**New in 0.15.0.** The Classic ruleset turns Quake 4 multiplayer into something
 that plays like Quake 2 deathmatch and Threewave CTF, on the stock Quake 4 maps
 and weapons. It is strongly inspired by Quake 2 rather than a copy of it: the
 numbers lean on Quake 2's, and Quake 4's models, effects and maps stay as they
@@ -157,7 +157,7 @@ shows in your team's colour.
 
 Bind it under **Settings → Controls → Attack/Look → Grappling Hook**, or from
 the console, for example `bind MOUSE4 _hook`. Its default key is `Mouse4`, as in
-Quake Live (**Not in 0.14.1**; an existing configuration keeps its own keys).
+Quake Live (**New in 0.15.0**; an existing configuration keeps its own keys).
 
 ## Limits
 

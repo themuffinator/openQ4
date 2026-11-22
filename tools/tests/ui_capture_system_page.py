@@ -280,7 +280,7 @@ class SystemPageOracleTests(unittest.TestCase):
             self.assertNotIn(';',' '.join(row))
             if row[0]=='wait': self.assertTrue(1<=int(row[1])<=60)
             if row[0]=='openq4_retainedGui': self.assertIn(row[1],('focus','menu','widget','report','event'))
-            if row[:2]==['openq4_retainedGui','event']: self.assertIn(row[2],('tab_graphics','tab_screen','tab_image'))
+            if row[:2]==['openq4_retainedGui','event']: self.assertIn(row[2],('tab_graphics','tab_screen','tab_image','tab_effects'))
             if row[0]=='screenshot': self.assertRegex(row[1],r'^screenshots/system-[a-z]+\.tga$')
 
     def test_probes_switch_tabs_first_and_closes_deactivate(self):
@@ -479,6 +479,7 @@ class SystemPageOracleTests(unittest.TestCase):
                                   capture.MULTIPLE_INSTANCES:'1'}.items():
                     self.assertEqual(values[key.lower()],value)
                 for _,_,key,_,seed in capture.EXTRA_ROWS: self.assertEqual(values[key.lower()],str(seed))
+                for key,seed in capture.EXTRA_LAUNCH.items(): self.assertEqual(values[key.lower()],seed)
                 self.assertEqual(command[-2:],gameplay); self.assertEqual(kwargs['cwd'],runtime)
                 self.assertEqual(kwargs['env']['TEMP'],str(root/'.tmp'))
                 self.assertFalse((output/'save/baseoq4'/capture.PAGE).exists())

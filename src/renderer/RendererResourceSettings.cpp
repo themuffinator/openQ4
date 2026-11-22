@@ -37,6 +37,9 @@ constexpr const char* DependencyNames[] = {
     "com_productionMode", "com_makingBuild", "com_SingleDeclFile"
 };
 constexpr size_t NumDependencies = sizeof(DependencyNames) / sizeof(DependencyNames[0]);
+// The recovery record keeps one value for each dependency above
+static_assert(NumDependencies == std::tuple_size<decltype(openq4::imageRecovery::Data::dependencies)>::value,
+    "image recovery dependencies must match DependencyNames");
 
 
 struct ImageProof {

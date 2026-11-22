@@ -1,6 +1,6 @@
 # Client settings guide
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 This page shows where openQ4's most useful options live, so you can set the game up without reading every guide. Open **Settings** from the main menu or the pause menu.
 

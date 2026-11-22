@@ -44,7 +44,8 @@ SOURCES = {
         'void riProjectileSpaceRocket::SetTargetPosition(', 'void riProjectileSpaceRocket::Think('],
     'src/game/awakening/vehicle/CockpitWeapons.cpp': [
         'idActor *riVehicleCockpitWeapon::FindEnemyNearCrosshair(',
-        'void riVCWMissileTurret::SetLockState(', 'void riVCWMissileTurret::UpdateTargeting(',
+        'void riVCWMissileTurret::SetLockState(', 'void riVCWMissileTurret::UpdateLockTone(',
+        'void riVCWMissileTurret::UpdateTargeting(',
         'void riVCWMissileTurret::SetRocketsLoaded(', 'void riVCWMissileTurret::UpdateMagazine(',
         'bool riVCWMissileTurret::Fire('],
     'src/game/weapon/WeaponNapalmGun.cpp': ['stateResult_t WeaponNapalmGun::State_Idle('],
@@ -84,7 +85,7 @@ def main() -> None:
     fixture = ROOT/'tools/tests/native/AwakeningStatusBehavior.cpp'
     constants = ['static const float PAINLORD_ENRAGED_ANIM_RATE = 1.75f;']
     for source in sources.values():
-        constants += re.findall(r'static const [^;\n]*\b(?:AI_FR(?:EEZ|OZ)\w*|SPACEROCKET_\w*|COCKPIT_TARGET_CONE|RETCH_\w+)\s*=[^;]*;', source)
+        constants += re.findall(r'static const [^;\n]*\b(?:AI_FR(?:EEZ|OZ)\w*|SPACEROCKET_\w*|COCKPIT_TARGET_CONE|LOCK_TONE_CHANNEL|RETCH_\w+)\s*=[^;]*;', source)
     constants = [line for line in constants if 'RETCH_BEAM_RANGE' not in line and 'RETCH_FALLBACK_AAS' not in line]
     code = fixture.read_text().replace('// @PRODUCTION_CONSTANTS@', '\n'.join(constants))
     code = code.replace('// @PRODUCTION_METHODS@', '\n\n'.join(methods))

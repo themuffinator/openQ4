@@ -4773,13 +4773,25 @@ static void Com_NetIPv4SelfTest_f( const idCmdArgs &args ) {
 			static const byte markerPacket[] = { 0x49, 0x50, 0x76, 0x34 };
 			sender.SendPacket( destination, oversizePacket, sizeof( oversizePacket ) );
 			sender.SendPacket( destination, markerPacket, sizeof( markerPacket ) );
-			receivedSize = -1;
-			if ( receiver.GetPacketBlocking( source, exactReceived, receivedSize, sizeof( exactReceived ), 1000 ) || receivedSize != 0 ) {
-				Common_NetIPv4SelfTestFailure( passed, "oversized UDP datagram was not rejected" );
+			// The read that meets an oversized datagram discards it and goes on to the
+			// next one, so it cannot end a server's packet drain. Neither its bytes nor a
+			// truncated copy may reach the caller, and the marker behind it must arrive:
+			// in the same read, or in a second one if it was not yet queued.
+			bool oversizeDelivered = false;
+			bool markerReceived = false;
+			for ( int markerRead = 0; markerRead < 2 && !markerReceived && !oversizeDelivered; ++markerRead ) {
+				receivedSize = -1;
+				if ( !receiver.GetPacketBlocking( source, exactReceived, receivedSize, sizeof( exactReceived ), 1000 ) ) {
+					oversizeDelivered = receivedSize != 0;
+				} else if ( receivedSize != sizeof( markerPacket ) || memcmp( exactReceived, markerPacket, sizeof( markerPacket ) ) != 0 ) {
+					oversizeDelivered = true;
+				} else {
+					markerReceived = true;
+				}
 			}
-			receivedSize = 0;
-			if ( !receiver.GetPacketBlocking( source, exactReceived, receivedSize, sizeof( exactReceived ), 1000 ) ||
-					receivedSize != sizeof( markerPacket ) || memcmp( exactReceived, markerPacket, sizeof( markerPacket ) ) != 0 ) {
+			if ( oversizeDelivered ) {
+				Common_NetIPv4SelfTestFailure( passed, "oversized UDP datagram was not rejected" );
+			} else if ( !markerReceived ) {
 				Common_NetIPv4SelfTestFailure( passed, "packet after oversized UDP datagram was not preserved" );
 			}
 		}

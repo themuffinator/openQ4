@@ -33,7 +33,7 @@ FIELDS = ('open', 'dirty', 'busy', 'canApply', 'phase', 'discardVisible',
           'draftPostAA', 'baselinePostAA')
 CONTROLS = ('settings_brightness', 'settings_shadows', 'settings_postaa')
 EXTRA_ROWS = (('settings_bloom','Bloom','r_bloom',1,0),
-              ('settings_ssao','SSAO','r_ssao',1,0),
+              ('settings_ssao','SSAO','r_ssao',3,0),
               ('settings_tonemap','Tonemap','r_hdrToneMap',1,0),
               ('settings_crt','CRT','r_crt',1,0),
               ('settings_irradiance','Irradiance','r_useLightGrid',1,0),
@@ -41,6 +41,20 @@ EXTRA_ROWS = (('settings_bloom','Bloom','r_bloom',1,0),
               ('settings_ui_aspect','UIAspect','ui_aspectCorrection',1,1))
 EXTRA_SEED = tuple(row[4] for row in EXTRA_ROWS)
 EXTRA_CHANGED = (1,1,1,1,1,85,0)
+# The option each choice row picks for the draft and then for the restore.
+# Ambient Occlusion (34acd0f1c) is a choice over r_ssao and r_ssaoMethod: Off
+# is r_ssao 0, SSAO r_ssao 1 with method 0. The launch seeds the method at 0, so
+# its widget reads the same 0/1 as the r_ssao readback aliases.
+EXTRA_PICKS = {'settings_ssao':(1,0), 'settings_resolution_scale':(4,5)}
+EXTRA_LAUNCH = {'r_ssaoMethod':'0'}
+# A choice row whose value derives from more than one draft.
+EXTRA_VALUES = {'settings_ssao':{'op':'select','args':[{'state':'settings.draft.r_ssao'},
+    {'op':'+','args':[{'op':'min','args':[{'state':'settings.draft.r_ssaoMethod'},2]},1]},0]}}
+# A choice row that writes more than one draft: Off keeps the method.
+EXTRA_ACTIONS = {'settings_ssao':{'input':'number','operation':'settings.system.edit','arguments':{
+    'r_ssao':{'op':'>','args':[{'input':'value'},0]},
+    'r_ssaoMethod':{'op':'select','args':[{'op':'>','args':[{'input':'value'},0]},
+        {'op':'-','args':[{'input':'value'},1]},{'state':'settings.draft.r_ssaoMethod'}]}}}}
 FIELDS += tuple(prefix+row[1] for row in EXTRA_ROWS for prefix in ('draft','baseline'))
 CONTROLS += tuple(row[0] for row in EXTRA_ROWS)
 ROLES = (2,1,3)+tuple(row[3] for row in EXTRA_ROWS)
@@ -48,8 +62,11 @@ TYPES = tuple(1 if role==1 else 0 for role in ROLES)
 VALUE_INDICES = tuple(range(6,len(FIELDS),2))
 SCREENSHOTS = ('draft', 'applied', 'discard', 'choice', 'reloaded', 'extrasapplied', 'extrasrestored', 'returned', 'reopened')
 # The tab (the page's tab_<name> event) holding each probed control. Only the
-# current tab's rows answer, and every opening starts on GRAPHICS.
-TABS = {**{control:'image' for control in CONTROLS}, 'settings_ui_aspect':'graphics'}
+# current tab's rows answer, and every opening starts on GRAPHICS. Shadows and
+# the lighting/post-processing rows moved to the EFFECTS tab (e02039dd8).
+TABS = {**{control:'image' for control in CONTROLS}, 'settings_ui_aspect':'graphics',
+        **{control:'effects' for control in ('settings_shadows','settings_bloom','settings_ssao',
+                                             'settings_tonemap','settings_crt','settings_irradiance')}}
 FIRST_TAB = 'graphics'
 TAB_WRITES = 2  # A switch writes page.leaving and page.tab.
 CLOSED = ('ondeactivate', 0, 0)  # Every close runs the page's onDeactivate.
@@ -235,21 +252,21 @@ def stages() -> list[dict]:
         page=False, actions=[('cancel', 0)], events=[('onback', 0, 1), ('discard', 2, 1)])
     add('reopen_clean', ['openq4_system open'], actions=[('begin', 0)],
         events=[('onactivate', 1, 1)], opening=True)
-    def extras(down):
+    def extras(restore):
         commands = []
         for control,_,_,role,_ in EXTRA_ROWS:
             commands += tabs.on(control)
-            commands += activate(control) if role==1 else open_choice(control)+key('home')+key('down')*down+key('accept')
+            commands += activate(control) if role==1 else                 open_choice(control)+key('home')+key('down')*EXTRA_PICKS[control][restore]+key('accept')
         # Settle on the Resolution Scale list's tab, so the readback measures
         # the list it inspects.
         return commands + tabs.on('settings_resolution_scale')
     # The list shows eight of its nine rows within the pages, so neither 85 %
     # nor 100 % scrolls it: its kept offset stays at the top, measured.
-    add('extras_dirty', extras(4), extras=EXTRA_CHANGED, dirty=1, actions=[('edit',1)]*7, resolution_measured=1)
+    add('extras_dirty', extras(0), extras=EXTRA_CHANGED, dirty=1, actions=[('edit',1)]*7, resolution_measured=1)
     add('extras_applied', activate('settings_apply'), extras=EXTRA_CHANGED,
         extra_baseline=EXTRA_CHANGED, actions=[('apply',0)], events=[('apply',1,0)], screenshot='extrasapplied',
         resolution_measured=1)
-    add('extras_restore_draft', extras(5), extra_baseline=EXTRA_CHANGED, dirty=1,
+    add('extras_restore_draft', extras(1), extra_baseline=EXTRA_CHANGED, dirty=1,
         actions=[('edit',1)]*7, resolution_measured=1)
     add('extras_restored', activate('settings_apply'), actions=[('apply',0)], events=[('apply',1,0)], resolution_measured=1,
         screenshot='extrasrestored')
@@ -310,13 +327,16 @@ def source_contract(runtime: Path) -> dict:
             raise ValueError(f'Production service readback alias changed: {field}')
     for control,alias,key,role,_ in EXTRA_ROWS:
         spec=nodes[control].get('control',{})
-        if spec.get('role')!=('toggle' if role==1 else 'choice') or spec.get('value')!={'state':'settings.draft.'+key}:
+        if (spec.get('role')!=('toggle' if role==1 else 'choice') or
+                spec.get('value')!=EXTRA_VALUES.get(control,{'state':'settings.draft.'+key})):
             raise ValueError(f'Production immediate control readback changed: {control}')
         action=model.get('actions',{}).get(spec.get('action'))
-        wanted={'input':'boolean' if role==1 else 'number','operation':'settings.system.edit','arguments':{key:{'input':'value'}}}
+        wanted=EXTRA_ACTIONS.get(control,{'input':'boolean' if role==1 else 'number','operation':'settings.system.edit','arguments':{key:{'input':'value'}}})
         if action!=wanted: raise ValueError(f'Production immediate control proposal changed: {control}')
-        if role==3 and [option.get('value') for option in spec.get('options',[])]!=[10,25,50,75,85,100,125,150,200]:
+        if control=='settings_resolution_scale' and [option.get('value') for option in spec.get('options',[])]!=[10,25,50,75,85,100,125,150,200]:
             raise ValueError('Production resolution scale option contract changed')
+        if control=='settings_ssao' and [option.get('value') for option in spec.get('options',[])]!=[0,1,2,3]:
+            raise ValueError('Production ambient occlusion option contract changed')
         for prefix in ('draft','baseline'):
             field=prefix+alias; target=model['aliases'][field].get('variable')
             if model.get('presentationVariables',{}).get(target,{}).get('value')!={'state':'settings.'+prefix+'.'+key}:
@@ -687,7 +707,7 @@ def capture(args) -> int:
         'r_windowWidth':'1280', 'r_windowHeight':'720', 'r_mode':'-1', 'r_customWidth':'1280', 'r_customHeight':'720',
         'r_renderApi':args.renderer, 'r_rendererSharedGui':'1', 'r_rendererSharedInWorldGui':'0', 'r_multiSamples':'0', 'r_swapInterval':'1',
         'r_gamma':'1', 'r_brightness':'1', 'r_shadows':'1', 'r_postAA':'0',
-        **{row[2]:str(row[4]) for row in EXTRA_ROWS},
+        **{row[2]:str(row[4]) for row in EXTRA_ROWS}, **EXTRA_LAUNCH,
         'in_mouse':'0', 'in_joystick':'0', 'in_joystickRumble':'0', 'g_autoScreenshot':'0', 'g_autoSkipCinematics':'1',
         'g_autoExecAfterMapLoad':'system-page.cfg', 'g_autoExecAfterMapLoadDelayMs':'3000',
         'com_skipLoadingContinue':'1', 'com_loadingContinueAutoAdvance':'1', 'com_maxfps':'60',

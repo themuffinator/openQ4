@@ -254,10 +254,12 @@ idAFConstraint::Restore
 ================
 */
 void idAFConstraint::Restore( idRestoreGame *saveFile ) {
-	constraintType_t t;
-	saveFile->ReadInt( (int &)t );
-	if ( t != type ) {
-		saveFile->Error( "idAFConstraint::Restore: constraint '%s' type mismatch %d (expected %d)", name.c_str(), t, type );
+	// openQ4: read into an int; a damaged save can hold any value, and an
+	// out-of-range value in a constraintType_t is undefined behaviour.
+	int t = 0;
+	saveFile->ReadInt( t );
+	if ( t != static_cast<int>( type ) ) {
+		saveFile->Error( "idAFConstraint::Restore: constraint '%s' type mismatch %d (expected %d)", name.c_str(), t, static_cast<int>( type ) );
 	}
 
 	idStr savedName;

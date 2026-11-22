@@ -24,7 +24,8 @@ struct idStr {static int Icmp(const char* a,const char* b){return std::strcmp(a,
 #define SEC2MS(x) int((x)*1000)
 #define DEG2RAD(x) ((x)*0.0174532925199433f)
 enum { ANIMCHANNEL_ALL, ANIMCHANNEL_TORSO, ANIMCHANNEL_LEGS, ANIM_NumAnimChannels, ANIM_MaxAnimsPerChannel=3 };
-enum { INVALID_JOINT=-1, MOVE_STATUS_DONE=1, MASK_SHOT_RENDERMODEL=2, SND_CHANNEL_ANY=3, SND_CHANNEL_VOICE=4, SND_CHANNEL_VOICE2=5, SND_CHANNEL_DAMAGE=6, PMOD_PROJECTILE_DEATHPUSH=7 };
+enum { INVALID_JOINT=-1, MOVE_STATUS_DONE=1, MASK_SHOT_RENDERMODEL=2, SND_CHANNEL_ANY=3, SND_CHANNEL_VOICE=4, SND_CHANNEL_VOICE2=5, SND_CHANNEL_DAMAGE=6, PMOD_PROJECTILE_DEATHPUSH=7, SND_CHANNEL_ITEM=8 };
+typedef int s_channelType;
 static int EV_DamageOverTime, EV_DamageOverTimeEffect;
 struct idMath {
     static int ClampInt(int lo,int hi,int n){return std::clamp(n,lo,hi);}
@@ -246,14 +247,19 @@ enum { CROSSHAIR_FRIENDLY,CROSSHAIR_OUT_OF_RANGE,CROSSHAIR_DEFAULT,CROSSHAIR_LOC
 struct Guide {idEntity* target=nullptr;void Update(const idDict&,idEntity* p,idPlayer*){target=p;}void Stop(){target=nullptr;}};
 struct riVCWMissileTurret : riVehicleCockpitWeapon {
     enum lockState_t {LOCK_NONE,LOCK_ACQUIRING,LOCK_LOCKED};
-    lockState_t lockState=LOCK_NONE;idEntityPtr<idActor> lockTarget;
+    lockState_t lockState=LOCK_NONE,lockTone=LOCK_NONE;idEntityPtr<idActor> lockTarget;
     int lockStartTime=0,timeToHardLock=250,crosshair=CROSSHAIR_DEFAULT;float lockRange=14000;
     Guide closestGuide,lockedGuide,acquiringGuide,outOfRangeGuide;idDict spawnArgs;idVec3 aimPoint;
     static const int MAGAZINE_SIZE=5;
     int rocketsLoaded=0,nextLoadTime=0,loadDelay=500;
     const idVec3* launchAxis=nullptr;
     std::vector<std::string> events,sounds;
-    void SetLockState(lockState_t);void UpdateTargeting();
+    void SetLockState(lockState_t);void UpdateLockTone();void UpdateTargeting();
+    // looping cues by channel: what the vehicle is playing, and every start/stop/restart
+    std::map<int,std::string> loops;std::vector<std::string> loopCalls;
+    void StartLoop(s_channelType c,const char* s){loops[c]=s;loopCalls.push_back(std::string("start ")+s);}
+    void StopLoop(s_channelType c){loops.erase(c);loopCalls.push_back("stop");}
+    void KeepLoop(s_channelType c,const char* s){CHECK(loops.count(c)&&loops[c]==s);loopCalls.push_back(std::string("keep ")+s);}
     void SetRocketsLoaded(int);void UpdateMagazine();bool Fire();
     idPlayer* GetPlayerDriver(){return position->driver;}
     idEntity* GetAimedEntity(float,idVec3&){return nullptr;}bool IsFriendly(idEntity*){return false;}
@@ -408,9 +414,18 @@ int main(){
         far.teamNode.next=&near;aiManager.enemies=&far;bool out=true;
         CHECK(gun.FindEnemyNearCrosshair(30,14000,out)==&near&&!out);
         gun.UpdateTargeting();CHECK(gun.lockState==gun.LOCK_ACQUIRING&&gun.lockTarget.GetEntity()==&near);
+        // One looping tone follows the lock (#230): seek while acquiring,
+        // lock once locked, silence with the lock; never a stacked restart.
+        CHECK(gun.loops.size()==1&&gun.loops[SND_CHANNEL_ITEM]=="snd_acquiringTarget");
+        CHECK(gun.loopCalls.size()==2&&gun.loopCalls[0]=="start snd_acquiringTarget"&&gun.loopCalls[1]=="keep snd_acquiringTarget");
         gameLocal.time+=249;gun.UpdateTargeting();CHECK(gun.lockState==gun.LOCK_ACQUIRING);
+        CHECK(gun.loopCalls.size()==3&&gun.loopCalls.back()=="keep snd_acquiringTarget");
         ++gameLocal.time;gun.UpdateTargeting();CHECK(gun.lockState==gun.LOCK_LOCKED&&gun.lockedGuide.target==&near);
+        CHECK(gun.loops.size()==1&&gun.loops[SND_CHANNEL_ITEM]=="snd_targetLock");
+        CHECK(gun.loopCalls.size()==5&&gun.loopCalls[3]=="start snd_targetLock"&&gun.loopCalls[4]=="keep snd_targetLock");
         gameLocal.blockedPoints.push_back(near.physics.bounds.center);gun.UpdateTargeting();CHECK(gun.lockState==gun.LOCK_NONE&&gun.lockTarget.GetEntity()==nullptr);
+        CHECK(gun.loops.empty()&&gun.loopCalls.size()==6&&gun.loopCalls.back()=="stop");
+        gun.UpdateTargeting();CHECK(gun.loopCalls.size()==6);
         CHECK(gun.outOfRangeGuide.target==&far);gameLocal.blockedPoints.push_back(far.physics.bounds.center);
         CHECK(gun.FindEnemyNearCrosshair(30,14000,out)==nullptr&&!out);
         gameLocal.blockedPoints.clear();near.health=0;CHECK(gun.FindEnemyNearCrosshair(30,14000,out)==&far&&out);

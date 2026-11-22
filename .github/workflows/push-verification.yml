@@ -506,6 +506,7 @@ jobs:
             tools/tests/renderer_shared_domain_targets.py \
             tools/tests/rigid_body_recovery_diagnostics.py \
             tools/tests/ai_medic_approach_watchdog.py \
+            tools/tests/ai_medic_combat_stance_restore.py \
             tools/tests/savegame_corruption_contract.py \
             tools/tests/savegame_gui_layout_contract.py \
             tools/tests/weapon_gui_event_queue_contract.py \
@@ -1079,6 +1080,7 @@ jobs:
           python tools/tests/renderer_shared_domain_targets.py
           python tools/tests/rigid_body_recovery_diagnostics.py
           python tools/tests/ai_medic_approach_watchdog.py
+          python tools/tests/ai_medic_combat_stance_restore.py
           python tools/tests/savegame_corruption_contract.py
           python tools/tests/savegame_gui_layout_contract.py
           python tools/tests/weapon_gui_event_queue_contract.py
@@ -1273,6 +1275,7 @@ jobs:
     timeout-minutes: 150
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+      OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER: ${{ matrix.test_timeout_multiplier }}
     strategy:
       fail-fast: false
       matrix:
@@ -1314,6 +1317,11 @@ jobs:
             python_tests: false
             macos_graphics_bridge: opengl
             macos_openal_provider: system
+            # The Intel image runs the UI matrices 2-4x slower than the
+            # arm64 macOS runners, and which ones overran their bound
+            # changed from run to run (menus, pointer reach, mp pages,
+            # settings journals), so every bound is scaled here.
+            test_timeout_multiplier: "3"
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -1524,6 +1532,17 @@ jobs:
     timeout-minutes: 150
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+      # The VS 2026 image pairs the MSVC 14.52 STL, which refuses Clang older
+      # than 22 (STL1000), with LLVM 20. The Python checks compile their
+      # fixtures with clang++ against that STL, so every one of them failed to
+      # build. The driver override adds the STL's own escape hatch to every
+      # clang invocation; the leading '#' keeps clang from echoing the edit.
+      # Remove it once the image ships Clang 22 or newer.
+      CCC_OVERRIDE_OPTIONS: "# +-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+      # The x64 debug build runs the UI tests about twice as slowly as the
+      # other lanes (scrollbar runtime 15 s against 6-12 s), and a loaded
+      # runner pushed it past its 30 s bound; every bound is doubled here.
+      OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER: "2"
     steps:
       - name: Checkout
         uses: actions/checkout@v7

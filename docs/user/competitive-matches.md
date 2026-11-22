@@ -1,6 +1,6 @@
 # Competitive matches
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 > Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
 
@@ -339,7 +339,7 @@ The **Rules** section separates **Minimum Active Players** (bots included) from
   team changes are blocked. Change rules, rosters and players through Match
   Control.
 - The `preset`, `modifier` and `weaponArena` commands are refused
-  (**Not in 0.14.1**). A managed match plays under whatever
+  (**New in 0.15.0**). A managed match plays under whatever
   [modifiers](server-setup.md#modifiers-and-presets) the server had when it
   took over; its rules record does not list them yet, so set them before
   the match is staged and say so to both sides.

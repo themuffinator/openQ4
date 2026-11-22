@@ -1,6 +1,6 @@
 # Display settings
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 This guide covers how openQ4 looks and how smoothly it runs: performance presets, fullscreen and windowed play, multiple monitors, resolution scale, anti-aliasing, V-Sync and frame rate, and choosing a renderer and graphics card. Almost everything here is on **Settings → Display** (the classic menus call this page **System**). Console settings come after the menu route in each section, and the [console reference](#console-reference) at the end lists the rest.
 
@@ -40,10 +40,10 @@ A preset sets resolution scale, anti-aliasing, shadows, effects, texture sizes, 
 What the effects are:
 
 - **Shadow maps** give soft, detailed shadows; see [Shadow mapping](shadow-mapping.md). Low, Performance and Balanced keep the original game's sharp-edged shadows. Minimum and Low Power draw no shadows at all; on integrated graphics that saves about as much as lowering the render scale from 75% to 50%.
-- **Light grids** add openQ4's bounced light to maps that ship one. **Not in 0.14.1:** Minimum and Low Power turn them off and use the original game's lighting, and their 30 FPS cap stretches the reduced scene instead of rebuilding it with [temporal upscaling](temporal-presentation.md#automatic-upscaling-default).
+- **Light grids** add openQ4's bounced light to maps that ship one. **New in 0.15.0:** Minimum and Low Power turn them off and use the original game's lighting, and their 30 FPS cap stretches the reduced scene instead of rebuilding it with [temporal upscaling](temporal-presentation.md#automatic-upscaling-default).
 - **Bloom** adds a glow around bright lights. **SSAO** (ambient occlusion) adds soft shading in corners and creases. **Tone mapping** balances very bright and dark areas. Presets below Enhanced leave these off.
 - Ultra and Maximum draw SSAO at full resolution. Enhanced and Quality draw it at half resolution, which is cheaper and looks the same in play. On OpenGL, half resolution is not in 0.14.1: there, 0.14.1 draws it at full resolution on every preset.
-- **Not in 0.14.1:** SSAO's shading is smooth instead of grainy on every preset. **Settings → Display → Effects → Ambient Occlusion** picks **Off**, **SSAO**, **HBAO** or **GTAO** (the console's `r_ssao` and `r_ssaoMethod`). HBAO (`r_ssaoMethod 1`) is horizon-based ambient occlusion, the familiar look of many games, about as accurate as SSAO with a different character. GTAO (`r_ssaoMethod 2`) is ground-truth ambient occlusion, the most physically accurate: corners shade more like real light does, edges around objects stay clean, and PBR surfaces get coloured bounce light and reflections that dim in creases. Both cost about the same as SSAO, or less on the higher presets. The presets turn ambient occlusion on or off and keep the kind you picked.
+- **New in 0.15.0:** SSAO's shading is smooth instead of grainy on every preset. **Settings → Display → Effects → Ambient Occlusion** picks **Off**, **SSAO**, **HBAO** or **GTAO** (the console's `r_ssao` and `r_ssaoMethod`). HBAO (`r_ssaoMethod 1`) is horizon-based ambient occlusion, the familiar look of many games, about as accurate as SSAO with a different character. GTAO (`r_ssaoMethod 2`) is ground-truth ambient occlusion, the most physically accurate: corners shade more like real light does, edges around objects stay clean, and PBR surfaces get coloured bounce light and reflections that dim in creases. Both cost about the same as SSAO, or less on the higher presets. The presets turn ambient occlusion on or off and keep the kind you picked.
 - The flashlight casts shadows on every preset that draws shadows. Lights carried by projectiles cast them only from Quality up, as on the original game's top setting.
 
 Brightness, exposure, CRT emulation and the experimental rendering modes are separate controls that presets leave alone. Choosing a lower preset restores all of its values, including those for effects you have switched off.
@@ -94,7 +94,7 @@ Typical results:
 - **Low:** a PC at the minimum requirements, with 4 GB of RAM or less, or a graphics card with 1 GB of memory or less.
 - **Low Power:** a Raspberry Pi, or when you set the environment variable `OPENQ4_LOWPOWER=1` or `OPENQ4_RASPBERRYPI=1`.
 - **Performance:** a Steam Deck, or a graphics driver that doesn't report its memory. Fewer than four CPU threads also limit any recommendation to Performance.
-- **ARM boards (Not in 0.14.1):** at most Performance on any ARM64 Linux board without a separate graphics card, such as Rockchip, Orange Pi, Radxa or NVIDIA Jetson boards, because openQ4 cannot tell how fast their graphics are. A Raspberry Pi still gets Low Power. Apple Silicon, including Asahi Linux, and Windows on ARM are not limited this way.
+- **ARM boards (New in 0.15.0):** at most Performance on any ARM64 Linux board without a separate graphics card, such as Rockchip, Orange Pi, Radxa or NVIDIA Jetson boards, because openQ4 cannot tell how fast their graphics are. A Raspberry Pi still gets Low Power. Apple Silicon, including Asahi Linux, and Windows on ARM are not limited this way.
 - **Phones and tablets:** at most Performance. Phones with about 12 GB of RAM or more render a 1080p-class scene, smaller ones a 720p-class scene, and those with 4 GB or less get Low Power.
 - **Integrated graphics, including Apple Silicon:** up to Balanced at 1080p-class resolutions with enough memory. On Apple's older OpenGL 2.1 mode, Auto-Detect leaves SMAA off because it cannot run there.
 - **Graphics cards with their own memory:** by memory and resolution, when the system has 16 GB of RAM and the renderer can run the modern effects:
@@ -127,7 +127,7 @@ The classic menus' four quality choices use the same recipes: Low is Low, Medium
   - **Custom FS Width** and **Custom FS Height** set a custom size; editing them selects Custom.
   - **Refresh Rate** offers Auto plus the rates your display reports for that resolution. Auto keeps your desktop's refresh rate, or the nearest rate that resolution offers, and openQ4 picks the same rate every time. Leave it on Auto unless you need a specific rate. On macOS, Auto uses the desktop rate rather than the display's highest; this has not yet been confirmed on a Mac.
 - On Windows, fullscreen minimizes when you switch away, so Alt+Tab and the Snipping Tool can come to the front cleanly. `PrintScreen` opens the Windows snipping tool; press `F12` for an openQ4 screenshot, or set `win_printScreenToSystemTool 0` to bind `PrintScreen` in game.
-- **Not in 0.14.1:** choose **Settings → Game Options → General → Screenshot Format → PNG** (or set `r_screenshotFormat 1`) to save screenshots as PNG instead of TGA. It applies from the next screenshot and is remembered. PNG files open in any image viewer or browser and usually take under a third of the space. `image_pngCompressionLevel` (0 to 9, default 4) trades file size for the time a capture takes: the default takes about a twentieth of a second for a 1280x720 frame, while 9 saves another tenth of the space but can take seconds. `screenshot <name>.png` always writes a PNG, whatever the setting. Screenshots go to `screenshots/` in your openQ4 save folder.
+- **New in 0.15.0:** choose **Settings → Game Options → General → Screenshot Format → PNG** (or set `r_screenshotFormat 1`) to save screenshots as PNG instead of TGA. It applies from the next screenshot and is remembered. PNG files open in any image viewer or browser and usually take under a third of the space. `image_pngCompressionLevel` (0 to 9, default 4) trades file size for the time a capture takes: the default takes about a twentieth of a second for a 1280x720 frame, while 9 saves another tenth of the space but can take seconds. `screenshot <name>.png` always writes a PNG, whatever the setting. Screenshots go to `screenshots/` in your openQ4 save folder.
 
 ### Windowed and borderless
 
@@ -489,7 +489,7 @@ Settings ("console variables") can be typed in the console or added to your conf
 | Setting | Default | What it does |
 |---|---:|---|
 | `r_multiSamples` | `0` | MSAA samples: `0` off, `2`, `4`, `8` or `16`. Other values round up to the next step, and `1` means off. |
-| `r_multiSamplesEffective` | (read-only) | **Not in 0.14.1:** the MSAA count the 3D scene last drew with. |
+| `r_multiSamplesEffective` | (read-only) | **New in 0.15.0:** the MSAA count the 3D scene last drew with. |
 | `r_postAA` | `0` | Post AA mode; see the values below. |
 | `r_msaaAlphaToCoverage` | `1` | Smoother fences and foliage when MSAA is on. |
 | `r_msaaResolveDepth` | `0` | Also resolves depth with MSAA. Leave off unless asked to test it. |
@@ -498,8 +498,8 @@ Settings ("console variables") can be typed in the console or added to your conf
 | `r_resolutionScaleMode` | `1` | How a scene below 100% is stretched; see [Resolution scale](#resolution-scale). |
 | `r_resolutionScaleSharpness` | `0.4` | Sharpening for scale mode `2` (`0` to `1.5`). |
 | `r_ssaoResolution` | `0` | SSAO resolution: `0` automatic (full at the highest SSAO sample count, as on Ultra and Maximum, half below), `1` full, `2` half. On OpenGL, not in 0.14.1. |
-| `r_ssaoMethod` | `0` | **Not in 0.14.1:** how ambient occlusion is computed when SSAO is on: `0` SSAO, `1` HBAO (horizon-based ambient occlusion), `2` GTAO (ground-truth ambient occlusion: physically based, slightly softer, and PBR surfaces get coloured bounce light and shinier reflections in creases), `3` a very slow reference image for comparisons. `r_ssaoIntensity` and `r_ssaoPower` set the strength of SSAO and HBAO; GTAO is physically based and ignores them. |
-| `r_ssaoMultiBounceAlbedo` | `0.3` | **Not in 0.14.1:** with GTAO, how much light the surfaces of the original game bounce back into creases (`0` off, up to `1`). |
+| `r_ssaoMethod` | `0` | **New in 0.15.0:** how ambient occlusion is computed when SSAO is on: `0` SSAO, `1` HBAO (horizon-based ambient occlusion), `2` GTAO (ground-truth ambient occlusion: physically based, slightly softer, and PBR surfaces get coloured bounce light and shinier reflections in creases), `3` a very slow reference image for comparisons. `r_ssaoIntensity` and `r_ssaoPower` set the strength of SSAO and HBAO; GTAO is physically based and ignores them. |
+| `r_ssaoMultiBounceAlbedo` | `0.3` | **New in 0.15.0:** with GTAO, how much light the surfaces of the original game bounce back into creases (`0` off, up to `1`). |
 
 `r_postAA` values:
 

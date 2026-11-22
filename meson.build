@@ -1,7 +1,7 @@
 project(
   'openQ4',
   ['c', 'cpp'],
-  version: '0.14.1',
+  version: '0.15.0',
   meson_version: '>=1.6.0',
   default_options: ['c_std=c11', 'cpp_std=c++20', 'b_vscrt=static_from_buildtype'],
 )
@@ -377,12 +377,17 @@ if get_option('build_native_tests')
   test('openq4-bc6h-codec', openq4_bc6h_codec_test, timeout: 120)
 
   # Render demo block container: the codec, the stream of blocks cut at any
-  # byte or damaged anywhere, and the timeline its headers alone give
+  # byte or damaged anywhere, and the timeline its headers alone give.
+  # Most of its time is the 2264 truncations, each replaying the recording
+  # from its start. In a debug build that costs 40-90 s with libstdc++ (the
+  # Linux runners, ASan+UBSan included) but about 420 s with libc++ on the
+  # same host, whose unoptimised vector code runs per element: the macOS
+  # runners overran 300 s. The bound is a hang guard for every host.
   openq4_demo_block_codec_test = executable(
     'openq4-demo-block-codec-test', files('tools/tests/native/DemoBlockCodecTest.cpp'),
     include_directories: root_include_dir, install: false,
   )
-  test('openq4-demo-block-codec', openq4_demo_block_codec_test, timeout: 300)
+  test('openq4-demo-block-codec', openq4_demo_block_codec_test, timeout: 1200)
 
   openq4_save_dict_under_test = custom_target(
     'openq4-save-dict-under-test', input: files('src/game/gamesys/SaveGame.cpp', 'src/mpgame/gamesys/SaveGame.cpp'),
@@ -1538,9 +1543,10 @@ if build_engine or get_option('build_native_tests')
     test('openq4-ui-input-disposition', py,
       args: [meson.project_source_root() / 'tools/tests/sdl3_input_disposition.py',
         '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 120)
+    # 47 s on Linux ARM64, 98-180+ s on the loaded macOS Intel runner.
     test('openq4-ui-settings-effect-journal', py,
       args: [meson.project_source_root() / 'tools/tests/ui_settings_effect_journal.py',
-        '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 180)
+        '--compiler', ui_test_cpp.cmd_array()[-1], '--no-mutations'], timeout: 480)
     openq4_ui_performance_presets_test = executable(
       'openq4-ui-performance-presets-test',
       files('tools/tests/native/UiPerformancePresetTest.cpp', 'src/framework/PerformancePreset.cpp'),
@@ -1686,7 +1692,9 @@ if build_engine or get_option('build_native_tests')
     # The two full page matrices cost 43-57 s on the fastest hosted runner and
     # 100-175 s on the slowest (macOS Intel, Windows) and under ASan+UBSan, at
     # an unchanged case count, so their bound is a hang guard for every host.
-    retained_screens_groups = {'menus': 120, 'pause': 120, 'strogg-pause': 120, 'loading-hud': 120, 'pages': 300, 'strogg-pages': 120, 'mp-pages': 300, 'mp-card': 120,
+    # 'menus' grew to 48-58 s on the fast runners with November's menu work and
+    # overran 120 s on macOS Intel, so it shares the page matrices' bound.
+    retained_screens_groups = {'menus': 300, 'pause': 120, 'strogg-pause': 120, 'loading-hud': 120, 'pages': 300, 'strogg-pages': 120, 'mp-pages': 300, 'mp-card': 120,
       'mp-vote-match': 120, 'mp-admin': 120, 'mp-settings-welcome': 120, 'pointer-reach': 120, 'optics': 240}
     foreach group, timeout : retained_screens_groups
       test('openq4-ui-retained-screens-' + group, openq4_ui_retained_screens_test,

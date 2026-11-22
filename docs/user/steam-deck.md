@@ -1,6 +1,6 @@
 # Steam Deck
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 openQ4 runs natively on the Steam Deck from the Linux x64 download. Its Steam Deck launcher sets up the Deck's controls, gyro aiming, a larger HUD and a frame-rate cap for the handheld screen.
 

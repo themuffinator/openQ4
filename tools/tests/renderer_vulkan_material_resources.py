@@ -45,12 +45,18 @@ struct { VkDevice device=VK_NULL_HANDLE; VkPhysicalDeviceProperties deviceProper
 struct { bool GetBool() const { return true; } } r_vkResourceProfile;
 struct { int value=0; int GetInteger() const { return value; } } r_vkMaterialDescriptorPoolTest;
 struct { uint64_t ringBytes=0, ringAllocations=0; } vkResourceProfile;
-struct idImage { unsigned handle=1; unsigned GetDeviceHandle() const { return handle; } } white, sampled{2};
+struct idImage {
+    unsigned handle=1; bool loaded=true; int loads=0;
+    unsigned GetDeviceHandle() const { return handle; }
+    bool IsLoaded() const { return loaded; }
+    void ActuallyLoadImage(bool fromBackEnd) { assert(fromBackEnd); ++loads; loaded=true; }
+} white, sampled{2};
 struct { idImage *whiteImage=&white; } imageManager;
 auto *globalImages=&imageManager;
 struct vkImageEntry_t {
     VkSampler sampler=1;VkImageView view=2;VkImageLayout layout=VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     bool isCube=false, materialSampleFlipY=false;VkSampleCountFlagBits samples=VK_SAMPLE_COUNT_1_BIT;
+    VkImageViewType viewType=VK_IMAGE_VIEW_TYPE_2D;
 } imageEntry;
 struct drawInteraction_t {};
 bool failPool=false, failSets=false, failReset=false, failPipeline=false, failShader=false;
@@ -103,7 +109,12 @@ void vkCmdBindDescriptorSets(VkCommandBuffer,VkPipelineBindPoint,VkPipelineLayou
     assert(count==2 && sets[0] && sets[1]);++binds;
 }
 VkDescriptorSet VK_Exec_ImageDescriptor(unsigned,bool) { return resident?1:VK_NULL_HANDLE; }
-const vkImageEntry_t *VK_Image_GetEntry(unsigned) { return resident?&imageEntry:nullptr; }
+// Unused slots bind the white image, an ordinary 2D view; the sampled image's
+// entry is the one each case shapes.
+const vkImageEntry_t whiteEntry;
+const vkImageEntry_t *VK_Image_GetEntry(unsigned handle) {
+    return !resident?nullptr:handle==white.handle?&whiteEntry:&imageEntry;
+}
 bool VK_Exec_MainRenderingScopeOpen() { return scopeOpen; }
 VkCommandBuffer VK_Exec_ActiveCmd() { return reinterpret_cast<VkCommandBuffer>(uintptr_t(1)); }
 '''
@@ -179,7 +190,7 @@ void Reset(int capacity=VK_UNIFORM_RING_BYTES) {
     program={};program.valid=true;program.name="native-pressure";program.identity=1;
     program.compiled.vertex={0x07230203};program.compiled.fragment={0x07230203};program.compiled.textureMask=1;
     program.compiled.vertexInputMask=3;
-    std::fill(std::begin(images),std::end(images),&sampled);block={};
+    std::fill(std::begin(images),std::end(images),&sampled);block={};sampled.loaded=true;sampled.loads=0;
 }
 void NextFrame(int slot) {
     vkExec.frameSlot=slot;vkExec.uniformRings[slot].cursor=0;vkExec.uniformRings[slot].overflowWarned=false;
@@ -256,6 +267,24 @@ int main() {
     Reset();scopeOpen=false;assert(!Bind() && creates==0 && ring.cursor==0);
     scopeOpen=true;imageEntry.materialSampleFlipY=true;assert(Bind());
     assert(block.textureOrientation[0]==0);Guards();
+
+    // sampler3D/sampler2DArray slots bypass the shared 2D/cube descriptor
+    // cache: they load on demand and must find a view of exactly their type,
+    // while 2D slots refuse a volume or array view.
+    Reset();program.compiled.volumeTextureMask=1;
+    assert(!Bind() && program.lastSkip=="shader texture type/sample mismatch" && allocations==0);
+    imageEntry.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY;assert(!Bind() && allocations==0);
+    imageEntry.viewType=VK_IMAGE_VIEW_TYPE_3D;sampled.loaded=false;
+    assert(Bind() && sampled.loads==1 && allocations==1);
+    assert(Bind() && sampled.loads==1);
+    imageEntry.view=VK_NULL_HANDLE;assert(!Bind() && program.lastSkip=="shader texture type/sample mismatch");
+    Reset();program.compiled.arrayTextureMask=1;imageEntry.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    resident=true;assert(Bind());
+    imageEntry.viewType=VK_IMAGE_VIEW_TYPE_3D;assert(!Bind() && program.lastSkip=="shader texture type/sample mismatch");
+    Reset();imageEntry.viewType=VK_IMAGE_VIEW_TYPE_3D;
+    assert(!Bind() && program.lastSkip=="shader texture type/sample mismatch" && sampled.loads==0);
+    imageEntry.viewType=VK_IMAGE_VIEW_TYPE_2D_ARRAY;assert(!Bind() && allocations==0);
+    imageEntry.viewType=VK_IMAGE_VIEW_TYPE_2D;assert(Bind());Guards();
 
     // Fill the actual shared cache with two vertex-stream variants for each
     // of 256 identities. Existing keys survive a full cache; releasing one

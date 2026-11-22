@@ -2,8 +2,8 @@
 # Counted CPU boundaries shared by the original restart and owned recovery tests.
 def extend_support(base):
  s=base.replace('#include "RendererConsumedPolicy.h"','#include "RendererConsumedPolicy.h"\n#include "RendererImageRecovery.h"\n#include "../idlib/CryptoHash.h"')
- s=s.replace('enum {TT_2D,TT_CUBIC};',r'''
-enum {TT_2D=1,TT_CUBIC=2};using textureUsage_t=int;
+ s=s.replace('enum {TT_2D,TT_CUBIC,TT_3D,TT_2D_ARRAY};',r'''
+enum {TT_2D=1,TT_CUBIC=2,TT_3D=3,TT_2D_ARRAY=4};using textureUsage_t=int;
 static bool sourceRefused=false;static int cpuReads=0,cpuTakes=0;
 imagePortableContent_t Content(){imagePortableContent_t c{};c.version=1;c.scope=IPC_DIRECT_SOURCE;c.file.kind=IFC_DIRECT_DDS;
  std::memcpy(c.file.qpath,"textures/owned.dds",19);c.file.bytes=208;c.file.digest.bytes[0]=1;c.binary.version=1;c.binary.textureType=TT_2D;

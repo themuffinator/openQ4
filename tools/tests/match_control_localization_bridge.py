@@ -508,6 +508,8 @@ def static_contracts(header: str, source: str) -> None:
     presentation = (
         read(PROJECTION_SOURCE) + read(MULTIPLAYER_SOURCE) + read(MATCH_CONTROL_GUI)
         + read(GAME_ROOT / "src/mpgame/mp/match/MatchRules.cpp")
+        + read(GAME_ROOT / "src/mpgame/Player.cpp")
+        + read(GAME_ROOT / "src/mpgame/gamesys/SysCmds.cpp")
     )
     referenced.update(
         key

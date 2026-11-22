@@ -1,6 +1,6 @@
 # Input settings
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 This guide shows how to set up your keyboard, mouse and controller in openQ4: changing bindings, tuning aim, using gyro and touch controls, and keeping your settings in config files. Steam Deck players should also read the [Steam Deck guide](steam-deck.md).
 
@@ -12,7 +12,7 @@ This guide shows how to set up your keyboard, mouse and controller in openQ4: ch
 - Press `` ` `` or `~` to open the console.
 - If your controls get into a mess, choose **Load Defaults** on the Settings page. This also resets your custom bindings, so back them up first with `writeConfig my-input-backup.cfg`.
 
-**Not in 0.14.1:** the mouse and controller settings, with **Free Look**, **Toggle Zoom** and **Scope Sensitivity**, are on the **Mouse** and **Controller** tabs of **Settings → Controls**, beside the key bindings. In 0.14.1 they are on **Settings → Game Options**: its **Mouse Input** and **Controller** tabs, and the three aim settings on **General**.
+**New in 0.15.0:** the mouse and controller settings, with **Free Look**, **Toggle Zoom** and **Scope Sensitivity**, are on the **Mouse** and **Controller** tabs of **Settings → Controls**, beside the key bindings. In 0.14.1 they are on **Settings → Game Options**: its **Mouse Input** and **Controller** tabs, and the three aim settings on **General**.
 
 The classic menus (`ui_retained 0`) have the same settings: their Game Options page has **General**, **Mouse** and **Controller** sections in its **Section** chooser.
 
@@ -26,8 +26,8 @@ Open **Settings → Controls**. Its tabs group the actions:
 | **Weapons** | One key per weapon, the multiplayer buy menu and the quick-chat wheel. |
 | **Attack/Look** | Attack, previous and next weapon, reload, look up and down, mouse look, centre view, zoom, objectives and scores, flashlight, screenshot, weapon wheel. |
 | **Other** | Quick save and load, chat and team chat, voting, multiplayer statistics, ready status, emotes and voice chat. |
-| **Mouse** | Not bindings: the [mouse settings](#mouse-settings), led by Free Look, Toggle Zoom and Scope Sensitivity. **Not in 0.14.1.** |
-| **Controller** | Not bindings: the [controller settings](#controller-settings). **Not in 0.14.1.** |
+| **Mouse** | Not bindings: the [mouse settings](#mouse-settings), led by Free Look, Toggle Zoom and Scope Sensitivity. **New in 0.15.0.** |
+| **Controller** | Not bindings: the [controller settings](#controller-settings). **New in 0.15.0.** |
 
 To bind an action, select its row and press the key, mouse button or controller button you want. Analogue sticks are set up in the controller settings rather than bound as buttons.
 
@@ -77,11 +77,11 @@ The mouse controls are on **Settings → Controls → Mouse**, which starts with
 | Zoom | `Mouse2`, `Mouse3` |
 | Reload | `R` |
 | Flashlight | `F` |
-| Last weapon | `G` (**Not in 0.14.1**) |
+| Last weapon | `G` (**New in 0.15.0**) |
 | Weapon wheel | `E` |
 | Next / previous weapon | Mouse wheel down / up, or `[` / `]` |
 | Weapons | `1` to `0` and `-`, in weapon-slot order |
-| Grappling hook (Classic multiplayer ruleset) | `Mouse4` (**Not in 0.14.1**) |
+| Grappling hook (Classic multiplayer ruleset) | `Mouse4` (**New in 0.15.0**) |
 | Console | `` ` `` and `~` |
 | Menu | `Escape` |
 | Objectives / scores | `Tab` |
@@ -92,7 +92,7 @@ The mouse controls are on **Settings → Controls → Mouse**, which starts with
 | Quick save / quick load | `F5` / `F9` |
 | Screenshot | `F12` |
 
-`F1` to `F12` keep their bindings while a menu is open, so `F12` also takes a screenshot of a menu. **Not in 0.14.1:** 0.14.1's new title and pause screens ignore them.
+`F1` to `F12` keep their bindings while a menu is open, so `F12` also takes a screenshot of a menu. **New in 0.15.0:** 0.14.1's new title and pause screens ignore them.
 
 ## Controllers
 

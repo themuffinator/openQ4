@@ -40,9 +40,9 @@ template<class T>T Max(T a,T b){return a>b?a:b;}
 enum {TD_SPECULAR,TD_DIFFUSE,TD_DEFAULT,TD_BUMP,TD_HIGH_QUALITY=15,TD_MATERIAL_DATA=30,TF_LINEAR=20,TF_NEAREST=21};
 using textureUsage_t=int;
 enum {PICMIP_FILTER_ALL=0,PICMIP_FILTER_TEXTURES=1,PICMIP_FILTER_MODELS=2,PICMIP_FILTER_OTHER=4,PICMIP_FILTER_MASK=7,IMAGEFLAG_NOMIPS=1};
-enum {TT_2D=1,TT_CUBIC=2,DS_PARSED=1,MF_DEFAULTED=1};
+enum {TT_2D=1,TT_CUBIC=2,TT_3D=3,TT_2D_ARRAY=4,DS_PARSED=1,MF_DEFAULTED=1};
 struct idStr {static int Icmpn(const char* a,const char* b,int n){for(int i=0;i<n;++i){unsigned char x=a[i],y=b[i];if(x>='A'&&x<='Z')x+=32;if(y>='A'&&y<='Z')y+=32;if(x!=y||!x)return x-y;}return 0;}};
-struct idImageOpts {int width=8,height=8,numLevels=4,textureType=TT_2D,format=1,colorFormat=0;bool isPersistant=false;};
+struct idImageOpts {int width=8,height=8,depth=1,numLevels=4,textureType=TT_2D,format=1,colorFormat=0;bool isPersistant=false;};
 struct renderDisplayPresentation_t {uint64_t generation=1,failureSequence=0;bool available=true;};
 extern renderDisplayPresentation_t nativeDevice;
 extern std::thread::id owner;
@@ -216,6 +216,13 @@ int main(){try{
  {idImage outer,inner;{imageConsumedLoad_t l(outer);Upload(outer);Load(inner);Prove(l,outer);l.Loaded(ICS_DECODED_2D);}TEST(R_CompleteConsumedImageUploads());TEST(outer.GetConsumedPolicy(out));TEST(inner.GetConsumedPolicy(out));}
  {idImage i;{imageConsumedLoad_t l(i);Upload(i);Load(i);l.Loaded(ICS_DECODED_2D);}TEST(R_CompleteConsumedImageUploads());Unavailable(i);}
  {idImage i;try{imageConsumedLoad_t l(i);Upload(i);l.Loaded(ICS_DECODED_2D);throw std::runtime_error("load");}catch(...){}TEST(R_CompleteConsumedImageUploads());Unavailable(i);}
+ for(int type:{TT_3D,TT_2D_ARRAY})for(int mode=0;mode<3;++mode){idImage i;i.opts.textureType=type;i.opts.depth=8;
+  {imageConsumedLoad_t load(i);++i.storageGeneration;imageConsumedLoad_t::Operation(&i,false,true,0,0,0,0,0);
+   // mode 1: a refused upload of a later slice or layer; mode 2: a level without slice or layer 0
+   for(int mip=0;mip<i.opts.numLevels;++mip)for(int z=(mode==2&&mip==2?1:0);z<R_ImageLevelDepth(type,i.opts.depth,mip);++z)
+    imageConsumedLoad_t::Operation(&i,true,!(mode==1&&mip==1&&z==1),mip,z,Max(1,i.opts.width>>mip),Max(1,i.opts.height>>mip),1);
+   Prove(load,i);load.Loaded(ICS_DECODED_2D);}
+  TEST(R_CompleteConsumedImageUploads());if(mode==0){TEST(i.GetConsumedPolicy(out)&&out.layers==1);}else Unavailable(i);}
  {idImage old,late;Load(old);nativeCallback=[&](){Load(late);};TEST(R_CompleteConsumedImageUploads());nativeCallback={};TEST(old.GetConsumedPolicy(out));Unavailable(late);TEST(R_CompleteConsumedImageUploads());TEST(late.GetConsumedPolicy(out));}
 
  // Exact source evidence and actual full-layer upload coverage are independent.
@@ -339,8 +346,10 @@ def main():
     assert 'image_ignoreHighQuality.GetBool()' not in method(material, 'textureUsage_t R_ResolveMaterialHighQualityUsage(')
     assert 'R_ApplyMaterialHighQualityUsage(' not in material and 'R_ApplyMaterialNoMipFlags(' not in material
     assert material.count('R_ResolveMaterialHighQualityUsage( pd->qualityInputs,') == 6
-    # Four stage paths, the PBR normal map and the packed ORM image (packORM).
-    assert material.count('R_ResolveMaterialNoMipFlags( pd->qualityInputs,') == 6
+    # Four stage paths, the PBR normal map, the packed ORM image (packORM) and
+    # the packed ORM+height image (packORMH, REN-11 parallax occlusion).
+    assert material.count('R_ResolveMaterialNoMipFlags( pd->qualityInputs,') == 7
+    assert 'const unsigned int flags = reference.noMips ? R_ResolveMaterialNoMipFlags( pd->qualityInputs, 0 ) : 0;\n\t\t\tidImage *packed = R_LoadMaterialImage( program.c_str(),' in material, 'packORMH must honour the reference map noMips through the resolved flags'
     actual_load = method(load, 'void idImage::ActuallyLoadImage(')
     assert 'R_GetImageDownsizePolicy(' not in actual_load
     assert actual_load.count('flags, &consumedDownsize );') == 2
@@ -363,7 +372,9 @@ def main():
     (root/'.tmp').mkdir(exist_ok=True)
     out = Path(tempfile.mkdtemp(prefix='consumed-policy-', dir=root/'.tmp'))
     env = dict(os.environ, TEMP=str(out), TMP=str(out), TMPDIR=str(out))
-    (out/'tr_local.h').write_text(SUPPORT)
+    # The engine's own per-level slice/layer count (ImageOpts.h), for volume and array receipts.
+    level_depth = method((root/'src/renderer/ImageOpts.h').read_text(), 'ID_INLINE int R_ImageLevelDepth(')
+    (out/'tr_local.h').write_text(SUPPORT+'\n'+level_depth.replace('ID_INLINE','inline').replace('textureType_t type','int type')+'\n')
     (out/'RendererResourceSettings.h').write_text('#pragma once\n')
     (out/'DisplayPresentation.h').write_text('#pragma once\n')
     (out/'RendererConsumedPolicy.h').write_text((root/names[0]).read_text().replace('../imagetools/ImageContentIdentity.h','ImageContentIdentity.h'))
@@ -388,6 +399,7 @@ def main():
             ('early-complete', 'value.batch > completedGL', 'false'),
             ('current-policy', 'candidate.inputs = R_ReadImageDownsizeInputs();', 'candidate.inputs = {};'),
             ('missing-coverage', 'mips[layer] != expected', 'false'),
+            ('layered-receipt', '(opts.textureType == TT_3D || opts.textureType == TT_2D_ARRAY) && layer > 0 &&', 'false &&'),
             ('accept-refusal', 'if (!succeeded ||', 'if (false ||'),
             ('stale-storage', 'value.storage != storageGeneration', 'false'),
             ('ignore-epoch', 'value.observationEpoch != R_ConsumedPolicyObservationEpoch()', 'false'),

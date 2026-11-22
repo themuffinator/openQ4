@@ -1,6 +1,6 @@
 # DDS texture replacements
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 openQ4 can load texture packs made of DDS files (a compressed image format that
 graphics cards read directly) in place of Quake 4's own textures, without
@@ -34,7 +34,7 @@ Set it, then load a map or run `reloadImages all`:
   right setting for a BC7 pack.** The performance presets keep it at 1.
 - `2` uses only BC7, BC6H, BC4 and BC5 replacements, and ignores DXT and RXGB
   files, including the ones in Quake 4's PK4s. Use it only if you want
-  everything else to come from the uncompressed originals. (**Not in 0.14.1:**
+  everything else to come from the uncompressed originals. (**New in 0.15.0:**
   BC6H, BC4 and BC5.)
 - `0` turns off all DDS replacements, including your own packs.
 
@@ -42,7 +42,7 @@ Set it, then load a map or run `reloadImages all`:
 `Texture compression: S3TC/DXT=1 BC7/BPTC=1` line. Without BC7 support, BC7
 files still load, uncompressed, so they use more video memory. DXT and RXGB
 files are decoded by the processor when the graphics card cannot take them
-directly. **Not in 0.14.1:** BC7 files are decoded the same way; 0.14.1 skipped
+directly. **New in 0.15.0:** BC7 files are decoded the same way; 0.14.1 skipped
 them on graphics without BC7 support.
 
 > **macOS:** with OpenGL, a Mac has no BC7 support. Apple's OpenGL stops below
@@ -67,7 +67,7 @@ A `.dds` placed beside the original path instead, such as
 `baseoq4/textures/stone/wall01.dds`, also works. If both exist, the `dds/` copy
 wins.
 
-**Not in 0.14.1:** uncompressed replacements and new textures can also be PNG
+**New in 0.15.0:** uncompressed replacements and new textures can also be PNG
 files. When a material names `wall01.tga` and there is no `.tga` or `.jpg`,
 openQ4 loads `wall01.png`, and a material may name a `.png` directly. Every
 kind of PNG works: greyscale, colour and palette images at any bit depth,
@@ -97,7 +97,7 @@ You can replace either end:
 - **Replace an input.** Ship `dds/textures/stone/wall01_local.dds` (or the
   `.dds` beside the original) and openQ4 recomputes the program's result from
   it at load. This is the simplest option and what a pack made for Quake 4
-  normally does. **Not in 0.14.1:** Quake 4 ships a precomputed result for
+  normally does. **New in 0.15.0:** Quake 4 ships a precomputed result for
   nearly every stock bump map, and 0.14.1 kept using it even after a pack
   replaced the inputs. openQ4 now sets Quake 4's result aside as soon as any
   input comes from outside Quake 4's and openQ4's own packs, and stores the
@@ -109,7 +109,7 @@ Rebuilding takes longer than loading a finished file, so the first load of a
 map after installing a pack is slower. openQ4 keeps the results in its image
 cache, and later loads read them from there.
 
-**`downsize()` textures. Not in 0.14.1.** Quake 4 wraps most character, weapon
+**`downsize()` textures. New in 0.15.0.** Quake 4 wraps most character, weapon
 and monster textures in `downsize( <texture>, 1 )`. A replacement named after
 the texture itself, such as `models/characters/marine/helmet_d.dds` or
 `dds/models/characters/marine/helmet_d.dds`, now covers it, and it loads
@@ -126,9 +126,9 @@ For each image, openQ4 tries these in order and uses the first usable file:
 1. `dds/<image program name>.dds`, the dhewm3 naming
 2. `dds/<texture path>.dds`, for plain textures
 3. `<texture path>.dds`, beside the original `.tga`, `.jpg` or `.png`, as Quake 4 packs do
-4. for `downsize( <texture>, N )`, steps 2 and 3 for that texture (**Not in 0.14.1**)
+4. for `downsize( <texture>, N )`, steps 2 and 3 for that texture (**New in 0.15.0**)
 5. `progimg/...`, the precomputed results inside Quake 4's own PK4s, unless an
-   input of the program was replaced (**Not in 0.14.1**)
+   input of the program was replaced (**New in 0.15.0**)
 
 Quake 4's own precomputed files come last, so a replacement named in steps 1-4
 always wins, and so does a replaced input. openQ4 finds them
@@ -151,7 +151,7 @@ openQ4 accepts single 2D DDS textures in these formats, with a classic header
 | BC2 / DXT3 | `DXT3` | `BC2_UNORM`, `BC2_UNORM_SRGB` | decoded; only when a material names the `.dds` |
 | Uncompressed 24/32-bit | none | `R8G8B8A8_UNORM`, `B8G8R8A8_UNORM`, `B8G8R8X8_UNORM` (and `_SRGB`) | decoded; only when a material names the `.dds` |
 
-**Not in 0.14.1:** BC1 and BC3 behind a DX10 header (what `texconv` writes for
+**New in 0.15.0:** BC1 and BC3 behind a DX10 header (what `texconv` writes for
 an sRGB format, and with `-dx10`), BC4, BC5, BC6H and uncompressed DDS files.
 0.14.1 skipped them.
 
@@ -219,7 +219,7 @@ a `.tga`, `.jpg` or `.png`.
 
 ## Compressing textures that are not DDS
 
-**Not in 0.14.1.** A pack made of TGA, PNG or JPG files, a BC4/BC5 pack, or
+**New in 0.15.0.** A pack made of TGA, PNG or JPG files, a BC4/BC5 pack, or
 loose originals that make a packed replacement look stale (see
 [Stale files](#stale-files)) all load uncompressed: four to eight times the
 video memory of a DDS file. Two settings, with Quake 4's own names, compress
@@ -262,7 +262,7 @@ no DDS replacement for 'textures/stone/wall01':
 - `listImages` shows each loaded image's format (`DXT1`, `DXT5`, `BC7`,
   `BC6H_UF16`, `RGBA8` for uncompressed) and size; `listImages uncompressed` lists only the
   uncompressed ones, the first place to look when a pack uses too much memory.
-  **Not in 0.14.1:** the totals are correct past 2 GB, and each size counts the
+  **New in 0.15.0:** the totals are correct past 2 GB, and each size counts the
   mipmap levels actually stored.
 - `imageDDSSelfTest` checks openQ4's built-in DDS naming and header handling
   for every format above, if you suspect the engine rather than your pack.
@@ -280,6 +280,6 @@ no DDS replacement for 'textures/stone/wall01':
   openQ4's `pak0.pk4`, `pak1.pk4` or `pak2.pk4` copied in next to the pack;
   less often, one of the pack's own PK4s carries a `strings/*_openq4.lang`
   file. Delete those copies. openQ4's packs belong only in `baseoq4/`, and a
-  texture pack doesn't need any of openQ4's files. Releases after 0.14.1 skip
-  a copy of openQ4's `pak0.pk4` found in a mod's folder and read a mod's
-  `*_openq4.lang` on top of openQ4's own table, so newer text still shows.
+  texture pack doesn't need any of openQ4's files. From 0.15.0, openQ4 skips
+  a copy of its own `pak0.pk4` found in a mod's folder and reads a mod's
+  `*_openq4.lang` on top of its own table, so newer text still shows.

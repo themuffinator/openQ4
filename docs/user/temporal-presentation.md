@@ -1,6 +1,6 @@
 # Temporal AA and dynamic resolution
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 Temporal anti-aliasing (TAA) combines detail from several frames. It smooths edges and, when the 3D scene renders below your screen's resolution, rebuilds a much sharper image than a plain stretch. It works on OpenGL and Vulkan, and a still picture stays still: when nothing moves, nothing on screen moves. Dynamic resolution builds on it, lowering the scene's resolution when your graphics card is busy.
 
@@ -8,7 +8,7 @@ Neither has a menu control; both use console settings ("console variables"). Mos
 
 ## Automatic upscaling (default)
 
-Temporal AA is automatic by default (`r_temporalAA 2`). It switches itself on only when the 3D scene renders below your screen's resolution: when **Settings → Display → Image Quality → Resolution Scale** is below 100%, or when dynamic resolution is on. At full resolution it stays off and your MSAA and SMAA settings apply as usual. The **Performance** and **Low** presets render below full resolution, so they use temporal upscaling. **Not in 0.14.1:** **Low Power** and **Minimum** also render below full resolution, but their 30 FPS cap leaves automatic mode off: on the small boards, phones and battery-limited machines those presets are for, a plain stretch costs less, and at 30 FPS temporal AA takes twice as long to settle after you move. Any frame cap of 30 or lower does the same; `r_temporalAA 1` turns it on anyway.
+Temporal AA is automatic by default (`r_temporalAA 2`). It switches itself on only when the 3D scene renders below your screen's resolution: when **Settings → Display → Image Quality → Resolution Scale** is below 100%, or when dynamic resolution is on. At full resolution it stays off and your MSAA and SMAA settings apply as usual. The **Performance** and **Low** presets render below full resolution, so they use temporal upscaling. **New in 0.15.0:** **Low Power** and **Minimum** also render below full resolution, but their 30 FPS cap leaves automatic mode off: on the small boards, phones and battery-limited machines those presets are for, a plain stretch costs less, and at 30 FPS temporal AA takes twice as long to settle after you move. Any frame cap of 30 or lower does the same; `r_temporalAA 1` turns it on anyway.
 
 Automatic mode leaves alone the cropped and pixelated scale modes (`r_resolutionScaleMode 0` and `3`), because those looks are chosen on purpose; see [Resolution scale](display-settings.md#resolution-scale). It also stays off on OpenGL ES and on OpenGL drivers too old to run its shaders (without GLSL 1.30).
 

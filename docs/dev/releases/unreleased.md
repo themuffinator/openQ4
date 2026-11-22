@@ -1,7 +1,8 @@
 # openQ4 development change record
 
 **Everything recorded here up to 11 November 2026 shipped in
-[0.14.1](v0.14.1.md)**, whose notes are the player-facing summary of this
+[0.14.1](v0.14.1.md), and everything up to 21 November 2026 in
+[0.15.0](v0.15.0.md)**, whose notes are the player-facing summaries of this
 material. This file is kept as the detailed record and collects later
 development changes for the next release's curation, with no version or
 release date promised. See [release status](../../user/release-status.md) and

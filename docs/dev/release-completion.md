@@ -1,11 +1,31 @@
 # openQ4 release completion and evidence record
 
-**Release status, 11 November 2026:** 0.14.1 is the latest available release,
-replacing 0.13.2. 0.14.0 (`v0.14.000`) was published and then withdrawn because
-it was broken. Entries below dated up to 11 November 2026 shipped in 0.14.1;
-later entries are unreleased development work. Historical CI/publication success
+**Release status, November 2026:** 0.15.0, the Multiplayer Edition, is the
+latest available release, replacing 0.14.1, which replaced 0.13.2. 0.14.0 (`v0.14.000`) was published and then withdrawn because
+it was broken. Entries below dated up to 11 November 2026 shipped in 0.14.1, and
+entries up to 21 November 2026 in 0.15.0; later entries are unreleased
+development work. Historical CI/publication success
 does not restore the withdrawn release. See
 [player release status](../user/release-status.md).
+
+**0.15.0, the Multiplayer Edition:** a minor version, because network
+protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
+player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
+
+## Texture recovery keeps every setting it watches, 21 November 2026
+
+- **No more out-of-bounds write when textures reload.** Texture recovery
+  remembers the image settings that were in force so it can tell whether a
+  restart may reuse them. `f2fe81753` (18 November) added two settings to
+  that list (`image_useCompression` and `image_useNormalCompression`, 13 in
+  all), but the record kept room for 11, so preparing a recovery wrote two
+  entries past its end. The record now holds all 13, and a compile-time check
+  fails the build if the list and the record drift apart again. No release
+  shipped the overrun.
+- **What to do.** Nothing. A recovery record left by an earlier development
+  build no longer decodes, and the renderer then loads textures from scratch.
+- Found by the address sanitizer in `renderer_image_recovery_owner.py`, whose
+  fixture had been failing to compile since `735878f06`.
 
 ## Smooth startup and loading screens, 21 November 2026
 

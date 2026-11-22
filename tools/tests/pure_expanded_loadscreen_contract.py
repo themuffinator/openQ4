@@ -416,8 +416,10 @@ MUTATIONS: dict[str, tuple[str, str, str, str]] = {
         '\tR_WriteTGA( "_oq4/stage.tmp", background.pixels.Ptr(), outputWidth, outputHeight, false, "fs_savepath" );\n'
         "\tbool uploaded = Session_UploadLoadingBackground();", "check_session"),
     "the session refuses the background while pure again": (
-        "session", "renderSystem == NULL || !renderSystem->IsOpenGLRunning() ) {",
-        "renderSystem == NULL || !renderSystem->IsOpenGLRunning() || FS_GeneratedDataReadsRefused() ) {", "check_session"),
+        # The two leading tabs pick Session_PrepareExpandedLoadingBackground's
+        # condition; WarmFirstGameFrame ends its own condition the same way.
+        "session", "\t\trenderSystem == NULL || !renderSystem->IsOpenGLRunning() ) {",
+        "\t\trenderSystem == NULL || !renderSystem->IsOpenGLRunning() || FS_GeneratedDataReadsRefused() ) {", "check_session"),
     "the image name loses its underscore": (
         "session", '#define SESSION_LOADING_BACKGROUND_IMAGE\t"_expandedLoadingBackground"',
         '#define SESSION_LOADING_BACKGROUND_IMAGE\t"expandedLoadingBackground"', "check_session"),

@@ -31,12 +31,15 @@ def main():
     valid=out/'valid.cpp';valid.write_text('#include "Interaction.h"\n#include <cmath>\nnamespace openq4::ui {\n'+
         function_body(doc,'bool Utf8(')+function_body(doc,'bool ValidStateValue(')+'}\n',encoding='utf-8',newline='\n')
     working=out/'Interaction.cpp';source=(CORE/'Interaction.cpp').read_text(encoding='utf-8');working.write_text(source,encoding='utf-8',newline='\n')
-    flags=[args.compiler,'-std=c++20','-Wall','-Wextra','-Werror','-Wno-missing-field-initializers','-I',str(ROOT),'-I',str(CORE)]
+    # Without the JSON-backed Document, UiModalInteractionTest leaves out its
+    # document-load contract (OPENQ4_UI_INTERACTION_ONLY); the Meson
+    # openq4-ui-modal-interaction target links Document and runs it.
+    flags=[args.compiler,'-std=c++20','-Wall','-Wextra','-Werror','-Wno-missing-field-initializers','-DOPENQ4_UI_INTERACTION_ONLY','-I',str(ROOT),'-I',str(CORE)]
     if msvc:
         # Keep iterator proxies out of the artificial global allocation sweep.
         # Debug-iterator functional coverage remains in the normal Meson test.
         flags=[args.compiler,'/nologo','/EHsc','/std:c++20','/W3','/WX','/MT',
-               '/D_ITERATOR_DEBUG_LEVEL=0','/I'+str(ROOT),'/I'+str(CORE),
+               '/D_ITERATOR_DEBUG_LEVEL=0','/DOPENQ4_UI_INTERACTION_ONLY','/I'+str(ROOT),'/I'+str(CORE),
                '/Fo'+str(out)+os.sep,'/Fd'+str(out/'native.pdb')]
     if args.sanitize:flags+=['-fsanitize=address,undefined','-fno-omit-frame-pointer','-g0','-no-pie']
     core=[str(working),str(valid)]+[str(CORE/n) for n in ['ScrollGeometry.cpp','TextInput.cpp','TextEdit.cpp','NativeTextDocument.cpp','NativeTextEditor.cpp','Input.cpp']]

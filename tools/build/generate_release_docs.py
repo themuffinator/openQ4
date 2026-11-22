@@ -1329,6 +1329,7 @@ def generate_release_docs_site(
         "docs/dev/game-test-coverage.json",
         "docs/dev/performance-budgets.json",
         "docs/dev/android-device-budgets.json",
+        "docs/dev/voice-generation-lines.json",
         "docs/dev/retail-overlay-audit.csv",
         "docs/dev/archive/2026-10-18/manifest.json",
         # The editable atlas sheets the visual specification links (6, 14.19).

@@ -1,10 +1,10 @@
 # Advanced screen-space lighting
 
-> This guide matches openQ4 0.14.1. Anything added since is marked **Not in 0.14.1**. See [release status](release-status.md) for what each download includes.
+> This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
 openQ4 has three experimental lighting effects you can try on OpenGL and Vulkan:
 
-- **Volumetric lighting:** lamps, spotlights and sunlight light up a thin haze in the air, and their beams stop where something casts a shadow. **Not in 0.14.1**: 0.14.1 had a plain haze in its place.
+- **Volumetric lighting:** lamps, spotlights and sunlight light up a thin haze in the air, and their beams stop where something casts a shadow. **New in 0.15.0**: 0.14.1 had a plain haze in its place.
 - **Screen-space reflections (SSR):** surfaces reflect what is on screen.
 - **Screen-space global illumination (SSGI):** a little light bounces off nearby surfaces.
 
@@ -26,7 +26,7 @@ When reflections or bounced light are on, they do their own upscaling, so every 
 
 ## Volumetric lighting
 
-**Not in 0.14.1.** Each light in view shines through the haze with its own colour, shape and fall-off, so a spotlight draws a cone, a caged lamp throws its pattern into the air and the sun lights the whole sky. Where the light uses a shadow map, its beams are blocked by whatever blocks its light on the walls: a pillar leaves a dark shaft behind it, and a fan or a swinging lamp moves its shafts as it moves.
+**New in 0.15.0.** Each light in view shines through the haze with its own colour, shape and fall-off, so a spotlight draws a cone, a caged lamp throws its pattern into the air and the sun lights the whole sky. Where the light uses a shadow map, its beams are blocked by whatever blocks its light on the walls: a pillar leaves a dark shaft behind it, and a fan or a swinging lamp moves its shafts as it moves.
 
 Shadow maps are on in the **Quality** and **Ultra** presets (`r_useShadowMap 1`). Without them, every light uses Quake 4's original stencil shadows, which can't block a beam. By default such lights add no glow to the haze at all, so no beam ever shines through a wall; `r_volumetricStencilLights 1` lets them glow anyway, through their shadows. Lights that cast no shadows, such as fire and muzzle flashes, always glow.
 
@@ -40,13 +40,13 @@ Quake 4's own fog and blend lights keep their original look. The haze also dims 
 | `r_froxelVolumetricDensity` | `0.00012` | How thick the haze is (`0.00001` to `0.01`). |
 | `r_froxelVolumetricMaxDistance` | `2048` | How far into the scene the haze reaches, in game units (`64` to `8192`). |
 | `r_froxelVolumetricSlices` | `12` | Steps taken through the haze for each light (`4` to `16`). More is smoother and slower. |
-| `r_volumetricIntensity` | `12` | How brightly the haze glows for its thickness (`0` to `64`). **Not in 0.14.1.** |
-| `r_volumetricSunIntensity` | `0.08` | Extra scale for sunlight and other far-away lights, whose beams cross the whole view rather than one room (`0` to `4`). **Not in 0.14.1.** |
-| `r_volumetricAnisotropy` | `0.35` | How much the glow gathers around a light as you look towards it (`0` even, up to `0.9`). **Not in 0.14.1.** |
-| `r_volumetricResolution` | `2` | `2` draws the haze at half resolution and smooths it up, `1` at full resolution (slower). **Not in 0.14.1.** |
-| `r_volumetricStencilLights` | `0` | `1` lets lights with stencil shadows glow, unblocked. **Not in 0.14.1.** |
-| `r_volumetricMaxLights` | `32` | Most lights that glow at once (`0` no limit). **Not in 0.14.1.** |
-| `r_volumetricSubviews` | `1` | `0` leaves mirrors and security cameras without the haze. **Not in 0.14.1.** |
+| `r_volumetricIntensity` | `12` | How brightly the haze glows for its thickness (`0` to `64`). **New in 0.15.0.** |
+| `r_volumetricSunIntensity` | `0.08` | Extra scale for sunlight and other far-away lights, whose beams cross the whole view rather than one room (`0` to `4`). **New in 0.15.0.** |
+| `r_volumetricAnisotropy` | `0.35` | How much the glow gathers around a light as you look towards it (`0` even, up to `0.9`). **New in 0.15.0.** |
+| `r_volumetricResolution` | `2` | `2` draws the haze at half resolution and smooths it up, `1` at full resolution (slower). **New in 0.15.0.** |
+| `r_volumetricStencilLights` | `0` | `1` lets lights with stencil shadows glow, unblocked. **New in 0.15.0.** |
+| `r_volumetricMaxLights` | `32` | Most lights that glow at once (`0` no limit). **New in 0.15.0.** |
+| `r_volumetricSubviews` | `1` | `0` leaves mirrors and security cameras without the haze. **New in 0.15.0.** |
 | `r_rendererSSR` | `0` | `1` turns on screen-space reflections. |
 | `r_screenReflectionIntensity` | `0.35` | Strongest reflection (`0` to `1`). |
 | `r_screenReflectionMaxDistance` | `512` | How far a reflection may reach, in game units (`32` to `2048`). |
@@ -56,7 +56,7 @@ Quake 4's own fog and blend lights keep their original look. The haze also dims 
 
 Values outside each range are clamped to it. Changing any of these settings resets temporal AA's history, so old lighting doesn't blend into the new result.
 
-`rendererVolumetricStatus` (also part of `gfxInfo`) reports whether volumetric lighting is requested and actually drawn on your renderer, and how many lights glowed with a shadow map, without one, or not at all and why. **Not in 0.14.1.**
+`rendererVolumetricStatus` (also part of `gfxInfo`) reports whether volumetric lighting is requested and actually drawn on your renderer, and how many lights glowed with a shadow map, without one, or not at all and why. **New in 0.15.0.**
 
 ## Limitations
 
