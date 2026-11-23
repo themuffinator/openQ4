@@ -179,6 +179,10 @@ Where each admission case of the roadmap is covered:
 | Atlas exhaustion | `probes-eight` (full), `probes-nine` (one too many: the whole set falls back), `probes-evicted`, `probes-record-overflow` |
 | Compressed, oversized, authored HDR | excluded by decision (above), with cleared output |
 
+The laboratory's authored-probe suite still passes on this build
+(`d30280aa2`, after the volumetric and parallax changes of 21 November):
+Vulkan 56/56 and OpenGL 50/50, each with its authored-probe proof.
+
 Not covered by the scene runs: failure injection on OpenGL (it has no
 equivalent of `r_vkPBRProbeFailure`; its rejections are counted on the
 `Modern specular probe atlas:` line, all zero in these runs), more than one
