@@ -151,6 +151,7 @@ struct GameLocal {
     bool teamGame = false, isServer = true, isClient = false, isRepeater = false;
     idEntity *entities[MAX_CLIENTS] = {};
     bool IsTeamGame() { return teamGame; }
+    bool RetailSnapshotFormat() const { return false; }  // MP-22: no retail network demo plays here
     template<class... T> void Error(const char *, T...) { throw std::runtime_error("game error"); }
     template<class... T> void Warning(const char *, T...) {}
 } gameLocal;

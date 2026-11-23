@@ -762,6 +762,9 @@ def validate_validation_wiring() -> None:
         # A player's recording of their own view on a cheats-off dedicated server,
         # played back by a second hidden game; mp_client_demo.py is wired.
         "mp_client_demo_smoke.py",
+        # The demos Quake 4 1.4.2 ships, played by a hidden game; needs a Quake 4
+        # installation and the staged runtime. retail_netdemo_contract.py is wired.
+        "mp_retail_netdemo_smoke.py",
         # Autoaction on a cheats-off dedicated server and a hidden client;
         # mp_autoaction.py is wired.
         "mp_autoaction_smoke.py",

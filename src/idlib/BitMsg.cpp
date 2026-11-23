@@ -759,6 +759,18 @@ void idBitMsgDelta::WriteDelta( int oldValue, int newValue, int numBits ) {
 
 /*
 ================
+idBitMsgDelta::BaseBits
+================
+*/
+int idBitMsgDelta::BaseBits( int numBits ) const {
+	if ( retailBaseReads && ( numBits < 0 ? -numBits : numBits ) > base->GetRemainingReadBits() ) {
+		return -1;
+	}
+	return base->ReadBits( numBits );
+}
+
+/*
+================
 idBitMsgDelta::ReadBits
 ================
 */
@@ -769,13 +781,13 @@ int idBitMsgDelta::ReadBits( int numBits ) const {
 		value = readDelta->ReadBits( numBits );
 		changed = true;
 	} else {
-		int baseValue = base->ReadBits( numBits );
+		int baseValue = BaseBits( numBits );
 		const bool baseOverflowed = base->IsReadOverflowed();
 		if ( !readDelta ) {
 			value = baseValue;
 		} else if ( readDelta->ReadBits( 1 ) == 0 ) {
 			value = baseValue;
-			if ( baseOverflowed ) {
+			if ( baseOverflowed && !retailBaseReads ) {
 				readDelta->MarkReadOverflowed();
 			}
 		} else {
@@ -806,13 +818,13 @@ int idBitMsgDelta::ReadDelta( int oldValue, int numBits ) const {
 		}
 		changed = true;
 	} else {
-		int baseValue = base->ReadBits( numBits );
+		int baseValue = BaseBits( numBits );
 		const bool baseOverflowed = base->IsReadOverflowed();
 		if ( !readDelta ) {
 			value = baseValue;
 		} else if ( readDelta->ReadBits( 1 ) == 0 ) {
 			value = baseValue;
-			if ( baseOverflowed ) {
+			if ( baseOverflowed && !retailBaseReads ) {
 				readDelta->MarkReadOverflowed();
 			}
 		} else if ( readDelta->ReadBits( 1 ) == 0 ) {
@@ -923,7 +935,7 @@ void idBitMsgDelta::WriteDeltaByteCounter( int oldValue, int newValue ) {
 		writeDelta->WriteDeltaByteCounter( oldValue, newValue );
 		changed = true;
 	} else {
-		int baseValue = base->ReadBits( 8 );
+		int baseValue = BaseBits( 8 );
 		if ( !base->IsReadOverflowed() && baseValue == newValue ) {
 			writeDelta->WriteBits( 0, 1 );
 		} else {
@@ -948,7 +960,7 @@ void idBitMsgDelta::WriteDeltaShortCounter( int oldValue, int newValue ) {
 		writeDelta->WriteDeltaShortCounter( oldValue, newValue );
 		changed = true;
 	} else {
-		int baseValue = base->ReadBits( 16 );
+		int baseValue = BaseBits( 16 );
 		if ( !base->IsReadOverflowed() && baseValue == newValue ) {
 			writeDelta->WriteBits( 0, 1 );
 		} else {
@@ -973,7 +985,7 @@ void idBitMsgDelta::WriteDeltaLongCounter( int oldValue, int newValue ) {
 		writeDelta->WriteDeltaLongCounter( oldValue, newValue );
 		changed = true;
 	} else {
-		int baseValue = base->ReadBits( 32 );
+		int baseValue = BaseBits( 32 );
 		if ( !base->IsReadOverflowed() && baseValue == newValue ) {
 			writeDelta->WriteBits( 0, 1 );
 		} else {
@@ -1001,7 +1013,7 @@ void idBitMsgDelta::ReadString( char *buffer, int bufferSize ) const {
 			idStr::Copynz( buffer, baseString, bufferSize );
 		} else if ( readDelta->ReadBits( 1 ) == 0 ) {
 			idStr::Copynz( buffer, baseString, bufferSize );
-			if ( baseOverflowed ) {
+			if ( baseOverflowed && !retailBaseReads ) {
 				readDelta->MarkReadOverflowed();
 			}
 		} else {
@@ -1033,7 +1045,7 @@ void idBitMsgDelta::ReadData( void *data, int length ) const {
 			base->ReadData( data, length );
 		} else if ( readDelta->ReadBits( 1 ) == 0 ) {
 			base->ReadData( data, length );
-			if ( base->IsReadOverflowed() ) {
+			if ( base->IsReadOverflowed() && !retailBaseReads ) {
 				readDelta->MarkReadOverflowed();
 			}
 		} else {
@@ -1084,13 +1096,13 @@ int idBitMsgDelta::ReadDeltaByteCounter( int oldValue ) const {
 		value = readDelta->ReadDeltaByteCounter( oldValue );
 		changed = true;
 	} else {
-		int baseValue = base->ReadBits( 8 );
+		int baseValue = BaseBits( 8 );
 		const bool baseOverflowed = base->IsReadOverflowed();
 		if ( !readDelta ) {
 			value = baseValue;
 		} else if ( readDelta->ReadBits( 1 ) == 0 ) {
 			value = baseValue;
-			if ( baseOverflowed ) {
+			if ( baseOverflowed && !retailBaseReads ) {
 				readDelta->MarkReadOverflowed();
 			}
 		} else {
@@ -1117,13 +1129,13 @@ int idBitMsgDelta::ReadDeltaShortCounter( int oldValue ) const {
 		value = readDelta->ReadDeltaShortCounter( oldValue );
 		changed = true;
 	} else {
-		int baseValue = base->ReadBits( 16 );
+		int baseValue = BaseBits( 16 );
 		const bool baseOverflowed = base->IsReadOverflowed();
 		if ( !readDelta ) {
 			value = baseValue;
 		} else if ( readDelta->ReadBits( 1 ) == 0 ) {
 			value = baseValue;
-			if ( baseOverflowed ) {
+			if ( baseOverflowed && !retailBaseReads ) {
 				readDelta->MarkReadOverflowed();
 			}
 		} else {
@@ -1150,13 +1162,13 @@ int idBitMsgDelta::ReadDeltaLongCounter( int oldValue ) const {
 		value = readDelta->ReadDeltaLongCounter( oldValue );
 		changed = true;
 	} else {
-		int baseValue = base->ReadBits( 32 );
+		int baseValue = BaseBits( 32 );
 		const bool baseOverflowed = base->IsReadOverflowed();
 		if ( !readDelta ) {
 			value = baseValue;
 		} else if ( readDelta->ReadBits( 1 ) == 0 ) {
 			value = baseValue;
-			if ( baseOverflowed ) {
+			if ( baseOverflowed && !retailBaseReads ) {
 				readDelta->MarkReadOverflowed();
 			}
 		} else {

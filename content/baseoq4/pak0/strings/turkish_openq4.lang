@@ -1964,4 +1964,7 @@
 	"#str_232842"	"Geri adım"
 	"#str_232843"	"Oyuncular: %s"
 	"#str_232844"	"%s görünümü"
+	"#str_232870"	"Quake 4 ağ demosu"
+	"#str_232871"	"Başka bir Quake 4 sürümüyle kaydedildi"
+	"#str_232872"	"Bu kurulumda bulunmayan Quake 4 paketleri gerekiyor"
 }

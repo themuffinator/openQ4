@@ -33,6 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Session_local.h"
 #include "NativeInputPublications.h"
 #include "ArenaCampaign.h"
+#include "async/RetailNetDemo.h"
 #include "BuildVersion.h"
 #include "SaveGameReleases.h"
 #include "VRSystemLocal.h"
@@ -5435,8 +5436,9 @@ Session_TimeDemo_f
 */
 static void Session_TimeDemo_f( const idCmdArgs &args ) {
 	if ( args.Argc() >= 2 ) {
-		// openQ4 MP-22: a multi-view demo, or a recording of one player's view, times as well
-		if ( idStr( args.Argv( 1 ) ).CheckExtension( ".mvd" ) ) {
+		// openQ4 MP-22: a multi-view demo, a recording of one player's view or a
+		// Quake 4 1.4.2 network demo times as well
+		if ( idStr( args.Argv( 1 ) ).CheckExtension( ".mvd" ) || openq4_retail::IsRetailNetDemoName( args.Argv( 1 ) ) ) {
 			idAsyncNetwork::multiViewDemo.StartTimeDemo( args.Argv( 1 ), false );
 			return;
 		}
@@ -5450,7 +5452,8 @@ Session_TimeDemoQuit_f
 ================
 */
 static void Session_TimeDemoQuit_f( const idCmdArgs &args ) {
-	if ( args.Argc() >= 2 && idStr( args.Argv( 1 ) ).CheckExtension( ".mvd" ) ) {
+	if ( args.Argc() >= 2 && ( idStr( args.Argv( 1 ) ).CheckExtension( ".mvd" ) ||
+			openq4_retail::IsRetailNetDemoName( args.Argv( 1 ) ) ) ) {
 		idAsyncNetwork::multiViewDemo.StartTimeDemo( args.Argv( 1 ), true );
 		return;
 	}

@@ -521,6 +521,9 @@ void						FS_RaiseDeferredContentPackFailure( void );
 // openQ4 MP-22: every pack on the search path as "<game dir>/<pack>:<checksum>",
 // in search order, for a demo to record what its game data came from.
 void						FS_ListLoadedPacks( idStrList &entries );
+// openQ4 MP-22: the checksum and game directory of the pak relativePath resolves to;
+// false when no pak holds it
+bool						FS_FilePack( const char *relativePath, int &checksum, idStr &gameDir );
 
 /*
 ================================================

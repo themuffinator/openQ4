@@ -89,7 +89,9 @@ def check_votes() -> None:
     # the flag word outgrew a short on every vote message, both ends
     require(game.count("outMsg.WriteLong( voteData.m_fieldFlags );") == 3, "three vote writers send the flag word as a long")
     require("const int wireFieldFlags = msg.ReadLong();" in game, "the packed vote call reads a long flag word")
-    require(network.count("voteData.m_fieldFlags = msg.ReadLong();") == 2, "both client vote readers read a long flag word")
+    # (a Quake 4 1.4.2 network demo's votes keep their short, MP-22)
+    require(network.count("voteData.m_fieldFlags = RetailSnapshotFormat() ? ( msg.ReadShort() & 0x0fff ) : msg.ReadLong();") == 2,
+            "both client vote readers read a long flag word")
     require("voteData.m_fieldFlags = msg.ReadShort();" not in network and "outMsg.WriteShort( voteData.m_fieldFlags );" not in game,
             "no vote message still carries a short flag word")
 

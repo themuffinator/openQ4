@@ -7435,7 +7435,9 @@ bool idAnimatedEntity::ClientReceiveEvent( int event, int time, const idBitMsg &
 			dir = msg.ReadDir( 24 );
 			const idDeclEntityDef *damageDef = static_cast< const idDeclEntityDef* >( idGameLocal::ReadDecl( msg, DECL_ENTITYDEF ) );
 			const idMaterial *collisionMaterial = static_cast< const idMaterial* >( idGameLocal::ReadDecl( msg, DECL_MATERIAL ) );
-			const rvDeclMatType *collisionMaterialType = ReadDamageEffectMaterialType( msg );
+			// openQ4 MP-22: Quake 4 1.4.2 sent no material type
+			const rvDeclMatType *collisionMaterialType = gameLocal.RetailSnapshotFormat() ? NULL :
+				ReadDamageEffectMaterialType( msg );
 // RAVEN BEGIN
 // ddynerman: removed redundant AddLocalDamageEffect()
 			trace_t collision;

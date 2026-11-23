@@ -746,7 +746,9 @@ extern rvGameLog *				gameLog;
 // 62: idSys appends ControllerTriggerPulse, ControllerDirectionalPulse and
 //     ControllerSetPlayerState: trigger motors, side-biased hits and the
 //     controller's light and trigger feel (PAD-08)
-const int GAME_API_VERSION		= 62;
+// 63: idNetworkSystem appends RetailDemoDeclIndex and RetailDemoDeclCount: the
+//     decl numbering of a retail Quake 4 1.4.2 network demo (MP-22)
+const int GAME_API_VERSION		= 63;
 
 struct gameImport_t {
 

@@ -434,7 +434,7 @@ def validate_container() -> None:
     for needle in (
         "initializationRecords < MVD_MAX_INITIALIZATION_RECORDS",
         "MVD_ValidateSnapshotPayload( record.payload, record.version, lastError )",
-        "MVD_ValidateReliablePayload( record.payload, record.version, lastError )",
+        "MVD_ValidateReliablePayload( record.payload, record.version, lastError, retailSource )",
         "sequence != lastSnapshotSequence + 1",
         "reportedSnapshots != info.snapshotCount",
         "reportedReliables != info.reliableCount",

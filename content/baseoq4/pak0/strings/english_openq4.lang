@@ -1964,4 +1964,7 @@
 	"#str_232842"	"Step back"
 	"#str_232843"	"Players: %s"
 	"#str_232844"	"View of %s"
+	"#str_232870"	"Quake 4 network demo"
+	"#str_232871"	"Recorded by another Quake 4 release"
+	"#str_232872"	"Needs Quake 4 paks this installation does not have"
 }

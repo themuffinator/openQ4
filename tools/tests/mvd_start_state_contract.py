@@ -89,7 +89,7 @@ def main() -> None:
     mvd = (ROOT / "src/framework/async/MultiViewDemo.cpp").read_text(encoding="utf-8")
     game = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
     reader = block(game, "void idMultiplayerGame::ClientReadStartState(")
-    for token in ("const int powerupBits = MP_StartStatePowerupBits( msg );",
+    for token in ("const int powerupBits = gameLocal.RetailSnapshotFormat() ? 16 : MP_StartStatePowerupBits( msg );",
                   "msg.GetRemainingReadBits() < powerupBits + ASYNC_PLAYER_INSTANCE_BITS + 1",
                   "powerup = msg.ReadBits( powerupBits );"):
         if token not in reader:

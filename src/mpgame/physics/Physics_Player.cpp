@@ -2436,7 +2436,8 @@ bool idPhysics_Player::DecodeSnapshotState( const idBitMsgDelta &msg, playerPSta
 	decoded.classicJumpTime = 0;
 	decoded.classicGrapple = 0;
 	decoded.classicGrapplePoint.Zero();
-	if ( gameLocal.IsClassicRuleset() ) {
+	// openQ4 MP-22: Quake 4 1.4.2 had no classic ruleset fields
+	if ( gameLocal.IsClassicRuleset() && !gameLocal.RetailSnapshotFormat() ) {
 		decoded.classicJumpTime = msg.ReadDeltaLong( 0 );
 		decoded.classicGrapple = msg.ReadBits( 1 );
 		if ( decoded.classicGrapple ) {

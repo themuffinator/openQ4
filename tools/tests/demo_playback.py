@@ -67,7 +67,7 @@ def validate_library_contract() -> None:
     ):
         require(header, needle, "demo capability model")
 
-    for extension in (".mvd", ".demo", ".cdemo", ".netdemo", ".part", ".ucmd"):
+    for extension in (".mvd", ".demo", ".cdemo", ".netdemo", ".ndmo85", ".part", ".ucmd"):
         require(
             source,
             f'DemoCollectExtension( paths, "{extension}" );',
@@ -84,7 +84,7 @@ def validate_library_contract() -> None:
         "probe.OpenForReading( entry.path.c_str(), false, true )",
         "OPENQ4_RENDERDEMO_CURRENT_VERSION",
         "ValidateCmdDemoFile",
-        'memcmp( prefix, "NDMO", 4 )',
+        "openq4_retail::IsRetailNetDemoName( entry.path.c_str() )",
         "DEMO_LIBRARY_LEGACY_RENDER",
         "DEMO_LIBRARY_LEGACY_NET",
         "DEMO_LIBRARY_INCOMPLETE",
@@ -132,7 +132,7 @@ def validate_library_contract() -> None:
     command_demo = between(
         source,
         '} else if ( DemoPathEndsWith( entry.path, ".cdemo" ) ) {',
-        '} else if ( DemoPathEndsWith( entry.path, ".netdemo" ) ) {',
+        '} else if ( openq4_retail::IsRetailNetDemoName( entry.path.c_str() ) ) {',
         "command demo branch",
     )
     require(command_demo, "ValidateCmdDemoFile", "command demo structural preflight")
@@ -147,14 +147,20 @@ def validate_library_contract() -> None:
     ):
         reject(command_demo, unsupported, "command demo capability")
 
+    # openQ4 MP-22: a retail network demo plays through the MVD player when its
+    # container reads and this installation has its paks; any other names why.
     legacy_net = between(
         source,
-        '} else if ( DemoPathEndsWith( entry.path, ".netdemo" ) ) {',
+        '} else if ( openq4_retail::IsRetailNetDemoName( entry.path.c_str() ) ) {',
         "if ( DemoEntryCanDelete( entry.path ) ) {",
-        "legacy netdemo branch",
+        "retail network demo branch",
     )
-    reject(legacy_net, "DEMO_CAP_PLAY", "unsupported retail netdemo capability")
-    require(legacy_net, '"#str_41547"', "legacy netdemo status")
+    require(legacy_net, "multiViewDemo.QueryFileInfo", "retail network demo probe")
+    require(legacy_net, "entry.playable = info.compatible;", "retail network demo compatibility gate")
+    require(legacy_net, "if ( info.compatible ) {", "retail network demo capabilities only when playable")
+    require(legacy_net, "DemoRetailProblemString( info.error )", "specific retail network demo problem")
+    require(legacy_net, '"#str_41547"', "retail network demo from another release")
+    require(legacy_net, '"#str_232870"', "retail network demo format label")
 
     # The browser's Play and the retained Demos page share one typed player.
     browser_play = between(

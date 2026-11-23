@@ -109,6 +109,7 @@ public:
 	};
 	bool ValidateNetworkStateRecord( const record_t &record, idStr &error ) const;
 	bool ValidateNetworkStatePayload( const byte *bytes, int length, idStr &error ) const;
+	bool retailSource = false;	// openQ4 MP-22: a retail network demo's shorter game state
 };
 
 // PRODUCTION_FUNCTIONS

@@ -480,6 +480,10 @@ public:
 
 extern idDeclManager *		declManager;
 
+// Engine only, openQ4 MP-22: where a later file defined again a decl an openQ4
+// override file defined first; false when none did.
+bool							DeclManager_ShadowedSource( declType_t type, int index, idStr &fileName, int &line );
+
 // Engine only: a campaign remount (idCommonLocal::RemountCampaign) changes the
 // search path under a running engine. ReleaseModuleDecls frees the decls the
 // game module allocated before it unloads; BeginRemount, after the filesystem

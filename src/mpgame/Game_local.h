@@ -512,6 +512,9 @@ private:
 // older layout it still reads from a multiview demo (idGameLocal::LegacySnapshotFormat)
 const int GAME_SNAPSHOT_PROTOCOL			= 42;
 const int GAME_SNAPSHOT_PROTOCOL_LEGACY		= 41;
+// openQ4 MP-22: retail Quake 4 1.4.2 (network protocol 2.85), whose network demos
+// play with the 1.4.2 layouts (idGameLocal::RetailSnapshotFormat)
+const int GAME_SNAPSHOT_PROTOCOL_RETAIL		= 85;
 
 ID_INLINE int PackEntitySpawnId( const int entitySpawnId, const int entityNumber ) {
 	const unsigned int packed = ( static_cast<unsigned int>( entitySpawnId ) << GENTITYNUM_BITS ) |
@@ -1620,7 +1623,24 @@ public:
 	// openQ4: the snapshot being read was recorded before network protocol 2.42 (a
 	// multiview demo made with 2.41), so its players, projectiles and entity tags have
 	// the older layout. Nothing is ever written in it.
-	bool					LegacySnapshotFormat( void ) const { return demoState == DEMO_PLAYING && serverDemo && demo_protocol == GAME_SNAPSHOT_PROTOCOL_LEGACY; }
+	// openQ4 MP-22: a retail Quake 4 1.4.2 network demo reads the same way, as 1.4.2's
+	// layout is the 2.41 one where 2.42 changed it.
+	bool					LegacySnapshotFormat( void ) const {
+		return demoState == DEMO_PLAYING &&
+			( ( serverDemo && demo_protocol == GAME_SNAPSHOT_PROTOCOL_LEGACY ) || demo_protocol == GAME_SNAPSHOT_PROTOCOL_RETAIL );
+	}
+	// openQ4 MP-22: a retail Quake 4 1.4.2 network demo is playing. Its game data has
+	// 1.4.2's layout, without what openQ4 added (classic rules, weapon mods, vote and
+	// game-state fields), and its decls carry the recording's own numbering.
+	bool					RetailSnapshotFormat( void ) const { return demoState == DEMO_PLAYING && demo_protocol == GAME_SNAPSHOT_PROTOCOL_RETAIL; }
+	// the decl a network index names, as openQ4's index; -1 for none
+	int						NetworkDeclIndex( declType_t type, int index ) const {
+		return RetailSnapshotFormat() ? networkSystem->RetailDemoDeclIndex( type, index ) : index;
+	}
+	// how many decls of a type the network numbering covers
+	int						NetworkDeclCount( declType_t type ) const {
+		return RetailSnapshotFormat() ? networkSystem->RetailDemoDeclCount( type ) : declManager->GetNumDecls( type );
+	}
 
 private:
 	char					clientGuids[ MAX_CLIENTS ][ CLIENT_GUID_LENGTH ];
@@ -1678,7 +1698,11 @@ ID_INLINE void idGameLocal::WriteDecl( idBitMsg &msg, const idDecl *decl ) {
 }
 
 ID_INLINE const idDecl* idGameLocal::ReadDecl( const idBitMsg &msg, declType_t type ) {
-	int index = msg.ReadLong();
+	// openQ4 MP-22: a retail recording's own numbering while one plays
+	int index = gameLocal.NetworkDeclIndex( type, msg.ReadLong() );
+	if ( index < 0 || index >= declManager->GetNumDecls( type ) ) {
+		gameLocal.Error( "ReadDecl: no %s decl at network index %d", declManager->GetDeclNameFromType( type ), index );
+	}
 	const idDecl *decl = declManager->DeclByIndex( type, index );
 	if ( !decl ) {
 		gameLocal.Error( "ReadDecl: NULL %s decl at index %d", declManager->GetDeclNameFromType( type ), index );
@@ -1698,7 +1722,11 @@ ID_INLINE void idGameLocal::WriteDecl( idBitMsgDelta &msg, const idDecl *decl ) 
 }
 
 ID_INLINE const idDecl* idGameLocal::ReadDecl( const idBitMsgDelta &msg, declType_t type ) {
-	int index = msg.ReadLong();
+	// openQ4 MP-22: a retail recording's own numbering while one plays
+	int index = gameLocal.NetworkDeclIndex( type, msg.ReadLong() );
+	if ( index < 0 || index >= declManager->GetNumDecls( type ) ) {
+		gameLocal.Error( "ReadDecl: no %s decl at network index %d", declManager->GetDeclNameFromType( type ), index );
+	}
 	const idDecl *decl = declManager->DeclByIndex( type, index );
 	if ( !decl ) {
 		gameLocal.Error( "ReadDecl: NULL %s decl at index %d", declManager->GetDeclNameFromType( type ), index );

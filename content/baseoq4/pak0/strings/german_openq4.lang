@@ -1964,4 +1964,7 @@
 	"#str_232842"	"Schritt zurück"
 	"#str_232843"	"Spieler: %s"
 	"#str_232844"	"Sicht von %s"
+	"#str_232870"	"Quake-4-Netzwerkdemo"
+	"#str_232871"	"Mit einer anderen Quake-4-Version aufgenommen"
+	"#str_232872"	"Benötigt Quake-4-Paks, die dieser Installation fehlen"
 }

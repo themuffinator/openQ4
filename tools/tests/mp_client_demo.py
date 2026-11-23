@@ -122,7 +122,8 @@ def check_playback() -> None:
                       "bool idMultiViewDemo::FollowClient( int clientNum ) {", "void idMultiViewDemo::FreeRoam() {"):
         require("MVD_ClientViewCamera( clientView )" in body(mvd, signature), f"{signature.split('(')[0]} keeps the recorder's view")
     session = read("src/framework/Session_demo.cpp")
-    require(session.count("~( DEMO_CAP_FREE_ROAM | DEMO_CAP_FOLLOW | DEMO_CAP_FULL_WORLD )") == 2,
+    # the MVD and retail network demo library rows, and the deck
+    require(session.count("~( DEMO_CAP_FREE_ROAM | DEMO_CAP_FOLLOW | DEMO_CAP_FULL_WORLD )") == 3,
             "the library and the deck offer a client-view recording no camera controls")
 
 

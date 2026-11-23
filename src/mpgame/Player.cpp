@@ -11849,7 +11849,8 @@ void idPlayer::UpdateHud( void ) {
 
 	if ( gameLocal.isMultiplayer && initialJoinMenuPending ) {
 		initialJoinMenuPending = false;
-		if ( !cvarSystem->GetCVarBool( "ui_autoJoin" ) ) {
+		// openQ4 MP-22: a demo's recorded player has nothing to join
+		if ( !cvarSystem->GetCVarBool( "ui_autoJoin" ) && gameLocal.GetDemoState() != DEMO_PLAYING ) {
 			gameLocal.mpGame.ShowInitialJoinMenu();
 		}
 	}
@@ -16931,7 +16932,8 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	decodedDeltaViewAngles[2] = msg.ReadDeltaFloat( 0.0f );
 	decodedHealth = msg.ReadShort();
 	decodedArmor = msg.ReadByte();
-	if ( gameLocal.IsClassicRuleset() ) {
+	// openQ4 MP-22: Quake 4 1.4.2 had no classic ruleset fields
+	if ( gameLocal.IsClassicRuleset() && !gameLocal.RetailSnapshotFormat() ) {
 		decodedArmorTier = msg.ReadBits( CLASSIC_ARMOR_TIER_BITS );
 		decodedHookState = msg.ReadBits( CLASSIC_HOOK_STATE_BITS );
 		if ( decodedHookState == CLASSIC_HOOK_FLYING ) {
@@ -16951,7 +16953,12 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 			msg.MarkReadOverflowed();
 		}
 	}
-	decodedLastDamageDef = msg.ReadBits( gameLocal.entityDefBits );
+	decodedLastDamageDef = gameLocal.NetworkDeclIndex( DECL_ENTITYDEF, msg.ReadBits( gameLocal.entityDefBits ) );
+	if ( decodedLastDamageDef < 0 || decodedLastDamageDef >= declManager->GetNumDecls( DECL_ENTITYDEF ) ) {
+		// openQ4 MP-22: no definition in a retail recording's numbering
+		msg.MarkReadOverflowed();
+		decodedLastDamageDef = 0;
+	}
 	decodedLastDamageDir = msg.ReadDir( 9 );
 	decodedLastDamageLocation = msg.ReadShort();
 	newIdealWeapon = msg.ReadBits( -idMath::BitsForInteger( MAX_WEAPONS ) );
@@ -16980,7 +16987,12 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	}
 	decodedInBuyZone = msg.ReadBits( 1 ) != 0;
 	decodedCash = msg.ReadLong();
-	ReadWeaponModsFromSnapshot( msg, decodedWeaponMods );
+	if ( gameLocal.RetailSnapshotFormat() ) {
+		// openQ4 MP-22: nor weapon mods
+		memcpy( decodedWeaponMods, inventory.weaponMods, sizeof( decodedWeaponMods ) );
+	} else {
+		ReadWeaponModsFromSnapshot( msg, decodedWeaponMods );
+	}
 	if ( msg.IsReadOverflowed() ) {
 		return;
 	}
@@ -17409,7 +17421,8 @@ void idPlayer::ReadPlayerStateFromSnapshot( const idBitMsgDelta &msg ) {
 
 	inventory.weapons = msg.ReadShort();
 	inventory.armor = msg.ReadByte();
-	inventory.powerups = msg.ReadBits( POWERUP_MAX );
+	// openQ4 MP-22: Quake 4 1.4.2 had sixteen powerups, sent in a short
+	inventory.powerups = msg.ReadBits( gameLocal.RetailSnapshotFormat() ? 16 : POWERUP_MAX );
 
 	for( i = 0; i < MAX_AMMO; i++ ) {
  		ammo = msg.ReadBits( ASYNC_PLAYER_INV_AMMO_BITS );
@@ -17422,7 +17435,8 @@ void idPlayer::ReadPlayerStateFromSnapshot( const idBitMsgDelta &msg ) {
  		}
 	}
 
-	int powerup_max = POWERUP_MAX;
+	// openQ4 MP-22: Quake 4 1.4.2 sent the end times of its sixteen powerups
+	int powerup_max = gameLocal.RetailSnapshotFormat() ? 16 : POWERUP_MAX;
 	for ( i = 0; i < powerup_max; i ++ ) {
 		inventory.powerupEndTime[ i ] = msg.ReadLong();
 	}

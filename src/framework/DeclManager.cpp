@@ -208,6 +208,12 @@ private:
 	byte						remountState;			// DECL_REMOUNT_*
 	bool						remountLive;			// has parsed data in use: FinishRemount parses it again
 	bool						remountRemoved;			// no file of the mounted game defines it any more
+
+public:
+	// openQ4 MP-22: the first later definition this decl's copy shadows, when an
+	// openQ4 override file defined it first (DeclManager_ShadowedSource)
+	idStr						shadowedFileName;
+	int							shadowedLine;
 };
 
 enum {
@@ -326,6 +332,7 @@ public:
 	virtual declType_t			GetDeclTypeFromName( const char *typeName ) const;
 	virtual const idDecl *		FindType( declType_t type, const char *name, bool makeDefault = true, bool noCaching = false);
 	virtual const idDecl *		DeclByIndex( declType_t type, int index, bool forceParse = true );
+	bool						ShadowedSource( declType_t type, int index, idStr &fileName, int &line ) const;	// DeclManager_ShadowedSource
 
 	virtual const idDecl*		FindDeclWithoutParsing( declType_t type, const char *name, bool makeDefault = true );
 	virtual void				ReloadFile( const char* filename, bool force );
@@ -510,6 +517,33 @@ static void DeclManager_ShowReloadProgress( int fileIndex, int fileCount, const 
 
 idDeclManagerLocal	declManagerLocal;
 idDeclManager *		declManager = &declManagerLocal;
+
+/*
+===================
+DeclManager_ShadowedSource
+
+openQ4 MP-22: where the file read after an openQ4 override file defined a decl
+again, if one did: the definition Quake 4 itself, without the override, numbered
+the decl at. False when no later file did.
+===================
+*/
+bool DeclManager_ShadowedSource( declType_t type, int index, idStr &fileName, int &line ) {
+	return declManagerLocal.ShadowedSource( type, index, fileName, line );
+}
+
+bool idDeclManagerLocal::ShadowedSource( declType_t type, int index, idStr &fileName, int &line ) const {
+	const int typeIndex = static_cast<int>( type );
+	if ( typeIndex < 0 || typeIndex >= DECL_MAX_TYPES || index < 0 || index >= linearLists[ typeIndex ].Num() ) {
+		return false;
+	}
+	const idDeclLocal *decl = linearLists[ typeIndex ][ index ];
+	if ( decl == NULL || decl->shadowedFileName.IsEmpty() ) {
+		return false;
+	}
+	fileName = decl->shadowedFileName;
+	line = decl->shadowedLine;
+	return true;
+}
 
 static rvDeclGuide *DeclManager_FindGuide( const char *name ) {
 	rvDeclGuide **guide;
@@ -1148,6 +1182,10 @@ int idDeclFile::LoadAndParse( bool unique ) {
 				// a layered copy only fills in what the mod's copy above it left out
 				const bool shadowedByLayerAbove = !layerGameDir.IsEmpty() && newDecl->sourceFile != NULL &&
 					newDecl->sourceFile->fileName.Icmp( fileName ) == 0;
+				if ( DeclManager_IsopenQ4OverrideDeclFile( newDecl->sourceFile ) && newDecl->shadowedFileName.IsEmpty() ) {
+					newDecl->shadowedFileName = fileName;
+					newDecl->shadowedLine = sourceLine;
+				}
 				if ( !shadowedByLayerAbove && !DeclManager_IsopenQ4OverrideDeclFile( newDecl->sourceFile ) &&
 						!DeclManager_IsStockMaterialRedeclaration( identifiedType, name, newDecl->sourceFile, this ) ) {
 					src.Warning( "%s '%s' previously defined at %s:%i", declManagerLocal.GetDeclNameFromType( identifiedType ),
@@ -1372,6 +1410,11 @@ int idDeclFile::LoadAndParse( idFile *file ) {
 		idDeclLocal *decl = declManagerLocal.FindTypeWithoutParsing( identifiedType, name, false );
 		if ( decl ) {
 			if ( decl->sourceFile != this || decl->redefinedInReload ) {
+				if ( DeclManager_IsopenQ4OverrideDeclFile( decl->sourceFile ) && decl->shadowedFileName.IsEmpty() &&
+						decl->sourceFile != this ) {
+					decl->shadowedFileName = fileName;
+					decl->shadowedLine = sourceLine;
+				}
 				if ( !DeclManager_IsopenQ4OverrideDeclFile( decl->sourceFile ) &&
 						!DeclManager_IsStockMaterialRedeclaration( identifiedType, name, decl->sourceFile, this ) ) {
 					src.Warning( "%s '%s' previously defined at %s:%i",
@@ -3847,6 +3890,7 @@ idDeclLocal::idDeclLocal( void ) {
 	remountState = DECL_REMOUNT_NONE;
 	remountLive = false;
 	remountRemoved = false;
+	shadowedLine = 0;
 }
 
 /*

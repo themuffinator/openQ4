@@ -12,6 +12,9 @@ openQ4 records and plays back two main kinds of demo:
 - **Your own view of a match**, recorded on any server you join, is a `.mvd`
   file too (**after 0.15.0**). It holds what you saw, so it plays back from
   your point of view only.
+- **Quake 4 1.4.2 network demos** (`.ndmo85` files), recorded by the original
+  game, play too (**after 0.15.0**). See
+  [Watch a Quake 4 1.4.2 network demo](#watch-a-quake-4-142-network-demo).
 
 Both appear in the **Demos** library, with the controls each format supports.
 
@@ -88,6 +91,35 @@ Use the **Auto-Track** button, or `demoAutoTrack killer`, `demoAutoTrack action`
 or `demoAutoTrack off`. Add `marine` or `strogg` to watch one team only.
 Choosing a player yourself, or pressing attack or jump, hands the camera back to
 you.
+
+### Watch a Quake 4 1.4.2 network demo
+
+> **After 0.15.0.** This describes the development build.
+
+The original Quake 4 records multiplayer demos with `recordNetDemo`. Version
+1.4.2 names them by network protocol, so its files end in `.ndmo85`, and it
+installs two of its own in `q4mp/demos`: `id_perftest.ndmo85` (one player's
+view of a match on Over The Edge) and `id_serverdemo.ndmo85` (the server's
+recording of the same match).
+
+Copy a `.ndmo85` file into the `demos/` folder in your openQ4 save path. It then
+appears in **Demos**, with its map, length and players, and plays with **Play**.
+You can also enter `playNetDemo id_perftest.ndmo85` in the console.
+
+- A demo a player recorded shows that player's view, with their HUD and the
+  match as they saw it. You can pause, change speed, step frames and seek;
+  seeking back replays the demo from the start.
+- A demo a server recorded starts on the free camera. Follow any player or fly
+  around the match, as in a multi-view demo.
+- `playNetTimeDemo id_perftest.ndmo85`, or `timeDemo id_perftest.ndmo85`, plays
+  one as a benchmark (see [Time a demo](#time-a-demo)).
+
+A network demo plays when it was recorded at 60 game frames a second (the
+standard setting) and your Quake 4 installation has the game data it was
+recorded with; a full installation does. Otherwise the library says why it
+cannot play. Demos from Quake 4 releases before 1.4.2 (`.netdemo` files) use an
+older layout: the library lists them as **Legacy** and does not play them. A
+damaged file is refused, with the reason in the console, and never stops openQ4.
 
 ### Playback console commands
 
@@ -204,6 +236,7 @@ file is.
 
 The familiar Quake 4 commands `recordNetDemo`, `stopNetDemo` and `playNetDemo`
 use this system too. Their files are `.mvd`, not the old `.netdemo` format.
+**After 0.15.0**, `playNetDemo` also plays a Quake 4 1.4.2 `.ndmo85` file.
 
 ### Record your view on any server
 
@@ -309,7 +342,8 @@ recording with no complete snapshot cannot be recovered.
 | openQ4 `.mvd` of one player's view (after 0.15.0) | Supported | Pause, speed, step, and replay-based seek (replays from the start) | The recorder's view only |
 | openQ4 render `.demo`, including campaign demos | Supported | Pause, speed, step, level markers, and fast seeking from the nearest keyframe (older recordings replay from the start) | The recorded view only |
 | Retail Quake 4 render `.demo` | Not supported yet | None | None |
-| Retail Quake 4 `.netdemo` | Not supported yet | None | None |
+| Quake 4 1.4.2 network demo `.ndmo85` (after 0.15.0) | Supported | Pause, speed, step, and replay-based seek (replays from the start) | A player's recording: their view only. A server's recording: free camera and player follow |
+| Retail Quake 4 `.netdemo`, before 1.4.2 | Not supported | None | None |
 | Command `.cdemo` | Developer use only | Play and stop only | Whatever the recording did |
 | `.mvd.part`, `.part`, `.ucmd` | Incomplete and not playable (`mvdRecover` can save an interrupted `.mvd.part`) | None | None |
 
@@ -332,9 +366,9 @@ of the file is damaged, playback skips ahead to the next keyframe or level,
 at most ten seconds later, tells you in the console how much was lost, and
 carries on to the end.
 
-**Retail Quake 4** `.demo` and `.netdemo` files use different formats. The
-library marks them as **Legacy** and keeps **Play** unavailable rather than
-risk playing them wrongly.
+**Retail Quake 4** `.demo` files, and `.netdemo` files from before 1.4.2, use
+different formats. The library marks them as **Legacy** and keeps **Play**
+unavailable rather than risk playing them wrongly.
 
 **Command demos** (`.cdemo`) are developer logs that replay correctly only with
 the exact openQ4 version that made them, so they are not a way to share

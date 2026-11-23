@@ -1306,7 +1306,7 @@ def validate_protocol_2_42() -> None:
     physics = (GAME_LIBS_ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8", errors="replace")
     projectile = (GAME_LIBS_ROOT / "src/mpgame/Projectile.cpp").read_text(encoding="utf-8", errors="replace")
     require(game_header, "const int GAME_SNAPSHOT_PROTOCOL\t\t\t= 42;", "the game's snapshot layout number")
-    require(game_header, "demoState == DEMO_PLAYING && serverDemo && demo_protocol == GAME_SNAPSHOT_PROTOCOL_LEGACY",
+    require(game_header, "( serverDemo && demo_protocol == GAME_SNAPSHOT_PROTOCOL_LEGACY ) || demo_protocol == GAME_SNAPSHOT_PROTOCOL_RETAIL",
             "the older layout is read only from a demo recorded with it")
     require(function_body(network, "bool idGameLocal::IsDemoProtocolCompatible(", "demo protocol"),
             "( minor_ref == GAME_SNAPSHOT_PROTOCOL && minor == GAME_SNAPSHOT_PROTOCOL_LEGACY )", "2.41 demos stay playable")

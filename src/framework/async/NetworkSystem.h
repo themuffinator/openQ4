@@ -241,6 +241,12 @@ public:
 	virtual bool			ServerSendVoice( int clientNum, const idBitMsg &msg );
 	// False when no recording is active or the marker is malformed.
 	virtual bool			ServerRecordMVDMarker( const serverMVDMarker_t &marker );
+	// openQ4 MP-22: Quake 4 sends decls by index. While a retail 1.4.2 network
+	// demo plays, the index openQ4 gives the decl its recording numbered
+	// retailIndex (-1 for none), and how many of the type the recording knew;
+	// otherwise the index unchanged and openQ4's own count.
+	virtual int				RetailDemoDeclIndex( int declType, int retailIndex ) const;
+	virtual int				RetailDemoDeclCount( int declType ) const;
 };
 
 extern idNetworkSystem *	networkSystem;

@@ -1964,4 +1964,7 @@
 	"#str_232842"	"Retroceder"
 	"#str_232843"	"Jugadores: %s"
 	"#str_232844"	"Vista de %s"
+	"#str_232870"	"Demo de red de Quake 4"
+	"#str_232871"	"Grabada con otra versión de Quake 4"
+	"#str_232872"	"Necesita paks de Quake 4 que esta instalación no tiene"
 }

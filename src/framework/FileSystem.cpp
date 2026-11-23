@@ -1569,6 +1569,7 @@ public:
 	virtual fsFileOrigin_t	GetFileOrigin( const char *relativePath );
 	bool					IsShippedPack( const pack_t *pak ) const;
 	void					ListLoadedPacks( idStrList &entries ) const;	// FS_ListLoadedPacks
+	bool					FilePack( const char *relativePath, int &checksum, idStr &gameDir );	// FS_FilePack
 	virtual idFile *		GetNewFileMemory( void );
 	virtual idFile *		GetNewFilePermanent( void );
 	virtual idFile *		OpenFileReadFlags( const char *relativePath, int searchFlags, pack_t **foundInPak = NULL, bool allowCopyFiles = true, const char* gamedir = NULL );
@@ -6332,6 +6333,10 @@ void FS_ListLoadedPacks( idStrList &entries ) {
 	fileSystemLocal.ListLoadedPacks( entries );
 }
 
+bool FS_FilePack( const char *relativePath, int &checksum, idStr &gameDir ) {
+	return fileSystemLocal.FilePack( relativePath, checksum, gameDir );
+}
+
 void FS_RaiseDeferredContentPackFailure( void ) {
 	fs_openQ4PackProblemsMayRaise = true;
 	if ( fs_openQ4PackProblems.Num() == 0 ) {
@@ -7345,6 +7350,41 @@ fsFileOrigin_t idFileSystemLocal::GetFileOrigin( const char *relativePath ) {
 		return FS_FILE_ORIGIN_NOT_FOUND;
 	}
 	return IsShippedPack( pak ) ? FS_FILE_ORIGIN_SHIPPED : FS_FILE_ORIGIN_ADDED;
+}
+
+/*
+=====================
+idFileSystemLocal::FilePack
+
+openQ4 MP-22: the checksum and game directory of the pak a read of relativePath
+would come from, without reading it or marking the pak referenced; loose copies
+are passed over. False when no pak holds it. A retail network demo numbers only
+the decls of Quake 4's own paks.
+=====================
+*/
+bool idFileSystemLocal::FilePack( const char *relativePath, int &checksum, idStr &gameDir ) {
+	checksum = 0;
+	gameDir.Clear();
+	if ( !searchPaths || relativePath == NULL || relativePath[0] == '\0' ) {
+		return false;
+	}
+	pack_t *pak = NULL;
+	packMemberProbe_t probe;
+	idFile *loose = OpenFileReadSearch( relativePath, FSFLAG_SEARCH_PAKS | FSFLAG_PURE_NOREF, &pak, false, NULL, &probe );
+	if ( loose != NULL ) {
+		CloseFile( loose );
+		return false;
+	}
+	if ( !probe.found || pak == NULL ) {
+		return false;
+	}
+	checksum = pak->checksum;
+	idStr directory = pak->pakFilename;
+	directory.BackSlashesToSlashes();
+	directory.StripFilename();
+	directory.StripTrailing( '/' );
+	directory.ExtractFileName( gameDir );
+	return true;
 }
 
 /*

@@ -1973,4 +1973,7 @@
 	"#str_232842"	"Image précédente"
 	"#str_232843"	"Joueurs : %s"
 	"#str_232844"	"Vue de %s"
+	"#str_232870"	"Démo réseau de Quake 4"
+	"#str_232871"	"Enregistrée par une autre version de Quake 4"
+	"#str_232872"	"Nécessite des paks de Quake 4 absents de cette installation"
 }

@@ -1964,4 +1964,7 @@
 	"#str_232842"	"Visszalépés"
 	"#str_232843"	"Játékosok: %s"
 	"#str_232844"	"%s nézete"
+	"#str_232870"	"Quake 4 hálózati demó"
+	"#str_232871"	"Másik Quake 4 kiadás rögzítette"
+	"#str_232872"	"Olyan Quake 4 csomagok kellenek, amelyek ebből a telepítésből hiányoznak"
 }

@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "NetworkSystem.h"
 #include "AsyncServer.h"
 #include "AsyncNetwork.h"
+#include "RetailNetDemo.h"
 #ifndef ID_DEDICATED
 #include "../Session_local.h"
 #include "../../sys/NetworkEndpoint.h"
@@ -184,6 +185,24 @@ bool idNetworkSystem::ServerRecordMVDMarker( const serverMVDMarker_t &marker ) {
 	// openQ4 MP-22: a recording of a client's own view takes the markers its game finds too
 	return ( idAsyncNetwork::server.IsActive() || idAsyncNetwork::multiViewDemo.IsClientRecording() ) &&
 		idAsyncNetwork::multiViewDemo.RecordMarker( marker );
+}
+
+/*
+==================
+idNetworkSystem::RetailDemoDeclIndex
+==================
+*/
+int idNetworkSystem::RetailDemoDeclIndex( int declType, int retailIndex ) const {
+	return openq4_retail::RemapDeclIndex( declType, retailIndex );
+}
+
+/*
+==================
+idNetworkSystem::RetailDemoDeclCount
+==================
+*/
+int idNetworkSystem::RetailDemoDeclCount( int declType ) const {
+	return openq4_retail::RetailDeclCount( declType );
 }
 
 /*

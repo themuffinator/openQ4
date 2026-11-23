@@ -10,6 +10,7 @@ openQ4 demo library and format-neutral playback controls.
 #include "DemoFile.h"
 #include "NativeInputPublications.h"
 #include "async/AsyncNetwork.h"
+#include "async/RetailNetDemo.h"
 #include "../ui/ListGUILocal.h"
 
 namespace {
@@ -66,12 +67,6 @@ static bool DemoPathEndsWith( const idStr &path, const char *suffix ) {
 	const int suffixLength = static_cast<int>( strlen( suffix ) );
 	return path.Length() >= suffixLength &&
 		idStr::Icmp( path.c_str() + path.Length() - suffixLength, suffix ) == 0;
-}
-
-static unsigned int DemoReadLittleUInt( const byte *data ) {
-	unsigned int value = 0;
-	memcpy( &value, data, sizeof( value ) );
-	return LittleLong( value );
 }
 
 static bool DemoPathIsSafe( const idStr &path ) {
@@ -170,6 +165,23 @@ static const char *DemoMVDProblemString( const idStr &error ) {
 	if ( error.Find( "unsupported" ) >= 0 ||
 		 error.Find( "incompatible" ) >= 0 ) {
 		return "#str_41553";
+	}
+	return "#str_41565";
+}
+
+// openQ4 MP-22: why a retail Quake 4 network demo cannot play
+static const char *DemoRetailProblemString( const idStr &error ) {
+	if ( error.Find( "another Quake 4 release" ) >= 0 ) {
+		return "#str_232871";
+	}
+	if ( error.Find( "paks" ) >= 0 ) {
+		return "#str_232872";
+	}
+	if ( error.Find( "game frames a second" ) >= 0 ) {
+		return "#str_41563";
+	}
+	if ( error.Find( "game module" ) >= 0 ) {
+		return "#str_41561";
 	}
 	return "#str_41565";
 }
@@ -614,18 +626,53 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 			common->DPrintf( "Demo library rejected '%s': %s\n",
 				entry.path.c_str(), error.c_str() );
 		}
-	} else if ( DemoPathEndsWith( entry.path, ".netdemo" ) ) {
-		byte prefix[20];
-		int prefixBytes = 0;
-		DemoReadPrefix( entry.path, prefix, sizeof( prefix ), prefixBytes );
+	} else if ( openq4_retail::IsRetailNetDemoName( entry.path.c_str() ) ) {
+		// openQ4 MP-22: a retail Quake 4 network demo (.ndmo85 from 1.4.2, .netdemo
+		// before it). 1.4.2's plays through the MVD player; the header names any other.
 		entry.type = DEMO_LIBRARY_LEGACY_NET;
-		entry.format = DemoLocalized( "#str_41543" );
-		entry.status = DemoLocalized( "#str_41547" );
-		entry.details = DemoLocalized( "#str_41547" );
-		if ( prefixBytes >= 4 && memcmp( prefix, "NDMO", 4 ) == 0 && prefixBytes >= 12 ) {
-			const int version = static_cast<int>( DemoReadLittleUInt( prefix + 4 ) );
-			const int protocol = static_cast<int>( DemoReadLittleUInt( prefix + 8 ) );
-			entry.format = va( "NDMO v%d / %d", version, protocol );
+		// .netdemo is what Quake 4 wrote before 1.4.2 named its demos by protocol
+		const char *formatLabel = DemoPathEndsWith( entry.path, ".netdemo" ) ? "#str_41543" : "#str_232870";
+		entry.format = DemoLocalized( formatLabel );
+		mvdFileInfo_t info;
+		const bool read = idAsyncNetwork::multiViewDemo.QueryFileInfo( entry.path.c_str(), info );
+		if ( info.protocolMajor > 0 ) {
+			entry.format = va( "%s %u.%u", DemoLocalized( formatLabel ), info.protocolMajor, info.protocolMinor );
+		}
+		if ( read ) {
+			entry.playable = info.compatible;
+			entry.compatible = info.compatible;
+			entry.cleanEnd = info.cleanEnd;
+			entry.durationMS = info.durationMS;
+			entry.mapName = DemoSanitizeText( info.mapName );
+			entry.gameType = DemoSanitizeText( info.gameType );
+			entry.serverName = DemoSanitizeText( info.serverName );
+			entry.players = DemoSanitizeText( info.players );
+			entry.recorder = DemoSanitizeText( info.viewName );
+			entry.clientView = info.clientView;
+			entry.status = DemoLocalized( info.compatible ? "#str_41546" : "#str_41547" );
+			entry.details = DemoLocalized( DemoRetailProblemString( info.error ) );
+			if ( info.compatible ) {
+				if ( info.clientView && !entry.recorder.IsEmpty() ) {
+					entry.details = va( DemoLocalized( "#str_232844" ), entry.recorder.c_str() );
+				} else if ( !entry.players.IsEmpty() ) {
+					entry.details = va( DemoLocalized( "#str_232843" ), entry.players.c_str() );
+				} else {
+					entry.details = DemoLocalized( info.clientView ? "#str_41551" : "#str_41550" );
+				}
+				entry.capabilities =
+					DEMO_CAP_PLAY | DEMO_CAP_PAUSE | DEMO_CAP_RATE |
+					DEMO_CAP_SEEK | DEMO_CAP_STEP | DEMO_CAP_FREE_ROAM |
+					DEMO_CAP_FOLLOW | DEMO_CAP_FULL_WORLD;
+				if ( info.clientView ) {
+					entry.capabilities &= ~( DEMO_CAP_FREE_ROAM | DEMO_CAP_FOLLOW | DEMO_CAP_FULL_WORLD );
+				}
+			}
+		} else {
+			const bool otherRelease = info.error.Find( "another Quake 4 release" ) >= 0;
+			entry.status = DemoLocalized( otherRelease ? "#str_41547" : "#str_41548" );
+			entry.details = DemoLocalized( DemoRetailProblemString( info.error ) );
+			common->DPrintf( "Demo library rejected '%s': %s\n",
+				entry.path.c_str(), info.error.c_str() );
 		}
 	}
 
@@ -936,6 +983,7 @@ void idSessionLocal::ScanDemoLibrary() {
 	DemoCollectExtension( paths, ".demo" );
 	DemoCollectExtension( paths, ".cdemo" );
 	DemoCollectExtension( paths, ".netdemo" );
+	DemoCollectExtension( paths, ".ndmo85" );
 	DemoCollectExtension( paths, ".part" );
 	DemoCollectExtension( paths, ".ucmd" );
 
@@ -1671,7 +1719,8 @@ bool idSessionLocal::PlayDemoLibraryEntry( int index ) {
 	demoReturnGui = NULL;
 	demoBrowserMode = false;
 	demoOverlayVisible = true;
-	if ( entry.type == DEMO_LIBRARY_MVD ) {
+	if ( entry.type == DEMO_LIBRARY_MVD || entry.type == DEMO_LIBRARY_LEGACY_NET ) {
+		// openQ4 MP-22: a retail network demo plays through the MVD player too
 		idCmdArgs play;
 		play.AppendArg( "playMVD" );
 		play.AppendArg( entry.path.c_str() );

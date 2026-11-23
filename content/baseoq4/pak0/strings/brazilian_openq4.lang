@@ -1964,4 +1964,7 @@
 	"#str_232842"	"Voltar quadro"
 	"#str_232843"	"Jogadores: %s"
 	"#str_232844"	"Visão de %s"
+	"#str_232870"	"Demo de rede do Quake 4"
+	"#str_232871"	"Gravada por outra versão do Quake 4"
+	"#str_232872"	"Precisa de paks do Quake 4 que esta instalação não tem"
 }

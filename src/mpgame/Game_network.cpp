@@ -2069,9 +2069,10 @@ bool idGameLocal::ClientReadSnapshot( int clientNum, int snapshotSequence, const
 		numBitsRead = msg.GetNumBitsRead();
 
 		deltaMsg.InitReading( base ? &base->state : NULL, &newBase->state, &msg );
+		deltaMsg.SetRetailBaseReads( RetailSnapshotFormat() );
 
 		spawnId = deltaMsg.ReadBits( 32 - GENTITYNUM_BITS );
-		entityDefNumber = deltaMsg.ReadBits( entityDefBits );
+		entityDefNumber = NetworkDeclIndex( DECL_ENTITYDEF, deltaMsg.ReadBits( entityDefBits ) );
 		entityInstance = readEntityInstances ? deltaMsg.ReadBits( ASYNC_PLAYER_INSTANCE_BITS ) : -1;
 		if ( spawnId < 0 || entityDefNumber < 0 ||
 			 entityDefNumber >= declManager->GetNumDecls( DECL_ENTITYDEF ) ||
@@ -2081,6 +2082,12 @@ bool idGameLocal::ClientReadSnapshot( int clientNum, int snapshotSequence, const
 		}
 
 		ent = entities[i];
+		if ( RetailSnapshotFormat() && cvarSystem->GetCVarInteger( "net_retailDemoDebug" ) > 2 ) {
+			// openQ4 MP-22: each entity a retail recording's snapshot holds
+			common->Printf( "retail snapshot %d entity %d spawn %d def %s%s\n", snapshotSequence, i, spawnId,
+				declManager->DeclByIndex( DECL_ENTITYDEF, entityDefNumber, false )->GetName(),
+				base ? "" : " (no base)" );
+		}
 
 		// if there is no entity or an entity of the wrong type
 		if ( !ent || ent->entityDefNumber != entityDefNumber || spawnId != spawnIds[ i ] ) {
@@ -2140,7 +2147,7 @@ bool idGameLocal::ClientReadSnapshot( int clientNum, int snapshotSequence, const
 		// read the class specific data from the snapshot
 		ent->ReadFromSnapshot( deltaMsg );
 		if ( deltaMsg.IsReadOverflowed() ) {
-			common->Warning( "ClientReadSnapshot: truncated entity state for %d", i );
+			common->Warning( "ClientReadSnapshot: truncated entity state for %d (%s, %s)", i, ent->GetClassname(), ent->GetEntityDefName() );
 			return false;
 		}
 
@@ -2403,6 +2410,7 @@ bool idGameLocal::ClientReadSnapshot( int clientNum, int snapshotSequence, const
 	newBase->state.Init( newBase->stateBuf, sizeof( newBase->stateBuf ) );
 	newBase->state.BeginWriting();
 	deltaMsg.InitReading( base ? &base->state : NULL, &newBase->state, &msg );
+	deltaMsg.SetRetailBaseReads( RetailSnapshotFormat() );
 
 	ReadGameStateFromSnapshot( deltaMsg );
 	if ( deltaMsg.IsReadOverflowed() ) {
@@ -2602,7 +2610,7 @@ bool idGameLocal::ClientReadServerDemoBaseline( int sequence, idFile *file ) {
 		base->state.BeginReading();
 		deltaMsg.InitReading( &base->state, NULL, NULL );
 		const int spawnId = deltaMsg.ReadBits( 32 - GENTITYNUM_BITS );
-		const int entityDefNumber = deltaMsg.ReadBits( entityDefBits );
+		const int entityDefNumber = NetworkDeclIndex( DECL_ENTITYDEF, deltaMsg.ReadBits( entityDefBits ) );
 		const int entityInstance = readEntityInstances ? deltaMsg.ReadBits( ASYNC_PLAYER_INSTANCE_BITS ) : -1;
 		if ( spawnId < 0 || entityDefNumber < 0 ||
 			 entityDefNumber >= declManager->GetNumDecls( DECL_ENTITYDEF ) ||
@@ -2842,7 +2850,7 @@ void idGameLocal::ClientHitScan( const idBitMsg &msg ) {
 
 	assert( isClient );
 
-	hitscanDefIndex = msg.ReadLong();
+	hitscanDefIndex = NetworkDeclIndex( DECL_ENTITYDEF, msg.ReadLong() );
 	if ( msg.IsReadOverflowed() || hitscanDefIndex < 0 || hitscanDefIndex >= declManager->GetNumDecls( DECL_ENTITYDEF ) ) {
 		common->Warning( "idGameLocal::ClientHitScan: invalid or truncated entity def index %d\n", hitscanDefIndex );
 		return;
@@ -2941,6 +2949,12 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 					}
 				}
 			} else {
+				// openQ4 MP-22: a retail server demo sent each player's copy to its own
+				// slot as well; the copy for the player the camera follows shows instead
+				if ( RetailSnapshotFormat() && toClient == MAX_CLIENTS && followPlayer >= 0 &&
+					 followPlayer < MAX_CLIENTS && !isRepeater ) {
+					return;
+				}
 				toClient = -1;
 			}
 			break;
@@ -3214,7 +3228,8 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			voteStruct_t voteData;
 			idMultiplayerGame::EmptyVoteStruct( voteData );
 			int clientNum = msg.ReadByte();
-			voteData.m_fieldFlags = msg.ReadLong();
+			// openQ4 MP-22: Quake 4 1.4.2 sent its twelve vote flags in a short
+			voteData.m_fieldFlags = RetailSnapshotFormat() ? ( msg.ReadShort() & 0x0fff ) : msg.ReadLong();
 			if ( voteData.m_fieldFlags <= 0 || ( voteData.m_fieldFlags & ~VOTEFLAG_ALL ) != 0 ) {
 				Warning( "Ignoring packed vote state with invalid field flags 0x%x", voteData.m_fieldFlags );
 				break;
@@ -3255,6 +3270,11 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_CONTROLTIME ) ) {
 				voteData.m_controlTime = msg.ReadShort();
 			}
+			if ( RetailSnapshotFormat() ) {
+				// 1.4.2's packed vote ends with the control time
+				mpGame.ClientStartPackedVote( clientNum, voteData );
+				break;
+			}
 			if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_ROUNDLIMIT ) ) {
 				voteData.m_roundLimit = msg.ReadShort();
 			}
@@ -3294,7 +3314,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			char mapNameBuffer[256] = { '\0' };
 			idMultiplayerGame::EmptyVoteStruct( voteData );
 			if ( multiVote ) {
-				voteData.m_fieldFlags = msg.ReadLong();
+				voteData.m_fieldFlags = RetailSnapshotFormat() ? ( msg.ReadShort() & 0x0fff ) : msg.ReadLong();
 				if ( voteData.m_fieldFlags <= 0 || ( voteData.m_fieldFlags & ~VOTEFLAG_ALL ) != 0 ) {
 					Warning( "Ignoring vote update with invalid field flags 0x%x", voteData.m_fieldFlags );
 					break;
@@ -3314,11 +3334,14 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 				voteData.m_buying = msg.ReadByte();
 				voteData.m_teamBalance = msg.ReadByte();
 				voteData.m_controlTime = msg.ReadShort();
-				voteData.m_roundLimit = msg.ReadShort();
-				voteData.m_ruleset = msg.ReadByte();
-				voteData.m_instagib = msg.ReadByte();
-				voteData.m_overtime = msg.ReadShort();
-				if ( !idMultiplayerGame::ReadVoteExtensionFields( msg, voteData ) ) {
+				// openQ4 MP-22: 1.4.2's vote update ends with the control time
+				if ( !RetailSnapshotFormat() ) {
+					voteData.m_roundLimit = msg.ReadShort();
+					voteData.m_ruleset = msg.ReadByte();
+					voteData.m_instagib = msg.ReadByte();
+					voteData.m_overtime = msg.ReadShort();
+				}
+				if ( !RetailSnapshotFormat() && !idMultiplayerGame::ReadVoteExtensionFields( msg, voteData ) ) {
 					Warning( "Ignoring vote update with a malformed modifier, preset or arena field" );
 					break;
 				}
@@ -3361,7 +3384,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			break;
 		}
 		case GAME_RELIABLE_MESSAGE_ITEMACQUIRESOUND:
-			mpGame.PlayGlobalItemAcquireSound( msg.ReadBits ( gameLocal.entityDefBits ) );
+			mpGame.PlayGlobalItemAcquireSound( NetworkDeclIndex( DECL_ENTITYDEF, msg.ReadBits( gameLocal.entityDefBits ) ) );
 			break;
 		case GAME_RELIABLE_MESSAGE_DEATH: {
 			int attackerEntityNumber = msg.ReadByte( );
@@ -6513,7 +6536,11 @@ void idGameLocal::ReadNetworkInfo( int gameTime, idFile* file, int clientNum ) {
 			deltaMsg.InitReading( &base->state, NULL, NULL );
 
 			spawnId = deltaMsg.ReadBits( 32 - GENTITYNUM_BITS );
-			entityDefNumber = deltaMsg.ReadBits( entityDefBits );
+			entityDefNumber = NetworkDeclIndex( DECL_ENTITYDEF, deltaMsg.ReadBits( entityDefBits ) );
+			if ( entityDefNumber < 0 || entityDefNumber >= declManager->GetNumDecls( DECL_ENTITYDEF ) ) {
+				common->Warning( "ReadNetworkInfo: invalid entity definition for entity %d", i );
+				continue;
+			}
 
 			if ( !ent || ent->entityDefNumber != entityDefNumber || spawnId != spawnIds[ i ] ) {
 
@@ -6662,6 +6689,9 @@ void idGameLocal::SetDemoState( demoState_t state, bool _serverDemo, bool _timeD
 	demoState = state;
 	serverDemo = _serverDemo;
 	timeDemo = _timeDemo;
+	// openQ4 MP-22: entity definitions are sent in as many bits as the sender's
+	// count takes; a retail recording's is its own paks' count
+	entityDefBits = idMath::BitsForInteger( NetworkDeclCount( DECL_ENTITYDEF ) ) + 1;
 }
 
 /*
@@ -6699,8 +6729,11 @@ bool idGameLocal::IsDemoProtocolCompatible( int minor_ref, int minor ) const {
 	// openQ4: protocol 2.42 changed what a snapshot holds for players, projectiles and
 	// entity tags; a demo recorded with 2.41 is read in its own layout
 	// (LegacySnapshotFormat), so recordings made before the change still play.
+	// openQ4 MP-22: and a retail Quake 4 1.4.2 network demo (2.85) reads in 1.4.2's layout
+	// (RetailSnapshotFormat), decoded and replayed by the engine's multi-view demo player.
 	return ( minor_ref == minor ||
-		( minor_ref == GAME_SNAPSHOT_PROTOCOL && minor == GAME_SNAPSHOT_PROTOCOL_LEGACY ) );
+		( minor_ref == GAME_SNAPSHOT_PROTOCOL && minor == GAME_SNAPSHOT_PROTOCOL_LEGACY ) ||
+		( minor_ref == GAME_SNAPSHOT_PROTOCOL && minor == GAME_SNAPSHOT_PROTOCOL_RETAIL ) );
 }
 
 /*

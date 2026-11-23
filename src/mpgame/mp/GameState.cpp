@@ -248,6 +248,13 @@ bool rvGameState::BaseUnpackState( const idBitMsg& inMsg ) {
 	currentState = (mpGameState_t)inMsg.ReadByte();
 	nextState = (mpGameState_t)inMsg.ReadByte();
 	nextStateTime = inMsg.ReadLong();
+	if ( gameLocal.RetailSnapshotFormat() ) {
+		// openQ4 MP-22: Quake 4 1.4.2 had no overtime state
+		overtimeCount = 0;
+		overtimeAccumulatedMsec = 0;
+		overtimeStartTime = 0;
+		return true;
+	}
 	overtimeCount = inMsg.ReadByte();
 	overtimeAccumulatedMsec = inMsg.ReadLong();
 	overtimeStartTime = inMsg.ReadLong();
@@ -1475,14 +1482,17 @@ rvCTFGameState::UnpackState
 ================
 */
 void rvCTFGameState::UnpackState( const idBitMsg& inMsg ) {
+	// openQ4 MP-22: Quake 4 1.4.2 numbered only the two team flags before the
+	// assault points; openQ4 has a third, neutral one
+	const int flags = gameLocal.RetailSnapshotFormat() ? TEAM_MAX : MAX_CTF_FLAGS;
 	while( inMsg.GetRemainingData() ) {
 		int index = inMsg.ReadByte();
 
-		if( index >= 0 && index < MAX_CTF_FLAGS ) {
+		if( index >= 0 && index < flags ) {
 			flagStatus[ index ].state = (flagState_t)inMsg.ReadByte();
 			flagStatus[ index ].clientNum = inMsg.ReadByte();
-		} else if( index >= MAX_CTF_FLAGS && index < ( MAX_CTF_FLAGS + MAX_AP ) ) {
-			apState[ index - MAX_CTF_FLAGS ] = (apState_t)inMsg.ReadByte();
+		} else if( index >= flags && index < ( flags + MAX_AP ) ) {
+			apState[ index - flags ] = (apState_t)inMsg.ReadByte();
 		} else {
 			// openQ4: this blob also reaches us from a recorded server demo, and
 			// the index space widened when the neutral one-flag slot got real

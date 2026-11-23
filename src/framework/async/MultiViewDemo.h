@@ -15,8 +15,10 @@ openQ4 multi-view demo recording and playback.
 #include <vector>
 
 class idFile;
+class idFile_Memory;
 class idBitMsg;
 class idCmdArgs;
+namespace openq4_retail { struct retailNetDemo_t; }
 
 struct mvdFileInfo_t {
 							mvdFileInfo_t();
@@ -47,6 +49,8 @@ struct mvdFileInfo_t {
 	idStr					viewName;
 	idStr					packs;			// "<dir>/<pack>:<checksum>;..." the game data came from
 	idStr					players;		// openQ4 MP-22: every name seen while recording, ", " between
+	// openQ4 MP-22: a retail Quake 4 network demo (.ndmo85, .netdemo), played through this player
+	bool					retail;
 };
 
 class idMultiViewDemo {
@@ -119,6 +123,7 @@ public:
 	static void				Record_f( const idCmdArgs &args );
 	static void				Stop_f( const idCmdArgs &args );
 	static void				Play_f( const idCmdArgs &args );
+	static void				TimeDemo_f( const idCmdArgs &args );
 	static void				Info_f( const idCmdArgs &args );
 	static void				Status_f( const idCmdArgs &args );
 	static void				Library_f( const idCmdArgs &args );
@@ -258,6 +263,11 @@ private:
 	bool					keyframeWritesDisabled;
 	serverMVDRecordingResult_t recordingResult;
 	bool					recordingResultValid;
+	// openQ4 MP-22: a retail Quake 4 1.4.2 network demo, decoded into this
+	// player's own records in memory and played from there
+	bool					retailSource;
+	int						retailEntityDefs;		// the entity definitions the recording numbered
+	idList<byte>			retailStream;
 
 	void					Clear();
 	void					ClearState();
@@ -310,6 +320,9 @@ private:
 	bool					ResetPlaybackStream();
 	bool					ProcessSeekBudget();
 	bool					ReadMetadataRecord( const record_t &record, mvdFileInfo_t &info );
+	bool					OpenRetailNetDemo();
+	bool					BuildRetailStream( openq4_retail::retailNetDemo_t &demo, idFile_Memory &out );
+	bool					QueryRetailFileInfo( const char *name, mvdFileInfo_t &info );
 
 	idStr					BuildRecordingName( const idCmdArgs &args ) const;
 	idStr					BuildPlaybackName( const char *name ) const;

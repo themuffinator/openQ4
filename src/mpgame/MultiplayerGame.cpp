@@ -24258,8 +24258,10 @@ idMultiplayerGame::PlayGlobalItemAcquireSound
 ================
 */
 void idMultiplayerGame::PlayGlobalItemAcquireSound( int defIndex ) {
-	const idDeclEntityDef*  def;
-	def = static_cast<const idDeclEntityDef*>( declManager->DeclByIndex( DECL_ENTITYDEF, defIndex, false ) );
+	const idDeclEntityDef*  def = NULL;
+	if ( defIndex >= 0 && defIndex < declManager->GetNumDecls( DECL_ENTITYDEF ) ) {
+		def = static_cast<const idDeclEntityDef*>( declManager->DeclByIndex( DECL_ENTITYDEF, defIndex, false ) );
+	}
 	if ( !def ) {
 		gameLocal.Warning ( "NET: invalid entity def index (%d) for global item acquire sound", defIndex );
 		return;
@@ -28241,7 +28243,8 @@ void idMultiplayerGame::ClientReadStartState( const idBitMsg &msg ) {
 
 	assert( gameLocal.isClient );
 
-	const int powerupBits = MP_StartStatePowerupBits( msg );
+	// openQ4 MP-22: Quake 4 1.4.2's mask is a short
+	const int powerupBits = gameLocal.RetailSnapshotFormat() ? 16 : MP_StartStatePowerupBits( msg );
 
 	// read the state in preparation for reading snapshot updates
 	matchStartedTime = msg.ReadLong( );

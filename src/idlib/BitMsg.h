@@ -442,6 +442,12 @@ public:
 
 	void			InitWriting( const idBitMsg *base, idBitMsg *newBase, idBitMsg *delta );
 	void			InitReading( const idBitMsg *base, idBitMsg *newBase, const idBitMsg *delta );
+	// openQ4 MP-22: reads the base as Quake 4 1.4.2 did, for one read of a retail
+	// recording. Its idBitMsg::ReadBits gave -1 for a read the message could not
+	// fit and left the message as it was, so a shorter read after it still read,
+	// and its writer compared against those values: a value past the end of a
+	// shorter base could be sent as unchanged. openQ4's own stream never is.
+	void			SetRetailBaseReads( bool set ) { retailBaseReads = set; }
 	bool			HasChanged( void ) const;
 	bool			IsReadOverflowed( void ) const;
 	void			MarkReadOverflowed( void ) const;
@@ -524,6 +530,8 @@ private:
 	idBitMsg *		writeDelta;		// delta from base to new base for writing
 	const idBitMsg *readDelta;		// delta from base to new base for reading
 	mutable bool	changed;		// true if the new base is different from the base
+	bool			retailBaseReads;	// SetRetailBaseReads
+	int				BaseBits( int numBits ) const;
 
 private:
 	void			WriteDelta( int oldValue, int newValue, int numBits );
@@ -536,6 +544,7 @@ ID_INLINE idBitMsgDelta::idBitMsgDelta() {
 	writeDelta = NULL;
 	readDelta = NULL;
 	changed = false;
+	retailBaseReads = false;
 }
 
 ID_INLINE bool idBitMsgDelta::IsReadOverflowed( void ) const {
@@ -560,6 +569,7 @@ ID_INLINE void idBitMsgDelta::InitWriting( const idBitMsg *base, idBitMsg *newBa
 	this->writeDelta = delta;
 	this->readDelta = delta;
 	this->changed = false;
+	this->retailBaseReads = false;
 }
 
 ID_INLINE void idBitMsgDelta::InitReading( const idBitMsg *base, idBitMsg *newBase, const idBitMsg *delta ) {
@@ -568,6 +578,7 @@ ID_INLINE void idBitMsgDelta::InitReading( const idBitMsg *base, idBitMsg *newBa
 	this->writeDelta = NULL;
 	this->readDelta = delta;
 	this->changed = false;
+	this->retailBaseReads = false;
 }
 
 ID_INLINE bool idBitMsgDelta::HasChanged( void ) const {
