@@ -2554,9 +2554,12 @@ bool R_MaterialResourceTable_ClassicCorridorPathEligible( const materialResource
 			|| ( record.fallbackFlags == 0 ) != ( record.fallbackReason == MATERIAL_RESOURCE_FALLBACK_NONE ) ) {
 		return false;
 	}
-	// The forward pass still samples the untransformed, uncoloured diffuse for a
-	// cutout's alpha, so neither stays in a cutout.
-	if ( ( record.hasTextureMatrix || record.hasVertexColor || record.hasConditionRegisters ) && record.alphaTest ) { return false; }
+	// REN-02 step 1: the depth and forward passes now test a cutout's alpha
+	// through the stage's texture matrix (uClassicStage), so these stay in a
+	// cutout. The corridor still checks each frame that one alpha-tested
+	// diffuse stage is active; clearing the rollback bit restores the exclusion.
+	if ( ( record.hasTextureMatrix || record.hasVertexColor || record.hasConditionRegisters ) && record.alphaTest
+			&& ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_STAGES ) == 0 ) { return false; }
 	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
 		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
 	if ( record.hasPBR || record.material == NULL || globalImages == NULL

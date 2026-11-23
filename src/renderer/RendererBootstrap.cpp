@@ -65,6 +65,7 @@ static bool RendererBootstrap_BuildDefaultSafetyReport( idStr &report, idStr &is
 		{ "r_rendererSharedFaultInject", &r_rendererSharedFaultInject, 0 },
 		{ "r_vkShadowFallbackTest", &r_vkShadowFallbackTest, 0 },
 		{ "r_rendererModernLightingParity", &r_rendererModernLightingParity, 0 },
+		{ "r_rendererOwnershipCompose", &r_rendererOwnershipCompose, 0 },
 		{ "r_rendererModernVisibleDepth", &r_rendererModernVisibleDepth, 0 },
 		{ "r_rendererModernDepthDebug", &r_rendererModernDepthDebug, 0 },
 		{ "r_rendererModernOpaque", &r_rendererModernOpaque, 0 },

@@ -736,6 +736,22 @@ bool RB_PrepareModernLightGrid( const drawSurf_t *surf, const viewDef_t *viewDef
 	return false;
 }
 
+int RB_LightGridClassicAlbedoStages( const drawSurf_t *surf, idImage **bumpImage, idVec4 bumpMatrix[2],
+		idImage **diffuseImage, idVec4 diffuseMatrix[2], float diffuseColor[4], float vertexColorParams[2] ) {
+	( void )surf; ( void )bumpImage; ( void )bumpMatrix; ( void )diffuseImage; ( void )diffuseMatrix;
+	( void )diffuseColor; ( void )vertexColorParams;
+	return 0;
+}
+
+bool RB_ARB2_LightShadowsByStencilPolicy( const viewLight_t *vLight ) {
+	( void )vLight;
+	return false;
+}
+
+void RB_ARB2_StencilShadowPassForLight( const viewDef_t *viewDef, viewLight_t *vLight, const drawSurf_t *shadows ) {
+	( void )viewDef; ( void )vLight; ( void )shadows;
+}
+
 void RB_DetermineLightScale( void ) {
 	RB_GLESD3_DetermineLightScale();
 }

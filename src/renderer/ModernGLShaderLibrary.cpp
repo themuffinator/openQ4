@@ -235,6 +235,11 @@ static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, modernGL
 		"uniform vec4 uLocalParams;\n"
 		"uniform vec4 uMaterialFlags;\n"
 		"uniform vec4 uMaterialEnhancement;\n"
+		// REN-02: a classic stage's texture matrices and vertex-colour mode, as
+		// offsets from identity so an unset uniform changes nothing. Rows 0-1
+		// are the diffuse matrix, 2-3 the bump matrix, 4 the vertex-colour
+		// scale and bias.
+		"uniform vec4 uClassicStage[5];\n"
 		"#define MODERN_HAS_DRAW_RECORDS %d\n"
 		"struct ModernDrawRecord {\n"
 		"    mat4 modelViewProjection;\n"
@@ -281,6 +286,8 @@ static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, modernGL
 		"    return ModernUniformDrawRecord();\n"
 		"}\n"
 		"out vec2 vTexCoord;\n"
+		"out vec2 vBumpTexCoord;\n"
+		"out vec3 vClassicTint;\n"
 		"out vec4 vVertexColor;\n"
 		"out vec3 vViewNormal;\n"
 		"out vec3 vViewTangent;\n"
@@ -307,7 +314,10 @@ static void R_ModernGLShaderLibrary_BuildVertexSource( int glslVersion, modernGL
 		"    vec3 rawBitangent = ModernSafeNormalize(localToView * attr_Tangent1, vec3(0.0, 1.0, 0.0));\n"
 		"    tangent = ModernSafeNormalize(tangent - normal * dot(normal, tangent), vec3(1.0, 0.0, 0.0));\n"
 		"    float signValue = dot(cross(normal, tangent), rawBitangent) < 0.0 ? -1.0 : 1.0;\n"
-		"    vTexCoord = attr_TexCoord0;\n"
+		"    vec4 classicUV = vec4(attr_TexCoord0, 0.0, 1.0);\n"
+		"    vTexCoord = attr_TexCoord0 + vec2(dot(classicUV, uClassicStage[0]), dot(classicUV, uClassicStage[1]));\n"
+		"    vBumpTexCoord = attr_TexCoord0 + vec2(dot(classicUV, uClassicStage[2]), dot(classicUV, uClassicStage[3]));\n"
+		"    vClassicTint = attr_Color.rgb * uClassicStage[4].x + vec3(1.0 + uClassicStage[4].y);\n"
 		"    vVertexColor = attr_Color;\n"
 		"    vViewNormal = normal;\n"
 		"    vViewTangent = tangent;\n"
@@ -413,6 +423,8 @@ static void R_ModernGLShaderLibrary_BuildFragmentBody( int glslVersion, modernGL
 		sharedHeader,
 		sizeof( sharedHeader ),
 		"in vec2 vTexCoord;\n"
+		"in vec2 vBumpTexCoord;\n"
+		"in vec3 vClassicTint;\n"
 		"in vec4 vVertexColor;\n"
 		"in vec3 vViewNormal;\n"
 		"in vec3 vViewTangent;\n"
@@ -460,7 +472,7 @@ static void R_ModernGLShaderLibrary_BuildFragmentBody( int glslVersion, modernGL
 		"}\n"
 		"vec3 ModernMaterialTangentNormal(void) {\n"
 		"    if (uMaterialFlags.x <= 0.5) { return vec3(0.0, 0.0, 1.0); }\n"
-		"    vec4 bumpSample = ModernSampleNormalTexture(vTexCoord);\n"
+		"    vec4 bumpSample = ModernSampleNormalTexture(vBumpTexCoord);\n"
 		"    if (uMaterialFlags.w >= 7.5) {\n"
 		"        int normalFormat = int(floor(uMaterialFlags.w - 9.0 + 0.5));\n"
 		"        if (normalFormat == 1) { vec2 xy = (bumpSample.rg * 2.0 - 1.0) * max(uLocalParams.w, 0.0); float z = sqrt(max(1.0 - dot(xy, xy), 0.0)); return ModernSafeNormal(vec3(xy, z)); }\n"
@@ -1888,7 +1900,7 @@ static void R_ModernGLShaderLibrary_BuildFragmentBody( int glslVersion, modernGL
 			"    vec3 lit = pbr ? ModernPBRSceneColor(ModernPBRIndirectSource(clusterPosition, materialNormal, ModernClusterFromEyeSpace(ModernSafeNormal(vViewNormal)), baseColor, pbrData.x, filteredRoughness, pbrData.z, clusterRange, baked)) + lightAccum + ModernPBRSceneColor(emissive) : baseColor * (lightScale + lightAccum * (0.30 + specular * 0.25)) + emissive;\n"
 			"    if (!pbr && uMaterialFlags.w == 1.0) lit = baseColor * lightAccum;\n"
 			"    if (!pbr && uMaterialFlags.w == 2.0) lit = texelFetch(uClassicLighting, ivec2(gl_FragCoord.xy), 0).rgb;\n"
-			"    if (!pbr && baked.x >= 0.0) lit += ModernBakedClamp(baseColor * baked.rgb, baked.w);\n"
+			"    if (!pbr && baked.x >= 0.0) lit += ModernBakedClamp(baseColor * vClassicTint * baked.rgb, baked.w);\n"
 			"    if (!pbr) lit = ModernClassicSceneColor(lit);\n"
 			"    if (pbr) lit = ModernClusterApplyFogAndBlend(lit, clusterRange, clusterLightCount, clusterPosition);\n"
 			"    int pbrDebug = int(floor(uDebugColor.a + 0.5));\n"
