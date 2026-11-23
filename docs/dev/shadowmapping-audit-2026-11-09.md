@@ -62,14 +62,15 @@ cache (sixteen at most) against forty cubes in view.
 | Finding | State |
 |---|---|
 | **A `noDynamicShadows` light lost every shadow** with shadow maps on: it has no per-surface volumes and no map casters, and the mapped-light rule also dropped its dmap prelight. 364 authored lights carry the flag, nearly all in multiplayer maps; the ones with a prelight (197 by a static count of the `.proc` files) shone through walls. | **Fixed** (`R_ShadowMapsNeedPerSurfaceStencilVolumes`). Verified by image on 23 November: waste's `light_8501` (`nodynamicshadows`, prelit), isolated and frozen in six views, shadows the same 0.7% of the one view its prelight reaches under shadow maps as under stencil, with no pixel shadowed by one and lit by the other, on both backends. |
-| **Static world geometry with a `noSelfShadow` material stopped shadowing `noSelfShadow` receivers** under prelit lights. Retail links the combined prelight as a GLOBAL shadow; the mapped path routed those surfaces by material into the local chains, so a marine behind such a pillar or container was lit, and the light needed a second map. | **Fixed.** Static-world casters of a prelit light keep global ownership. |
+| **Static world geometry with a `noSelfShadow` material stopped shadowing `noSelfShadow` receivers** under prelit lights. Retail links the combined prelight as a GLOBAL shadow; the mapped path routed those surfaces by material into the local chains, so a marine behind such a pillar or container was lit, and the light needed a second map. | **Fixed.** Static-world casters of a prelit light keep global ownership. Verified by image on 23 November: a stock marine crate (`noSelfShadow` material) spawned behind `noSelfShadow` world geometry under mcc_1's prelit `corey_light_3557` is as dark under shadow maps as under stencil on both backends. See "A `noSelfShadow` receiver behind `noSelfShadow` world geometry" below. |
 | **Gibs, burning corpses and fading moveables cast whenever `r_useShadowMap` was on**, including under point lights left on stencil at Enhanced, which is exactly the volume retail suppressed. | **Fixed.** They cast only when point lights are mapped too. |
 | **The five-tap kernel was one-sided**: the first four taps of the Poisson set all lie left of the centre (centroid 0.41 radius off). Enhanced uses five taps. | **Fixed, both backends.** A balanced four-tap ring. |
 | **Packed point depth wrapped at the far envelope**: `fract(1.0)` stored the nearest depth for a caster at or beyond far. Manual (non-comparison) OpenGL path only. | **Fixed.** |
 | **Shadow passes restored the viewport without the tiled-capture offset.** | **Fixed** (OpenGL). |
-| Casters are not clipped to the light volume. For a point light whose origin lies outside its box (388 authored), geometry between origin and box can shadow the box in a map and never in stencil. | **Open; confirmed in the code, small where measured.** A map draws each caster surface whole (`sint->ambientTris`); a prelight volume holds casters cut to the light (dmap's `ClipTriByLight`) and a run-time volume only the triangles that touch it. In controlled captures of six such lights in mcc_landing the map shadows at most 0.41% of a view that stencil lights (`light_9081`), on both backends. What a fix needs is in "Off-centre lights against stencil" below. |
-| **mcc_landing's `light_9083` shadows structures in its map that stencil leaves lit**: 25% to 49% of four views from the light's entity origin on both backends, and up to 13% from four positions 250 units away (OpenGL). A prelit fill light whose source lies 832 units outside its box, outside the level. | **Open.** Not casters outside the volume, not entities, not cascades. Forcing light-facing casters (`r_shadowMapCasterCulling 1`) reproduces the stencil picture. See "Off-centre lights against stencil" below. |
-| **mcc_landing's `light_9081` leaves lit in its map 10.4% of one view that stencil shadows**, on both backends. | **Open**, found by the same scan and not examined. |
+| **The static world was not cut to the light volume.** For a light whose source lies outside its own box (396 point lights and 9 parallel ones in the stock maps), geometry between source and box shadowed the box in a map and never in stencil: a map drew each world surface whole, and the dmap prelight volume, which is the stencil shadow of the static world, holds only the pieces inside the light (`ClipTriByLight` and the shadow frustums). | **Fixed, both backends**, for the 296 of those lights whose prelight volume carries front caps: the static world casts into the map as those caps (`r_shadowMapPrelightCasters`). Entities need nothing: stencil does not cut them either (their run-time volumes are infinite projections of the whole surface). **Open** for the 78 whose volume folds its caps away (a perforated surface casts into it) and the 31 with no prelight. See "What the stock volumes hold" below. |
+| **mcc_landing's `light_9083` shadowed structures in its map that stencil leaves lit**: 25% to 49% of four views from the light's entity origin on both backends. A prelit fill light whose source lies 832 units outside its box. | **Fixed, both backends**: 48.9% to 0.01% of the worst view. The map held the terrain's triangles that face the light; stencil casts only from those that face away, and the light's entity origin lies 63 units under that terrain, among wall bases that only the light reaches. See "What the stock volumes hold" below. |
+| **mcc_landing's `light_9081` left lit in its map 10.4% of one view that stencil shadows**, on both backends. | **Fixed, both backends**: 10.4% to 0.22%. Its source sits 8 units above its box, inside the ceiling, and the ceiling face lies in the box's top plane: no interaction, so no map caster, while the prelight volume keeps the piece of it under the source. See "What the stock volumes hold" below. |
+| **Suns and fill lights from outside lost shadows.** The maps of parallel and distant point lights stored the triangles of open geometry that face the light, the reverse of the stencil rule. A one-sided surface lit from its front blocked the light, and geometry that only has faces turned away cast nothing: q4cmp13's three parallel suns left lit 12% to 31% of a view that stencil shadows, q4ctf2's ten distant lights 3% to 14%. | **Fixed for the static world, both backends**, by the same caster: 30.9% to 0.7% (q4cmp13, worst light, both backends) and 14.3% to 1.4% (q4ctf2, Vulkan). **Open** for the other casters of those lights. See "What the stock volumes hold" below. |
 | **A soft shadow's grain followed its tile around.** The projected filter turns its kernel by a hash of the texel, and the texel was counted within the sampled image. The grain therefore changed whenever the light's tile took another place in the atlas, and a cached map differed from the same map drawn fresh: in hub2's start view one light alone changed 19,000 pixels between the two, by up to 147 levels, on both renderers. Reading cached maps where they live on Vulkan added a third place. | **Fixed, both backends.** The hash takes the texel within the tile. See "Walking" below. |
 | **Light-facing one-sided geometry cast in maps and never in stencil.** A stencil volume is built from the triangles that face away from the light and from nothing else, and the levels are lit on that understanding: a lamp shines through the one-sided floor it hangs over. The automatic caster mode drew every open surface two-sided, so the same floor blocked its light. storage2's fourteen alarm lights lit almost nothing with shadow maps on: at eight beam angles the mapped picture differed from the stencil one in up to 32,000 pixels on Vulkan and 73,000 on OpenGL. Recorded in September as a contact-detail decision; it is a missing light. | **Fixed, both backends.** Open geometry stores the triangles that face away from the light; a sealed hull keeps its near shell. See "Which triangles cast" below. |
 | **The near shell of a sealed hull was its far shell under every parallel and distant point light**, and under any projector whose right and up vectors are left-handed against its direction. Those projections show the light's view mirrored, which swaps the face the rasterizer reports for every triangle, and the culling took no account of it. A sealed hull has the same silhouette either way, so it showed only as the detached contact shadow the near shell was chosen to avoid. | **Fixed, both backends.** The face to discard follows the projection's handedness. See "Which triangles cast" below. |
@@ -1657,47 +1658,249 @@ share of pixels the map shadows and stencil lights in the worst view;
 edge of one large shadow. The two backends agree throughout, so what follows
 is in the shared front end.
 
-**Casters outside the volume: confirmed, small, not yet fixed.** A map draws
-each caster surface whole (`sint->ambientTris`), and an interaction exists as
-soon as a surface's bounds touch the light. Stencil holds less: dmap cuts a
-prelight's casters to the light (`ClipTriByLight`) and the run-time builders
-drop the triangles outside it. With the source inside the volume that cannot
-matter; with it outside, geometry between source and box shadows the box in
-the map only. In `light_9083`'s interactions, 18 of one trim surface's 2,025
-indexes reach the volume. The measured effect is `light_9081`'s 0.41%.
+**Casters outside the volume: confirmed.** A map draws each caster surface
+whole (`sint->ambientTris`), and an interaction exists as soon as a surface's
+bounds touch the light. For the static world stencil holds less: dmap cuts a
+prelight's casters to the light (`ClipTriByLight`, then the shadow frustums).
+With the source inside the volume that cannot matter; with it outside,
+geometry between source and box shadows the box in the map only. In
+`light_9083`'s interactions, 18 of one trim surface's 2,025 indexes reach the
+volume.
 
-A trial withheld static surfaces with no triangle in the volume from such a
-light's casters, and then clipped the rest exactly. It was withdrawn, for two
-reasons a fix has to deal with first:
+A first trial withheld static surfaces with no triangle in the volume from
+such a light's casters, and then clipped the rest. It was withdrawn: both
+caster passes draw a model surface whole (OpenGL's
+`RB_ShadowMapResolveCasterDrawData` and Vulkan's
+`VK_ShadowMap_ResolveCasterGeo` resolve an index-subset surface back to its
+ambient surface), so the clipped lists were never drawn as such, and an
+admitted caster that is not linked counts as a map that failed
+(`mapMissingCasterNeedsStencil`, `prelightMapMissingCasterNeedsStencil`): on
+Vulkan `light_9081` fell back unshadowed.
 
-- Both caster passes draw a model surface whole. OpenGL
-  (`RB_ShadowMapResolveCasterDrawData`) and Vulkan
-  (`VK_ShadowMap_ResolveCasterGeo`) resolve an index-subset surface back to
-  its ambient surface, and Vulkan's caster plan rejects a surface with
-  vertices of its own. Cutting casters needs an index selection in both.
-- An admitted caster that is not linked counts as a map that failed
-  (`mapMissingCasterNeedsStencil`, `prelightMapMissingCasterNeedsStencil`):
-  the light goes to its stencil fallback, and on Vulkan `light_9081` fell
-  back unshadowed ("required shadow resource unavailable"). A surface with
-  nothing in the volume has to be classed as having nothing to cast before
-  the ownership rules see it.
-
-**`light_9083`.** Clipping changes nothing, so its blockers are inside the
-volume. They are world surfaces (`r_skipEntities 1` changes nothing) and the
-same with one map as with cascades. With casters forced to the faces turned
-towards the light (`r_shadowMapCasterCulling 1`) the map lights what stencil
-lights; under the automatic rule of "Which triangles cast" (open geometry
-casts the triangles turned away from the light) it shadows the structures.
-The source sits outside the level and sees the world from behind, so by that
-rule every inward face between it and a receiver casts. Stencil leaves the
-structures lit with `r_useOptimizedShadows` on or off, so the stock volumes
-do not hold those faces. Which rule excluded them there is not established;
-until it is, the automatic rule stays, because storage2's lights depend on
-it.
+Two conclusions drawn from that trial the same morning were wrong, and are
+corrected in "What the stock volumes hold" below. "Clipping changes nothing
+for `light_9083`" measured nothing, because nothing was clipped. And
+"`r_skipEntities 1` changes nothing, so the blockers are world surfaces" was
+right by accident: that setting keeps entities out of the view, not out of a
+light's casters.
 
 **`nodynamicshadows`.** The same scan with `--select nodynamic` gives the
 image the fixed rule lacked: waste's `light_8501` shadows 0.7% of one view
 under maps and under stencil alike, on both backends.
+
+### What the stock volumes hold
+
+Added later on 23 November, from the two lights the scan left open.
+
+**The volume.** `_prelight_light_9083`, read from the retail
+`mcc_landing.proc`, has 2,166 vertexes in pairs (a point on the casting
+geometry, then its projection onto the light's far planes) and 6,864 indexes:
+silhouette quads, then 568 rear caps on the projected vertexes, then 568
+front caps on the others. Set against the world model of the same file, the
+front caps cover the world triangles in the light's box that face away from
+the source, and no others: by material, the covered area equals the
+away-facing area (the terrain 184,361 square units against 184,359, the
+largest wall material 830,022 against 830,022). There is no optimizer
+exclusion and no other rule:
+the stock volume follows the stencil rule of "Which triangles cast", cut to
+the light. The map compiler says the same (`BuildLightShadows` skips a group
+whose plane has the light in front, then `ClipTriByLight`).
+
+Run-time volumes are not cut. Every per-surface volume is built by the turbo
+path, an infinite projection of all the surface's away-facing triangles
+(`idInteraction::CreateInteraction` asks for the clipped builder only for a
+model wider than 3,000 units). So stencil cuts the static world of a prelit
+light, through the dmap volume, and nothing else.
+
+**`light_9083`: the terrain.** Its blocker is one world surface, the terrain
+(`textures/rock/smoothrock01_to_sharprock01_brown`, area 2): withheld from
+the map alone, the worst view's 48.9% goes to 0.0%. The light's entity origin
+lies 63 units under that terrain, so the scan's views look at the bases of
+walls set into the ground. The source is above, and sees the terrain's
+front. Stencil does not cast from a triangle that faces the light, so the
+buried walls are lit; the map held exactly those triangles. Predicted per
+pixel by casting rays through the `.proc` geometry (cells of an 80 x 45
+grid over the view, shadowed out of those predicted; three views for the
+first row, two of them for the second):
+
+| Between source and receiver | Stencil | Map before | Map with facing reversed |
+|---|---:|---:|---:|
+| only triangles that face the light | 0/1,843, 6/1,241, 4/87 | 1,832/1,843, 1,227/1,241, 82/87 | 0/1,843, 5/1,241, 0/87 |
+| triangles that face away as well | 194/198, 186/189 | 195/198, 185/189 | 193/198, 163/189 |
+
+So the map of a distant point light stores, for open geometry, the faces
+turned towards the light: the reverse of what `R_ShadowMapCasterFaces`
+intends. The same was measured on Air Defense 1's sun (`light_146`) at
+receivers the `.proc` predicts to be lit by the stencil rule and blocked by a
+light-facing surface (stencil and the reversed map lit, the map black in 61%
+and 75% of two views), on q4ctf2's ten distant lights and on q4cmp13's three
+parallel suns. `R_ShadowMapLightMirrorsCasterWinding` calls both synthesized
+projections mirrored, by the determinant of their planes, and the face to
+discard is swapped on that verdict. Measured, the swap is wrong for them. It
+is right for authored projectors (storage2's alarm lights; hub2's
+`light_7984`, where reversing it shadows 9.5% of a view that stencil
+lights). Why the determinant misjudges the synthesized projections is not
+established: the planes do have the opposite handedness from an authored
+projector's.
+
+The 11 November round measured the arena under that sun at 3,153 pixels
+differing from stencil with two-sided casters, 5,576 with the rule and no
+swap, and 3,155 with the swap, and took the swap. The swap stores what a
+two-sided map stores wherever the nearest surface faces the light, which is
+nearly everywhere; the rule without it is the stencil rule, with the light
+leaks of a far shell under a coarse map. That reading was not available then.
+
+**`light_9081`: the ceiling.** A cube light whose source is 8 units above its
+box, inside the ceiling. The ceiling face (a 256-unit square of
+`textures/common_misc/elevator_floor`) lies in the box's top plane. Its
+bounds only touch the light, so it has no interaction and was no map caster.
+dmap keeps of it what the shadow frustum of the box's bottom face cuts out: a
+window of 8.2 by 7.2 units under the source, which shadows everything inside
+that frustum down to the floor, and nothing towards the walls. That is the
+10.4%.
+
+**The caster.** For a light whose source lies outside its own box, the
+static world now casts into the map as one caster: the front caps of the
+prelight volume (`R_ShadowMapPrelightCaster`, built once per light and kept
+with it; `R_ShadowMapLinkPrelightCaster` links it into the GLOBAL caster
+chain, as the volume is a GLOBAL shadow). The world surfaces of that light
+stand aside in `idInteraction::AddActiveInteraction`, and count as held by
+the map, so no light is sent to its stencil fallback. The caps are the
+triangles stencil casts from, where stencil casts from them, so one mechanism
+gives the facing rule, the cut to the volume and the ceiling window. Each cap
+is stored in both windings, so the result does not depend on the caster
+culling mode or on the handedness verdict above. Both caster passes draw it
+as an ordinary surface with its own vertexes; neither backend changed.
+
+`r_shadowMapPrelightCasters` (archived, default 1): 0 draws each world
+surface whole as before, 1 takes the caps for a light whose source lies
+outside its box (an off-centre point light, a parallel light), 2 for every
+light with such a volume.
+
+It found one defect on the way: the view's world space had an identity model
+matrix without its last row (`R_SetViewMatrix`), which nothing had read as a
+whole matrix before. The caster passes do, and the first version of the
+caster came out with w = 0 and wrote no depth. The row is set now.
+
+Worst of six views from each light's entity origin, the share of pixels the
+map shadows and stencil lights / the reverse, before (the setting at 0) and
+after, one build:
+
+| Light | OpenGL before | OpenGL after | Vulkan before | Vulkan after |
+|---|---:|---:|---:|---:|
+| mcc_landing `light_9083` (distant) | 48.93% / 0.22% | 0.01% / 1.01% | 48.94% / 0.22% | 0.01% / 1.01% |
+| mcc_landing `light_9081` (cube, 8 units) | 0.41% / 10.4% | 0.42% / 0.22% | 0.42% / 10.4% | 0.42% / 0.22% |
+| mcc_landing `light_9058` (cube, 128) | 0.10% / 0.18% | 0.08% / 0.17% | 0.10% / 0.18% | 0.09% / 0.17% |
+| q4cmp13 `light_4895` (parallel sun) | 0.14% / 30.87% | 0.21% / 0.65% | 0.14% / 30.89% | 0.21% / 0.65% |
+| q4cmp13 `light_4894` (parallel sun) | 0.09% / 27.75% | 0.10% / 0.82% | 0.09% / 27.75% | 0.10% / 0.82% |
+| q4cmp13 `light_2` (parallel sun) | 0.28% / 11.92% | 0.38% / 0.69% | 0.28% / 11.93% | 0.39% / 0.68% |
+| q4ctf2 `light_5` (distant) | not run | not run | 0.47% / 14.28% | 0.49% / 1.39% |
+| Air Defense 1 `light_146` (the sun) | not run | not run | 0.03% / 0.03% | 0.01% / 0.04% |
+| Air Defense 1 `light_7910_cursed` (distant, 48) | not run | not run | 0.06% / 0.15% | 0.05% / 1.90% |
+
+Over 20 distant lights of q4ctf2 and hub2 (Vulkan, worst views summed): 4.5
+points map-only and 73.7 stencil-only before, 4.6 and 23.0 after. hub2's
+`light_6456` holds 13.1 of what is left: its volume folds its caps. One light
+measured is worse for it: Air Defense 1's `light_7910_cursed`, by the leak
+described first below. The four other off-centre lights of that level that
+were scanned fold their caps or changed by under 0.1 points.
+
+Checked for this change, on the final build: the scan above on both
+backends, with no stencil-fallback mark and no missing-caster report in any
+log; the continuous-motion qualification's receiver case on both; the five
+moving-door scenarios and the six caster-cycle scenarios on both, all
+passing; storage2's alarm lights, which are projectors and do not take the
+caster, by render light index from the start view with the setting at 1 and
+at 0 (map-only 0.16% at most, stencil-only 0.18%, identical between the
+settings on Vulkan); the in-engine self-tests on both renderers, including
+the new one for the caster; and the static tests that read the touched
+files.
+
+What remains after it, in the order it shows:
+
+- **A far shell leaks behind itself.** The caps are the faces turned away
+  from the light, and a receiver that stands closer behind one than the
+  map's bias is lit: `light_9083`'s stencil-only share rises from 0.22% to
+  1.01% in the view of an arch whose inner wall meets its roof. Stencil has
+  no such band. The bias follows the texel, and a wide distant map is coarse
+  (22 units a texel for `light_9083`'s whole-light map). Measured on Air
+  Defense 1's `light_170` with every caster on its away-facing triangles
+  (cells of one view that the stencil rule shadows, by how far in front of
+  the receiver the first such triangle stands):
+
+  | Distance | Cells | Stencil shadows | Away-facing map | Map before (near shell) |
+  |---|---:|---:|---:|---:|
+  | under 16 units | 50 | 36 | 0 | 29 |
+  | 16 to 32 | 82 | 79 | 14 | 72 |
+  | 32 to 64 | 191 | 191 | 138 | 174 |
+  | 64 to 128 | 293 | 284 | 235 | 235 |
+  | over 128 | 201 | 201 | 181 | 184 |
+
+  Beyond 64 units the two maps agree; closer in, the near shell of the same
+  solid, further towards the light, is what kept the shadow. That is the
+  price of casting from what stencil casts from, and it is paid wherever the
+  caster is used.
+- **78 stock lights fold their caps.** dmap writes a volume with a perforated
+  caster in it with no cap ranges (the caps cannot be left out when a hole
+  shows through them). Those lights keep their per-surface casters, uncut and
+  on the reversed faces if the light is distant or parallel. The caps are
+  still in the index list: a front cap is a triangle on three even vertexes
+  (verified on `light_9083`, where that selects exactly the 568). Taking them
+  would cast the cutout solid, as stencil does, where the map now casts its
+  holes; that choice has not been made.
+- **The other casters of distant and parallel lights** (entities; the world
+  under the 78 lights above and the 31 without a prelight) keep the reversed
+  faces: open geometry its light-facing triangles, sealed hulls their far
+  shell. Reversing the verdict alone, before the caster existed, summed over
+  57 distant lights of six maps: map-only 36 to 47 points, stencil-only 98 to
+  34. With the caster in place it changes nothing in q4ctf2 and trades
+  hub2's `light_6456` from 13.1% stencil-only to 11.4% map-only (its uncut
+  casters outside the volume). On Air Defense 1's six distant lights it made
+  the worst views worse (stencil-only 3.1 to 9.7 points summed), by the leak
+  above. It also takes the contact shadow of a character standing in
+  sunlight from the near shell to the far one. Left as it is until the
+  folded volumes are decided.
+- **A mapped light's stencil fallback is not the stock shadow** for a
+  prelit light: its world surfaces carry per-surface turbo volumes, uncut,
+  and the fallback draws those. Found in passing; the fallback is rare and
+  brief.
+- dispersal's parallel `light_4722` leaves lit 24.5% of a view that stencil
+  shadows, with the faces either way. Not examined.
+
+The scan tool changed with it. An interaction keeps the stencil volumes it
+was built with, so each picture is now taken after `regenerateWorld`, from
+interactions built under that picture's settings (the numbers did not move).
+`--select` takes `distant`, `projected` and `parallel`, `--position` and
+`--view` place the camera, and `--spawn` puts stock entities in the level and
+reports the pixels they changed.
+
+### A `noSelfShadow` receiver behind `noSelfShadow` world geometry
+
+The image the fixed rule lacked. Stock maps inline many models into the
+world, and most of their materials are `noSelfShadow` (18,482 such world
+triangles in mcc_1). Under mcc_1's prelit `corey_light_3557` a stock marine
+crate (`models/mapobjects/marine/equipment/crates/crate1.lwo`, a
+`noSelfShadow` material) was spawned at `437 -1575 98`, where the `.proc`
+puts only `noSelfShadow` world triangles between it and the source, and
+viewed from `538 -1656 152`:
+
+```
+renderer_shadow_stencil_parity_scan.py --map game/mcc_1 --names corey_light_3557
+  --view 538,-1656,152,14,141
+  --spawn 'func_static name probe model models/mapobjects/marine/equipment/crates/crate1.lwo origin "437 -1575 98"'
+```
+
+| Mean brightness of the crate's pixels (33,800) | OpenGL | Vulkan |
+|---|---:|---:|
+| No shadows | 5.14 | 5.24 |
+| Stencil | 3.36 | 3.44 |
+| Shadow maps | 3.56 | 3.64 |
+
+0.2% of those pixels are shadowed by the map and lit by stencil, 0.8% the
+reverse, on both. With the world's model-material casters withheld from the
+map by a temporary switch, the crate went from 2.11 to 3.25 on a narrower
+mask where the unshadowed picture reads 3.76: it is that geometry that
+shadows it.
 
 ## Presets
 
@@ -1720,6 +1923,12 @@ whether Enhanced can now map point lights on Vulkan.
 3. A static model that moves under still lights (a lift, a door) builds its
    volumes again each frame it moves, 40 to 45 microseconds a view in hub2.
    Leaving them out needs a mark on the entity for having moved.
+4. Stencil parity for lights whose source lies outside their box, beyond the
+   static world of the 296 that take the prelight caster: the 78 whose
+   volume folds its caps (the caps can be recovered, at the price of solid
+   cutouts), the reversed faces of the other casters under distant and
+   parallel lights, and the far shell's corner leak under a coarse map. See
+   "What the stock volumes hold".
 
 Set aside after measurement: cube faces the view cannot see (see "Static
 cutout casters"); the stencil volumes of static models under lights that have
