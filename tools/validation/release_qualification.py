@@ -1111,6 +1111,10 @@ def self_test() -> int:
         client = runtime / client_name()
         client.write_bytes(b"MZ\0\0openQ4 0.16.0+g0123456789abcdef0123456789abcdef01234567\0pad")
         (runtime / ded_name()).write_bytes(b"openQ4 0.16.0+g0123456789abcdef0123456789abcdef01234567\0")
+        # Staged Linux and macOS binaries carry no suffix; check_runtime knows
+        # them by their execute bit, as staging sets it. Windows ignores this.
+        for binary in (client, runtime / ded_name()):
+            binary.chmod(binary.stat().st_mode | 0o111)
         (runtime / "baseoq4" / "pak0.pk4").write_bytes(b"pack")
         (runtime / "crashes" / "old.log").write_text("ignored")
         stamp = version_line(client)
