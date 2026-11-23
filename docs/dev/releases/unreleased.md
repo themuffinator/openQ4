@@ -444,6 +444,9 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Upgrade Notes
 
+- Multiplayer-only settings that earlier versions lost (field of view, HUD
+  options such as item timers or damage numbers, Create Server options) do not
+  come back by themselves: set them once more and they now stay set.
 - Servers and players must run the same build for buying: the player state now
   carries weapon mods, and the buying vote names Off, Quake 4 or The Awakening.
   Replace the engine and both game modules together.
@@ -506,6 +509,13 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Multiplayer-only settings are kept between sessions. Field of view, the
+  HUD's damage numbers, speedometer, input display, item timers, hit sound and
+  other multiplayer options, and the Create Server bot and server options, were
+  dropped from the config whenever it was saved before a match had loaded the
+  multiplayer module, and came back at their defaults. A new profile's
+  multiplayer character is the default marine instead of the Failed Transfer
+  monster.
 - Players can vote on more of the match. `callvote quadhog 1`, `vampiric`,
   `frenzy` and `modifier <name> 0|1` turn a modifier on or off, `callvote arena
   rocketlauncher` (or `none`) plays a single-weapon arena, `callvote preset

@@ -111,6 +111,7 @@ jobs:
             tools/validation/audit_source_provenance.py \
             tools/validation/generate_pbr_fixture.py \
             tools/validation/openq4_validate.py \
+            tools/validation/release_qualification.py \
             tools/validation/run_parallel_commands.py \
             tools/validation/stock_asset_baseline.py \
             tools/tests/renderer_validation_matrix.py \
@@ -745,6 +746,8 @@ jobs:
             tools/tests/vk_display_color_mapping_capture.py \
             tools/tests/savegame_restore_matrix.py \
             tools/tests/savegame_cross_load.py \
+            tools/tests/release_profile_runtime.py \
+            tools/tests/archived_settings_across_modules.py \
             tools/tests/bse_lifecycle_runtime.py \
             tools/tests/turbo_lift_runtime.py \
             tools/tests/awakening_vehicle_runtime.py \
@@ -1259,6 +1262,9 @@ jobs:
           python tools/tests/vk_display_color_mapping_capture.py --self-test
           python tools/tests/savegame_restore_matrix.py --self-test
           python tools/tests/savegame_cross_load.py --self-test
+          python tools/tests/release_profile_runtime.py self-test
+          python tools/tests/archived_settings_across_modules.py
+          python tools/validation/release_qualification.py self-test
           python tools/tests/bse_lifecycle_runtime.py --self-test
           python tools/tests/turbo_lift_runtime.py --self-test
           python tools/tests/awakening_vehicle_runtime.py --self-test

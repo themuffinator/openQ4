@@ -12,6 +12,39 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Multiplayer settings and field of view are kept between sessions, 23 November 2026
+
+- **Your multiplayer settings stay set.** openQ4 starts on its single-player
+  game module and loads the multiplayer one only when a match starts. Until
+  then, the multiplayer-only settings in your config (field of view, the HUD's
+  damage numbers, speedometer, input display, item timers, hit sound,
+  crosshair names, team locations and local clock, and the bot and server
+  options of Create Server) were not marked to be saved, so the next time
+  anything changed the config they were dropped and came back at their
+  defaults. They are now kept. 0.15.0 and earlier releases had the same
+  problem.
+- **The multiplayer Player Setup rows always work.** The Create Server and
+  Player Setup settings the engine declares for the menu used to lose their
+  type when a saved config set them, and the menu then could not show or
+  change them on every launch after the first.
+- **A new profile's multiplayer character is a marine.** The shipped
+  configuration names a character the game does not have, and the menu
+  replaced it with the first one in its list, the Failed Transfer monster. It
+  now uses the game's own default marine (Strogg in a team game's Strogg
+  team). A character you picked yourself is unchanged.
+- **What to do.** Nothing. Settings you lose to the old problem return only if
+  you set them again.
+- **Evidence.** Found by the REL-01 release qualification of the 0.16.0
+  candidate `174cb31a4` (`release_profile_runtime.py clean-install`, then
+  reproduced by hand on the official 0.15.0 package): a level start dropped
+  all 21 menu settings, a menu start re-declared them at their defaults, and
+  `g_fov`, `hud_damageNumbers` and `hud_showSpeed` set in a config were gone
+  after one menu start. `archived_settings_across_modules.py` pins the three
+  source changes and fails on the earlier source; the clean-install run now
+  also seeds multiplayer-only settings and requires them to survive a level
+  start and a menu start. The packaged fix is qualified on the next candidate,
+  recorded in [release qualification](release-qualification.md).
+
 ## Votes for modifiers, arenas, presets and spectator chat; ban lengths and reasons, 23 November 2026
 
 - **Vote on how the match plays.** `callvote quadhog 1` (or `vampiric`,
