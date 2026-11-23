@@ -4022,6 +4022,9 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_ssao", preset.ssao, shadowMapTier ? 1 : 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_hdrToneMap", preset.hdrToneMap, shadowMapTier ? 1 : 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_motionBlur", preset.motionBlur, Common_PerformancePresetIsNamed( preset, "maximum" ) ? 1 : 0 );
+	// The game's depth of field (weapon wheel, scripted cinematics) belongs to
+	// the top half of the ladder, the same tiers as the modern effects.
+	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_depthOfField", preset.depthOfField, shadowMapTier ? 1 : 0 );
 	// Only Enhanced leaves point lights on stencil shadows; every other shadow-map
 	// tier maps them, and the stencil tiers keep the inert default.
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointLights", preset.shadowMapPointLights, Common_PerformancePresetIsNamed( preset, "enhanced" ) ? 0 : 1 );
@@ -4120,7 +4123,7 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_postAA", preset.postAA, 3 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 4096 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 2048 );
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 1024 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterTaps", preset.shadowMapFilterTaps, 13 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointFilterTaps", preset.shadowMapPointFilterTaps, 13 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterMode", preset.shadowMapFilterMode, 2 );
@@ -4252,6 +4255,7 @@ static bool Common_ValidatePerformancePresetDefinition( const openQ4PerformanceP
 		 ( preset.ssao != 0 && preset.ssao != 1 ) ||
 		 ( preset.hdrToneMap != 0 && preset.hdrToneMap != 1 ) ||
 		 ( preset.motionBlur != 0 && preset.motionBlur != 1 ) ||
+		 ( preset.depthOfField != 0 && preset.depthOfField != 1 ) ||
 		 ( preset.crt != 0 && preset.crt != 1 ) ||
 		 ( preset.useLightGrid != 0 && preset.useLightGrid != 1 ) ||
 		 preset.uploadMegs < 1 || preset.uploadMegs > 128 ||
@@ -4389,6 +4393,7 @@ static bool Common_ValidatePerformancePresetApplied( const openQ4PerformancePres
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_motionBlurObjectVectors", 1 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapHashedAlpha", 1 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapTranslucentReceivers", 1 );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_depthOfField", preset.depthOfField );
 	passed &= Common_CheckPerformancePresetTargetsArchived( preset.name );
 	return passed;
 }

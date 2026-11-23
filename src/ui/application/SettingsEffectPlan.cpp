@@ -128,18 +128,27 @@ const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV7() {
  }();
  return catalog;
 }
+const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV8() {
+ static const auto catalog=[] {
+  auto result=SettingsEffectCatalogV7();
+  result.emplace("r_depthOfField",SettingsEffectField{1,0});
+  return result;
+ }();
+ return catalog;
+}
 bool BuildSettingsEffectPlan(const StateValues& baseline, const StateValues& target,
  const std::map<std::string,std::size_t>& catalog, SettingsEffectPlan& output, std::string& error, unsigned requested) {
  try {
   const unsigned newest=catalog.size()==SettingsEffectCatalogV1().size()?1u:
    catalog.size()==SettingsEffectCatalogV2().size()?2u:catalog.size()==SettingsEffectCatalogV3().size()?3u:
-   catalog.size()==SettingsEffectCatalogV5().size()?5u:catalog.size()==SettingsEffectCatalogV6().size()?6u:7u;
+   catalog.size()==SettingsEffectCatalogV5().size()?5u:catalog.size()==SettingsEffectCatalogV6().size()?6u:
+   catalog.size()==SettingsEffectCatalogV7().size()?7u:8u;
   // V4 and V5 share their keys: only a plan that names V4 keeps its meaning.
   const unsigned version=requested==0?newest:requested;
   if (version!=newest && !(version==4 && newest==5)) return Fail(error,"Settings effect catalog version does not match its keys");
   const auto& audited=version==1?SettingsEffectCatalogV1():version==2?SettingsEffectCatalogV2():
    version==3?SettingsEffectCatalogV3():version==4?SettingsEffectCatalogV4():version==5?SettingsEffectCatalogV5():
-   version==6?SettingsEffectCatalogV6():SettingsEffectCatalogV7();
+   version==6?SettingsEffectCatalogV6():version==7?SettingsEffectCatalogV7():SettingsEffectCatalogV8();
   if (catalog.size()!=audited.size() || baseline.size()!=audited.size() || target.size()!=audited.size())
    return Fail(error,"Settings effect catalog or complete snapshots changed");
   SettingsEffectPlan candidate; candidate.version=version;

@@ -5734,11 +5734,31 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
                 vLight->localShadows == NULL;""",
             "GLOBAL complete-empty fallback",
         ),
+        # #258: a receiver whose map never came still draws the volumes it
+        # has when its stencil ownership is incomplete only because some
+        # casters are map-only; drawing the light unshadowed was worse. A map
+        # supplement is not a full fallback and keeps its own completeness.
+        (
+            """const bool localPartialStencil =
+                localReceiverNeedsFallback &&
+                !localStencilOwnershipComplete &&
+                vLight->globalShadows != NULL;""",
+            "LOCAL partial stencil fallback",
+        ),
+        (
+            """const bool globalPartialStencil =
+                globalReceiverNeedsFallback &&
+                !globalOpaqueMapNeedsSupplement &&
+                !translucentMapNeedsSupplement &&
+                !globalStencilOwnershipComplete &&
+                ( vLight->globalShadows != NULL || vLight->localShadows != NULL );""",
+            "GLOBAL partial stencil fallback",
+        ),
         (
             """const bool localStencilFallback =
                 localReceiverNeedsStencil &&
                 !localEmptyFallback &&
-                localStencilOwnershipComplete &&
+                ( localStencilOwnershipComplete || localPartialStencil ) &&
                 stencilResourcesReady;""",
             "LOCAL nonempty stencil fallback",
         ),
@@ -5746,7 +5766,7 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
             """const bool globalStencilFallback =
                 globalReceiverNeedsStencil &&
                 !globalEmptyFallback &&
-                globalStencilOwnershipComplete &&
+                ( globalStencilOwnershipComplete || globalPartialStencil ) &&
                 stencilResourcesReady;""",
             "GLOBAL nonempty stencil fallback",
         ),

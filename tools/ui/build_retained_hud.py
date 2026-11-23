@@ -510,7 +510,9 @@ def canonical_numbers(value):
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--check',action='store_true');args=parser.parse_args()
     for name,data in build().items():
-        text=json.dumps(canonical_numbers(data),indent=2,ensure_ascii=False)+'\n';target=OUT/name
+        # Compact JSON: the artwork catalog is parsed once a level, and indented it
+        # was four times the size.
+        text=json.dumps(canonical_numbers(data),separators=(',',':'),ensure_ascii=False)+'\n';target=OUT/name
         if args.check:
             assert target.read_text(encoding='utf8')==text,str(target)+' is stale'
         else:target.write_text(text,encoding='utf8')

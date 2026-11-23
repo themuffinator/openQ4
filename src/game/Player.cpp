@@ -1270,6 +1270,16 @@ idPlayer::idPlayer() {
 	vrBodySeated = false;
 	vrModelYaw = 0.0f;
 	vrModelYawValid = false;
+	unarmedArmsModel = NULL;
+	unarmedArmsValid = false;
+	for ( int i = 0; i < 4; i++ ) {
+		unarmedArmJoints[ i ] = INVALID_JOINT;
+		unarmedArmTurns[ i ].Set( 0.0f, 0.0f, 0.0f, 1.0f );
+	}
+	unarmedArmsWeight = 0.0f;
+	unarmedArmsLeaveWeight = 0.0f;
+	unarmedWorldModelHidden = false;
+	unarmedIdleRestartTime = -1;
 	vrBodyScale = 1.0f;
 	vrBodyOrigin.Zero();
 	vrBodyAxis.Identity();
@@ -7077,18 +7087,14 @@ void idPlayer::Weapon_Combat( void ) {
 		return;
 	}
 
+	// The weapon stays raised under the wheel, as in multiplayer: the wheel's
+	// depth of field focuses on it. It only stops firing.
 	if ( weaponWheelActive ) {
 		pfl.weaponFired = false;
 		pfl.attackHeld = false;
-
 		if ( weapon ) {
 			weapon->EndAttack();
-
-			if ( !weapon->IsHolstered() && ( weapon->IsReady() || weapon->IsReloading() ) ) {
-				weapon->PutAway();
-			}
 		}
-
 		return;
 	}
 
@@ -11467,6 +11473,7 @@ void idPlayer::Think( void ) {
   	}
 
  	if ( !g_stopTime.GetBool() ) {
+		UpdateUnarmedBody();
 		UpdateAnimation();
 		UpdateMultiplayerVisibilityEffects( headRenderEnt );
 
@@ -13601,6 +13608,187 @@ void idPlayer::FreeVRBody( void ) {
 			gameRenderWorld->FreeEntityDef( vrBodyDefHandle );
 		}
 		vrBodyDefHandle = -1;
+	}
+}
+
+/*
+===============
+idPlayer::IsBodyUnarmed
+
+openQ4: no weapon in the player's hands. A map without weapons (no_Weapons:
+the MCC's campaign maps) still selects the blaster and only hides it, and a
+script's disableWeapon does the same, so the body went on holding the hidden
+gun. Lowering a weapon at a GUI or a usable keeps it in hand.
+===============
+*/
+bool idPlayer::IsBodyUnarmed( void ) const {
+	if ( gameLocal.isMultiplayer || spectating ) {
+		return false;
+	}
+	return weapon == NULL || weaponGone || hiddenWeapon || !weaponEnabled;
+}
+
+/*
+===============
+idPlayer::WantsUnarmedBody
+===============
+*/
+bool idPlayer::WantsUnarmedBody( void ) const {
+	return IsBodyUnarmed() && animator.GetAnim( "af_pose" ) != 0;
+}
+
+/*
+===============
+idPlayer::TorsoPlaysUnarmed
+
+True while the torso's newest animation is the unarmed stand.
+===============
+*/
+bool idPlayer::TorsoPlaysUnarmed( void ) {
+	const int stand = animator.GetAnim( "af_pose" );
+	const idAnimBlend *torso = animator.CurrentAnim( ANIMCHANNEL_TORSO );
+	return stand != 0 && torso != NULL && torso->AnimNum() == stand;
+}
+
+/*
+===============
+UnarmedArmTurn
+
+The turn, as a joint axis takes it (axis * turn), that carries direction from
+onto direction to.
+===============
+*/
+static idMat3 UnarmedArmTurn( idVec3 from, idVec3 to ) {
+	from.Normalize();
+	to.Normalize();
+	idVec3 pivot = from.Cross( to );
+	if ( pivot.Normalize() < 1e-4f ) {
+		return mat3_identity;
+	}
+	const idMat3 a( from, pivot, from.Cross( pivot ) );
+	const idMat3 b( to, pivot, to.Cross( pivot ) );
+	return a.Transpose() * b;
+}
+
+/*
+===============
+idPlayer::PrepareUnarmedArms
+
+openQ4: the unarmed stand is the model's rest pose (af_pose: upright, square
+to the front, arms out level) with each upper arm turned down to hang a little
+out from the side and each forearm bent a little forward, palms in. The turns
+are local to each joint, so they ease in and out with the stand's own blend.
+===============
+*/
+bool idPlayer::PrepareUnarmedArms( void ) {
+	const idRenderModel *model = animator.ModelHandle();
+	if ( model == unarmedArmsModel ) {
+		return unarmedArmsValid;
+	}
+	unarmedArmsModel = model;
+	unarmedArmsValid = false;
+
+	const idDeclModelDef *modelDef = animator.ModelDef();
+	const int numJoints = animator.NumJoints();
+	const int restAnim = animator.GetAnim( "af_pose" );
+	const idAnim *rest = restAnim ? animator.GetAnim( restAnim ) : NULL;
+	const idMD5Anim *md5 = rest != NULL ? rest->MD5Anim( 0 ) : NULL;
+	if ( model == NULL || modelDef == NULL || md5 == NULL || numJoints <= 0
+			|| numJoints != model->NumJoints() || numJoints != md5->NumJoints() ) {
+		return false;
+	}
+	idJointMat *pose = ( idJointMat * )_alloca16( numJoints * sizeof( pose[0] ) );
+	gameEdit->ANIM_CreateAnimFrame( model, md5, numJoints, pose, 0, modelDef->GetVisualOffset(), animator.RemoveOrigin() );
+	const int *parents = modelDef->JointParents();
+
+	static const char *sides[ 2 ] = { "l", "r" };
+	for ( int side = 0; side < 2; side++ ) {
+		const jointHandle_t shoulder = animator.GetJointHandle( va( "%s_up_arm", sides[ side ] ) );
+		const jointHandle_t elbow = animator.GetJointHandle( va( "%s_elbo", sides[ side ] ) );
+		const jointHandle_t wrist = animator.GetJointHandle( va( "%s_wrist", sides[ side ] ) );
+		if ( shoulder == INVALID_JOINT || elbow == INVALID_JOINT || wrist == INVALID_JOINT
+				|| parents[ shoulder ] < 0 || parents[ elbow ] != shoulder ) {
+			gameLocal.DPrintf( "unarmed stand: '%s' lacks the arm joints it is posed by\n", modelDef->GetName() );
+			return false;
+		}
+		const idVec3 shoulderPos = pose[ shoulder ].ToVec3();
+		const idVec3 elbowPos = pose[ elbow ].ToVec3();
+		const idVec3 wristPos = pose[ wrist ].ToVec3();
+		// the model faces +X; out is the shoulder's own side
+		const float out = shoulderPos.y >= 0.0f ? 1.0f : -1.0f;
+		idVec3 hang( 0.06f, 0.2f * out, -1.0f );
+		hang.Normalize();
+		idVec3 forearm = hang + idVec3( 0.3f, 0.0f, 0.0f );
+		forearm.Normalize();
+
+		const idMat3 upperTurn = UnarmedArmTurn( elbowPos - shoulderPos, hang );
+		const idMat3 foreTurn = UnarmedArmTurn( ( wristPos - elbowPos ) * upperTurn, forearm );
+
+		const idMat3 parentAxis = pose[ parents[ shoulder ] ].ToMat3();
+		const idMat3 shoulderAxis = pose[ shoulder ].ToMat3();
+		const idMat3 elbowAxis = pose[ elbow ].ToMat3();
+		const idMat3 shoulderTurned = shoulderAxis * upperTurn;
+		const idMat3 elbowTurned = elbowAxis * upperTurn * foreTurn;
+
+		// joint = local * parent: each turn is applied to the joint's local axis
+		const idMat3 shoulderLocal = shoulderAxis * parentAxis.Transpose();
+		const idMat3 elbowLocal = elbowAxis * shoulderAxis.Transpose();
+		unarmedArmJoints[ side * 2 + 0 ] = shoulder;
+		unarmedArmJoints[ side * 2 + 1 ] = elbow;
+		unarmedArmTurns[ side * 2 + 0 ] = ( shoulderTurned * parentAxis.Transpose() * shoulderLocal.Transpose() ).ToQuat();
+		unarmedArmTurns[ side * 2 + 1 ] = ( elbowTurned * shoulderTurned.Transpose() * elbowLocal.Transpose() ).ToQuat();
+	}
+	unarmedArmsValid = true;
+	return true;
+}
+
+/*
+===============
+idPlayer::UpdateUnarmedBody
+
+openQ4: lowers the arms while the torso plays the unarmed stand, weighted as
+the stand blends in and out, and keeps the hidden weapon's world model out of
+the hand meanwhile (mirrors, the third-person view).
+===============
+*/
+void idPlayer::UpdateUnarmedBody( void ) {
+	idAnimatedEntity *worldModel = weaponWorldModel.GetEntity();
+	if ( IsBodyUnarmed() && health > 0 ) {
+		// SetWeapon and idPlayer::Show bring it back, so it is checked every tic
+		if ( worldModel != NULL && !worldModel->IsHidden() ) {
+			worldModel->Hide();
+			unarmedWorldModelHidden = true;
+		}
+	} else if ( unarmedWorldModelHidden ) {
+		unarmedWorldModelHidden = false;
+		if ( worldModel != NULL && health > 0 && !IsHidden() ) {
+			worldModel->Show();
+		}
+	}
+
+	float weight = 0.0f;
+	const idAnimBlend *torso = animator.CurrentAnim( ANIMCHANNEL_TORSO );
+	if ( TorsoPlaysUnarmed() && !af.IsActive() ) {
+		weight = torso->GetWeight( gameLocal.time );
+		unarmedArmsLeaveWeight = weight;
+	} else if ( unarmedArmsWeight > 0.0f && torso != NULL && !af.IsActive() ) {
+		// the stand blends out as the torso's next animation blends in
+		weight = unarmedArmsLeaveWeight * ( 1.0f - idMath::ClampFloat( 0.0f, 1.0f, torso->GetWeight( gameLocal.time ) ) );
+	}
+	unarmedArmsWeight = idMath::ClampFloat( 0.0f, 1.0f, weight );
+
+	if ( !PrepareUnarmedArms() ) {
+		unarmedArmsWeight = 0.0f;
+		return;
+	}
+	for ( int i = 0; i < 4; i++ ) {
+		if ( unarmedArmsWeight <= 0.0f ) {
+			animator.ClearJoint( unarmedArmJoints[ i ] );
+			continue;
+		}
+		idQuat turn;
+		turn.Slerp( idQuat( 0.0f, 0.0f, 0.0f, 1.0f ), unarmedArmTurns[ i ], unarmedArmsWeight );
+		animator.SetJointAxis( unarmedArmJoints[ i ], JOINTMOD_LOCAL, turn.ToMat3() );
 	}
 }
 

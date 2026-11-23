@@ -431,8 +431,7 @@ typedef struct viewDef_s {
 	bool				temporalCaptureFrame;
 	// The game's depth-of-field request for this frame (SetViewDepthOfField),
 	// latched when the view was built so the back end reads it on any thread.
-	float				depthOfFieldRequest;
-	int					depthOfFieldRequestFlags;
+	renderViewDepthOfField_t depthOfFieldRequest;
 	bool				temporalPreviousProjectionValid;
 
 	idRenderWorldLocal *renderWorld;
@@ -1084,7 +1083,7 @@ public:
 	virtual int				GetImageMSAASamples(idImage* image);
 	virtual const glconfig_t &	GetGLConfig( void ) const;
 	virtual bool			SetUnderwaterView( float amount, const idVec3 &tint, float fogDistance );
-	virtual bool			SetViewDepthOfField( float amount, int flags );
+	virtual bool			SetViewDepthOfField( const renderViewDepthOfField_t &dof );
 	virtual void			GetGpuFrameTiming( renderGpuFrameTiming_t &timing ) const;
 	virtual void			ResetGpuFrameTiming( const char *reason );
 	virtual void			GetPresentationState( renderPresentationState_t &state ) const;
@@ -1241,8 +1240,7 @@ public:
 	float					underwaterFogDistance;
 	// openQ4: the game's depth-of-field request (SetViewDepthOfField), valid for
 	// the frame it was made in; RenderScene latches it into the view.
-	float					depthOfFieldRequestAmount;
-	int						depthOfFieldRequestFlags;
+	renderViewDepthOfField_t depthOfFieldRequest;
 	int						depthOfFieldRequestFrame;
 	idRenderTexture *		activeRenderTexture;
 	renderPortalSkyCaptureViewCallback_t portalSkyCaptureViewCallback;

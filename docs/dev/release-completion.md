@@ -34,14 +34,74 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   recording identical to the retail dedicated server's (Windows, OpenGL). Not
   run: Vulkan, Linux, macOS and a person watching.
 
+## Point lights keep their shadows in crowded views on Vulkan, 23 November 2026
+
+- **Lights no longer shine through walls when a view runs out of shadow
+  maps** (#258). Vulkan renders a view's point-light shadows into a bounded
+  pool of cubes, and some views of `mcc_landing` see 240 to 265 lights, more
+  than a hundred of them point lights that cast shadows. A light that found
+  no cube left fell back to its stencil shadows only when they were
+  complete. Most lights also cast from surfaces only shadow maps draw, such
+  as grates, so they drew with no shadow at all. They now draw the stencil
+  shadows they have: the original game's shadows, without the map-only ones.
+  On a 56-spot sweep of `mcc_landing` this cut unshadowed light-frames by 87%
+  on Maximum and 79% on Ultra, and the result matches OpenGL, which renders
+  each cube in turn and never runs out. The rest are lights in the frame they
+  switch to stencil, which has no volumes yet.
+- **Maximum's point-light shadows are 1024 pixels, not 2048.** A 2048 cube
+  is 96 MB, so the default budget held five and a Vulkan view's pool twelve.
+  The preset change brings up the System Check once.
+- Evidence: scripted camera sweeps (no input) on Vulkan and OpenGL, and
+  side-by-side captures against OpenGL. Not yet run: a frame-time
+  comparison.
+
+## Lighter zoom scopes and cannon optics, smaller HUD files, 23 November 2026
+
+- **Scopes and the cannon draw once.** The user asked for a round of HUD
+  optimizations confined to the `.rui` documents. The air-defence cannon's
+  optic and the machine gun, nailgun and railgun scopes resubmitted large
+  antialiased rings and gradients every frame: 218k vertices for the cannon at
+  720p, 166-264k for the moving scopes at 1080p and up to 414k at 4K. Their
+  unchanging art now sits under isolating groups the runtime caches as layers:
+  20k for the cannon, 25-47k for the scopes, the railgun scope from 4.1 to
+  0.7 ms a frame on OpenGL. Moving parts keep their order and behaviour.
+- **Smaller files.** The weapon wheels, quick-chat wheel, HUD artwork catalog
+  and its coverage registry are compact JSON with the same content, about a
+  quarter of their size (a weapon wheel loads about 55 ms faster).
+- **What you need to do.** Nothing; nothing looks different.
+- **Checks.** Engine profiles of each HUD before and after; frozen A/B
+  pictures of the cannon (within 2/255 in the optic) and the scopes;
+  `ui_scope_performance.py` passes on OpenGL and Vulkan; the native retained
+  screen, scope, quick chat, HUD, Remastered HUD and coverage tests and every
+  generator's `--check` pass. Details:
+  [performance report section 20](performance-report.md#20-static-optic-art-and-hud-document-size-fps-06-23-november-2026).
+
+## Kane stands unarmed on the MCC, 23 November 2026
+
+- **No gun stance without a gun.** The MCC's campaign maps put the weapons
+  away, but the game only hid the blaster, so Kane's body kept the pistol
+  stance, twisted and aiming, wherever it shows: his shadow, mirrors and the
+  third-person view. With no weapon in hand (a map without weapons, or a
+  script that disables them) he now stands upright with his arms at his
+  sides, and the hidden gun's model leaves his hand. The arms ease down and
+  back up with the animation's own blend when the weapon goes or returns.
+  Stock content has no unarmed player animation, so the stand is the model's
+  rest pose with the arms turned down in code; no new assets.
+- Evidence: front, side and back third-person captures on `mcc_1` before
+  and after (OpenGL, no input), and `enableWeapon`/`disableWeapon` from the
+  console bringing the stance and the gun back and dropping them again.
+  Not yet seen: Kane's Strogg body on `mcc_2`, and Vulkan.
+
 ## Depth of field for captures and the weapon wheel, 23 November 2026
 
 - **The weapon wheel focuses on your weapon.** The renderer's depth of field
   keeps the view weapon and the world within 128 units sharp and blurs the
   distance with round bokeh, in place of the whole-screen Gaussian, which
   stays as the fallback where the renderer declines. The crosshair hides
-  while the wheel is open. Visual spec 1.50, register revision 30
-  (`WID-039` supersedes `WID-037`, pending).
+  while the wheel is open, and in single player the weapon now stays raised
+  under the wheel, as in multiplayer, instead of being put away. Visual spec
+  1.50 and 1.51, register revision 30 (`WID-039` supersedes `WID-037`,
+  pending).
 - **`r_dof` camera for promotional shots** (REN-12, partial): a thin-lens
   model following the field of view, autofocus with an eased pull, focus
   range, near/far scales, bladed bokeh with highlight weighting, quality up
@@ -51,6 +111,17 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   airdefense2; `openq4-depth-of-field-core`, `retained_view_effects.py` and
   the retained-screens wheel checks pass. Not yet run: Linux, macOS, the
   Android emulator (GLES declines by design) and a cost measurement.
+- **Scripted depth of field and a Depth of Field setting** (second round).
+  Map scripts call `sys.setDepthOfField`, `setDepthOfFieldFocus`,
+  `setDepthOfFieldLens` and `clearDepthOfField` (eased focus pulls, entity
+  tracking), declared by the script compiler on first use so stock programs
+  and save checksums are unchanged; the state rides in the worldspawn's spawn
+  args. `r_depthOfField` (Settings > Display > Effects, SYSTEM catalog V8,
+  12 languages, `#str_232914`) gates the wheel and scripts and is a preset
+  target on from Enhanced up; the preset system version moves (players see the
+  system check again). Evidence: airdefense2 `script` calls draw and clear on
+  OpenGL; the setting off returns the reference frame. Cinematics across the
+  campaign are REN-13.
 
 ## Texture packs' converted normal maps light correctly; a clearer settings failure, 23 November 2026
 

@@ -486,8 +486,7 @@ def kill_feed(doc: HudDocument) -> dict:
                               "opacity": num(1), "transform": transform_value()})
         top = 24 - 11.5 + slot * 15
         row = ui.group(lid, {**ui.absolute(left=0, top=u(top), width=u(637), height=u(15)), "display": ui.keyword("none"),
-                             "flex-direction": ui.keyword("row"), "justify-content": ui.keyword("flex-end"), "opacity": num(1),
-                             "transform": transform_value()},
+                             "flex-direction": ui.keyword("row"), "justify-content": ui.keyword("flex-end"), "opacity": num(1)},
                        [content])
         doc.bind(lid + ".display", lid, "display", sel(S(f("live")), "flex", "none"))
         # The Tourney strip pushes the feed down; Competitive takes the strip
@@ -502,11 +501,13 @@ def kill_feed(doc: HudDocument) -> dict:
             tr(lid + "-c", "transform", [(0, transform_value(tx=u(22)), FEED_EASE), (240, rest)]),
             tr(lid + "-mark", "transform", [(0, transform_value(sx=1.55, sy=1.55), FEED_EASE), (260, rest)]),
             tr(lid + "-glint", "opacity", [(0, num(0)), (60, num(0.45)), (280, num(0))])])
-        doc.timeline(lid + "-shift", 200, [tr(lid, "transform", [(0, transform_value(ty=u(15)), FEED_EASE), (200, rest)])])
-        doc.on(f"oq4_feedIn{slot}", cancel(lid + "-shift"), play(lid + "-in"))
+        doc.on(f"oq4_feedIn{slot}", play(lid + "-in"))
         rows.append(row)
-    doc.on("oq4_feedShift", *[play(f"feed{slot}-shift") for slot in range(4)])
-    return full("feed", rows)
+    # The lines that stay glide up together: one track on the feed, not one
+    # per line (an event's cost grows with the tracks it starts).
+    doc.timeline("feed-shift", 200, [tr("feed", "transform", [(0, transform_value(ty=u(15)), FEED_EASE), (200, transform_value())])])
+    doc.on("oq4_feedShift", play("feed-shift"))
+    return full("feed", rows, transform=transform_value())
 
 
 # ======================================================= top-leading group

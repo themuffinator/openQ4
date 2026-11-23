@@ -5463,15 +5463,32 @@ void VK_Interactions_DrawLights( const viewDef_t *viewDef ) {
 				activeTargetHasStencil &&
 				interPass.pipelineStencilShadow != VK_NULL_HANDLE &&
 				!r_vkShadowFallbackTest.GetBool();
+		// A receiver whose map never came (the view's cube pool or atlas ran
+		// out) and whose stencil ownership is incomplete still has the
+		// volumes it does have: casters only the map carries, such as
+		// alpha-tested grates, which the original stencil shadows never cast.
+		// Those volumes give the original game's shadows; without them the
+		// whole light drew unshadowed (#258). A receiver with no volume at all
+		// stays unshadowed for the frame.
+		const bool localPartialStencil =
+				localReceiverNeedsFallback &&
+				!localStencilOwnershipComplete &&
+				vLight->globalShadows != NULL;
+		const bool globalPartialStencil =
+				globalReceiverNeedsFallback &&
+				!globalOpaqueMapNeedsSupplement &&
+				!translucentMapNeedsSupplement &&
+				!globalStencilOwnershipComplete &&
+				( vLight->globalShadows != NULL || vLight->localShadows != NULL );
 		const bool localStencilFallback =
 				localReceiverNeedsStencil &&
 				!localEmptyFallback &&
-				localStencilOwnershipComplete &&
+				( localStencilOwnershipComplete || localPartialStencil ) &&
 				stencilResourcesReady;
 		const bool globalStencilFallback =
 				globalReceiverNeedsStencil &&
 				!globalEmptyFallback &&
-				globalStencilOwnershipComplete &&
+				( globalStencilOwnershipComplete || globalPartialStencil ) &&
 				stencilResourcesReady;
 		const bool anyStencilFallback =
 				localStencilFallback ||

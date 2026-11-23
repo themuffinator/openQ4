@@ -19,9 +19,11 @@ the [development roadmap](../roadmap.md) for current scope.
   to returning, and kill feed lines slide in with a quick glint.
 
 - **The weapon wheel focuses like a camera.** While the wheel is open, your
-  weapon and everything close by stay sharp and the distance falls softly out
-  of focus, instead of the whole screen blurring, and the crosshair gets out
-  of the way. For screenshots and videos there is a full depth-of-field camera
+  weapon stays raised and it and everything close by stay sharp while the
+  distance falls softly out of focus, instead of the whole screen blurring,
+  and the crosshair gets out of the way. **Depth of Field** in Settings >
+  Display > Effects turns it on or off (on from the Enhanced preset up), and
+  map scripts can now use it to pull focus in cutscenes. For screenshots and videos there is a full depth-of-field camera
   too, with autofocus, aperture, bokeh shape and more, kept to the console as
   a cheat. See [Depth of Field for Screenshots and Video](../../user/depth-of-field.md).
 
@@ -544,6 +546,11 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Zooming in with the machine gun, nailgun or railgun, and crewing the
+  air-defence cannon, cost far less: their scope pictures are drawn once and
+  reused instead of being redrawn every frame (the railgun scope went from
+  about 4 ms a frame to under 1 ms in testing). The weapon and quick-chat
+  wheels and the HUD artwork load faster, their files a quarter of the size.
 - The Competitive HUD layout has a scoreline across the top in Duel, Tourney
   and team games: large scores either side of the timer and, further out, up
   to four players a side named by their initials, with a bar for the
@@ -566,12 +573,23 @@ the [development roadmap](../roadmap.md) for current scope.
   Settings > Controls > Other has a Record Video key. See
   [Record Video](../../user/video-capture.md).
 - The weapon wheel uses a depth of field focused on your weapon and the
-  world within about three metres, and hides the crosshair while it is open;
+  world within about three metres, keeps your weapon raised (single player
+  used to put it away) and hides the crosshair while it is open;
   where post-processing is off it keeps the old soft blur. For promotional
   shots, `r_dof` and its settings (cheats, no menu entry) add a thin-lens
   camera with autofocus, f-stop, focal length, focus range, round or bladed
   bokeh and a focus view, on OpenGL and Vulkan. See
   [Depth of Field for Screenshots and Video](../../user/depth-of-field.md).
+- **Depth of Field** (Settings > Display > Effects, `r_depthOfField`) turns
+  the game's own depth of field on or off: the weapon wheel's focus and
+  scripted cutscene focus. Enhanced, Quality, Ultra and Maximum turn it on.
+  Because the presets changed, the game offers its graphics system check once
+  more on the next start.
+- Map and mod scripts can drive depth of field with `sys.setDepthOfField`,
+  `sys.setDepthOfFieldFocus` (follows a character), `sys.setDepthOfFieldLens`
+  and `sys.clearDepthOfField`, with smooth focus pulls, kept in saved games;
+  Quake 4's own scripts and existing saves are unaffected. See
+  [scripted depth of field](../../user/depth-of-field.md#for-map-and-mod-authors-scripted-depth-of-field).
 - Classic multiplayer ruleset corrections: quad damage is four times, seeking
   nails lose Quake 4's splash, the expansion maps' napalm launcher respawns in
   30 seconds, Scout carriers take no armour, health from Regeneration drains

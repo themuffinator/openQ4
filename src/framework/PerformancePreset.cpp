@@ -19,31 +19,31 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		0, 0, 30,
 		1, 512, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
-		0, 1, 24, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1 },
+		0, 1, 24, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1, 0 },
 	// Low Power is the battery and small-board recipe: Raspberry Pi, low-memory
 	// phones and an explicit power request. No shadows, 30 Hz.
 	{ "lowpower", 0, "low",
 		0, 0, 30,
 		1, 1024, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
-		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1 },
+		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1, 0 },
 	// Low is the documented minimum PC: the original stencil shadows at 60 Hz,
 	// with Low Power's reduced texture sizes.
 	{ "low", 0, "low",
 		0, 0, 60,
 		2, 1024, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
-		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 1, 1 },
+		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 1, 1, 0 },
 	{ "performance", 1, "baseline",
 		0, 1, 60,
 		2, 0, 0, 0, 1, 0,
 		0, 1024, 2, 0, 0, 0, 0, 0, 1, 16, 4,
-		0, 1, 40, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1, 1 },
+		0, 1, 40, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1, 1, 0 },
 	{ "balanced", 2, "baseline",
 		2, 1, 120,
 		4, 0, 0, 0, 1, 0,
 		0, 1024, 0, 0, 0, 0, 0, 0, 1, 16, 4,
-		0, 1, 48, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1, 1 },
+		0, 1, 48, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1, 1, 0 },
 	// The three top recipes are built from measured feature costs to hold a
 	// refresh class on the reference machine (RTX 4060 Laptop, 2560x1440, both
 	// backends, every timed scene; docs/dev/performance-report.md section 11):
@@ -57,7 +57,7 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		0, 2, 144,
 		16, 0, 0, 0, 1, 0,
 		1, 1024, 0, 1, 1, 1, 0, 0, 1, 16, 4,
-		0, 1, 48, 512, 5, 5, 0, 0, 4096, 12, 5, 8, 0, 0, 1, 1 },
+		0, 1, 48, 512, 5, 5, 0, 0, 4096, 12, 5, 8, 0, 0, 1, 1, 1 },
 	// Quality shadow-maps every light class: 2048 projected maps with PCSS and
 	// 512 point cubes, with 2x MSAA under SMAA high. Sunlight and distant
 	// sources are cascaded (spotlights keep one map): Quake 4 lights outdoor
@@ -67,7 +67,7 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		2, 2, 144,
 		16, 0, 0, 0, 1, 0,
 		1, 2048, 0, 1, 1, 1, 0, 0, 1, 32, 4,
-		0, 1, 48, 512, 9, 9, 2, 0, 4096, 20, 5, 8, 1, 1, 1, 0 },
+		0, 1, 48, 512, 9, 9, 2, 0, 4096, 20, 5, 8, 1, 1, 1, 0, 1 },
 	// image_usePrecompressedTextures stays at 1 here even though retail's top
 	// machine spec used 0. In openQ4 that cvar also gates user-supplied DDS
 	// replacement packs, so 0 silently discarded a player's high-resolution BC7
@@ -83,11 +83,15 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		4, 3, 240,
 		16, 0, 0, 0, 1, 0,
 		1, 4096, 0, 1, 1, 1, 0, 0, 1, 32, 4,
-		0, 1, 48, 512, 13, 9, 2, 0, 8192, 32, 5, 8, 1, 1, 1, 0 },
+		0, 1, 48, 512, 13, 9, 2, 0, 8192, 32, 5, 8, 1, 1, 1, 0, 1 },
 	// Maximum requests every supported quality maximum and carries no frame-rate
 	// target (FPS-02): it is the choice for players who want everything on.
 	// MSAA is 8 samples, the most the Vulkan renderer draws, so Maximum is one
 	// image on both renderers (FPS-05); 16 stays a manual choice for OpenGL.
+	// Point cubes are 1024, not 2048: a 2048 cube is 96 MB, so the default
+	// r_shadowMapPointCacheMegs held five and a Vulkan view's pool twelve, and
+	// views with a hundred shadowing point lights (mcc_landing) put most of
+	// them on stencil shadows (#258).
 	// CRT and exposure/strength
 	// controls are artistic preferences, not quality levels; experimental
 	// rendering modes stay opt-in.
@@ -95,7 +99,7 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		8, 3, 240,
 		16, 0, 0, 0, 1, 0,
 		1, 4096, 0, 1, 1, 1, 1, 0, 1, 32, 4,
-		0, 1, 48, 2048, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1, 1, 1 }
+		0, 1, 48, 1024, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1, 1, 1, 1 }
 }};
 static const std::array<const char*,PerformancePresetTargetCount> Targets{{
 	"com_performancePreset",
@@ -136,7 +140,7 @@ static const std::array<const char*,PerformancePresetTargetCount> Targets{{
 	"r_skipBump", "r_skipSpecular", "r_skipSky", "image_picmip",
 	"r_shadowMapCSM", "r_shadowMapCascadeCount", "r_shadowMapProjectedCSM",
 	"r_shadowMapCascadeStabilize", "r_motionBlurObjectVectors",
-	"r_shadowMapHashedAlpha", "r_shadowMapTranslucentReceivers"
+	"r_shadowMapHashedAlpha", "r_shadowMapTranslucentReceivers", "r_depthOfField"
 }};
 bool EqualAscii(std::string_view a,std::string_view b) noexcept {
  if(a.size()!=b.size())return false;
@@ -216,6 +220,7 @@ bool ExpandPerformancePreset(const PerformancePreset& preset,PerformancePresetAs
   {"r_motionBlurObjectVectors",1},
   {"r_shadowMapHashedAlpha",1},
   {"r_shadowMapTranslucentReceivers",1},
+  {"r_depthOfField",preset.depthOfField},
   {"com_performancePreset",std::string(preset.name)}
   }};
   static_assert(std::is_nothrow_move_assignable_v<PerformancePresetAssignments>);

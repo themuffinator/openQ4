@@ -181,7 +181,7 @@ def roster(doc: HudDocument, side: int) -> list:
     nodes = []
     for i in range(ROSTER):
         p = f"oq4_sl{side}_{i}"
-        declare(doc, {p + "_name": "", p + "_initials": "", p + "_open": False, p + "_weapon": -1, p + "_ammo": -1, p + "_health": 0,
+        declare(doc, {p + "_initials": "", p + "_open": False, p + "_weapon": -1, p + "_ammo": -1, p + "_health": 0,
                       p + "_armor": 0, p + "_dead": False, p + "_you": False, p + "_followed": False})
         rid = f"sl{side}t{i}"
         dead, opened, you, followed = S(p + "_dead"), S(p + "_open"), S(p + "_you"), S(p + "_followed")
@@ -442,7 +442,7 @@ def match_bar(doc: HudDocument) -> dict:
                   "oq4_zone": 0, "oq4_pips": False, "oq4_state": 0, "oq4_countdown": False, "oq4_timed": False, "oq4_clock_warn": 0,
                   "oq4_clock": "", "showready": False, "overtime": False, "overtimetext": ""})
     for side in (0, 1):
-        declare(doc, {f"oq4_mb{side}_name": "", f"oq4_mb{side}_rank": "", f"oq4_mb{side}_score": 0, f"oq4_mb{side}_you": False,
+        declare(doc, {f"oq4_mb{side}_name": "", f"oq4_mb{side}_score": 0, f"oq4_mb{side}_you": False,
                       f"oq4_mb{side}_lead": False})
     for flag in range(3):
         declare(doc, {f"oq4_flag{flag}_state": 0, f"oq4_flag{flag}_carrier": ""})

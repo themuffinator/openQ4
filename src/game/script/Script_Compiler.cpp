@@ -1372,6 +1372,9 @@ idVarDef *idCompiler::ParseValue( void ) {
 	ParseName( name );
 	def = LookupDef( name, basetype );
 	if ( !def ) {
+		def = DeclareImplicitEvent( name );
+	}
+	if ( !def ) {
 		if ( basetype ) {
 			Error( "%s is not a member of %s", name.c_str(), basetype->TypeDef()->Name() );
 		} else {
@@ -2596,6 +2599,64 @@ void idCompiler::ParseEventDef( idTypeDef *returnType, const char *name ) {
 		// mark the parms as local
 		func.locals	= func.parmTotal;
 	}
+}
+
+/*
+================
+idCompiler::DeclareImplicitEvent
+
+openQ4: script events openQ4 adds are declared here the first time a script
+names one, as if a "scriptEvent" line for it had been compiled, instead of in
+a declaration file every program compiles. Quake 4's own scripts never name
+them, so their compiled programs - and the checksums their savegames carry -
+stay exactly as they were. Returns NULL for any other name.
+================
+*/
+idVarDef *idCompiler::DeclareImplicitEvent( const char *name ) {
+	static const char *const implicitEvents[] = {
+		"setDepthOfField", "setDepthOfFieldFocus", "setDepthOfFieldLens", "clearDepthOfField"
+	};
+	bool listed = false;
+	for ( int i = 0; i < int( sizeof( implicitEvents ) / sizeof( implicitEvents[0] ) ); i++ ) {
+		if ( !idStr::Cmp( name, implicitEvents[i] ) ) {
+			listed = true;
+			break;
+		}
+	}
+	const idEventDef *ev = listed ? idEventDef::FindEvent( name ) : NULL;
+	if ( ev == NULL ) {
+		return NULL;
+	}
+	idTypeDef *existing = gameLocal.program.FindType( name );
+	if ( existing != NULL ) {
+		return existing->def;
+	}
+	idTypeDef *returnType = const_cast<idTypeDef *>( GetTypeForEventArg( ev->GetReturnType() ) );
+	if ( returnType == NULL ) {
+		Error( "Invalid return type '%c' in the implicit declaration of '%s'", ev->GetReturnType(), name );
+	}
+	idTypeDef newtype( ev_function, NULL, name, type_function.Size(), returnType );
+	const char *format = ev->GetArgFormat();
+	const int num = idLib::SizeToInt( strlen( format ), "idCompiler::DeclareImplicitEvent" );
+	for ( int i = 0; i < num; i++ ) {
+		const idTypeDef *argType = GetTypeForEventArg( format[i] );
+		if ( argType == NULL || argType == &type_void ) {
+			Error( "Invalid parameter '%c' in the implicit declaration of '%s'", format[i], name );
+		}
+		newtype.AddFunctionParm( const_cast<idTypeDef *>( argType ), "" );
+	}
+	idTypeDef *type = gameLocal.program.AllocType( newtype );
+	type->def = gameLocal.program.AllocDef( type, name, &def_namespace, true );
+	function_t &func = gameLocal.program.AllocFunction( type->def );
+	func.eventdef = ev;
+	func.parmSize.SetNum( num );
+	for ( int i = 0; i < num; i++ ) {
+		const idTypeDef *argType = newtype.GetParmType( i );
+		func.parmTotal += argType->Size();
+		func.parmSize[i] = argType->Size();
+	}
+	func.locals = func.parmTotal;
+	return type->def;
 }
 
 /*

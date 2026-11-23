@@ -238,6 +238,7 @@ private:
 	void			ParseFunctionDef( idTypeDef *returnType, const char *name );
 	void			ParseVariableDef( idTypeDef *type, const char *name );
 	void			ParseEventDef( idTypeDef *type, const char *name );
+	idVarDef *		DeclareImplicitEvent( const char *name );
 	void			ParseDefs( void );
 	void			ParseNamespace( idVarDef *newScope );
 

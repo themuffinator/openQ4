@@ -134,32 +134,498 @@
     }
    },
    {
-    "id": "outer-haze",
-    "type": "vector",
+    "id": "optic-still",
+    "type": "group",
     "properties": {
      "position": {"type": "keyword", "value": "absolute"},
      "left": {"type": "length", "value": 0, "unit": "dp"},
      "top": {"type": "length", "value": 0, "unit": "dp"},
      "width": {"type": "length", "value": 100, "unit": "%"},
-     "height": {"type": "length", "value": 100, "unit": "%"}
+     "height": {"type": "length", "value": 100, "unit": "%"},
+     "display": {"type": "keyword", "value": "block"},
+     "opacity": {"type": "number", "value": 0.999}
     },
-    "paths": [
+    "children": [
      {
       "id": "outer-haze",
-      "commands": [
-       {"id": "p0", "op": "move", "points": [[0, 0]]},
-       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-       {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
-       {"id": "p4", "op": "close"},
-       {"id": "p5", "op": "move", "points": [[{"fraction": 0.5, "dp": 0.0}, {"fraction": 0.5, "dp": -834.0}]]},
-       {"id": "p6", "op": "line", "points": [[{"fraction": 0.5, "dp": 834.0}, {"fraction": 0.5, "dp": 0.0}]]},
-       {"id": "p7", "op": "line", "points": [[{"fraction": 0.5, "dp": 0.0}, {"fraction": 0.5, "dp": 834.0}]]},
-       {"id": "p8", "op": "line", "points": [[{"fraction": 0.5, "dp": -834.0}, {"fraction": 0.5, "dp": 0.0}]]},
-       {"id": "p9", "op": "close"}
-      ],
-      "fillRule": "evenodd",
-      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.51]}}
+      "type": "vector",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 100, "unit": "%"},
+       "height": {"type": "length", "value": 100, "unit": "%"}
+      },
+      "paths": [
+       {
+        "id": "outer-haze",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[0, 0]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+         {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+         {"id": "p4", "op": "close"},
+         {"id": "p5", "op": "move", "points": [[{"fraction": 0.5, "dp": 0.0}, {"fraction": 0.5, "dp": -834.0}]]},
+         {"id": "p6", "op": "line", "points": [[{"fraction": 0.5, "dp": 834.0}, {"fraction": 0.5, "dp": 0.0}]]},
+         {"id": "p7", "op": "line", "points": [[{"fraction": 0.5, "dp": 0.0}, {"fraction": 0.5, "dp": 834.0}]]},
+         {"id": "p8", "op": "line", "points": [[{"fraction": 0.5, "dp": -834.0}, {"fraction": 0.5, "dp": 0.0}]]},
+         {"id": "p9", "op": "close"}
+        ],
+        "fillRule": "evenodd",
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.51]}}
+       }
+      ]
+     },
+     {
+      "id": "optic-still-center",
+      "type": "group",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "width": {"type": "length", "value": 960, "unit": "dp"},
+       "height": {"type": "length", "value": 720, "unit": "dp"},
+       "left": {"type": "length", "value": 50, "unit": "%"},
+       "top": {"type": "length", "value": 50, "unit": "%"},
+       "margin-left": {"type": "length", "value": -480, "unit": "dp"},
+       "margin-top": {"type": "length", "value": -360, "unit": "dp"}
+      },
+      "children": [
+       {
+        "id": "glow",
+        "type": "vector",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 100, "unit": "%"},
+         "height": {"type": "length", "value": 100, "unit": "%"}
+        },
+        "paths": [
+         {
+          "id": "glow",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[480.0, -180.0]]},
+           {"id": "p1", "op": "line", "points": [[1020.0, 360.0]]},
+           {"id": "p2", "op": "line", "points": [[480.0, 900.0]]},
+           {"id": "p3", "op": "line", "points": [[-60.0, 360.0]]},
+           {"id": "p4", "op": "close"},
+           {"id": "p5", "op": "move", "points": [[480.0, 60.0]]},
+           {"id": "p6", "op": "line", "points": [[780.0, 360.0]]},
+           {"id": "p7", "op": "line", "points": [[480.0, 660.0]]},
+           {"id": "p8", "op": "line", "points": [[180.0, 360.0]]},
+           {"id": "p9", "op": "close"}
+          ],
+          "fillRule": "evenodd",
+          "fill": {
+           "type": "diamond",
+           "from": [480.0, 360.0],
+           "to": [1020.0, 360.0],
+           "stops": [
+            {"at": 0, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0]}},
+            {"at": 0.5555555555555556, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0]}},
+            {"at": 0.6666666666666666, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0.13]}},
+            {"at": 0.75, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0.34]}},
+            {"at": 0.8333333333333334, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0.68]}},
+            {"at": 0.9166666666666666, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0.97]}},
+            {"at": 1.0, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 1]}}
+           ]
+          },
+          "blend": "additive"
+         }
+        ]
+       },
+       {
+        "id": "haze",
+        "type": "vector",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 100, "unit": "%"},
+         "height": {"type": "length", "value": 100, "unit": "%"}
+        },
+        "paths": [
+         {
+          "id": "haze",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[480.0, -474.0]]},
+           {"id": "p1", "op": "line", "points": [[1314.0, 360.0]]},
+           {"id": "p2", "op": "line", "points": [[480.0, 1194.0]]},
+           {"id": "p3", "op": "line", "points": [[-354.0, 360.0]]},
+           {"id": "p4", "op": "close"},
+           {"id": "p5", "op": "move", "points": [[480.0, -195.0]]},
+           {"id": "p6", "op": "line", "points": [[1035.0, 360.0]]},
+           {"id": "p7", "op": "line", "points": [[480.0, 915.0]]},
+           {"id": "p8", "op": "line", "points": [[-75.0, 360.0]]},
+           {"id": "p9", "op": "close"}
+          ],
+          "fillRule": "evenodd",
+          "fill": {
+           "type": "diamond",
+           "from": [480.0, 360.0],
+           "to": [1314.0, 360.0],
+           "stops": [
+            {"at": 0, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.25]}},
+            {"at": 0.6654676258992805, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.25]}},
+            {"at": 0.7320143884892086, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.31]}},
+            {"at": 0.7985611510791367, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.41]}},
+            {"at": 0.8669064748201439, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.47]}},
+            {"at": 0.9334532374100719, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.5]}},
+            {"at": 1.0, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.51]}}
+           ]
+          }
+         }
+        ]
+       },
+       {
+        "id": "marks",
+        "type": "vector",
+        "properties": {
+         "position": {"type": "keyword", "value": "absolute"},
+         "left": {"type": "length", "value": 0, "unit": "dp"},
+         "top": {"type": "length", "value": 0, "unit": "dp"},
+         "width": {"type": "length", "value": 100, "unit": "%"},
+         "height": {"type": "length", "value": 100, "unit": "%"}
+        },
+        "paths": [
+         {
+          "id": "aperture-band",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[480.0, -168.0]]},
+           {"id": "p1", "op": "line", "points": [[1008.0, 360.0]]},
+           {"id": "p2", "op": "line", "points": [[480.0, 888.0]]},
+           {"id": "p3", "op": "line", "points": [[-48.0, 360.0]]},
+           {"id": "p4", "op": "close"},
+           {"id": "p5", "op": "move", "points": [[339.6, 0.15000000000000002]]},
+           {"id": "p6", "op": "line", "points": [[219.60000000000002, 120.14999999999999]]},
+           {"id": "p7", "op": "cubic", "points": [[193.5, 146.25], [208.5, 162.0], [189.75, 180.75]]},
+           {"id": "p8", "op": "line", "points": [[62.099999999999994, 308.4]]},
+           {
+            "id": "p9",
+            "op": "cubic",
+            "points": [[34.5, 336.0], [34.5, 384.0], [62.099999999999994, 411.59999999999997]]
+           },
+           {"id": "p10", "op": "line", "points": [[106.19999999999999, 455.70000000000005]]},
+           {
+            "id": "p11",
+            "op": "cubic",
+            "points": [
+             [92.69999999999999, 468.45000000000005],
+             [100.94999999999999, 494.70000000000005],
+             [121.35000000000001, 498.45000000000005]
+            ]
+           },
+           {
+            "id": "p12",
+            "op": "cubic",
+            "points": [[130.5, 500.70000000000005], [136.2, 496.5], [143.7, 494.84999999999997]]
+           },
+           {
+            "id": "p13",
+            "op": "cubic",
+            "points": [[148.5, 495.45000000000005], [152.39999999999998, 501.0], [157.8, 505.5]]
+           },
+           {"id": "p14", "op": "line", "points": [[189.75, 537.45]]},
+           {
+            "id": "p15",
+            "op": "cubic",
+            "points": [[208.5, 556.2], [191.25, 572.25], [219.60000000000002, 600.5999999999999]]
+           },
+           {"id": "p16", "op": "line", "points": [[338.85, 719.8499999999999]]},
+           {"id": "p17", "op": "line", "points": [[621.1500000000001, 719.8499999999999]]},
+           {"id": "p18", "op": "line", "points": [[740.4000000000001, 600.5999999999999]]},
+           {"id": "p19", "op": "cubic", "points": [[768.75, 572.25], [751.5, 556.2], [770.25, 537.45]]},
+           {"id": "p20", "op": "line", "points": [[897.9000000000001, 411.59999999999997]]},
+           {"id": "p21", "op": "cubic", "points": [[925.5, 384.0], [925.5, 336.0], [897.9000000000001, 308.4]]},
+           {"id": "p22", "op": "line", "points": [[770.25, 180.75]]},
+           {
+            "id": "p23",
+            "op": "cubic",
+            "points": [[751.5, 162.0], [766.5, 146.25], [740.4000000000001, 120.14999999999999]]
+           },
+           {"id": "p24", "op": "line", "points": [[620.4000000000001, 0.15000000000000002]]},
+           {"id": "p25", "op": "close"}
+          ],
+          "fillRule": "evenodd",
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0627, 0.0627, 0.0627, 0.26]}}
+         },
+         {
+          "id": "edge",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[480.0, -189.0]]},
+           {"id": "p1", "op": "line", "points": [[1029.0, 360.0]]},
+           {"id": "p2", "op": "line", "points": [[480.0, 909.0]]},
+           {"id": "p3", "op": "line", "points": [[-69.0, 360.0]]},
+           {"id": "p4", "op": "close"},
+           {"id": "p5", "op": "move", "points": [[480.0, -183.0]]},
+           {"id": "p6", "op": "line", "points": [[1023.0, 360.0]]},
+           {"id": "p7", "op": "line", "points": [[480.0, 903.0]]},
+           {"id": "p8", "op": "line", "points": [[-63.0, 360.0]]},
+           {"id": "p9", "op": "close"}
+          ],
+          "fillRule": "evenodd",
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.87]}}
+         },
+         {
+          "id": "rail_lines",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[199.45499999999998, 561.27]]},
+           {"id": "p1", "op": "line", "points": [[198.99, 561.9749999999999]]},
+           {"id": "p2", "op": "line", "points": [[199.92000000000002, 562.3199999999999]]},
+           {"id": "p3", "op": "line", "points": [[200.385, 561.615]]},
+           {"id": "p4", "op": "close"},
+           {"id": "p5", "op": "move", "points": [[138.99, 495.52500000000003]]},
+           {"id": "p6", "op": "line", "points": [[139.92000000000002, 496.23]]},
+           {"id": "p7", "op": "line", "points": [[140.865, 494.82]]},
+           {"id": "p8", "op": "line", "points": [[143.67000000000002, 494.82]]},
+           {"id": "p9", "op": "line", "points": [[145.54500000000002, 496.23]]},
+           {"id": "p10", "op": "line", "points": [[146.01, 495.885]]},
+           {"id": "p11", "op": "line", "points": [[146.01, 494.115]]},
+           {"id": "p12", "op": "line", "points": [[145.54500000000002, 493.77]]},
+           {"id": "p13", "op": "line", "points": [[141.32999999999998, 493.77]]},
+           {"id": "p14", "op": "line", "points": [[140.865, 494.82]]},
+           {"id": "p15", "op": "close"},
+           {"id": "p16", "op": "move", "points": [[105.705, 454.395]]},
+           {"id": "p17", "op": "line", "points": [[105.24, 455.09999999999997]]},
+           {"id": "p18", "op": "line", "points": [[106.17, 455.445]]},
+           {"id": "p19", "op": "line", "points": [[106.635, 454.74]]},
+           {"id": "p20", "op": "close"},
+           {"id": "p21", "op": "move", "points": [[478.83000000000004, 423.45000000000005]]},
+           {"id": "p22", "op": "line", "points": [[478.365, 423.81000000000006]]},
+           {"id": "p23", "op": "line", "points": [[478.365, 583.0649999999999]]},
+           {"id": "p24", "op": "line", "points": [[476.49, 584.115]]},
+           {"id": "p25", "op": "line", "points": [[476.49, 719.8199999999999]]},
+           {"id": "p26", "op": "line", "points": [[483.51, 719.8199999999999]]},
+           {"id": "p27", "op": "line", "points": [[483.51, 584.115]]},
+           {"id": "p28", "op": "line", "points": [[481.635, 583.0649999999999]]},
+           {"id": "p29", "op": "line", "points": [[481.635, 425.22]]},
+           {"id": "p30", "op": "close"},
+           {"id": "p31", "op": "move", "points": [[917.58, 361.57500000000005]]},
+           {"id": "p32", "op": "line", "points": [[917.115, 361.935]]},
+           {"id": "p33", "op": "line", "points": [[917.115, 363.69]]},
+           {"id": "p34", "op": "line", "points": [[918.045, 364.04999999999995]]},
+           {"id": "p35", "op": "line", "points": [[918.51, 363.69]]},
+           {"id": "p36", "op": "line", "points": [[918.51, 361.935]]},
+           {"id": "p37", "op": "close"},
+           {"id": "p38", "op": "move", "points": [[41.955, 358.77]]},
+           {"id": "p39", "op": "line", "points": [[41.49, 359.475]]},
+           {"id": "p40", "op": "line", "points": [[42.42, 359.82]]},
+           {"id": "p41", "op": "line", "points": [[42.885, 359.115]]},
+           {"id": "p42", "op": "close"},
+           {"id": "p43", "op": "move", "points": [[917.58, 357.36]]},
+           {"id": "p44", "op": "line", "points": [[917.115, 357.71999999999997]]},
+           {"id": "p45", "op": "line", "points": [[917.115, 359.475]]},
+           {"id": "p46", "op": "line", "points": [[918.045, 359.82]]},
+           {"id": "p47", "op": "line", "points": [[918.51, 359.475]]},
+           {"id": "p48", "op": "line", "points": [[918.51, 357.71999999999997]]},
+           {"id": "p49", "op": "close"},
+           {"id": "p50", "op": "move", "points": [[884.76, 376.35]]},
+           {"id": "p51", "op": "line", "points": [[884.76, 343.65]]},
+           {"id": "p52", "op": "line", "points": [[884.295, 343.305]]},
+           {"id": "p53", "op": "line", "points": [[881.955, 343.305]]},
+           {"id": "p54", "op": "line", "points": [[881.49, 343.65]]},
+           {"id": "p55", "op": "line", "points": [[881.49, 356.65500000000003]]},
+           {"id": "p56", "op": "line", "points": [[880.545, 357.36]]},
+           {"id": "p57", "op": "line", "points": [[767.58, 357.36]]},
+           {"id": "p58", "op": "line", "points": [[766.635, 356.65500000000003]]},
+           {"id": "p59", "op": "line", "points": [[766.635, 343.65]]},
+           {"id": "p60", "op": "line", "points": [[766.17, 343.305]]},
+           {"id": "p61", "op": "line", "points": [[763.83, 343.305]]},
+           {"id": "p62", "op": "line", "points": [[763.365, 343.65]]},
+           {"id": "p63", "op": "line", "points": [[763.365, 356.65500000000003]]},
+           {"id": "p64", "op": "line", "points": [[762.42, 357.36]]},
+           {"id": "p65", "op": "line", "points": [[705.705, 357.36]]},
+           {"id": "p66", "op": "line", "points": [[703.83, 355.95000000000005]]},
+           {"id": "p67", "op": "line", "points": [[702.42, 357.36]]},
+           {"id": "p68", "op": "line", "points": [[700.08, 357.36]]},
+           {"id": "p69", "op": "line", "points": [[698.67, 358.77]]},
+           {"id": "p70", "op": "line", "points": [[544.455, 358.77]]},
+           {"id": "p71", "op": "line", "points": [[543.99, 359.115]]},
+           {"id": "p72", "op": "line", "points": [[546.33, 361.23]]},
+           {"id": "p73", "op": "line", "points": [[698.67, 361.23]]},
+           {"id": "p74", "op": "line", "points": [[700.08, 362.64]]},
+           {"id": "p75", "op": "line", "points": [[702.42, 362.64]]},
+           {"id": "p76", "op": "line", "points": [[703.83, 364.04999999999995]]},
+           {"id": "p77", "op": "line", "points": [[705.705, 362.64]]},
+           {"id": "p78", "op": "line", "points": [[762.42, 362.64]]},
+           {"id": "p79", "op": "line", "points": [[763.365, 363.34499999999997]]},
+           {"id": "p80", "op": "line", "points": [[763.365, 376.35]]},
+           {"id": "p81", "op": "line", "points": [[763.83, 376.695]]},
+           {"id": "p82", "op": "line", "points": [[766.17, 376.695]]},
+           {"id": "p83", "op": "line", "points": [[766.635, 376.35]]},
+           {"id": "p84", "op": "line", "points": [[766.635, 363.34499999999997]]},
+           {"id": "p85", "op": "line", "points": [[767.58, 362.64]]},
+           {"id": "p86", "op": "line", "points": [[880.545, 362.64]]},
+           {"id": "p87", "op": "line", "points": [[881.49, 363.34499999999997]]},
+           {"id": "p88", "op": "line", "points": [[881.49, 376.35]]},
+           {"id": "p89", "op": "line", "points": [[881.955, 376.695]]},
+           {"id": "p90", "op": "line", "points": [[884.295, 376.695]]},
+           {"id": "p91", "op": "close"},
+           {"id": "p92", "op": "move", "points": [[75.24, 343.65]]},
+           {"id": "p93", "op": "line", "points": [[75.24, 376.35]]},
+           {"id": "p94", "op": "line", "points": [[75.705, 376.695]]},
+           {"id": "p95", "op": "line", "points": [[78.045, 376.695]]},
+           {"id": "p96", "op": "line", "points": [[78.51, 376.35]]},
+           {"id": "p97", "op": "line", "points": [[78.51, 363.34499999999997]]},
+           {"id": "p98", "op": "line", "points": [[79.455, 362.64]]},
+           {"id": "p99", "op": "line", "points": [[192.42000000000002, 362.64]]},
+           {"id": "p100", "op": "line", "points": [[193.365, 363.34499999999997]]},
+           {"id": "p101", "op": "line", "points": [[193.365, 376.35]]},
+           {"id": "p102", "op": "line", "points": [[193.82999999999998, 376.695]]},
+           {"id": "p103", "op": "line", "points": [[196.17000000000002, 376.695]]},
+           {"id": "p104", "op": "line", "points": [[196.635, 376.35]]},
+           {"id": "p105", "op": "line", "points": [[196.635, 363.34499999999997]]},
+           {"id": "p106", "op": "line", "points": [[197.57999999999998, 362.64]]},
+           {"id": "p107", "op": "line", "points": [[259.92, 362.64]]},
+           {"id": "p108", "op": "line", "points": [[261.33, 361.23]]},
+           {"id": "p109", "op": "line", "points": [[415.54499999999996, 361.23]]},
+           {"id": "p110", "op": "line", "points": [[416.01, 360.885]]},
+           {"id": "p111", "op": "line", "points": [[413.66999999999996, 358.77]]},
+           {"id": "p112", "op": "line", "points": [[261.33, 358.77]]},
+           {"id": "p113", "op": "line", "points": [[259.92, 357.36]]},
+           {"id": "p114", "op": "line", "points": [[197.57999999999998, 357.36]]},
+           {"id": "p115", "op": "line", "points": [[196.635, 356.65500000000003]]},
+           {"id": "p116", "op": "line", "points": [[196.635, 343.65]]},
+           {"id": "p117", "op": "line", "points": [[196.17000000000002, 343.305]]},
+           {"id": "p118", "op": "line", "points": [[193.82999999999998, 343.305]]},
+           {"id": "p119", "op": "line", "points": [[193.365, 343.65]]},
+           {"id": "p120", "op": "line", "points": [[193.365, 356.65500000000003]]},
+           {"id": "p121", "op": "line", "points": [[192.42000000000002, 357.36]]},
+           {"id": "p122", "op": "line", "points": [[79.455, 357.36]]},
+           {"id": "p123", "op": "line", "points": [[78.51, 356.65500000000003]]},
+           {"id": "p124", "op": "line", "points": [[78.51, 343.65]]},
+           {"id": "p125", "op": "line", "points": [[78.045, 343.305]]},
+           {"id": "p126", "op": "line", "points": [[75.705, 343.305]]},
+           {"id": "p127", "op": "close"},
+           {"id": "p128", "op": "move", "points": [[697.74, 120.06]]},
+           {"id": "p129", "op": "line", "points": [[698.205, 120.76500000000001]]},
+           {"id": "p130", "op": "line", "points": [[736.17, 120.76500000000001]]},
+           {"id": "p131", "op": "line", "points": [[736.635, 120.405]]},
+           {"id": "p132", "op": "line", "points": [[736.635, 118.64999999999999]]},
+           {"id": "p133", "op": "line", "points": [[736.17, 118.305]]},
+           {"id": "p134", "op": "line", "points": [[700.08, 118.305]]},
+           {"id": "p135", "op": "close"},
+           {"id": "p136", "op": "move", "points": [[663.99, 83.49]]},
+           {"id": "p137", "op": "line", "points": [[663.99, 85.26]]},
+           {"id": "p138", "op": "line", "points": [[664.455, 85.605]]},
+           {"id": "p139", "op": "line", "points": [[702.42, 85.605]]},
+           {"id": "p140", "op": "line", "points": [[702.885, 85.26]]},
+           {"id": "p141", "op": "line", "points": [[700.545, 83.145]]},
+           {"id": "p142", "op": "line", "points": [[664.455, 83.145]]},
+           {"id": "p143", "op": "close"},
+           {"id": "p144", "op": "move", "points": [[630.24, 49.739999999999995]]},
+           {"id": "p145", "op": "line", "points": [[630.24, 51.510000000000005]]},
+           {"id": "p146", "op": "line", "points": [[630.705, 51.855000000000004]]},
+           {"id": "p147", "op": "line", "points": [[668.67, 51.855000000000004]]},
+           {"id": "p148", "op": "line", "points": [[669.135, 51.510000000000005]]},
+           {"id": "p149", "op": "line", "points": [[666.795, 49.394999999999996]]},
+           {"id": "p150", "op": "line", "points": [[630.705, 49.394999999999996]]},
+           {"id": "p151", "op": "close"},
+           {"id": "p152", "op": "move", "points": [[476.49, 0.18]]},
+           {"id": "p153", "op": "line", "points": [[476.49, 135.885]]},
+           {"id": "p154", "op": "line", "points": [[478.365, 136.935]]},
+           {"id": "p155", "op": "line", "points": [[478.365, 294.78000000000003]]},
+           {"id": "p156", "op": "line", "points": [[478.83000000000004, 295.14]]},
+           {"id": "p157", "op": "line", "points": [[481.16999999999996, 295.14]]},
+           {"id": "p158", "op": "line", "points": [[481.635, 294.78000000000003]]},
+           {"id": "p159", "op": "line", "points": [[481.635, 136.935]]},
+           {"id": "p160", "op": "line", "points": [[483.51, 135.885]]},
+           {"id": "p161", "op": "line", "points": [[483.51, 0.18]]},
+           {"id": "p162", "op": "close"}
+          ],
+          "fillRule": "evenodd",
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.87]}}
+         },
+         {
+          "id": "bar-0",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[82.5, 345.465]]},
+           {"id": "p1", "op": "line", "points": [[190.5, 345.465]]},
+           {"id": "p2", "op": "line", "points": [[190.5, 353.34]]},
+           {"id": "p3", "op": "line", "points": [[82.5, 353.34]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.19]}}
+         },
+         {
+          "id": "bar-1",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[82.5, 344.16]]},
+           {"id": "p1", "op": "line", "points": [[190.5, 344.16]]},
+           {"id": "p2", "op": "line", "points": [[190.5, 345.465]]},
+           {"id": "p3", "op": "line", "points": [[82.5, 345.465]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.5]}}
+         },
+         {
+          "id": "bar-2",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[82.5, 366.66]]},
+           {"id": "p1", "op": "line", "points": [[190.5, 366.66]]},
+           {"id": "p2", "op": "line", "points": [[190.5, 374.535]]},
+           {"id": "p3", "op": "line", "points": [[82.5, 374.535]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.19]}}
+         },
+         {
+          "id": "bar-3",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[82.5, 374.535]]},
+           {"id": "p1", "op": "line", "points": [[190.5, 374.535]]},
+           {"id": "p2", "op": "line", "points": [[190.5, 375.84]]},
+           {"id": "p3", "op": "line", "points": [[82.5, 375.84]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.5]}}
+         },
+         {
+          "id": "bar-4",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[771.0, 345.465]]},
+           {"id": "p1", "op": "line", "points": [[879.0, 345.465]]},
+           {"id": "p2", "op": "line", "points": [[879.0, 353.34]]},
+           {"id": "p3", "op": "line", "points": [[771.0, 353.34]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.19]}}
+         },
+         {
+          "id": "bar-5",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[771.0, 344.16]]},
+           {"id": "p1", "op": "line", "points": [[879.0, 344.16]]},
+           {"id": "p2", "op": "line", "points": [[879.0, 345.465]]},
+           {"id": "p3", "op": "line", "points": [[771.0, 345.465]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.5]}}
+         },
+         {
+          "id": "bar-6",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[771.0, 366.66]]},
+           {"id": "p1", "op": "line", "points": [[879.0, 366.66]]},
+           {"id": "p2", "op": "line", "points": [[879.0, 374.535]]},
+           {"id": "p3", "op": "line", "points": [[771.0, 374.535]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.19]}}
+         },
+         {
+          "id": "bar-7",
+          "commands": [
+           {"id": "p0", "op": "move", "points": [[771.0, 374.535]]},
+           {"id": "p1", "op": "line", "points": [[879.0, 374.535]]},
+           {"id": "p2", "op": "line", "points": [[879.0, 375.84]]},
+           {"id": "p3", "op": "line", "points": [[771.0, 375.84]]},
+           {"id": "close", "op": "close"}
+          ],
+          "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.5]}}
+         }
+        ]
+       }
+      ]
      }
     ]
    },
@@ -176,442 +642,6 @@
      "margin-top": {"type": "length", "value": -360, "unit": "dp"}
     },
     "children": [
-     {
-      "id": "glow",
-      "type": "vector",
-      "properties": {
-       "position": {"type": "keyword", "value": "absolute"},
-       "left": {"type": "length", "value": 0, "unit": "dp"},
-       "top": {"type": "length", "value": 0, "unit": "dp"},
-       "width": {"type": "length", "value": 100, "unit": "%"},
-       "height": {"type": "length", "value": 100, "unit": "%"}
-      },
-      "paths": [
-       {
-        "id": "glow",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[480.0, -180.0]]},
-         {"id": "p1", "op": "line", "points": [[1020.0, 360.0]]},
-         {"id": "p2", "op": "line", "points": [[480.0, 900.0]]},
-         {"id": "p3", "op": "line", "points": [[-60.0, 360.0]]},
-         {"id": "p4", "op": "close"},
-         {"id": "p5", "op": "move", "points": [[480.0, 60.0]]},
-         {"id": "p6", "op": "line", "points": [[780.0, 360.0]]},
-         {"id": "p7", "op": "line", "points": [[480.0, 660.0]]},
-         {"id": "p8", "op": "line", "points": [[180.0, 360.0]]},
-         {"id": "p9", "op": "close"}
-        ],
-        "fillRule": "evenodd",
-        "fill": {
-         "type": "diamond",
-         "from": [480.0, 360.0],
-         "to": [1020.0, 360.0],
-         "stops": [
-          {"at": 0, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0]}},
-          {"at": 0.5555555555555556, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0]}},
-          {"at": 0.6666666666666666, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0.13]}},
-          {"at": 0.75, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0.34]}},
-          {"at": 0.8333333333333334, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0.68]}},
-          {"at": 0.9166666666666666, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 0.97]}},
-          {"at": 1.0, "color": {"type": "color", "value": [0.0314, 0.1569, 0.1569, 1]}}
-         ]
-        },
-        "blend": "additive"
-       }
-      ]
-     },
-     {
-      "id": "haze",
-      "type": "vector",
-      "properties": {
-       "position": {"type": "keyword", "value": "absolute"},
-       "left": {"type": "length", "value": 0, "unit": "dp"},
-       "top": {"type": "length", "value": 0, "unit": "dp"},
-       "width": {"type": "length", "value": 100, "unit": "%"},
-       "height": {"type": "length", "value": 100, "unit": "%"}
-      },
-      "paths": [
-       {
-        "id": "haze",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[480.0, -474.0]]},
-         {"id": "p1", "op": "line", "points": [[1314.0, 360.0]]},
-         {"id": "p2", "op": "line", "points": [[480.0, 1194.0]]},
-         {"id": "p3", "op": "line", "points": [[-354.0, 360.0]]},
-         {"id": "p4", "op": "close"},
-         {"id": "p5", "op": "move", "points": [[480.0, -195.0]]},
-         {"id": "p6", "op": "line", "points": [[1035.0, 360.0]]},
-         {"id": "p7", "op": "line", "points": [[480.0, 915.0]]},
-         {"id": "p8", "op": "line", "points": [[-75.0, 360.0]]},
-         {"id": "p9", "op": "close"}
-        ],
-        "fillRule": "evenodd",
-        "fill": {
-         "type": "diamond",
-         "from": [480.0, 360.0],
-         "to": [1314.0, 360.0],
-         "stops": [
-          {"at": 0, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.25]}},
-          {"at": 0.6654676258992805, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.25]}},
-          {"at": 0.7320143884892086, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.31]}},
-          {"at": 0.7985611510791367, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.41]}},
-          {"at": 0.8669064748201439, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.47]}},
-          {"at": 0.9334532374100719, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.5]}},
-          {"at": 1.0, "color": {"type": "color", "value": [0.5137, 0.5137, 0.5137, 0.51]}}
-         ]
-        }
-       }
-      ]
-     },
-     {
-      "id": "marks",
-      "type": "vector",
-      "properties": {
-       "position": {"type": "keyword", "value": "absolute"},
-       "left": {"type": "length", "value": 0, "unit": "dp"},
-       "top": {"type": "length", "value": 0, "unit": "dp"},
-       "width": {"type": "length", "value": 100, "unit": "%"},
-       "height": {"type": "length", "value": 100, "unit": "%"}
-      },
-      "paths": [
-       {
-        "id": "aperture-band",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[480.0, -168.0]]},
-         {"id": "p1", "op": "line", "points": [[1008.0, 360.0]]},
-         {"id": "p2", "op": "line", "points": [[480.0, 888.0]]},
-         {"id": "p3", "op": "line", "points": [[-48.0, 360.0]]},
-         {"id": "p4", "op": "close"},
-         {"id": "p5", "op": "move", "points": [[339.6, 0.15000000000000002]]},
-         {"id": "p6", "op": "line", "points": [[219.60000000000002, 120.14999999999999]]},
-         {"id": "p7", "op": "cubic", "points": [[193.5, 146.25], [208.5, 162.0], [189.75, 180.75]]},
-         {"id": "p8", "op": "line", "points": [[62.099999999999994, 308.4]]},
-         {
-          "id": "p9",
-          "op": "cubic",
-          "points": [[34.5, 336.0], [34.5, 384.0], [62.099999999999994, 411.59999999999997]]
-         },
-         {"id": "p10", "op": "line", "points": [[106.19999999999999, 455.70000000000005]]},
-         {
-          "id": "p11",
-          "op": "cubic",
-          "points": [
-           [92.69999999999999, 468.45000000000005],
-           [100.94999999999999, 494.70000000000005],
-           [121.35000000000001, 498.45000000000005]
-          ]
-         },
-         {
-          "id": "p12",
-          "op": "cubic",
-          "points": [[130.5, 500.70000000000005], [136.2, 496.5], [143.7, 494.84999999999997]]
-         },
-         {
-          "id": "p13",
-          "op": "cubic",
-          "points": [[148.5, 495.45000000000005], [152.39999999999998, 501.0], [157.8, 505.5]]
-         },
-         {"id": "p14", "op": "line", "points": [[189.75, 537.45]]},
-         {
-          "id": "p15",
-          "op": "cubic",
-          "points": [[208.5, 556.2], [191.25, 572.25], [219.60000000000002, 600.5999999999999]]
-         },
-         {"id": "p16", "op": "line", "points": [[338.85, 719.8499999999999]]},
-         {"id": "p17", "op": "line", "points": [[621.1500000000001, 719.8499999999999]]},
-         {"id": "p18", "op": "line", "points": [[740.4000000000001, 600.5999999999999]]},
-         {"id": "p19", "op": "cubic", "points": [[768.75, 572.25], [751.5, 556.2], [770.25, 537.45]]},
-         {"id": "p20", "op": "line", "points": [[897.9000000000001, 411.59999999999997]]},
-         {"id": "p21", "op": "cubic", "points": [[925.5, 384.0], [925.5, 336.0], [897.9000000000001, 308.4]]},
-         {"id": "p22", "op": "line", "points": [[770.25, 180.75]]},
-         {
-          "id": "p23",
-          "op": "cubic",
-          "points": [[751.5, 162.0], [766.5, 146.25], [740.4000000000001, 120.14999999999999]]
-         },
-         {"id": "p24", "op": "line", "points": [[620.4000000000001, 0.15000000000000002]]},
-         {"id": "p25", "op": "close"}
-        ],
-        "fillRule": "evenodd",
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0627, 0.0627, 0.0627, 0.26]}}
-       },
-       {
-        "id": "edge",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[480.0, -189.0]]},
-         {"id": "p1", "op": "line", "points": [[1029.0, 360.0]]},
-         {"id": "p2", "op": "line", "points": [[480.0, 909.0]]},
-         {"id": "p3", "op": "line", "points": [[-69.0, 360.0]]},
-         {"id": "p4", "op": "close"},
-         {"id": "p5", "op": "move", "points": [[480.0, -183.0]]},
-         {"id": "p6", "op": "line", "points": [[1023.0, 360.0]]},
-         {"id": "p7", "op": "line", "points": [[480.0, 903.0]]},
-         {"id": "p8", "op": "line", "points": [[-63.0, 360.0]]},
-         {"id": "p9", "op": "close"}
-        ],
-        "fillRule": "evenodd",
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.87]}}
-       },
-       {
-        "id": "rail_lines",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[199.45499999999998, 561.27]]},
-         {"id": "p1", "op": "line", "points": [[198.99, 561.9749999999999]]},
-         {"id": "p2", "op": "line", "points": [[199.92000000000002, 562.3199999999999]]},
-         {"id": "p3", "op": "line", "points": [[200.385, 561.615]]},
-         {"id": "p4", "op": "close"},
-         {"id": "p5", "op": "move", "points": [[138.99, 495.52500000000003]]},
-         {"id": "p6", "op": "line", "points": [[139.92000000000002, 496.23]]},
-         {"id": "p7", "op": "line", "points": [[140.865, 494.82]]},
-         {"id": "p8", "op": "line", "points": [[143.67000000000002, 494.82]]},
-         {"id": "p9", "op": "line", "points": [[145.54500000000002, 496.23]]},
-         {"id": "p10", "op": "line", "points": [[146.01, 495.885]]},
-         {"id": "p11", "op": "line", "points": [[146.01, 494.115]]},
-         {"id": "p12", "op": "line", "points": [[145.54500000000002, 493.77]]},
-         {"id": "p13", "op": "line", "points": [[141.32999999999998, 493.77]]},
-         {"id": "p14", "op": "line", "points": [[140.865, 494.82]]},
-         {"id": "p15", "op": "close"},
-         {"id": "p16", "op": "move", "points": [[105.705, 454.395]]},
-         {"id": "p17", "op": "line", "points": [[105.24, 455.09999999999997]]},
-         {"id": "p18", "op": "line", "points": [[106.17, 455.445]]},
-         {"id": "p19", "op": "line", "points": [[106.635, 454.74]]},
-         {"id": "p20", "op": "close"},
-         {"id": "p21", "op": "move", "points": [[478.83000000000004, 423.45000000000005]]},
-         {"id": "p22", "op": "line", "points": [[478.365, 423.81000000000006]]},
-         {"id": "p23", "op": "line", "points": [[478.365, 583.0649999999999]]},
-         {"id": "p24", "op": "line", "points": [[476.49, 584.115]]},
-         {"id": "p25", "op": "line", "points": [[476.49, 719.8199999999999]]},
-         {"id": "p26", "op": "line", "points": [[483.51, 719.8199999999999]]},
-         {"id": "p27", "op": "line", "points": [[483.51, 584.115]]},
-         {"id": "p28", "op": "line", "points": [[481.635, 583.0649999999999]]},
-         {"id": "p29", "op": "line", "points": [[481.635, 425.22]]},
-         {"id": "p30", "op": "close"},
-         {"id": "p31", "op": "move", "points": [[917.58, 361.57500000000005]]},
-         {"id": "p32", "op": "line", "points": [[917.115, 361.935]]},
-         {"id": "p33", "op": "line", "points": [[917.115, 363.69]]},
-         {"id": "p34", "op": "line", "points": [[918.045, 364.04999999999995]]},
-         {"id": "p35", "op": "line", "points": [[918.51, 363.69]]},
-         {"id": "p36", "op": "line", "points": [[918.51, 361.935]]},
-         {"id": "p37", "op": "close"},
-         {"id": "p38", "op": "move", "points": [[41.955, 358.77]]},
-         {"id": "p39", "op": "line", "points": [[41.49, 359.475]]},
-         {"id": "p40", "op": "line", "points": [[42.42, 359.82]]},
-         {"id": "p41", "op": "line", "points": [[42.885, 359.115]]},
-         {"id": "p42", "op": "close"},
-         {"id": "p43", "op": "move", "points": [[917.58, 357.36]]},
-         {"id": "p44", "op": "line", "points": [[917.115, 357.71999999999997]]},
-         {"id": "p45", "op": "line", "points": [[917.115, 359.475]]},
-         {"id": "p46", "op": "line", "points": [[918.045, 359.82]]},
-         {"id": "p47", "op": "line", "points": [[918.51, 359.475]]},
-         {"id": "p48", "op": "line", "points": [[918.51, 357.71999999999997]]},
-         {"id": "p49", "op": "close"},
-         {"id": "p50", "op": "move", "points": [[884.76, 376.35]]},
-         {"id": "p51", "op": "line", "points": [[884.76, 343.65]]},
-         {"id": "p52", "op": "line", "points": [[884.295, 343.305]]},
-         {"id": "p53", "op": "line", "points": [[881.955, 343.305]]},
-         {"id": "p54", "op": "line", "points": [[881.49, 343.65]]},
-         {"id": "p55", "op": "line", "points": [[881.49, 356.65500000000003]]},
-         {"id": "p56", "op": "line", "points": [[880.545, 357.36]]},
-         {"id": "p57", "op": "line", "points": [[767.58, 357.36]]},
-         {"id": "p58", "op": "line", "points": [[766.635, 356.65500000000003]]},
-         {"id": "p59", "op": "line", "points": [[766.635, 343.65]]},
-         {"id": "p60", "op": "line", "points": [[766.17, 343.305]]},
-         {"id": "p61", "op": "line", "points": [[763.83, 343.305]]},
-         {"id": "p62", "op": "line", "points": [[763.365, 343.65]]},
-         {"id": "p63", "op": "line", "points": [[763.365, 356.65500000000003]]},
-         {"id": "p64", "op": "line", "points": [[762.42, 357.36]]},
-         {"id": "p65", "op": "line", "points": [[705.705, 357.36]]},
-         {"id": "p66", "op": "line", "points": [[703.83, 355.95000000000005]]},
-         {"id": "p67", "op": "line", "points": [[702.42, 357.36]]},
-         {"id": "p68", "op": "line", "points": [[700.08, 357.36]]},
-         {"id": "p69", "op": "line", "points": [[698.67, 358.77]]},
-         {"id": "p70", "op": "line", "points": [[544.455, 358.77]]},
-         {"id": "p71", "op": "line", "points": [[543.99, 359.115]]},
-         {"id": "p72", "op": "line", "points": [[546.33, 361.23]]},
-         {"id": "p73", "op": "line", "points": [[698.67, 361.23]]},
-         {"id": "p74", "op": "line", "points": [[700.08, 362.64]]},
-         {"id": "p75", "op": "line", "points": [[702.42, 362.64]]},
-         {"id": "p76", "op": "line", "points": [[703.83, 364.04999999999995]]},
-         {"id": "p77", "op": "line", "points": [[705.705, 362.64]]},
-         {"id": "p78", "op": "line", "points": [[762.42, 362.64]]},
-         {"id": "p79", "op": "line", "points": [[763.365, 363.34499999999997]]},
-         {"id": "p80", "op": "line", "points": [[763.365, 376.35]]},
-         {"id": "p81", "op": "line", "points": [[763.83, 376.695]]},
-         {"id": "p82", "op": "line", "points": [[766.17, 376.695]]},
-         {"id": "p83", "op": "line", "points": [[766.635, 376.35]]},
-         {"id": "p84", "op": "line", "points": [[766.635, 363.34499999999997]]},
-         {"id": "p85", "op": "line", "points": [[767.58, 362.64]]},
-         {"id": "p86", "op": "line", "points": [[880.545, 362.64]]},
-         {"id": "p87", "op": "line", "points": [[881.49, 363.34499999999997]]},
-         {"id": "p88", "op": "line", "points": [[881.49, 376.35]]},
-         {"id": "p89", "op": "line", "points": [[881.955, 376.695]]},
-         {"id": "p90", "op": "line", "points": [[884.295, 376.695]]},
-         {"id": "p91", "op": "close"},
-         {"id": "p92", "op": "move", "points": [[75.24, 343.65]]},
-         {"id": "p93", "op": "line", "points": [[75.24, 376.35]]},
-         {"id": "p94", "op": "line", "points": [[75.705, 376.695]]},
-         {"id": "p95", "op": "line", "points": [[78.045, 376.695]]},
-         {"id": "p96", "op": "line", "points": [[78.51, 376.35]]},
-         {"id": "p97", "op": "line", "points": [[78.51, 363.34499999999997]]},
-         {"id": "p98", "op": "line", "points": [[79.455, 362.64]]},
-         {"id": "p99", "op": "line", "points": [[192.42000000000002, 362.64]]},
-         {"id": "p100", "op": "line", "points": [[193.365, 363.34499999999997]]},
-         {"id": "p101", "op": "line", "points": [[193.365, 376.35]]},
-         {"id": "p102", "op": "line", "points": [[193.82999999999998, 376.695]]},
-         {"id": "p103", "op": "line", "points": [[196.17000000000002, 376.695]]},
-         {"id": "p104", "op": "line", "points": [[196.635, 376.35]]},
-         {"id": "p105", "op": "line", "points": [[196.635, 363.34499999999997]]},
-         {"id": "p106", "op": "line", "points": [[197.57999999999998, 362.64]]},
-         {"id": "p107", "op": "line", "points": [[259.92, 362.64]]},
-         {"id": "p108", "op": "line", "points": [[261.33, 361.23]]},
-         {"id": "p109", "op": "line", "points": [[415.54499999999996, 361.23]]},
-         {"id": "p110", "op": "line", "points": [[416.01, 360.885]]},
-         {"id": "p111", "op": "line", "points": [[413.66999999999996, 358.77]]},
-         {"id": "p112", "op": "line", "points": [[261.33, 358.77]]},
-         {"id": "p113", "op": "line", "points": [[259.92, 357.36]]},
-         {"id": "p114", "op": "line", "points": [[197.57999999999998, 357.36]]},
-         {"id": "p115", "op": "line", "points": [[196.635, 356.65500000000003]]},
-         {"id": "p116", "op": "line", "points": [[196.635, 343.65]]},
-         {"id": "p117", "op": "line", "points": [[196.17000000000002, 343.305]]},
-         {"id": "p118", "op": "line", "points": [[193.82999999999998, 343.305]]},
-         {"id": "p119", "op": "line", "points": [[193.365, 343.65]]},
-         {"id": "p120", "op": "line", "points": [[193.365, 356.65500000000003]]},
-         {"id": "p121", "op": "line", "points": [[192.42000000000002, 357.36]]},
-         {"id": "p122", "op": "line", "points": [[79.455, 357.36]]},
-         {"id": "p123", "op": "line", "points": [[78.51, 356.65500000000003]]},
-         {"id": "p124", "op": "line", "points": [[78.51, 343.65]]},
-         {"id": "p125", "op": "line", "points": [[78.045, 343.305]]},
-         {"id": "p126", "op": "line", "points": [[75.705, 343.305]]},
-         {"id": "p127", "op": "close"},
-         {"id": "p128", "op": "move", "points": [[697.74, 120.06]]},
-         {"id": "p129", "op": "line", "points": [[698.205, 120.76500000000001]]},
-         {"id": "p130", "op": "line", "points": [[736.17, 120.76500000000001]]},
-         {"id": "p131", "op": "line", "points": [[736.635, 120.405]]},
-         {"id": "p132", "op": "line", "points": [[736.635, 118.64999999999999]]},
-         {"id": "p133", "op": "line", "points": [[736.17, 118.305]]},
-         {"id": "p134", "op": "line", "points": [[700.08, 118.305]]},
-         {"id": "p135", "op": "close"},
-         {"id": "p136", "op": "move", "points": [[663.99, 83.49]]},
-         {"id": "p137", "op": "line", "points": [[663.99, 85.26]]},
-         {"id": "p138", "op": "line", "points": [[664.455, 85.605]]},
-         {"id": "p139", "op": "line", "points": [[702.42, 85.605]]},
-         {"id": "p140", "op": "line", "points": [[702.885, 85.26]]},
-         {"id": "p141", "op": "line", "points": [[700.545, 83.145]]},
-         {"id": "p142", "op": "line", "points": [[664.455, 83.145]]},
-         {"id": "p143", "op": "close"},
-         {"id": "p144", "op": "move", "points": [[630.24, 49.739999999999995]]},
-         {"id": "p145", "op": "line", "points": [[630.24, 51.510000000000005]]},
-         {"id": "p146", "op": "line", "points": [[630.705, 51.855000000000004]]},
-         {"id": "p147", "op": "line", "points": [[668.67, 51.855000000000004]]},
-         {"id": "p148", "op": "line", "points": [[669.135, 51.510000000000005]]},
-         {"id": "p149", "op": "line", "points": [[666.795, 49.394999999999996]]},
-         {"id": "p150", "op": "line", "points": [[630.705, 49.394999999999996]]},
-         {"id": "p151", "op": "close"},
-         {"id": "p152", "op": "move", "points": [[476.49, 0.18]]},
-         {"id": "p153", "op": "line", "points": [[476.49, 135.885]]},
-         {"id": "p154", "op": "line", "points": [[478.365, 136.935]]},
-         {"id": "p155", "op": "line", "points": [[478.365, 294.78000000000003]]},
-         {"id": "p156", "op": "line", "points": [[478.83000000000004, 295.14]]},
-         {"id": "p157", "op": "line", "points": [[481.16999999999996, 295.14]]},
-         {"id": "p158", "op": "line", "points": [[481.635, 294.78000000000003]]},
-         {"id": "p159", "op": "line", "points": [[481.635, 136.935]]},
-         {"id": "p160", "op": "line", "points": [[483.51, 135.885]]},
-         {"id": "p161", "op": "line", "points": [[483.51, 0.18]]},
-         {"id": "p162", "op": "close"}
-        ],
-        "fillRule": "evenodd",
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.87]}}
-       },
-       {
-        "id": "bar-0",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[82.5, 345.465]]},
-         {"id": "p1", "op": "line", "points": [[190.5, 345.465]]},
-         {"id": "p2", "op": "line", "points": [[190.5, 353.34]]},
-         {"id": "p3", "op": "line", "points": [[82.5, 353.34]]},
-         {"id": "close", "op": "close"}
-        ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.19]}}
-       },
-       {
-        "id": "bar-1",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[82.5, 344.16]]},
-         {"id": "p1", "op": "line", "points": [[190.5, 344.16]]},
-         {"id": "p2", "op": "line", "points": [[190.5, 345.465]]},
-         {"id": "p3", "op": "line", "points": [[82.5, 345.465]]},
-         {"id": "close", "op": "close"}
-        ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.5]}}
-       },
-       {
-        "id": "bar-2",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[82.5, 366.66]]},
-         {"id": "p1", "op": "line", "points": [[190.5, 366.66]]},
-         {"id": "p2", "op": "line", "points": [[190.5, 374.535]]},
-         {"id": "p3", "op": "line", "points": [[82.5, 374.535]]},
-         {"id": "close", "op": "close"}
-        ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.19]}}
-       },
-       {
-        "id": "bar-3",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[82.5, 374.535]]},
-         {"id": "p1", "op": "line", "points": [[190.5, 374.535]]},
-         {"id": "p2", "op": "line", "points": [[190.5, 375.84]]},
-         {"id": "p3", "op": "line", "points": [[82.5, 375.84]]},
-         {"id": "close", "op": "close"}
-        ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.5]}}
-       },
-       {
-        "id": "bar-4",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[771.0, 345.465]]},
-         {"id": "p1", "op": "line", "points": [[879.0, 345.465]]},
-         {"id": "p2", "op": "line", "points": [[879.0, 353.34]]},
-         {"id": "p3", "op": "line", "points": [[771.0, 353.34]]},
-         {"id": "close", "op": "close"}
-        ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.19]}}
-       },
-       {
-        "id": "bar-5",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[771.0, 344.16]]},
-         {"id": "p1", "op": "line", "points": [[879.0, 344.16]]},
-         {"id": "p2", "op": "line", "points": [[879.0, 345.465]]},
-         {"id": "p3", "op": "line", "points": [[771.0, 345.465]]},
-         {"id": "close", "op": "close"}
-        ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.5]}}
-       },
-       {
-        "id": "bar-6",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[771.0, 366.66]]},
-         {"id": "p1", "op": "line", "points": [[879.0, 366.66]]},
-         {"id": "p2", "op": "line", "points": [[879.0, 374.535]]},
-         {"id": "p3", "op": "line", "points": [[771.0, 374.535]]},
-         {"id": "close", "op": "close"}
-        ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.19]}}
-       },
-       {
-        "id": "bar-7",
-        "commands": [
-         {"id": "p0", "op": "move", "points": [[771.0, 374.535]]},
-         {"id": "p1", "op": "line", "points": [[879.0, 374.535]]},
-         {"id": "p2", "op": "line", "points": [[879.0, 375.84]]},
-         {"id": "p3", "op": "line", "points": [[771.0, 375.84]]},
-         {"id": "close", "op": "close"}
-        ],
-        "fill": {"type": "solid", "color": {"type": "color", "value": [0.0, 1.0, 1.0, 0.5]}}
-       }
-      ]
-     },
      {
       "id": "turning-ring",
       "type": "vector",

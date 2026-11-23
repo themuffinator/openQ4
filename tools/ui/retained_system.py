@@ -66,7 +66,7 @@ CATALOG = {
         "image_downSizeBump", "image_downSizeSpecular", "image_ignoreHighQuality", "image_writeGeneratedImages", "r_motionBlur",
         "r_shadowMapCSM", "r_shadowMapProjectedCSM", "r_shadowMapCascadeStabilize", "r_motionBlurObjectVectors",
         "r_shadowMapHashedAlpha", "r_shadowMapTranslucentReceivers", "r_useShadowMap", "s_useEAXReverb",
-        "r_shadowMapCharacterSelfShadow")},
+        "r_shadowMapCharacterSelfShadow", "r_depthOfField")},
     **{key: ("boolean", True) for key in ("r_shadowMapPointLights", "r_hdrSceneTarget")},
     **{key: ("number", 0) for key in (
         "r_brightness", "r_customHeight", "r_customWidth", "r_displayRefresh", "r_forceAmbient", "r_mode", "r_multiSamples",
@@ -90,7 +90,7 @@ EDITS = ("com_performancePreset", "r_bloom", "r_borderless", "r_brightness", "r_
          "image_writeGeneratedImages", "r_motionBlur", "r_rendererBenchmarkPreset", "r_rendererUploadFrameBuffers",
          "r_rendererUploadMegs", "r_shadowMapMaxUpdatesPerView", "r_shadowMapSize", "r_useShadowMap", "s_maxEmitterChannels",
          "s_maxSoundsPerShader", "s_numberOfSpeakers", "s_useEAXReverb", "ui_retainedScale", "ui_retainedTextScale",
-         "r_shadowMapCharacterSelfShadow")
+         "r_shadowMapCharacterSelfShadow", "r_depthOfField")
 RENDER_SLOTS = 32                         # the renderer device list (RenderingSettings)
 PROFILES = ("minimum", "lowpower", "low", "performance", "balanced", "enhanced", "quality", "ultra", "maximum")   # PerformancePreset.cpp
 # The service's values as presentation variables: each its name and state.
@@ -569,7 +569,7 @@ def system_document() -> dict:
               "#str_41092", "#str_229946", "#str_229947", "#str_229975", "#str_229948", "#str_229949", "#str_229945", "#str_200148",
               "#str_200160", "#str_200161", "#str_200162", "#str_223009", "#str_41082", "#str_41088", "#str_41084", "#str_41094",
               "#str_223002", "#str_223003", "#str_41090", "#str_41107", "#str_42820", "#str_41103", "#str_232513", "#str_232548",
-              "#str_232550", "#str_232552", "#str_232553")
+              "#str_232550", "#str_232552", "#str_232553", "#str_232914")
     x = value_column(labels)
     draft = lambda key: st(f"settings.draft.{key}")
     edit = lambda key: f"edit.{key}"
@@ -695,7 +695,10 @@ def system_document() -> dict:
             ("settings_bump", "#str_200162", "r_skipBump", "-enabled"), ("settings_sky", "#str_223009", "r_skipSky", "-enabled"),
             ("settings_bloom", "#str_41082", "r_bloom", None),
             ("settings_tonemap", "#str_41084", "r_hdrToneMap", None), ("settings_shadowmaps", "#str_232552", "r_useShadowMap", None),
-            ("settings_motionblur", "#str_232553", "r_motionBlur", None)):
+            ("settings_motionblur", "#str_232553", "r_motionBlur", None),
+            # The game's depth of field: the weapon wheel's focus and scripted
+            # cinematic focus (r_dof, the capture camera, stays console-only).
+            ("settings_depthoffield", "#str_232914", "r_depthOfField", None)):
         value = draft(setting) if action is None else no(draft(setting))
         toggles[ident] = row(doc, ident, key, "toggle", x, value=value, action=edit(setting) + (action or ""))
     # Ambient Occlusion (REN-10): Off, SSAO, HBAO or GTAO in one choice over r_ssao
@@ -741,7 +744,7 @@ def system_document() -> dict:
     for ident in ("settings_brightness", "settings_brightness_number", "settings_shadows", "settings_specular", "settings_bump",
                   "settings_sky", "settings_bloom", "settings_ssao", "settings_tonemap", "settings_postaa", "settings_ambient_enabled",
                   "settings_ambient", "settings_ambient_number", "settings_crt", "settings_irradiance", "settings_anisotropy",
-                  "settings_motionblur"):
+                  "settings_motionblur", "settings_depthoffield"):
         gate(doc, ident, EDITABLE, None if ident.endswith("_number") else 0.4)
 
     tabs = [
@@ -758,7 +761,7 @@ def system_document() -> dict:
             [heading("#str_232546"), toggles["settings_shadows"], toggles["settings_shadowmaps"], self_shadow, irradiance, preload,
              preload_help, preload_status],
             [heading("#str_232547"), toggles["settings_bloom"], toggles["settings_ssao"], toggles["settings_tonemap"],
-             toggles["settings_motionblur"], crt]]),
+             toggles["settings_motionblur"], toggles["settings_depthoffield"], crt]]),
     ]
 
     # APPLY CHANGES under the columns' trailing end, the service's message

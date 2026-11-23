@@ -6,11 +6,13 @@ bokeh. It is a capture tool, not a setting: it has no menu entry, and its
 console variables are cheats. They work in single player, and in multiplayer
 only on a server with cheats on; joining a server without cheats resets them.
 
-The weapon wheel uses the same effect on its own: while the wheel is open,
-your weapon and everything within about three metres stay sharp and the
-distance falls out of focus, and the crosshair hides. That needs no cheats and
-no setting; where post-processing is off, the wheel blurs the whole scene as
-before.
+The weapon wheel and map scripts use the same effect for players: while the
+wheel is open, your weapon stays raised, it and everything within about
+three metres stay sharp, the distance falls out of focus, and the crosshair
+hides; cutscenes can pull focus between characters. That needs no cheats: the
+**Depth of Field** setting (Settings → Display → Effects, `r_depthOfField`, on
+from the Enhanced preset up) turns it on or off. With it off, the wheel blurs
+the whole scene as before.
 
 ## Quick start
 
@@ -104,6 +106,43 @@ point with `r_dofFocusX` and `r_dofFocusY`, or change `r_dofFocusDistance`
 between two values while recording.
 
 To check what is in focus before you shoot, turn on `r_dofDebug 1`.
+
+## For map and mod authors: scripted depth of field
+
+Map scripts drive the same lens for cinematics, with four events on `sys`:
+
+```
+sys.setDepthOfField( float focusDistance, float fStop, float blendTime );
+sys.setDepthOfFieldFocus( entity focus, float fStop, float blendTime );
+sys.setDepthOfFieldLens( float focalLength, float focusRange, float maxBlur );
+sys.clearDepthOfField( float blendTime );
+```
+
+- `focusDistance` is in world units along the view (0 autofocuses on the
+  centre of the view); `blendTime` is in seconds and eases from wherever the
+  focus stands now, so calls chain into smooth focus pulls.
+- `setDepthOfFieldFocus` follows an entity as it and the camera move,
+  focusing on an actor's eyes. Passing `$null_entity` autofocuses.
+- `setDepthOfFieldLens` sets the focal length in millimetres (0 follows the
+  camera's field of view, so a zoomed cinematic camera gets a shallower
+  focus), a depth kept fully sharp each side of the focus, and the largest
+  blur in pixels of a 1080-line picture (0 keeps the default, 24).
+- `clearDepthOfField` fades the effect out.
+
+A rack focus from a marine to the door behind him:
+
+```
+sys.setDepthOfFieldLens( 85, 0, 0 );
+sys.setDepthOfFieldFocus( $marine_cortez, 2, 0.5 );
+sys.wait( 3 );
+sys.setDepthOfField( 400, 2, 1.5 );
+```
+
+The events need no declaration: the script compiler knows them, so they work
+in any openQ4 script without a `scriptEvent` line and leave Quake 4's own
+scripts, and their saved games, unchanged. The state is kept in saved games.
+The player's Depth of Field setting decides whether it is drawn, and the
+console `r_dof` camera, when on, takes over from a script.
 
 ## Notes
 

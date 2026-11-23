@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.50, 23 November 2026 (1.47 to 1.49 earlier that day, 1.46 on 17 November, 1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.51, 23 November 2026 (1.47 to 1.50 earlier that day, 1.46 on 17 November, 1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -90,6 +90,10 @@ and the world beyond falls out of focus with soft bokeh. The Gaussian soft
 focus of version 1.19 remains the fallback where the renderer cannot draw the
 depth of field, and the crosshair hides while the wheel is open (section
 14.11).
+
+Version 1.51 keeps the view weapon raised under the wheel in single player,
+as multiplayer already did, so the depth of field has the weapon to focus on;
+it stops firing while the wheel is open (section 14.11).
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -2700,7 +2704,7 @@ weapon color code, and the Marine gauge and scope constructions.
 | No ammunition | The dim icon under the red prohibition sign. Releasing on it keeps the current weapon and gives the refusal feedback of section 13.5 |
 | Hub | A black 0.55 disc of 86 dp inside the machinegun scope's double ring (86 and 80 dp, #B3D06E at 0.35) and its 16 compass dots at 93 dp, turned so the bright dot faces the selection. The disc is a signal screen: the briefing's torn video bands at their 0.06 rest level and additive scanlines at 0.11 roll down it |
 | Center | The weapon name in Marine 12 dp and #B0C891, on two lines when it would not fit on one, and the ammunition as `clip / reserve` in Chain 21 dp, over the signal screen. Nothing else: the radio's waveform belongs to the transmission display, not to a weapon selector. A pointer on the inner ring faces the selection |
-| Backing | A black radial wash at 0.35 out to 280 dp over the renderer's depth of field (`idRenderSystem::SetViewDepthOfField`, view-weapon focus): the view weapon and the world within 128 units stay sharp, and beyond them a round-bokeh blur grows with distance to 14 px at 1080 lines (scaled with the view's height), all eased with the wheel blend, with saturation 0.94. It filters the 3D view only, so the HUD and wheel artwork stay sharp. Where the renderer declines (no post-processing, a headset's eye) the full wide/tall scene takes separable Gaussian soft focus at sigma 8 dp instead, before the HUD and wheel artwork. Apply in SP and MP without changing MP simulation speed; respect the opaque-backing fallback and submit no focus pass once closed. The crosshair (and its hit marker) hides from the moment the wheel opens until it has faded out |
+| Backing | A black radial wash at 0.35 out to 280 dp over the renderer's depth of field (`idRenderSystem::SetViewDepthOfField`, view-weapon focus): the view weapon and the world within 128 units stay sharp, and beyond them a round-bokeh blur grows with distance to 14 px at 1080 lines (scaled with the view's height), all eased with the wheel blend, with saturation 0.94. It filters the 3D view only, so the HUD and wheel artwork stay sharp. Where the renderer declines (no post-processing, a headset's eye) the full wide/tall scene takes separable Gaussian soft focus at sigma 8 dp instead, before the HUD and wheel artwork. Apply in SP and MP without changing MP simulation speed; respect the opaque-backing fallback and submit no focus pass once closed. The crosshair (and its hit marker) hides from the moment the wheel opens until it has faded out. The view weapon stays raised, in focus, and does not fire while the wheel is open |
 
 **Selection.** A stick selects the segment under its angle beyond 35%
 deflection, with 4 degrees of hysteresis at boundaries; inside the dead zone
@@ -4785,6 +4789,12 @@ timing do not.
 
 Register revision 30 appends `WID-039`, superseding `WID-037`; it is
 pending, and nothing is accepted.
+
+Version 1.51 adds, at the product owner's choice, that the view weapon stays
+raised under the wheel in single player as it already did in multiplayer
+(single player used to put it away), so the focus has something to rest on.
+`WID-039` already asks for the focus on the view weapon; the register only
+re-binds this specification.
 
 ### Version 1.39: the Awakening chaingun turret
 

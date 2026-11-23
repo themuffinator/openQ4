@@ -1377,8 +1377,8 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 		"an arriving line slides and fades in, its weapon mark settling");
 	Check(runtime.RunEvent("oq4_feedShift",.433,effects,error),"the feed shifts");
 	runtime.Frame(RemasteredViewport(1280,720),.434);
-	const auto gliding = runtime.PresentedValue("feed0","transform");
-	Check(gliding && gliding->data[1] > 1,"the lines glide up into the slot that emptied");
+	const auto gliding = runtime.PresentedValue("feed","transform");
+	Check(gliding && gliding->data[1] > 1,"the lines glide up together into the slot that emptied");
 	Check(runtime.SetState({{"oq4_feed0_live",false},{"oq4_it_count",0.0}},error,.435),error.c_str());
 
 	// Network quality follows the scoreline's trailing end at all times: four

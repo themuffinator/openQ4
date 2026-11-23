@@ -485,7 +485,9 @@ def airdef_lens() -> list:
     #E6780B. The optic fits the view's height or width like every scope, and
     the haze fills the exposed bands."""
     stops = [(144, 0), (168, .07), (192, .255), (216, .57), (240, .97), (252, 1), (264, .69), (276, 0)]
-    glow = scopes.art("ad-glow", scopes.radial("ad-glow", stops, "#533200", "additive"), opacity=ui.number(.44))
+    # The glow's 0.44 lives in its stops: a nested opacity layer would keep the
+    # optic's layer below from caching.
+    glow = scopes.art("ad-glow", scopes.radial("ad-glow", [(r, round(a * .44, 4)) for r, a in stops], "#533200", "additive"))
     ring2 = scopes.art("ad-ring2", [scopes.measured("nail_ring2", [0, 0, 0, .34])])
     haze = scopes.art("ad-haze", scopes.radial("ad-haze", [(291.5, .08), (310, .24), (332, .4), (356, .5)], "#828282"))
     marks = scopes.art("ad-marks", [scopes.measured("nail_hook", [0, 0, 0, .5]),
@@ -496,8 +498,15 @@ def airdef_lens() -> list:
     bars = scopes.art("ad-load", load_bar("lead", True) + load_bar("trail", False))
     reticle = hud_svg.icon_nodes("crosshair_nailgun", "ad-reticle", U * 295, U * 215, U * 50, tint=ui.rgb("#E6780B"),
                                  family="crosshairs")
-    return [scopes.lens_focus(255), scopes.surround("ad-outer-haze", scopes.circle(356), ui.rgb("#828282", .5)),
-            scopes.center("ad-optic", [glow, ring2, haze, marks, bars, *reticle])]
+    # The optic never moves or changes, but its rings, gradients and haze are
+    # about 220k antialiased vertices at 720p, resubmitted every frame. Under
+    # one isolating group (opacity just under 1) the runtime caches it as a
+    # layer and composites one quad a frame instead.
+    # The group spans the view: a layer keeps only what lies inside its group.
+    static = ui.group("ad-static", {**ui.FULL, "display": ui.keyword("block"), "opacity": ui.number(0.999)},
+                      [scopes.surround("ad-outer-haze", scopes.circle(356), ui.rgb("#828282", .5)),
+                       scopes.center("ad-optic", [glow, ring2, haze, marks, bars, *reticle])])
+    return [scopes.lens_focus(255), static]
 
 
 def airdef_document() -> dict:
