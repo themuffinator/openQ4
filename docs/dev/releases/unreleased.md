@@ -521,6 +521,12 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Classic multiplayer ruleset corrections: quad damage is four times, seeking
+  nails lose Quake 4's splash, the expansion maps' napalm launcher respawns in
+  30 seconds, Scout carriers take no armour, health from Regeneration drains
+  after it ends, rockets keep their range, and the CTF defence and assist
+  bonuses follow Threewave CTF. See
+  [Classic Multiplayer Ruleset](../../user/classic-ruleset.md).
 - Demo playback lists the players to follow by name, steps back a frame,
   and `demoExport` writes a demo as pictures; the library shows who played and
   a picture from each recording, and `demoFind` searches it.

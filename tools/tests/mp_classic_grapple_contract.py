@@ -142,11 +142,45 @@ def check_bots() -> None:
     require("hookPhase == BOTHOOK_AIM" in aim and "aimPoint = hookBite;" in aim, "turning to throw looks at the bite")
 
 
+def check_rules() -> None:
+    """The ruleset audit of 2026-11-23: rows and rules that had been missing."""
+    rules = read("src/mpgame/mp/ClassicRules.cpp")
+    player = read("src/mpgame/Player.cpp")
+    item_h = read("src/mpgame/Item.h")
+    rows = set(re.findall(r'\{\s*"([^"]+)",\s*"([^"]+)",\s*(NULL|"[^"]*")\s*\}', rules))
+    # the zoomed nailgun's seeking nails had kept a 25 point splash
+    require(("projectile_nail_seek", "def_splash_damage", "NULL") in rows, "seeking nails lose their splash")
+    # slower rockets still reach as far as Quake 2's
+    require(("projectile_rocket", "fuse", '"12"') in rows, "rockets live long enough at 650 units a second")
+    # the expansion maps' napalm launcher respawned every five seconds
+    for row in (("weapon_napalmgun_mp", "respawn", '"30"'), ("ammo_napalmgun_mp", "respawn", '"30"'),
+                ("weapon_napalmgun_mp", "inv_start_ammo_napalmgun", "NULL")):
+        require(row in rows, f"napalm launcher row {row}")
+    modifier = function_body(player, "float idPlayer::PowerUpModifier( int type )")
+    require(modifier.count("gameLocal.IsClassicRuleset() ? 4.0f : 3.0f") == 2, "Classic quad damage is four times")
+    give = function_body(player, "bool idPlayer::Give( const char *statname, const char *value, bool dropped, bool updateHud )")
+    require("PowerUpActive( POWERUP_SCOUT ) || !rvClassicRules::GiveArmor( this, value )" in give,
+            "a Scout carrier takes no tiered armour")
+    clear = function_body(player, "void idPlayer::ClearPowerup( int i )")
+    require("i == POWERUP_REGENERATION" in clear and "classicMegaDecayTime" in clear,
+            "Regeneration's overheal drains once the powerup ends")
+    frag = function_body(rules, "bool rvClassicRules::AwardFragBonuses( idPlayer *victim, idPlayer *killer )")
+    require("BaseFlag( killer->team )" in frag and "GetFlagEntity" not in frag,
+            "flag defence is scored around the base flag, not the dropped or carried one")
+    require("IsDroppedFlag()" in function_body(rules, "static idEntity *BaseFlag( int team )") and "IsDroppedFlag" in item_h,
+            "the base flag is the one that was never dropped")
+    capture = function_body(rules, "bool rvClassicRules::AwardCapture( idPlayer *capturer )")
+    require("( p == capturer ) ? CLASSIC_CTF_CAPTURE_BONUS : CLASSIC_CTF_TEAM_BONUS" in capture,
+            "the capturer earns assists too")
+    require("lastHurtCarrier = 0" in capture, "a capture ends the danger to the carrier")
+
+
 def main() -> int:
     try:
         check_overlay()
         check_player()
         check_bots()
+        check_rules()
     except (AssertionError, ValueError) as error:
         print(f"mp_classic_grapple_contract: FAIL: {error}")
         return 1

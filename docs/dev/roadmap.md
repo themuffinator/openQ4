@@ -6052,6 +6052,22 @@ Completion substeps:
   no world deaths; q4ctf1 26 pulls (2 rescues, 1 unstick). q4ctf5's open
   walkways give the hook nothing to hold, so it planned two rescues and made
   no pulls there.
+  Progress, 23 November (ruleset audit): every overlay row checked against the
+  stock definitions and Quake 2's and Threewave CTF's values. Fixed: zoomed
+  seeking nails kept a 25-point splash; the expansion napalm launcher
+  respawned every 5 s; slower rockets died at 3,900 units (fuse 12); quad was
+  Quake 4's 3x, now Quake 2's 4x; tiered armour ignored Scout; Regeneration's
+  overheal never drained once Classic disabled the stock decay; flag defence
+  followed the moving flag pointer instead of the base flag; the capturer got
+  no assists; a capture left the "hurt the carrier" marks standing.
+  `mp_classic_grapple_contract.py` pins them. Live: a Classic CTF bot match on
+  q4ctf1 applied all 156 values with none missing and played without an MP
+  module fault, but only in warmup, so the CTF awards were not exercised live.
+  Kept as deliberate deviations: Quake 4's linear splash falloff (Quake 2's
+  stays stronger further out), flag defence needs sight and 400 units (Threewave
+  took either), and the zoomed machinegun keeps 10 damage at 5 shots a second.
+  Remaining: real-input play, a CTF capture on a live server, and Classic
+  pickup names.
 
 - [ ] **MP-12 — P1, implementation: casual match flow and voting parity.** Bring
   to every server what exists today only inside a managed match, or not at all,

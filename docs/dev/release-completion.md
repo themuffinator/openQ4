@@ -12,6 +12,25 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The Classic ruleset plays by its own numbers, 23 November 2026
+
+- **Quad damage hits four times as hard under Classic**, as Quake 2's did,
+  instead of Quake 4's three.
+- **Zoomed nailgun fire plays by Classic's numbers.** Its seeking nails had
+  kept Quake 4's 25-point splash on top of every 10-point nail.
+- **The napalm launcher on the expansion maps** comes back after 30 seconds
+  like every other Classic weapon, instead of every 5, and its pickup gives a
+  box of napalm.
+- **Rockets fly as far as before.** Classic's slower rockets now last long
+  enough to cross the big maps instead of vanishing after 3,900 units.
+- **Scout carriers take no armour** under Classic, as under Quake 4's rules.
+- **Health that Regeneration builds past 100 drains** once the powerup runs
+  out, like mega health's, instead of staying for good.
+- **Threewave CTF bonuses follow Threewave.** Fragging near your flag's base
+  counts while the flag is away, a dropped flag is no longer a base to
+  defend, the capturer earns capture assists too, and a capture ends the
+  bonus for fragging whoever was hurting the carrier.
+
 ## Music and ambience keep playing when the game runs slowly, 23 November 2026
 
 - **No more gaps in long tracks on slow frames.** Since 0.14.1, music, ambience

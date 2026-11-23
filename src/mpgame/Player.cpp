@@ -5624,8 +5624,10 @@ bool idPlayer::Give( const char *statname, const char *value, bool dropped, bool
 		}
 		health = Min( health + atoi( value ), CLASSIC_HEALTH_CAP );
 	} else if ( !idStr::Icmp( statname, "armor_tier" ) ) {
-		// openQ4: Classic tiered armour
-		if ( !rvClassicRules::GiveArmor( this, value ) ) {
+		// openQ4: Classic tiered armour. Scout trades armour for speed, so its
+		// carrier takes none, as the stock armour above (boundaryArmor 0) and the
+		// buy menu already refuse it.
+		if ( PowerUpActive( POWERUP_SCOUT ) || !rvClassicRules::GiveArmor( this, value ) ) {
 			return false;
 		}
 	} else if ( !idStr::Icmp( statname, "bonushealth" ) ) {
@@ -5819,12 +5821,13 @@ float idPlayer::PowerUpModifier( int type ) {
 
 	if ( PowerUpActive( POWERUP_QUADDAMAGE ) ) {
 		switch( type ) {
+			// openQ4: the Classic ruleset's quad damage is Quake 2's, four times
 			case PMOD_PROJECTILE_DAMAGE: {
-				mod *= 3.0f;
+				mod *= gameLocal.IsClassicRuleset() ? 4.0f : 3.0f;
 				break;
 			}
 			case PMOD_MELEE_DAMAGE: {
-				mod *= 3.0f;
+				mod *= gameLocal.IsClassicRuleset() ? 4.0f : 3.0f;
 				break;
 			}
 			case PMOD_PROJECTILE_DEATHPUSH: {
@@ -6332,6 +6335,14 @@ void idPlayer::ClearPowerup( int i ) {
 
  	inventory.powerups &= ~( 1 << i );
 	inventory.powerupEndTime[ i ] = 0;
+
+	// openQ4: Classic drains only mega health, so the health Regeneration builds
+	// past the limit (up to twice it) stayed for good once the powerup ran out.
+	// It drains the way mega health's does, a point a second down to the limit.
+	if ( i == POWERUP_REGENERATION && gameLocal.isServer && gameLocal.IsClassicRuleset() &&
+		 health > inventory.maxHealth && !ClassicMegaHealthActive() ) {
+		classicMegaDecayTime = gameLocal.time + CLASSIC_MEGA_DECAY_PULSE;
+	}
 
 	//if the player doesn't have quad, regen, haste or invisibility remaining on him, remove the power up overlay.
 	if ( !( 

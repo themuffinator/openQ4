@@ -2,6 +2,8 @@
 
 > This guide matches openQ4 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**. See [release status](release-status.md) for what each download includes.
 
+> **After 0.15.0.** The development build corrects these Classic rules: quad damage is four times, seeking nails lose their splash, the napalm launcher respawns in 30 seconds, Scout carriers take no armour, Regeneration's extra health drains, and the CTF defence and assist bonuses follow Threewave CTF. 0.15.0 plays without these corrections.
+
 > Part of the [multiplayer guide](multiplayer.md), which covers joining, game types and match rules and lists every multiplayer guide.
 
 **New in 0.15.0.** The Classic ruleset turns Quake 4 multiplayer into something
@@ -51,11 +53,12 @@ Each Quake 4 weapon plays its Quake 2 counterpart.
 | Shotgun | Super Shotgun | 20 pellets of 6 | 1 a second | 2 shells a shot |
 | Hyperblaster | Hyperblaster | 15 bolt, no splash | 10 a second | cells |
 | Grenade Launcher | Grenade Launcher | 120 over 160 units, 2.5 s fuse | 1 a second | grenades |
-| Nailgun | Chaingun | 10 a nail | 12 a second | bullets |
+| Nailgun | Chaingun | 10 a nail, zoomed seeking nails too | 12 a second | bullets |
 | Rocket Launcher | Rocket Launcher | 110 hit, 120 over 120 units, slower rockets | 1 every 0.8 s | rockets |
 | Railgun | Railgun | 100, through everyone in line | 1 every 1.5 s | slugs |
 | Lightning Gun | Lightning Gun (no Quake 2 twin) | unchanged | unchanged | cells |
 | Dark Matter Gun | BFG10K | 200, over a very wide area | 1 every 2.5 s | 50 cells a shot |
+| Napalm Launcher (expansion maps) | no Quake 2 twin | unchanged | unchanged | napalm |
 
 The machinegun and nailgun share **bullets**; the hyperblaster, lightning gun
 and Dark Matter Gun share **cells**. A weapon pickup gives one box of its ammo
@@ -89,6 +92,7 @@ The nailgun, lightning gun and Dark Matter Gun ammo boxes give bullets or cells.
 - A **weaker** armour tops your current armour up by its worth, and you cannot
   pick it up if that adds nothing.
 - Armour can stop a hit completely, and it never drains away.
+- A **Scout** carrier cannot pick up armour, as under Quake 4's rules.
 - **Energy** weapons (blaster, hyperblaster, lightning gun, Dark Matter Gun)
   get through armour more easily.
 - The armour icon on your HUD takes the colour of the armour you wear: green
@@ -107,10 +111,12 @@ The nailgun, lightning gun and Dark Matter Gun ammo boxes give bullets or cells.
 Health over 100 from shards stays. **Mega health** holds its extra points for
 five seconds, then drains one point a second until you are back to 100. The
 mega health item only starts its 20-second respawn once its holder is back to
-100, dies or leaves.
+100, dies or leaves. Health that the **Regeneration** powerup builds past 100
+drains the same way once the powerup runs out.
 
 Items come back like Quake 2's: weapons, ammo and health after 30 seconds,
-armour after 20, quad damage after a minute.
+armour after 20, quad damage after a minute. **Quad damage** multiplies your
+damage by four, as in Quake 2, rather than Quake 4's three.
 
 ### Movement
 
@@ -129,12 +135,15 @@ way. These points go to your CTF score:
 | Capturing the flag | 15, and 10 to each team mate |
 | Fragging the enemy flag carrier | 2 |
 | Fragging someone who just hurt your flag carrier | 2 |
-| Fragging an enemy near your flag, or while you defend it | 1 |
+| Fragging an enemy near your flag's base, or while you defend it, even while the flag is away | 1 |
 | Fragging an enemy near your team's flag carrier | 1 |
 | Returning your dropped flag | 1 |
 | Returning the flag shortly before your team captures | +1 |
 | Fragging the enemy carrier shortly before your team captures | +2 |
 | Picking up the enemy flag | nothing |
+
+The two capture bonuses at the end of the table go to everyone on the
+capturing team who earned them, the capturer included.
 
 ## The grappling hook
 
