@@ -2374,6 +2374,30 @@ void idRenderSystemLocal::CancelSavePreview() {
 	RB_ReleaseSavePreview();
 }
 
+// Video capture readback (render API 37). The ring is shared with the frame on
+// the render thread, as the save preview is.
+bool idRenderSystemLocal::RequestVideoFrame( long long tag ) {
+	R_RenderThread_Sync( "video capture" );
+	return glConfig.isInitialized && RB_RequestVideoFrame( tag );
+}
+
+int idRenderSystemLocal::PollVideoFrame( renderVideoFrame_t &frame, bool wait ) {
+	R_RenderThread_Sync( "video capture" );
+	memset( &frame, 0, sizeof( frame ) );
+	if ( !glConfig.isInitialized ) return -1;
+	return RB_PollVideoFrame( frame, wait );
+}
+
+void idRenderSystemLocal::ReleaseVideoFrame() {
+	R_RenderThread_Sync( "video capture" );
+	RB_ReleaseVideoFrame();
+}
+
+void idRenderSystemLocal::EndVideoCapture() {
+	R_RenderThread_Sync( "video capture" );
+	RB_ShutdownVideoCapture();
+}
+
 bool idRenderSystemLocal::ReloadGeneratedCacheImages() {
 	// with no device no texture is resident, so nothing holds cache pixels
 	if ( !IsOpenGLRunning() || globalImages == NULL ) {

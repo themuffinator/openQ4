@@ -736,6 +736,7 @@ const void	RB_SwapBuffers( const void *data ) {
 	// All ordinary frames retain the existing presentation path.
 	RB_ForceOpaquePresentAlpha();
 	RB_QueueSavePreview();
+	RB_QueueVideoFrame();
 
 	if ( !r_frontBuffer.GetBool() && !tr.takingScreenshot ) {
 	    R_SwapBuffersWithInputTiming();

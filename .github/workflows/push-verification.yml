@@ -209,6 +209,7 @@ jobs:
             tools/tests/match_control_localization_bridge.py \
             tools/tests/match_control_ui_contract.py \
             tools/tests/campaign_demo_contract.py \
+            tools/tests/video_capture_contract.py \
             tools/tests/demo_playback.py \
             tools/tests/docs_link_integrity.py \
             tools/tests/dmap_render_geometry_lifecycle.py \
@@ -839,6 +840,7 @@ jobs:
           python tools/tests/match_control_localization_bridge.py
           python tools/tests/match_control_ui_contract.py
           python tools/tests/campaign_demo_contract.py
+          python tools/tests/video_capture_contract.py
           python tools/tests/demo_playback.py
           python tools/tests/docs_link_integrity.py
           python tools/tests/dmap_render_geometry_lifecycle.py

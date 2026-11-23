@@ -1045,6 +1045,10 @@ public:
 	virtual bool BeginSavePreview();
 	virtual int PollSavePreview( const char *fileName );
 	virtual void CancelSavePreview();
+	virtual bool RequestVideoFrame( long long tag );
+	virtual int PollVideoFrame( renderVideoFrame_t &frame, bool wait );
+	virtual void ReleaseVideoFrame();
+	virtual void EndVideoCapture();
 	virtual bool ReloadGeneratedCacheImages();
 	virtual void			SetPortalSkyCaptureViewCallback( renderPortalSkyCaptureViewCallback_t callback );
 	virtual void			UnCrop();

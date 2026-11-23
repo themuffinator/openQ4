@@ -917,9 +917,10 @@ silent, and the device opened again. On 23 November it passed on Windows
 33.000 s, 48 kHz HRTF stereo track (1,584,000 frames, peak 27,684, every
 second audible). The same export with `s_numberOfSpeakers 6` wrote a 5.1
 `WAVE_FORMAT_EXTENSIBLE` track (mask 0x60F) of the same length, with sound in
-the front, centre and side channels. The render-demo `aviDemo` path writes no
-pictures (its `TakeScreenshot` calls are commented out), so it has nothing for
-a track to line up with and was left as it is.
+the front, centre and side channels. The render-demo `aviDemo` path, which
+wrote no pictures here, now records a video file with its sound through video
+capture ([Record Video](../user/video-capture.md)), which shares this
+loopback mixer.
 
 **Open.** Recording across a map change, and the prediction's
 lead: playback predicts to the recorder's frame as the clock reconstructs it,

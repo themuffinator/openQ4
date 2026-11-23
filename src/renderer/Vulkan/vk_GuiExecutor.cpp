@@ -124,6 +124,7 @@ bool VK_PostProcess_DrawUnderwater( const viewDef_t *viewDef );
 void VK_DebugTools_DrawView( const viewDef_t *viewDef );
 #include "../SavePreviewCapture.h"
 static void VK_ConsumeSavePreview( int slot );
+static void VK_ConsumeVideoFrames( int slot );
 static void VK_Exec_ReleaseStencilReadbacks( void );
 static void VK_Exec_PrintStencilReadbacks( int slot );
 static void VK_Exec_ReleaseHDRReadbacks( void );
@@ -3907,6 +3908,7 @@ void VK_GuiExecutor_Shutdown( void ) {
 	VK_Exec_ReleaseStencilReadbacks();
 	VK_Exec_ReleaseHDRReadbacks();
 	RB_ReleaseSavePreview();
+	RB_ShutdownVideoCapture();
 	for ( int i = 0; i < 2; ++i ) {
 		if ( vkExec.temporalDirectHistoryRenderTextures[i] != NULL ) {
 			delete vkExec.temporalDirectHistoryRenderTextures[i];
@@ -4433,6 +4435,7 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	VK_Exec_PrintStencilReadbacks( slot );
 	VK_Exec_ConsumeHDRReadback( slot );
 	VK_ConsumeSavePreview( slot );
+	VK_ConsumeVideoFrames( slot );
 	// retire the last upload batch (and, per fence submission-order scope,
 	// every earlier one) before deferred destroys can release images those
 	// batches referenced; near-free, since the batch was submitted before the
@@ -7843,6 +7846,172 @@ void RB_ReleaseSavePreview() {
 	memset( &vkSavePreview, 0, sizeof( vkSavePreview ) );
 }
 
+/*
+====================
+Video capture ring
+
+The save preview's copy, made for every requested frame into one of four
+host buffers. A copy becomes readable when its frame slot's fence is waited
+at the start of a later frame (VK_ConsumeVideoFrames), or when a poll that
+must wait waits that fence itself.
+====================
+*/
+static const int VK_VIDEO_RING = 4;
+static struct {
+	VkBuffer buffer;
+	VmaAllocation allocation;
+	void *mapped;
+	VkDeviceSize allocated;
+	int width, height, frameSlot, state;	// 0 free, 1 copy recorded, 2 readable
+	long long tag;
+	bool bgra;
+} vkVideoSlots[ VK_VIDEO_RING ];
+static int vkVideoHead = 0;
+static int vkVideoCount = 0;
+static bool vkVideoRequested = false;
+static long long vkVideoRequestTag = 0;
+
+static void VK_DestroyVideoSlotBuffer( int index, bool inFlight ) {
+	if ( vkVideoSlots[index].buffer == VK_NULL_HANDLE ) return;
+	if ( inFlight ) {
+		VK_Device_DeferDestroy( VK_NULL_HANDLE, VK_NULL_HANDLE, vkVideoSlots[index].buffer, vkVideoSlots[index].allocation );
+	} else {
+		vmaDestroyBuffer( vkCtx.allocator, vkVideoSlots[index].buffer, vkVideoSlots[index].allocation );
+	}
+	vkVideoSlots[index].buffer = VK_NULL_HANDLE;
+	vkVideoSlots[index].allocation = VK_NULL_HANDLE;
+	vkVideoSlots[index].mapped = NULL;
+	vkVideoSlots[index].allocated = 0;
+}
+
+bool RB_RequestVideoFrame( int64 tag ) {
+	if ( !vkCtx.initialized || vkCtx.presentationBlocked ||
+		( !vkCtx.offscreenFrames && !vkCtx.swapchainTransferSrc ) ) return false;
+	if ( vkVideoRequested ) {
+		vkVideoRequestTag = tag;
+		return true;
+	}
+	if ( vkVideoCount >= VK_VIDEO_RING ) return false;
+	vkVideoRequested = true;
+	vkVideoRequestTag = tag;
+	return true;
+}
+
+void RB_QueueVideoFrame() {
+	if ( !vkVideoRequested || !vkExec.frameOpen || vkVideoCount >= VK_VIDEO_RING ||
+		VK_Exec_DefaultColorImage() == VK_NULL_HANDLE ) return;
+	vkVideoRequested = false;
+	const VkFormat format = VK_Exec_DefaultColorFormat();
+	const bool bgra = format == VK_FORMAT_B8G8R8A8_UNORM || format == VK_FORMAT_B8G8R8A8_SRGB;
+	if ( !bgra && format != VK_FORMAT_R8G8B8A8_UNORM && format != VK_FORMAT_R8G8B8A8_SRGB ) return;
+	const int width = (int)VK_Exec_DefaultExtent().width;
+	const int height = (int)VK_Exec_DefaultExtent().height;
+	const VkDeviceSize bytes = (VkDeviceSize)width * height * 4;
+	if ( width <= 0 || height <= 0 || bytes > (VkDeviceSize)33554432 * 4 ) return;
+	const int index = ( vkVideoHead + vkVideoCount ) % VK_VIDEO_RING;
+	if ( vkVideoSlots[index].allocated != bytes ) {
+		VK_DestroyVideoSlotBuffer( index, false );
+		VkBufferCreateInfo buffer = {};
+		buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+		buffer.size = bytes;
+		buffer.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		VmaAllocationCreateInfo allocation = {};
+		allocation.usage = VMA_MEMORY_USAGE_AUTO;
+		allocation.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+		VmaAllocationInfo mapped = {};
+		if ( vmaCreateBuffer( vkCtx.allocator, &buffer, &allocation, &vkVideoSlots[index].buffer,
+			&vkVideoSlots[index].allocation, &mapped ) != VK_SUCCESS ) {
+			vkVideoSlots[index].buffer = VK_NULL_HANDLE;
+			return;
+		}
+		vkVideoSlots[index].mapped = mapped.pMappedData;
+		vkVideoSlots[index].allocated = bytes;
+	}
+	VK_Exec_EndMainRendering();
+	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL );
+	VkBufferImageCopy copy = {};
+	copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	copy.imageSubresource.layerCount = 1;
+	copy.imageExtent.width = width;
+	copy.imageExtent.height = height;
+	copy.imageExtent.depth = 1;
+	vkCmdCopyImageToBuffer( vkExec.cmd, VK_Exec_DefaultColorImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vkVideoSlots[index].buffer, 1, &copy );
+	VkBufferMemoryBarrier2 barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
+	barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
+	barrier.srcAccessMask = VK_ACCESS_2_TRANSFER_WRITE_BIT;
+	barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
+	barrier.dstAccessMask = VK_ACCESS_2_HOST_READ_BIT;
+	barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.buffer = vkVideoSlots[index].buffer;
+	barrier.size = VK_WHOLE_SIZE;
+	VkDependencyInfo dependency = {};
+	dependency.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+	dependency.bufferMemoryBarrierCount = 1;
+	dependency.pBufferMemoryBarriers = &barrier;
+	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.barriers; }
+	vkCmdPipelineBarrier2( vkExec.cmd, &dependency );
+	VK_Exec_TransitionSwapchain( VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	vkVideoSlots[index].width = width;
+	vkVideoSlots[index].height = height;
+	vkVideoSlots[index].bgra = bgra;
+	vkVideoSlots[index].tag = vkVideoRequestTag;
+	vkVideoSlots[index].frameSlot = vkExec.frameSlot;
+	vkVideoSlots[index].state = 1;
+	vkVideoCount++;
+}
+
+static void VK_ConsumeVideoFrames( int slot ) {
+	for ( int i = 0; i < vkVideoCount; ++i ) {
+		const int index = ( vkVideoHead + i ) % VK_VIDEO_RING;
+		if ( vkVideoSlots[index].state == 1 && vkVideoSlots[index].frameSlot == slot ) {
+			vkVideoSlots[index].state = vmaInvalidateAllocation( vkCtx.allocator, vkVideoSlots[index].allocation,
+				0, VK_WHOLE_SIZE ) == VK_SUCCESS ? 2 : -1;
+		}
+	}
+}
+
+int RB_PollVideoFrame( renderVideoFrame_t &frame, bool wait ) {
+	if ( vkCtx.presentationBlocked || vkVideoCount == 0 ) return -1;
+	const int index = vkVideoHead;
+	if ( vkVideoSlots[index].state == 1 ) {
+		if ( !wait ) return 0;
+		const VkResult waited = vkWaitForFences( vkCtx.device, 1, &vkCtx.frameFences[ vkVideoSlots[index].frameSlot ],
+			VK_TRUE, 2000000000ULL );
+		if ( waited == VK_TIMEOUT ) return -1;
+		vkVideoSlots[index].state = waited == VK_SUCCESS && vmaInvalidateAllocation( vkCtx.allocator,
+			vkVideoSlots[index].allocation, 0, VK_WHOLE_SIZE ) == VK_SUCCESS ? 2 : -1;
+	}
+	if ( vkVideoSlots[index].state != 2 || vkVideoSlots[index].mapped == NULL ) {
+		RB_ReleaseVideoFrame();
+		return -1;
+	}
+	frame.pixels = static_cast<const byte *>( vkVideoSlots[index].mapped );
+	frame.width = vkVideoSlots[index].width;
+	frame.height = vkVideoSlots[index].height;
+	frame.topDown = true;
+	frame.bgra = vkVideoSlots[index].bgra;
+	frame.tag = vkVideoSlots[index].tag;
+	return 1;
+}
+
+void RB_ReleaseVideoFrame() {
+	if ( vkVideoCount == 0 ) return;
+	vkVideoSlots[vkVideoHead].state = 0;
+	vkVideoHead = ( vkVideoHead + 1 ) % VK_VIDEO_RING;
+	vkVideoCount--;
+}
+
+void RB_ShutdownVideoCapture() {
+	for ( int i = 0; i < VK_VIDEO_RING; ++i ) {
+		VK_DestroyVideoSlotBuffer( i, vkVideoSlots[i].state == 1 );
+		vkVideoSlots[i].state = 0;
+	}
+	vkVideoHead = vkVideoCount = 0;
+	vkVideoRequested = false;
+}
+
 bool VK_GuiExecutor_ReadPixels( int x, int y, int width, int height, void *pixels, int components ) {
 	R_RenderThread_Sync( "readback" );
 	if ( components != 3 && components != 4 ) {
@@ -8033,7 +8202,10 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 	VkCommandBuffer cmd = vkExec.cmd;
 	// A hidden window's offscreen frame completes without a presentation.
 	const bool presentImage = present && vkExec.framePresentable;
-	if ( present ) RB_QueueSavePreview();
+	if ( present ) {
+		RB_QueueSavePreview();
+		RB_QueueVideoFrame();
+	}
 
 	// submit any batched image uploads first: same-queue submission order makes
 	// them execute before this frame samples the images, and this frame's fence
