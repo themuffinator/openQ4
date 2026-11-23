@@ -12,6 +12,35 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Linux downloads as .tar.gz, and a faster, rehearsable release workflow, 23 November 2026
+
+- **Linux packages also as `.tar.gz`.** Each Linux release now offers the
+  same archive as `.tar.gz` beside the `.tar.xz`, for sites that do not take
+  xz archives, such as ModDB. Both hold exactly the same files; the AppImage,
+  update archive and debug symbols are unchanged.
+- **Releases publish sooner.** Publishing 0.15.0 took two dispatches (the
+  first failed after 18 minutes in a Linux check that only releases run) and
+  50 minutes for the run that worked: Linux ARM64 took 30 minutes, 10 of them
+  compressing already-compressed content packs with single-threaded lzma
+  (about 1 to 2 MB/s, for a 1.5% saving). Linux and macOS archives now come
+  from one tar stream through `xz -T0` (fixed block size, so reproducible) and
+  gzip at once; Linux debug symbols use every core; the prepared OpenAL Soft is
+  cached on Windows (3 to 5 minutes per job); compressed archives upload as
+  artifacts without recompression; the publish job checks archives in one pass
+  on parallel threads and runs both update proofs at once; and the Discord job
+  checks out one folder instead of the 3 GB tree.
+- **Rehearse before release day.** `rehearsal: true` runs the whole release
+  from `main` or any branch, every build, package and publication check, and
+  stops before tagging, publishing or announcing.
+- **Evidence.** `release_archive_formats.py` checks that the `.tar.xz` and
+  `.tar.gz` hold exactly the tar the previous writer made, that the gzip
+  header carries no name or time, that reruns are byte-identical, that Python's
+  lzma is the fallback without `xz`, that a truncated stream still fails
+  verification, and pins the workflow's archive, upload, cache and rehearsal
+  wiring. The release, packaging, Linux, macOS and Windows workflow contracts
+  pass. The changes have not run on GitHub yet: the first rehearsal measures
+  them.
+
 ## Windows crash reports from the renderers and the updater can be read, 23 November 2026
 
 - **For crash reports.** The Windows symbols download that accompanies each
@@ -59,6 +88,29 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   also seeds multiplayer-only settings and requires them to survive a level
   start and a menu start. The packaged fix is qualified on the next candidate,
   recorded in [release qualification](release-qualification.md).
+
+## A master server you can run, and an HTTPS server list, 23 November 2026
+
+- **Run your own master.** `tools/master/openq4_master.py` lists the openQ4
+  servers that announce themselves to it, for IPv4 and IPv6 players, and lists
+  a server only once it has answered the master's own challenge. It needs
+  nothing but Python.
+- **A server list over HTTPS.** The master can write its list to a file for a
+  web server to publish. Set `net_serverListUrl` to that `https://` address and
+  the browser reads it beside the master, listing each server once, so your
+  players still find servers when no master answers.
+- **Nothing changes until you choose to.** The game still asks Quake 4's master
+  first, and reads no HTTPS list until you set one.
+- **Check it from the console.** `NETScan` runs the browser's Internet search,
+  and `listServers` shows what it found.
+- **Evidence.** `master_protocol.py` plays both sides of the protocol against
+  the program over loopback; `mp_server_discovery.py` runs the list reader's
+  native test and pins the browser's wiring; `mp_master_smoke.py` runs the
+  program, a staged dedicated server and a hidden client on loopback (Windows):
+  the server's heartbeat, the master's challenge, the JSON list, and the
+  client's `NETScan` listing the server once with its name and ping. Not run:
+  a deployed master, the HTTPS list against a real certificate, Linux and
+  macOS.
 
 ## Servers recognise returning players; identity bans, rankings and your match history, 23 November 2026
 

@@ -288,6 +288,10 @@ jobs:
             tools/tests/mp_identity.py \
             tools/tests/mp_identity_smoke.py \
             tools/tests/mp_vote_extensions_smoke.py \
+            tools/master/openq4_master.py \
+            tools/tests/master_protocol.py \
+            tools/tests/mp_server_discovery.py \
+            tools/tests/mp_master_smoke.py \
             tools/tests/awakening_turret_skin_contract.py \
             tools/tests/awakening_m01_dropship_contract.py \
             tools/tests/awakening_m01_retch_contract.py \
@@ -747,6 +751,7 @@ jobs:
             tools/tests/savegame_cross_load.py \
             tools/tests/release_profile_runtime.py \
             tools/tests/archived_settings_across_modules.py \
+            tools/tests/release_archive_formats.py \
             tools/tests/bse_lifecycle_runtime.py \
             tools/tests/turbo_lift_runtime.py \
             tools/tests/awakening_vehicle_runtime.py \
@@ -889,6 +894,8 @@ jobs:
           python tools/tests/mp_client_options.py
           python tools/tests/mp_moderation.py
           python tools/tests/mp_identity.py
+          python tools/tests/master_protocol.py
+          python tools/tests/mp_server_discovery.py
           python tools/tests/awakening_turret_skin_contract.py
           python tools/tests/awakening_m01_dropship_contract.py
           python tools/tests/awakening_m01_retch_contract.py
@@ -1264,6 +1271,7 @@ jobs:
           python tools/tests/savegame_cross_load.py --self-test
           python tools/tests/release_profile_runtime.py self-test
           python tools/tests/archived_settings_across_modules.py
+          python tools/tests/release_archive_formats.py
           python tools/validation/release_qualification.py self-test
           python tools/tests/bse_lifecycle_runtime.py --self-test
           python tools/tests/turbo_lift_runtime.py --self-test

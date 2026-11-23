@@ -205,6 +205,7 @@ void idAsyncNetwork::Init( void ) {
 	cmdSystem->AddCommand( "reconnect", Reconnect_f, CMD_FL_SYSTEM, "reconnect to the last server we tried to connect to" );
 	cmdSystem->AddCommand( "serverInfo", GetServerInfo_f, CMD_FL_SYSTEM, "shows server info" );
 	cmdSystem->AddCommand( "LANScan", GetLANServers_f, CMD_FL_SYSTEM, "scans LAN for servers" );
+	cmdSystem->AddCommand( "NETScan", GetNETServers_f, CMD_FL_SYSTEM, "asks the master server in net_master0, and the list in net_serverListUrl, for Internet servers" );
 	cmdSystem->AddCommand( "listServers", ListServers_f, CMD_FL_SYSTEM, "lists scanned servers" );
 	cmdSystem->AddCommand( "rcon", RemoteConsole_f, CMD_FL_SYSTEM | CMD_FL_RAWTEXT, "sends an authenticated remote console command to the server" );
 	cmdSystem->AddCommand( "heartbeat", Heartbeat_f, CMD_FL_SYSTEM, "send a heartbeat to the the master servers" );
@@ -782,6 +783,18 @@ idAsyncNetwork::GetLANServers_f
 */
 void idAsyncNetwork::GetLANServers_f( const idCmdArgs &args ) {
 	client.GetLANServers();
+}
+
+/*
+==================
+idAsyncNetwork::GetNETServers_f
+
+openQ4 MP-19: what the browser's Get New List does on the Internet source;
+listServers shows the result.
+==================
+*/
+void idAsyncNetwork::GetNETServers_f( const idCmdArgs &args ) {
+	client.GetNETServers();
 }
 
 /*

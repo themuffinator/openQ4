@@ -132,6 +132,8 @@ public:
 	void				PacifierUpdate( void );
 
 	idServerScan		serverList;
+	// openQ4 MP-19: the HTTPS server list read beside the master's (net_serverListUrl)
+	idServerListFallback	serverListFallback;
 
 private:
 	bool				active;						// true if client is active

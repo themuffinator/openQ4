@@ -377,6 +377,40 @@ rated. `rankings [game type]` lists the table, best first. The file is written
 whole each time; a file this build cannot read is left as it is and not
 updated.
 
+## Run a master server
+
+> **After 0.15.0.** The program is in the source tree; openQ4 does not run one
+> for you yet.
+
+A master server is how players' browsers find Internet servers. openQ4
+servers announce themselves to the masters in `net_master0` to `net_master4`
+when a map starts and every five minutes, unless `net_LANServer 1`.
+`tools/master/openq4_master.py` is a master you can run yourself, with nothing
+but Python 3.10 or later:
+
+```
+python openq4_master.py --port 27650 --json /var/www/openq4/servers.json
+```
+
+- It lists a server only once the server answers the master's own challenge,
+  so nobody can list an address that is not theirs, and drops one that has not
+  announced itself for fifteen minutes.
+- It answers both the old list request and the newer one, so players on IPv6
+  find IPv6 servers.
+- With `--json` it writes the list to a file every minute. Publish that file
+  over HTTPS and players can set `net_serverListUrl` to it: their browser then
+  lists your servers even when no master answers.
+- `--allow-private` lists servers on private and loopback addresses, for a LAN
+  or a test. By default only public addresses are listed.
+
+Point your servers at it with `net_master1 <host>:27650` (they announce to
+every master set), and players at it with `net_master0 <host>:27650` (the
+browser asks only the first).
+
+To check it from a game, set `net_master0` to it and type `NETScan` in the
+console (the browser's **Get New List** on the Internet source), then
+`listServers` a few seconds later: your server should be in the list.
+
 ## Maps, rotation and the map queue
 
 **New in 0.15.0.** openQ4 keeps one list of the multiplayer maps your server

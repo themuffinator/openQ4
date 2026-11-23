@@ -509,6 +509,12 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Linux packages are also offered as `.tar.gz`, with exactly the same files as
+  the `.tar.xz`, for sites that do not take xz archives such as ModDB.
+- Server hosts can run their own master server (`tools/master/openq4_master.py`),
+  and the server browser can also read an HTTPS server list such a master
+  publishes (`net_serverListUrl`). Both are off until you set them up. See
+  [Run a master server](../../user/server-setup.md#run-a-master-server).
 - The Windows symbols download now includes the OpenGL and Vulkan renderer
   modules and the updater, so crash reports from them can be read.
 - Servers recognise a returning player. Your game proves to each server that

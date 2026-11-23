@@ -507,6 +507,8 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "mp_client_options.py",
         root / "tools" / "tests" / "mp_moderation.py",
         root / "tools" / "tests" / "mp_identity.py",
+        root / "tools" / "tests" / "master_protocol.py",
+        root / "tools" / "tests" / "mp_server_discovery.py",
         root / "tools" / "tests" / "choice_gui_value_contract.py",
         root / "tools" / "tests" / "list_window_selection_contract.py",
         root / "tools" / "tests" / "loading_pacifier_reentry_contract.py",
