@@ -128,6 +128,13 @@ idRenderSystemLocal::SetVRFrame
 ====================
 */
 void idRenderSystemLocal::SetVRFrame( const renderVRFrame_t *frame ) {
+	// Without a headset the engine clears the frame on every frame. vrFrame is
+	// either an active frame or all zero, so clearing a cleared frame changes
+	// nothing the backend reads and must not wait for it: that wait removed
+	// every overlap of r_vkRenderThread 1 and 2 in ordinary play.
+	if ( !vrFrame.active && ( frame == NULL || ( !frame->active && !frame->releaseImages ) ) ) {
+		return;
+	}
 	// the backend reads the frame's images and waits on its queue; a Vulkan
 	// render thread must be done with the previous frame first
 	R_RenderThread_Sync( "vr frame" );
