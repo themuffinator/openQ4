@@ -56,7 +56,7 @@ Quake 4's own fog and blend lights keep their original look. The haze also dims 
 
 Values outside each range are clamped to it. Changing any of these settings resets temporal AA's history, so old lighting doesn't blend into the new result.
 
-`rendererVolumetricStatus` (also part of `gfxInfo`) reports whether volumetric lighting is requested and actually drawn on your renderer, and how many lights glowed with a shadow map, without one, or not at all and why. **New in 0.15.0.**
+`rendererVolumetricStatus` (also part of `gfxInfo`) reports whether volumetric lighting is requested and actually drawn on your renderer, how many lights glowed with a shadow map, without one, or not at all and why, and in how many views it drew (mirrors and camera screens are counted as `subviews`). **New in 0.15.0.**
 
 ## Limitations
 

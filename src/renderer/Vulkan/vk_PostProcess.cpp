@@ -3968,10 +3968,13 @@ static const vkPostModuleSource_t vkVolumetricModuleSources[ VK_VOLUMETRIC_MODUL
 typedef struct vkVolumetricState_s {
 	VkShaderModule		modules[ VK_VOLUMETRIC_MODULE_COUNT ];
 	bool				moduleFailed[ VK_VOLUMETRIC_MODULE_COUNT ];
-	idImage *			depth;
-	idImage *			scatter;
-	idRenderTexture *	scatterTarget;
+	// one depth copy and scattering target per view size (VolumetricLighting.h)
+	volumetricTargetPool_t pool;
+	idImage *			depth[ VOLUMETRIC_TARGET_SLOTS ];
+	idImage *			scatter[ VOLUMETRIC_TARGET_SLOTS ];
+	idRenderTexture *	scatterTarget[ VOLUMETRIC_TARGET_SLOTS ];
 	// the view being drawn
+	int					slot;
 	const viewDef_t *	view;
 	volumetricViewSettings_t settings;
 	volumetricViewStats_t stats;
@@ -4004,7 +4007,9 @@ static void VK_Post_ShutdownVolumetrics( void ) {
 	for ( int i = 0; i < VK_VOLUMETRIC_MODULE_COUNT; i++ ) {
 		VK_Post_DestroyModule( vkVolumetric.modules[ i ] );
 	}
-	delete vkVolumetric.scatterTarget;
+	for ( int i = 0; i < VOLUMETRIC_TARGET_SLOTS; i++ ) {
+		delete vkVolumetric.scatterTarget[ i ];
+	}
 	memset( &vkVolumetric, 0, sizeof( vkVolumetric ) );
 }
 
@@ -4016,8 +4021,12 @@ static bool VK_Post_VolumetricDepth( const viewDef_t *viewDef ) {
 	if ( state.depthCopied ) {
 		return true;
 	}
-	if ( VK_Post_EnsureImage( state.depth, "_vkVolumetricDepth", VK_Post_DepthImage ) == NULL
-			|| !VK_Post_CaptureDepth( state.depth, viewDef ) ) {
+	if ( state.depth[ state.slot ] == NULL || state.depth[ state.slot ]->GetUploadWidth() != VK_Post_ViewWidth( viewDef )
+			|| state.depth[ state.slot ]->GetUploadHeight() != VK_Post_ViewHeight( viewDef ) ) {
+		R_Volumetric_NoteTargetAllocation();
+	}
+	if ( VK_Post_EnsureImage( state.depth[ state.slot ], va( "_vkVolumetricDepth%d", state.slot ), VK_Post_DepthImage ) == NULL
+			|| !VK_Post_CaptureDepth( state.depth[ state.slot ], viewDef ) ) {
 		return false;
 	}
 	state.depthCopied = true;
@@ -4026,7 +4035,12 @@ static bool VK_Post_VolumetricDepth( const viewDef_t *viewDef ) {
 
 static bool VK_Post_VolumetricTarget( void ) {
 	vkVolumetricState_t &state = vkVolumetric;
-	return VK_Post_EnsureColorTarget( state.scatter, state.scatterTarget, "_vkVolumetricScatter",
+	if ( state.scatterTarget[ state.slot ] == NULL || state.scatterTarget[ state.slot ]->GetWidth() != state.targetWidth
+			|| state.scatterTarget[ state.slot ]->GetHeight() != state.targetHeight ) {
+		R_Volumetric_NoteTargetAllocation();
+	}
+	return VK_Post_EnsureColorTarget( state.scatter[ state.slot ], state.scatterTarget[ state.slot ],
+		va( "_vkVolumetricScatter%d", state.slot ),
 		state.targetWidth, state.targetHeight, TF_NEAREST, "volumetric scattering" );
 }
 
@@ -4137,7 +4151,7 @@ static void VK_Post_VolumetricDrawLight( const viewLight_t *vLight, const volume
 			? VK_Exec_PostPipeline( VK_POST_VOLUMETRIC_INJECT, vkPost.fullscreenVert, fragModule,
 				GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE )
 			: VK_Exec_VolumetricShadowPipeline( kind == VOLUMETRIC_SHADOW_POINT, vkPost.fullscreenVert, fragModule ) );
-	const VkDescriptorSet depthSet = VK_Post_Descriptor( state.depth );
+	const VkDescriptorSet depthSet = VK_Post_Descriptor( state.depth[ state.slot ] );
 	const VkDescriptorSet falloffSet = VK_Post_Descriptor( record.falloffImage );
 	if ( cmd == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE
 			|| depthSet == VK_NULL_HANDLE || falloffSet == VK_NULL_HANDLE ) {
@@ -4242,7 +4256,7 @@ void VK_PostProcess_DrawVolumetricLights( const viewDef_t *viewDef, bool classic
 	R_Volumetric_BuildViewSettings( viewDef,
 		R_Volumetric_Requested() && viewDef != NULL ? VK_Post_VolumetricDecline( viewDef, classicLights ) : NULL,
 		state.settings );
-	R_Volumetric_BeginViewStats( state.stats, state.settings );
+	R_Volumetric_BeginViewStats( state.stats, state.settings, viewDef );
 	if ( !state.settings.active ) {
 		return;
 	}
@@ -4256,6 +4270,8 @@ void VK_PostProcess_DrawVolumetricLights( const viewDef_t *viewDef, bool classic
 	state.sceneHeight = VK_Post_ViewHeight( viewDef );
 	R_Volumetric_TargetExtent( state.settings, state.sceneWidth, state.sceneHeight,
 		state.targetWidth, state.targetHeight );
+	state.slot = R_Volumetric_ChooseTargetSlot( state.pool, state.sceneWidth, state.sceneHeight,
+		state.settings.resolutionDivisor );
 
 	idRenderTexture *sceneTarget = VK_Exec_ActiveRenderTexture();
 	const int sceneFace = VK_Exec_ActiveCubeFace();
@@ -4302,7 +4318,7 @@ void VK_PostProcess_DrawVolumetricLights( const viewDef_t *viewDef, bool classic
 		if ( !onTarget ) {
 			// The depth comes from the scene target, before switching away.
 			if ( !VK_Post_VolumetricDepth( viewDef ) || !VK_Post_VolumetricTarget()
-					|| !VK_Exec_SetRenderTarget( state.scatterTarget, 0, false ) ) {
+					|| !VK_Exec_SetRenderTarget( state.scatterTarget[ state.slot ], 0, false ) ) {
 				failed = true;
 				R_Volumetric_CountOutcome( state.stats, VOLUMETRIC_LIGHT_SKIPPED_FAILED );
 				continue;
@@ -4311,7 +4327,9 @@ void VK_PostProcess_DrawVolumetricLights( const viewDef_t *viewDef, bool classic
 			VK_Post_VolumetricClear();
 		}
 		const int passes = state.stats.passes;
-		VK_Post_VolumetricDrawLight( vLight, record, mapped ? kind : VOLUMETRIC_SHADOW_NONE, shadowSet, shadowBlock );
+		// r_volumetricDebug 2: the same lights with no shadow term
+		VK_Post_VolumetricDrawLight( vLight, record,
+			mapped && state.settings.debug != 2 ? kind : VOLUMETRIC_SHADOW_NONE, shadowSet, shadowBlock );
 		if ( state.stats.passes > passes ) {
 			state.budgetUsed++;
 			R_Volumetric_CountOutcome( state.stats, outcome );
@@ -4352,7 +4370,7 @@ bool VK_PostProcess_CompositeVolumetrics( const viewDef_t *viewDef ) {
 		// No light scattered: the medium still attenuates the scene.
 		idRenderTexture *sceneTarget = VK_Exec_ActiveRenderTexture();
 		const int sceneFace = VK_Exec_ActiveCubeFace();
-		ready = VK_Exec_SetRenderTarget( state.scatterTarget, 0, false );
+		ready = VK_Exec_SetRenderTarget( state.scatterTarget[ state.slot ], 0, false );
 		if ( ready ) {
 			VK_Post_VolumetricClear();
 		}
@@ -4369,10 +4387,10 @@ bool VK_PostProcess_CompositeVolumetrics( const viewDef_t *viewDef ) {
 		block.sceneInfo[ 2 ] = (float)state.targetWidth;
 		block.sceneInfo[ 3 ] = (float)state.targetHeight;
 		R_Volumetric_PackViewParams( state.settings, block.params0, block.params1 );
-		const VkDescriptorSet sets[ 2 ] = { VK_Post_Descriptor( state.depth ), VK_Post_Descriptor( state.scatter ) };
+		const VkDescriptorSet sets[ 2 ] = { VK_Post_Descriptor( state.depth[ state.slot ] ), VK_Post_Descriptor( state.scatter[ state.slot ] ) };
 		const int uniformOffset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
 		const VkPipeline pipeline = VK_Exec_PostPipeline( VK_POST_VOLUMETRIC_COMPOSITE, vkPost.fullscreenVert,
-			fragModule, state.settings.debug ? ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO )
+			fragModule, state.settings.debug != 0 ? ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO )
 				: ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_SRC_ALPHA ) );
 		drawn = VK_Post_DrawSceneRect( viewDef, pipeline, sets, 2, uniformOffset );
 	}

@@ -1201,7 +1201,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
-| REN-09 — Partial | Per-light shadowed scattering replaces the REN-06 leaf on GL and Vulkan: falloff/projection images, point, projected and cascaded-sun maps, stencil-light policy (none by default), composite before fog and translucents, status reporting, exact rollback; frozen outdoor/indoor captures pass under TAA and 4x MSAA. | Moving-flashlight and moving-caster review in play, dynamic resolution, mirrors/remote views and VR runs, a visual tuning review, per-tier cost against FPS-01 on a quiet machine. |
+| REN-09 — Partial | Per-light shadowed scattering replaces the REN-06 leaf on GL and Vulkan: falloff/projection images, point, projected and cascaded-sun maps, stencil-light policy (none by default), composite before fog and translucents, status reporting, exact rollback; frozen outdoor/indoor captures pass under TAA and 4x MSAA. 23 November 2026: moving casters and a moving flashlight, temporal history, resolution scale and dynamic resolution, mirrors and remote cameras, a backend decline and VR stereo pass on GL and Vulkan; scratch targets are pooled by view size. Evidence: [volumetric lighting](volumetric-lighting.md). | Per-tier cost against FPS-01 on a quiet reference machine (a shared-machine ladder is recorded), the owner's visual review of the defaults (contact sheets captured, no default changed; 12 whites out the Tram 1 opening), and physical Linux/macOS/Android runs with the Apple GL 2.1 and GLES declines (PLAT). |
 | REN-10 — Closed | HBAO (`r_ssaoMethod 1`), GTAO (`2`) and a brute-force reference (`3`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. GTAO closer to the reference than SSAO with fewer halos, HBAO as close as SSAO; backend parity, exact rollback, cost at or near SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
 | REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | Linux (Mesa GL and Vulkan) and the Android emulator (GLES declines cleanly) pass. VR headset confirmation and physical Linux GPUs, macOS and Android devices belong to platform qualification; a preset decision waits for authored content. |
 
@@ -1886,11 +1886,47 @@ diagnostics establish whole-frame ownership or production performance.
   effect and status only) and Process 1 (8), with the Quality shadow
   configuration: frozen baselines identical, leaf-on master-off byte-identical
   to master-off, GL/Vulkan mean change within 0.6 of each other on the frozen
-  scenes; it also passes with TAA and with 4x MSAA. Open: a moving flashlight
-  and moving casters in play, dynamic resolution, mirrors and remote views, VR
-  stereo, a visual review of the defaults (indoor beams are subtle at
-  `r_volumetricIntensity 12`), and cost: the GPU timings were taken beside three
-  other clients and are not budget evidence.
+  scenes; it also passes with TAA and with 4x MSAA.
+  Progress, 23 November 2026 ([evidence](volumetric-lighting.md)):
+  `renderer_volumetric_motion.py` (opt-in, hardware-bound) passes its five cases
+  on GL and Vulkan. With a stock door pair between a spawned shadow-casting
+  light and a camera that pans 540 degrees carrying the flashlight, 17 lights
+  scatter (11 shadow-mapped); the scattered light from motion-warmed shadow
+  caches matches fresh maps (at most 0.02% of pixels differ), is nowhere
+  brighter than the same lights unshadowed (`r_volumetricDebug 2`, new), moves
+  by 39.8 levels where the doors shadow the medium and returns with them, the
+  backends within 0.01 levels of each other. Frozen halfway through opening
+  under TAA, the history clears as fast with the leaf as without (18 to 21% of
+  the first frame's residual left after 16 frames, against 24 to 29%). The
+  scattering target follows the scene at half resolution at 50% scale and
+  through forced dynamic resolution, and the native frame afterwards is
+  byte-identical. Mirrors, a reflection and a remote camera scatter (five views
+  a frame in the REN-01 validation room), `r_volumetricSubviews 0` leaves them
+  clear and reports them declined, and `r_skipPostProcess 1` declines with its
+  reason and an unchanged frame. That case found each backend reallocating its
+  one depth copy and scattering target for every view of a frame (204
+  allocations in 34 frozen frames); both now keep four pairs keyed by view size
+  and allocate nothing while the views hold still. The status counts scattering
+  views, subviews and declined views alike on both backends.
+  `openxr_vr_volumetric_smoke.py` passes on GL and Vulkan: both eyes scatter
+  (two main views a frame, 12 shadow-mapped passes), keep their parallax and
+  return byte for byte with the leaf off. `renderer_volumetric_tiers.py`
+  records the tier ladder and the tuning candidates: on this shared machine, in
+  a hidden window at 2538x1312, the default half-resolution tier cost roughly
+  0.2 to 1.0 ms of GPU frame time and full resolution 1 to 4 ms, with the
+  leaf-off frame itself drifting by up to 5 ms, so none of it is budget
+  evidence. No default changed: the same `r_volumetricIntensity 12` is faint in
+  the Process 1 view (+2.5 levels mean), lifts the busy Air Defense 2 corridor
+  as a whole (+31 levels at the median) and whites out the Tram 1 opening view
+  (+80), and the lower candidates pull those views apart, which is a visual
+  decision. The frozen-view harness passes again on the changed engine (six
+  of six, and outdoors with 4x MSAA).
+  Open: the tier ladder and the performance suite on the quiet reference
+  machine against the FPS-01 budgets; the owner's visual review of the defaults;
+  the physical Linux, macOS and Android runs, including the Apple GL 2.1 and
+  GLES declines, which no driver here can be made to report (PLAT). Outside the
+  leaf: Vulkan shows no reflection in the validation rooms' direct mirror with
+  the leaf off, so the leaf's picture inside it could not be compared there.
 - [x] **REN-10 — P2, implementation: ground-truth ambient occlusion (GTAO).**
   Closed 21 November 2026. `r_ssaoMethod` selects the kernel of SSAO's
   occlusion pass: `0` SSAO (default), `1` HBAO (horizon rises above the

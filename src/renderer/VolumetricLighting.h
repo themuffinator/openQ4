@@ -72,7 +72,7 @@ typedef struct volumetricViewSettings_s {
 	int		stencilPolicy;		// 0 skip, 1 unshadowed
 	int		maxLights;		// 0 unlimited
 	float		noiseOffset;		// per-frame march offset under TAA, else 0
-	bool		debug;			// show the scattering alone
+	int		debug;			// 1 show the scattering alone, 2 the same with no shadow term
 } volumetricViewSettings_t;
 
 // One light stage in world space, as both backends upload it.
@@ -113,7 +113,10 @@ typedef struct volumetricShadowParams_s {
 
 typedef struct volumetricViewStats_s {
 	int		frame;
-	int		views;
+	bool		subview;		// this view is a mirror, remote camera or other subview
+	int		views;			// views that scattered and composited this frame
+	int		subviews;		// of those, subviews
+	int		viewsDeclined;		// requested views the leaf declined this frame
 	int		lights;
 	int		passes;
 	int		outcomes[VOLUMETRIC_LIGHT_OUTCOME_COUNT];
@@ -158,12 +161,32 @@ void		R_Volumetric_TargetExtent( const volumetricViewSettings_t &settings,
 void		R_Volumetric_PackViewParams( const volumetricViewSettings_t &settings,
 			float params0[4], float params1[4] );
 
-// Status: each backend records its last main view.
-void		R_Volumetric_BeginViewStats( volumetricViewStats_t &stats, const volumetricViewSettings_t &settings );
+// The scratch targets of a view: its depth copy and its scattering target.
+// The main view, capture-backed mirrors and remote cameras differ in size, and
+// one pair resized for each of them is reallocated several times a frame, so
+// each backend keeps a few pairs and a view takes the pair of its own size.
+const int VOLUMETRIC_TARGET_SLOTS = 4;
+typedef struct volumetricTargetPool_s {
+	int		sceneWidth[VOLUMETRIC_TARGET_SLOTS];
+	int		sceneHeight[VOLUMETRIC_TARGET_SLOTS];
+	int		divisor[VOLUMETRIC_TARGET_SLOTS];
+	int		lastUse[VOLUMETRIC_TARGET_SLOTS];	// 0 never used
+	int		clock;
+} volumetricTargetPool_t;
+// The slot holding targets of this size, else the least recently used one,
+// which the backend then resizes.
+int		R_Volumetric_ChooseTargetSlot( volumetricTargetPool_t &pool, int sceneWidth, int sceneHeight, int divisor );
+
+// Status: each backend records the views of its last frame.
+void		R_Volumetric_BeginViewStats( volumetricViewStats_t &stats, const volumetricViewSettings_t &settings,
+			const struct viewDef_s *view );
 void		R_Volumetric_CountOutcome( volumetricViewStats_t &stats, volumetricLightOutcome_t outcome );
 void		R_Volumetric_PublishViewStats( const char *backend, const volumetricViewStats_t &stats );
 const char *	R_Volumetric_OutcomeName( volumetricLightOutcome_t outcome );
 void		R_Volumetric_PrintStatus();
+// A backend created or resized a scattering or depth target. The status
+// reports the running count: it must hold still while the views do.
+void		R_Volumetric_NoteTargetAllocation();
 void		R_Volumetric_RegisterCommands();
 // Nonzero while the leaf is requested; changes whenever a setting that shapes
 // the scattered light does, so temporal history resets with it.
