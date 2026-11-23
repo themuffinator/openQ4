@@ -2250,8 +2250,9 @@ diagnostics establish whole-frame ownership or production performance.
   cheats). The game asks through `idRenderSystem::SetViewDepthOfField`
   (render API 38): the weapon wheel keeps the view weapon (its depth range)
   and the world within 128 units sharp and blurs beyond (visual spec 1.50,
-  register revision 30, `WID-039`); where the renderer declines, the view
-  effects document's Gaussian takes over. Evidence: Windows x64 captures on
+  register revision 30, `WID-039`), with the weapon kept raised under the
+  wheel in single player as in multiplayer (spec 1.51); where the renderer
+  declines, the view effects document's Gaussian takes over. Evidence: Windows x64 captures on
   OpenGL and Vulkan at 2560x1440 on airdefense2 (autofocus, telephoto with
   six blades, the CoC debug view, the open wheel), the
   `openq4-depth-of-field-core` native test, `retained_view_effects.py` and the

@@ -7077,18 +7077,14 @@ void idPlayer::Weapon_Combat( void ) {
 		return;
 	}
 
+	// The weapon stays raised under the wheel, as in multiplayer: the wheel's
+	// depth of field focuses on it. It only stops firing.
 	if ( weaponWheelActive ) {
 		pfl.weaponFired = false;
 		pfl.attackHeld = false;
-
 		if ( weapon ) {
 			weapon->EndAttack();
-
-			if ( !weapon->IsHolstered() && ( weapon->IsReady() || weapon->IsReloading() ) ) {
-				weapon->PutAway();
-			}
 		}
-
 		return;
 	}
 

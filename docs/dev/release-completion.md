@@ -18,8 +18,10 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   keeps the view weapon and the world within 128 units sharp and blurs the
   distance with round bokeh, in place of the whole-screen Gaussian, which
   stays as the fallback where the renderer declines. The crosshair hides
-  while the wheel is open. Visual spec 1.50, register revision 30
-  (`WID-039` supersedes `WID-037`, pending).
+  while the wheel is open, and in single player the weapon now stays raised
+  under the wheel, as in multiplayer, instead of being put away. Visual spec
+  1.50 and 1.51, register revision 30 (`WID-039` supersedes `WID-037`,
+  pending).
 - **`r_dof` camera for promotional shots** (REN-12, partial): a thin-lens
   model following the field of view, autofocus with an eased pull, focus
   range, near/far scales, bladed bokeh with highlight weighting, quality up

@@ -7,8 +7,8 @@ console variables are cheats. They work in single player, and in multiplayer
 only on a server with cheats on; joining a server without cheats resets them.
 
 The weapon wheel uses the same effect on its own: while the wheel is open,
-your weapon and everything within about three metres stay sharp and the
-distance falls out of focus, and the crosshair hides. That needs no cheats and
+your weapon stays raised, it and everything within about three metres stay
+sharp, the distance falls out of focus, and the crosshair hides. That needs no cheats and
 no setting; where post-processing is off, the wheel blurs the whole scene as
 before.
 

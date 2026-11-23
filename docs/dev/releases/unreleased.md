@@ -19,9 +19,9 @@ the [development roadmap](../roadmap.md) for current scope.
   to returning, and kill feed lines slide in with a quick glint.
 
 - **The weapon wheel focuses like a camera.** While the wheel is open, your
-  weapon and everything close by stay sharp and the distance falls softly out
-  of focus, instead of the whole screen blurring, and the crosshair gets out
-  of the way. For screenshots and videos there is a full depth-of-field camera
+  weapon stays raised and it and everything close by stay sharp while the
+  distance falls softly out of focus, instead of the whole screen blurring,
+  and the crosshair gets out of the way. For screenshots and videos there is a full depth-of-field camera
   too, with autofocus, aperture, bokeh shape and more, kept to the console as
   a cheat. See [Depth of Field for Screenshots and Video](../../user/depth-of-field.md).
 
@@ -566,7 +566,8 @@ the [development roadmap](../roadmap.md) for current scope.
   Settings > Controls > Other has a Record Video key. See
   [Record Video](../../user/video-capture.md).
 - The weapon wheel uses a depth of field focused on your weapon and the
-  world within about three metres, and hides the crosshair while it is open;
+  world within about three metres, keeps your weapon raised (single player
+  used to put it away) and hides the crosshair while it is open;
   where post-processing is off it keeps the old soft blur. For promotional
   shots, `r_dof` and its settings (cheats, no menu entry) add a thin-lens
   camera with autofocus, f-stop, focal length, focus range, round or bladed

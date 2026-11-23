@@ -4,7 +4,7 @@
   "date": "2026-11-23",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "6c81ea99186c2e54c660c8af5aa5460c474decfc",
+    "engine_revision": "436e4f52ec2a0f01a0937ea088c8e0946d5bf2db",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -14,7 +14,7 @@
     "visual": {
       "path": "docs/dev/ui-visual-design.md",
       "authority": "normative visual, interaction and editor contract",
-      "sha256": "979b9a91a3021abf84c8c2bb6cf586f8807715b4d4b61cd7224253a416ca7e8f"
+      "sha256": "d6a1169aa0266e5f17f34844f9869a61c0ec6f49ae74daf83b9efd5079ad826b"
     },
     "product": {
       "path": "docs/dev/archive/2026-10-18/plans/ui-product-completion.md",
