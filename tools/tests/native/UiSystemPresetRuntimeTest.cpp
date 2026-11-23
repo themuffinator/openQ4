@@ -81,8 +81,10 @@ struct View {
 struct PageTab { const char* id; std::vector<const char*> order; };
 static const PageTab PageTabs[]={
  {"graphics",{"settings_preset","settings_autodetect","settings_backend","settings_gpu","settings_renderer","settings_ui_scale","settings_text_scale","settings_ui_aspect","settings_reset_sizes"}},
- {"screen",{"settings_display_device","settings_multiscreen","settings_fullscreen","settings_borderless","settings_fullscreen_policy","settings_vsync",
-  "settings_framecap","settings_window_width","settings_window_height","settings_display_mode","settings_custom_width","settings_custom_height","settings_display_refresh"}},
+ // The host starts windowed: the Fullscreen Policy and the exclusive
+ // fullscreen's resolution, custom size and refresh rate wait for Fullscreen.
+ {"screen",{"settings_display_device","settings_multiscreen","settings_fullscreen","settings_borderless","settings_vsync",
+  "settings_framecap","settings_window_width","settings_window_height"}},
  {"image",{"settings_brightness","settings_brightness_number","settings_resolution_scale","settings_msaa","settings_postaa","settings_anisotropy","settings_specular",
   "settings_bump","settings_sky","settings_ambient_enabled","settings_ambient","settings_ambient_number"}},
  // Shadow Maps and Character Self-Shadows wait for Enable Shadows, which the

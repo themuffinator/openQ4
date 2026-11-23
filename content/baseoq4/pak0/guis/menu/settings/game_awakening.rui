@@ -808,6 +808,421 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "cvar.g_crosshairCustom"}, "1"]}, 1, 0.38]}
   },
   {
+   "id": "game_hudscale.enabled",
+   "node": "game_hudscale",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 1]}, {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]}]
+   }
+  },
+  {
+   "id": "game_hudscale.opacity",
+   "node": "game_hudscale",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]}, 1, 0.4]}
+  },
+  {
+   "id": "game_hudwidth.enabled",
+   "node": "game_hudwidth",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 1]}, {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]}]
+   }
+  },
+  {
+   "id": "game_hudwidth.opacity",
+   "node": "game_hudwidth",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]}, 1, 0.4]}
+  },
+  {
+   "id": "game_hudinset.enabled",
+   "node": "game_hudinset",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 1]}, {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]}]
+   }
+  },
+  {
+   "id": "game_hudinset.opacity",
+   "node": "game_hudinset",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]}, 1, 0.4]}
+  },
+  {
+   "id": "game_hudopacity.enabled",
+   "node": "game_hudopacity",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 1]}, {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]}]
+   }
+  },
+  {
+   "id": "game_hudopacity.opacity",
+   "node": "game_hudopacity",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]}, 1, 0.4]}
+  },
+  {
+   "id": "game_damagedirection.enabled",
+   "node": "game_damagedirection",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 1]},
+     {
+      "op": "&&",
+      "args": [
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]},
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 2]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "game_damagedirection.opacity",
+   "node": "game_damagedirection",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]},
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 2]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "game_pickups.enabled",
+   "node": "game_pickups",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 1]},
+     {
+      "op": "&&",
+      "args": [
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]},
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 2]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "game_pickups.opacity",
+   "node": "game_pickups",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]},
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 2]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "game_weaponstrip.enabled",
+   "node": "game_weaponstrip",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 1]},
+     {
+      "op": "&&",
+      "args": [
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]},
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 2]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "game_weaponstrip.opacity",
+   "node": "game_weaponstrip",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 0]},
+       {"op": "!=", "args": [{"state": "cvar.ui_hudLayout"}, 2]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "game_gunfov.enabled",
+   "node": "game_gunfov",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 2]}, {"state": "cvar.ui_showGun"}]}
+  },
+  {
+   "id": "game_gunfov.opacity",
+   "node": "game_gunfov",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.ui_showGun"}, 1, 0.4]}
+  },
+  {
+   "id": "game_gunfov_number.enabled",
+   "node": "game_gunfov_number",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 2]}, {"state": "cvar.ui_showGun"}]}
+  },
+  {
+   "id": "game_gunfov_number.opacity",
+   "node": "game_gunfov_number",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.ui_showGun"}, 1, 0.4]}
+  },
+  {
+   "id": "game_gunfovadjust.enabled",
+   "node": "game_gunfovadjust",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 2]},
+     {"op": "&&", "args": [{"state": "cvar.ui_showGun"}, {"op": ">", "args": [{"state": "cvar.cl_gunfov"}, 0]}]}
+    ]
+   }
+  },
+  {
+   "id": "game_gunfovadjust.opacity",
+   "node": "game_gunfovadjust",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "cvar.ui_showGun"}, {"op": ">", "args": [{"state": "cvar.cl_gunfov"}, 0]}]},
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "game_vraim.enabled",
+   "node": "game_vraim",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vraim.opacity",
+   "node": "game_vraim",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrhand.enabled",
+   "node": "game_vrhand",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrhand.opacity",
+   "node": "game_vrhand",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrturn.enabled",
+   "node": "game_vrturn",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrturn.opacity",
+   "node": "game_vrturn",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrsnap.enabled",
+   "node": "game_vrsnap",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 4]},
+     {"op": "&&", "args": [{"state": "cvar.vr_enable"}, {"op": "!=", "args": [{"state": "cvar.vr_turnMode"}, 1]}]}
+    ]
+   }
+  },
+  {
+   "id": "game_vrsnap.opacity",
+   "node": "game_vrsnap",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "cvar.vr_enable"}, {"op": "!=", "args": [{"state": "cvar.vr_turnMode"}, 1]}]},
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "game_vrmove.enabled",
+   "node": "game_vrmove",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrmove.opacity",
+   "node": "game_vrmove",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrroomscale.enabled",
+   "node": "game_vrroomscale",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrroomscale.opacity",
+   "node": "game_vrroomscale",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrlaser.enabled",
+   "node": "game_vrlaser",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 4]},
+     {"op": "&&", "args": [{"state": "cvar.vr_enable"}, {"op": "==", "args": [{"state": "cvar.vr_aimMode"}, 1]}]}
+    ]
+   }
+  },
+  {
+   "id": "game_vrlaser.opacity",
+   "node": "game_vrlaser",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "cvar.vr_enable"}, {"op": "==", "args": [{"state": "cvar.vr_aimMode"}, 1]}]},
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "game_vrhaptics.enabled",
+   "node": "game_vrhaptics",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrhaptics.opacity",
+   "node": "game_vrhaptics",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrtwohanded.enabled",
+   "node": "game_vrtwohanded",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 4]},
+     {"op": "&&", "args": [{"state": "cvar.vr_enable"}, {"op": "==", "args": [{"state": "cvar.vr_aimMode"}, 1]}]}
+    ]
+   }
+  },
+  {
+   "id": "game_vrtwohanded.opacity",
+   "node": "game_vrtwohanded",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "cvar.vr_enable"}, {"op": "==", "args": [{"state": "cvar.vr_aimMode"}, 1]}]},
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "game_vrvignette.enabled",
+   "node": "game_vrvignette",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrvignette.opacity",
+   "node": "game_vrvignette",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrcrouch.enabled",
+   "node": "game_vrcrouch",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrcrouch.opacity",
+   "node": "game_vrcrouch",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrplayspace.enabled",
+   "node": "game_vrplayspace",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrplayspace.opacity",
+   "node": "game_vrplayspace",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrbody.enabled",
+   "node": "game_vrbody",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"state": "cvar.vr_enable"}]}
+  },
+  {
+   "id": "game_vrbody.opacity",
+   "node": "game_vrbody",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.vr_enable"}, 1, 0.4]}
+  },
+  {
    "id": "tab-general-active.display",
    "node": "tab-general-active",
    "property": "display",
@@ -12184,50 +12599,8 @@
    "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
   },
   {
-   "id": "game_hudscale.enabled",
-   "node": "game_hudscale",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
-  },
-  {
-   "id": "game_hudwidth.enabled",
-   "node": "game_hudwidth",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
-  },
-  {
-   "id": "game_hudinset.enabled",
-   "node": "game_hudinset",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
-  },
-  {
-   "id": "game_hudopacity.enabled",
-   "node": "game_hudopacity",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
-  },
-  {
    "id": "game_objectives.enabled",
    "node": "game_objectives",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
-  },
-  {
-   "id": "game_damagedirection.enabled",
-   "node": "game_damagedirection",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
-  },
-  {
-   "id": "game_pickups.enabled",
-   "node": "game_pickups",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
-  },
-  {
-   "id": "game_weaponstrip.enabled",
-   "node": "game_weaponstrip",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 1]}
   },
@@ -16111,24 +16484,6 @@
   {
    "id": "game_gunz_number.enabled",
    "node": "game_gunz_number",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 2]}
-  },
-  {
-   "id": "game_gunfov.enabled",
-   "node": "game_gunfov",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 2]}
-  },
-  {
-   "id": "game_gunfov_number.enabled",
-   "node": "game_gunfov_number",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 2]}
-  },
-  {
-   "id": "game_gunfovadjust.enabled",
-   "node": "game_gunfovadjust",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 2]}
   },
@@ -22982,84 +23337,6 @@
   {
    "id": "game_vr.enabled",
    "node": "game_vr",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vraim.enabled",
-   "node": "game_vraim",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrhand.enabled",
-   "node": "game_vrhand",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrturn.enabled",
-   "node": "game_vrturn",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrsnap.enabled",
-   "node": "game_vrsnap",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrmove.enabled",
-   "node": "game_vrmove",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrroomscale.enabled",
-   "node": "game_vrroomscale",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrlaser.enabled",
-   "node": "game_vrlaser",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrhaptics.enabled",
-   "node": "game_vrhaptics",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrtwohanded.enabled",
-   "node": "game_vrtwohanded",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrvignette.enabled",
-   "node": "game_vrvignette",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrcrouch.enabled",
-   "node": "game_vrcrouch",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrplayspace.enabled",
-   "node": "game_vrplayspace",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
-  },
-  {
-   "id": "game_vrbody.enabled",
-   "node": "game_vrbody",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
   },

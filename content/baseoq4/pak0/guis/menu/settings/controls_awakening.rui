@@ -1276,7 +1276,12 @@
     "then": [
      {"op": "setState", "values": {"page.leaving": {"state": "page.tab"}, "page.tab": 6}},
      {"op": "playTimeline", "timeline": "show-aim"},
-     {"op": "focus", "control": "controls_response"}
+     {
+      "op": "if",
+      "condition": {"state": "cvar.in_joystick"},
+      "then": [{"op": "focus", "control": "controls_response"}],
+      "else": [{"op": "focus", "control": "controls_touchscreen"}]
+     }
     ]
    }
   ],
@@ -1494,7 +1499,14 @@
               "op": "if",
               "condition": {"op": "==", "args": [{"state": "page.tab"}, 5]},
               "then": [{"op": "focus", "control": "controls_controller"}],
-              "else": [{"op": "focus", "control": "controls_response"}]
+              "else": [
+               {
+                "op": "if",
+                "condition": {"state": "cvar.in_joystick"},
+                "then": [{"op": "focus", "control": "controls_response"}],
+                "else": [{"op": "focus", "control": "controls_touchscreen"}]
+               }
+              ]
              }
             ]
            }
@@ -46417,6 +46429,666 @@
    "value": {"op": "select", "args": [{"state": "controls.touchLayout"}, "block", "none"]}
   },
   {
+   "id": "controls_device.enabled",
+   "node": "controls_device",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_device.opacity",
+   "node": "controls_device",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_test.enabled",
+   "node": "controls_test",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_test.opacity",
+   "node": "controls_test",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_southpaw.enabled",
+   "node": "controls_southpaw",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_southpaw.opacity",
+   "node": "controls_southpaw",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_layout.enabled",
+   "node": "controls_layout",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_layout.opacity",
+   "node": "controls_layout",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_trigger.enabled",
+   "node": "controls_trigger",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_trigger.opacity",
+   "node": "controls_trigger",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_context.enabled",
+   "node": "controls_context",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_context.opacity",
+   "node": "controls_context",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_rumble.enabled",
+   "node": "controls_rumble",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_rumble.opacity",
+   "node": "controls_rumble",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_rumblescale.enabled",
+   "node": "controls_rumblescale",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 5]},
+     {"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}
+    ]
+   }
+  },
+  {
+   "id": "controls_rumblescale.opacity",
+   "node": "controls_rumblescale",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [{"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}, 1, 0.4]
+   }
+  },
+  {
+   "id": "controls_triggerrumble.enabled",
+   "node": "controls_triggerrumble",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 5]},
+     {"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}
+    ]
+   }
+  },
+  {
+   "id": "controls_triggerrumble.opacity",
+   "node": "controls_triggerrumble",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [{"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}, 1, 0.4]
+   }
+  },
+  {
+   "id": "controls_adaptivetriggers.enabled",
+   "node": "controls_adaptivetriggers",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 5]},
+     {"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}
+    ]
+   }
+  },
+  {
+   "id": "controls_adaptivetriggers.opacity",
+   "node": "controls_adaptivetriggers",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [{"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}, 1, 0.4]
+   }
+  },
+  {
+   "id": "controls_directionalhits.enabled",
+   "node": "controls_directionalhits",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 5]},
+     {"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}
+    ]
+   }
+  },
+  {
+   "id": "controls_directionalhits.opacity",
+   "node": "controls_directionalhits",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [{"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}, 1, 0.4]
+   }
+  },
+  {
+   "id": "controls_batterythreshold.enabled",
+   "node": "controls_batterythreshold",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 5]},
+     {"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}
+    ]
+   }
+  },
+  {
+   "id": "controls_batterythreshold.opacity",
+   "node": "controls_batterythreshold",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [{"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]}, 1, 0.4]
+   }
+  },
+  {
+   "id": "controls_batteryscale.enabled",
+   "node": "controls_batteryscale",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 5]},
+     {
+      "op": "&&",
+      "args": [
+       {"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]},
+       {"op": ">", "args": [{"state": "cvar.in_joystickLowBatteryRumbleThreshold"}, 0]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "controls_batteryscale.opacity",
+   "node": "controls_batteryscale",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_joystickRumble"}]},
+       {"op": ">", "args": [{"state": "cvar.in_joystickLowBatteryRumbleThreshold"}, 0]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "controls_light.enabled",
+   "node": "controls_light",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_light.opacity",
+   "node": "controls_light",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_playerlight.enabled",
+   "node": "controls_playerlight",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_playerlight.opacity",
+   "node": "controls_playerlight",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_batterynotice.enabled",
+   "node": "controls_batterynotice",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_batterynotice.opacity",
+   "node": "controls_batterynotice",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_promptstyle.enabled",
+   "node": "controls_promptstyle",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_promptstyle.opacity",
+   "node": "controls_promptstyle",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_swapconfirm.enabled",
+   "node": "controls_swapconfirm",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 5]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_swapconfirm.opacity",
+   "node": "controls_swapconfirm",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_response.enabled",
+   "node": "controls_response",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_response.opacity",
+   "node": "controls_response",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_lookcurve.enabled",
+   "node": "controls_lookcurve",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_lookcurve.opacity",
+   "node": "controls_lookcurve",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_invertlook.enabled",
+   "node": "controls_invertlook",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_invertlook.opacity",
+   "node": "controls_invertlook",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_turnboost.enabled",
+   "node": "controls_turnboost",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_turnboost.opacity",
+   "node": "controls_turnboost",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_aimassist.enabled",
+   "node": "controls_aimassist",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_aimassist.opacity",
+   "node": "controls_aimassist",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_lookdeadzone.enabled",
+   "node": "controls_lookdeadzone",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_lookdeadzone.opacity",
+   "node": "controls_lookdeadzone",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_lookouterzone.enabled",
+   "node": "controls_lookouterzone",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_lookouterzone.opacity",
+   "node": "controls_lookouterzone",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_movedeadzone.enabled",
+   "node": "controls_movedeadzone",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_movedeadzone.opacity",
+   "node": "controls_movedeadzone",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_moveouterzone.enabled",
+   "node": "controls_moveouterzone",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_moveouterzone.opacity",
+   "node": "controls_moveouterzone",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_moveshape.enabled",
+   "node": "controls_moveshape",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_moveshape.opacity",
+   "node": "controls_moveshape",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_movecurve.enabled",
+   "node": "controls_movecurve",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_movecurve.opacity",
+   "node": "controls_movecurve",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_gyro.enabled",
+   "node": "controls_gyro",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_gyro.opacity",
+   "node": "controls_gyro",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_gyrospace.enabled",
+   "node": "controls_gyrospace",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 6]},
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "controls_gyrospace.opacity",
+   "node": "controls_gyrospace",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "controls_gyroactive.enabled",
+   "node": "controls_gyroactive",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 6]},
+     {"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_gyro"}]}
+    ]
+   }
+  },
+  {
+   "id": "controls_gyroactive.opacity",
+   "node": "controls_gyroactive",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [{"op": "&&", "args": [{"state": "cvar.in_joystick"}, {"state": "cvar.in_gyro"}]}, 1, 0.4]
+   }
+  },
+  {
+   "id": "controls_gyroinvertturn.enabled",
+   "node": "controls_gyroinvertturn",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 6]},
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "controls_gyroinvertturn.opacity",
+   "node": "controls_gyroinvertturn",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "controls_gyroinverttilt.enabled",
+   "node": "controls_gyroinverttilt",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 6]},
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "controls_gyroinverttilt.opacity",
+   "node": "controls_gyroinverttilt",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "controls_gyrotightening.enabled",
+   "node": "controls_gyrotightening",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 6]},
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "controls_gyrotightening.opacity",
+   "node": "controls_gyrotightening",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "controls_gyropointer.enabled",
+   "node": "controls_gyropointer",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_gyropointer.opacity",
+   "node": "controls_gyropointer",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
+   "id": "controls_gyrocalibrate.enabled",
+   "node": "controls_gyrocalibrate",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 6]},
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "controls_gyrocalibrate.opacity",
+   "node": "controls_gyrocalibrate",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"state": "cvar.in_joystick"},
+       {"op": "||", "args": [{"state": "cvar.in_gyro"}, {"state": "cvar.in_gyroMenuPointer"}]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "controls_touchpad.enabled",
+   "node": "controls_touchpad",
+   "property": "enabled",
+   "value": {"op": "&&", "args": [{"op": "==", "args": [{"state": "page.tab"}, 6]}, {"state": "cvar.in_joystick"}]}
+  },
+  {
+   "id": "controls_touchpad.opacity",
+   "node": "controls_touchpad",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "cvar.in_joystick"}, 1, 0.4]}
+  },
+  {
    "id": "test-name.text",
    "node": "test-name",
    "property": "text",
@@ -79428,24 +80100,6 @@
    "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
   },
   {
-   "id": "controls_device.enabled",
-   "node": "controls_device",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_test.enabled",
-   "node": "controls_test",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_southpaw.enabled",
-   "node": "controls_southpaw",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
    "id": "controls_wheelsensitivity.enabled",
    "node": "controls_wheelsensitivity",
    "property": "enabled",
@@ -79454,18 +80108,6 @@
   {
    "id": "controls_wheeloffset.enabled",
    "node": "controls_wheeloffset",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_layout.enabled",
-   "node": "controls_layout",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_trigger.enabled",
-   "node": "controls_trigger",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
   },
@@ -79482,12 +80124,6 @@
    "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
   },
   {
-   "id": "controls_context.enabled",
-   "node": "controls_context",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
    "id": "controls_resetcontroller.enabled",
    "node": "controls_resetcontroller",
    "property": "enabled",
@@ -79496,78 +80132,6 @@
   {
    "id": "controls_resetkeyboard.enabled",
    "node": "controls_resetkeyboard",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_rumble.enabled",
-   "node": "controls_rumble",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_rumblescale.enabled",
-   "node": "controls_rumblescale",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_triggerrumble.enabled",
-   "node": "controls_triggerrumble",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_adaptivetriggers.enabled",
-   "node": "controls_adaptivetriggers",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_directionalhits.enabled",
-   "node": "controls_directionalhits",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_batterythreshold.enabled",
-   "node": "controls_batterythreshold",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_batteryscale.enabled",
-   "node": "controls_batteryscale",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_light.enabled",
-   "node": "controls_light",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_playerlight.enabled",
-   "node": "controls_playerlight",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_batterynotice.enabled",
-   "node": "controls_batterynotice",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_promptstyle.enabled",
-   "node": "controls_promptstyle",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
-  },
-  {
-   "id": "controls_swapconfirm.enabled",
-   "node": "controls_swapconfirm",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 5]}
   },
@@ -89572,12 +90136,6 @@
    }
   },
   {
-   "id": "controls_response.enabled",
-   "node": "controls_response",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
    "id": "controls_turnspeed.enabled",
    "node": "controls_turnspeed",
    "property": "enabled",
@@ -89602,72 +90160,6 @@
    "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
   },
   {
-   "id": "controls_lookcurve.enabled",
-   "node": "controls_lookcurve",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_invertlook.enabled",
-   "node": "controls_invertlook",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_turnboost.enabled",
-   "node": "controls_turnboost",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_aimassist.enabled",
-   "node": "controls_aimassist",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_lookdeadzone.enabled",
-   "node": "controls_lookdeadzone",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_lookouterzone.enabled",
-   "node": "controls_lookouterzone",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_movedeadzone.enabled",
-   "node": "controls_movedeadzone",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_moveouterzone.enabled",
-   "node": "controls_moveouterzone",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_moveshape.enabled",
-   "node": "controls_moveshape",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_movecurve.enabled",
-   "node": "controls_movecurve",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_gyro.enabled",
-   "node": "controls_gyro",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
    "id": "controls_gyroturn.enabled",
    "node": "controls_gyroturn",
    "property": "enabled",
@@ -89688,54 +90180,6 @@
   {
    "id": "controls_gyrotilt_number.enabled",
    "node": "controls_gyrotilt_number",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_gyrospace.enabled",
-   "node": "controls_gyrospace",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_gyroactive.enabled",
-   "node": "controls_gyroactive",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_gyroinvertturn.enabled",
-   "node": "controls_gyroinvertturn",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_gyroinverttilt.enabled",
-   "node": "controls_gyroinverttilt",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_gyrotightening.enabled",
-   "node": "controls_gyrotightening",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_gyropointer.enabled",
-   "node": "controls_gyropointer",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_gyrocalibrate.enabled",
-   "node": "controls_gyrocalibrate",
-   "property": "enabled",
-   "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
-  },
-  {
-   "id": "controls_touchpad.enabled",
-   "node": "controls_touchpad",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 6]}
   },

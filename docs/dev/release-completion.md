@@ -68,6 +68,20 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   defend, the capturer earns capture assists too, and a capture ends the
   bonus for fragging whoever was hurting the carrier.
 
+## Settings that do nothing are greyed out, 23 November 2026
+
+- **See at a glance what applies.** On every settings page, a row that another
+  setting has switched off is now dimmed and skipped by the keyboard and
+  controller: the rumble, gyro and stick options while Controller Input is
+  off, the acceleration options while Mouse Accel is 0, the HUD size and
+  message options under the Classic HUD, the VR options while VR Mode is off,
+  the subtitle options while subtitles are off, Surround Speakers while
+  Headphone HRTF is on, Borderless Window in fullscreen, and the fullscreen
+  resolution, refresh rate and policy in a window. Turn the setting they need
+  back on and they come back with the values you left.
+- **What you need to do.** Nothing. No setting changes value.
+- **Developer detail:** [the dependency table](settings-menu-structure.md#dependent-rows).
+
 ## Music and ambience keep playing when the game runs slowly, 23 November 2026
 
 - **No more gaps in long tracks on slow frames.** Since 0.14.1, music, ambience

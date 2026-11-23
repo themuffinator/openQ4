@@ -18,7 +18,7 @@ screen that opened it."""
 from __future__ import annotations
 
 from build_retained_screens import Document
-from retained_settings_rows import heading, setting_row, settings_subpage, value_column
+from retained_settings_rows import heading, requires, setting_row, settings_subpage, value_column
 
 DEVICES = 16                               # the device list's rows (BuildMainMenuAudioDeviceChoices)
 
@@ -51,6 +51,18 @@ SECTIONS = (
 )
 VERBS = tuple(row[3] for _section, _heading, rows in SECTIONS for row in rows)
 
+
+# The rows another setting turns off (retained_settings_rows.requires), each
+# the condition under which it does anything: the subtitle options with
+# Subtitles off (the game draws no subtitle, Subtitles.inl), and the speakers
+# while Headphone HRTF is On, which takes stereo HRTF output whatever they
+# say (AL_SoundHardware.cpp openQ4_GetRequestedOutputMode).
+SUBTITLES_ON = {"state": "audio.subtitles"}
+DEPENDENCIES = {
+    **{ident: SUBTITLES_ON for ident in ("audio_subtitle_size", "audio_subtitle_background", "audio_subtitle_speakers",
+                                         "audio_subtitle_untranscribed")},
+    "audio_speakers": {"op": "!=", "args": [{"state": "audio.hrtf"}, 2]},
+}
 
 # The columns: the sections each holds, by their place in SECTIONS.
 COLUMNS = ((0, 1), (2, 3))
@@ -100,4 +112,6 @@ def audio_document() -> dict:
                     items.append(setting_row(doc, ident, label_key, "choice", value_x, value=value, action=verb, entries=entries,
                                              count=count))
         columns.append(items)
+    for node in (node for column in columns for node in column if isinstance(node, dict) and node["id"] in DEPENDENCIES):
+        requires(doc, node, DEPENDENCIES[node["id"]])
     return settings_subpage(doc, "audio", "#str_229901", [("audio", "#str_229901", columns)])
