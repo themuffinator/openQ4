@@ -468,6 +468,17 @@ public:
 	// (VR_ModelYawFollow). Never saved.
 	float					vrModelYaw;
 	bool					vrModelYawValid;
+	// openQ4: with no weapon in hand the body stands with its arms at its
+	// sides (IsBodyUnarmed, UpdateUnarmedBody): the arms' turn from the
+	// model's rest pose, read once per model. Never saved.
+	const idRenderModel *	unarmedArmsModel;	// the model the turns were read from
+	bool					unarmedArmsValid;
+	jointHandle_t			unarmedArmJoints[ 4 ];	// left shoulder, left elbow, right shoulder, right elbow
+	idQuat					unarmedArmTurns[ 4 ];	// each joint's local turn
+	float					unarmedArmsWeight;		// how far the arms are down, 0-1
+	float					unarmedArmsLeaveWeight;	// as the unarmed pose began to blend out
+	bool					unarmedWorldModelHidden;	// the hidden weapon's world model was hidden here
+	int						unarmedIdleRestartTime;		// when Torso_IdleThink last swapped the stand, -1 before
 
 	bool					presentationCanInterpolate;
 	idVec3					presentationPrevViewOrigin;
@@ -686,6 +697,14 @@ public:
 	bool					SolveVRViewArm( int hand, const idVec3 &wrist, float forearmLength, idVec3 &elbow );
 	void					FinishVRBody( void );
 	void					FreeVRBody( void );
+	// openQ4: no weapon in hand (a no_Weapons map such as the MCC's, a weapon a
+	// script disabled): the body stands upright with its arms at its sides
+	// instead of in the hidden weapon's stance.
+	bool					IsBodyUnarmed( void ) const;
+	bool					WantsUnarmedBody( void ) const;		// unarmed, and the model has the pose
+	bool					TorsoPlaysUnarmed( void );
+	bool					PrepareUnarmedArms( void );
+	void					UpdateUnarmedBody( void );
 	// True while this draw's body has arms for the view weapon to meet.
 	bool					VRBodyHasArms( void ) const { return vrBodyPosed && vrBodyMode == VR_BODY_FULL; }
 	// A controller in the world as this draw shows it: the palm, and the axes
@@ -1360,9 +1379,11 @@ private:
 	
 	stateResult_t			State_Torso_Idle				( const stateParms_t& parms );
 	stateResult_t			State_Torso_IdleThink			( const stateParms_t& parms );
+	stateResult_t			TorsoIdleTransitions			( const stateParms_t& parms );
 	stateResult_t			State_Torso_Teleport			( const stateParms_t& parms );
 	stateResult_t			State_Torso_RaiseWeapon			( const stateParms_t& parms );
 	stateResult_t			State_Torso_LowerWeapon			( const stateParms_t& parms );
+	stateResult_t			State_Torso_Lowered				( const stateParms_t& parms );
 	stateResult_t			State_Torso_Fire				( const stateParms_t& parms );
 	stateResult_t			State_Torso_Fire_Windup			( const stateParms_t& parms );
 

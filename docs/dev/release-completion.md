@@ -12,6 +12,22 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Kane stands unarmed on the MCC, 23 November 2026
+
+- **No gun stance without a gun.** The MCC's campaign maps put the weapons
+  away, but the game only hid the blaster, so Kane's body kept the pistol
+  stance, twisted and aiming, wherever it shows: his shadow, mirrors and the
+  third-person view. With no weapon in hand (a map without weapons, or a
+  script that disables them) he now stands upright with his arms at his
+  sides, and the hidden gun's model leaves his hand. The arms ease down and
+  back up with the animation's own blend when the weapon goes or returns.
+  Stock content has no unarmed player animation, so the stand is the model's
+  rest pose with the arms turned down in code; no new assets.
+- Evidence: front, side and back third-person captures on `mcc_1` before
+  and after (OpenGL, no input), and `enableWeapon`/`disableWeapon` from the
+  console bringing the stance and the gun back and dropping them again.
+  Not yet seen: Kane's Strogg body on `mcc_2`, and Vulkan.
+
 ## Depth of field for captures and the weapon wheel, 23 November 2026
 
 - **The weapon wheel focuses on your weapon.** The renderer's depth of field

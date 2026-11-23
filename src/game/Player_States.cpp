@@ -15,6 +15,7 @@ CLASS_STATES_DECLARATION ( idPlayer )
 	STATE ( "Torso_Teleport",				idPlayer::State_Torso_Teleport )
 	STATE ( "Torso_RaiseWeapon",			idPlayer::State_Torso_RaiseWeapon )
 	STATE ( "Torso_LowerWeapon",			idPlayer::State_Torso_LowerWeapon )
+	STATE ( "Torso_Lowered",				idPlayer::State_Torso_Lowered )
 	STATE ( "Torso_Fire",					idPlayer::State_Torso_Fire )
 	STATE ( "Torso_Fire_Windup",			idPlayer::State_Torso_Fire_Windup )
 	STATE ( "Torso_Reload",					idPlayer::State_Torso_Reload )
@@ -51,8 +52,11 @@ idPlayer::State_Torso_Idle
 ================
 */
 stateResult_t idPlayer::State_Torso_Idle ( const stateParms_t& parms ) {
-	if ( SRESULT_WAIT == State_Torso_IdleThink ( parms ) ) {
-		PlayCycle ( ANIMCHANNEL_TORSO, "idle", parms.blendFrames  );
+	if ( SRESULT_WAIT == TorsoIdleTransitions ( parms ) ) {
+		// openQ4: with no weapon in hand the body stands upright, its arms
+		// at its sides (UpdateUnarmedBody); every stock torso idle, the bare
+		// "idle" too, holds a gun
+		PlayCycle ( ANIMCHANNEL_TORSO, WantsUnarmedBody() ? "af_pose" : "idle", parms.blendFrames  );
 		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_IdleThink", parms.blendFrames );
 	}
 	return SRESULT_DONE;
@@ -64,6 +68,31 @@ idPlayer::State_Torso_IdleThink
 ================
 */
 stateResult_t idPlayer::State_Torso_IdleThink ( const stateParms_t& parms ) {
+	if ( SRESULT_WAIT != TorsoIdleTransitions ( parms ) ) {
+		return SRESULT_DONE;
+	}
+	// openQ4: the arms drop when the weapon goes, and come up when it
+	// returns. Only here: Torso_Idle runs the transitions above before it
+	// starts its cycle, and would restart itself for ever. At most twice a
+	// second, in case the channel does not take the new cycle.
+	if ( WantsUnarmedBody() != TorsoPlaysUnarmed()
+			&& ( unarmedIdleRestartTime < 0 || gameLocal.time - unarmedIdleRestartTime >= 500 || gameLocal.time < unarmedIdleRestartTime ) ) {
+		unarmedIdleRestartTime = gameLocal.time;
+		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Idle", 4 );
+		return SRESULT_DONE;
+	}
+	return SRESULT_WAIT;
+}
+
+/*
+================
+idPlayer::TorsoIdleTransitions
+
+What takes the torso out of its idle: shared by Torso_Idle, before it starts
+its cycle, and Torso_IdleThink.
+================
+*/
+stateResult_t idPlayer::TorsoIdleTransitions ( const stateParms_t& parms ) {
 	if ( pfl.teleport ) {
 		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Teleport", 0 );
 		return SRESULT_DONE;
@@ -139,9 +168,34 @@ idPlayer::State_Torso_LowerWeapon
 ================
 */
 stateResult_t idPlayer::State_Torso_LowerWeapon ( const stateParms_t& parms ) {	
+	// openQ4: a weapon without a lowering anim (the blaster) left the torso
+	// waiting on its idle cycle for good; it now waits in Torso_Lowered, which
+	// lets the arms drop once the weapon has gone from the hand
+	if ( !HasAnim ( ANIMCHANNEL_TORSO, "lower" ) ) {
+		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Lowered", 0 );
+		return SRESULT_DONE;
+	}
 	PlayAnim( ANIMCHANNEL_TORSO, "lower", parms.blendFrames );
 	PostAnimState ( ANIMCHANNEL_TORSO, "Wait_TorsoAnim", 3 );
+	PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Lowered", 0 );
 	return SRESULT_DONE;
+}
+
+/*
+================
+idPlayer::State_Torso_Lowered
+
+openQ4: the weapon is down (a GUI, a usable, a script); the torso holds where
+lowering left it until the weapon comes back up (WeaponRisingCallback), or
+goes back to idle when there is no weapon in hand, to stand unarmed.
+================
+*/
+stateResult_t idPlayer::State_Torso_Lowered ( const stateParms_t& parms ) {
+	if ( WantsUnarmedBody() ) {
+		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Idle", 4 );
+		return SRESULT_DONE;
+	}
+	return SRESULT_WAIT;
 }
 
 /*
