@@ -10,6 +10,13 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 
+- **Native resolution, always.** The game starts at your display's native
+  resolution with the 3D scene at full size, and no graphics preset or
+  Auto-Detect ever changes your resolution or resolution scale again. The
+  lower presets save their performance with lighter effects, shadows and
+  textures instead of a blurrier picture; **Resolution Scale** stays yours to
+  lower if you want more speed.
+
 - **Sharper textures at lower resolution scales, and on Vulkan with NVIDIA
   cards.** When the game draws the 3D scene below your screen's resolution
   and upscales it, the world's textures now keep more of their detail: 16-18%
@@ -128,9 +135,8 @@ the [development roadmap](../roadmap.md) for current scope.
   Capable Macs using Apple's compatibility renderer are no longer forced to
   Minimum because modern post effects are unavailable. An unset legacy quality
   marker no longer resets saved graphics settings at startup.
-  On high-resolution displays, Auto-Detect also reduces scene render scale to
-  suit the hardware, keeping the interface sharp, and leaves unsupported post
-  AA off. Stock quality controls now use the same presets and preserve your
+  On high-resolution displays, Auto-Detect picks a lighter preset rather than
+  lowering the resolution, and leaves unsupported post AA off. Stock quality controls now use the same presets and preserve your
   display mode and VSync preference.
 
 - **Less wasted Vulkan rendering work.** High-resolution shadow maps avoid clearing
@@ -429,7 +435,7 @@ the [development roadmap](../roadmap.md) for current scope.
 - **Cleaner outdoor shadows.** Shadow mapping removes repeating terrain lines in Sandstorm and restores terrain brightness and debris shadows in Air Defense 1's opening, on OpenGL and Vulkan. Keep cascaded shadow maps enabled for distant outdoor lighting.
 - Railings and other objects first seen at a distance now regain their mapped shadows as you approach, fixing missing entrance shadows in Air Defense 1.
 - **Shadow maps come on with the top presets.** Choosing **Quality** or **Ultra** in Settings > System now turns shadow maps on. Shadows from projected lights, such as the flashlight, stay sharp where an object touches a surface and soften with distance. Lower presets keep Quake 4's original shadows.
-- **Sharper, smoother image at lower render scales.** When the 3D scene renders below your screen's resolution, as the **Performance**, **Low Power** and **Minimum** presets do, temporal anti-aliasing now rebuilds it at full resolution instead of stretching it. Edges stay smooth and fine detail returns. It also tracks animated characters and your weapon exactly while they move, so they no longer shimmer or lose their anti-aliasing. At native resolution nothing changes unless you turn it on with `r_temporalAA 1`. See [Temporal AA](../../user/temporal-presentation.md).
+- **Sharper, smoother image at lower render scales.** When you set the 3D scene below your screen's resolution with **Resolution Scale**, temporal anti-aliasing now rebuilds it at full resolution instead of stretching it. Edges stay smooth and fine detail returns. It also tracks animated characters and your weapon exactly while they move, so they no longer shimmer or lose their anti-aliasing. At native resolution nothing changes unless you turn it on with `r_temporalAA 1`. See [Temporal AA](../../user/temporal-presentation.md).
 - **Physically based materials for mods.** Maps and mods can now ship PBR materials that render by default on OpenGL and Vulkan, beside the stock surfaces. Their metalness, roughness and ambient occlusion shape how every light (shadows included), the map's ambient light and its baked light grids fall on them. Glow maps shine on their own, and SSAO darkens only their bounced light. Reflection probes can follow a room's walls and be captured in the game. Stock content has no PBR materials and looks exactly as before. See the [PBR materials guide](../../user/pbr-materials.md).
 - **Smarter multiplayer bots you can give orders to.** Bots plan safer routes around jump pads, ledges and hazardous floors, recover when knocked off their route, and make running jumps across gaps. They hear gunfire and footsteps, time armour and weapon respawns, back off from fights they can't win and go hunting while they have quad damage. In team games you can give the bots on your side orders in team chat, such as `kane defend`, `everyone follow me` or `sorg hold here`, and they answer in character. Navigation and decision-making also use less processor time. See [Giving bots orders](../../user/multiplayer.md#give-bots-orders).
 - Bots account for their health and armour before taking drops or jump pads, and check the ground beyond a touchdown before continuing. Running jumps check their current position and momentum against the player's collision shape, and bots avoid walking through jump pads that have no safe landing route.
@@ -443,6 +449,12 @@ the [development roadmap](../roadmap.md) for current scope.
 - **Radio chatter and squad banter have subtitles.** About three in ten campaign lines had no transcript in the installed game, among them most radio transmissions. They now show the line as written in the game's own script, and marines heard over the helmet radio show the same text as face to face. What is left, screams, laughter and pain sounds, shows **[untranscribed speech]** after the speaker's name instead of nothing; turn it off with **Settings > Audio > Untranscribed Speech**. **Speaker Names** now shows who is talking, not only the radio label. Captions also stay up long enough to read after a line ends, and mods can correct or translate captions with caption packs. See [Dialogue subtitles](../../user/gameplay-settings.md#dialogue-subtitles).
 
 ## Upgrade Notes
+
+- If an earlier preset lowered your resolution scale (Performance 85%, Low and
+  Low Power 75%, Minimum 50%, or less from Auto-Detect on a large display),
+  the first start returns it to 100% once. A scale you set in `autoexec.cfg`,
+  or after that start, is kept. Because the presets changed, the system check
+  offers its recommendation again before the main menu.
 
 - Multiplayer-only settings that earlier versions lost (field of view, HUD
   options such as item timers or damage numbers, Create Server options) do not

@@ -402,7 +402,7 @@ def source_checks(host_source):
     page |= {'r_ssao', 'r_ssaoMethod'}
     catalog = set(re.findall(r'(?:Number|Boolean|String)\("(\w+)"', host_source))
     assert {key.lower() for key in page | preset_keys} == {key.lower() for key in catalog}
-    assert len(preset_keys) == 55 and len(catalog) == 78
+    assert len(preset_keys) == 54 and len(catalog) == 78
     renderer = (ROOT / 'src/renderer/RenderSystem_init.cpp').read_text(encoding='utf-8')
     modes = renderer.split('vidmode_t r_vidModes[] = {', 1)[1].split('};', 1)[0]
     expected = {int(mode): (int(width), int(height)) for mode, width, height in re.findall(r'\{\s*(\d+),\s*(\d+),\s*(\d+)\s*\}', modes)}

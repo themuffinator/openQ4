@@ -16,18 +16,18 @@ int main(){
  Seed();SystemSettingsHost host;std::string error;StateValues original;
  Check(host.Read(original,error),"complete host baseline");
  const std::set<std::string> keys(openq4::PerformancePresetTargets().begin(),openq4::PerformancePresetTargets().end());
- Check(keys.size()==55&&original.size()==78,"catalog union");
+ Check(keys.size()==54&&original.size()==78&&!keys.contains("r_screenFraction"),"catalog union; presets never own the render scale");
  for(const auto& preset:openq4::PerformancePresets()){
   SettingsTransaction tx(host);Check(tx.Begin(7).code==SettingsCode::Ok,"begin real host");
   Check(tx.Edit(7,{{"r_brightness",1.375},{"r_forceAmbient",0.1375}}).code==SettingsCode::Ok,"custom outside draft");
   const auto previous=tx.Draft();
-  StateValues patch;Check(host.BuildPreset(preset.name,patch,error)&&patch.size()==55,"real typed expansion");
+  StateValues patch;Check(host.BuildPreset(preset.name,patch,error)&&patch.size()==54,"real typed expansion");
   Check(tx.EditGenerated(7,[&](StateValues& out,std::string& why){return host.BuildPreset(preset.name,out,why);}).code==SettingsCode::Ok,"whole preset atomically drafted");
   int untouched=0;for(const auto& [key,value]:previous){
-   Check(SettingsValueEqual(tx.Draft().at(key),keys.contains(key)?patch.at(key):value),"55 replacements and exact outside preservation");
+   Check(SettingsValueEqual(tx.Draft().at(key),keys.contains(key)?patch.at(key):value),"54 replacements and exact outside preservation");
    if(!keys.contains(key))++untouched;
   }
-  Check(untouched==23&&SettingsValuesEqual(tx.Baseline(),original),"23 outside keys and baseline preserved");
+  Check(untouched==24&&SettingsValuesEqual(tx.Baseline(),original),"24 outside keys and baseline preserved");
   Check(writes==0,"draft preset never invokes setter");
   StateValues readback;Check(host.Read(readback,error)&&SettingsValuesEqual(original,readback),"all 78 live unchanged");
   Check((SystemSettingsHost::ChangedEffects(tx.Baseline(),tx.Draft())&(SystemSettingPresetExpansion|SystemSettingImageReload|SystemSettingAudioRestart|SystemSettingRendererResources))!=0,"profile remains real unsupported effect footprint");
@@ -38,7 +38,7 @@ int main(){
  Check(tx.Draft().at("com_performancePreset")==StateValue(std::string("enhanced"))&&presetSignalReads==1&&writes==0,"auto enhanced without setters");
  presetSignals.gpuClass=RendererGpuClass::Integrated;presetSignals.drawableWidth=3840;presetSignals.drawableHeight=2160;presetSignals.modernEffects=false;
  Check(tx.EditGenerated(1,[&](StateValues& out,std::string& why){return host.BuildDetectedPreset(out,why);}).code==SettingsCode::Ok,"4K shared GPU draft");
- Check(tx.Draft().at("com_performancePreset")==StateValue(std::string("performance"))&&tx.Draft().at("r_screenFraction")==StateValue(50.0)&&tx.Draft().at("r_postAA")==StateValue(0.0)&&writes==0,"typed host retains detected scale and unsupported-AA result");
+ Check(tx.Draft().at("com_performancePreset")==StateValue(std::string("performance"))&&SettingsValueEqual(tx.Draft().at("r_screenFraction"),original.at("r_screenFraction"))&&tx.Draft().at("r_postAA")==StateValue(0.0)&&writes==0,"typed host keeps the render scale and the unsupported-AA result");
  const auto saved=tx.Draft();failPresetSignals=true;
  Check(tx.EditGenerated(1,[&](StateValues& out,std::string& why){return host.BuildDetectedPreset(out,why);}).code==SettingsCode::Invalid&&SettingsValuesEqual(tx.Draft(),saved),"capability failure unchanged");
  failPresetSignals=false;presetSignalCallback=[&]{Check(tx.Cancel(1).code==SettingsCode::Busy,"capability collection under transaction guard");};
@@ -128,7 +128,7 @@ int main(){
   Seed();openq4::PerformancePresetAssignments expected;std::string error;
   Check(openq4::ExpandPerformancePreset(preset,expected,error),"shared expansion");
   Check(Common_ApplyPerformancePreset(preset),"actual Common apply");
-  Check(cvars.calls.size()==55&&instance.warnings==0&&instance.prints==1,"exact successful call count");
+  Check(cvars.calls.size()==54&&instance.warnings==0&&instance.prints==1,"exact successful call count");
   for(size_t i=0;i<expected.size();++i){Check(cvars.calls[i]==expected[i].key,"old setter ordering and marker last");
    const auto& value=expected[i].value;Check(cvars.vars.at(expected[i].key).value==(value.index()==0?std::to_string(std::get<int>(value)):std::get<std::string>(value)),"real accepted readback");
    Check(cvars.vars.at(expected[i].key).flags==17,"archive flags preserved on success");}
@@ -140,9 +140,9 @@ int main(){
  for(bool marker:{false,true}){
   Seed();cvars.refuse=marker?"com_performancePreset":"r_postAA";
   Check(!Common_ApplyPerformancePreset(openq4::PerformancePresets()[3]),"setter refusal rejected");
-  Check(cvars.calls.size()==(marker?110:109)&&instance.warnings==1&&cvars.modified==64,"rollback and global flags");
+  Check(cvars.calls.size()==(marker?108:107)&&instance.warnings==1&&cvars.modified==64,"rollback and global flags");
   for(const auto& [key,value]:cvars.vars)Check(value.value=="sentinel"&&value.flags==16,"all target values and flags restored");
-  if(!marker)Check(cvars.calls[54]=="com_performancePreset","first marker setter belongs only to rollback");
+  if(!marker)Check(cvars.calls[53]=="com_performancePreset","first marker setter belongs only to rollback");
  }
  Seed();auto invalid=openq4::PerformancePresets()[2];invalid.anisotropy=17;
  Check(!Common_ApplyPerformancePreset(invalid,true)&&instance.warnings==0&&instance.prints==0,"normalization rejected quietly");
@@ -156,7 +156,7 @@ int main(){
  for(int spec=0;spec<4;++spec){
   Seed();com_machineSpec.value=std::to_string(spec);Com_ExecMachineSpec_f({{"execMachineSpec"}});
   const char* names[]={"low","performance","balanced","ultra"};
-  Check(cvars.calls.size()==55&&cvars.vars.at("com_performancePreset").value==names[spec],"actual compatibility command uses complete canonical expansion only");
+  Check(cvars.calls.size()==54&&cvars.vars.at("com_performancePreset").value==names[spec],"actual compatibility command uses complete canonical expansion only");
   Check(cvars.vars.at("r_shadows").value=="1","every stock quality choice keeps the original shadows");
  }
  for(const char* spec:{"-1","4","2147483647"}){
@@ -203,7 +203,7 @@ int main(){
  Check(Common_CapturePerformancePresetSignals(got,error)&&got.systemRamMB==0&&std::string(openq4::DetectPerformancePreset(got).preset->name)=="performance","failed SDL RAM observation stays unknown without a fabricated 512 MiB fallback");
  raw.systemRamMB=16384;renderer.config.vidWidth=3840;renderer.config.vidHeight=2160;
  Seed();Check(Common_AutoDetectPerformancePresetCommand({{"autoDetectPerformancePreset"}},true),"actual 4K classic auto command");
- Check(cvars.vars.at("r_screenFraction").value=="50"&&cvars.vars.at("r_postAA").value=="0"&&cvars.vars.at("com_performancePreset").value=="performance","console retains automatic scene/AA adjustments");
+ Check(std::find(cvars.calls.begin(),cvars.calls.end(),"r_screenFraction")==cvars.calls.end()&&cvars.vars.at("r_postAA").value=="0"&&cvars.vars.at("com_performancePreset").value=="performance","console keeps the render scale and the automatic AA adjustment");
  renderer.config.version_string="Vulkan";
  Check(Common_CapturePerformancePresetSignals(got,error)&&got.postAAAvailable&&got.modernEffects&&!got.legacyRenderer,"native Vulkan capability independent of GL flags");
  renderer.overrideConfig=false;
@@ -227,14 +227,14 @@ int main(){
  openQ4PerformancePresetCVarBackup_t baseline[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT];
  bootstrap(baseline);
  openq4::CVarAssignmentCapture capture;capture.Begin(openq4::PerformancePresetTargets().data(),OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT,assigned);
- cvarSystem->SetCVarInteger("r_screenFraction",90,CVAR_ARCHIVE);
+ cvarSystem->SetCVarInteger("image_anisotropy",8,CVAR_ARCHIVE);
  cvarSystem->SetCVarInteger("r_multiSamples",0,CVAR_ARCHIVE); // autoexec value equal to bootstrap
  capture.End();cvars.calls.clear();
  Check(Common_ApplyStartupPerformancePreset(baseline,assigned),"actual initialized first-launch detection");
  Check(cvars.vars.at("com_performancePreset").value=="enhanced"&&cvars.vars.at("r_useShadowMap").value=="1","first launch uses canonical modern ladder");
- Check(cvars.vars.at("r_screenFraction").value=="90"&&cvars.vars.at("r_multiSamples").value=="0","configured and equal-valued autoexec overrides preserved");
+ Check(cvars.vars.at("image_anisotropy").value=="8"&&cvars.vars.at("r_multiSamples").value=="0","configured and equal-valued autoexec overrides preserved");
  bootstrap(baseline);raw.gpuClass=RendererGpuClass::Integrated;raw.drawableWidth=3840;raw.drawableHeight=2160;raw.modernEffects=false;
- Check(Common_ApplyStartupPerformancePreset(baseline,assigned)&&cvars.vars.at("r_screenFraction").value=="50"&&cvars.vars.at("r_postAA").value=="0","first launch retains the same automatic scene/AA recommendation");
+ Check(Common_ApplyStartupPerformancePreset(baseline,assigned)&&std::find(cvars.calls.begin(),cvars.calls.end(),"r_screenFraction")==cvars.calls.end()&&cvars.vars.at("r_postAA").value=="0","first launch keeps the render scale and the same automatic AA recommendation");
  for(const auto* choice:{"minimum","quality","ultra"}){
   bootstrap(baseline);com_performancePreset.value=choice;
   capture.Begin(openq4::PerformancePresetTargets().data(),OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT,assigned);
@@ -387,7 +387,7 @@ def main():
   if args.mutations:
    # Each altered production body/TU must compile, then fail a positive oracle.
    mutations=[
-    ('lattice-profile','native','src/framework/PerformancePreset.cpp','85, 0, 1, 60,','86, 0, 1, 60,'),
+    ('lattice-profile','native','src/framework/PerformancePreset.cpp','{ "performance", 1, "baseline",','{ "performance", 2, "baseline",'),
     ('detection-boundary','native','src/framework/PerformancePreset.cpp','ram>0&&ram<=4096','ram>0&&ram<4096'),
     ('classic-uma-demotion','native','src/framework/PerformancePreset.cpp','tier=Balanced;result.reason=Reason::Shared;','tier=signals.modernEffects?Balanced:Performance;result.reason=Reason::Shared;'),
     ('shadowless-floor','native','src/framework/PerformancePreset.cpp','{"r_shadows",preset.shadows}','{"r_shadows",1}'),
@@ -396,7 +396,6 @@ def main():
     ('capacity-class','native','src/framework/PerformancePreset.cpp','else if(vram>=PerformancePresetVram12GiB)tier=Quality;','else if(vram>=PerformancePresetVram8GiB)tier=Quality;'),
     ('resolution-step','native','src/framework/PerformancePreset.cpp','ceiling=Balanced+capacity;','ceiling=Ultra;'),
     ('power-cap-ignored','native','src/framework/PerformancePreset.cpp','if(!powerLimited||signals.displayRefreshHz<result.maxFps)','if(true)'),
-    ('phone-scene-budget','native','src/framework/PerformancePreset.cpp','if(ram<PerformancePresetMobileFlagshipRamMB)budget','if(false)budget'),
     ('arm-board-ceiling','native','src/framework/PerformancePreset.cpp','if(armBoard&&tier>Performance)','if(false&&tier>Performance)'),
     ('arm-board-cap','native','src/framework/PerformancePreset.cpp','signals.mobile||armBoard;','signals.mobile;'),
     ('apple-gpu-ignored','common',None,'signals.appleGpu=RendererIsAppleGpu(config.renderer_string);','signals.appleGpu=false;'),
@@ -408,7 +407,6 @@ def main():
     ('wrong-owner','native','src/ui/application/SettingsTransaction.cpp','if (requestedOwner != owner) return Result','if (false) return Result'),
     ('host-extra-key','host',None,'candidate.size()!=openq4::PerformancePresetTargetCount','(candidate["r_brightness"]=1.0,candidate.size()!=openq4::PerformancePresetTargetCount+1)'),
     ('host-detection-ignored','host',None,'return BuildPerformancePresetPatch(resolved,patch,error);','return BuildPreset(detection.preset->name,patch,error);'),
-    ('scene-budget-ignored','native','src/framework/PerformancePreset.cpp','if(pixels*scale*scale<=budget*10000||scale==10)','if(true)'),
     ('unsupported-aa-enabled','native','src/framework/PerformancePreset.cpp','(signals.postAAAvailable||signals.modernEffects)?result.preset->postAA:0','result.preset->postAA'),
     ('common-detection-ignored','common','src/framework/PerformancePreset.cpp','output=resolved;return true;','output=*detection.preset;return true;'),
     ('marker-on-failure','common',None,'if ( applied ) {','if ( true ) {'),

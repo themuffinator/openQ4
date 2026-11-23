@@ -23,24 +23,26 @@ The Display page has four tabs (in 0.14.1, three: MSAA was on **Screen**, and th
 
 ## Performance presets
 
-A preset sets resolution scale, anti-aliasing, shadows, effects, texture sizes, a frame-rate cap and a few sound options in one step. Pick the one that matches your hardware, then adjust single settings if you like.
+A preset sets anti-aliasing, shadows, effects, texture sizes, a frame-rate cap and a few sound options in one step. Pick the one that matches your hardware, then adjust single settings if you like.
+
+No preset, and not Auto-Detect, ever changes your resolution or your resolution scale. The game starts at your display's native resolution with the 3D scene at 100%, and stays there until you change **Resolution** or **Resolution Scale** yourself.
 
 | Preset | Best for | What it turns on |
 |---|---|---|
-| `minimum` | Software renderers and systems below the minimum requirements | 50% render scale, no anti-aliasing, no shadows, smallest textures, 30 FPS cap |
-| `lowpower` | Raspberry Pi-class boards, low-memory phones and saving battery | 75% scale, no anti-aliasing, no shadows, reduced textures, 30 FPS cap |
-| `low` | PCs at the [minimum requirements](getting-started.md#system-requirements) | 75% scale, no anti-aliasing, the original game's shadows, reduced textures, 60 FPS cap |
-| `performance` | Modest desktops, laptops and handhelds such as the Steam Deck | 85% scale, SMAA medium, original shadows, full-size textures, 60 FPS cap |
-| `balanced` | Most desktops; the default | Full resolution, 2x MSAA with SMAA medium, original shadows, 120 FPS cap |
-| `enhanced` | High-refresh play with modern effects | Full resolution, SMAA high, shadow maps for spotlights and sunlight (other lights keep the original shadows), bloom, SSAO, tone mapping, 144 FPS cap |
-| `quality` | Soft shadow maps on every light | Full resolution, 2x MSAA with SMAA high, soft shadow maps for every light with cascaded sun shadows (not in 0.14.1), bloom, SSAO, tone mapping, 144 FPS cap |
-| `ultra` | The best image that still plays smoothly on a strong graphics card | Full resolution, 4x MSAA with SMAA ultra, larger and softer shadow maps, more SSAO detail, 240 FPS cap |
+| `minimum` | Software renderers and systems below the minimum requirements | No anti-aliasing, no shadows, smallest textures, 30 FPS cap |
+| `lowpower` | Raspberry Pi-class boards, low-memory phones and saving battery | No anti-aliasing, no shadows, reduced textures, 30 FPS cap |
+| `low` | PCs at the [minimum requirements](getting-started.md#system-requirements) | No anti-aliasing, the original game's shadows, reduced textures, 60 FPS cap |
+| `performance` | Modest desktops, laptops and handhelds such as the Steam Deck | SMAA medium, original shadows, full-size textures, 60 FPS cap |
+| `balanced` | Most desktops; the default | 2x MSAA with SMAA medium, original shadows, 120 FPS cap |
+| `enhanced` | High-refresh play with modern effects | SMAA high, shadow maps for spotlights and sunlight (other lights keep the original shadows), bloom, SSAO, tone mapping, 144 FPS cap |
+| `quality` | Soft shadow maps on every light | 2x MSAA with SMAA high, soft shadow maps for every light with cascaded sun shadows (not in 0.14.1), bloom, SSAO, tone mapping, 144 FPS cap |
+| `ultra` | The best image that still plays smoothly on a strong graphics card | 4x MSAA with SMAA ultra, larger and softer shadow maps, more SSAO detail, 240 FPS cap |
 | `maximum` | Everything on, with no frame-rate target | As Ultra, plus 8x MSAA (not in 0.14.1, which asks for 16x), the largest shadow maps, cascades for spotlights as well as sunlight, and motion blur |
 
 What the effects are:
 
-- **Shadow maps** give soft, detailed shadows; see [Shadow mapping](shadow-mapping.md). Low, Performance and Balanced keep the original game's sharp-edged shadows. Minimum and Low Power draw no shadows at all; on integrated graphics that saves about as much as lowering the render scale from 75% to 50%.
-- **Light grids** add openQ4's bounced light to maps that ship one. **New in 0.15.0:** Minimum and Low Power turn them off and use the original game's lighting, and their 30 FPS cap stretches the reduced scene instead of rebuilding it with [temporal upscaling](temporal-presentation.md#automatic-upscaling-default).
+- **Shadow maps** give soft, detailed shadows; see [Shadow mapping](shadow-mapping.md). Low, Performance and Balanced keep the original game's sharp-edged shadows. Minimum and Low Power draw no shadows at all, which on integrated graphics saves about as much as halving the number of pixels drawn.
+- **Light grids** add openQ4's bounced light to maps that ship one. **New in 0.15.0:** Minimum and Low Power turn them off and use the original game's lighting. If you lower **Resolution Scale** yourself, their 30 FPS cap stretches the smaller scene instead of rebuilding it with [temporal upscaling](temporal-presentation.md#automatic-upscaling-default).
 - **Bloom** adds a glow around bright lights. **SSAO** (ambient occlusion) adds soft shading in corners and creases. **Tone mapping** balances very bright and dark areas. Presets below Enhanced leave these off.
 - Ultra and Maximum draw SSAO at full resolution. Enhanced and Quality draw it at half resolution, which is cheaper and looks the same in play. On OpenGL, half resolution is not in 0.14.1: there, 0.14.1 draws it at full resolution on every preset.
 - **New in 0.15.0:** SSAO's shading is smooth instead of grainy on every preset. **Settings → Display → Effects → Ambient Occlusion** picks **Off**, **SSAO**, **HBAO** or **GTAO** (the console's `r_ssao` and `r_ssaoMethod`). HBAO (`r_ssaoMethod 1`) is horizon-based ambient occlusion, the familiar look of many games, about as accurate as SSAO with a different character. GTAO (`r_ssaoMethod 2`) is ground-truth ambient occlusion, the most physically accurate: corners shade more like real light does, edges around objects stay clean, and PBR surfaces get coloured bounce light and reflections that dim in creases. Both cost about the same as SSAO, or less on the higher presets. The presets turn ambient occlusion on or off and keep the kind you picked.
@@ -111,7 +113,7 @@ Typical results:
 Auto-Detect also:
 
 - **Caps the frame rate at your display's refresh rate**, rounded to whole hertz (a 59.94 Hz display caps at 60), so a fresh installation doesn't draw frames the display can't show. If the rate is unknown or outside 30 to 1000 Hz, the preset's own cap applies. Phones, the Steam Deck, a Raspberry Pi, other ARM boards (not in 0.14.1) and low-power requests never go above their preset's cap. Choosing a preset by name always uses the table cap.
-- **May lower the render scale on large displays.** For example, integrated graphics at 1440p get Performance at 75%, and at 4K Performance at 50% (a 1080p scene). The window and menus stay at full resolution, and the scale never goes above the preset's own. Choosing a preset by name restores its table value. VR has its own [headset scale](vr.md).
+- **Picks a lighter preset on large displays** rather than lowering the resolution: for example, integrated graphics above 1080p get Performance. Your resolution and resolution scale are never changed. VR has its own [headset scale](vr.md).
 
 On a fresh installation openQ4 starts with a small profile, detects your hardware once the renderer is running and applies the recommendation before you play. The console's `Quality profile:` line reports the result, including the video memory it found. A preset you name at launch takes precedence, and existing settings are kept.
 
