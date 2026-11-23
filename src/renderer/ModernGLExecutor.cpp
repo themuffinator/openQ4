@@ -546,6 +546,9 @@ struct modernGLSubmitUniformMemo_t {
 	float	materialEnhancement[4];
 };
 static modernGLSubmitUniformMemo_t rg_modernGLSubmitUniformMemo;
+// Programs whose uClassicStage is not identity (REN-02). Uniforms persist per
+// program object, so the next draw without a classic stage resets them.
+static idList<GLuint> rg_modernClassicStagePrograms;
 static bool rg_modernGLDepthRangeKnown = false;
 static bool rg_modernGLDepthRangeHalf = false;
 
@@ -2245,6 +2248,109 @@ static const LightGrid *R_ModernGLExecutor_CommandBakedGrid( const modernGLSubmi
 	return NULL;
 }
 
+/*
+==================
+R_ModernGLExecutor_ClassicStageForCommand
+
+REN-02 step 1. The modern depth and forward passes sample one diffuse texture
+for a cutout's alpha test, and the forward pass adds baked light for one
+albedo layer. Report the classic stage state those samples need (uClassicStage:
+texture matrices and vertex-colour mode as offsets from identity, plus the
+albedo colour), or false when ARB2 would draw something they cannot: several
+alpha-tested stages, an alpha scale, several baked layers, or a stage whose
+image is not the one the command binds.
+==================
+*/
+static const materialResourceTableRecord_t *R_ModernGLExecutor_MaterialRecordForCommand( const modernGLSubmitCommand_t &command );
+
+struct modernClassicStage_t {
+	float	rows[5][4];
+	float	color[4];
+	bool	bakedColor;
+	bool	transformed;
+};
+
+static bool R_ModernGLExecutor_ClassicStageForCommand( const modernGLSubmitCommand_t &command, const bool baked, modernClassicStage_t &out ) {
+	memset( &out, 0, sizeof( out ) );
+	const drawSurf_t *surf = R_ModernGLExecutor_CommandSurface( command );
+	const idMaterial *shader = surf != NULL ? surf->material : NULL;
+	const float *regs = surf != NULL ? surf->shaderRegisters : NULL;
+	if ( shader == NULL || regs == NULL ) { return false; }
+	const GLuint mainTexture = static_cast<GLuint>( command.materialTextureHandles[MODERN_GL_SUBMIT_MATERIAL_TEXTURE_MAIN] );
+	const GLuint normalTexture = static_cast<GLuint>( command.materialTextureHandles[MODERN_GL_SUBMIT_MATERIAL_TEXTURE_NORMAL] );
+	idVec4 diffuseMatrix[2];
+	bool haveDiffuse = false;
+	if ( shader->Coverage() == MC_PERFORATED ) {
+		// ARB2's depth fill draws each active alpha-tested stage with its own
+		// image, texture matrix and alpha scale (RB_T_FillDepthBuffer).
+		const shaderStage_t *tested = NULL;
+		for ( int i = 0; i < shader->GetNumStages(); ++i ) {
+			const shaderStage_t *stage = shader->GetStage( i );
+			if ( !stage->hasAlphaTest || regs[ stage->conditionRegister ] == 0.0f ) { continue; }
+			if ( tested != NULL ) { return false; }
+			tested = stage;
+		}
+		if ( tested == NULL || tested->lighting != SL_DIFFUSE || regs[ tested->color.registers[3] ] != 1.0f ) { return false; }
+		idImage *image = NULL;
+		R_SetDrawInteraction( tested, regs, &image, diffuseMatrix, NULL );
+		if ( image == NULL || image->GetDeviceHandle() != mainTexture ) { return false; }
+		haveDiffuse = true;
+	}
+	idVec4 bumpMatrix[2];
+	bumpMatrix[0].Set( 1.0f, 0.0f, 0.0f, 0.0f );
+	bumpMatrix[1].Set( 0.0f, 1.0f, 0.0f, 0.0f );
+	if ( baked ) {
+		idImage *bumpImage = NULL, *diffuseImage = NULL;
+		idVec4 bakedMatrix[2];
+		float vertexColor[2];
+		const int layers = RB_LightGridClassicAlbedoStages( surf, &bumpImage, bumpMatrix, &diffuseImage, bakedMatrix, out.color, vertexColor );
+		if ( layers > 1 ) { return false; }
+		out.bakedColor = true;
+		if ( layers == 0 ) {
+			// ARB2 adds no baked light to a surface without an active albedo stage.
+			out.color[0] = out.color[1] = out.color[2] = 0.0f;
+		} else {
+			if ( diffuseImage == NULL || diffuseImage->GetDeviceHandle() != mainTexture ) { return false; }
+			// Without a bound bump map the forward pass shades the flat normal.
+			const bool flatBump = bumpImage == globalImages->flatNormalMap && normalTexture == 0;
+			if ( !flatBump && ( bumpImage == NULL || bumpImage->GetDeviceHandle() != normalTexture ) ) { return false; }
+			if ( haveDiffuse && ( bakedMatrix[0] != diffuseMatrix[0] || bakedMatrix[1] != diffuseMatrix[1] ) ) { return false; }
+			diffuseMatrix[0] = bakedMatrix[0];
+			diffuseMatrix[1] = bakedMatrix[1];
+			haveDiffuse = true;
+			out.rows[4][0] = vertexColor[0];
+			out.rows[4][1] = vertexColor[1] - 1.0f;
+		}
+	}
+	if ( haveDiffuse ) {
+		for ( int row = 0; row < 2; ++row ) {
+			for ( int c = 0; c < 4; ++c ) {
+				out.rows[row][c] = diffuseMatrix[row][c] - ( row == c ? 1.0f : 0.0f );
+				out.rows[row + 2][c] = bumpMatrix[row][c] - ( row == c ? 1.0f : 0.0f );
+			}
+		}
+	}
+	for ( int row = 0; row < 5; ++row ) {
+		for ( int c = 0; c < 4; ++c ) {
+			if ( !std::isfinite( out.rows[row][c] ) ) { return false; }
+			out.transformed = out.transformed || out.rows[row][c] != 0.0f;
+		}
+	}
+	return true;
+}
+
+// The forward and depth draws of the corridor's view are the only ones that
+// carry a classic stage; every other draw leaves uClassicStage at identity.
+static bool R_ModernGLExecutor_CommandClassicStage( const modernGLSubmitCommand_t &command, modernClassicStage_t &stage ) {
+	if ( rg_modernClassicView == NULL || command.viewDef != rg_modernClassicView
+			|| ( command.shaderKind != MODERN_GL_SHADER_DEPTH && !R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) ) ) { return false; }
+	const materialResourceTableRecord_t *material = R_ModernGLExecutor_MaterialRecordForCommand( command );
+	if ( material == NULL || material->hasPBR || !R_MaterialResourceTable_ClassicCorridorPathEligible( *material ) ) { return false; }
+	const bool baked = command.shaderKind != MODERN_GL_SHADER_DEPTH && R_ModernGLExecutor_CommandBakedGrid( command ) != NULL;
+	if ( !baked && !material->alphaTest ) { return false; }
+	return R_ModernGLExecutor_ClassicStageForCommand( command, baked, stage );
+}
+
 static void R_ModernGLExecutor_PrepareBakedGrid( const idScenePacketFrame &packetFrame, const modernGLExecutorStats_t &stats ) {
 	rg_modernGLBakedGridView = NULL;
 	rg_modernGLBakedGridCommandHash.Clear();
@@ -3593,6 +3699,15 @@ static void R_ModernGLExecutor_DebugColorForCommand( const modernGLSubmitCommand
 			color[3] = static_cast<float>( r_pbrDebug.GetInteger() );
 			break;
 		}
+		{
+			// REN-02: a corridor-owned surface only uses this colour for its
+			// baked light, which takes ARB2's light-grid albedo colour.
+			modernClassicStage_t classicStage;
+			if ( R_ModernGLExecutor_CommandClassicStage( command, classicStage ) && classicStage.bakedColor ) {
+				memcpy( color, classicStage.color, sizeof( float ) * 4 );
+				break;
+			}
+		}
 		if ( R_ModernGLExecutor_CommandMaterialColor( command, materialColor ) ) {
 			memcpy( color, materialColor, sizeof( float ) * 4 );
 		} else {
@@ -4812,6 +4927,25 @@ static void R_ModernGLExecutor_MaterialEnhancementForCommand( const modernGLSubm
 	enhancement[3] = active ? idMath::ClampFloat( 0.0f, 1.0f, r_enhancedMaterialFresnel.GetFloat() ) : 0.0f;
 }
 
+static void R_ModernGLExecutor_SetClassicStage( const modernGLSubmitCommand_t &command ) {
+	modernClassicStage_t stage;
+	const bool transformed = R_ModernGLExecutor_CommandClassicStage( command, stage ) && stage.transformed;
+	const int dirty = rg_modernClassicStagePrograms.FindIndex( command.program );
+	if ( !transformed && dirty < 0 ) {
+		return;
+	}
+	const GLint location = glGetUniformLocation( command.program, "uClassicStage[0]" );
+	if ( !transformed ) {
+		memset( &stage, 0, sizeof( stage ) );
+		rg_modernClassicStagePrograms.RemoveIndex( dirty );
+	} else if ( dirty < 0 ) {
+		rg_modernClassicStagePrograms.Append( command.program );
+	}
+	if ( location >= 0 ) {
+		glUniform4fv( location, 5, &stage.rows[0][0] );
+	}
+}
+
 static void R_ModernGLExecutor_SetMaterialFlags( const modernGLSubmitCommand_t &command ) {
 	if ( command.materialFlagsLocation < 0 ) {
 		return;
@@ -5126,6 +5260,7 @@ static bool R_ModernGLExecutor_SubmitCommand( const modernGLSubmitCommand_t &com
 	R_ModernGLExecutor_SetPBRIBL( command.pbrIBLLocation, true );
 	R_ModernGLExecutor_SetMaterialFlags( command );
 	R_ModernGLExecutor_SetMaterialEnhancement( command );
+	R_ModernGLExecutor_SetClassicStage( command );
 	R_ModernGLExecutor_BindMaterialTextures(
 		command, stats, clusteredDecalSurface != NULL );
 	if ( R_ModernGLExecutor_CommandUsesShadowTextures( command ) ) {
@@ -5429,7 +5564,10 @@ static bool R_ModernGLExecutor_VisibleDepthMaterialSupported( const modernGLSubm
 				stats.visibleDepthAlphaTestFallbackDraws++;
 				return false;
 			}
-		} else if ( !R_ModernGLExecutor_MaterialContractPromotable( *materialRecord, false, false, false, false ) ) {
+		} else if ( !R_MaterialResourceTable_ClassicCorridorOnly( *materialRecord )
+				&& !R_ModernGLExecutor_MaterialContractPromotable( *materialRecord, false, false, false, false ) ) {
+			// A corridor-only cutout tests its diffuse alpha through the stage's
+			// texture matrix (uClassicStage), as ARB2's depth fill does (REN-02).
 			stats.visibleDepthAlphaTestFallbackDraws++;
 			return false;
 		}
@@ -7088,6 +7226,14 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 			|| rg_modernClassicProgram == 0 || r_testARBProgram.GetBool() ) { return; }
 	const viewDef_t *root = NULL;
 	bool extended = false;
+	// Preparing a light grid loads and binds its images behind the state cache.
+	struct stateGuard_t {
+		bool &touched;
+		~stateGuard_t() { if ( touched ) { R_GLStateCache_InvalidateAll( "classic lighting admission" ); } }
+	};
+	bool touchedImages = false;
+	const stateGuard_t stateGuard = { touchedImages };
+	const bool gridRequested = r_useLightGrid.GetBool() && !r_skipDiffuse.GetBool() && r_lightGridDebug.GetInteger() == 0;
 	for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
 		const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
 		if ( !R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) ) { continue; }
@@ -7098,9 +7244,23 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 				|| draw->geometryRecord->deformMode != GEOMETRY_DEFORM_NONE ) { return; }
 		if ( !R_MaterialResourceTable_ClassicCorridorPathEligible( *material ) || command.weaponDepthHack || command.modelDepthHack != 0
 				|| command.negativeScale || ( root != NULL && root != command.viewDef ) ) { return; }
-		// The forward pass adds baked light from the untransformed, uncoloured
-		// diffuse, so corridor-only materials need the grid off.
-		if ( R_MaterialResourceTable_ClassicCorridorOnly( *material ) && r_useLightGrid.GetBool() ) { return; }
+		// REN-02 step 1: a cutout's alpha test and a receiver's baked light
+		// sample one classic stage in the depth and forward passes. Decline
+		// what that stage cannot stand for, and honour the named rollback for
+		// stages that carry a texture matrix, vertex colour or expression.
+		const drawSurf_t *surf = R_ModernGLExecutor_CommandSurface( command );
+		const LightGrid *grid = NULL;
+		bool baked = false;
+		if ( gridRequested && surf != NULL ) {
+			baked = RB_PrepareModernLightGrid( surf, command.viewDef, grid ) && grid != NULL;
+			touchedImages = true;
+		}
+		if ( baked || material->alphaTest ) {
+			modernClassicStage_t classicStage;
+			if ( ( R_MaterialResourceTable_ClassicCorridorOnly( *material )
+						&& ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_STAGES ) == 0 )
+					|| !R_ModernGLExecutor_ClassicStageForCommand( command, baked, classicStage ) ) { return; }
+		}
 		root = command.viewDef;
 		extended = extended || !R_MaterialResourceTable_ClassicDiffusePathEligible( *material );
 	}

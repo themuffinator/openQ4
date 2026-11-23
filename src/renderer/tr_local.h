@@ -1544,6 +1544,9 @@ const int SHARED_FAULT_INJECT_CINEMATIC_POST = 4;
 const int SHARED_FAULT_INJECT_DETAIL = 9000;	// failure detail recorded for an injected decline
 extern idCVar r_vkShadowFallbackTest;	// diagnostic-only forced Vulkan unshadowed receiver fallback
 extern idCVar r_rendererModernLightingParity;	// diagnostic override forcing lighting-ownership parity contracts proven
+extern idCVar r_rendererModernClassicShapes;	// REN-02 rollback mask for corridor-owned classic shapes
+const int MODERN_CLASSIC_SHAPE_STAGES = 1;	// stage transforms on cutouts and baked-light receivers
+const int MODERN_CLASSIC_SHAPE_STENCIL_SHADOWS = 2;	// stencil-shadowed lights
 extern idCVar r_rendererModernAutoPromote;	// allow gated default modern-visible promotion
 extern idCVar r_rendererPromotionEvidence;	// Phase 8 evidence token required before auto-promotion
 extern idCVar r_rendererShaderReload;	// allow runtime reload of the internal modern GL shader library
@@ -2313,6 +2316,10 @@ bool RB_LightGridSurfaceModernRepresentable( const drawSurf_t *surf, const viewD
 // True with a null grid is an intentional native non-receiver, not missing work.
 class LightGrid;
 bool RB_PrepareModernLightGrid( const drawSurf_t *surf, const viewDef_t *viewDef, const LightGrid *&grid );
+// REN-02: the number of albedo layers the native light-grid pass draws for a
+// surface, and the bump/diffuse stage state of the first.
+int RB_LightGridClassicAlbedoStages( const drawSurf_t *surf, idImage **bumpImage, idVec4 bumpMatrix[2],
+	idImage **diffuseImage, idVec4 diffuseMatrix[2], float diffuseColor[4], float vertexColorParams[2] );
 // ModernLightGridGLSL.h's uBakedGrid[7], with positions relative to origin.
 void RB_LightGridBakedParams( const LightGrid &grid, const float origin[3], float params[7][4] );
 bool RB_FlatDiffuseSweepActive( const drawSurf_t *surf );

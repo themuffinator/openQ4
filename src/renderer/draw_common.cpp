@@ -15902,6 +15902,66 @@ static bool RB_STD_DrawLightGridSurface( const drawSurf_t *surf, const LightGrid
 	return submitted;
 }
 
+/*
+=====================
+RB_LightGridClassicAlbedoStages
+
+REN-02: the modern forward pass adds baked light for one albedo layer. Walk a
+surface's stages exactly as RB_STD_DrawLightGridSurface does and report how
+many layers the native pass draws; the outputs describe the first one, with
+the bump stage in effect when it is reached.
+=====================
+*/
+int RB_LightGridClassicAlbedoStages( const drawSurf_t *surf, idImage **bumpImage, idVec4 bumpMatrix[2],
+		idImage **diffuseImage, idVec4 diffuseMatrix[2], float diffuseColor[4], float vertexColorParams[2] ) {
+	const idMaterial *shader = surf != NULL ? surf->material : NULL;
+	const float *regs = surf != NULL ? surf->shaderRegisters : NULL;
+	idImage *currentBumpImage = globalImages->flatNormalMap;
+	idVec4 currentBumpMatrix[2];
+	RB_LightGridSetIdentityTextureMatrix( currentBumpMatrix );
+	*bumpImage = currentBumpImage;
+	*diffuseImage = globalImages->whiteImage;
+	RB_LightGridSetIdentityTextureMatrix( bumpMatrix );
+	RB_LightGridSetIdentityTextureMatrix( diffuseMatrix );
+	diffuseColor[0] = diffuseColor[1] = diffuseColor[2] = diffuseColor[3] = 1.0f;
+	vertexColorParams[0] = 0.0f;
+	vertexColorParams[1] = 1.0f;
+	if ( shader == NULL || regs == NULL ) {
+		return 0;
+	}
+	int layers = 0;
+	for ( int stageIndex = 0; stageIndex < shader->GetNumStages(); stageIndex++ ) {
+		const shaderStage_t *stage = shader->GetStage( stageIndex );
+		if ( stage->lighting == SL_BUMP ) {
+			if ( !r_skipBump.GetBool() && RB_LightGridMaterialStageIsActive( stage, regs ) ) {
+				R_SetDrawInteraction( stage, regs, &currentBumpImage, currentBumpMatrix, NULL );
+				if ( currentBumpImage == NULL ) {
+					currentBumpImage = globalImages->flatNormalMap;
+				}
+			}
+			continue;
+		}
+		if ( !RB_LightGridStageCanProvideAlbedo( shader, stage, regs ) ) {
+			continue;
+		}
+		if ( layers++ != 0 ) {
+			continue;
+		}
+		*bumpImage = r_skipBump.GetBool() ? globalImages->flatNormalMap : currentBumpImage;
+		bumpMatrix[0] = currentBumpMatrix[0];
+		bumpMatrix[1] = currentBumpMatrix[1];
+		R_SetDrawInteraction( stage, regs, diffuseImage, diffuseMatrix, diffuseColor );
+		if ( *diffuseImage == NULL ) {
+			*diffuseImage = globalImages->whiteImage;
+		}
+		if ( diffuseColor[0] <= 0.0f && diffuseColor[1] <= 0.0f && diffuseColor[2] <= 0.0f ) {
+			diffuseColor[0] = diffuseColor[1] = diffuseColor[2] = 1.0f;
+		}
+		RB_LightGridVertexColorParams( stage->vertexColor, vertexColorParams );
+	}
+	return layers;
+}
+
 static bool RB_LightGridUseDepthTextureCompare( void ) {
 	return rbLightGridDepthCompareAvailable && globalImages != NULL && globalImages->currentDepthImage != NULL;
 }

@@ -289,6 +289,22 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     mats += [f'{PREFIX}/classic_texmatrix\n{{\n{{\nblend bumpmap\nmap {PREFIX}/normal\nscale 3, 3\n}}\ndiffusemap {PREFIX}/grey\nspecularmap _white\n}}\n']
     # ... and the common stock shape: a bumped, specular cutout.
     mats += [f'{PREFIX}/classic_cutout_bump\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\n}}\nspecularmap _white\n}}\n']
+    # REN-02 step 1 remainder: the same stage state on a cutout. The diffuse
+    # stage carries the alpha test, so its texture matrix moves the holes and
+    # the depth and forward passes must test alpha through it.
+    mats += [f'{PREFIX}/classic_cutout_texmatrix\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\ntranslate 0.13, 0.07\nscale 2, 2\n}}\nspecularmap _white\n}}\n',
+             f'{PREFIX}/classic_cutout_vertex\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\nvertexColor\n}}\n{{\nblend specularmap\nmap _white\nvertexColor\n}}\n}}\n',
+             f'{PREFIX}/classic_cutout_condition\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\n}}\n{{\nblend specularmap\nmap _white\nif ( parm7 > 0.5 )\n}}\n}}\n']
+    # A baked-light receiver whose diffuse stage is scaled and tinted by an
+    # expression, under a scaled bump: the forward pass must take ARB2's
+    # light-grid albedo colour and both texture matrices.
+    mats += [f'{PREFIX}/classic_grid_stage\n{{\n{{\nblend bumpmap\nmap {PREFIX}/normal\nscale 3, 3\n}}\n{{\nblend diffusemap\nmap {PREFIX}/checker\nscale 2, 2\nrgb 0.5 + parm7\n}}\nspecularmap _white\n}}\n']
+    # The same stage state over a flat bump, for baked-light controls at ten
+    # times the laboratory's grid intensity: there the baked term is tens of
+    # levels, so a wrong matrix, colour or tint cannot hide in the tolerance,
+    # and the bump-mapped baked term's own looseness stays out of the result.
+    mats += [f'{PREFIX}/classic_grid_flat_stage\n{{\nbumpmap _flat\n{{\nblend diffusemap\nmap {PREFIX}/checker\nscale 2, 2\nrgb 0.5 + parm7\n}}\nspecularmap _black\n}}\n',
+             f'{PREFIX}/classic_grid_flat_vertex\n{{\nbumpmap _flat\n{{\nblend diffusemap\nmap {PREFIX}/grey\nvertexColor\n}}\n{{\nblend specularmap\nmap _black\nvertexColor\n}}\n}}\n']
     stations: list[dict] = []
     for row, metal in enumerate((0,1)):
         for col, roughness in enumerate((0.045, 0.16, 0.32, 0.5, 0.75, 1.0)):
@@ -387,7 +403,8 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     # checks merely because another green PBR surface is visible behind it.
     level = f'Version 3\n{{\n"classname" "worldspawn"\n"mtr_local_global_test" "{PREFIX}/noself_shadow"\n' + ''.join(brush(lo,hi,f'{PREFIX}/classic_floor') for lo,hi in room) + '}\n'
     precache = f'"model_sampling_test" "{SAMPLING_MODEL}"\n"model_skinning_test" "{SKINNING_MODEL}"\n"def_skinning_test" "func_animate"\n"mtr_classic_rejection_test" "{PREFIX}/classic_specular"\n' + ''.join(f'"mtr_sampling_{name}" "{PREFIX}/sampler_{name}"\n' for name in ('nearest','linear','clamp','mips'))
-    precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored','cutout','cutout_bump','vertex','texmatrix','condition','multistage'))
+    precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored','cutout','cutout_bump','vertex','texmatrix','condition','multistage',
+        'cutout_texmatrix','cutout_vertex','cutout_condition','grid_stage','grid_flat_stage','grid_flat_vertex'))
     precache += f'"mtr_extreme_emissive_test" "{PREFIX}/extreme_emissive"\n'
     precache += ''.join(f'"skin_skinning_{name}_test" "{skin}"\n' for name, skin in SKINNING_SKINS.items())
     precache += f'"model_mixed_material_test" "{MIXED_MODEL}"\n'

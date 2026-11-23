@@ -736,6 +736,13 @@ bool RB_PrepareModernLightGrid( const drawSurf_t *surf, const viewDef_t *viewDef
 	return false;
 }
 
+int RB_LightGridClassicAlbedoStages( const drawSurf_t *surf, idImage **bumpImage, idVec4 bumpMatrix[2],
+		idImage **diffuseImage, idVec4 diffuseMatrix[2], float diffuseColor[4], float vertexColorParams[2] ) {
+	( void )surf; ( void )bumpImage; ( void )bumpMatrix; ( void )diffuseImage; ( void )diffuseMatrix;
+	( void )diffuseColor; ( void )vertexColorParams;
+	return 0;
+}
+
 void RB_DetermineLightScale( void ) {
 	RB_GLESD3_DetermineLightScale();
 }

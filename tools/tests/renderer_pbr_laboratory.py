@@ -57,6 +57,7 @@ BASE = {
     'r_rendererModernOpaque': '1', 'r_rendererModernDeferred': '1',
     'r_rendererForwardPlus': '1', 'r_rendererModernVisible': '1',
     'r_rendererModernLightingParity': '0', 'r_rendererModernQuality': '1',
+    'r_rendererModernClassicShapes': '3',
     'r_rendererModernAutoPromote': '0', 'r_rendererClusteredDecals': '0',
     'r_rendererSharedWorldFogBlend':'0',
     'r_rendererSharedWorldAmbient':'0',
@@ -143,6 +144,23 @@ INTEL_VULKAN_SSAO_DEBUG_PIXELS = 12
 # alpha-test shader and ARB2's depth prepass (5 of 6,073 disc pixels measured
 # on 6 November 2026, all on edges). Allow at most this many edge pixels.
 CUTOUT_EDGE_FLIP_PIXELS = 24
+
+
+def cutout_hole_edge(image, x: int, y: int) -> bool:
+    """True when a pixel of the native capture sits on a cutout's hole edge.
+
+    The modern passes and ARB2's depth prepass test the same diffuse alpha in
+    different programs, so a texel on a hole's edge can land either side. Such
+    a pixel differs from a 4-neighbour by a clear step: more than 30 summed
+    levels, or more than 10 in one channel where a dim tinted surface meets a
+    grey background of similar brightness.
+    """
+    pixel = image[(y*1280+x)*3:(y*1280+x)*3+3]
+    for dx, dy in ((1,0),(-1,0),(0,1),(0,-1)):
+        other = image[((y+dy)*1280+x+dx)*3:((y+dy)*1280+x+dx)*3+3]
+        if abs(sum(pixel)-sum(other)) > 30 or max(abs(a-b) for a, b in zip(pixel, other)) > 10:
+            return True
+    return False
 # REN-05 matched half-resolution control. A view with native PBR always takes
 # the full-resolution pass, so half resolution reaches classic-only frames:
 # compare them, and their occlusion debug view, with the full-resolution ones.
@@ -164,7 +182,8 @@ CASES = {
     'production-rejected-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-fixed{kind}{suffix}': {'r_rendererModernLightingParity':'0','r_hdrToneMap':'1','r_lightScale':'0.1',
           **({'r_pbrMaterials':'0','r_rendererReflectionProbes':'0'} if suffix else {})}
-       for kind in ('','-bump','-diffuse','-colored','-cutout','-cutout-bump','-vertex','-texmatrix','-condition','-multistage','-ambient','-fog') for suffix in ('','-native')},
+       for kind in ('','-bump','-diffuse','-colored','-cutout','-cutout-bump','-vertex','-texmatrix','-condition','-multistage','-ambient','-fog',
+                    '-cutout-texmatrix','-cutout-vertex','-cutout-condition') for suffix in ('','-native')},
     'production-curved': {'r_rendererModernLightingParity':'0'},
     'production-curved-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-{light}{suffix}': {'r_rendererModernLightingParity':'0',
@@ -290,7 +309,16 @@ for restart in ('partial','full'):
 # frame (no laboratory linear scene), compared directly with native ARB2.
 # The linear scene blends fog in linear radiance by design, so the fog control
 # is compared with ARB2 only in the display frame (`-fog-display`).
-DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage', '-ambient', '-grid', '-fog')
+# REN-02 step 1 remainder: stage state (texture matrix, vertex colour, stage
+# expression) on a cutout, and on a baked-light receiver.
+CUTOUT_STAGE_KINDS = ('-cutout-texmatrix', '-cutout-vertex', '-cutout-condition')
+GRID_STAGE_KINDS = ('-grid-texmatrix', '-grid-vertex', '-grid-condition', '-grid-stage')
+# At the laboratory's 0.2 grid intensity the baked term is 1 to 4 levels on
+# the specimen, the size of the comparison's own tolerance. These repeat the
+# flat-bump baseline and the diffuse stage state at ten times that intensity.
+GRID_STRONG_KINDS = ('-grid-strong', '-grid-flat-stage', '-grid-flat-vertex')
+DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage', '-ambient', '-grid', '-fog',
+                          *CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS)
 # Mixed-material model (REN-05): one skinned mesh, PBR above its equator and
 # classic below, on CPU skinning and packed MD5R.
 for backend in ('cpu','md5r'):
@@ -335,6 +363,18 @@ for suffix in ('-clear','','-native','-zero','-restored'):
     CASES['production-fixed-grid'+suffix]={**CASES['production-fixed'], 'r_useLightGrid':'0' if suffix=='-clear' else '1', 'r_pbrIBL':'0',
         'r_lightGridIntensity':'0' if suffix=='-zero' else '0.2', 'r_lightGridMaxContribution':'0',
         **({'r_pbrMaterials':'0','r_rendererReflectionProbes':'0'} if suffix=='-native' else {})}
+for kind in GRID_STAGE_KINDS:
+    for suffix in ('', '-native'):
+        CASES[f'production-fixed{kind}{suffix}'] = dict(CASES['production-fixed-grid'+suffix])
+for kind in GRID_STRONG_KINDS:
+    for suffix in ('', '-native'):
+        CASES[f'production-fixed{kind}{suffix}'] = {**CASES['production-fixed-grid'+suffix], 'r_lightGridIntensity': '2'}
+# Declines by name: ARB2 adds one baked layer per albedo stage, the forward
+# pass one per surface, so a two-set material with baked light stays on ARB2.
+# The rollback control clears the stage bit for a shape the corridor owns.
+CASES['production-fixed-grid-multistage-fallback'] = dict(CASES['production-fixed-grid'])
+CASES['production-fixed-grid-multistage-native'] = dict(CASES['production-fixed-grid-native'])
+CASES['production-fixed-stages-fallback'] = {**CASES['production-fixed-cutout-texmatrix'], 'r_rendererModernClassicShapes': '0'}
 for kind in DISPLAY_CORRIDOR_KINDS:
     CASES[f'production-fixed{kind}-display'] = {**CASES[f'production-fixed{kind}'], 'r_pbrLinearScene': '0'}
 
@@ -347,6 +387,7 @@ CASES['production-fixed-bright']={**CASES['production-fixed'],'r_lightScale':'2'
 FALLBACK_CASES = {'multi-budget','shadow-capacity','local-global','production-rejected','production-no-scissor'}
 FALLBACK_CASES.update(('fog-fallback','blend-fallback','lightgrid-fallback'))
 FALLBACK_CASES.update(f'production-fixed-{boundary}-fallback' for boundary in ('shadow','msaa'))
+FALLBACK_CASES.update(('production-fixed-grid-multistage-fallback','production-fixed-stages-fallback'))
 # Controls whose PBR specimen is deliberately hidden (background captures for
 # composite oracles): no native owner is expected to admit anything there.
 HIDDEN_SPECIMEN_CASES: set[str] = set()
@@ -356,6 +397,8 @@ CONTRACT_DECLINE_CASES = {'vk-direct-emission-mismatch-fallback', 'vk-direct-cut
 LEGACY_CASES = {'legacy','master-off','multi-legacy','shadow-capacity-legacy','local-global-legacy','production-native','production-rejected-native','production-curved-native'}
 LEGACY_CASES.update(('production-fixed-colored-native','production-fixed-master-off'))
 LEGACY_CASES.add('production-fixed-grid-native')
+LEGACY_CASES.add('production-fixed-grid-multistage-native')
+LEGACY_CASES.update(f'production-fixed{kind}-native' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS))
 LEGACY_CASES.update(f'production-fixed-{boundary}-native' for boundary in ('shadow','msaa'))
 LEGACY_CASES.update(f'production-{light}-native' for light in ('points','projector'))
 LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native','production-fixed-cutout-native','production-fixed-cutout-bump-native','production-fixed-vertex-native','production-fixed-texmatrix-native','production-fixed-condition-native','production-fixed-multistage-native','production-fixed-ambient-native','production-fixed-fog-native'))
@@ -1337,7 +1380,22 @@ def compare_material_captures(results: list[dict]) -> None:
     exact_pairs += [('production-minimal','hdr'),('production-fixed-minimal','production-fixed')]
     exact_pairs += [('hdr-restored','hdr')]
     exact_pairs += [('production-fixed-'+suffix,'production-fixed') for suffix in ('restored','image-reload','shader-reload','partial-restart','full-restart','resize')]
-    exact_pairs += [('production-fixed-shadow-fallback','production-fixed-shadow-native')]
+    # A declined frame is drawn by the classic light loop, whose native PBR
+    # owner still shades the laboratory's PBR stations, while the PBR-off
+    # reference shows their classic stand-ins. Compare what both draw the same
+    # way: the classic specimen, pixel for pixel.
+    for left,right in (('production-fixed-shadow-fallback','production-fixed-shadow-native'),
+                       ('production-fixed-grid-multistage-fallback','production-fixed-grid-multistage-native'),
+                       ('production-fixed-stages-fallback','production-fixed-cutout-texmatrix-native')):
+        if left not in by_case or right not in by_case: continue
+        a,b=(capture_rgb(Path(by_case[name]['screenshot'])) for name in (left,right))
+        if not a or not b:
+            by_case[left]['failures'].append('declined-frame comparison inputs missing'); continue
+        pixels=[(x,y) for y in range(296,385) for x in range(663,752) if (x-707)**2+(y-340)**2<44**2]
+        differing=sum(1 for x,y in pixels if a[(y*1280+x)*3:(y*1280+x)*3+3]!=b[(y*1280+x)*3:(y*1280+x)*3+3])
+        by_case[left]['declinedSpecimenComparison']={'pixels':len(pixels),'differingPixels':differing}
+        if differing:
+            by_case[left]['failures'].append(f'{left}/{right}: the declined frame changed the classic specimen')
     exact_pairs += [('production-fixed-grid-zero','production-fixed-grid-clear'),('production-fixed-grid-restored','production-fixed-grid')]
     for left,right in exact_pairs:
         if left not in by_case or right not in by_case: continue
@@ -1475,7 +1533,8 @@ def compare_material_captures(results: list[dict]) -> None:
             by_case['production-curved']['classicComparison']=proof
             if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
                 by_case['production-curved']['failures'].append('curved classic surface differs from the native lighting reference')
-    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-grid'):
+    for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-grid',
+                 *(f'production-fixed{kind}' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS))):
         if case not in by_case or case+'-native' not in by_case: continue
         modern=by_case[case]
         pfm=Path(modern.get('linearScreenshot',''))
@@ -1501,15 +1560,13 @@ def compare_material_captures(results: list[dict]) -> None:
         # edge can flip either way. Bound those edge flips instead of the
         # whole-disc maximum; every other pixel keeps the 3-level limit.
         edge_flips=0
-        if case in ('production-fixed-cutout','production-fixed-cutout-bump'):
+        if 'cutout' in case:
             kept=[]
             for index,(x,y) in enumerate(coordinates):
                 pixel=errors[index*3:index*3+3]
-                if max(pixel)>3:
-                    level=lambda px,py: sum(native[(py*1280+px)*3:(py*1280+px)*3+3])
-                    if max(abs(level(x,y)-level(x+dx,y+dy)) for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)))>30:
-                        edge_flips+=1
-                        continue
+                if max(pixel)>3 and cutout_hole_edge(native, x, y):
+                    edge_flips+=1
+                    continue
                 kept+=pixel
             if edge_flips>CUTOUT_EDGE_FLIP_PIXELS:
                 modern['failures'].append(f'{edge_flips} cutout edge pixels differ from the native reference (limit {CUTOUT_EDGE_FLIP_PIXELS})')
@@ -1533,10 +1590,8 @@ def compare_material_captures(results: list[dict]) -> None:
         errors=[]; flips=0
         for x,y in pixels:
             pixel=[abs(a[(y*1280+x)*3+c]-b[(y*1280+x)*3+c]) for c in range(3)]
-            if max(pixel)>3 and 'cutout' in kind:
-                level=lambda px,py: sum(b[(py*1280+px)*3:(py*1280+px)*3+3])
-                if max(abs(level(x,y)-level(x+dx,y+dy)) for dx,dy in ((1,0),(-1,0),(0,1),(0,-1)))>30:
-                    flips+=1; continue
+            if max(pixel)>3 and 'cutout' in kind and cutout_hole_edge(b, x, y):
+                flips+=1; continue
             errors+=pixel
         proof={'meanAbsoluteByteError':sum(errors)/len(errors),'maximumByteError':max(errors),'edgeFlipPixels':flips,
                'nativeRange':[min(b[(y*1280+x)*3+c] for x,y in pixels for c in range(3)),max(b[(y*1280+x)*3+c] for x,y in pixels for c in range(3))]}
@@ -1554,7 +1609,13 @@ def compare_material_captures(results: list[dict]) -> None:
                              ('production-fixed-multistage','production-fixed-bump','second stage set'),
                              ('production-fixed-ambient','production-fixed-bump','ambient light'),
                              ('production-fixed-fog','production-fixed-bump','fog light'),
-                             ('production-fixed-grid','production-fixed-grid-clear','baked lighting')):
+                             ('production-fixed-grid','production-fixed-grid-clear','baked lighting'),
+                             ('production-fixed-cutout-texmatrix','production-fixed-cutout-bump','cutout texture matrix'),
+                             ('production-fixed-cutout-vertex','production-fixed-cutout-bump','cutout vertex colour'),
+                             ('production-fixed-cutout-condition','production-fixed-cutout-bump','cutout conditioned specular'),
+                             ('production-fixed-grid-texmatrix','production-fixed-grid','baked bump texture matrix'),
+                             ('production-fixed-grid-vertex','production-fixed-grid','baked vertex colour'),
+                             ('production-fixed-grid-stage','production-fixed-grid','baked stage colour and matrix')):
         if left not in by_case or right not in by_case: continue
         paths=[Path(by_case[name].get('linearScreenshot','')) for name in (left,right)]
         if not all(p.is_file() for p in paths): continue
@@ -1985,13 +2046,18 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
                             else 'extreme emission entered a linear scene the case did not request')
     if ( case.endswith('-display') and case.startswith('production-fixed') ) and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('the display-referred frame did not run the classic-lighting corridor')
-    if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-fog','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
+    if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-fog','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright',
+                *(f'production-fixed{kind}' for kind in CUTOUT_STAGE_KINDS)) and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('classic compatibility lighting was not submitted')
+    if case.startswith('production-fixed') and case.endswith('-native'):
+        visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
+        if re.search(r'\bexec=1\b', visible):
+            failures.append('the native reference was drawn by the modern visible path')
     if case.startswith('production-fixed-msaa') and not re.search(r'Renderer AA: MSAA requested=4 effective=4\b',text):
         failures.append('four-sample fallback control did not activate MSAA')
     if case.startswith('production-fixed-') and case.endswith('-fallback') and not re.search(r'Modern classic lighting: ready=0 executed=0 primitives=0\b',text):
         failures.append('unsupported classic lighting left a partial transaction active')
-    if case.startswith('production-fixed-grid') and not case.endswith('-native'):
+    if case.startswith('production-fixed-grid') and not case.endswith(('-native','-fallback')):
         if not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
             failures.append('classic compatibility lighting was not submitted with the baked grid')
         if not case.endswith('-clear') and not re.search(r'Modern forward\+:.*lightGrid=[1-9]\d*',text):
@@ -2343,8 +2409,18 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             if case.startswith('production-fixed-condition'): material='classic_condition'
             if case.startswith('production-fixed-multistage'): material='classic_multistage'
             if case.startswith(('production-fixed-ambient','production-fixed-fog')): material='classic_bump'
+            for name in ('cutout-texmatrix','cutout-vertex','cutout-condition'):
+                if case.startswith('production-fixed-'+name): material='classic_'+name.replace('-','_')
+            if case.startswith('production-fixed-stages'): material='classic_cutout_texmatrix'
+            for name in ('texmatrix','vertex','condition','multistage'):
+                if case.startswith('production-fixed-grid-'+name): material='classic_'+name
+            if case.startswith('production-fixed-grid-stage'): material='classic_grid_stage'
+            for name in ('flat-stage','flat-vertex'):
+                if case.startswith('production-fixed-grid-'+name): material='classic_grid_'+name.replace('-','_')
+            vertex_model=case.startswith(('production-fixed-vertex','production-fixed-cutout-vertex','production-fixed-grid-vertex',
+                                                      'production-fixed-grid-flat-vertex'))
             commands += ['g_stopTime 0',f'script "${removed}.remove()"','wait 3',
-                         f'spawn func_static name pbr_classic model "{lab.VERTEX_COLOR_MODEL if case.startswith("production-fixed-vertex") else lab.MODEL}" shader "{lab.PREFIX}/{material}" origin "100 160 480" solid 0',
+                         f'spawn func_static name pbr_classic model "{lab.VERTEX_COLOR_MODEL if vertex_model else lab.MODEL}" shader "{lab.PREFIX}/{material}" origin "100 160 480" solid 0',
                          'wait 30','g_stopTime 1']
             scene_setups.add('classic')
             # REN-02: a classic ambient light (step 2) or fog light (step 3)
