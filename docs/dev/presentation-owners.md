@@ -1348,6 +1348,127 @@ JSON, host samples, gameplay reports with runtime hashes) and `sample-retain2/`
 (stack samples). The binaries were built from the working tree of the commit
 that records this section.
 
+### Snapshot cost beyond copying, 23 November 2026
+
+The stack sample of the preceding section put about 40% of mode 2's snapshot
+in the comparisons that validate retained streams, about 18% in heap
+allocation and release, and about 10% in the per-view `std` hash containers.
+Four changes cut that work. None of them treats a stream as unchanged without
+reading it: the full-range comparison of every retained stream stays.
+
+- **Streams the consumer never reads are not frozen.** The Vulkan back end
+  never reads silhouette indexes or edges, face planes, dominant triangles,
+  shadow vertexes or the mirrored and duplicated vertex tables. They feed the
+  front end's shadow volumes, culling and tangent derivation, all of which ran
+  before the snapshot. The back end derives tangents only to repair GPU
+  skinning that a view deferred, and the snapshot's preparation already
+  finishes that repair for every copy; a copy whose source still defers keeps
+  the tables. Three debug views read some of them (`r_showEdges`,
+  `r_showDominantTri`, `r_showTextureVectors`), each null-checked, and a
+  snapshot taken while any of them is on keeps all of them. Otherwise the copy
+  keeps the counts and nulls the pointers, so a reader that was missed fails
+  at once instead of reading a live stream. This is about 2.0 MB a frame on
+  the comparison route that is neither copied nor compared.
+- **Frame-temporary index streams stay out of the retained cache.** Index
+  bytes in frame memory or in a temporary vertex cache are refilled every
+  frame, and retaining them displaced the persistent streams. The working set
+  exceeded the 32,768-entry cap, and least-recently-used eviction then missed
+  on nearly every acquisition, paying an allocation, a copy and a release
+  each time. Those bytes (about 45 KB a frame) now take the ordinary per-view
+  copy. The cache holds 670 to 950 entries in place of a constant 32,768.
+  Index streams also join the per-view lookup, so a range that two records in
+  one view share is validated once per view, as vertex streams already were.
+- **One lease per version per frame.** A frame held one shared owner per
+  acquisition, an atomic count update and a vector append for every reused
+  range. `Lease` hands out the bytes and appends an owner only the first time a
+  version is leased under the frame slot's epoch, which changes whenever the
+  slot's holder is emptied. A replaced version starts unleased.
+- **Reused per-view identity tables.** The geometry, cache, surface and entity
+  lookups were four `std::unordered_*` containers built and destroyed per view
+  (nine views a frame here). `idFrameSnapshotIdentities` is an open-addressing
+  table whose storage persists across views; a view starts by advancing a
+  generation, so it pays no node allocations and no clear. It is released
+  with the retained caches at a vertex-cache purge, a world free and shutdown.
+
+`rendererFrameSnapshotStats` adds `threadWork` (work on the snapshotting
+thread: cycles on Windows, nanoseconds where POSIX has a thread CPU clock),
+`omittedBytes` and `temporaryIndexBytes`. Unlike `cpuUs`, `threadWork`
+excludes time the thread spends preempted by other processes, so two builds
+can be compared on a busy host. Memory contention from other processes still
+reaches it. The native snapshot test covers leases, the identity tables and
+three further negative controls (twelve in all).
+
+**Parity.** `--check parity` on the final binary repeats the preceding
+section's result on all five views: with the HUD hidden, captures and the
+backend readbacks are bit-identical across modes 0, 1, 2 and 0 again on
+`airdefense1` (twice), `hub2` and `medlabs`. `q4dm1` stays within the mode 0
+floor. Validation layers were on, no message was logged, and all four
+ownership self-tests passed in each launch.
+
+**Same-binary A/B.** Only `renderer-vk_x64.dll` holds the snapshot code, so
+one build serves both arms: a baseline DLL from the preceding commit's
+snapshot sources and the candidate, each with the same `threadWork` counter,
+swapped into `.install` between runs. Six comparison runs (`--retain 2`,
+airdefense1 Quality sweep, 1280 x 720 windowed, uncapped) in the order
+candidate, baseline, baseline, candidate, candidate, baseline, give nine mode 2
+windows per arm. Per mode 2 frame:
+
+| | Baseline | Candidate | Change |
+| --- | ---: | ---: | ---: |
+| Thread work, median (min to max) | 17.04 M cycles (11.63 to 20.67) | 9.23 M cycles (7.30 to 15.28) | -45.8% |
+| Elapsed snapshot time, median | 7.72 ms | 4.03 ms | -47.8% |
+| Bytes copied, median | 2,643 KB | 2,285 KB | -13.5% |
+| Bytes compared or shared, median | 9,444 KB | 8,054 KB | -14.7% |
+| Front-end-only bytes omitted | 0 | 2,049 KB | |
+| Retained index entries | 32,768 in every window | 672 to 951 | |
+| Retained vertex entries | 1,007 to 1,011 | 423 to 425 | |
+| Mode 2 window mean / same run's mode 0 median | 1.29 (1.06 to 3.12) | 0.90 (0.74 to 1.48) | |
+
+The compared bytes fall by less than the omitted bytes because they now also
+count index ranges served from the per-view lookup. An earlier four-run A/B
+without the counter (candidate, baseline, baseline, candidate) gave the same
+counters: 715 to 884 retained index entries against 15,426 to 32,768, and
+copied and compared bytes within 2% of the table.
+
+The host was busy throughout (mean CPU 79 to 99% per run, two to five and a
+half other openQ4 clients on average, compilers and linkers in every run),
+and single windows swung from 8 to 60 ms. Thread work is the measure; the
+window means and the mode 2 to mode 0 ratio are shared-machine observations,
+not budget evidence. They agree in direction: the candidate's mode 2 windows
+were below the same run's mode 0 median in six of nine, where the baseline's
+were above it in all nine. `r_vkRenderThread` stays 0.
+
+**Bounds.** `--check bounds` on the final binary (100 resize and scene-scale
+cycles and a full `vid_restart` per mode, validation layers on) passes with
+the bounds declared in the preceding section:
+
+| | Mode 0 (control) | Mode 1 | Mode 2 |
+| --- | ---: | ---: | ---: |
+| Private bytes, period medians 1 to 5 (MiB) | 4,375, 4,463, 4,459, 4,480, 4,463 | 4,440, 4,468, 4,508, 4,480, 4,456 | 4,483, 4,467, 4,567, 4,481, 4,515 |
+| Growth, period 2 to 5 | 0.8 MiB (0.02%) | -12.5 MiB (-0.28%) | 47.4 MiB (1.06%) |
+| Growth against the control | | -13.2 MiB | 46.6 MiB |
+| Handles, period medians 2 to 5 | -5 | -1 | 0 |
+| Vulkan allocations, cycle 40 to 100 | 0.0 MiB, 0 | 0.0 MiB, 0 | +2.2 MiB, 0 |
+| Retained caches, maximum | not used | not used | index 684 entries (1.7 MiB), vertex 492 (4.0 MiB) |
+| After the full restart: threaded, inline | 0, 240 | 240, 0 | 240, 0 |
+
+Mode 2's period medians do not climb (the third is the highest), and its
+growth is smaller than the preceding run's 64.4 MiB. That run's control,
+though, drifted 74 MiB where this one drifted almost none, so mode 2 sits
+closer to the 64 MiB allowance over the control than it did. Both ownership
+self-tests passed in every launch, and no error or validation message was
+logged.
+
+The next lever is the vertex stream itself. Static geometry is validated twice
+a view, once as `verts` and once as the ambient cache bytes holding the same
+vertices. Dropping `verts` from the snapshot needs an audit of every reader
+in the shared domain code linked into the Vulkan module, which this round did
+not do.
+
+Evidence is under `.tmp/ren07b/` in the ren07 worktree: `parity/`, `ab/` (the
+first A/B), `ab2/` (the counter A/B, with `driver.log` naming the DLL hash per
+run), `bounds/`, and the two DLL pairs under `dll/`.
+
 ### Quiet Quality floor baseline, 5 November 2026
 
 All earlier Quality-floor timings ran beside a dozen peer builds and clients.

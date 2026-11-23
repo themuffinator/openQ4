@@ -6,6 +6,80 @@
 #include <cstring>
 #include <cstdint>
 #include <new>
+#include <vector>
+
+// The identities one view's snapshot has already frozen: producer object to
+// its copy, or to nullptr for a mark. Every insertion succeeds, since aliasing
+// decides which records share a copy. Storage persists across views and a view
+// starts by advancing the generation, so a view pays neither node allocations
+// nor a clear. Producer-only, one view at a time. A returned value slot is
+// valid until the next insertion.
+class idFrameSnapshotIdentities {
+	struct entry_t {
+		const void *key;
+		void *value;
+		std::uint32_t generation;		// live in the current view when equal
+	};
+	std::vector<entry_t> entries;
+	std::size_t count = 0;
+	std::uint32_t generation = 1;
+	static std::size_t Hash( const void *key ) {
+		std::size_t hash = reinterpret_cast<std::uintptr_t>( key ) >> 4;
+		hash ^= hash >> 17;
+		hash *= 0xed5ad4bbu;
+		return hash ^ ( hash >> 11 );
+	}
+	std::size_t Slot( const void *key ) const {
+		const std::size_t mask = entries.size() - 1;
+		std::size_t slot = Hash( key ) & mask;
+		while ( entries[slot].generation == generation && entries[slot].key != key ) slot = ( slot + 1 ) & mask;
+		return slot;
+	}
+	void Grow() {
+		std::vector<entry_t> previous( entries.size() < 256 ? 256 : entries.size() * 2, entry_t{ nullptr, nullptr, 0 } );
+		previous.swap( entries );
+		for ( const entry_t &entry : previous ) {
+			if ( entry.generation == generation ) entries[Slot( entry.key )] = entry;
+		}
+	}
+public:
+	// Forget the previous view's identities.
+	void Begin() {
+		count = 0;
+		if ( ++generation == 0 ) {
+			for ( entry_t &entry : entries ) entry.generation = 0;
+			generation = 1;
+		}
+	}
+	// Drop the storage itself (video restart, world free, shutdown).
+	void Release() {
+		std::vector<entry_t>().swap( entries );
+		count = 0;
+	}
+	std::size_t Size() const { return count; }
+	std::size_t Capacity() const { return entries.size(); }
+	bool Contains( const void *key ) const {
+		return !entries.empty() && entries[Slot( key )].generation == generation;
+	}
+	// The value recorded for key in this view, or nullptr.
+	void *Find( const void *key ) const {
+		if ( entries.empty() ) return nullptr;
+		const entry_t &entry = entries[Slot( key )];
+		return entry.generation == generation ? entry.value : nullptr;
+	}
+	// The value slot for key; a key new to this view starts at nullptr.
+	void *&Insert( const void *key, bool *inserted = nullptr ) {
+		if ( ( count + 1 ) * 2 > entries.size() ) Grow();
+		entry_t &entry = entries[Slot( key )];
+		const bool fresh = entry.generation != generation;
+		if ( fresh ) {
+			entry = entry_t{ key, nullptr, generation };
+			++count;
+		}
+		if ( inserted != nullptr ) *inserted = fresh;
+		return entry.value;
+	}
+};
 
 // A view is frozen atomically on the producer. Identical source ranges in
 // that view can share their submitted copy. Never retain this lookup across
