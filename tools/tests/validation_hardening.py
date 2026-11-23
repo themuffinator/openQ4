@@ -962,6 +962,7 @@ def validate_validation_wiring() -> None:
         "renderer_volumetric_lighting.py",
         "renderer_shared_domain_qualification.py",
         "renderer_shadow_motion_qualification.py",
+        "renderer_shadow_stencil_parity_scan.py",
         "renderer_temporal_qualification.py",
         "renderer_temporal_stability.py",
         "renderer_vulkan_descriptor_pressure.py",

@@ -43,6 +43,7 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   resolution-policy test pass.
 - **Developer detail:** [texture detail](temporal-presentation.md#texture-detail-while-upscaling-and-under-vulkan-23-november-2026)
   and REN-04 in the [roadmap](roadmap.md).
+
 ## Controllers: the one in your hands, aim in degrees, gyro, layouts and haptics, 22 November 2026
 
 - **The controller in your hands is the one in charge.** Every connected

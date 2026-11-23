@@ -68,7 +68,9 @@ void R_ListRenderLightDefs_f( const idCmdArgs &args ) {
 		}
 		totalRef += rCount;
 
-		common->Printf( "%4i: %3i intr %2i refs %s\n", i, iCount, rCount, ldef->lightShader->GetName());
+		// the origin identifies an authored light for r_singleLight
+		common->Printf( "%4i: %3i intr %2i refs %s at %s\n", i, iCount, rCount, ldef->lightShader->GetName(),
+			ldef->parms.origin.ToString( 0 ) );
 		active++;
 	}
 

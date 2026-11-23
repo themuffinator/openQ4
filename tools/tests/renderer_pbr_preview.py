@@ -30,7 +30,7 @@ def captured_scene(log, name):
     marker = re.search(rf'(?m)^PBRSCENE_{re.escape(name)}_BEGIN\s*$([\s\S]*?)^PBRSCENE_{re.escape(name)}_END\s*$', log)
     if not marker:
         return None
-    defs = re.findall(r'(?m)^\s*\d+:\s+\d+ intr\s+\d+ refs (\S+)\s*$', marker[1])
+    defs = re.findall(r'(?m)^\s*\d+:\s+\d+ intr\s+\d+ refs (\S+)(?: at [^\r\n]*)?\s*$', marker[1])
     return dict(specimens=sum(d.lower() == lab.lab.MODEL.lower() for d in defs),
                 lights=sorted(d.rsplit('/', 1)[-1] for d in defs
                               if re.fullmatch(r'lights/openq4/pbr_lab/(?:fog|blend)', d, re.I)))

@@ -469,6 +469,7 @@ jobs:
             tools/tests/renderer_volumetric_lighting.py \
             tools/tests/renderer_shared_domain_qualification.py \
             tools/tests/renderer_shadow_motion_qualification.py \
+            tools/tests/renderer_shadow_stencil_parity_scan.py \
             tools/tests/renderer_native_ui_output.py \
             tools/tests/renderer_mp_flat_items.py \
             tools/tests/renderer_pbr_materials.py \
