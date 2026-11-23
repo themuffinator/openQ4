@@ -47,6 +47,21 @@ class idFrameSnapshotCopies {
 	}
 public:
 	struct result_t { void *data; bool reused; };
+	// A range this view already froze, whoever owns its bytes, or nullptr.
+	void *Find( const void *source, std::size_t bytes ) const {
+		if ( source == nullptr || bytes == 0 || capacity == 0 ) return nullptr;
+		const entry_t &entry = entries[Slot( source, bytes )];
+		return entry.source != nullptr ? entry.data : nullptr;
+	}
+	// Record bytes owned elsewhere (a retained lease held by this frame) so the
+	// same range is not validated again in this view. A full table only costs
+	// the later lookups; the caller's data stays valid either way.
+	template<class Allocate> void Remember( const void *source, std::size_t bytes, void *data, Allocate allocate ) {
+		if ( source == nullptr || bytes == 0 || data == nullptr || Find( source, bytes ) != nullptr ) return;
+		if ( count >= capacity / 2 && !Grow( allocate ) ) return;
+		entries[Slot( source, bytes )] = { source, bytes, data };
+		++count;
+	}
 	template<class Allocate> result_t Copy( const void *source, std::size_t bytes, Allocate allocate ) {
 		if ( source == nullptr || bytes == 0 ) return { nullptr, false };
 		if ( capacity != 0 ) {

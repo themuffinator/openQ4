@@ -860,7 +860,7 @@ if get_option('build_native_tests')
   test('openq4-render-frame-ownership', py,
     args: [files('tools/tests/renderer_frame_ownership.py')], timeout: 90)
   test('openq4-render-snapshot-copy', py,
-    args: [files('tools/tests/renderer_snapshot_copy.py')], timeout: 90)
+    args: [files('tools/tests/renderer_snapshot_copy.py')], timeout: 240)
   test('openq4-render-overlap-benchmark', py,
     args: [files('tools/tests/renderer_overlap_benchmark_test.py')], timeout: 30)
   test('openq4-render-frame-identity', py,

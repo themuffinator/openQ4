@@ -1075,6 +1075,279 @@ The earlier MP shutdown overflow was not reproduced in this run; existing
 scene-packet capacity fallback and post-restart Vulkan bootstrap labeling remain
 outside this iteration.
 
+### Retained vertex streams, 23 November 2026
+
+Mode 2 now also retains the vertex-class streams of static geometry across
+views and frames: vertices, the CPU bytes of the ambient, lighting and shadow
+vertex caches, shadow vertices, and the per-vertex and per-face tables
+(silhouette edges, face planes, dominant triangles, mirrored and duplicate
+vertices). Index streams keep their existing cache.
+
+**What counts as static.** A stream is a candidate only when all of these hold:
+
+- the drawing entity has a static model class, no dynamic model and no joints:
+  world areas and static models;
+- the triangle record is the model's own, not frame memory. Material deforms,
+  decals, overlays and dynamic light or shadow triangles are allocated from the
+  frame arena whichever entity draws them
+  (`R_FrameMemoryContains`);
+- the surface carries no GPU-skinning sidecar, captured previous positions or
+  packed MD5R mesh, and is not marked deformed;
+- a vertex cache is a static block, not a frame-temporary one.
+
+A light triangle or a deform source passes the entity's classification on to
+the ambient surface it references, so light triangles share the ambient
+surface's retained vertices. Everything else keeps its per-view copy: animated
+and GPU-skinned meshes, effects, liquids, beams, GUI geometry, joints, palettes,
+MD5R transforms, previous positions, dynamic texture coordinates and decal
+colours.
+
+**What makes a version immutable.** The classification only selects
+candidates. `idFrameSnapshotRetainedStreams` compares the complete byte range
+with its owned copy on every acquisition; the source address and length are
+lookup keys, never a version or a lifetime guarantee. No sound version identity
+exists for model geometry (tangents derive lazily, models reload, interactions
+are rebuilt at reused addresses), so none is assumed. A view validates each
+range once: the view's own lookup records the retained bytes, and later
+references in that view reuse them without another comparison.
+
+A range that compares unequal was rewritten in place. Its cached version is
+dropped (submitted leases keep it alive) and the range is refused for a
+doubling run of acquisitions, 2 up to 256, during which the caller takes its
+ordinary per-view copy. Geometry that derives tangents once costs two per-view
+copies; data animated in place despite its classification settles on per-view
+copies with one comparison every 256 acquisitions, instead of a comparison, an
+allocation and a release every view.
+
+**Lifetime and bounds.** Blocks are 16-byte aligned and owned by reference
+count. A submitted frame holds a lease on every version it uses, through
+replacement, refusal, eviction, `Clear` and model destruction, and releases it
+at retirement after the worker joins. The cache holds at most 128 MiB and
+32,768 entries (keyed by address and length) beside the index cache's 64 MiB
+and 32,768; pressure evicts the least recently acquired entries one at a time
+and oversized ranges are never retained. The audited Vulkan backend never
+writes these streams: its only in-place vertex write is the GPU-skinning
+repair, which the classification excludes and mode 2 completes before the
+snapshot.
+
+**Switch.** `r_vkSnapshotRetain` is now 0 (per-view copies only), 1 (index
+streams, the 4 November behaviour) or 2 (index and static vertex streams, the
+default within mode 2). Lowering it drops the cached versions at the next
+retirement. `rendererFrameSnapshotStats` adds `retainedVertexBytes` and the
+entries, resident bytes and live leases of both caches. The comparison runner
+takes `--retain 0|1|2`.
+
+**Tests.** The production-header native test (`openq4-render-snapshot-copy`)
+covers unchanged reuse, length as identity, replacement after an in-place
+rewrite, the doubling refusal run and its cap, leases through replacement,
+`Clear` and eviction, least-recently-used eviction under the byte and entry
+bounds, oversized ranges and the view lookup's record of externally owned
+bytes. Four new negative controls fail as required: a stale version served
+after a rewrite, whole-cache clearing under pressure, an immediate retry after
+a rewrite, and a view record that displaces the view's own copy. With the five
+existing controls that is nine. `rendererFrameOwnershipSelfTest` adds a static
+entity fixture: two views share one version of its vertices and cache bytes, a
+rewrite reaches neither that version nor the next view, and a frame-allocated
+triangle record under the same entity is not a candidate.
+
+**Copied bytes.** Two runs of the comparison runner against the same staged
+binary (windowed 1280 x 720 Quality `game/airdefense1` view sweep, uncapped,
+VSync off, nine windows each), with `--retain 1` and `--retain 2`:
+
+| Mode 2, per frame | `--retain 1` (indexes) | `--retain 2` (indexes and static vertices) |
+| --- | ---: | ---: |
+| Copied bytes | 6,861,836 | 2,648,681 |
+| Static vertex bytes served from retention | 0 | 4,225,593 |
+| Bytes reused, all sources | 5,564,669 | 9,870,717 |
+| Elapsed snapshot time | 4.90 ms | 6.18 ms |
+
+Copied bytes fall by **61.4%**. Elapsed snapshot time does not fall: these are
+shared-machine numbers (below), and a comparison replaces each avoided copy.
+A stack sample of the main thread during the same sweep in mode 2 with
+retention 2 (hidden window, 3,322 samples over 20 s, `tools/debug/cpu_sampler.py`)
+puts the snapshot at 29.6% of the thread. Of those 29.6 points, 17.6 acquire
+retained versions (10.2 static vertex streams, 7.3 index streams): about 11
+are the validating comparison itself, and most of the rest is the index
+cache's lookups, evictions and allocations. 2.7 are the remaining per-view
+copies, and about 4 are the per-view hash containers and their heap nodes.
+The index cache sat at its 32,768-entry cap through the sweep, churning on
+frame-temporary index streams. Retention as
+built therefore bounds memory traffic into the frame arena but **establishes no
+CPU gain**. The next lever is not re-reading unchanged streams at all, which
+needs a sound version identity for model geometry and vertex-cache blocks; the
+per-view containers come after that.
+
+### Overlap repair and mode qualification, 23 November 2026
+
+**The overlap had been lost.** Since the 6 November VR change,
+`idRenderSystemLocal::SetVRFrame` joined the render thread unconditionally, and
+the engine clears the VR frame on every frame without a headset. In ordinary
+play modes 1 and 2 therefore joined the worker once per frame before the next
+front end began: `renderThreadStats` showed `early sync: vr frame` on 149 of
+150 frames and `frontEndsWhileBusy=0`. Mode 0/1/2 timings taken between
+6 and 23 November compared a serialized frame with the hand-off cost added.
+Clearing an already clear VR frame now returns before the join (the stored
+frame is either active or all zero, so nothing the backend reads changes); a
+real frame, or one releasing images, still joins. The render-thread contract
+test pins both.
+
+**Qualification runner.** `tools/tests/renderer_overlap_benchmark.py` gains two
+checks beside the comparison. Both launch the staged Vulkan client with a hidden
+window, validation layers on, device input disabled and an isolated save path,
+and drive it with console commands only:
+
+```text
+python tools/tests/renderer_overlap_benchmark.py --check parity --runtime-dir .install --output-dir .tmp/ren07/parity
+python tools/tests/renderer_overlap_benchmark.py --check bounds --runtime-dir .install --output-dir .tmp/ren07/bounds
+```
+
+**Parity.** Each view applies Quality (temporal AA 2, 2x scene MSAA as the
+preset sets them), freezes the world with `g_stopTime 1`, then visits modes
+0, 1, 2 and 0 again. Every visit runs 90 settling frames and a 150-frame window
+bracketed by `renderThreadStats`, reads back the backend's `_vkPostScene` and
+`_currentRender` images (drawn by the worker in modes 1 and 2) and takes an
+engine capture. A capture frame runs inline in every mode; in mode 2 it is
+drawn from the frozen snapshot, retained streams included. `g_stopTime` does
+not stop the HUD's own clock, so each view is captured twice: with the HUD
+(judged against the mode 0 repeat) and with `g_showHud 0`, where a frozen
+Quality frame must repeat bit for bit.
+
+| View | HUD hidden: captures and readbacks, modes 0/1/2/0 | With HUD: pixels over 8/255 from mode 0 (modes 1, 2; mode 0 repeat) |
+| --- | --- | --- |
+| `game/airdefense1` arena | identical | 0.079%, 0.072%; 0.081% |
+| `game/airdefense1` skyline | identical | 0.063%, 0.068%; 0.055% |
+| `game/hub2` spawn | identical | 0.047%, 0.062%; 0.062% |
+| `game/medlabs` spawn | identical | identical |
+| `mp/q4dm1` listen server | not still: 5.2%, 5.5%; 5.5% | 2.3%, 5.2%; 5.3% |
+
+The with-HUD differences sit in one top-centre HUD element in every still
+view. Multiplayer has no single-client world freeze (pickups turn, lights
+pulse), so it is compared with how far mode 0 differs from itself over the
+run: modes 1 and 2 must stay within 1.5 times that floor plus 0.5%. A view
+that cannot be held still at all, such as `game/storage1`'s moving craft
+inside dust effects (mode 0 differs from itself in 10% of pixels), tells
+nothing either way and is not part of the check.
+
+Every mode 1 and mode 2 window drew all 150 frames on the render thread and
+none inline. Mode 1 recorded no early join. Mode 2 recorded only its ordinary
+`handoff` join, and started 24 to 149 of its 150 front ends while the backend
+was still busy; the low counts are the lightest views, where the backend
+usually finishes first. Both ownership self-tests passed in every launch and no
+validation message was logged. The table is the final run, on the same binary
+as the bounds and timing below; two earlier runs on the preceding build gave
+the same identities.
+
+**Bounds.** One launch per mode (0 as the control, then 1 and 2) loads
+`game/airdefense1` at Quality, starts a view sweep and runs 100 cycles. Each
+cycle sets a new window size (1280 x 720, 1024 x 576, 1600 x 900, 960 x 540 in
+rotation) and applies it with `vid_restart partial`, which resizes the window,
+recreates the swapchain and purges the vertex caches, then sets a new scene
+scale (`r_screenFraction` 100, 75, 50, 67, 125 in rotation). Every cycle
+reports the render-thread and snapshot counters, and the runner samples the
+process at that moment. A full `vid_restart` follows the cycles, then 240
+frames, the ownership self-test and a clean exit. Validation layers were on.
+
+Bounds declared in the runner before the final run: the retained caches within
+64 MiB / 32,768 index entries and 128 MiB / 32,768 vertex entries at every
+cycle; process private bytes within 5%, and within 64 MiB of the mode 0
+control, between the second and the last 20-cycle period; handles within 16;
+Vulkan allocations within 5% and 32 MiB between cycles 40 and 100. Single
+samples of private bytes swing by about 150 MiB (image reloads are in flight
+when a cycle's marker is logged), so each period is summarized by its median;
+a period visits every size and scale once.
+
+| | Mode 0 (control) | Mode 1 | Mode 2 |
+| --- | ---: | ---: | ---: |
+| Private bytes, median of period 2 | 4,383 MiB | 4,456 MiB | 4,491 MiB |
+| Private bytes, median of period 5 | 4,458 MiB | 4,502 MiB | 4,555 MiB |
+| Growth, period 2 to 5 | 74.4 MiB (1.70%) | 45.9 MiB (1.03%) | 64.4 MiB (1.43%) |
+| Growth against the control | | -28.5 MiB | -10.0 MiB |
+| Handles, period medians 2 to 5 | -2 | -0.5 | 0 |
+| Handles, minimum to maximum | 792 to 829 | 792 to 844 | 799 to 834 |
+| Vulkan allocations, cycle 40 to 100 | -2.3 MiB, 0 | 0.0 MiB, 0 | +6.0 MiB, +1 |
+| Vulkan allocations at cycle 100 | 988.0 MiB in 2,093 | 994.0 MiB in 2,094 | 1,000.0 MiB in 2,095 |
+| Retained vertex cache, maximum | not used | not used | 5.5 MiB, 1,153 entries |
+| Retained index cache, maximum | not used | not used | 3.9 MiB, 7,613 entries |
+| Frames on the render thread in the cycles | 0 | 2,410 | 2,410 |
+| After the full restart: threaded, inline | 0, 240 | 240, 0 | 240, 0 |
+
+All three launches pass: no error or validation message in any log, both
+ownership self-tests in each, clean exits. Mode 2 started 184
+of the 240 post-restart front ends while the backend was busy. The joins the
+cycles produced are the expected barriers: one `renderer configuration` join
+per cycle for the setting changes, two `image` joins per cycle in mode 2 for
+images recreated by the restart, and the report commands.
+
+The first bounds run, before retained versions were dropped at a vertex-cache
+purge, failed and is kept (`bounds-before-clear/`): every restart reallocates
+the caches at new addresses, the dead entries could only age out under
+pressure, the vertex cache climbed towards its budget (99 MiB by cycle 100) and
+mode 2's private bytes grew 258 MiB between periods 2 and 5. Retained versions
+are now dropped when the vertex caches are purged (both restart routes) and
+when a world is freed; submitted leases are unaffected. The control's own
+1.7% drift over 60 partial restarts is not a render-thread effect and is
+outside REN-07.
+
+**Timing with the overlap restored (shared machine, not qualification).** The
+two comparison runs of the previous section are also the first mode 0/1/2
+timings since the join was removed: windowed 1280 x 720 Quality, uncapped,
+VSync off, each mode once in each order position, 8-second windows after
+4-second warm-ups. Milliseconds per frame, per window in run order:
+
+| `--retain` | Window | Frames | Mean | p50 | p95 | p99 |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 1 | r0 mode 0 | 754 | 10.60 | 10.50 | 15.35 | 17.30 |
+| 1 | r0 mode 1 | 1,000 | 8.00 | 7.75 | 11.05 | 14.55 |
+| 1 | r0 mode 2 | 691 | 11.57 | 11.10 | 17.80 | 23.05 |
+| 1 | r1 mode 2 | 724 | 11.05 | 10.75 | 17.05 | 19.65 |
+| 1 | r1 mode 0 | 748 | 10.68 | 9.90 | 18.10 | 27.30 |
+| 1 | r1 mode 1 | 967 | 8.27 | 7.55 | 13.55 | 23.15 |
+| 1 | r2 mode 1 | 955 | 8.38 | 7.90 | 12.75 | 18.85 |
+| 1 | r2 mode 2 | 576 | 13.88 | 12.70 | 25.55 | 39.75 |
+| 1 | r2 mode 0 | 834 | 9.59 | 8.90 | 16.55 | 23.90 |
+| 2 | r0 mode 0 | 735 | 10.87 | 10.90 | 14.75 | 15.90 |
+| 2 | r0 mode 1 | 915 | 8.75 | 8.20 | 13.05 | 15.20 |
+| 2 | r0 mode 2 | 645 | 12.41 | 12.25 | 17.60 | 19.95 |
+| 2 | r1 mode 2 | 617 | 12.96 | 13.10 | 17.85 | 20.20 |
+| 2 | r1 mode 0 | 753 | 10.62 | 10.40 | 14.35 | 21.85 |
+| 2 | r1 mode 1 | 993 | 8.05 | 7.95 | 11.15 | 13.80 |
+| 2 | r2 mode 1 | 930 | 8.60 | 8.30 | 12.05 | 15.20 |
+| 2 | r2 mode 2 | 450 | 17.75 | 17.25 | 26.60 | 33.70 |
+| 2 | r2 mode 0 | 687 | 11.65 | 11.00 | 18.30 | 24.20 |
+
+Medians of the three window statistics per mode:
+
+| `--retain` | Mode | Mean | p50 | p95 | p99 |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 0 | 10.598 | 9.90 | 16.55 | 23.90 |
+| 1 | 1 | 8.273 | 7.75 | 12.75 | 18.85 |
+| 1 | 2 | 11.571 | 11.10 | 17.80 | 23.05 |
+| 2 | 0 | 10.875 | 10.90 | 14.75 | 21.85 |
+| 2 | 1 | 8.604 | 8.20 | 12.05 | 15.20 |
+| 2 | 2 | 12.959 | 13.10 | 17.85 | 20.20 |
+
+The host was busy throughout. Competing processes appeared in all 171 and all
+164 one-second host samples, mean host CPU was 95.2% and 94.7%, and on average
+5.4 and 6.1 other openQ4 clients (other sessions' harness runs) were running,
+with compilers and linkers beside them in the second run. The process list
+taken before each run showed the same.
+
+Read as shared-machine observations only: mode 1 was faster than mode 0 in all
+six paired windows (window means 8.00 to 8.75 ms against 9.59 to 11.65 ms),
+and mode 2 was slower than mode 0 in all six (11.05 to 17.75 ms), with 4.6 to
+7.5 ms of snapshot time per frame. Mode 1's gain is what the stage 1 design
+predicted once the tic really overlaps the backend; mode 2's loss is the
+snapshot cost attributed above. Neither is budget evidence. `r_vkRenderThread`
+stays 0, the every-frame Quality floor is not claimed, and five quiet matched
+runs per GOV-03 are still required before any default changes.
+
+Evidence is retained under `.tmp/ren07/evidence/`: `parity/` (report and
+logs; the report carries each image's hash), `bounds/` and
+`bounds-before-clear/`, `compare-retain1/` and `compare-retain2/` (comparison
+JSON, host samples, gameplay reports with runtime hashes) and `sample-retain2/`
+(stack samples). The binaries were built from the working tree of the commit
+that records this section.
+
 ### Quiet Quality floor baseline, 5 November 2026
 
 All earlier Quality-floor timings ran beside a dozen peer builds and clients.

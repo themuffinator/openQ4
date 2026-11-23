@@ -240,6 +240,8 @@ static void R_InitFrameData(){frameData=&frameObject;command={};Record("R_InitFr
 static void R_RendererMetrics_ResetGpuFrameTiming(const char*){Record("timing-reset");}
 static void Sys_GrabMouseCursor(bool value){assert(!value);Record("cursor-release");}
 static void R_FreeDerivedData(){Record("derived-free");}
+// Overlap-snapshot versions are keyed by vertex-cache blocks: they drop with the purge.
+static void R_ClearRetainedSnapshotStreams(){assert(!events.empty() && events.back()=="vertex-purge");}
 static void R_ToggleSmpFrame(){assert(frameData);command={};Record("frame-drain");}
 static void R_RegenerateWorld_f(const idCmdArgs&){assert(fontsAlive && deviceAlive);Record("world-ready");if(failure==4)R_RejectRecoverableRendererRestart("world program refused");}
 '''
