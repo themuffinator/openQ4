@@ -187,7 +187,7 @@ def validate_container() -> None:
     for needle in (
         "game->GetMVDSchemaVersion( schemaMajor, schemaMinor );",
         "header.gameSchemaVersion = MVD_PackSchemaVersion( schemaMajor, schemaMinor );",
-        "header.requiredFeatures = MVD_SUPPORTED_REQUIRED_FEATURES;",
+        "header.requiredFeatures = asClient ? MVD_CLIENT_VIEW_REQUIRED_FEATURES : MVD_SERVER_VIEW_REQUIRED_FEATURES;",
     ):
         require(start_recording, needle, "MVD 1.2 recording header")
 
@@ -475,7 +475,9 @@ def validate_engine_wiring() -> None:
         "single semantic instance reliable capture",
     )
     require(client, "return active || idAsyncNetwork::multiViewDemo.IsPlaying();", "pseudo-client activity")
-    require(client, "MAX_ASYNC_CLIENTS : clientNum", "pseudo-client number")
+    require(client, "idAsyncNetwork::multiViewDemo.GetPlaybackLocalClient() : clientNum", "pseudo-client number")
+    require(read(ROOT / "src/framework/async/MultiViewDemo.cpp"), "return clientView ? viewClient : MAX_ASYNC_CLIENTS;",
+            "pseudo-client number for a server recording")
     require_order(
         session,
         "idAsyncNetwork::multiViewDemo.SessionStop();",

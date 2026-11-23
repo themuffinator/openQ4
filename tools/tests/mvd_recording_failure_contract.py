@@ -103,6 +103,9 @@ struct idMultiViewDemo {
     int state = MVD_RECORDING, recordCount = 0, snapshotCount = 2, reliableCount = 3;
     int indexWrites = 0, clears = 0;
     bool finalizing = false, indexOK = true, recordingResultValid = false;
+    // MP-22: a server recording; a client-view one stamps its end with its own clock
+    bool clientView = false;
+    void ClientStamp(int &frame, int &time) const { frame = 0; time = 0; }
     int64_t recordingLibraryByteLimit = 0;
     struct Index { int count = 0; int Num() const { return count; } } recordingIndex;
     idStr fileName = "demos/fixture.mvd", tempFileName = "demos/fixture.mvd.part", lastError;

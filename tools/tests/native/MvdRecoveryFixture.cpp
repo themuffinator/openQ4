@@ -16,9 +16,11 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "src/framework/async/MvdNavigation.h"
@@ -221,6 +223,8 @@ struct FileSystem {
 		return true;
 	}
 	void RemoveFile( const char *path, const char * ) { files.erase( path ); }
+	// MP-22: MVD_PathExists also asks the save folder; these files live only in memory
+	const char *RelativePathToOSPath( const char *, const char * ) { return ""; }
 } fs, *fileSystem = &fs;
 
 struct Common {
@@ -342,7 +346,7 @@ static Layout WriteSource( bool withStaleIndex ) {
 	writer.file = fs.OpenFileWrite( "demos/source.mvd.part", "fs_savepath" );
 	writer.header.formatMajor = MVD_FORMAT_MAJOR;
 	writer.header.formatMinor = MVD_FORMAT_MINOR;
-	writer.header.requiredFeatures = MVD_SUPPORTED_REQUIRED_FEATURES;
+	writer.header.requiredFeatures = MVD_SERVER_VIEW_REQUIRED_FEATURES;	// a server's full-world recording
 	writer.header.optionalFeatures = MVD_OPTIONAL_CLEAN_END | MVD_OPTIONAL_TIMELINE_INDEX;
 	writer.header.protocolMajor = ASYNC_PROTOCOL_MAJOR;
 	writer.header.protocolMinor = ASYNC_PROTOCOL_MINOR;

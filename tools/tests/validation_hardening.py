@@ -758,6 +758,9 @@ def validate_validation_wiring() -> None:
         # staged dedicated server and a hidden client; master_protocol.py and
         # mp_server_discovery.py are wired.
         "mp_master_smoke.py",
+        # A player's recording of their own view on a cheats-off dedicated server,
+        # played back by a second hidden game; mp_client_demo.py is wired.
+        "mp_client_demo_smoke.py",
         # The modifier, arena, preset and spectator chat votes on a staged hidden
         # listen server; mp_casual_match_flow_contract.py pins their wiring.
         "mp_vote_extensions_smoke.py",

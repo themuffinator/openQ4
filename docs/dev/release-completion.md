@@ -131,6 +131,22 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   start and a menu start. The packaged fix is qualified on the next candidate,
   recorded in [release qualification](release-qualification.md).
 
+## Record your own view on any server, 23 November 2026
+
+- **Record without hosting.** On a server you joined, `record match_name`
+  records your view; `stopRecord` saves it to **Demos**. `recordNetDemo` does
+  the same.
+- **Watch it as you saw it.** The recording plays back from your point of view,
+  with your HUD, the players and effects around you, pause, speed, stepping and
+  skipping. It cannot follow another player; seeking backwards replays from
+  the start.
+- **Compatibility.** A recording of your own view needs this version or later
+  to play; recordings made by a server are unchanged and play as before.
+- **Evidence.** `mp_client_demo.py` pins the recorder and the player;
+  `mp_client_demo_smoke.py` records on a cheats-off pure dedicated server with
+  two bots and plays the file back to its end (Windows, OpenGL). Not run:
+  Vulkan, Linux, macOS and a person watching a recording.
+
 ## The scoreboard names the next map and reads out the awards, 23 November 2026
 
 - **Know where you are going.** With `g_intermissionAnnounce 1`, the

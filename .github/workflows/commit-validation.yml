@@ -293,6 +293,8 @@ jobs:
             tools/tests/master_protocol.py \
             tools/tests/mp_server_discovery.py \
             tools/tests/mp_master_smoke.py \
+            tools/tests/mp_client_demo.py \
+            tools/tests/mp_client_demo_smoke.py \
             tools/tests/awakening_turret_skin_contract.py \
             tools/tests/awakening_m01_dropship_contract.py \
             tools/tests/awakening_m01_retch_contract.py \
@@ -898,6 +900,7 @@ jobs:
           python tools/tests/mp_identity.py
           python tools/tests/master_protocol.py
           python tools/tests/mp_server_discovery.py
+          python tools/tests/mp_client_demo.py
           python tools/tests/awakening_turret_skin_contract.py
           python tools/tests/awakening_m01_dropship_contract.py
           python tools/tests/awakening_m01_retch_contract.py

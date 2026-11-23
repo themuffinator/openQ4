@@ -467,6 +467,10 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 					DEMO_CAP_PLAY | DEMO_CAP_PAUSE | DEMO_CAP_RATE |
 					DEMO_CAP_SEEK | DEMO_CAP_STEP | DEMO_CAP_FREE_ROAM |
 					DEMO_CAP_FOLLOW | DEMO_CAP_FULL_WORLD;
+				// openQ4 MP-22: a player's recording of their own view has no other camera
+				if ( info.clientView ) {
+					entry.capabilities &= ~( DEMO_CAP_FREE_ROAM | DEMO_CAP_FOLLOW | DEMO_CAP_FULL_WORLD );
+				}
 			}
 		} else {
 			entry.status = DemoLocalized( "#str_41548" );
@@ -1000,7 +1004,13 @@ void idSessionLocal::UpdateDemoMenuGui() {
 		seeking = idAsyncNetwork::multiViewDemo.IsSeeking();
 		title = idAsyncNetwork::multiViewDemo.GetPlaybackName();
 		title.StripPath();
-		const int followClient = idAsyncNetwork::multiViewDemo.GetFollowClient();
+		// openQ4 MP-22: a player's recording of their own view shows that player
+		const bool clientView = idAsyncNetwork::multiViewDemo.IsClientViewPlayback();
+		if ( clientView ) {
+			capabilities &= ~( DEMO_CAP_FREE_ROAM | DEMO_CAP_FOLLOW | DEMO_CAP_FULL_WORLD );
+		}
+		const int followClient = clientView ? idAsyncNetwork::multiViewDemo.GetPlaybackLocalClient() :
+			idAsyncNetwork::multiViewDemo.GetFollowClient();
 		idStr followName;
 		if ( followClient < 0 ) {
 			view = DemoLocalized( "#str_41539" );

@@ -120,6 +120,15 @@ public:
 	float				GetIncomingCompression( void ) const;
 	float				GetIncomingPacketLoss( void ) const;
 	int					GetPredictedFrames( void ) const { return lastFrameDelta; }
+	// openQ4 MP-22: what a client-view recording starts from
+	bool				IsInGame( void ) const { return active && clientState == CS_INGAME; }
+	int					GetClientNum( void ) const { return clientNum; }
+	int					GetGameFrame( void ) const { return gameFrame; }
+	int					GetGameTime( void ) const { return gameTime; }
+	int					GetSnapshotSequence( void ) const { return snapshotSequence; }
+	int					GetSnapshotGameFrame( void ) const { return snapshotGameFrame; }
+	int					GetSnapshotGameTime( void ) const { return snapshotGameTime; }
+	const usercmd_t &	GetUserCmd( int frame, int client ) const { return userCmds[ frame & ( MAX_USERCMD_BACKUP - 1 ) ][ client ]; }
 
 	void				RunFrame( bool allowBlocking = true );
 	void				SendReliableGameMessage( const idBitMsg &msg );

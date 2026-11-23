@@ -509,6 +509,10 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- You can record your own view of a match on any server you join: `record
+  match_name`, then `stopRecord`. The recording appears in **Demos** and plays
+  back from your point of view. See
+  [Record your view on any server](../../user/multiview-demos.md#record-your-view-on-any-server).
 - Server hosts can have the end-of-match scoreboard name the next map and
   read out each player's awards (`g_intermissionAnnounce 1`; off by default).
   See [Picking the next map](../../user/server-setup.md#picking-the-next-map).

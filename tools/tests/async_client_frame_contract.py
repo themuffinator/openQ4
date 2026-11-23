@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SUPPORT = r'''
 #include <cassert>
 #include <string>
+#include <vector>
 using byte = unsigned char;
 constexpr int MAX_MESSAGE_SIZE=32, MAX_USERCMD_BACKUP=16, CVAR_USERINFO=1, CLIENT_FRAME_CLAMP_MSEC=100;
 enum { CS_DISCONNECTED, CS_PURERESTART, CS_CONNECTING, CS_CONNECTED, CS_INGAME };
@@ -27,11 +28,14 @@ struct Game {
 } gameValue, *game=&gameValue;
 struct Cvars { int flags=0; int GetModifiedFlags(){return flags;} void ClearModifiedFlags(int){flags=0;} } cv, *cvarSystem=&cv;
 struct Commands { void GetDirectUsercmd() {} } commands, *usercmdGen=&commands;
-struct Common { int GetUserCmdMSec(){return 16;} } commonValue, *common=&commonValue;
+struct Common { int GetUserCmdMSec(){return 16;} void Printf(const char*, ...){} } commonValue, *common=&commonValue;
 struct Session { struct { int userInfo[1]{}; } mapSpawnData; } sessLocal;
 struct BoolCvar { bool value=true; bool GetBool() const {return value;} };
-struct idAsyncNetwork { static void ExecuteSessionCommand(const char*){} static BoolCvar clientPredictionMargin; };
+// MP-22: a recording of the player's own view hears of their user info changes
+struct ClientDemo { void CaptureClientUserInfo(int,int){} };
+struct idAsyncNetwork { static void ExecuteSessionCommand(const char*){} static BoolCvar clientPredictionMargin; static ClientDemo multiViewDemo; };
 BoolCvar idAsyncNetwork::clientPredictionMargin;
+ClientDemo idAsyncNetwork::multiViewDemo;
 struct PredictionMargin { void Clear(){} void Frame(int,int,int,int){} };
 int AsyncClient_NextGameFrameMsec(int) {return 16;}
 int AsyncClient_PredictionCoverMsec(int) {return 32;}
@@ -41,7 +45,9 @@ struct idAsyncClient {
         int GetPort(){return opened;}
         bool GetPacketBlocking(netadr_t&,byte*,int&,int,int){return false;}
     } clientPort;
-    struct List { void RunFrame(){} } serverList;
+    struct List { void RunFrame(){} int Num(){return 0;} void AddServer(int,const char*){} } serverList;
+    // MP-19: the HTTPS server list the frame polls
+    struct Fallback { bool Poll(std::vector<std::string>&,std::string&,std::string&){return false;} } serverListFallback;
     int gameTimeResidual=0, clientPredictTime=0, clientState=CS_INGAME;
     int gameFrame=0, gameTime=0, snapshotGameFrame=0, snapshotGameTime=0;
     int lastFrameDelta=0, clientNum=0, elapsed=0, userCmds[MAX_USERCMD_BACKUP]{};

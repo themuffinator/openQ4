@@ -905,11 +905,15 @@ def validate_remote_dictionary_authority() -> None:
     require(client, "SetCVarsFromDictByFlags( info, CVAR_USERINFO )", "client userinfo authority")
     require(client, "SetCVarsFromDictByFlags( info, CVAR_NETWORKSYNC )", "client sync authority")
     require(server, "SetCVarsFromDictByFlags( *gameInfo, CVAR_USERINFO )", "listen-server userinfo authority")
-    # Playback start, replay reset and a keyframe jump each restore recorded map state.
-    if demo.count("SetCVarsFromDictByFlags( sessLocal.mapSpawnData.syncedCVars, CVAR_NETWORKSYNC )") != 3:
+    # Playback start and replay reset restore recorded map state through
+    # ApplyPlaybackNetworkState (MP-22), and a keyframe jump on its own.
+    if demo.count("SetCVarsFromDictByFlags( sessLocal.mapSpawnData.syncedCVars, CVAR_NETWORKSYNC )") != 2:
         raise AssertionError("MVD start/reset/keyframe must each apply only NETWORKSYNC CVars")
-    if demo.count("SetCVarsFromDictByFlags(") != 3:
+    if demo.count("SetCVarsFromDictByFlags(") != 2:
         raise AssertionError("MVD playback applies recorded CVars outside the NETWORKSYNC paths")
+    if demo.count('ApplyPlaybackNetworkState( networkState, "initial" )') != 1 or \
+            demo.count('ApplyPlaybackNetworkState( playbackNetworkState, "reset" )') != 1:
+        raise AssertionError("MVD start and reset must both restore state through ApplyPlaybackNetworkState")
 
     for source, label in (
         (engine_bitmsg, "engine delta dictionary"),

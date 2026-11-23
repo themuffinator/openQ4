@@ -9,6 +9,9 @@ openQ4 records and plays back two main kinds of demo:
 - **Multi-view demos** (MVDs, `.mvd` files) record a whole multiplayer match on
   the server. Instead of one player's view, they hold the full match, so when
   you watch you can follow any player or fly a free camera.
+- **Your own view of a match**, recorded on any server you join, is a `.mvd`
+  file too (**after 0.15.0**). It holds what you saw, so it plays back from
+  your point of view only.
 
 Both appear in the **Demos** library, with the controls each format supports.
 
@@ -192,6 +195,34 @@ file is.
 The familiar Quake 4 commands `recordNetDemo`, `stopNetDemo` and `playNetDemo`
 use this system too. Their files are `.mvd`, not the old `.netdemo` format.
 
+### Record your view on any server
+
+> **After 0.15.0.** This describes the development build; 0.15.0 records only
+> on a server you host.
+
+On a server you joined, enter:
+
+```text
+record match_name
+```
+
+and later `stopRecord`. Leave out the name to use an unused `mvd` file name.
+The file goes to `baseoq4/demos/` in your save path, like a server's
+recording, and appears in **Demos**. `recordNetDemo` and `recordMVD` do the
+same when you are not hosting; when you host, all three record the whole
+match.
+
+The recording holds what your game received from the server and your own
+moves, so it plays back exactly what you saw: your view, the players and
+effects around you, your HUD and the scoreboard. It cannot follow another
+player or fly free, and the **Follow** and **Free roam** controls are not
+offered. Pause, speed, stepping and skipping work; seeking backwards replays
+from the start, so it takes a moment on a long recording.
+
+A recording ends by itself when the map changes or you leave the server.
+`mvdStatus` shows a recording in progress (`view=client`); `mvdInfo` describes
+a finished one, including whose view it is.
+
 ### Add markers and notes
 
 Markers are added automatically (see [Jump to markers](#jump-to-markers)). Add
@@ -226,6 +257,7 @@ recording with no complete snapshot cannot be recovered.
 |---|---|---|---|
 | openQ4 MVD `.mvd` 1.3 | Supported | Pause, speed, step, and fast seeking from the nearest keyframe | Free camera over the whole match, player follow, markers and auto-tracking |
 | openQ4 MVD `.mvd` 1.0–1.2 | Supported, from game versions openQ4 still recognises | Pause, speed, step, and replay-based seek (replays from the start) | Free camera over the whole match, player follow and auto-tracking |
+| openQ4 `.mvd` of one player's view (after 0.15.0) | Supported | Pause, speed, step, and replay-based seek (replays from the start) | The recorder's view only |
 | openQ4 render `.demo`, including campaign demos | Supported | Pause, speed, step, level markers, and fast seeking from the nearest keyframe (older recordings replay from the start) | The recorded view only |
 | Retail Quake 4 render `.demo` | Not supported yet | None | None |
 | Retail Quake 4 `.netdemo` | Not supported yet | None | None |
