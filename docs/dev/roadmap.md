@@ -1197,8 +1197,8 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-02 — Partial | Shared material/light contracts and corridors provide foundations; the remaining decline reasons are inventoried. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
 | REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). The opt-in modern OpenGL receivers filter projected shadows with the classic kernel and PCSS-lite blocker search since 17 November; a widened PCSS radius now softens the same pixels as the classic receivers (84% overlap), where before it changed none. The 9 November [stencil-parity audit](shadowmapping-audit-2026-11-09.md) fixed prelight-only (`noDynamicShadows`) lights losing their shadows, `noSelfShadow` world geometry no longer shadowing `noSelfShadow` receivers under prelit lights, the one-sided five-tap kernel and the packed-depth wrap at the far envelope. | Physical platforms; the audit's open parity items, narrowed on 23 November by a controlled scan of off-centre lights: casters outside an off-centre light's box are confirmed but small (0.41% of a view at most) and need index-subset casters in both backends; mcc_landing's `light_9083` shadows structures in its map that stencil lights (up to 49% of a view) and `light_9081` misses 10% that stencil shadows; an image for the fixed `noSelfShadow` world-geometry rule (the `noDynamicShadows` rule has its image). The cascade range end is closed (19 November, whole-light last cascade). |
 | REN-04 — Closed | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed; the picture is still at rest (#216). A temporally upscaled scene samples sharper texture mips (16-18% more detail at 50% scale, stability unchanged), and Vulkan corrects the NVIDIA driver's softer anisotropic filter, so its frames hold OpenGL's detail. | Human review of ghosting and disocclusion on the reference display and physical Linux/macOS/Android belong to platform qualification. |
-| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. | lavapipe residual, mods authored outside the laboratory, physical Linux/Apple fallback. |
-| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
+| REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. lavapipe's one-byte difference is traced to its texel decode and bounded to lavapipe. The showcase map qualifies skins, a mixed PBR/classic model, cutout coverage and shadows on both renderers (67/67 each, procedural stand-ins). | The Mesa SSAO controls that fail since 21 November (not investigated); real textures.com materials (the owner's downloads); physical Linux/Apple fallback (PLAT). |
+| REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; SSR and SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan in seven stock scenes; a map's own baked probe, a probe captured in a stock scene and authored decals pass on both renderers; a scratch re-bake of one bundled grid is measured. | Re-bake of the cropped bundled grids (owner decision, evidence recorded); quiet-machine cost of the leaves beyond the first scene; other GPUs/platforms and appearance review (PLAT). |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and the opt-in Vulkan render thread exist: stage 1 (tic overlap) and stage 2 (front-end overlap) with retained index and static vertex streams. 23 November, Windows x64 Vulkan: the per-frame join that had removed all overlap since 6 November is fixed; frozen Quality captures are bit-identical between modes 0, 1 and 2 on four single-player views and within the mode 0 floor in multiplayer; 100 resize/scale cycles and a restart per mode stay within the memory, handle, cache and Vulkan-allocation bounds with validation clean. | Matched benefit without tail regression: five quiet paired mode 0/1/2 runs and the every-frame Quality floor (shared-machine runs show mode 1 ahead of mode 0 and mode 2 behind it); snapshot cost reduction beyond copying; physical display/input qualification; Wayland/macOS runtime coverage. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 | REN-09 — Partial | Per-light shadowed scattering replaces the REN-06 leaf on GL and Vulkan: falloff/projection images, point, projected and cascaded-sun maps, stencil-light policy (none by default), composite before fog and translucents, status reporting, exact rollback; frozen outdoor/indoor captures pass under TAA and 4x MSAA. 23 November 2026: moving casters and a moving flashlight, temporal history, resolution scale and dynamic resolution, mirrors and remote cameras, a backend decline and VR stereo pass on GL and Vulkan; scratch targets are pooled by view size. Evidence: [volumetric lighting](volumetric-lighting.md). | Per-tier cost against FPS-01 on a quiet reference machine (a shared-machine ladder is recorded), the owner's visual review of the defaults (contact sheets captured, no default changed; 12 whites out the Tram 1 opening), and physical Linux/macOS/Android runs with the Apple GL 2.1 and GLES declines (PLAT). |
@@ -1456,15 +1456,41 @@ diagnostics establish whole-frame ownership or production performance.
   each part's owner on both backends, on CPU skinning and packed MD5R; OpenGL
   declines such frames to its light loop, whose native owner still draws the
   PBR part. See [skin substitutions](renderer-validation-matrix.md#skin-substitutions-on-packed-md5r-6-november-2026-ren-05).
-  Remaining: lavapipe's one-byte difference (a WSL lavapipe run, blocked by
-  free space on C:, where the WSL disk lives), mods authored outside the
-  laboratory, and physical Linux/Apple.
+  That was the position on 6 November; the 23 November entry below
+  supersedes its remaining list.
   Progress, 21 November: SSAO's dither is gone. Both renderers draw the raw
   AO into an occlusion target (full or half resolution) with sixteen
   interleaved sample patterns and resolve it with a depth-plane-aware tent
   that cancels them; native PBR's field filters the same target, so its
   classic pixels still match a classic-only frame and it now follows
   `r_ssaoResolution`. See [filtered SSAO occlusion](presentation-owners.md#filtered-ssao-occlusion-21-november-2026).
+  Progress, 23 November: the lavapipe run was made on a scratch disk on E:.
+  The one-byte difference does not occur at `d30280aa2` (three runs, 41/41
+  each, scalar, packed and separate forms identical; llvmpipe OpenGL 40/40).
+  Its cause is lavapipe's texel decode, `float(k) * float(1/255)`, one float
+  step from the rounded quotient for two of the laboratory's bytes; with
+  exactly rounded scalars the October pixel returns. The ambient parity tool
+  now allows at most four one-byte pixels between those forms on lavapipe
+  only, read from the run's own logs. See
+  [lavapipe](renderer-validation-matrix.md#lavapipe-material-layout-difference-23-november-2026-ren-05).
+  The same run found the ten current SSAO controls failing on Mesa since the
+  21 November change (`ssao-on` on llvmpipe and lavapipe, and OpenGL/Vulkan
+  parity on `ssao-classic-half`); that is open.
+  Authored content outside the laboratory: the showcase runner now spawns a
+  skin swapping a PBR material for another and for a classic one, a skinned
+  model carrying both (CPU skinning and packed MD5R), measures the cutout
+  fence's coverage and the light passing it, and compares the two renderers.
+  Both pass 67/67 on procedural stand-ins. It found that the showcase fence
+  had never cast a shadow (`twoSided` implies `noShadows`, a stock rule the
+  PBR guide now states) and that OpenGL's first PBR draw under a mapped
+  projected light costs a two-minute, 9.3 GB cold shader compile on NVIDIA,
+  which belongs to the shadow items. See
+  [showcase proofs](renderer-validation-matrix.md#authoring-cutout-decal-and-probe-proofs-23-november-2026-ren-05-ren-06).
+  Remaining: the Mesa SSAO controls (reproduce on current SSAO, then fix or
+  bound as the Intel residual was); qualification on the real textures.com
+  materials, which waits on the owner's downloads (the drop folder is empty);
+  and physical Linux and Apple fallback, which belongs to platform
+  qualification (PLAT).
 - [ ] **REN-06 — P2, qualification: probes, baked data and advanced effects.**
   Qualify probe capture orientation, generated-grid provenance and whether existing
   baked grids need regeneration after capture fixes. Broaden authored probe/decal
@@ -1509,8 +1535,33 @@ diagnostics establish whole-frame ownership or production performance.
   5 October; re-baking (about 24 minutes a large map, replacing pak1 data)
   waits on that decision being reversed. See
   [release notes](release-completion.md).
-  Remaining: re-baking the bundled grids (owner decision), broader authored
-  scenes.
+  Progress, 23 November: broader authored scenes. The showcase map now
+  carries a box probe captured in the engine and two authored decals; a
+  further launch places a probe and a PBR specimen in `game/airdefense1`.
+  On both renderers the probe changes every station, survives an image
+  reload exactly, follows a second capture (new source generation, counted
+  in `gfxInfo`) and returns with a third; the stock scene's pixels away from
+  the specimen do not change at all with probes on; and the two renderers'
+  captured faces agree. See
+  [probe sources](vulkan-probe-sources.md#authored-scenes-beyond-the-laboratory-23-november-2026-ren-06),
+  which also maps each admission case (incomplete sources, generations,
+  reload, atlas exhaustion) to its control.
+  SSR and SSGI now run on seven stock scenes (three `airdefense1` poses and
+  the `medlabs`, `tram1`, `hangar1` and `building_b` starts): fourteen
+  launches pass, master-off is byte-identical everywhere, and their
+  screen-space limits are restated. The froxel leaf is REN-09's shadowed
+  volumetric lighting now; the harness keeps it in the combination and the
+  rollback and no longer judges its own effect. See
+  [more stock scenes](renderer-validation-matrix.md#more-stock-scenes-23-november-2026-ren-06).
+  For the owner's re-bake decision, `game/airdefense2` was baked in scratch
+  with the bundled options (6.7 minutes): at 24 fixed views the bundled grid
+  adds 0.00 levels and the re-bake 0.58, lighting a third to two thirds of
+  the frame in four of six areas. Nothing in `pak1` changed. See
+  [re-bake evidence](renderer-validation-matrix.md#light-grid-re-bake-evidence-23-november-2026-ren-06).
+  Remaining: re-baking the bundled grids (owner decision); a quiet-machine
+  measurement of the leaves' cost beyond the first scene (today's GPU times
+  were taken on a shared machine); other GPUs and platforms and review of
+  the leaves' appearance (PLAT).
 - [ ] **REN-07 — P2, measured optimization: remove demonstrated CPU/GPU stalls.**
   The 28 October [preset audit](ui/performance-presets.md#preset-and-detection-audit-28-october-2026)
   adds Enhanced between Balanced and Quality and replaces host-wide memory

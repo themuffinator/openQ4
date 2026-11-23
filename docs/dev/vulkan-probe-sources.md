@@ -135,6 +135,60 @@ synchronously. `renderer-vk-clear-startup` and
 counts after the read was split. Not covered: other GPUs and platforms, and a
 quiet-machine distribution of frame times rather than these maxima.
 
+## Authored scenes beyond the laboratory, 23 November 2026 (REN-06)
+
+The laboratory spawns its probes in an empty room with every light off. The
+PBR showcase runner (`renderer_pbr_showcase.py`) now exercises the same
+machinery on authored lighting and on a stock map, on both backends; the
+numbers are in the
+[validation matrix](renderer-validation-matrix.md#authoring-cutout-decal-and-probe-proofs-23-november-2026-ren-05-ren-06).
+
+- **A map's own probe.** The showcase map carries a box-projected probe the
+  size of its room. `bakeReflectionProbes 128` captures it under the map's
+  key, fill, ambient and projected lights. With probes on, every station
+  changes by 23-52 levels against the probes-off launch, the same on OpenGL
+  and Vulkan, and the six captured faces of the two backends agree to a
+  median of at most 1 level.
+- **Storage and upload generations.** A second capture with the two key
+  lights off rewrites the six face files in place and reloads them; the
+  frame, with the lights on again, moves 5.7 levels (the reflected room is
+  darker), and a third capture restores the first frame exactly. `gfxInfo`
+  counts 2, 4 and 5 published background prefilters after the three captures
+  on both backends: each new source generation reached the atlas, and none
+  was served from a stale tile.
+- **Reload.** `reloadImages all` between captures restores the frame exactly
+  (0.0 levels) on both backends.
+- **A stock scene.** A sphere probe and a PBR specimen are spawned in
+  `game/airdefense1` and the probe is captured from the stock scene. The
+  specimen changes by 12-13 levels with probes on, and no stock pixel away
+  from it changes at all (0 of the frozen frame): a probe light is metadata,
+  never a classic light. The two backends' captured faces have the same
+  layout and orientation (median difference at most 5 levels; the scene's
+  live explosions fall in different places in two of the faces).
+- **Decals.** Authored `blend filter` and `blend blend` decal quads over PBR
+  receivers draw the same on both backends through the classic stage path.
+
+Where each admission case of the roadmap is covered:
+
+| Case | Control |
+| --- | --- |
+| Incomplete, null, purged, mutable, unsupported, failed-upload and non-finite sources | 32 rejection controls of the source self-test (`renderer-vk-clear-startup`, `renderer-vk-probe-source-lifecycle`), each requiring cleared output |
+| A source that fails while resident | `probes-source-failure` and `probes-source-recovered` (Vulkan failure injection), exact fallback and recovery |
+| Storage and upload generations | in-place overwrite in the source self-test; the showcase's three captures above, on both backends |
+| Reload | `probes-image-reload`, `probes-partial-restart`, `probes-full-restart`; the showcase's `reloadImages all` |
+| Atlas exhaustion | `probes-eight` (full), `probes-nine` (one too many: the whole set falls back), `probes-evicted`, `probes-record-overflow` |
+| Compressed, oversized, authored HDR | excluded by decision (above), with cleared output |
+
+The laboratory's authored-probe suite still passes on this build
+(`d30280aa2`, after the volumetric and parallax changes of 21 November):
+Vulkan 56/56 and OpenGL 50/50, each with its authored-probe proof.
+
+Not covered by the scene runs: failure injection on OpenGL (it has no
+equivalent of `r_vkPBRProbeFailure`; its rejections are counted on the
+`Modern specular probe atlas:` line, all zero in these runs), more than one
+resident probe outside the laboratory, and real authored materials (the
+showcase ran on procedural stand-ins).
+
 ## Transfer ownership
 
 A cache miss appends the six-face copy after pending image uploads on the

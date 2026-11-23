@@ -45,6 +45,58 @@ LIGHT_PREFIX = "lights/openq4/pbr_showcase"
 SPHERE_RADIUS = 48
 UNITS_PER_METER = 39.37  # one id unit is an inch
 DEFAULT_SOURCE = ROOT / ".tmp" / "pbr-showcase" / "downloads"
+# Authoring bay (REN-05): the runner spawns one specimen at a time here, the way
+# a mod would author it: a skin swapping a PBR material for another PBR material
+# or for a classic one, and one model that carries a PBR and a classic material.
+AUTHORING_ORIGIN = (360, -420, 96)
+AUTHORING_CAMERA = (360, -720, 96, 0, 90, 0)
+CLASSIC_SUFFIX = "_classic"
+SKIN_PREFIX = "openq4_pbr_showcase"
+MIXED_MODEL = "openq4_pbr_showcase_mixed"
+MIXED_MESH = "models/openq4/pbr_showcase/mixed.md5mesh"
+MIXED_ANIM = "models/openq4/pbr_showcase/mixed_idle.md5anim"
+MIXED_RADIUS = 72  # generate_pbr_validation_map.skinned_sphere
+# The fence stands at y = -260 between the projector and the stations.
+FENCE_CLOSE_CAMERA = (-260, -302, 110, 0, 90, 0)
+FENCE_SHADOW_CAMERA = (-260, -200, 150, 60, 90, 0)
+# Authored probes (REN-06). The room probe is a box the size of the room,
+# captured in the engine (bakeReflectionProbes); the stock probe is a sphere
+# the runner spawns in a stock map. Their faces live in each run's save path.
+PROBE_PREFIX = "env/openq4/pbr_showcase"
+PROBE_FACES = ("px", "nx", "py", "ny", "pz", "nz")
+# Authored decals: unlit blend stages over PBR receivers, aligned to the
+# 128-unit texture grid so each quad shows its texture once.
+DECAL_SIZE = 128
+DECALS = {
+    # name: (blend, brush lo, brush hi, camera)
+    "wall": ("filter", (639.75, -640, 128), (640, -512, 256), (400, -576, 192, 0, 0, 0)),
+    "floor": ("blend", (384, -768, 0), (512, -640, 0.25), (448, -704, 200, 90, 0, 0)),
+}
+
+
+def decal_textures() -> dict[str, bytes]:
+    """Original procedural decal art: a scorch for 'blend filter', a stencil for 'blend blend'."""
+    y, x = (np.mgrid[0:DECAL_SIZE, 0:DECAL_SIZE] + 0.5) / DECAL_SIZE - 0.5
+    radius = np.hypot(x, y)
+    scorch = 1.0 - 0.85 * np.exp(-(radius / 0.22) ** 2)
+    scorch[radius > 0.47] = 1.0  # nothing reaches the quad's edge
+    stripes = ((x + y) * 8 % 1.0 < 0.5) & (np.abs(x) < 0.4) & (np.abs(y) < 0.4)
+    stencil = np.zeros((DECAL_SIZE, DECAL_SIZE, 4))
+    stencil[..., 0], stencil[..., 1], stencil[..., 2] = 0.95, 0.55, 0.05
+    stencil[..., 3] = stripes
+    return {f"{PREFIX}/decal_filter_image.tga": tga(np.repeat(scorch[..., None], 3, axis=-1)),
+            f"{PREFIX}/decal_blend_image.tga": tga(stencil)}
+
+
+def decal_decl(blend: str) -> str:
+    return "\n".join([f"{PREFIX}/decal_{blend}", "{", "polygonOffset", "noShadows", "nonsolid", "noimpact",
+                      "sort decal", "{", f"blend {blend}", f"map {PREFIX}/decal_{blend}_image", "}", "}", ""])
+
+
+def probe_decl(name: str, box: bool) -> str:
+    return "\n".join([f"{LIGHT_PREFIX}/probe_{name}", "{", "openQ4SpecularProbe {", f"cubeMap {PROBE_PREFIX}/{name}",
+                      "intensity 1", "blendFraction 0.1", "priority 8", *(["boxParallax"] if box else []), "}",
+                      "{ map _white }", "}", ""])
 
 # Map name -> file-name patterns, tried in this order on lower-cased stems.
 MAP_PATTERNS = (
@@ -228,9 +280,10 @@ def convert(material: dict, sources: dict[str, np.ndarray], size: int, default_f
 
 def material_decl(material: dict, cutout: bool) -> str:
     base = f"{PREFIX}/{material['id']}"
+    # No twoSided on the cutout: the engine keeps the stock rule that twoSided
+    # implies noShadows, and the fence is a thin brush whose two faces already
+    # show it from both sides, so it can cast its cutout shadow.
     lines = [base, "{"]
-    if cutout:
-        lines += ["twoSided"]
     lines += [f"bumpmap {base}_normal"]
     if cutout:
         lines += ["{", "blend diffusemap", f"map {base}_albedo", "alphaTest 0.5", "}"]
@@ -241,6 +294,19 @@ def material_decl(material: dict, cutout: bool) -> str:
               f"normalMap {base}_normal", "normalFormat tangentXYZ", "normalScale 1",
               f"ormMap {base}_orm", "metallic 1", "roughness 1", "ao 1", "}", "}", ""]
     return "\n".join(lines)
+
+
+def classic_decl(material: dict) -> str:
+    """The same textures authored the classic way: no pbr block, so never PBR."""
+    base = f"{PREFIX}/{material['id']}"
+    return "\n".join([base + CLASSIC_SUFFIX, "{", f"bumpmap {base}_normal", f"diffusemap {base}_albedo",
+                      f"specularmap {base}_spec", "}", ""])
+
+
+def alpha_coverage(blob: bytes) -> float:
+    """Share of a converted RGBA albedo that passes the cutout's alphaTest 0.5."""
+    pixels = np.frombuffer(blob, dtype=np.uint8, offset=18).reshape(-1, 4)
+    return float((pixels[:, 3] >= 128).mean())
 
 
 def brush(lo: tuple[float, float, float], hi: tuple[float, float, float], material: str, tile_units: float) -> str:
@@ -254,7 +320,7 @@ def tile_units(material: dict) -> float:
     return max(1.0, float(material.get("sizeMeters", 1.0)) * UNITS_PER_METER)
 
 
-def payloads(materials: list[dict], textures: dict[str, bytes]) -> tuple[dict[str, bytes], list[dict], dict]:
+def payloads(materials: list[dict], textures: dict[str, bytes], authoring: dict | None = None) -> tuple[dict[str, bytes], list[dict], dict, dict]:
     data: dict[str, bytes] = {"baseoq4/" + path: blob for path, blob in textures.items()}
     def add(qpath: str, value: str | bytes) -> None:
         data["baseoq4/" + qpath] = value.encode("utf-8") if isinstance(value, str) else value
@@ -271,6 +337,30 @@ def payloads(materials: list[dict], textures: dict[str, bytes]) -> tuple[dict[st
     stations = by_role.get("station", [])
 
     mats = [material_decl(m, m["id"] == fence["id"] or "alpha" in m["maps"]) for m in materials]
+    extras: dict = {}
+    precache = ""
+    if authoring:
+        by_id = {m["id"]: m for m in materials}
+        base, substitute = by_id[authoring["base"]], by_id[authoring["substitute"]]
+        base_shader, classic_shader = f"{PREFIX}/{base['id']}", f"{PREFIX}/{base['id']}{CLASSIC_SUFFIX}"
+        mats.append(classic_decl(base))
+        skins = {"pbr": f"{SKIN_PREFIX}/{base['id']}_to_{substitute['id']}",
+                 "classic": f"{SKIN_PREFIX}/{base['id']}_to_classic"}
+        add("skins/openq4_pbr_showcase.skin",
+            f"skin {skins['pbr']}\n{{\n{base_shader} {PREFIX}/{substitute['id']}\n}}\n"
+            f"skin {skins['classic']}\n{{\n{base_shader} {classic_shader}\n}}\n")
+        # One skinned mesh, PBR above its equator and classic below.
+        mesh, anim, _ = lab.skinned_sphere((base_shader, classic_shader))
+        add(MIXED_MESH, mesh.replace("PBR laboratory", "PBR showcase"))
+        add(MIXED_ANIM, anim.replace("PBR laboratory", "PBR showcase"))
+        add("def/openq4_pbr_showcase.def", f"model {MIXED_MODEL} {{\nmesh {MIXED_MESH}\nanim idle {MIXED_ANIM}\n}}\n")
+        precache = (f'"mtr_authoring_classic" "{classic_shader}"\n"model_authoring_mixed" "{MIXED_MODEL}"\n'
+                    '"def_authoring_mixed" "func_animate"\n'
+                    + "".join(f'"skin_authoring_{name}" "{skin}"\n' for name, skin in skins.items()))
+        extras["authoring"] = {"origin": list(AUTHORING_ORIGIN), "camera": list(AUTHORING_CAMERA),
+                               "base": base["id"], "substitute": substitute["id"], "classic": classic_shader,
+                               "model": f"models/openq4/pbr_showcase/{base['id']}.ase", "radius": SPHERE_RADIUS,
+                               "skins": skins, "mixedModel": MIXED_MODEL, "mixedRadius": MIXED_RADIUS}
     mats.append(f"{LIGHT_PREFIX}/projected\n{{\nlightFalloffImage _white\n{{\nmap _white\ncolored\n}}\n}}\n")
     mats.append(f"{LIGHT_PREFIX}/ambient\n{{\nambientLight\nnoShadows\nlightFalloffImage _white\n{{\nmap _white\ncolored\n}}\n}}\n")
     add("materials/openq4_pbr_showcase.mtr", "\n".join(mats))
@@ -278,7 +368,7 @@ def payloads(materials: list[dict], textures: dict[str, bytes]) -> tuple[dict[st
     # Interior 1280 x 1440 x 512 units. Textures tile at their real size (one
     # unit is an inch), so a wall shows as many bricks as a real one would.
     x0, x1, y0, y1, z1, t = -640, 640, -940, 500, 512, 16
-    level = 'Version 3\n{\n"classname" "worldspawn"\n'
+    level = 'Version 3\n{\n"classname" "worldspawn"\n' + precache
     level += brush((x0 - t, y0 - t, -t), (x1 + t, -720, 0), f"{PREFIX}/{strip['id']}", tile_units(strip))
     level += brush((x0 - t, -720, -t), (x1 + t, y1 + t, 0), f"{PREFIX}/{floor['id']}", tile_units(floor))
     level += brush((x0 - t, y0 - t, z1), (x1 + t, y1 + t, z1 + t), f"{PREFIX}/{sides['id']}", tile_units(sides))
@@ -332,6 +422,22 @@ def payloads(materials: list[dict], textures: dict[str, bytes]) -> tuple[dict[st
     level += lab.entity(classname="light", name="fence_projector", texture=f"{LIGHT_PREFIX}/projected",
                         origin="-260 -720 420", light_target="0 760 -420", light_right="420 0 0",
                         light_up="0 210 380", _color="0.9 0.85 0.75")
+    # The room probe: its light volume is the room itself (boxParallax).
+    level += lab.entity(classname="light", name="probe_room", texture=f"{LIGHT_PREFIX}/probe_room",
+                        origin=f"{(x0 + x1) / 2:g} {(y0 + y1) / 2:g} {z1 / 2:g}",
+                        light_radius=f"{(x1 - x0) / 2:g} {(y1 - y0) / 2:g} {z1 / 2:g}", _color="1 1 1", noshadows="1")
+    for name, (blend, lo, hi, _) in DECALS.items():
+        level += ('{\n"classname" "func_static"\n' f'"name" "decal_{name}"\n"model" "decal_{name}"\n'
+                  + brush(lo, hi, f"{PREFIX}/decal_{blend}", DECAL_SIZE) + "}\n")
+    for path, blob in decal_textures().items():
+        add(path, blob)
+    add("materials/openq4_pbr_showcase_extras.mtr", "\n".join(
+        [decal_decl("filter"), decal_decl("blend"), probe_decl("room", True), probe_decl("stock", False)]))
+    extras["probes"] = {"room": {"entity": "probe_room", "cubeMap": f"{PROBE_PREFIX}/room"},
+                        "stock": {"material": f"{LIGHT_PREFIX}/probe_stock", "cubeMap": f"{PROBE_PREFIX}/stock"},
+                        "faces": list(PROBE_FACES), "lights": ["key", "station_key"]}
+    extras["decals"] = {name: {"entity": f"decal_{name}", "blend": blend, "camera": list(camera)}
+                        for name, (blend, _, _, camera) in DECALS.items()}
     add(MAP + ".map", level)
     cameras = {"overview": [0, -640, 190, 0, 90, 0],
                "fence": [-260, -440, 110, 0, 90, 0],
@@ -339,7 +445,15 @@ def payloads(materials: list[dict], textures: dict[str, bytes]) -> tuple[dict[st
     for record in records:
         x, y, z = record["sphere"]
         cameras["station-" + record["id"]] = [x, y - 300, z + 20, 0, 90, 0]
-    return data, records, cameras
+    albedo = textures.get(f"{PREFIX}/{fence['id']}_albedo.tga")
+    if albedo is not None and albedo[16] == 32:
+        # Cutout proof: the close camera sees nothing but fence, so the share of
+        # the frame the fence covers is its alpha map's coverage; the shadow
+        # camera looks at the floor the projector lights through the fence.
+        extras["cutout"] = {"material": fence["id"], "entity": "fence", "projector": "fence_projector",
+                            "coverage": round(alpha_coverage(albedo), 4),
+                            "closeCamera": list(FENCE_CLOSE_CAMERA), "shadowCamera": list(FENCE_SHADOW_CAMERA)}
+    return data, records, cameras, extras
 
 
 def gather(materials: list[dict], source_dir: Path, synthetic: bool, size: int) -> tuple[dict[str, bytes], dict]:
@@ -388,8 +502,8 @@ def generate(root: Path, source_dir: Path, synthetic: bool, force: bool, size: i
     if size < 64 or size > 4096 or size & (size - 1):
         raise ValueError("--resolution must be a power of two from 64 through 4096")
     textures, reports = gather(manifest["materials"], source_dir, synthetic, size)
-    files, records, cameras = payloads(manifest["materials"], textures)
-    record = {"schema": 1, "id": manifest["id"], "map": MAP, "synthetic": synthetic,
+    files, records, cameras, extras = payloads(manifest["materials"], textures, manifest.get("authoring"))
+    record = {"schema": 2, "id": manifest["id"], "map": MAP, "synthetic": synthetic, **extras,
               "source": "procedural stand-ins" if synthetic else f"{manifest['source']} downloads in {source_dir}",
               "licence": manifest["licence"], "resolution": size, "stations": records, "cameras": cameras,
               "conversion": reports, "sha256": {k: hashlib.sha256(v).hexdigest() for k, v in sorted(files.items())}}

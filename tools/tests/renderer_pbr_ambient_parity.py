@@ -28,6 +28,32 @@ def linear(value):
 # steep, so their last bit of interpolation can move a few bytes.
 EDGE_SHIFT_LIMIT = 0.0005
 
+# REN-05 (23 November 2026). Mesa's software Vulkan driver, lavapipe, decodes
+# an 8-bit texel k as float(k) * float(1 / 255), one float step above the
+# correctly rounded k / 255 for the laboratory's metallic (102) and AO (192)
+# bytes. The scalar material and its packed and separate texture forms are
+# therefore different float inputs there, and a pixel whose shaded value sits
+# on a rounding boundary can land one byte apart: one pixel of 1,024,000 on
+# 5 October, none at d30280aa2 (three runs), and one again (blue 37 against
+# 36 at 689,434) when the scalar form is given the exactly rounded quotients.
+# Giving it the reciprocal products instead makes the forms identical. Allow
+# at most this many one-byte pixels between those forms on lavapipe only;
+# every other device, and every other exact pair on lavapipe, stays exact.
+LAVAPIPE_LAYOUT_PIXELS = 4
+LAVAPIPE_LAYOUT_PAIRS = {('scalar', 'packed'), ('scalar', 'separate')}
+
+
+def lavapipe(report):
+    """Whether every engine log of a Vulkan run names lavapipe as its driver.
+
+    The device comes from the run's own logs (their digests are verified
+    before this is asked), not from an option an operator could forget.
+    """
+    logs = {row['log'] for row in report['results'] if row.get('backend') == 'vk' and row.get('log')}
+    return bool(logs) and all(
+        re.search(r"^Vulkan: driver 'llvmpipe' .*\(driverID 13,", Path(log).read_text(encoding='utf-8', errors='replace'), re.M)
+        for log in logs)
+
 
 def neighbourhood(image):
     """Per-channel minimum and maximum of each pixel's 3x3 neighbourhood."""
@@ -122,7 +148,7 @@ def compare(paths):
     nov, variance = reference.sampling_sphere()
     nov = np.nan_to_num(nov, nan=-1.0)
     variance = np.nan_to_num(variance)
-    for backend, images in zip(backends, captures):
+    for backend, report, images in zip(backends, reports, captures):
         mask = interior(images['owned-dark'])
         if np.count_nonzero(mask) < 10000:
             raise ValueError(backend + ': missing complete PBR coverage')
@@ -208,10 +234,18 @@ def compare(paths):
             checks[f'{backend}/{a}/{b}'] = {'maximumByteError': error, 'limit': 1}
             if error > 1:
                 failures.append(f'{backend}/{a}/{b}: normal encodings disagree ({error})')
+        bounded = backend == 'vk' and lavapipe(report)
         for a, b in exact_pairs:
-            error = int(np.abs(images[a] - images[b]).max())
+            delta = np.abs(images[a] - images[b]).max(axis=2)
+            error = int(delta.max())
             checks[f'{backend}/{a}/{b}'] = {'maximumByteError': error}
-            if error:
+            if bounded and (a, b) in LAVAPIPE_LAYOUT_PAIRS:
+                pixels = int(np.count_nonzero(delta))
+                checks[f'{backend}/{a}/{b}'].update(pixels=pixels, lavapipeLimitPixels=LAVAPIPE_LAYOUT_PIXELS)
+                if error > 1 or pixels > LAVAPIPE_LAYOUT_PIXELS:
+                    failures.append(f'{backend}/{a}/{b}: material layouts differ beyond the lavapipe '
+                                    f'texel-decode allowance ({pixels} pixels, {error} bytes)')
+            elif error:
                 failures.append(f'{backend}/{a}/{b}: material, restoration or rollback changed ({error})')
 
     parity = {}
@@ -244,6 +278,8 @@ def compare(paths):
             'scope': 'Absolute ambient lighting and alpha composition, material invariants, native rollback and lifecycle. GL pairing requires an admitted reference; its absence is not a parity pass.',
             'inputs': {str(p.resolve()): digest(p) for p in paths}, 'harnessSHA256': digest(__file__),
             'nativeRevisionDifferences': revisions,
+            'lavapipeLayoutAllowance': {'active': lavapipe(reports[-1]), 'pixels': LAVAPIPE_LAYOUT_PIXELS,
+                                        'pairs': sorted('/'.join(pair) for pair in LAVAPIPE_LAYOUT_PAIRS)},
             'checks': checks, 'parity': parity, 'failures': failures}
 
 

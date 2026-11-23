@@ -136,7 +136,10 @@ renderers:
   `specularmap` sequence, in that order.
 - **Cutouts:** set the `alphaTest` threshold on the classic diffuse stage, and
   make that stage use the same image as `albedoMap`, with no texture
-  transforms.
+  transforms. A cutout casts a shadow with its holes in it under mapped
+  shadows, unless the material is `twoSided`: as in Quake 4, `twoSided`
+  also turns the material's shadows off. Build a fence or grate that should
+  cast a shadow as thin geometry with a face on each side instead.
 - **Transparency:** a `translucent` material with a single `blend blend` stage
   can be drawn as PBR. Keep the alpha in the albedo texture, and make the blend
   stage use that same image, with no texture transforms and no vertex colour.

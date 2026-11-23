@@ -5,6 +5,11 @@
   "licence": "Textures.com material, licensed to whoever downloads it. Its terms forbid redistribution, open-source projects included. Keep the downloads and everything converted from them outside Git and out of every pak; generate_pbr_showcase_map.py writes only below an ignored runtime root.",
   "dropFolder": "Put each material's files (or its zip) in <source-dir>/<id>/. File names only need to contain the map name: Albedo, Normal, Roughness, Metallic, Ambient Occlusion, Alpha, Height.",
   "resolution": 1024,
+  "authoring": {
+    "note": "Authoring bay: a skin swaps 'base' for 'substitute' (PBR to PBR) or for a classic material made from base's own textures, and one skinned model carries base above and that classic material below.",
+    "base": "polished_brass",
+    "substitute": "plain_leather"
+  },
   "materials": [
     {
       "id": "brushed_steel",
