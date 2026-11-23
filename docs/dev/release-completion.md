@@ -12,6 +12,24 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Texture packs' converted normal maps light correctly; a clearer settings failure, 23 November 2026
+
+- **BC7 normal maps that keep X in alpha are read correctly** (#255). A pack
+  that converts Quake 4's own DXT5 normal maps to BC7 carries their layout
+  across, X in alpha with red empty or holding a height. openQ4 read X from
+  red, which lit one half of a mirrored face and darkened the other. It now
+  recognises the layout from the pixels, whether the file uploads as it is
+  or is decoded to rebuild a bump map, and caches of rebuilt bump maps are
+  made again once. Evidence: hidef2k's `anderson_local.dds` rebuilt with
+  `image_usePrecompressedTextures 2` on Vulkan; X averages 118 of 255 where
+  it averaged 32 before; `imageDDSSelfTest` covers the recognition. Not yet
+  run: a BC7 normal map uploaded as it is, and OpenGL.
+- **A failed display change says why in the log** (#260). The settings
+  recovery window only says the changes could not be applied; the reason is
+  now a console warning every time, not only with `ui_retainedTrace 1`. The
+  Keep countdown no longer shows a stray 0 under "Settings need attention".
+  The macOS check that fails for the reporter is still unknown.
+
 ## Initials and ammunition on the scoreline, no side lists, and a moving kill feed, 23 November 2026
 
 - **Players by initials, ammunition at a glance.** On the user's review the
