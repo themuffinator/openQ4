@@ -91,6 +91,8 @@ struct idMultiplayerGame {
     void StampVoteRateLimit(int) { ++cooldowns; }
     void ClientUpdateVote(int notice, int, int, const voteStruct_t&) { ++notifications; lastNotice = notice; }
     void ExecuteVote() { ++executions; }
+    // MP-14/MP-16: the modifier, preset and arena payloads have their own contract
+    static void WriteVoteExtensionFields(idBitMsg&, const voteStruct_t&) {}
     void ServerStartVote(int clientNum, vote_flags_t index, const char* value);
     void ServerStartPackedVote(int clientNum, const voteStruct_t& data);
     void CastVote(int clientNum, bool castVote);

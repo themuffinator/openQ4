@@ -120,7 +120,7 @@ def validate_engine_declares_menu_cvars() -> None:
     source = read(ROOT / "src" / "framework" / "Session.cpp")
 
     require(source, "Session_DeclareMultiplayerMenuGameCVars", "Session.cpp")
-    declare = source[source.index("static void Session_DeclareMultiplayerMenuGameCVars") :]
+    declare = source[source.index("void Session_DeclareMultiplayerMenuGameCVars( void ) {") :]
     declare = declare[: declare.index("\n}\n") + 3]
 
     for _, cvar_name, _ in BOT_ROWS:
@@ -207,7 +207,7 @@ def validate_row_widgets() -> None:
         )
 
     session = read(ROOT / "src" / "framework" / "Session.cpp")
-    declare = session[session.index("static void Session_DeclareMultiplayerMenuGameCVars"):]
+    declare = session[session.index("void Session_DeclareMultiplayerMenuGameCVars( void ) {"):]
     declare = declare[: declare.index("\n}\n")]
     entries = re.findall(r'\{ "(\w+)",\s*"([^"]*)",\s*([A-Z_ |]+) \}', declare)
     if {name for name, _, _ in entries} < {cvar for _, cvar, _ in BOT_ROWS}:

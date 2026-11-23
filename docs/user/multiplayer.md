@@ -292,7 +292,10 @@ pass. Who can vote is fixed until the vote ends, even if players disconnect.
 offers every vote below but `scorelimit`: the map, **Skip to Next Map** and
 **Random Map**, the game type and its limits, the **Overtime Period**, the
 **Ruleset**, **Instagib**, buying, balance and shuffle, **Ready Everyone**,
-a **Coin Toss** and kicking a player. The old `clientCallVote` still works.
+a **Coin Toss** and kicking a player. After 0.15.0 the page also offers
+**Quad Hog** (in Deathmatch), **Vampiric Damage**, **Weapons Frenzy**, a
+**Weapon Arena**, a **Preset**, **Spectator Chat** and **Mute Instead of
+Kicking** for the player chosen. The old `clientCallVote` still works.
 The votes are:
 
 | Vote | What passes |
@@ -304,7 +307,11 @@ The votes are:
 | `readyall` | Mark everyone ready, during a warmup that waits for ready players |
 | `kick <name>`, `restart`, `buying 0\|1\|2`, `controlTime <sec>` | Kick a player, restart the map, change the buying rules, change DeadZone's control time |
 | `cointoss` | Nothing changes; the server announces heads or tails for everyone |
-| `mute <name>` | Stop that player's text chat reaching anyone, for ten minutes unless the server sets another time. **After 0.15.0**; typed at the console only, and players on 0.15.0 do not see the vote |
+| `mute <name>` | Stop that player's text chat reaching anyone, for ten minutes unless the server sets another time. **After 0.15.0**; players on 0.15.0 do not see the vote |
+| `modifier <name> 0\|1`, or the modifier's name: `quadhog 1`, `vampiric 1`, `frenzy 1` | Turn a [modifier](server-setup.md#modifiers-and-presets) on or off; Quad Hog only in Deathmatch. The match restarts. **After 0.15.0** |
+| `arena <weapon>`, `arena none` | Play a single-weapon arena (`rocketlauncher`, `railgun` and the rest), or none. The match restarts. **After 0.15.0** |
+| `preset <name>` | Apply a [preset](server-setup.md#modifiers-and-presets), built in or one of the server's own; it sets the game type, ruleset, modifiers and limits together, so it is a vote of its own. **After 0.15.0** |
+| `spectatorchat 0\|1` | Let spectators' all-chat reach the players during live play, or keep it to spectators. **After 0.15.0** |
 
 The operator chooses the rules of voting: `g_votePercent` (the share of the
 eligible players that must say yes, 51 by default, so a plain majority),

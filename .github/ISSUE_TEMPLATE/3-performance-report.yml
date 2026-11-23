@@ -1,0 +1,72 @@
+name: Low frame rate or stutter
+description: openQ4 runs slower than it should, stutters, hitches, or takes a long time to load.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks. Frame rate depends a lot on the machine and the scene, so a few numbers go a long way. Only the first four questions are required.
+
+        To show the frame rate, open the console with the `~` key and enter `com_showFPS 1`.
+  - type: input
+    id: version
+    attributes:
+      label: openQ4 version
+      description: The first line of `openq4.log` is the most reliable. Otherwise, the release you downloaded.
+      placeholder: "0.15.0"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: System, CPU, graphics card and driver
+      placeholder: "Windows 11, i5-12400F, RTX 3060 12 GB, driver 591.74"
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What does it feel like?
+      options:
+        - Low frame rate all the time
+        - Low frame rate in some places
+        - Stutter or hitches, even with a good frame rate
+        - Slow loading
+        - It got slower after updating openQ4
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Where, and how fast?
+      description: >-
+        The level and spot, and the frame rate you see there. If you can, say what OpenGL and Vulkan each
+        give at the same spot (`+set r_renderApi gl` or `vulkan` on the command line): that tells us whether
+        it's the renderer or the scene.
+      placeholder: "Air Defense 2, first fight with the squad: 35 fps on Vulkan, 110 on OpenGL. 140 everywhere else."
+    validations:
+      required: true
+  - type: input
+    id: settings
+    attributes:
+      label: Graphics preset, resolution and frame cap
+      placeholder: "Ultra, 2560x1440, no cap, VSync off"
+    validations:
+      required: false
+  - type: input
+    id: previous
+    attributes:
+      label: Was an earlier version faster?
+      placeholder: "0.14.1 held 140 fps in the same place"
+    validations:
+      required: false
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: >-
+        Start with `+set logFile 2 +set logFileName logs/openq4.log`, load the level, stay at the slow spot for
+        a few seconds, quit, and drag `baseoq4/logs/openq4.log` from your save folder in here.
+    validations:
+      required: false

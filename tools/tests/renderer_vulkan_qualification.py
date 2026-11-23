@@ -502,6 +502,18 @@ def resolve_source_commit(root: Path, short: str, explicit: str | None) -> tuple
     return resolved, None
 
 
+def resolve_stable_source_commit(root: Path, explicit: str | None) -> tuple[str | None, str | None]:
+    """The operator's full SHA for a stable version line, which carries none."""
+    if not explicit:
+        return None, "pass --source-commit with the full SHA the stable build was made from"
+    explicit = explicit.strip().lower()
+    if HEX40.fullmatch(explicit) is None:
+        return None, "--source-commit must be a full 40-character SHA"
+    if git(root, "cat-file", "-t", explicit) != "commit":
+        return None, f"--source-commit {explicit} is not a commit in {root}"
+    return explicit, None
+
+
 def harness_identity(root: Path, source_commit: str | None) -> dict[str, Any]:
     identity: dict[str, Any] = {
         "path": HARNESS_RELATIVE_PATH,
@@ -1266,7 +1278,13 @@ def run_suite(args: argparse.Namespace) -> int:
         short, dirty = parse_version(versions[0])
         source.update(version=versions[0], shortCommit=short, dirty=dirty)
         if short is None:
-            failures.append(f"version {versions[0]} carries no git SHA")
+            # A clean stable release build's version line names no commit by
+            # design (openq4_version.py). Its commit can only come from whoever
+            # built or downloaded the package, so the report says so.
+            commit, error = resolve_stable_source_commit(ROOT, args.source_commit)
+            source.update(commit=commit, commitSource="--source-commit" if commit else None)
+            if error:
+                failures.append(f"version {versions[0]} carries no git SHA; {error}")
         elif dirty:
             failures.append(f"version {versions[0]} was built from a dirty tree")
         else:
@@ -1387,6 +1405,13 @@ def run_self_test() -> int:
     )
     parsed = parse_engine_log(log)
     check(parsed["commit"] == "1234abcd" and parsed["dirty"] is False, "log version")
+    # A stable release line names no commit; only an explicit, existing full SHA stands in.
+    check(parse_version("0.16.0") == (None, False), "stable version line")
+    check(resolve_stable_source_commit(ROOT, None)[0] is None, "stable line without --source-commit")
+    check(resolve_stable_source_commit(ROOT, "1234abcd")[1] is not None, "short --source-commit")
+    head = git(ROOT, "rev-parse", "HEAD")
+    if head:
+        check(resolve_stable_source_commit(ROOT, head.upper()) == (head, None), "stable --source-commit")
     check(parsed["validationEnabled"], "validation enabled")
     check(parsed["validationMessages"] == 1, "validation message count")
     check(parsed["vuids"] == ["VUID-vkCmdDraw-None-08600"], "VUID list")

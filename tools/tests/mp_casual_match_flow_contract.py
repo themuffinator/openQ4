@@ -59,8 +59,24 @@ def check_votes() -> None:
                         ("OVERTIME", 0x10000), ("COINTOSS", 0x20000), ("RANDOMMAP", 0x40000), ("READYALL", 0x80000)):
         require(re.search(rf"VOTEFLAG_{name}\s*=\s*0x{value:X},", header, re.IGNORECASE) is not None,
                 f"VOTEFLAG_{name} keeps bit value 0x{value:X}")
-    # MP-18 added VOTEFLAG_MUTE at bit 20 (tools/tests/mp_moderation.py pins it)
-    require(re.search(r"#define\s+NUM_VOTES\s+21\b", header) is not None, "NUM_VOTES covers the new flags")
+    # MP-18 added VOTEFLAG_MUTE at bit 20 (tools/tests/mp_moderation.py pins it); the
+    # modifier, spectator chat, preset and arena votes (MP-14, MP-16) take bits 21 to 24
+    for name, value in (("MODIFIER", 0x200000), ("SPECTATORCHAT", 0x400000), ("PRESET", 0x800000), ("ARENA", 0x1000000)):
+        require(re.search(rf"VOTEFLAG_{name}\s*=\s*0x{value:X},", header, re.IGNORECASE) is not None,
+                f"VOTEFLAG_{name} keeps bit value 0x{value:X}")
+    require(re.search(r"#define\s+NUM_VOTES\s+25\b", header) is not None, "NUM_VOTES covers the new flags")
+    # their payloads follow the MP-12 fields on every message, only when their flags are set
+    require(game.count("WriteVoteExtensionFields( outMsg, voteData );") == 3, "the three vote writers send the extension fields")
+    require(network.count("idMultiplayerGame::ReadVoteExtensionFields( msg, voteData )") == 2, "both client vote readers read them")
+    require("ReadVoteExtensionFields( msg, voteData )" in function_body(game, "void idMultiplayerGame::ServerCallPackedVote"),
+            "the packed vote call reads them before the kick identity")
+    before(function_body(game, "void idMultiplayerGame::ServerCallPackedVote"), "ReadVoteExtensionFields( msg, voteData )",
+           "ReadVoteKickTarget( msg, voteData.m_kick )", "the extension fields come before the kick identity")
+    writer = function_body(game, "void idMultiplayerGame::WriteVoteExtensionFields")
+    for flag in ("VOTEFLAG_MODIFIER", "VOTEFLAG_SPECTATORCHAT", "VOTEFLAG_PRESET", "VOTEFLAG_ARENA"):
+        require(flag in writer, f"{flag} has a payload only when set")
+    for word in ('"modifier"', '"arena"', '"preset"', '"spectatorchat"'):
+        require(word in function_body(game, "void idMultiplayerGame::CallVote_f"), f"callvote takes {word}")
     for field in ("m_roundLimit", "m_ruleset", "m_instagib", "m_overtime"):
         require(field in function_body(header, "struct voteStruct_t"), f"voteStruct_t carries {field}")
 

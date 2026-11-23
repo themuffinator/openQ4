@@ -1,0 +1,118 @@
+name: Bug report
+description: Something in the game looks, sounds or behaves wrong. Gameplay, graphics, sound, menus, controls, saves, multiplayer or mods.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Only the first three questions are required; answer the rest if you can, and leave out anything you're unsure of.
+
+        **A log helps most.** openQ4 only writes one when asked: add `+set logFile 2 +set logFileName logs/openq4.log` to the launch command (or the shortcut, or Steam's launch options), reproduce the problem, quit, and attach `baseoq4/logs/openq4.log` from your save folder: `%LOCALAPPDATA%\openQ4` on Windows, `~/.local/share/openq4` on Linux and Steam Deck, `~/Library/Application Support/openQ4` on macOS.
+
+        Did the game crash or refuse to start? The **Crash or won't start** form asks for the files that help with that.
+  - type: input
+    id: version
+    attributes:
+      label: openQ4 version
+      description: The first line of `openq4.log` is the most reliable, for example `openQ4 0.15.0`. Otherwise, the release you downloaded.
+      placeholder: "0.15.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: System
+      options:
+        - Windows
+        - Windows ARM64
+        - Linux
+        - Linux ARM64
+        - Steam Deck
+        - macOS
+        - Android
+    validations:
+      required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What you saw or heard, and what you expected instead. Screenshots and short videos are very welcome; drag them in here.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      options:
+        - Quake 4 campaign
+        - The Awakening campaign
+        - Arena campaign
+        - Multiplayer
+        - Menus or settings
+        - Saving or loading
+        - Everywhere
+        - Somewhere else (say where below)
+    validations:
+      required: false
+  - type: textarea
+    id: where_and_how
+    attributes:
+      label: Map and steps to see it
+      description: >-
+        The level (its name on the loading screen or in the Save/Load list is enough) and roughly where in it,
+        then what you did. "Every time" or "only once" helps too.
+      placeholder: |
+        Air Defense 1, the corridor after the squad meeting.
+        1. Walk up to the crates.
+        2. Look at the floor under them.
+    validations:
+      required: false
+  - type: input
+    id: graphics
+    attributes:
+      label: Renderer and graphics preset
+      description: Settings → Display. Say whether the other renderer (OpenGL or Vulkan) behaves the same, if you tried it.
+      placeholder: "Vulkan, Ultra. Same on OpenGL."
+    validations:
+      required: false
+  - type: input
+    id: hardware
+    attributes:
+      label: Graphics card and driver
+      placeholder: "RTX 3060, driver 591.74"
+    validations:
+      required: false
+  - type: dropdown
+    id: mods
+    attributes:
+      label: Mods or texture packs
+      description: Problems that only show with a mod are still worth reporting; say which below.
+      options:
+        - None, just Quake 4 and openQ4
+        - Yes, and it also happens without them
+        - Yes, and I haven't tried without them
+        - Yes, and it only happens with them
+    validations:
+      required: false
+  - type: dropdown
+    id: original
+    attributes:
+      label: Is it the same in the original Quake 4?
+      description: Some things Quake 4 always did. Skip this if you don't know.
+      options:
+        - Not sure
+        - No, only in openQ4
+        - Yes, the original does it too
+        - It started in a newer openQ4 version (say which was fine below)
+    validations:
+      required: false
+  - type: textarea
+    id: log
+    attributes:
+      label: Log and anything else
+      description: >-
+        Drag `openq4.log` in here. For a save that won't load or that breaks progress, attach a zip of the
+        `.save`, `.txt` and `.tga` files with the same name from `baseoq4/savegames` in your save folder.
+    validations:
+      required: false

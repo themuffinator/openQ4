@@ -173,7 +173,7 @@ Reproduce the problem, quit, and find `openq4.log` in the `baseoq4/logs` folder 
 | Linux and Steam Deck | `~/.local/share/openq4` |
 | macOS | `~/Library/Application Support/openQ4` |
 
-Attach the log to a new [issue](https://github.com/themuffinator/openQ4/issues) with your system, graphics card and the openQ4 version. After a Windows crash, also attach the files from the `crashes/` folder. On a Mac, follow [macOS Support Data](macos-support-data.md).
+Then [open an issue](https://github.com/themuffinator/openQ4/issues/new/choose) and pick the form that fits: a bug, a crash, a performance problem, or one of the platform and VR reports. Each form asks only a few required questions and says where to find anything else. After a Windows crash, also attach the files from the `crashes` folder next to `openQ4-client_x64.exe`. On a Mac, follow [macOS Support Data](macos-support-data.md).
 
 **If openQ4 stops with an error window on Windows**, you don't need to capture a log first: the game saves the error and its startup log to `fatal.log` in the same `baseoq4\logs` folder, and the window shows the full path. Attach that file.
 

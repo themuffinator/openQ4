@@ -85,6 +85,9 @@ void Sys_SDL_KeepWindowResponsive( void );
 void openQ4_PrintFramePacingSnapshot( const char *reason );
 void openQ4_RecordMultiplayerFramePacing( void );
 void Session_FinishPendingSave();
+#ifndef ID_DEDICATED
+void Session_DeclareMultiplayerMenuGameCVars( void );
+#endif
 static void Com_ProfileFrameWork_f( const idCmdArgs &args );
 
 static const int OPENQ4_ENTITYDEF_MEDIA_CACHE_TOOL_MASK =
@@ -8216,6 +8219,16 @@ void idCommonLocal::InitGame( void ) {
 	eventLoop->Init();
 
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104343" ) );
+
+#ifndef ID_DEDICATED
+	// The multiplayer menu edits settings only game_mp declares. Declare them
+	// before the configs run, so a saved value lands on the declaration rather
+	// than on a bare console cvar (Session.cpp). Session::Init skips them for a
+	// dedicated server, as this does.
+	if ( idAsyncNetwork::serverDedicated.GetInteger() != 1 ) {
+		Session_DeclareMultiplayerMenuGameCVars();
+	}
+#endif
 
 	// exec the startup scripts
 	if ( fileSystem->ReadFile( "editor.cfg", NULL ) >= 0 ) {

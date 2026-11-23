@@ -1,10 +1,6 @@
 name: Linux ARM64 hardware report
 description: Report a Linux aarch64 result — a bug, or a successful run that can feed the ARM64 signoff evidence record.
 title: "[Linux ARM64]: "
-labels:
-  - linux
-  - arm64
-  - preview-support
 body:
   - type: markdown
     attributes:
@@ -24,7 +20,7 @@ body:
     attributes:
       label: openQ4 version
       description: The version string printed at startup, or the release tag you downloaded.
-      placeholder: "0.8.1"
+      placeholder: "0.15.0"
     validations:
       required: true
   - type: input
@@ -32,7 +28,7 @@ body:
     attributes:
       label: Package artifact name
       description: Paste the exact downloaded file name, or say "built from source" and give the commit SHA.
-      placeholder: "openq4-0.8.1-linux-arm64-preview.tar.xz"
+      placeholder: "openq4-0.15.0-linux-arm64-preview.tar.xz"
     validations:
       required: true
   - type: dropdown

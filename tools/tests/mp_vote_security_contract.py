@@ -418,12 +418,13 @@ def main() -> None:
     require(callvote, "MPGameTypeIsSelectable", "console hidden-gametype rejection")
     require(callvote, "ParseVoteIntegerRange", "console typed numeric parsing")
 
-    if not re.search(r"#define\s+NUM_VOTES\s+21\b", multiplayer_h):
-        raise AssertionError("vote-mask loop must cover MUTE bit 20")
+    if not re.search(r"#define\s+NUM_VOTES\s+25\b", multiplayer_h):
+        raise AssertionError("vote-mask loop must cover ARENA bit 24")
     require(multiplayer_h, "#define VOTEFLAG_ALL", "known packed vote mask")
     require(cvars, '"bit 11 (+2048) control time\\n"', "CONTROLTIME vote-mask help")
     require(cvars, '"bit 19 (+524288) ready all\\n"', "READYALL vote-mask help")
-    require(cvars, '"bit 20 (+1048576) mute player"', "MUTE vote-mask help")
+    require(cvars, '"bit 20 (+1048576) mute player\\n"', "MUTE vote-mask help")
+    require(cvars, '"bit 24 (+16777216) weapon arena"', "ARENA vote-mask help")
     # MP-18: a mute vote is the kick field plus VOTEFLAG_MUTE, so the kick
     # target's slot, host and identity checks all apply to it.
     require(multiplayer_h, "VOTEFLAG_MUTE\t\t\t= 0x100000,", "mute vote flag")

@@ -12,6 +12,86 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Windows crash reports from the renderers and the updater can be read, 23 November 2026
+
+- **For crash reports.** The Windows symbols download that accompanies each
+  release (`openq4-<version>-windows-<arch>-symbols.zip`) now carries the
+  debug symbols of both renderer modules and the updater, not only the
+  engine, the dedicated server and the game modules. Crashes inside the
+  OpenGL or Vulkan renderer, where many of them happen, can be symbolized from
+  a release again. The game package itself is unchanged.
+- **Evidence.** The REL-04 symbols check of the 0.16.0 candidates found the
+  three PDBs missing. `package_nightly.py` and the stage validator in
+  `openq4_validate.py` now require them. Packaging candidate C2's staged
+  install with the fixed packager gives a byte-identical runtime archive and a
+  symbols archive whose seven PDBs each carry their image's GUID
+  (`release_qualification.py check-symbols`).
+
+## Multiplayer settings and field of view are kept between sessions, 23 November 2026
+
+- **Your multiplayer settings stay set.** openQ4 starts on its single-player
+  game module and loads the multiplayer one only when a match starts. Until
+  then, the multiplayer-only settings in your config (field of view, the HUD's
+  damage numbers, speedometer, input display, item timers, hit sound,
+  crosshair names, team locations and local clock, and the bot and server
+  options of Create Server) were not marked to be saved, so the next time
+  anything changed the config they were dropped and came back at their
+  defaults. They are now kept. 0.15.0 and earlier releases had the same
+  problem.
+- **The multiplayer Player Setup rows always work.** The Create Server and
+  Player Setup settings the engine declares for the menu used to lose their
+  type when a saved config set them, and the menu then could not show or
+  change them on every launch after the first.
+- **A new profile's multiplayer character is a marine.** The shipped
+  configuration names a character the game does not have, and the menu
+  replaced it with the first one in its list, the Failed Transfer monster. It
+  now uses the game's own default marine (Strogg in a team game's Strogg
+  team). A character you picked yourself is unchanged.
+- **What to do.** Nothing. Settings you lose to the old problem return only if
+  you set them again.
+- **Evidence.** Found by the REL-01 release qualification of the 0.16.0
+  candidate `174cb31a4` (`release_profile_runtime.py clean-install`, then
+  reproduced by hand on the official 0.15.0 package): a level start dropped
+  all 21 menu settings, a menu start re-declared them at their defaults, and
+  `g_fov`, `hud_damageNumbers` and `hud_showSpeed` set in a config were gone
+  after one menu start. `archived_settings_across_modules.py` pins the three
+  source changes and fails on the earlier source; the clean-install run now
+  also seeds multiplayer-only settings and requires them to survive a level
+  start and a menu start. The packaged fix is qualified on the next candidate,
+  recorded in [release qualification](release-qualification.md).
+
+## Votes for modifiers, arenas, presets and spectator chat; ban lengths and reasons, 23 November 2026
+
+- **Vote on how the match plays.** `callvote quadhog 1` (or `vampiric`,
+  `frenzy`, or `modifier <name> 0|1`) turns a modifier on or off,
+  `callvote arena rocketlauncher` plays a single-weapon arena and `arena none`
+  ends it, and `callvote preset <name>` applies one of the server's presets.
+  The match restarts with the new rules once the vote passes. A preset sets
+  the game type and limits itself, so it is a vote of its own.
+- **Vote whether spectators talk to the players.** `callvote spectatorchat 1`
+  lets spectators' all-chat reach players during live play.
+- **On the Vote page.** The in-match **Vote** page now offers Quad Hog (in
+  Deathmatch), Vampiric Damage, Weapons Frenzy, a weapon arena, a built-in
+  preset, Spectator Chat and **Mute Instead of Kicking** for the player
+  chosen.
+- **Bans with a length and a reason from the Admin page.** Under **View Ban
+  List**, **Ban Length** (10 minutes to permanent) and **Ban Reason** set
+  what the next **Ban** records, and the ban list shows each ban's reason
+  and time left.
+- **For server operators.** `si_voteFlags` forbids the new votes with bits 21
+  (modifiers), 22 (spectator chat), 23 (presets) and 24 (weapon arenas).
+- **Compatibility.** Players on 0.15.0 can join and vote as before; they do
+  not see the new votes called. A remote admin's Ban on a server running
+  0.15.0 still only kicks.
+- **Evidence.** `mp_vote_extensions_smoke.py` (hidden OpenGL listen server,
+  Deathmatch on `mp/q4dm1` with two paused bots): three refused calls start
+  no vote, then Quad Hog, a rocket arena, spectator chat and the standard
+  preset each pass and apply. `mp_casual_match_flow_contract.py`,
+  `mp_vote_security_contract.py`, `mp_moderation.py` and
+  `mp_match_vote_electorate_contract.py` pin the flags, payloads and Admin
+  page handling. Not run: Vulkan, a dedicated server, a remote client, and a
+  person using the new rows with real input.
+
 ## Sharper textures when upscaling, and on Vulkan with NVIDIA cards, 23 November 2026
 
 - **Lower resolution scales keep more texture detail.** When the 3D scene is

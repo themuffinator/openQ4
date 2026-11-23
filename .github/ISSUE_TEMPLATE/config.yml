@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and help
+    url: https://discord.gg/T32mFejwR4
+    about: Ask in #openq4 on the DarkMatter Discord. Install help, settings, matches and VR chat are all welcome there.
+  - name: Install and setup guide
+    url: https://github.com/themuffinator/openQ4/blob/main/docs/user/getting-started.md
+    about: Installing openQ4, finding your Quake 4 files, and where logs and saves are kept.
