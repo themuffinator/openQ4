@@ -3900,6 +3900,12 @@
    "value": {"op": "numberText", "args": [{"op": "ceil", "args": [{"state": "settings.remaining"}]}], "decimals": 0}
   },
   {
+   "id": "confirmation-countdown.display",
+   "node": "confirmation-countdown",
+   "property": "display",
+   "value": {"op": "select", "args": [{"state": "settings.canConfirm"}, "block", "none"]}
+  },
+  {
    "id": "confirmation-panel-softfocus.display",
    "node": "confirmation-panel-softfocus",
    "property": "display",

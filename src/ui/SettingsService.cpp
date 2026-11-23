@@ -71,6 +71,8 @@ struct Service {
     struct ExitIdentity { std::uint64_t owner = 0, request = 0; };
     ExitIdentity exitIntent, exitReceipt;
     DisplayCatalogCache catalog;
+    std::uint64_t lastWarnedDisplayRequest = 0;
+    std::string lastWarnedDisplayDiagnostic;
 };
 std::unique_ptr<Service>& Instance() { static std::unique_ptr<Service> service; return service; }
 Service& Settings() { auto& service=Instance(); if (!service) service=std::make_unique<Service>(); return *service; }
@@ -411,6 +413,20 @@ void UI_SettingsFrame(bool allowWork) {
                     static_cast<unsigned long long>(owner),static_cast<unsigned long long>(service.display.Request()),
                     static_cast<unsigned long long>(presented.epoch),static_cast<unsigned long long>(presented.generation),
                     static_cast<unsigned long long>(presented.submitted),static_cast<unsigned long long>(presented.presented),static_cast<unsigned long long>(presented.failures));
+        }
+        {
+            // The menu only says the change could not be applied; the reason
+            // goes to the console and log whether or not tracing is on (#260).
+            const auto& last = service.display.LastResult();
+            const bool failed = last.code == SettingsCode::ApplyFailed || last.code == SettingsCode::RollbackFailed ||
+                last.code == SettingsCode::Conflict;
+            if (failed && before != service.display.Stage() &&
+                (service.display.Request() != service.lastWarnedDisplayRequest || last.diagnostic != service.lastWarnedDisplayDiagnostic)) {
+                service.lastWarnedDisplayRequest = service.display.Request();
+                service.lastWarnedDisplayDiagnostic = last.diagnostic;
+                common->Warning("Display settings change failed (result %d): %s", static_cast<int>(last.code),
+                    last.diagnostic.empty() ? "no detail" : last.diagnostic.c_str());
+            }
         }
         if (service.owners.contains(owner)) service.results[owner]=result;
         if (!service.display.Active() && service.closing) {
