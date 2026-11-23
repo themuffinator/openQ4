@@ -36,6 +36,8 @@ TILE_W, TILE_H, TILE_PITCH, ROSTER_GAP, ROSTER = 20.0, 20.0, 22.0, 3.0, 4
 VITAL_Y, VITAL_H, VITAL_PITCH = BAR_Y + TILE_H + 2.2, 2.4, 3.4
 # The ammunition bar over each tile, in the 4 u above the scoreline.
 AMMO_Y, AMMO_H = 1.0, 1.8
+# Where a roster's players stand: names cut at 66 u.
+PLACE_W = 66.0
 BAR_END = SCORE_X[1] + SCORE_W + ROSTER_GAP + ROSTER * TILE_PITCH - (TILE_PITCH - TILE_W)
 UNDER_Y = BAR_Y + BAR_H + 2
 TEAM_NAMES = ("#str_200197", "#str_200199")
@@ -236,6 +238,42 @@ def roster(doc: HudDocument, side: int) -> list:
     return nodes
 
 
+def roster_places(doc: HudDocument, side: int) -> dict:
+    """Where the players on a roster stand (hud_teamLocations): under the
+    roster, one 7.5 u row a placed player on an 8.5 u pitch in tile order,
+    each a plate at 0.45 with the initials in the team's text color (#E4EBD2 in
+    Duel and Tourney) and the place in Lowpixel at 0.80, cut at 66 u, growing
+    outward from the roster's inner end. It starts 2 u under the scoreline, or
+    under the flags or the alive pips where they hang. The game names a place
+    only for the tiles this viewer may look over, never their own."""
+    team = side_team(side)
+    teams = team_mode()
+    gametype = S("gametype")
+    hanging = OR(op("==", gametype, 4), op("==", gametype, 6), S("oq4_pips"))
+    rows = []
+    for i in range(ROSTER):
+        p = f"oq4_sl{side}_{i}"
+        declare(doc, {p + "_location": ""})
+        rid = f"slp{side}r{i}"
+        initials = bound_label(doc, rid + "-ini", S(p + "_initials"), 6, rgb(MAR_T), line=7.5,
+                               **{"margin-right": ui.length(u(3)), "letter-spacing": ui.length(u(0.2))})
+        doc.bind(rid + "-ini.color", rid + "-ini", "color",
+                 colour_of([(AND(teams, op("==", team, 0)), rgb(MAR_T)), (teams, rgb(STR_T))], rgb(NAME)))
+        place = bound_label(doc, rid + "-place", S(p + "_location"), 6.2, [1, 1, 1, 0.8], line=7.5, **ellipsis(PLACE_W))
+        row = flex_row(rid, [plate_vec(rid + "-plate", 7.5, 0.45), initials, place],
+                       **{"height": ui.length(u(7.5)), "padding-left": ui.length(u(4)), "padding-right": ui.length(u(5)),
+                          "margin-bottom": ui.length(u(1)), "display": ui.keyword("none")})
+        doc.bind(rid + ".display", rid, "display",
+                 sel(AND(op(">", S(f"oq4_sl{side}_count"), i), op("!=", S(p + "_location"), "")), "flex", "none"))
+        rows.append(row)
+    edge = {"right": u(640 - (tile_x(0, 0) + TILE_W))} if side == 0 else {"left": u(tile_x(1, 0))}
+    column = ui.group(f"slp{side}", {**ui.absolute(top=u(UNDER_Y), **edge), "display": ui.keyword("flex"),
+                                     "flex-direction": ui.keyword("column"),
+                                     "align-items": ui.keyword("flex-end" if side == 0 else "flex-start")}, rows)
+    doc.bind(f"slp{side}.top", f"slp{side}", "top", sel(hanging, u(UNDER_Y + 15), u(UNDER_Y)))
+    return column
+
+
 def bar_timer(doc: HudDocument) -> list:
     """The timer plate at 0.72: the time in Chain 17 u with the Remastered
     timer's states (WARM-UP, the countdown in #FFBE23, #FFBE23 in the last
@@ -411,7 +449,7 @@ def match_bar(doc: HudDocument) -> dict:
     for team in range(2):
         declare(doc, {f"oq4_alive{team}": 0})
     nodes = (roster(doc, 0) + roster(doc, 1) + score_side(doc, 0) + score_side(doc, 1) + bar_timer(doc) + under_bar(doc) +
-             [net_quality(doc)])
+             [roster_places(doc, 0), roster_places(doc, 1), net_quality(doc)])
     group = full("matchbar", nodes, display=ui.keyword("none"))
     doc.show("matchbar", scoreline_shown())
     return group

@@ -1544,6 +1544,17 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	Check(!Shown(runtime,"tsl") && !Shown(runtime,"tst"),"spectators see no side lists");
 	Check(Shown(runtime,"sl1t0-lit1") && !Shown(runtime,"sl1t0-lit0") && Shown(runtime,"sl1t0-vitals") && Shown(runtime,"sl0t0-vitals") &&
 		Shown(runtime,"sl1t0-ammo") && Shown(runtime,"sl0t0-ammo"),"spectators see both rosters' ammunition and vitals, the followed tile lit");
+	// Where they stand: a row under the roster for each placed player, below
+	// the flags in a two-flag mode, growing outward from the roster's inner end.
+	Check(runtime.SetState({{"oq4_sl1_0_initials",std::string("Ny")},{"oq4_sl1_0_location",std::string("Upper Atrium")},
+		{"oq4_sl0_0_location",std::string("")}},error,1.355),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),1.357);
+	Bounds placeRow;
+	const auto placeText = runtime.PresentedValue("slp1r0-place","text"), placeInitials = runtime.PresentedValue("slp1r0-ini","text");
+	Check(Shown(runtime,"slp1r0") && !Shown(runtime,"slp1r1") && !Shown(runtime,"slp0r0") && placeText && placeText->text == "Upper Atrium" &&
+		placeInitials && placeInitials->text == "Ny","a placed player's row names the initials and the place");
+	Check(runtime.GetBounds("slp1r0",placeRow) && Near(placeRow.x,160+413*1.5f,1.5f) && Near(placeRow.y,51*1.5f,1.f),
+		"the rows hang under the roster, below the flags");
 	// The item timers: a heavy armor counting down (its symbol at 0.45, the
 	// time, a line filling in #FA2B05 as the respawn runs) and a quad that is
 	// there (#B5C784, no time, no line), named by place.

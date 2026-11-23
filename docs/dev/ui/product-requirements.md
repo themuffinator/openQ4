@@ -877,8 +877,8 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **126 partial, 235 pending and 0 verified requirements**, counting the
-44 superseded rows at their recorded states. `BEH-002`
+There are **126 partial, 236 pending and 0 verified requirements**, counting the
+45 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -1382,3 +1382,14 @@ revision re-binds the visual specification and the Remastered HUD notes; no
 evidence scope or result changes. There are 361 rows, 317 active requirements
 and 44 historical superseded rows; the 358 migration variants and seven final
 gates remain unaccepted.
+
+## Revision 29: places under the rosters
+
+Visual specification 1.49 brings back where team mates stand, which the side
+lists showed until revision 28: the product owner chose to list the places
+under the scoreline's rosters rather than retire team locations. `FLOW-077`
+supersedes `FLOW-075`, carrying no evidence, and is pending. The revision
+re-binds the visual specification and the Remastered HUD notes; no evidence
+scope or result changes. There are 362 rows, 317 active requirements and 45
+historical superseded rows; the 358 migration variants and seven final gates
+remain unaccepted.

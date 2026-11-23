@@ -542,8 +542,9 @@ the [development roadmap](../roadmap.md) for current scope.
   ammunition of the weapon in hand (in its colour) and health and armour bars
   where you may see them (your own side, or both sides when you spectate), and
   a skull while they are dead. It replaces the team lists at the screen's
-  edges. Deathmatch keeps the leader, the runner-up and the timer at the top
-  left. Item timers in every layout now show each item's symbol, where it lies
+  edges, and lists where your team mates stand under their tiles (Team
+  Locations). Deathmatch keeps the leader, the runner-up and the timer at the
+  top left. Item timers in every layout now show each item's symbol, where it lies
   and a line filling as it respawns, and kill feed lines arrive with a quick
   slide and glint and glide up as older lines leave. See
   [Spectate](../../user/multiplayer.md#spectate) and

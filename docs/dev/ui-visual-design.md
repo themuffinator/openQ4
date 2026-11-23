@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.48, 23 November 2026 (1.47 earlier that day, 1.46 on 17 November, 1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.49, 23 November 2026 (1.47 and 1.48 earlier that day, 1.46 on 17 November, 1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -79,6 +79,10 @@ code instead of the weapon's symbol, and drops Competitive's side team lists,
 which the rosters make redundant. Kill feed lines now arrive with a quick
 slide, fade and glint, and the lines below glide up when the top line leaves
 (section 14.9).
+
+Version 1.49 brings back where team mates stand: under each roster the
+scoreline lists the places of the players the viewer may look over, beside
+their initials (section 14.9).
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -3013,6 +3017,13 @@ places.
     armor #B5C784. They end level with the slabs.
   - **Dead.** The initials drop to 0.35 under a skull in #E46D56 over a plate
     at 0.30, on every side, as the round modes' alive pips already show.
+  - **Places.** Under the roster, where the viewer may look the players over
+    and team locations are on, one 7.5 u row a placed player on an 8.5 u pitch
+    in tile order: a plate at 0.45 with the initials in the team's text color
+    (#E4EBD2 in Duel and Tourney) and the place in Lowpixel at 0.80, cut at
+    66 u, growing outward from the roster's inner end. The rows start 2 u under
+    the scoreline, or 15 u lower where the flags or the alive pips hang. Your
+    own place is not listed; the dead have none.
 - **Timer.** The time in Chain 17 dp with the Remastered timer's states, and
   under it, in Lowpixel 700 at 0.55, the limit (TO 30), the round (ROUND 3) or
   the arena (ARENA 2).
@@ -3023,8 +3034,8 @@ places.
 - **Network.** Network quality (section 13.13), the ping beside four bars,
   follows the scoreline's trailing end, where the fourth tile would end, at all
   times.
-- **No side lists.** The rosters carry the players: Competitive shows no team
-  status lists at the view's edges.
+- **No side lists.** The rosters and the places under them carry the players:
+  Competitive shows no team status lists at the view's edges.
 - **Readouts.** The status bar grows by 15% about the bottom edge, with the
   weapon strip and pickups above it, and the chat box keeps its 8 u clearance
   above it. The box stays low: where it cannot span

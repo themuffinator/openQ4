@@ -20,8 +20,13 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   over each tile fills to the ammunition for the weapon in hand, in that
   weapon's colour. The dead keep their initials, dimmed, under the skull.
 - **Less clutter.** Competitive's team lists at the screen's edges are gone;
-  the rosters carry the players. Team Locations (`hud_teamLocations`) has
-  nothing to show on the new interface's HUD for now.
+  the rosters carry the players. Where each team mate stands now shows under
+  your team's tiles instead (Team Locations, `hud_teamLocations`): one small
+  row each, initials then the place, below the flags or alive pips where they
+  hang; a spectator sees both teams'. The user chose this over retiring the
+  setting (visual specification 1.49, register revision 29: `FLOW-077`
+  supersedes `FLOW-075`, pending). A native check covers the rows; captures
+  show them for a spectator and a player.
 - **A kill feed that moves.** A new line slides in from the right as it fades
   in, its weapon mark settles and its plate glints, all within 280 ms; when the
   top line leaves, the rest glide up instead of jumping. Reduced motion seats

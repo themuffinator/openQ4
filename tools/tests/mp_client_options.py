@@ -273,6 +273,8 @@ def check_hud_state() -> None:
     require("neutralView || player->team == localPlayer->team" in rows
             and "const bool neutralView = localPlayer->spectating && localPlayer->wantSpectate;" in rows,
             "an opponent's row is never given a location, and an eliminated player is not a neutral spectator")
+    require('"%s_location"' in rows and "showLocations && open && !dead" in rows,
+            "the scoreline names places only under the tiles this viewer may look over (hud_teamLocations)")
 
 
 def check_strings() -> None:

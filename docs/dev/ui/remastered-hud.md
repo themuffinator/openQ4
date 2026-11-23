@@ -305,7 +305,9 @@ player it is the Remastered layout. In multiplayer:
   filling to the ammunition for the weapon in hand in the weapon color code
   (`-ammo`), and under it health and armor bars, both where the viewer may see
   them (your side, or both for someone who chose to watch); a skull in #E46D56
-  over dimmed initials for the dead on every side.
+  over dimmed initials for the dead on every side. Under each roster, rows
+  (`slp{side}r{i}`) name where its placed players stand, initials then the
+  place, below the flags or pips where they hang (`hud_teamLocations`).
 - **Timer.** The Remastered timer's states in Chain 17 u, with WARM-UP, the
   countdown and STARTS IN, SUDDEN DEATH and the infinity mark, and under it the
   limit (TO 30), the round, the arena or the warm-up's ready count.
@@ -342,7 +344,7 @@ player it is the Remastered layout. In multiplayer:
 The game publishes the scoreline's sides (`oq4_mb0_*`, `oq4_mb1_*`), the
 rosters (`oq4_sl_left`, `oq4_sl{side}_count`, `oq4_sl{side}_{i}_*` with
 `_open` saying whether the ammunition and vitals are this viewer's to see,
-`_initials`, and `_ammo` as a percentage or -1), the line under the timer
+`_initials`, `_ammo` as a percentage or -1, and `_location`), the line under the timer
 (`oq4_mb_sub`, `oq4_mb_ready`), the tags' health and
 `oq4_loss` from `idMultiplayerGame::PublishRemasteredCompetitive` and
 `PublishRemasteredHud`, and the item timers (`oq4_it_count`,

@@ -118,9 +118,9 @@ the far side of the map. Opponents are never sent to players. On a casual
 server someone who chose to spectate is sent every player, so both sides'
 ammunition bars and vitals stay current; a managed match keeps its own rules.
 
-The Competitive layout no longer lists team mates at the screen's edge with
-the place each one stands; the scoreline's player tiles replaced it. For now
-`hud_teamLocations` has nothing to show on the new interface's HUD.
+With the Competitive layout, the place each team mate stands is listed under
+your team's player tiles on the scoreline, beside their initials (a spectator
+sees both teams'). `hud_teamLocations 0` hides the places.
 
 ## Item timers
 

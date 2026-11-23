@@ -23357,7 +23357,8 @@ names the limit, the round or the arena.  The team status lists each team's
 players, best score first: the weapon, health, armor and whether they are
 dead, you or followed.  The scoreline's rosters (team modes, Duel and Tourney)
 put up to four players beside each side's score, each by initials, with the
-ammunition for the weapon in hand where this viewer may see it.
+ammunition for the weapon in hand and where they stand where this viewer may
+see it.
 ================
 */
 void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, idPlayer *localPlayer, idPlayer *followed, int limit ) {
@@ -23512,6 +23513,11 @@ void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, i
 			_mphud->SetStateString( va( "%s_name", prefix ), name.c_str() );
 			_mphud->SetStateString( va( "%s_initials", prefix ), OQ4_HudInitials( name.c_str() ).c_str() );
 			_mphud->SetStateInt( va( "%s_ammo", prefix ), ammo );
+			// where the player stands (hud_teamLocations), under the tiles this
+			// viewer may look over; your own place is on your screen already
+			const bool placed = showLocations && open && !dead && !( player == localPlayer && !localPlayer->spectating );
+			_mphud->SetStateString( va( "%s_location", prefix ), placed
+				? locations.NameForPoint( idVec3( info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ] ) ) : "" );
 			_mphud->SetStateBool( va( "%s_open", prefix ), open );
 			_mphud->SetStateInt( va( "%s_weapon", prefix ), open && !dead ? info.weapon : -1 );
 			_mphud->SetStateInt( va( "%s_health", prefix ), open && !dead ? Max( 0, info.health ) : 0 );
