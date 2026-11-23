@@ -411,6 +411,23 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   turn shadow maps on.
 - Details: [advanced screen-space lighting](../user/advanced-screen-space-lighting.md#volumetric-lighting),
   [roadmap REN-09](roadmap.md#ren-task-evidence-and-acceptance).
+
+## Volumetric lighting with mirrors, in VR and in motion, 23 November 2026
+
+- **Smoother next to mirrors and camera screens.** With the experimental
+  volumetric lighting on, a room with a mirror or a security screen no longer
+  rebuilds the haze's working images several times in every frame.
+- **Checked where it moves.** Beams follow doors as they open and close, the
+  flashlight's beam keeps up with a fast turn, nothing trails behind under
+  temporal AA, the haze keeps its place at any resolution scale and with
+  dynamic resolution, mirrors and camera screens show it, and in VR both eyes
+  get it. This holds on OpenGL and Vulkan.
+- **What to do.** Nothing: it stays off by default and its settings are
+  unchanged. `rendererVolumetricStatus` now also says how many views, and how
+  many mirrors and screens among them, drew the haze.
+- Details: [volumetric lighting evidence](volumetric-lighting.md),
+  [roadmap REN-09](roadmap.md#ren-task-evidence-and-acceptance).
+
 ## One place to start for multiplayer, 21 November 2026
 
 - **A multiplayer guide.** The new [multiplayer guide](../user/multiplayer.md)

@@ -30,11 +30,12 @@ idCVar r_volumetricMaxLights( "r_volumetricMaxLights", "32", CVAR_RENDERER | CVA
 	"volumetric lighting: most lights that scatter in one view, in view order (0 = no limit)", 0, 256 );
 idCVar r_volumetricSubviews( "r_volumetricSubviews", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
 	"volumetric lighting in mirrors, remote cameras and other subviews" );
-idCVar r_volumetricDebug( "r_volumetricDebug", "0", CVAR_RENDERER | CVAR_BOOL,
-	"volumetric lighting: show the in-scattered light alone over black" );
+idCVar r_volumetricDebug( "r_volumetricDebug", "0", CVAR_RENDERER | CVAR_INTEGER,
+	"volumetric lighting: 1 show the in-scattered light alone over black, 2 the same with every scattering light unshadowed (the reference its shadow maps are judged against)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
 static volumetricViewStats_t	rg_volumetricStats[2];
 static const char *		rg_volumetricStatsBackend[2] = { "", "" };
+static int			rg_volumetricTargetAllocations = 0;
 
 bool R_Volumetric_Requested() {
 	return r_rendererModernQuality.GetBool() && r_rendererFroxelVolumetrics.GetBool();
@@ -77,7 +78,7 @@ void R_Volumetric_BuildViewSettings( const viewDef_t *view, const char *backendD
 	settings.resolutionDivisor = r_volumetricResolution.GetInteger() >= 2 ? 2 : 1;
 	settings.stencilPolicy = idMath::ClampInt( 0, 1, r_volumetricStencilLights.GetInteger() );
 	settings.maxLights = Max( 0, r_volumetricMaxLights.GetInteger() );
-	settings.debug = r_volumetricDebug.GetBool();
+	settings.debug = idMath::ClampInt( 0, 2, r_volumetricDebug.GetInteger() );
 	// Under temporal AA the march start turns through four offsets, so the
 	// history averages four times the steps; without it the pattern holds
 	// still and the composite filter takes the dither out.
@@ -282,6 +283,30 @@ void R_Volumetric_TargetExtent( const volumetricViewSettings_t &settings,
 	height = Max( 1, ( sceneHeight + divisor - 1 ) / divisor );
 }
 
+int R_Volumetric_ChooseTargetSlot( volumetricTargetPool_t &pool, int sceneWidth, int sceneHeight, int divisor ) {
+	int slot = -1;
+	for ( int i = 0; i < VOLUMETRIC_TARGET_SLOTS; i++ ) {
+		if ( pool.lastUse[i] != 0 && pool.sceneWidth[i] == sceneWidth && pool.sceneHeight[i] == sceneHeight
+				&& pool.divisor[i] == divisor ) {
+			slot = i;
+			break;
+		}
+	}
+	if ( slot < 0 ) {
+		slot = 0;
+		for ( int i = 1; i < VOLUMETRIC_TARGET_SLOTS; i++ ) {
+			if ( pool.lastUse[i] < pool.lastUse[slot] ) {
+				slot = i;
+			}
+		}
+		pool.sceneWidth[slot] = sceneWidth;
+		pool.sceneHeight[slot] = sceneHeight;
+		pool.divisor[slot] = divisor;
+	}
+	pool.lastUse[slot] = ++pool.clock;
+	return slot;
+}
+
 void R_Volumetric_PackViewParams( const volumetricViewSettings_t &settings,
 		float params0[4], float params1[4] ) {
 	params0[0] = settings.extinction;
@@ -290,13 +315,15 @@ void R_Volumetric_PackViewParams( const volumetricViewSettings_t &settings,
 	params0[3] = settings.maxDistance;
 	params1[0] = static_cast<float>( settings.steps );
 	params1[1] = settings.noiseOffset;
-	params1[2] = settings.debug ? 1.0f : 0.0f;
+	params1[2] = settings.debug != 0 ? 1.0f : 0.0f;
 	params1[3] = static_cast<float>( settings.resolutionDivisor );
 }
 
-void R_Volumetric_BeginViewStats( volumetricViewStats_t &stats, const volumetricViewSettings_t &settings ) {
+void R_Volumetric_BeginViewStats( volumetricViewStats_t &stats, const volumetricViewSettings_t &settings,
+		const viewDef_t *view ) {
 	memset( &stats, 0, sizeof( stats ) );
 	stats.frame = tr.frameCount;
+	stats.subview = view != NULL && view->isSubview;
 	stats.declineReason = settings.declineReason;
 }
 
@@ -315,11 +342,17 @@ void R_Volumetric_PublishViewStats( const char *backend, const volumetricViewSta
 	const int slot = ( backend != NULL && idStr::Icmp( backend, "Vulkan" ) == 0 ) ? 1 : 0;
 	// A frame's first view replaces the record; its later views add to it.
 	volumetricViewStats_t &record = rg_volumetricStats[slot];
+	const int composited = stats.composited ? 1 : 0;
+	const int subview = stats.composited && stats.subview ? 1 : 0;
 	if ( record.frame != stats.frame ) {
 		record = stats;
-		record.views = 1;
+		record.views = composited;
+		record.subviews = subview;
+		record.viewsDeclined = 1 - composited;
 	} else {
-		record.views++;
+		record.views += composited;
+		record.subviews += subview;
+		record.viewsDeclined += 1 - composited;
 		record.lights += stats.lights;
 		record.passes += stats.passes;
 		for ( int i = 0; i < VOLUMETRIC_LIGHT_OUTCOME_COUNT; i++ ) {
@@ -335,6 +368,10 @@ void R_Volumetric_PublishViewStats( const char *backend, const volumetricViewSta
 		}
 	}
 	rg_volumetricStatsBackend[slot] = slot == 1 ? "Vulkan" : "OpenGL";
+}
+
+void R_Volumetric_NoteTargetAllocation() {
+	rg_volumetricTargetAllocations++;
 }
 
 const char *R_Volumetric_OutcomeName( volumetricLightOutcome_t outcome ) {
@@ -354,20 +391,21 @@ const char *R_Volumetric_OutcomeName( volumetricLightOutcome_t outcome ) {
 
 void R_Volumetric_PrintStatus() {
 	const bool requested = R_Volumetric_Requested();
-	common->Printf( "Volumetric lighting: requested=%d leaf=%d master=%d density=%.6f intensity=%.2f sun=%.2f anisotropy=%.2f distance=%.0f steps=%d resolution=1/%d stencilLights=%d maxLights=%d subviews=%d\n",
+	common->Printf( "Volumetric lighting: requested=%d leaf=%d master=%d density=%.6f intensity=%.2f sun=%.2f anisotropy=%.2f distance=%.0f steps=%d resolution=1/%d stencilLights=%d maxLights=%d subviews=%d targetAllocations=%d\n",
 		requested ? 1 : 0, r_rendererFroxelVolumetrics.GetBool() ? 1 : 0, r_rendererModernQuality.GetBool() ? 1 : 0,
 		r_froxelVolumetricDensity.GetFloat(), r_volumetricIntensity.GetFloat(), r_volumetricSunIntensity.GetFloat(), r_volumetricAnisotropy.GetFloat(),
 		r_froxelVolumetricMaxDistance.GetFloat(), idMath::ClampInt( 4, VOLUMETRIC_MAX_STEPS, r_froxelVolumetricSlices.GetInteger() ),
 		r_volumetricResolution.GetInteger() >= 2 ? 2 : 1, r_volumetricStencilLights.GetInteger(),
-		r_volumetricMaxLights.GetInteger(), r_volumetricSubviews.GetBool() ? 1 : 0 );
+		r_volumetricMaxLights.GetInteger(), r_volumetricSubviews.GetBool() ? 1 : 0, rg_volumetricTargetAllocations );
 	for ( int slot = 0; slot < 2; slot++ ) {
 		const volumetricViewStats_t &stats = rg_volumetricStats[slot];
 		if ( rg_volumetricStatsBackend[slot][0] == '\0' ) {
 			continue;
 		}
 		const int age = tr.frameCount - stats.frame;
-		common->Printf( "Volumetric lighting %s: effective=%d frame=%d age=%d views=%d target=%dx%d lights=%d passes=%d decline=%s",
+		common->Printf( "Volumetric lighting %s: effective=%d frame=%d age=%d views=%d subviews=%d viewsDeclined=%d target=%dx%d lights=%d passes=%d decline=%s",
 			rg_volumetricStatsBackend[slot], stats.composited ? 1 : 0, stats.frame, age, stats.views,
+			stats.subviews, stats.viewsDeclined,
 			stats.width, stats.height, stats.lights, stats.passes,
 			stats.declineReason != NULL && stats.declineReason[0] != '\0' ? stats.declineReason : "none" );
 		for ( int i = 0; i < VOLUMETRIC_LIGHT_OUTCOME_COUNT; i++ ) {
@@ -389,7 +427,7 @@ unsigned int R_Volumetric_ConfigSignature() {
 		static_cast<float>( r_volumetricResolution.GetInteger() ),
 		static_cast<float>( r_volumetricStencilLights.GetInteger() ),
 		static_cast<float>( r_volumetricMaxLights.GetInteger() ),
-		r_volumetricSubviews.GetBool() ? 1.0f : 0.0f, r_volumetricDebug.GetBool() ? 1.0f : 0.0f
+		r_volumetricSubviews.GetBool() ? 1.0f : 0.0f, static_cast<float>( r_volumetricDebug.GetInteger() )
 	};
 	for ( size_t i = 0; i < sizeof( values ) / sizeof( values[0] ); i++ ) {
 		unsigned int bits = 0;

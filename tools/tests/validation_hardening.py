@@ -948,6 +948,7 @@ def validate_validation_wiring() -> None:
         "openxr_vr_stereo_cost.py",
         "openxr_vr_stereo_share_smoke.py",
         "openxr_vr_temporal_smoke.py",
+        "openxr_vr_volumetric_smoke.py",
         # Benchmark and engine-capture drivers need a staged client, a GPU and
         # retail assets.
         "performance_suite.py",
@@ -960,6 +961,8 @@ def validate_validation_wiring() -> None:
         "renderer_motion_blur_qualification.py",
         "renderer_screen_space_effects_qualification.py",
         "renderer_volumetric_lighting.py",
+        "renderer_volumetric_motion.py",
+        "renderer_volumetric_tiers.py",
         "renderer_shared_domain_qualification.py",
         "renderer_shadow_motion_qualification.py",
         "renderer_shadow_stencil_parity_scan.py",

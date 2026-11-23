@@ -75,9 +75,11 @@ typedef struct rbVolumetricProgram_s {
 } rbVolumetricProgram_t;
 
 static rbVolumetricProgram_t	rbVolumetricPrograms[RB_VOL_PROGRAM_COUNT];
-static idImage *		rbVolumetricDepthImage = NULL;
-static idImage *		rbVolumetricScatterImage = NULL;
-static idRenderTexture *	rbVolumetricScatterTarget = NULL;
+// One depth copy and scattering target per view size (VolumetricLighting.h).
+static volumetricTargetPool_t	rbVolumetricPool;
+static idImage *		rbVolumetricDepthImages[VOLUMETRIC_TARGET_SLOTS];
+static idImage *		rbVolumetricScatterImages[VOLUMETRIC_TARGET_SLOTS];
+static idRenderTexture *	rbVolumetricScatterTargets[VOLUMETRIC_TARGET_SLOTS];
 
 // The view being drawn.
 typedef struct rbVolumetricView_s {
@@ -87,6 +89,7 @@ typedef struct rbVolumetricView_s {
 	bool			began;
 	bool			depthCopied;
 	bool			targetCleared;
+	int			slot;			// this view's pair in the target pool
 	int			sceneX;
 	int			sceneY;
 	int			sceneWidth;
@@ -423,7 +426,7 @@ void RB_Volumetric_GL_BeginView( const viewDef_t *view ) {
 	memset( &state, 0, sizeof( state ) );
 	state.view = view;
 	R_Volumetric_BuildViewSettings( view, view != NULL ? RB_Volumetric_GL_BackendDecline( view ) : NULL, state.settings );
-	R_Volumetric_BeginViewStats( state.stats, state.settings );
+	R_Volumetric_BeginViewStats( state.stats, state.settings, view );
 	state.began = true;
 	if ( !state.settings.active ) {
 		return;
@@ -433,6 +436,8 @@ void RB_Volumetric_GL_BeginView( const viewDef_t *view ) {
 	state.sceneWidth = view->viewport.x2 - view->viewport.x1 + 1;
 	state.sceneHeight = view->viewport.y2 - view->viewport.y1 + 1;
 	R_Volumetric_TargetExtent( state.settings, state.sceneWidth, state.sceneHeight, state.targetWidth, state.targetHeight );
+	state.slot = R_Volumetric_ChooseTargetSlot( rbVolumetricPool, state.sceneWidth, state.sceneHeight,
+		state.settings.resolutionDivisor );
 
 	if ( !R_Volumetric_ViewTransforms( view, state.clipToWorld, state.eye, state.viewForward ) ) {
 		state.settings.active = false;
@@ -456,6 +461,9 @@ static bool RB_Volumetric_EnsureResources( rbVolumetricView_t &state ) {
 	if ( globalImages == NULL ) {
 		return false;
 	}
+	idImage *&rbVolumetricDepthImage = rbVolumetricDepthImages[state.slot];
+	idImage *&rbVolumetricScatterImage = rbVolumetricScatterImages[state.slot];
+	idRenderTexture *&rbVolumetricScatterTarget = rbVolumetricScatterTargets[state.slot];
 	if ( !state.depthCopied ) {
 		idImageOpts depthOpts;
 		depthOpts.textureType = TT_2D;
@@ -465,7 +473,11 @@ static bool RB_Volumetric_EnsureResources( rbVolumetricView_t &state ) {
 		depthOpts.numLevels = 1;
 		depthOpts.numMSAASamples = 0;
 		depthOpts.isPersistant = true;
-		rbVolumetricDepthImage = globalImages->ScratchImage( "_volumetricDepth", &depthOpts, TF_NEAREST, TR_CLAMP, TD_DEPTH );
+		if ( rbVolumetricDepthImage == NULL || rbVolumetricDepthImage->GetUploadWidth() != state.sceneWidth
+				|| rbVolumetricDepthImage->GetUploadHeight() != state.sceneHeight ) {
+			R_Volumetric_NoteTargetAllocation();
+		}
+		rbVolumetricDepthImage = globalImages->ScratchImage( va( "_volumetricDepth%d", state.slot ), &depthOpts, TF_NEAREST, TR_CLAMP, TD_DEPTH );
 		if ( rbVolumetricDepthImage == NULL ) {
 			return false;
 		}
@@ -486,7 +498,8 @@ static bool RB_Volumetric_EnsureResources( rbVolumetricView_t &state ) {
 		opts.numLevels = 1;
 		opts.numMSAASamples = 0;
 		opts.isPersistant = true;
-		rbVolumetricScatterImage = globalImages->ScratchImage( "_volumetricScatter", &opts, TF_NEAREST, TR_CLAMP, TD_DEFAULT );
+		R_Volumetric_NoteTargetAllocation();
+		rbVolumetricScatterImage = globalImages->ScratchImage( va( "_volumetricScatter%d", state.slot ), &opts, TF_NEAREST, TR_CLAMP, TD_DEFAULT );
 		if ( rbVolumetricScatterImage == NULL ) {
 			return false;
 		}
@@ -595,8 +608,8 @@ static void RB_Volumetric_BindTexture( int unit, idImage *image ) {
 }
 
 static void RB_Volumetric_BindTargetAndClear( rbVolumetricView_t &state ) {
-	backEnd.renderTexture = rbVolumetricScatterTarget;
-	rbVolumetricScatterTarget->MakeCurrent();
+	backEnd.renderTexture = rbVolumetricScatterTargets[state.slot];
+	rbVolumetricScatterTargets[state.slot]->MakeCurrent();
 	glViewport( 0, 0, state.targetWidth, state.targetHeight );
 	if ( !state.targetCleared ) {
 		GLfloat clearColor[4];
@@ -633,12 +646,16 @@ void RB_Volumetric_GL_InjectLight( const viewLight_t *vLight, const volumetricSh
 		}
 		return;
 	}
-	const volumetricShadowKind_t kind = shadow != NULL ? shadow->kind : VOLUMETRIC_SHADOW_NONE;
+	volumetricShadowKind_t kind = shadow != NULL ? shadow->kind : VOLUMETRIC_SHADOW_NONE;
 	volumetricLightOutcome_t outcome = R_Volumetric_ClassifyLight( state.settings, state.view, record,
 		kind, stencilShadowed, mapExpected, state.budgetUsed );
 	if ( !R_Volumetric_OutcomeScatters( outcome ) ) {
 		R_Volumetric_CountOutcome( state.stats, outcome );
 		return;
+	}
+	if ( state.settings.debug == 2 ) {
+		// the same lights with no shadow term
+		kind = VOLUMETRIC_SHADOW_NONE;
 	}
 	const int programIndex = kind == VOLUMETRIC_SHADOW_PROJECTED ? RB_VOL_PROGRAM_PROJECTED
 		: ( kind == VOLUMETRIC_SHADOW_POINT ? RB_VOL_PROGRAM_POINT : RB_VOL_PROGRAM_UNSHADOWED );
@@ -688,7 +705,7 @@ void RB_Volumetric_GL_InjectLight( const viewLight_t *vLight, const volumetricSh
 	RB_Volumetric_Uniform4( program, RB_VOL_U_BOUNDS_MIN, record.boundsMin );
 	RB_Volumetric_Uniform4( program, RB_VOL_U_BOUNDS_MAX, record.boundsMax );
 
-	RB_Volumetric_BindTexture( 0, rbVolumetricDepthImage );
+	RB_Volumetric_BindTexture( 0, rbVolumetricDepthImages[state.slot] );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE );
 	RB_Volumetric_BindTexture( 2, record.falloffImage );
 
@@ -773,9 +790,8 @@ void RB_Volumetric_GL_Composite( void ) {
 		return;
 	}
 	state.began = false;
-	const bool mainView = state.view != NULL && !state.view->isSubview;
 	if ( !state.settings.active ) {
-		if ( state.settings.requested && mainView ) {
+		if ( state.settings.requested ) {
 			R_Volumetric_PublishViewStats( "OpenGL", state.stats );
 		}
 		return;
@@ -802,7 +818,7 @@ void RB_Volumetric_GL_Composite( void ) {
 	}
 	glViewport( state.sceneX, state.sceneY, state.sceneWidth, state.sceneHeight );
 	glScissor( state.sceneX, state.sceneY, state.sceneWidth, state.sceneHeight );
-	GL_State( state.settings.debug
+	GL_State( state.settings.debug != 0
 		? ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO | GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS )
 		: ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_SRC_ALPHA | GLS_DEPTHMASK | GLS_DEPTHFUNC_ALWAYS ) );
 	glUseProgramObjectARB( program->program );
@@ -823,9 +839,9 @@ void RB_Volumetric_GL_Composite( void ) {
 	RB_Volumetric_Uniform4( program, RB_VOL_U_TARGET_INFO, targetInfo );
 	RB_Volumetric_Uniform4( program, RB_VOL_U_PARAMS0, params0 );
 	RB_Volumetric_Uniform4( program, RB_VOL_U_PARAMS1, params1 );
-	RB_Volumetric_BindTexture( 0, rbVolumetricDepthImage );
+	RB_Volumetric_BindTexture( 0, rbVolumetricDepthImages[state.slot] );
 	glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE );
-	RB_Volumetric_BindTexture( 1, rbVolumetricScatterImage );
+	RB_Volumetric_BindTexture( 1, rbVolumetricScatterImages[state.slot] );
 	RB_Volumetric_DrawQuad();
 	RB_Volumetric_BindTexture( 1, NULL );
 	RB_Volumetric_BindTexture( 0, NULL );
@@ -836,9 +852,7 @@ void RB_Volumetric_GL_Composite( void ) {
 	state.stats.composited = true;
 	state.stats.width = state.targetWidth;
 	state.stats.height = state.targetHeight;
-	if ( mainView || state.settings.requested ) {
-		R_Volumetric_PublishViewStats( "OpenGL", state.stats );
-	}
+	R_Volumetric_PublishViewStats( "OpenGL", state.stats );
 }
 
 void RB_Volumetric_GL_Shutdown( void ) {
@@ -850,11 +864,14 @@ void RB_Volumetric_GL_Shutdown( void ) {
 		}
 	}
 	// The images belong to the image manager.
-	if ( rbVolumetricScatterTarget != NULL ) {
-		tr.DestroyRenderTexture( rbVolumetricScatterTarget );
-		rbVolumetricScatterTarget = NULL;
+	for ( int i = 0; i < VOLUMETRIC_TARGET_SLOTS; i++ ) {
+		if ( rbVolumetricScatterTargets[i] != NULL ) {
+			tr.DestroyRenderTexture( rbVolumetricScatterTargets[i] );
+			rbVolumetricScatterTargets[i] = NULL;
+		}
+		rbVolumetricDepthImages[i] = NULL;
+		rbVolumetricScatterImages[i] = NULL;
 	}
-	rbVolumetricDepthImage = NULL;
-	rbVolumetricScatterImage = NULL;
+	memset( &rbVolumetricPool, 0, sizeof( rbVolumetricPool ) );
 	memset( &rbVolumetricView, 0, sizeof( rbVolumetricView ) );
 }
