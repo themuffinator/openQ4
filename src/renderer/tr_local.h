@@ -1547,6 +1547,7 @@ extern idCVar r_rendererModernLightingParity;	// diagnostic override forcing lig
 extern idCVar r_rendererModernClassicShapes;	// REN-02 rollback mask for corridor-owned classic shapes
 const int MODERN_CLASSIC_SHAPE_STAGES = 1;	// stage transforms on cutouts and baked-light receivers
 const int MODERN_CLASSIC_SHAPE_STENCIL_SHADOWS = 2;	// stencil-shadowed lights
+extern idCVar r_rendererOwnershipCompose;	// REN-02 step 5: compose the aggregate executor with the shared world domains
 extern idCVar r_rendererModernAutoPromote;	// allow gated default modern-visible promotion
 extern idCVar r_rendererPromotionEvidence;	// Phase 8 evidence token required before auto-promotion
 extern idCVar r_rendererShaderReload;	// allow runtime reload of the internal modern GL shader library

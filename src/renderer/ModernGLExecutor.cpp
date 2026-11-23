@@ -222,10 +222,15 @@ static bool R_ModernGLExecutor_ModernVisibleRequested( void ) {
 	// These diagnostics intentionally remove the 3D backend work while retaining
 	// classic 2D drawing.  Never let the side pipeline recreate or later compose
 	// a world frame over that GUI, including when shared GUI ownership is enabled.
-	return !r_skipRender.GetBool() && !r_skipRenderContext.GetBool()
-		&& !r_rendererSharedWorldAmbient.GetBool()
+	// REN-02 step 5: the shared world domains and this executor exclude each
+	// other unless r_rendererOwnershipCompose asks them to compose. Then this
+	// executor is asked first, and a view's pass reaches its shared domain or
+	// ARB2 only when the frame was not composed here.
+	const bool noSharedWorldDomain = !r_rendererSharedWorldAmbient.GetBool()
 		&& !r_rendererSharedWorldInteraction.GetBool()
-		&& !r_rendererSharedDeform.GetBool()
+		&& !r_rendererSharedDeform.GetBool();
+	return !r_skipRender.GetBool() && !r_skipRenderContext.GetBool()
+		&& ( noSharedWorldDomain || r_rendererOwnershipCompose.GetBool() )
 		&& ( r_rendererModernVisible.GetBool()
 			|| RendererBootstrap_ShouldAutoPromoteModernVisible() );
 }
@@ -10255,11 +10260,17 @@ bool R_ModernGLExecutor_LegacyPassCanSkipForView( renderPassCategory_t category,
 	// Shared world-ambient ownership is decided transactionally at the source
 	// view.  The older aggregate executor must never suppress that classic
 	// rollback before the shared domain has completed backend preflight.
-	if ( r_rendererSharedWorldAmbient.GetBool()
+	// REN-02 step 5: under r_rendererOwnershipCompose the order is explicit.
+	// This executor composed the frame before the classic walker started, so
+	// a pass it owns has one owner and its shared stream is left unconsumed;
+	// a frame it declined never reaches the skip below, and the shared domain
+	// (or ARB2) owns the pass as if this executor were off.
+	const bool composeOwners = r_rendererOwnershipCompose.GetBool();
+	if ( !composeOwners && r_rendererSharedWorldAmbient.GetBool()
 			&& category == RENDER_PASS_AMBIENT ) {
 		return false;
 	}
-	if ( r_rendererSharedWorldInteraction.GetBool()
+	if ( !composeOwners && r_rendererSharedWorldInteraction.GetBool()
 			&& ( category == RENDER_PASS_ARB2_INTERACTION
 				|| category == RENDER_PASS_STENCIL_SHADOW
 				|| category == RENDER_PASS_SHADOW_MAP ) ) {

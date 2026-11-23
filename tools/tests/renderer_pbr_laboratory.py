@@ -61,6 +61,7 @@ BASE = {
     'r_rendererModernAutoPromote': '0', 'r_rendererClusteredDecals': '0',
     'r_rendererSharedWorldFogBlend':'0',
     'r_rendererSharedWorldAmbient':'0',
+    'r_rendererSharedWorldInteraction':'0', 'r_rendererOwnershipCompose':'0',
     'r_rendererReflectionProbes': '1', 'r_pbrMaterials': '1', 'r_pbrDebug': '0',
     'r_pbrIBL': '1', 'r_pbrIBLIntensity': '1', 'r_shadows': '0',
     # The laboratory keeps its linear-scene and floating-point preview
@@ -318,7 +319,7 @@ GRID_STAGE_KINDS = ('-grid-texmatrix', '-grid-vertex', '-grid-condition', '-grid
 # flat-bump baseline and the diffuse stage state at ten times that intensity.
 GRID_STRONG_KINDS = ('-grid-strong', '-grid-flat-stage', '-grid-flat-vertex')
 DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage', '-ambient', '-grid', '-fog',
-                          *CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS, '-stencil')
+                          *CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS, '-stencil', '-compose')
 # Mixed-material model (REN-05): one skinned mesh, PBR above its equator and
 # classic below, on CPU skinning and packed MD5R.
 for backend in ('cpu','md5r'):
@@ -387,10 +388,21 @@ for suffix in ('', '-native'):
 CASES['production-fixed-stencil-native']['r_rendererModernVisible'] = '0'
 CASES['production-fixed-stencil-off-fallback'] = {**CASES['production-fixed-stencil'], 'r_rendererModernClassicShapes': '1'}
 CASES['production-fixed-stencil-clear'] = {**CASES['production-fixed-stencil'], 'r_shadows': '0'}
+# REN-02 step 5: the shared world domains requested together with the
+# aggregate executor. The aggregate executor composes the frame it can own
+# (compose), and a frame it declines goes to the shared interaction stream
+# (stencil-compose-fallback: the stencil bit is cleared, so the executor
+# declines). Both compare with plain ARB2.
+COMPOSE_SETTINGS = {'r_rendererSharedWorldAmbient': '1', 'r_rendererSharedWorldInteraction': '1',
+                    'r_rendererSharedWorldFogBlend': '1', 'r_rendererOwnershipCompose': '1'}
+CASES['production-fixed-compose'] = {**CASES['production-fixed-bump'], **COMPOSE_SETTINGS}
+CASES['production-fixed-compose-native'] = {**CASES['production-fixed-bump-native'], 'r_rendererModernVisible': '0'}
+CASES['production-fixed-stencil-compose-fallback'] = {**CASES['production-fixed-stencil-off-fallback'], **COMPOSE_SETTINGS}
 # These controls need a view without PBR receivers: a stencil-shadowed light
-# cannot shadow the forward pass's PBR surfaces. They remove the laboratory's
+# cannot shadow the forward pass's PBR surfaces, and the shared interaction
+# stream rolls a view with PBR receivers back. They remove the laboratory's
 # PBR stations for the rest of the process, so they run in their own batch.
-ISOLATED_PREFIXES = ('production-fixed-stencil',)
+ISOLATED_PREFIXES = ('production-fixed-stencil', 'production-fixed-compose')
 for kind in DISPLAY_CORRIDOR_KINDS:
     CASES[f'production-fixed{kind}-display'] = {**CASES[f'production-fixed{kind}'], 'r_pbrLinearScene': '0'}
 
@@ -404,7 +416,7 @@ FALLBACK_CASES = {'multi-budget','shadow-capacity','local-global','production-re
 FALLBACK_CASES.update(('fog-fallback','blend-fallback','lightgrid-fallback'))
 FALLBACK_CASES.update(f'production-fixed-{boundary}-fallback' for boundary in ('shadow','msaa'))
 FALLBACK_CASES.update(('production-fixed-grid-multistage-fallback','production-fixed-stages-fallback'))
-FALLBACK_CASES.add('production-fixed-stencil-off-fallback')
+FALLBACK_CASES.update(('production-fixed-stencil-off-fallback','production-fixed-stencil-compose-fallback'))
 # Controls whose PBR specimen is deliberately hidden (background captures for
 # composite oracles): no native owner is expected to admit anything there.
 HIDDEN_SPECIMEN_CASES: set[str] = set()
@@ -415,7 +427,7 @@ LEGACY_CASES = {'legacy','master-off','multi-legacy','shadow-capacity-legacy','l
 LEGACY_CASES.update(('production-fixed-colored-native','production-fixed-master-off'))
 LEGACY_CASES.add('production-fixed-grid-native')
 LEGACY_CASES.add('production-fixed-grid-multistage-native')
-LEGACY_CASES.add('production-fixed-stencil-native')
+LEGACY_CASES.update(('production-fixed-stencil-native','production-fixed-compose-native'))
 LEGACY_CASES.update(f'production-fixed{kind}-native' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS))
 LEGACY_CASES.update(f'production-fixed-{boundary}-native' for boundary in ('shadow','msaa'))
 LEGACY_CASES.update(f'production-{light}-native' for light in ('points','projector'))
@@ -1400,7 +1412,8 @@ def compare_material_captures(results: list[dict]) -> None:
     exact_pairs += [('production-fixed-'+suffix,'production-fixed') for suffix in ('restored','image-reload','shader-reload','partial-restart','full-restart','resize')]
     # The isolated controls have no PBR station in view, so a declined frame
     # is the native frame byte for byte.
-    exact_pairs += [('production-fixed-stencil-off-fallback','production-fixed-stencil-native')]
+    exact_pairs += [('production-fixed-stencil-off-fallback','production-fixed-stencil-native'),
+                    ('production-fixed-stencil-compose-fallback','production-fixed-stencil-native')]
     # Elsewhere a declined frame is drawn by the classic light loop, whose
     # native PBR owner still shades the laboratory's PBR stations, while the
     # PBR-off reference shows their classic stand-ins. Compare what both draw
@@ -1555,7 +1568,8 @@ def compare_material_captures(results: list[dict]) -> None:
             if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
                 by_case['production-curved']['failures'].append('curved classic surface differs from the native lighting reference')
     for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-grid',
-                 *(f'production-fixed{kind}' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS)), 'production-fixed-stencil'):
+                 *(f'production-fixed{kind}' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS)), 'production-fixed-stencil',
+                 'production-fixed-compose'):
         if case not in by_case or case+'-native' not in by_case: continue
         modern=by_case[case]
         pfm=Path(modern.get('linearScreenshot',''))
@@ -2069,8 +2083,11 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
     if ( case.endswith('-display') and case.startswith('production-fixed') ) and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('the display-referred frame did not run the classic-lighting corridor')
     if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-fog','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright',
-                *(f'production-fixed{kind}' for kind in CUTOUT_STAGE_KINDS), 'production-fixed-stencil') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
+                *(f'production-fixed{kind}' for kind in CUTOUT_STAGE_KINDS), 'production-fixed-stencil', 'production-fixed-compose') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('classic compatibility lighting was not submitted')
+    if case in ('production-fixed-compose','production-fixed-compose-display','production-fixed-stencil-compose-fallback'):
+        if not re.search(r'Renderer shared interaction: requested=1 prepared=1 valid=1 views=[1-9]\d* ready=[1-9]\d* fallback=0\b', text):
+            failures.append('the shared interaction domain did not seal the view beside the aggregate executor')
     if case == 'production-fixed-stencil-clear' and not re.search(r'Modern classic lighting: ready=1 executed=1 .*stencilLights=0\b',text):
         failures.append('the unshadowed twin still drew a stencil-shadowed light')
     if case in ('production-fixed-stencil','production-fixed-stencil-display') and not re.search(r'Modern classic lighting: ready=1 executed=1 .*stencilLights=[1-9]',text):
@@ -2443,7 +2460,7 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             if case.startswith('production-fixed-grid-stage'): material='classic_grid_stage'
             for name in ('flat-stage','flat-vertex'):
                 if case.startswith('production-fixed-grid-'+name): material='classic_grid_'+name.replace('-','_')
-            if case.startswith('production-fixed-stencil'): material='classic_bump'
+            if case.startswith(('production-fixed-stencil','production-fixed-compose')): material='classic_bump'
             vertex_model=case.startswith(('production-fixed-vertex','production-fixed-cutout-vertex','production-fixed-grid-vertex',
                                                       'production-fixed-grid-flat-vertex'))
             commands += ['g_stopTime 0',f'script "${removed}.remove()"','wait 3',
@@ -2632,7 +2649,7 @@ def main() -> int:
     if args.prepare and args.update_fixture: parser.error('choose --prepare or --update-fixture')
     if any(case not in CASES for case in cases): parser.error('unknown capture case')
     if args.batch and any(case.startswith(ISOLATED_PREFIXES) for case in cases) and not all(case.startswith(ISOLATED_PREFIXES) for case in cases):
-        parser.error('the isolated stencil controls remove the PBR stations; batch them on their own')
+        parser.error('the isolated stencil/compose controls remove the PBR stations; batch them on their own')
     if args.backend!='vk' and not args.gl_native and any(case.startswith('vk-direct-') for case in cases):
         parser.error('vk-direct controls require a native PBR owner: Vulkan or --gl-native')
     if args.backend!='vk' and 'ibl-shared' in cases:
