@@ -7,7 +7,10 @@ good enough to upload as it is.
 
 ## Start and stop
 
-Open the console and type:
+The quickest way is a key: bind **Record Video** in **Settings > Controls >
+Other**, then press it once to start recording and again to stop.
+
+Or open the console and type:
 
 ```
 recordVideo
@@ -24,7 +27,7 @@ the map and the time, such as `airdefense1_20261123-184016.mp4`. To start and
 stop with one key, bind `toggleVideo`:
 
 ```
-bind F9 toggleVideo
+bind F10 toggleVideo
 ```
 
 The console says where the file went when the recording starts and when it
@@ -74,6 +77,21 @@ a Motion JPEG AVI instead, which needs nothing but makes large files (about
 5 MB a second at 1280x720). `videoEncoders` lists what your system has.
 
 ## Settings
+
+The everyday settings are in **Settings > Game Options**, under **Video
+Capture** (on the General tab; in the classic menus, the page's last
+section):
+
+| Menu row | Setting | Choices |
+| --- | --- | --- |
+| Video Format | `com_videoFormat` | MP4, MKV, WebM, MOV, AVI, GIF |
+| Video Quality | `com_videoQuality` | 1 to 100 |
+| Video Frame Rate | `com_videoFPS` | 24, 30, 60, 120 |
+| Video Resolution | `com_videoHeight` | Window Size, 480p, 720p, 1080p, 1440p, 2160p |
+| Record Sound | `com_videoAudio` | On or off (GIFs have no sound) |
+| Video Timing | `com_videoTiming` | Automatic, Frame-Exact, Real Time |
+
+Changes apply to the next recording. Everything else is a console setting:
 
 | Setting | Default | What it does |
 | --- | --- | --- |

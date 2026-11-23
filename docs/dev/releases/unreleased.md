@@ -25,11 +25,12 @@ the [development roadmap](../roadmap.md) for current scope.
   textures instead of a blurrier picture; **Resolution Scale** stays yours to
   lower if you want more speed.
 
-- **Record video of your games.** Type `recordVideo` in the console (or bind
-  `toggleVideo` to a key) and openQ4 saves an MP4 of what you see and hear,
-  ready to upload. In single-player the video stays perfectly smooth even if
-  your computer struggles to keep up; quality, size, frame rate and format
-  (MP4, MKV, WebM, MOV, AVI, GIF) are all settings. See
+- **Record video of your games.** Bind **Record Video** in Settings >
+  Controls > Other (or type `recordVideo` in the console) and openQ4 saves an
+  MP4 of what you see and hear, ready to upload. In single-player the video
+  stays perfectly smooth even if your computer struggles to keep up; format
+  (MP4, MKV, WebM, MOV, AVI, GIF), quality, frame rate, resolution, sound and
+  timing are under Video Capture in Settings > Game Options. See
   [Record Video](../../user/video-capture.md).
 
 - **Sharper textures at lower resolution scales, and on Vulkan with NVIDIA
@@ -553,7 +554,10 @@ the [development roadmap](../roadmap.md) for current scope.
   an MP4 at your window's resolution and 60 frames a second by default,
   smooth even when your computer is busy. MKV, WebM, MOV and GIF use FFmpeg
   if you have it, and an AVI needs nothing at all. `aviGame` and `aviDemo`
-  now record video too. See [Record Video](../../user/video-capture.md).
+  now record video too. Settings > Game Options has a Video Capture section
+  for its format, quality, frame rate, resolution, sound and timing, and
+  Settings > Controls > Other has a Record Video key. See
+  [Record Video](../../user/video-capture.md).
 - Classic multiplayer ruleset corrections: quad damage is four times, seeking
   nails lose Quake 4's splash, the expansion maps' napalm launcher respawns in
   30 seconds, Scout carriers take no armour, health from Regeneration drains

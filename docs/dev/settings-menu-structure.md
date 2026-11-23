@@ -22,10 +22,10 @@ With `ui_retained 1` (the default) the Settings screen opens the retained SETTIN
 
 | Page | Tab | First column | Second column |
 |---|---|---|---|
-| Controls | Movement, Weapons, Attack/Look, Other | The stock bindings | The stock bindings |
+| Controls | Movement, Weapons, Attack/Look, Other | The stock bindings | The stock bindings (Other ends with Record Video, `toggleVideo`) |
 | Controls | Mouse | Aim: Free Look, Invert Mouse, Toggle Zoom, Scope Sensitivity. Mouse Input: Sensitivity, CPI, Smoothing, View Filter | Acceleration: Mouse Accel, Accel Offset, Accel Curve, Sensitivity Cap |
 | Controls | Controller | Sticks: Controller Input, Stick Layout, Dead Zone, Look Sensitivity, Look Curve, Invert Look, Wheel Sensitivity, Wheel Offset. Prompts: Prompt Style, Swap Confirm and Back | Triggers and Rumble: Trigger Threshold, Rumble, Rumble Strength, the low battery rumble pair. Gyro and Touch: Gyro, Gyro Sensitivity, Touchpad Mode, Touchpad Sensitivity, Touchscreen |
-| Game Options | General | Gameplay: Auto Reload, Auto Switch, Show Decals, Corpse Sink, Corpse Time, Enhanced Physics, Auto Skip Cinematics | Interface: Language, Console Access, Screenshot Format. Items and Players: Pickup Style, Opponent Weapon Style, Force Model |
+| Game Options | General | Gameplay: Auto Reload, Auto Switch, Show Decals, Corpse Sink, Corpse Time, Enhanced Physics, Auto Skip Cinematics | Interface: Language, Console Access, Screenshot Format. Items and Players: Pickup Style, Opponent Weapon Style, Force Model. Video Capture: Video Format, Video Quality, Video Frame Rate, Video Resolution, Record Sound, Video Timing |
 | Game Options | HUD | HUD: Layout, Size, Width, Safe Area Inset, Opacity, Toggle Objectives, Damage Direction, Pickup Messages, Weapon Strip | Crosshair: Custom Crosshair, the crosshair, Size, Color, Hit Marker, Animated Crosshair |
 | Game Options | View Weapon | Show Gun, Gun Position, Weapon X/Y/Z Offset | Weapon FOV, Weapon FOV Aspect, Weapon Kick |
 | Game Options | Accessibility | Motion: View Kick, Screen Shake, Cinematic Shake | Visibility: Reduced Flashing, Opaque Menu Backing |
@@ -66,6 +66,7 @@ On the retained pages a row that another setting has turned off is dimmed and di
 | Game Options | Snap Turn Angle | Turning is Snap | Smooth turning has its own speed. |
 | Game Options | Laser Sight, Two-Handed Grip | Aim is hand aim | Head aim draws no laser and has no grip. |
 | Game Options | Custom crosshair picker | Custom Crosshair is on | Unchanged. |
+| Game Options | Record Sound | Video Format is not GIF | A GIF has no sound track. |
 | Audio | Subtitle Size, Subtitle Background, Speaker Names, Untranscribed Speech | Subtitles is on | No subtitle is drawn with them off. |
 | Audio | Surround Speakers | Headphone HRTF is not On | HRTF On always outputs stereo HRTF. |
 
@@ -104,8 +105,8 @@ Scroll controls:
 
 | Pane | Scroll widget | Cvar | Range | Step | Notes |
 |---|---|---|---|---|---|
-| Game Options | `choiceDef set_game_section_choice` | `game_section_choice` | General / Mouse / Controller / Crosshair / Gameplay / View Weapon | `1` | Localized section picker below the pane title and above the scroll frame. Sets live GUI state `gui::gui_set_game_scroll` to the group anchor and calls `applySettingsScroll game`; the engine clamps and applies the matching row-canvas rect. |
-| Game Options | `sliderDef set_game_scroll_thumb` | `gui_set_game_scroll` | `0..46` | `1` | Vertical scrollbar. Calls `applySettingsScroll game`; `idSliderWindow` propagates the command from thumb drag as well as key/button events. |
+| Game Options | `choiceDef set_game_section_choice` | `game_section_choice` | General / Mouse / Controller / Crosshair / HUD / Gameplay / View Weapon / VR / Video Capture | `1` | Localized section picker below the pane title and above the scroll frame. Sets live GUI state `gui::gui_set_game_scroll` to the group anchor and calls `applySettingsScroll game`; the engine clamps and applies the matching row-canvas rect. |
+| Game Options | `sliderDef set_game_scroll_thumb` | `gui_set_game_scroll` | `0..90` | `1` | Vertical scrollbar. Calls `applySettingsScroll game`; `idSliderWindow` propagates the command from thumb drag as well as key/button events. |
 | System | `choiceDef set_sys_section_choice` | `sys_section_choice` | Video / Window / Rendering / Quality / Post FX / Sizing | `1` | Localized section picker above the scroll frame. Sets live GUI state `gui::gui_set_sys_scroll` to the group anchor and calls `applySettingsScroll system`; the engine clamps and applies the matching row-canvas rect. |
 | System | `sliderDef set_sys_scroll_thumb` | `gui_set_sys_scroll` | `0..26` | `1` | Vertical scrollbar. Calls `applySettingsScroll system`; `idSliderWindow` propagates the command from thumb drag as well as key/button events. |
 | Audio | `sliderDef set_audio_scroll_thumb` | `gui_set_audio_scroll` | `0..0` | `1` | Disabled in practice because Audio fits without scrolling; the engine keeps its scroll thumb hidden and no-evented. |
@@ -207,6 +208,7 @@ The numbered `set_b_controls_move_1..13` windows are row hover/action surfaces f
 | Taunt | `set_ctrls_other_taunt_key` | `emote taunt` |
 | Grab | `set_ctrls_other_grab_key` | `emote grab_a` |
 | Voice Chat | `set_ctrls_other_vchat_key` | `_voicechat` |
+| Record Video | `set_ctrls_other_video_key` | `toggleVideo` (starts or stops a video recording) |
 
 ## Game Options
 
@@ -328,6 +330,13 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Physical Crouch | `choiceDef` | `set_game_vr_physicalcrouch_value` | `vr_physicalCrouch` | `Disabled;Enabled` | Crouching in the room crouches the character. |
 | Play Space | `choiceDef` | `set_game_vr_playspace_value` | `vr_playSpace` | `0 Automatic`, `1 Seated`, `2 Standing` | Seated play measures height from where the player recentred; standing play from the floor, against the standing eye height (`vr_standingHeight`, learned at the first recentre or measured by `vr_calibrateHeight`). Automatic stands when the headset knows the floor. |
 | Your Body | `choiceDef` | `set_game_vr_body_value` | `vr_body` | `0 Off`, `1 Legs and Torso`, `2 With Arms` | The player's own body in the headset: a second render entity of the player model, seen in the player's own view only and posed from the tracked head and hands (`src/framework/VRBody.h`). With Arms needs controller aiming; aimed by the head it shows legs and torso. |
+| Video Capture | `windowDef` label | `set_game_video` | N/A | N/A | Section label; the last section, reached by the section picker's ninth entry (scroll `90`). The rows set the `com_video*` CVars `recordVideo` reads when a recording starts ([Record Video](../user/video-capture.md)). |
+| Video Format | `choiceDef` | `set_game_videoformat_value` | `com_videoFormat` | `mp4`, `mkv`, `webm`, `mov`, `avi`, `gif` | MKV, WebM, MOV and GIF need FFmpeg; without it the recording falls back to the built-in Motion JPEG AVI. MP4 needs FFmpeg outside Windows. |
+| Video Quality | `sliderDef` + `editDef` | `set_game_videoquality_slider_bar`, `set_game_videoquality_value` | `com_videoQuality` | `1..100`, step `1` | 80 (the default) is close to the screen. A non-zero `com_videoBitrate` (console) overrides it. |
+| Video Frame Rate | `choiceDef` | `set_game_videofps_value` | `com_videoFPS` | `24;30;60;120` | 30 and 60 divide the tic rate and record frame-exact offline; 24 and 120 follow the clock. |
+| Video Resolution | `choiceDef` | `set_game_videoheight_value` | `com_videoHeight` | `0 Window Size`, `480p`, `720p`, `1080p`, `1440p`, `2160p` | Scales down to the height, keeping the window's shape; a height at or above the window's records at the window's size. |
+| Record Sound | `choiceDef` | `set_game_videoaudio_value` | `com_videoAudio` | `No;Yes` | The game's sound in the video. |
+| Video Timing | `choiceDef` | `set_game_videotiming_value` | `com_videoTiming` | `auto Automatic`, `fixed Frame-Exact`, `realtime Real Time` | Automatic is frame-exact in single-player and demos, real time online. |
 
 ## System
 

@@ -84,7 +84,7 @@ SECTIONS = (
         ("#str_200127", "clientMessageMode 1"), ("#str_200129", "_impulse28"), ("#str_200130", "_impulse29"),
         ("#str_200132", "_ingamestats"), ("#str_201009", "_impulse17"), ("#str_200311", "emote salute"),
         ("#str_200312", "emote cheer"), ("#str_200313", "emote taunt"), ("#str_200314", "emote grab_a"),
-        ("#str_200959", "_voicechat"),
+        ("#str_200959", "_voicechat"), ("#str_232913", "toggleVideo"),
     )),
 )
 BINDINGS = tuple(binding for _section, _heading, rows in SECTIONS for _label, binding in rows)

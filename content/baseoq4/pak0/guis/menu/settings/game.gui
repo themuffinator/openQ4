@@ -44,7 +44,7 @@
 						textscale	0.2
 						font	"fonts/lowpixel"
 						choices	"#str_229960"
-						values	"0;1;2;3;4;5;6;7"
+						values	"0;1;2;3;4;5;6;7;8"
 						choiceType	1
 
 						onAction {
@@ -66,8 +66,10 @@
 								set "gui::gui_set_game_scroll" "62" ;
 							} else if ( "gui::game_section_choice" == 6 ) {
 								set "gui::gui_set_game_scroll" "70" ;
-							} else {
+							} else if ( "gui::game_section_choice" == 7 ) {
 								set "gui::gui_set_game_scroll" "77" ;
+							} else {
+								set "gui::gui_set_game_scroll" "90" ;
 							}
 							set "cmd" "applySettingsScroll game" ;
 						}
@@ -80,7 +82,7 @@
 					noclip	0
 					windowDef set_game_content
 					{
-						rect	-24,-41,640,2306
+						rect	-24,-41,640,2474
 						visible	1
 
 	//--------------------------------------------------------------//
@@ -4688,6 +4690,295 @@
 					}
 				}
 	//==============================================================//
+	// Settings->Game Options->Video Capture (recordVideo, docs/user/video-capture.md)
+	//==============================================================//
+
+				windowDef set_game_video
+				{
+					rect	259,2277,327,13
+					visible	1
+					forecolor	1,1,1,0.4
+					text	"#str_232900"
+					textscale	0.2
+					font	"fonts/lowpixel"
+				}
+
+	//==============================================================//
+	// Settings->Game Options->Video Format
+	//==============================================================//
+
+				windowDef set_game_videoformat
+				{
+					rect	228,2291,403,25
+					visible	1
+
+					windowDef set_game_videoformat_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_videoformat_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_232903"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_videoformat_value
+					{
+							rect	240,3,162,18
+							visible	1
+							forecolor	1,0.745,0.137,0.8
+							cvar	com_videoFormat
+							textscale	0.24
+							font	"fonts/lowpixel"
+							choices	"#str_232904"
+							values	"mp4;mkv;webm;mov;avi;gif"
+							choiceType	1
+
+							onAction {
+								set "cmd" "play main_menu_selection" ;
+							}
+					}
+				}
+	//==============================================================//
+	// Settings->Game Options->Video Quality
+	//==============================================================//
+
+				windowDef set_game_videoquality
+				{
+					rect	228,2315,377,25
+					visible	1
+
+					windowDef set_game_videoquality_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_videoquality_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_232905"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					windowDef set_game_videoquality_slider_bg
+					{
+						rect	244,8,128,16
+						background	"gfx/guis/mainmenu/slider_bg"
+						matcolor	1,0.745,0.137,0.8
+						noevents	1
+						visible	1
+					}
+					sliderDef set_game_videoquality_slider_bar
+					{
+						rect	244,9,71,8
+						forecolor	1,0.745,0.137,0.8
+						matcolor	1,0.745,0.137,0.8
+						low	1
+						high	100
+						step	1
+						thumbShader	"gfx/guis/mainmenu/slider_bar"
+						cvar	com_videoQuality
+						visible	1
+					}
+					editDef set_game_videoquality_value
+					{
+						rect	322,4,100,18
+						visible	1
+						cvar	com_videoQuality
+						textscale	0.24
+						maxchars	3
+						numeric	1
+						forecolor	1,0.745,0.137,0.8
+						font	"fonts/lowpixel"
+
+						onEnter {
+							setfocus "set_b_back" ;
+						}
+
+						onAction {
+							set "cmd" "play main_menu_selection" ;
+						}
+					}
+				}
+	//==============================================================//
+	// Settings->Game Options->Video Frame Rate
+	//==============================================================//
+
+				windowDef set_game_videofps
+				{
+					rect	228,2339,403,25
+					visible	1
+
+					windowDef set_game_videofps_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_videofps_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_232906"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_videofps_value
+					{
+							rect	240,3,162,18
+							visible	1
+							forecolor	1,0.745,0.137,0.8
+							cvar	com_videoFPS
+							textscale	0.24
+							font	"fonts/lowpixel"
+							choices	"#str_232907"
+							values	"24;30;60;120"
+							choiceType	1
+
+							onAction {
+								set "cmd" "play main_menu_selection" ;
+							}
+					}
+				}
+	//==============================================================//
+	// Settings->Game Options->Video Resolution
+	//==============================================================//
+
+				windowDef set_game_videoheight
+				{
+					rect	228,2363,403,25
+					visible	1
+
+					windowDef set_game_videoheight_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_videoheight_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_232908"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_videoheight_value
+					{
+							rect	240,3,162,18
+							visible	1
+							forecolor	1,0.745,0.137,0.8
+							cvar	com_videoHeight
+							textscale	0.24
+							font	"fonts/lowpixel"
+							choices	"#str_232909"
+							values	"0;480;720;1080;1440;2160"
+							choiceType	1
+
+							onAction {
+								set "cmd" "play main_menu_selection" ;
+							}
+					}
+				}
+	//==============================================================//
+	// Settings->Game Options->Record Sound
+	//==============================================================//
+
+				windowDef set_game_videoaudio
+				{
+					rect	228,2387,403,25
+					visible	1
+
+					windowDef set_game_videoaudio_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_videoaudio_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_232910"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_videoaudio_value
+					{
+							rect	240,3,162,18
+							visible	1
+							forecolor	1,0.745,0.137,0.8
+							cvar	com_videoAudio
+							textscale	0.24
+							font	"fonts/lowpixel"
+							choices	"#str_200059"
+							values	"0;1"
+							choiceType	1
+
+							onAction {
+								set "cmd" "play main_menu_selection" ;
+							}
+					}
+				}
+	//==============================================================//
+	// Settings->Game Options->Video Timing
+	//==============================================================//
+
+				windowDef set_game_videotiming
+				{
+					rect	228,2411,403,25
+					visible	1
+
+					windowDef set_game_videotiming_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_videotiming_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_232911"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_videotiming_value
+					{
+							rect	240,3,162,18
+							visible	1
+							forecolor	1,0.745,0.137,0.8
+							cvar	com_videoTiming
+							textscale	0.24
+							font	"fonts/lowpixel"
+							choices	"#str_232912"
+							values	"auto;fixed;realtime"
+							choiceType	1
+
+							onAction {
+								set "cmd" "play main_menu_selection" ;
+							}
+					}
+				}
+	//==============================================================//
 				#include "guis/menu/settings/game_hovers.gui"
 					}
 				}
@@ -4699,7 +4990,7 @@
 					forecolor	1,1,1,0.8
 					matcolor	1,1,1,0.4
 					low	0
-					high	83
+					high	90
 					step	1
 					vertical	1
 					scrollbar	1

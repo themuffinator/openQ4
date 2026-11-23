@@ -91,7 +91,7 @@ idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "
 // r_ssao and r_ssaoMethod, which the presets and the console also change.
 idCVar gui_set_sys_ao( "gui_set_sys_ao", "0", CVAR_GUI | CVAR_INTEGER, "display menu ambient occlusion choice: 0 off, 1 SSAO, 2 HBAO, 3 GTAO", 0, 3 );
 idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 7 );
-idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 83 );
+idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 90 );
 // The opt-ins are unarchived, so each lasts until the player quits, and
 // CVAR_NOCHEAT, because the engine counts any other unarchived CVar as a
 // cheat: joining or hosting a server without cheats resets it to its default,
@@ -405,7 +405,7 @@ static const char *const RETAINED_CONTROLS_BINDINGS[] = {
 	"_impulse10", "buymenu", "_quickChat", "_impulse51", "_attack", "_impulse15", "_impulse14", "_impulse13", "_lookUp", "_lookDown", "_mlook",
 	"centerview", "_zoom", "_impulse19", "_impulse50", "screenshot", "_weaponWheel", "_hook", "savegame quick", "loadgame quick",
 	"clientMessageMode", "clientMessageMode 1", "_impulse28", "_impulse29", "_ingamestats", "_impulse17", "emote salute",
-	"emote cheer", "emote taunt", "emote grab_a", "_voicechat"
+	"emote cheer", "emote taunt", "emote grab_a", "_voicechat", "toggleVideo"
 };
 static const int RETAINED_CONTROLS_ROWS = sizeof( RETAINED_CONTROLS_BINDINGS ) / sizeof( RETAINED_CONTROLS_BINDINGS[0] );
 // The retained SETTINGS page (tools/ui/retained_settings_page.py): its
@@ -5782,10 +5782,10 @@ static const mainMenuSettingsScrollPage_t MAINMENU_SETTINGS_SCROLL_PAGES[] = {
 		"game_section_choice",
 		21,
 		0,
-		83,
+		90,
 		-24,
 		-41,
-		2306,
+		2474,
 		24.0f
 	}
 };
@@ -5831,7 +5831,10 @@ static int MainMenuSettingsSectionChoiceForScroll( const mainMenuSettingsScrollP
 		if ( scrollValue < 76 ) {
 			return 6;
 		}
-		return 7;
+		if ( scrollValue < 88 ) {
+			return 7;
+		}
+		return 8;
 	}
 
 	if ( idStr::Icmp( page.name, "system" ) == 0 ) {

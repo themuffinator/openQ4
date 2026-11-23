@@ -16503,6 +16503,7 @@ windowDef Desktop
 			set "set_ctrls_other_taunt_key::noevents" "0" ;
 			set "set_ctrls_other_grab_key::noevents" "0" ;
 			set "set_ctrls_other_vchat_key::noevents" "0" ;
+			set "set_ctrls_other_video_key::noevents" "0" ;
 		}
 
 		onNamedEvent hideSetControls {
@@ -16569,6 +16570,7 @@ windowDef Desktop
 			set "set_ctrls_other_taunt_key::noevents" "1" ;
 			set "set_ctrls_other_grab_key::noevents" "1" ;
 			set "set_ctrls_other_vchat_key::noevents" "1" ;
+			set "set_ctrls_other_video_key::noevents" "1" ;
 		}
 
 		onNamedEvent showSetGameOptions {			
@@ -16767,6 +16769,19 @@ windowDef Desktop
 			set "set_game_vr_playspace_hover::visible" "1" ;
 			set "set_game_vr_body::visible" "1" ;
 			set "set_game_vr_body_hover::visible" "1" ;
+			set "set_game_video::visible" "1" ;
+			set "set_game_videoformat::visible" "1" ;
+			set "set_game_videoformat_hover::visible" "1" ;
+			set "set_game_videoquality::visible" "1" ;
+			set "set_game_videoquality_hover::visible" "1" ;
+			set "set_game_videofps::visible" "1" ;
+			set "set_game_videofps_hover::visible" "1" ;
+			set "set_game_videoheight::visible" "1" ;
+			set "set_game_videoheight_hover::visible" "1" ;
+			set "set_game_videoaudio::visible" "1" ;
+			set "set_game_videoaudio_hover::visible" "1" ;
+			set "set_game_videotiming::visible" "1" ;
+			set "set_game_videotiming_hover::visible" "1" ;
 			set "set_game_freelook_value::noevents" "0" ;
 			set "set_game_autoreload::noevents" "0" ;
 			set "set_game_autoswitch::noevents" "0" ;
@@ -16852,6 +16867,12 @@ windowDef Desktop
 			set "set_game_vr_physicalcrouch::noevents" "0" ;
 			set "set_game_vr_playspace::noevents" "0" ;
 			set "set_game_vr_body::noevents" "0" ;
+			set "set_game_videoformat::noevents" "0" ;
+			set "set_game_videoquality::noevents" "0" ;
+			set "set_game_videofps::noevents" "0" ;
+			set "set_game_videoheight::noevents" "0" ;
+			set "set_game_videoaudio::noevents" "0" ;
+			set "set_game_videotiming::noevents" "0" ;
 	
 
 		}
@@ -17036,6 +17057,19 @@ windowDef Desktop
 			set "set_game_vr_playspace_hover::visible" "0" ;
 			set "set_game_vr_body::visible" "0" ;
 			set "set_game_vr_body_hover::visible" "0" ;
+			set "set_game_video::visible" "0" ;
+			set "set_game_videoformat::visible" "0" ;
+			set "set_game_videoformat_hover::visible" "0" ;
+			set "set_game_videoquality::visible" "0" ;
+			set "set_game_videoquality_hover::visible" "0" ;
+			set "set_game_videofps::visible" "0" ;
+			set "set_game_videofps_hover::visible" "0" ;
+			set "set_game_videoheight::visible" "0" ;
+			set "set_game_videoheight_hover::visible" "0" ;
+			set "set_game_videoaudio::visible" "0" ;
+			set "set_game_videoaudio_hover::visible" "0" ;
+			set "set_game_videotiming::visible" "0" ;
+			set "set_game_videotiming_hover::visible" "0" ;
 			set "set_game_freelook_value::noevents" "1" ;
 			set "set_game_autoreload::noevents" "1" ;
 			set "set_game_autoswitch::noevents" "1" ;
@@ -17121,6 +17155,12 @@ windowDef Desktop
 			set "set_game_vr_physicalcrouch::noevents" "1" ;
 			set "set_game_vr_playspace::noevents" "1" ;
 			set "set_game_vr_body::noevents" "1" ;
+			set "set_game_videoformat::noevents" "1" ;
+			set "set_game_videoquality::noevents" "1" ;
+			set "set_game_videofps::noevents" "1" ;
+			set "set_game_videoheight::noevents" "1" ;
+			set "set_game_videoaudio::noevents" "1" ;
+			set "set_game_videotiming::noevents" "1" ;
 			set "set_game_scroll_thumb::visible" "0" ;
 			set "set_game_scroll_thumb::noevents" "1" ;
 		}
@@ -19331,6 +19371,12 @@ windowDef Desktop
 				set "set_game_vr_physicalcrouch_background::matcolor_w" "0.4" ;
 				set "set_game_vr_playspace_background::matcolor_w" "0.4" ;
 				set "set_game_vr_body_background::matcolor_w" "0.4" ;
+				set "set_game_videoformat_background::matcolor_w" "0.4" ;
+				set "set_game_videoquality_background::matcolor_w" "0.4" ;
+				set "set_game_videofps_background::matcolor_w" "0.4" ;
+				set "set_game_videoheight_background::matcolor_w" "0.4" ;
+				set "set_game_videoaudio_background::matcolor_w" "0.4" ;
+				set "set_game_videotiming_background::matcolor_w" "0.4" ;
 				if ( "gui::g_crosshairCustom" == 1 ) {
 					set "set_game_previewxhair_background::matcolor" "$desktop::corner" ;
 					set "set_game_previewxhair_description::forecolor" "$desktop::white_8" ;				
