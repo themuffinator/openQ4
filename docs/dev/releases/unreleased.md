@@ -518,6 +518,13 @@ the [development roadmap](../roadmap.md) for current scope.
   history or written to the server's log. If you typed it at a console in an
   earlier build, the old line is removed from the history file the next time
   the game starts; consider changing the password anyway.
+- Server moderation was audited and tightened. Ban and mute commands act on
+  exactly what you type (IPv6 addresses need no brackets, and a reason may
+  begin with a digit); an IPv6 player is banned, muted and counted by their
+  `/64`; a ban list the server cannot read is left untouched instead of
+  being replaced; a muted player keeps their name and clan tag; admins stay
+  logged in across map changes, and the host can list them and end their
+  logins with `admin`, `admin revoke` and `admin off`.
 - When openQ4 stops with an error on Windows, it now saves the message and
   the startup log to `fatal.log` in the `baseoq4\logs` folder of your save
   folder, and the error window says where. Attach that file to a report: until

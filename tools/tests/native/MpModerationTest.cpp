@@ -3,6 +3,7 @@
 // ranges, the ban list and its file lines, text mutes, the chat flood window,
 // the name policy and the admin log's lines. Run by tools/tests/mp_moderation.py.
 #include "../../../src/mpgame/mp/Moderation.h"
+#include "../../../src/idlib/PrivateCommand.h"
 
 #include <cstdio>
 #include <cstring>
@@ -243,6 +244,64 @@ static void TestConsoleWords( void ) {
 	CHECK( JoinDuration( { "ban", "3", "9999999999", "m" }, 2, seconds ) == 0 );
 }
 
+// A command's line as typed, cut at spaces only: what the commands read when the
+// engine publishes the line (cmd_rawText), instead of the console's tokens.
+static std::string Words( const char *line ) {
+	static mpModWords_t words;
+	if ( !MPModSplitWords( line, words ) ) {
+		return "<too long>";
+	}
+	std::string joined;
+	for ( int i = 0; i < words.count; i++ ) {
+		joined += "<";
+		joined += words.word[ i ];
+		joined += ">";
+	}
+	return joined;
+}
+
+static void TestTypedLines( void ) {
+	CHECK( Words( "ban 192.0.2.0/24 10m 3rd offence" ) == "<ban><192.0.2.0/24><10m><3rd><offence>" );
+	// the address the console's lexer damaged: "1e" read as a float, its "f" lost
+	CHECK( Words( "ban [2001:1ef0::/32] perm" ) == "<ban><[2001:1ef0::/32]><perm>" );
+	CHECK( Words( "ban [::1]:27650 10m spam" ) == "<ban><[::1]:27650><10m><spam>" );
+	CHECK( Words( "  mute\t\"Ada Lovelace\"  5m \r\n" ) == "<mute><Ada Lovelace><5m>" );
+	CHECK( Words( "ban 3 perm http://example.org/rules" ) == "<ban><3><perm><http://example.org/rules>" );
+	CHECK( Words( "ban 3 perm // a note in a script" ) == "<ban><3><perm>" );
+	CHECK( Words( "ban \"\" x" ) == "<ban><><x>" );
+	CHECK( Words( "ban \"unclosed name" ) == "<ban><unclosed name>" );
+	CHECK( Words( "" ) == "" && Words( "   " ) == "" && Words( 0 ) == "" );
+	CHECK( Words( std::string( MP_MOD_WORDS_BYTES + 10, 'x' ).c_str() ) == "<too long>" );
+	std::string many;
+	for ( int i = 0; i < MP_MOD_MAX_WORDS + 1; i++ ) {
+		many += "w ";
+	}
+	CHECK( Words( many.c_str() ) == "<too long>" );
+	CHECK( Words( many.substr( 0, MP_MOD_MAX_WORDS * 2 ).c_str() ) != "<too long>" );
+
+	// The joiners read whole words as well as the console's pieces.
+	int used = 0;
+	CHECK( JoinAddress( { "ban", "192.0.2.0/24", "10m" }, 1, &used ) == "192.0.2.0/24" && used == 1 );
+	CHECK( JoinAddress( { "ban", "[2001:1ef0::/32]", "perm" }, 1, &used ) == "2001:1ef0::/32" && used == 1 );
+	CHECK( Range( JoinAddress( { "ban", "[2001:1ef0::/32]", "perm" }, 1 ).c_str() ) == "2001:1ef0::/32" );
+	CHECK( JoinAddress( { "ban", "[::1]:27650", "10m", "spam" }, 1, &used ) == "[::1]:27650" && used == 1 );
+	CHECK( Range( "[::1]:27650" ) == "::1/128" );
+	mpModTime_t seconds = -1;
+	// a reason that begins with a digit is a reason, once the lexer no longer cuts it in two
+	CHECK( JoinDuration( { "ban", "4", "3rd", "offence" }, 2, seconds ) == 0 );
+	CHECK( JoinDuration( { "ban", "4", "24/7", "spam" }, 2, seconds ) == 0 );
+	CHECK( JoinDuration( { "ban", "4", "10m", "3rd", "offence" }, 2, seconds ) == 1 && seconds == 600 );
+
+	// "admin <password>" is the slip the engine keeps out of the console history
+	using idPrivateCommand::NamesAdminPassword;
+	CHECK( NamesAdminPassword( "admin hunter2secret" ) && NamesAdminPassword( "ADMIN  x" ) && NamesAdminPassword( "/admin x" ) );
+	CHECK( NamesAdminPassword( "echo hi; admin secret" ) && NamesAdminPassword( "admin logoutx" ) && NamesAdminPassword( "admin off now" ) == false );
+	CHECK( !NamesAdminPassword( "admin" ) && !NamesAdminPassword( "admin   " ) && !NamesAdminPassword( "admin logout" ) );
+	CHECK( !NamesAdminPassword( "admin LIST" ) && !NamesAdminPassword( "admin revoke 3" ) && !NamesAdminPassword( "admin off" ) );
+	CHECK( !NamesAdminPassword( "administer x" ) && !NamesAdminPassword( "say admin x" ) && !NamesAdminPassword( "" ) && !NamesAdminPassword( 0 ) );
+	CHECK( !NamesAdminPassword( "adm" ) && !NamesAdminPassword( "admin;" ) && !NamesAdminPassword( "admin logout; say hi" ) );
+}
+
 static mpModBanList_t banList;		// 120 KB: not on the stack
 
 static void TestBans( void ) {
@@ -393,6 +452,20 @@ static void TestMutes( void ) {
 	CHECK( list.count == 1 );
 	CHECK( MPModMuteFind( list, none, now ) == -1 );
 
+	// a list full of mutes that never end does not lose one to a mute that does
+	std::memset( &list, 0, sizeof( list ) );
+	for ( int i = 0; i < MP_MOD_MAX_MUTES; i++ ) {
+		char text[ 32 ];
+		std::snprintf( text, sizeof( text ), "10.0.2.%d", i + 1 );
+		MPModMuteAdd( list, Address( text ), now, 0 );
+	}
+	MPModMuteAdd( list, Address( "10.0.3.1" ), now, 60 );
+	CHECK( list.count == MP_MOD_MAX_MUTES && MPModMuteFind( list, Address( "10.0.3.1" ), now ) == -1 );
+	CHECK( MPModMuteFind( list, Address( "10.0.2.1" ), now ) >= 0 );
+	// one that never ends takes a place
+	MPModMuteAdd( list, Address( "10.0.3.2" ), now, 0 );
+	CHECK( list.count == MP_MOD_MAX_MUTES && MPModMuteFind( list, Address( "10.0.3.2" ), now ) >= 0 );
+
 	// a full list gives up its expired mutes, then the one that ends soonest
 	std::memset( &list, 0, sizeof( list ) );
 	for ( int i = 0; i < MP_MOD_MAX_MUTES; i++ ) {
@@ -409,6 +482,50 @@ static void TestMutes( void ) {
 	CHECK( list.count == MP_MOD_MAX_MUTES );
 	CHECK( MPModMuteFind( list, Address( "10.0.0.6" ), now + 60 ) == -1 );
 	CHECK( MPModMuteFind( list, Address( "10.0.1.2" ), now + 60 ) >= 0 );
+}
+
+// One player's range: an IPv4 address, or an IPv6 /64.
+static void TestPlayerRange( void ) {
+	CHECK( MPModPlayerPrefixBits( Address( "192.0.2.7" ) ) == 32 );
+	CHECK( MPModPlayerPrefixBits( Address( "2001:db8:1:2::7" ) ) == 64 );
+	// an IPv4 peer that arrived through an IPv6 socket is an IPv4 address
+	CHECK( MPModPlayerPrefixBits( Address( "::ffff:192.0.2.7" ) ) == 32 );
+	mpModAddress_t none;
+	MPModClearAddress( none );
+	CHECK( MPModPlayerPrefixBits( none ) == 0 );
+
+	CHECK( MPModSamePlayer( Address( "192.0.2.7:1" ), Address( "192.0.2.7:2" ) ) );
+	CHECK( !MPModSamePlayer( Address( "192.0.2.7" ), Address( "192.0.2.8" ) ) );
+	// a device moves around inside its /64 at will
+	CHECK( MPModSamePlayer( Address( "2001:db8:1:2::7" ), Address( "2001:db8:1:2:aaaa:bbbb:cccc:dddd" ) ) );
+	CHECK( !MPModSamePlayer( Address( "2001:db8:1:2::7" ), Address( "2001:db8:1:3::7" ) ) );
+	CHECK( !MPModSameAddress( Address( "2001:db8:1:2::7" ), Address( "2001:db8:1:2::8" ) ) );
+	CHECK( !MPModSamePlayer( Address( "192.0.2.7" ), Address( "2001:db8::7" ) ) );
+	CHECK( !MPModSamePlayer( none, none ) );
+	CHECK( !MPModSamePlayer( none, Address( "192.0.2.7" ) ) );
+
+	// a ban of a connected IPv6 player covers the addresses they can move to
+	static mpModBanList_t bans;
+	std::memset( &bans, 0, sizeof( bans ) );
+	const mpModTime_t now = 1795000000;
+	const mpModAddress_t player = Address( "2001:db8:1:2::7" );
+	CHECK( MPModBanAdd( bans, player, MPModPlayerPrefixBits( player ), now, 0, "Mover", "" ) == 0 );
+	CHECK( MPModBanFind( bans, Address( "2001:db8:1:2:ffff:ffff:ffff:ffff" ), now ) == 0 );
+	CHECK( MPModBanFind( bans, Address( "2001:db8:1:3::7" ), now ) == -1 );
+	char range[ MP_MOD_RANGE_TEXT_BYTES ];
+	MPModFormatRange( bans.bans[ 0 ].address, bans.bans[ 0 ].prefixBits, range, sizeof( range ) );
+	CHECK( std::string( range ) == "2001:db8:1:2::/64" );
+
+	// and a mute follows them the same way
+	static mpModMuteList_t mutes;
+	std::memset( &mutes, 0, sizeof( mutes ) );
+	MPModMuteAdd( mutes, player, now, 0 );
+	CHECK( MPModMuteFind( mutes, Address( "2001:db8:1:2:1234::1" ), now ) == 0 );
+	CHECK( MPModMuteFind( mutes, Address( "2001:db8:1:3::7" ), now ) == -1 );
+	// muting another address of the same player replaces the mute, and lifting either lifts it
+	MPModMuteAdd( mutes, Address( "2001:db8:1:2::99" ), now, 60 );
+	CHECK( mutes.count == 1 );
+	CHECK( MPModMuteRemove( mutes, Address( "2001:db8:1:2::5" ) ) && mutes.count == 0 );
 }
 
 static void TestFlood( void ) {
@@ -501,21 +618,118 @@ static void TestNames( void ) {
 	CHECK( Clean( "\xc3\x84" "da", 2 ) == "\xc3\x84" "d" );
 	CHECK( Clean( "\xe2\x82\xac\xe2\x82\xac\xe2\x82\xac", 2 ) == "\xe2\x82\xac\xe2\x82\xac" );
 	CHECK( Clean( "ab\xe2\x82\xac", MP_MOD_NAME_VISIBLE_MAX, 0, 5 ) == "ab" );
-	CHECK( Clean( "\xc3", 4 ) == "\xc3" );
+	CHECK( Clean( "\xc3", 4 ) == MP_MOD_DEFAULT_NAME );
 	// the output never passes its buffer
 	const std::string longName( 300, 'n' );
 	CHECK( Clean( longName.c_str(), 1000, 0, 16 ) == std::string( 15, 'n' ) );
 	CHECK( Clean( longName.c_str() ) == std::string( MP_MOD_NAME_VISIBLE_MAX, 'n' ) );
 
+	// The engine's escapes are not all two bytes (idStr::IsEscape): "^c" and "^i" take three more,
+	// "^n" one more. Each is kept whole, and none counts as a character except an icon.
+	CHECK( MPModEscapeLength( "^1x" ) == 2 && MPModEscapeLength( "^:x" ) == 2 && MPModEscapeLength( "^-" ) == 2 );
+	CHECK( MPModEscapeLength( "^+" ) == 2 && MPModEscapeLength( "^r" ) == 2 && MPModEscapeLength( "^R" ) == 2 );
+	CHECK( MPModEscapeLength( "^c900x" ) == 5 && MPModEscapeLength( "^C123" ) == 5 && MPModEscapeLength( "^idm0" ) == 5 );
+	CHECK( MPModEscapeLength( "^n1" ) == 3 && MPModEscapeLength( "^N" ) == 0 );
+	CHECK( MPModEscapeLength( "^c90" ) == 0 && MPModEscapeLength( "^c" ) == 0 && MPModEscapeLength( "^i12" ) == 0 );
+	CHECK( MPModEscapeLength( "^^" ) == 0 && MPModEscapeLength( "^a" ) == 0 && MPModEscapeLength( "^" ) == 0 );
+	CHECK( MPModEscapeLength( "x^1" ) == 0 && MPModEscapeLength( "" ) == 0 && MPModEscapeLength( 0 ) == 0 );
+	CHECK( Clean( "^c900Ada", MP_MOD_NAME_VISIBLE_MAX, &changed ) == "^c900Ada" && !changed );
+	CHECK( Clean( "^c900abcdef", 3 ) == "^c900abc" );
+	// an icon or a repeat is no part of a name: an unknown icon draws nothing, "^n9^idm0" draws nine
+	CHECK( Clean( "ab^idm0cd", 3 ) == "abc" );
+	CHECK( Clean( "^idm0" ) == MP_MOD_DEFAULT_NAME );
+	CHECK( Clean( "^n9^idm0Ada" ) == "Ada" );
+	CHECK( Clean( "^ixyz" ) == MP_MOD_DEFAULT_NAME );
+	// a colour takes its three digits and nothing else, so it never takes bytes of a character
+	CHECK( Clean( "^c12\xe2\x82\xac" "Ada" ) == "c12\xe2\x82\xac" "Ada" );
+	CHECK( Clean( "a^c1\xe2\x82\xac" ) == "ac1\xe2\x82\xac" );
+	CHECK( Clean( "^cabcAda" ) == "cabcAda" );
+	CHECK( Clean( "^c123" ) == MP_MOD_DEFAULT_NAME );
+	// A caret that starts no escape is removed. Left at the end of a name it joins the text
+	// printed after it: "Ada^" then ": hi" loses the colon, "Ada^c" loses three characters.
+	CHECK( Clean( "Ada^c" ) == "Adac" );
+	CHECK( Clean( "Ada^c9" ) == "Adac9" );
+	CHECK( Clean( "Ada^c90" ) == "Adac90" );
+	CHECK( Clean( "Ada^i" ) == "Adai" );
+	CHECK( Clean( "Ada^n" ) == "Adan" );
+	CHECK( Clean( "Ada^^" ) == "Ada" );
+	CHECK( Clean( "A^^1da" ) == "A^1da" );
+	CHECK( Clean( "A^ada" ) == "Aada" );
+	// control characters are removed before an escape is measured
+	CHECK( Clean( "^c9\x01" "00Ada" ) == "^c900Ada" );
+	for ( const char *name : { "Ada^", "Ada^c", "Ada^c1", "Ada^c12", "Ada^i", "Ada^n", "Ada^^", "^^^", "a^c12^", "^c^^^" } ) {
+		// whatever the name, nothing printed after it is taken into an escape
+		const std::string shown = Clean( name ) + ": hello";
+		size_t at = 0;
+		while ( at < shown.size() && shown.compare( at, 7, ": hello" ) != 0 ) {
+			const int escape = MPModEscapeLength( shown.c_str() + at );
+			at += escape > 0 ? static_cast<size_t>( escape ) : 1;
+		}
+		CHECK( at < shown.size() );
+	}
+	// a clan tag answers to the same rules, and may be empty
+	char clan[ MP_MOD_NAME_BYTES ];
+	CHECK( MPModCleanText( "", clan, sizeof( clan ), MP_MOD_NAME_VISIBLE_MAX ) == false && clan[ 0 ] == '\0' );
+	CHECK( MPModCleanText( " \x01 ", clan, sizeof( clan ), MP_MOD_NAME_VISIBLE_MAX ) && clan[ 0 ] == '\0' );
+	CHECK( MPModCleanText( "[^1OQ4^0]\n", clan, sizeof( clan ), MP_MOD_NAME_VISIBLE_MAX ) && std::string( clan ) == "[^1OQ4^0]" );
+	CHECK( !MPModTextShows( "" ) && !MPModTextShows( "^1 ^c123" ) && MPModTextShows( "^1a" ) && !MPModTextShows( "^idm0" ) );
+	CHECK( MPModNameEscapeLength( "^1" ) == 2 && MPModNameEscapeLength( "^c900" ) == 5 && MPModNameEscapeLength( "^c9a0" ) == 0 );
+	CHECK( MPModNameEscapeLength( "^idm0" ) == 0 && MPModNameEscapeLength( "^n1" ) == 0 && MPModNameEscapeLength( "^^" ) == 0 );
+
+	// Only well-formed UTF-8 is kept: a stray byte would make every list and log line that shows the name invalid.
+	CHECK( Clean( "A\xc3" "da" ) == "Ada" );
+	CHECK( Clean( "A\x80" "d\xbf" "a" ) == "Ada" );
+	CHECK( Clean( "\xc0\xaf" "Ada" ) == "Ada" );					// an overlong "/"
+	CHECK( Clean( "\xed\xa0\x80" "Ada" ) == "Ada" );				// a surrogate
+	CHECK( Clean( "\xf4\x90\x80\x80" "Ada" ) == "Ada" );			// past U+10FFFF
+	CHECK( Clean( "\xc2\x85" "Ada" ) == "Ada" );					// a C1 control
+	CHECK( Clean( "\xf0\x9f\x98\x80" "Ada" ) == "\xf0\x9f\x98\x80" "Ada" );
+	// Characters that show nothing are removed, and every kind of space is a space: neither can
+	// make an empty name, hide in a reserved one or pad it.
+	CHECK( Clean( "\xc2\xa0" ) == MP_MOD_DEFAULT_NAME );				// no-break space alone
+	CHECK( Clean( "\xe2\x80\x8b" ) == MP_MOD_DEFAULT_NAME );			// zero width space alone
+	CHECK( Clean( "\xe3\x80\x80\xe2\x80\x8a" ) == MP_MOD_DEFAULT_NAME );	// ideographic and hair spaces
+	CHECK( Clean( "adm\xe2\x80\x8b" "in" ) == "admin" );
+	CHECK( Clean( "admin\xc2\xa0" ) == "admin" );
+	CHECK( Clean( "\xef\xbb\xbf" "admin" ) == "admin" );			// a byte order mark
+	CHECK( Clean( "ad\xc2\xad" "min" ) == "admin" );				// a soft hyphen
+	CHECK( Clean( "a\xe2\x80\xae" "nimd" ) == "animd" );			// a right-to-left override
+	CHECK( Clean( "Ada\xc2\xa0" "Lovelace" ) == "Ada Lovelace" );
+	unsigned int code = 0;
+	CHECK( MPModUtf8Decode( "A", code ) == 1 && code == 'A' );
+	CHECK( MPModUtf8Decode( "\xc3\x84", code ) == 2 && code == 0xc4 );
+	CHECK( MPModUtf8Decode( "\xe2\x82\xac", code ) == 3 && code == 0x20ac );
+	CHECK( MPModUtf8Decode( "\xf0\x9f\x98\x80", code ) == 4 && code == 0x1f600 );
+	CHECK( MPModUtf8Decode( "\xc3", code ) == 0 && MPModUtf8Decode( "\x80", code ) == 0 && MPModUtf8Decode( "\xe2\x82", code ) == 0 );
+	CHECK( MPModUtf8Decode( "\xc0\xaf", code ) == 0 && MPModUtf8Decode( "\xe0\x80\xaf", code ) == 0 );
+	CHECK( MPModUtf8Decode( "\xed\xa0\x80", code ) == 0 && MPModUtf8Decode( "\xf4\x90\x80\x80", code ) == 0 );
+	CHECK( MPModUtf8Decode( "\xf5\x80\x80\x80", code ) == 0 && MPModUtf8Decode( "\xff", code ) == 0 );
+
 	char visible[ MP_MOD_NAME_BYTES ];
 	MPModVisibleName( "^1B^2o^0B", visible, sizeof( visible ) );
 	CHECK( std::string( visible ) == "bob" );
+	MPModVisibleName( "^c900B^idm0o^n1B", visible, sizeof( visible ) );
+	CHECK( std::string( visible ) == "bob" );
+	// what the cleaner keeps and what the comparison skips are the same escapes
+	CHECK( Clean( "^c900B^idm0o^n1B" ) == "^c900BoB" );
+	// a name that shows only digits reads as a slot number
+	CHECK( MPModNameIsNumeric( "3" ) && MPModNameIsNumeric( "^13" ) && MPModNameIsNumeric( "^c9001^12" ) );
+	// as the commands read it: a minus and one point are still a number
+	CHECK( MPModNameIsNumeric( "-3" ) && MPModNameIsNumeric( "1.5" ) && MPModNameIsNumeric( "^1-^21^3.^45" ) && MPModNameIsNumeric( ".5" ) );
+	CHECK( !MPModNameIsNumeric( "3a" ) && !MPModNameIsNumeric( "" ) && !MPModNameIsNumeric( "^1" ) && !MPModNameIsNumeric( "1.5.2" ) );
+	CHECK( !MPModNameIsNumeric( "3-" ) && !MPModNameIsNumeric( "Ada" ) && !MPModNameIsNumeric( "-" ) && !MPModNameIsNumeric( "." ) );
 	MPModVisibleName( "x^", visible, sizeof( visible ) );
 	CHECK( std::string( visible ) == "x^" );
 
 	const char *reserved = "admin; Console ,referee;;";
 	CHECK( MPModNameIsReserved( "admin", reserved ) );
 	CHECK( MPModNameIsReserved( "^1A^2dmin", reserved ) );
+	// the longer escapes hide nothing from the check
+	CHECK( MPModNameIsReserved( "^c900admin", reserved ) );
+	CHECK( MPModNameIsReserved( "^c900ad^idm0min", reserved ) );
+	CHECK( MPModNameIsReserved( "ad^n1min", reserved ) );
+	// what the cleaner leaves of a name padded with characters that show nothing
+	CHECK( MPModNameIsReserved( Clean( "adm\xe2\x80\x8b" "in\xc2\xa0" ).c_str(), reserved ) );
 	CHECK( MPModNameIsReserved( "CONSOLE", reserved ) );
 	CHECK( MPModNameIsReserved( "referee", reserved ) );
 	CHECK( !MPModNameIsReserved( "admin2", reserved ) );
@@ -617,11 +831,17 @@ static void TestAdmins( void ) {
 	CHECK( MPModAdminCheck( MP_MOD_ADMIN_BAN, 3, 5, player, 0 ) == MP_MOD_ADMIN_REFUSED_BANS_OFF );
 	CHECK( MPModAdminCheck( MP_MOD_ADMIN_KICK, 3, 5, player, 0 ) == MP_MOD_ADMIN_OK );
 	CHECK( MPModAdminCheck( MP_MOD_ADMIN_MUTE, 3, 5, player, 0 ) == MP_MOD_ADMIN_OK );
+	// A ban and a mute are of a range. One that also holds an admin (the asking one, or
+	// another behind the same router) would act on that admin: refused. A kick is of one
+	// player, and lifting a mute harms nobody.
 	mpModAdminTarget_t housemate = player;
-	housemate.sameAddress = true;
-	CHECK( MPModAdminCheck( MP_MOD_ADMIN_BAN, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_REFUSED_SELF );
+	housemate.coversAdmin = true;
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_BAN, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_REFUSED_ADMIN );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_MUTE, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_REFUSED_ADMIN );
 	CHECK( MPModAdminCheck( MP_MOD_ADMIN_KICK, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_OK );
-	CHECK( MPModAdminCheck( MP_MOD_ADMIN_MUTE, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_OK );
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_UNMUTE, 3, 5, housemate, 1440 ) == MP_MOD_ADMIN_OK );
+	// where the host forbids admin bans, that is the answer whoever the range holds
+	CHECK( MPModAdminCheck( MP_MOD_ADMIN_BAN, 3, 5, housemate, 0 ) == MP_MOD_ADMIN_REFUSED_BANS_OFF );
 	// a logout needs no target; anything else is not a request
 	mpModAdminTarget_t nobody;
 	std::memset( &nobody, 0, sizeof( nobody ) );
@@ -631,12 +851,70 @@ static void TestAdmins( void ) {
 	CHECK( MPModAdminCheck( 200, 3, 5, player, 1440 ) == MP_MOD_ADMIN_REFUSED_VERB );
 }
 
+// Whether the bytes are well-formed UTF-8, by the same reading the log uses.
+static bool WellFormed( const std::string &text ) {
+	for ( size_t at = 0; at < text.size(); ) {
+		unsigned int code = 0;
+		const int bytes = MPModUtf8Decode( text.c_str() + at, code );
+		if ( bytes == 0 ) {
+			return false;
+		}
+		at += static_cast<size_t>( bytes );
+	}
+	return true;
+}
+
+static void TestText( void ) {
+	char out[ 16 ];
+	// no control characters, nothing that is not UTF-8, and never half a character
+	MPModCopyText( out, sizeof( out ), "a\tb\x80" "c\xc3" "d" );
+	CHECK( std::string( out ) == "abcd" );
+	MPModCopyText( out, 6, "abcd\xe2\x82\xac" "x" );
+	CHECK( std::string( out ) == "abcd" );
+	MPModCopyText( out, 8, "abcd\xe2\x82\xac" "x" );
+	CHECK( std::string( out ) == "abcd\xe2\x82\xac" );
+	MPModCopyText( out, sizeof( out ), "\xc2\x85" "ok" );
+	CHECK( std::string( out ) == "ok" );
+	MPModCopyText( out, sizeof( out ), 0 );
+	CHECK( out[ 0 ] == '\0' );
+	MPModCopyText( out, 1, "abc" );
+	CHECK( out[ 0 ] == '\0' );
+
+	// Whatever a name or a reason holds, the log line is valid JSON in valid UTF-8.
+	mpModLogLine_t line;
+	MPModLogBegin( line, 0, "kick" );
+	MPModLogString( line, "name", "A\x80" "d\xc3" "a \xe2\x82\xac" );
+	MPModLogEnd( line );
+	std::string text( line.text );
+	CHECK( text.find( "\"name\":\"A\\ufffdd\\ufffda \xe2\x82\xac\"" ) != std::string::npos );
+	CHECK( WellFormed( text ) );
+	// a value cut by the line's length ends on a whole character
+	for ( int pad = 0; pad < 4; pad++ ) {
+		const std::string reason = std::string( static_cast<size_t>( pad ), 'p' ) + [] {
+			std::string euros;
+			for ( int i = 0; i < 600; i++ ) {
+				euros += "\xe2\x82\xac";
+			}
+			return euros;
+		}();
+		MPModLogBegin( line, 0, "ban" );
+		MPModLogString( line, "reason", reason.c_str() );
+		MPModLogEnd( line );
+		text = line.text;
+		CHECK( line.truncated && WellFormed( text ) );
+		CHECK( text.size() >= 3 && text.compare( text.size() - 3, 3, "\"}\n" ) == 0 );
+	}
+}
+
 int main( void ) {
 	TestAddresses();
 	TestDurations();
 	TestConsoleWords();
+	TestTypedLines();
+	TestText();
 	TestBans();
 	TestMutes();
+	TestPlayerRange();
 	TestFlood();
 	TestNames();
 	TestLog();

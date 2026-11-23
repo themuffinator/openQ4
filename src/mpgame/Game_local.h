@@ -1621,8 +1621,14 @@ private:
 	mpModFlood_t			modChatFlood[ MAX_CLIENTS ];
 	int						modNoticeTime[ MAX_CLIENTS ];	// game time of the next "you are muted" notice
 	int						modActorClient;			// the admin whose request is being carried out, or -1
-	mpModAddress_t			modLastRefused;			// the last banned address the admin log recorded
-	mpModTime_t				modLastRefusedTime;
+	// the name and clan tag a muted player is held to; both empty until the first
+	// name the server accepts from a connection whose mute came with its address
+	idStr					modMutedName[ MAX_CLIENTS ];
+	idStr					modMutedClan[ MAX_CLIENTS ];
+	mpModTime_t				modRefusalWindowStart;	// the minute in which refused connections are being counted
+	int						modRefusalWindowCount;	// how many of them reached the admin log in it
+	bool					modBanFileWarned;		// said once that an unusable banlist.txt is not written over
+	int						modShutdownRun;			// the server (net_serverRunId) a waiting shutdown was asked of
 	int						modShutdownMode;		// MOD_SHUTDOWN_* in Game_network.cpp
 	mpModTime_t				modShutdownAt;			// when a timed shutdown stops the server
 	int						modShutdownNextNotice;	// seconds left at which players are told again; -1 none

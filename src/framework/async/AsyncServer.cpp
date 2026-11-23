@@ -406,6 +406,9 @@ void idAsyncServer::Spawn( void ) {
 	}
 
 	active = true;
+	// openQ4 MP-18: a new server, not a new map: what the game module scheduled for the last one
+	// (serverShutdown) is not this one's
+	idAsyncNetwork::serverRunId.SetInteger( idAsyncNetwork::serverRunId.GetInteger() + 1 );
 	RefreshRcon2Verifier();
 
 	nextHeartbeatTime = 0;
@@ -958,6 +961,30 @@ float idAsyncServer::GetClientIncomingPacketLoss( int clientNum ) const {
 	} else {
 		return client.channel.GetIncomingPacketLoss();
 	}
+}
+
+/*
+==================
+AsyncServer_SameSubscriber
+
+openQ4 MP-18: whether two addresses belong to one subscriber, for
+net_serverMaxClientsPerAddress. A home connection is given a whole IPv6 /64
+and a device picks new addresses inside it at will, so IPv6 is compared by its
+first 64 bits. Link-local and IPv4-mapped addresses, and IPv4, are compared
+whole. The game module's bans and mutes take the same view (mp/Moderation.h,
+MPModPlayerPrefixBits).
+==================
+*/
+static bool AsyncServer_SameSubscriber( const netadr_t &a, const netadr_t &b ) {
+	if ( a.type == NA_IP6 && b.type == NA_IP6 ) {
+		static const unsigned char mappedPrefix[ 12 ] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff, 0xff };
+		const bool linkLocal = a.ip6[ 0 ] == 0xfe && ( a.ip6[ 1 ] & 0xc0 ) == 0x80;
+		const bool mapped = memcmp( a.ip6, mappedPrefix, sizeof( mappedPrefix ) ) == 0;
+		if ( !linkLocal && !mapped ) {
+			return memcmp( a.ip6, b.ip6, 8 ) == 0;
+		}
+	}
+	return Sys_CompareNetAdrBase( a, b );
 }
 
 /*
@@ -2992,10 +3019,14 @@ void idAsyncServer::ProcessConnectMessage( const netadr_t from, const idBitMsg &
 		int sameAddress = 0;
 		for ( i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
 			const serverClient_t &client = clients[ i ];
-			if ( client.clientState < SCS_PUREWAIT || !Sys_CompareNetAdrBase( from, client.channel.GetRemoteAddress() ) ) {
+			const netadr_t held = client.channel.GetRemoteAddress();
+			if ( client.clientState < SCS_PUREWAIT || !AsyncServer_SameSubscriber( from, held ) ) {
 				continue;
 			}
-			if ( clientId == client.clientId || from.port == client.channel.GetRemoteAddress().port ) {
+			// The same client coming back holds the very address, with its id or its port. Neither
+			// alone is enough within an IPv6 /64: the id is the client's own choice of 16 bits, and
+			// two machines of one household use the same port by default.
+			if ( Sys_CompareNetAdrBase( from, held ) && ( clientId == client.clientId || from.port == held.port ) ) {
 				continue;
 			}
 			sameAddress++;
@@ -3338,6 +3369,12 @@ void idAsyncServer::ExecuteRemoteConsoleCommand( const netadr_t from, const char
 	rconAddress = from;
 	noRconOutput = true;
 	rconCommandExecuted = true;
+	// openQ4 MP-18: while the command runs, the game module's admin log can say that it
+	// came by rcon and from where. Cleared however the command ends.
+	struct rconSource_t {
+		rconSource_t( const netadr_t &address ) { idAsyncNetwork::serverRconFrom.SetString( Sys_NetAdrToString( address ) ); }
+		~rconSource_t() { idAsyncNetwork::serverRconFrom.SetString( "" ); }
+	} rconSource( from );
 	common->BeginRedirect( (char *)msgBuf, sizeof( msgBuf ), RConRedirect );
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, command );
 	common->EndRedirect();

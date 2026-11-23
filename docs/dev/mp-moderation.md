@@ -191,12 +191,21 @@ verifier, then cleared, with an unknowable verifier installed when there is
 no password so the exchange does not say whether one exists.
 
 **The grant** is `matchAdminConnection[slot] == matchConnectionId[slot]`: it
-belongs to the connection, is cleared with the slot's other transport state,
-and is cleared for everyone when a match session begins. A match session
-begins on every map load and map restart, and the engine re-initialises
-every client on a map load, so a login lasts for one map, as a referee's
-does. An admin who is watching with no roster seat also gets the referee
-role, by the same role mutation; a playing admin does not.
+belongs to the connection and is cleared with the slot's other transport
+state. The engine re-initialises every client on a map load, which gives each
+a new connection id with no disconnect in between; the grant is carried
+across that by `matchAdminCarry`, the address and port that logged in, set at
+login and cleared on disconnect, logout and a change of password. So a login
+lasts for the connection, not for one map, and a slot's next occupant never
+inherits it. An admin who is watching with no roster seat also gets the
+referee role for the current match session, by the same role mutation; a
+playing admin does not. A logout takes back only a referee role the admin
+login gave.
+
+**The host** sees and ends logins from the console: `admin` lists them,
+`admin revoke <slot|name|all>` ends them, `admin off` forgets the password. A
+password is at least 8 bytes, is taken as soon as it is set (the server polls
+the cvar each frame) and logs out everyone who used the old one.
 
 **The request** is a new client-to-server reliable message,
 `GAME_RELIABLE_MESSAGE_MODERATION` (appended), never a console line: a verb,
@@ -205,8 +214,9 @@ the target's slot and spawn identity, a length and a reason
 still refuses remote clients. The rules are in the core and natively tested
 (`MPModAdminCheck`, `MPModAdminBanSeconds`): the target must be the player
 the admin chose and not the admin, the host, another admin or a bot; a ban
-needs `g_adminMaxBanMinutes` above 0, is always cut to it, and is refused
-when the target shares the admin's address, since a ban is of an address.
+needs `g_adminMaxBanMinutes` above 0 and is always cut to it; and a ban or a
+mute is refused when the range it would cover (`MPModPlayerPrefixBits`) also
+holds an admin, the asking one included, since both are of a range.
 The only console line a request can run is `kick <slot>` for the slot the
 server checked. The flood class is `RELIABLE_FLOOD_MODERATION` (500 ms).
 The login operation is exempt from the match operation cooldown, so what a
@@ -244,27 +254,36 @@ referee's login) passes on the same build.
 ## Commands
 
 On the server (its console, a listen host, or rcon): `ban`, `unban`,
-`banlist [reload]`, `mute`, `unmute`, `status`, `serverShutdown`.
-`removeClientFromBanList` is kept as another name for `unban`. `unban`,
-`banlist`, `status` and `serverShutdown` refuse to run anywhere else. Typed
-on a client, `ban`, `mute`, `unmute` and `gameKick` are a logged-in admin's
-request, and `admin` / `admin logout` log in and out.
+`banlist [reload]`, `mute`, `unmute`, `status`, `serverShutdown`, and
+`admin [list|revoke|off]`. `removeClientFromBanList` is kept as another name
+for `unban`. `unban`, `banlist`, `status` and `serverShutdown` refuse to run
+anywhere else. Typed on a client, `ban`, `mute`, `unmute` and `gameKick` are
+a logged-in admin's request, and `admin` / `admin logout` log in and out.
 
-**Words the console cuts apart.** `idCmdArgs` tokenizes with the script lexer,
-so `192.0.2.0/24` arrives as `192.0.2.0` and `/24`, `10m` as `10` and `m`, and
-an IPv6 address in pieces at its colons; rcon then forwards the pieces joined
-by spaces, so the original spacing is gone by the time the server sees them.
-`MPModJoinAddressArgs` and `MPModJoinDurationArgs` (in the core, natively
-tested) put those words back: a `/prefix` argument joins the address before
-it, a number joins a one-letter unit after it, and an IPv6 address is taken
-from `[` to `]`. An IPv6 address without brackets is refused instead of being
-guessed at, because a hex word of the reason could otherwise be read as part
-of the address.
+**The line as typed.** `idCmdArgs` tokenizes with the script lexer, which is
+wrong for these commands in ways no rejoining can undo: `192.0.2.0/24`
+arrives as `192.0.2.0` and `/24` and `10m` as `10` and `m`; `3rd offence`
+becomes the number 3 and a word, so the reason was read as a three-minute
+ban; and inside `2001:1ef0::` the lexer reads `1e0` as a float and consumes
+the `f` as its suffix, so a different range was banned. The engine now
+publishes the line of a command registered with `CMD_FL_RAWTEXT` in the
+private read-only cvar `cmd_rawText` while it runs, and the commands cut it at
+spaces only (`MPModSplitWords`, natively tested; double quotes keep a name's
+spaces, a word beginning `//` ends the line). The engine's `rcon` sends its
+line the same way, so the server does not tokenize damaged text a second
+time. Where there is no such line (an older engine, or a line with `$`, whose
+cvar values only the tokens hold) the tokens are used and
+`MPModJoinAddressArgs` / `MPModJoinDurationArgs` put back what they can.
+`ban` reads its first word as a slot number if it is all digits, then as an
+address, then as a name, so a player named `192.0.2.7` or `[` cannot take a
+ban meant for an address.
 
 ## Tests
 
 - `tools/tests/mp_moderation.py`: compiles and runs
-  `tools/tests/native/MpModerationTest.cpp` against the core, then pins the
+  `tools/tests/native/MpModerationTest.cpp` against the core and
+  `MpModerationFileTest.cpp` against the ban file reader (over a stand-in
+  file system that can cut a read short and fill the disk), then pins the
   call sites, each command and its server-only guard, the file reader, the
   engine limit, the text in twelve languages and the guide. No assets.
 - `tools/tests/network_security.py`: pins the caps and policies.
@@ -273,8 +292,8 @@ of the address.
   address, one after the ban is lifted, one sharing the address, one to
   kick, and two for an admin to kick and to ban). Needs a staged runtime and
   retail assets, so CI compiles it and does not run it. 22 November 2026,
-  Windows x64, debugoptimized build of the referee password change over
-  `945dbea77`: 104 checks pass and every process exits cleanly, the server by itself
+  Windows x64, debugoptimized build of the audit's fixes over `d30280aa2`:
+  133 checks pass and every process exits cleanly, the server by itself
   after its last match. The players an admin acts on bind 127.0.0.2, so the
   server sees a second address and the ban is a real one; `--skip-admin`
   leaves the stage out where only 127.0.0.1 exists. The hidden clients take
@@ -288,13 +307,103 @@ of the address.
   the moderation stages still; the shutdown stage sets a frag limit and
   restarts the map to get a match that ends.
 
+## Audit, 22 November 2026
+
+The user asked for the implementation and the functionality around it to be
+scrutinised. Two independent reviews (the engine-free core with its file
+reader; the wiring into the game and the engine) and a pass of my own found
+the following, all fixed in the same change unless marked open below.
+
+**Wrong result, silently**
+- The console's lexer damaged what the commands were given: an IPv6 group
+  such as `1ef0` lost a character and a different range was banned; a reason
+  beginning with a digit became the ban's length; `[address]:port` was never
+  seen whole. Fixed at the root: the commands read the line as typed.
+- A player named like an address (`192.0.2.7`, `[`) took a ban meant for it.
+- `banlist.txt` that could not be read (too large, cut short, UTF-16, a first
+  line the sniff did not expect) was taken for an empty or a Quake 4 list and
+  written over; more than 512 bans, or 256 other lines, were silently dropped
+  on the next save; a full disk could promote a short staged file. Now such a
+  file is left as it is, the list in memory stays in force, saving is refused
+  until a load works, and a staged file is read back before it is promoted.
+- `serverShutdown match` was skipped by every map load that goes round
+  `MapRestart` (a limit vote, a ruleset change, a series handing on its map,
+  the eight-hour restart). All of them pass one point in `RunFrame` now.
+
+**Evasion**
+- Over IPv6 a ban by slot, a mute and the per-address limit keyed on one
+  `/128`; a player moves inside their `/64` at will. All three use the `/64`
+  (`MPModPlayerPrefixBits`, `AsyncServer_SameSubscriber`).
+- Reserved names were passed under Raven's long escapes (`^c900admin`,
+  `^idm0`, `^n1`), and with invisible characters and non-breaking spaces. The
+  cleaner mirrors `idStr::IsEscape`, keeps colours only, removes icons and
+  repeats, keeps only well-formed UTF-8, removes invisible characters and
+  reads every kind of space as a space. A caret that starts no colour is
+  removed, so a name can no longer swallow the text printed after it.
+- A muted player still spoke through `ui_name` and `ui_clan` (shown in the
+  score list and every kill message) and through the map queue's
+  announcement. The mute holds both, and the announcement goes to the sender
+  alone. The clan tag had no rules at all; it follows the name's now.
+- The per-address limit's reconnect exemption matched on the port alone, and
+  in my first `/64` version on the client-chosen id alone.
+
+**Privilege**
+- An admin's ban, or a mute, of a player who shares an address with another
+  admin reached that admin. Refused.
+- An admin who is watching holds the referee role and through Match Control
+  could remove another admin. Only the host does now.
+- The host could not see who was an admin, end a login or withdraw the
+  password while the server ran. `admin`, `admin revoke`, `admin off`.
+- An admin password could be one character. Eight bytes at least.
+- `admin logout` took away a referee role earned with the referee's own
+  password.
+
+**The log**
+- Refused connections were paced by the last address seen, so two banned
+  addresses in turn wrote a line a packet. Paced for each ban, with a cap of
+  30 lines a minute for the list.
+- A referee's removal of a player was logged as a console kick with nobody
+  named; a console kick could vanish when the disconnect's own broadcast
+  dropped another client and overwrote `net_serverLastDrop`; an engine error
+  inside an admin's request left every later line attributed to that admin;
+  a locked-out login wrote a line every two seconds for ever.
+- A console line that came by rcon was indistinguishable from one typed at
+  the console. It carries `rcon`, the sender's address (`net_serverRconFrom`).
+- A name or reason with a stray byte, or one cut by the line's length, made
+  the line invalid UTF-8. Values are written a character at a time, and a
+  byte that is no part of one as U+FFFD.
+
+**Smaller**
+- A shutdown set on one listen server ran on the next one in the same process
+  (`net_serverRunId`). `banlist reload` did not remove the connected players
+  a new ban covered. A list of 64 permanent mutes lost one to any timed mute.
+  The chat flood window's stamps outlived a map restart. `admin <password>`
+  was refused but kept in the console history (the engine treats that line
+  as private now). An admin login lasted one map (see **The grant**).
+
+**Left as they are**
+- The chat flood silence belongs to the slot and ends with a reconnect or a
+  map load. A reconnect takes longer than the silence.
+- A timed ban's expiry trusts the wall clock: a host whose clock jumps ahead
+  expires bans early, and a load then deletes them.
+- An admin alternating `mute` and `unmute` writes two log lines a second.
+  The admin is trusted and named on each line.
+- Look-alike letters from other alphabets pass the reserved-name check.
+- A first load cannot tell a missing `banlist.txt` from one the system will
+  not open; both read as no list. A reload keeps the list in memory.
+- On an older engine, or for a line with `$`, the commands still get the
+  lexer's tokens.
+- A kick, by vote or by hand, lets the player reconnect at once. Whether a
+  kick should carry a short ban is a decision for the project, not a defect.
+
 ## Not done yet
 
 - Bans by identity (waits for MP-17) and `status` showing an identity.
 - A row for the mute vote on the retained Vote page.
-- An admin's login lasts one map; nothing logs the admin in again after a
-  map change. Admins have no menu: the commands are console only.
+- Admins have no menu: the commands are console only.
 - The retained Admin page still labels the range column as it did the GUID
   and does not show a ban's reason or expiry.
-- Linux, macOS and a real remote address: the smoke ran on Windows over
-  loopback only.
+- Linux, macOS, IPv6 and a real remote address: the smoke ran on Windows over
+  IPv4 loopback only, so the `/64` rules, the referee's removal and the map
+  queue's muted announcement are covered by native tests and pins, not by a
+  run.

@@ -25,7 +25,12 @@ typedef enum {
 	CMD_FL_RENDERER			= BIT(2),	// renderer command
 	CMD_FL_SOUND			= BIT(3),	// sound command
 	CMD_FL_GAME				= BIT(4),	// game command
-	CMD_FL_TOOL				= BIT(5)	// tool command
+	CMD_FL_TOOL				= BIT(5),	// tool command
+	// openQ4: while the command runs, the read-only cvar cmd_rawText holds its line as it was typed.
+	// The tokenizer is a script lexer: it cuts "192.0.2.0/24" and "10m" apart, splits "3rd" into a
+	// number and a word, and reads "1e0f" inside an IPv6 address as a float, losing the "f". A
+	// command that takes addresses, lengths of time or free text asks for the line and reads it itself.
+	CMD_FL_RAWTEXT			= BIT(6)
 } cmdFlags_t;
 
 // parameters for command buffer stuffing

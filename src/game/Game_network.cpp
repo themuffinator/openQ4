@@ -2868,7 +2868,8 @@ void idGameLocal::LoadBanList() {
 	banListLoaded = true;
 	banListChanged = result.rewrite;
 	if ( result.unreadable ) {
-		common->Warning( "ban list: %s was not a ban list; it was copied to %s and replaced", MP_MOD_BANLIST_FILENAME, MP_MOD_BANLIST_UNREADABLE );
+		// left as it is and never written over (mp/ModerationFile.h)
+		common->Warning( "ban list: %s was not taken: %s. It is left as it is and nothing is saved over it", MP_MOD_BANLIST_FILENAME, result.why );
 	} else if ( result.legacy > 0 ) {
 		common->Printf( "ban list: %d Quake 4 GUID ban(s) in %s are kept as comments; they never matched a player\n", result.legacy, MP_MOD_BANLIST_FILENAME );
 	}

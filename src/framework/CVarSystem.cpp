@@ -843,6 +843,10 @@ bool idCVarSystemLocal::CommandContainsPrivateCVar( const char *commandText ) co
 	if ( commandText == NULL || commandText[0] == '\0' ) {
 		return false;
 	}
+	// openQ4 MP-18: a password typed after "admin" by mistake names no cvar, and is as private
+	if ( idPrivateCommand::NamesAdminPassword( commandText ) ) {
+		return true;
+	}
 	for ( int index = 0; index < cvars.Num(); ++index ) {
 		const idInternalCVar *cvar = cvars[ index ];
 		if ( !( cvar->GetFlags() & CVAR_PRIVATE ) ) {

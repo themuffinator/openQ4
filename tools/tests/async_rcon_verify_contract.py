@@ -80,12 +80,15 @@ struct idBitMsg {
 	int ReadLong() const { return longs[ nextLong++ ]; }
 	void ReadString( char *out, int n ) const { idStr::Copynz( out, strings[ nextString++ ].c_str(), n ); }
 };
-struct CVarString { std::string value; const char *GetString() const { return value.c_str(); } };
+struct CVarString { std::string value; const char *GetString() const { return value.c_str(); } void SetString( const char *s ) { value = s; } };
 struct CVarBool { bool value; bool GetBool() const { return value; } };
 struct idAsyncNetwork {
 	static CVarString clientRemoteConsoleAddress, clientRemoteConsolePassword;
+	// MP-18: where the rcon command now running came from, for the game module's admin log
+	static CVarString serverRconFrom;
 	static CVarBool clientUseLegacyRcon;
 };
+CVarString idAsyncNetwork::serverRconFrom{ "" };
 CVarString idAsyncNetwork::clientRemoteConsoleAddress{ "localhost" };
 CVarString idAsyncNetwork::clientRemoteConsolePassword{ "" };
 CVarBool idAsyncNetwork::clientUseLegacyRcon{ false };
@@ -105,7 +108,8 @@ struct Common {
 	void EndRedirect() {}
 } commonValue, *common = &commonValue;
 std::vector<std::string> commands;
-struct CmdSystem { void BufferCommandText( int, const char *text ) { commands.push_back( text ); } } cmdValue, *cmdSystem = &cmdValue;
+std::vector<std::string> commandSources;	// net_serverRconFrom as each command ran
+struct CmdSystem { void BufferCommandText( int, const char *text ) { commands.push_back( text ); commandSources.push_back( idAsyncNetwork::serverRconFrom.value ); } } cmdValue, *cmdSystem = &cmdValue;
 struct CVarSystem { void SetCVarString( const char *, const char * ) {} } cvarValue, *cvarSystem = &cvarValue;
 struct Session {
 	const char *MessageBox( int, const char *, const char *, bool, const char * = nullptr ) { return nullptr; }
@@ -202,6 +206,9 @@ int main() {
 		commands.clear();
 		server.ExecuteRemoteConsoleCommand( netadr_t{ 5, 27960 }, "status", false );
 		CHECK( commands.size() == 1 && commands[0] == "status", "server-runs-commands" );
+		// the command ran with its source published, and the source is withdrawn afterwards
+		CHECK( commandSources.size() >= 1 && commandSources.back() == "endpoint" && idAsyncNetwork::serverRconFrom.value.empty(),
+			"server-publishes-rcon-source" );
 		CHECK( server.oob.size() == 1 && server.oob[0].text == "#str_04848", "server-quiet-command-reply" );
 	}
 	{	// verified: answered once, as true, and shown as console output rather than status

@@ -84,6 +84,7 @@ struct serverAdminData_t {};
 typedef long long mpModTime_t;
 struct mpModAddress_t {unsigned char bytes[16]={};int family=0;};
 static int MPModAddressBits(const mpModAddress_t& a){return a.family==4?32:a.family==6?128:0;}
+static int MPModPlayerPrefixBits(const mpModAddress_t& a){return a.family==6?64:MPModAddressBits(a);}
 static bool IsValidVotePlayerSlot(int);
 static bool IsCurrentPlayerTarget(int,int);
 struct idMultiplayerGame {

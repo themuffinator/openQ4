@@ -1448,10 +1448,14 @@ def validate_server_moderation() -> None:
     parse = function_body(core, "inline bool MPModParseAddress(", "address parser")
     require(parse, "if ( length <= 0 || length >= 128 ) {", "address text is bounded before it is read")
     require(parse, "static const unsigned char mapped[ 12 ]", "an IPv4-mapped address is its IPv4 address")
-    require(function_body(core, "inline void MPModCopyText(", "stored text"), "if ( c < 0x20 || c == 0x7f ) {",
-            "control characters never reach the ban list or its file")
-    require(function_body(core, "inline void MPModLogValue(", "admin log value"), "if ( c == '\"' || c == '\\\\' ) {",
-            "player text is escaped in the admin log")
+    require(function_body(core, "inline void MPModCopyText(", "stored text"),
+            "if ( bytes == 0 || value < 0x20 || value == 0x7f || ( value >= 0x80 && value <= 0x9f ) ) {",
+            "control characters and bytes that are not UTF-8 never reach the ban list or its file")
+    log_value = function_body(core, "inline void MPModLogValue(", "admin log value")
+    require(log_value, "} else if ( code == '\"' || code == '\\\\' ) {", "player text is escaped in the admin log")
+    require(log_value, "ufffd", "a byte that is not UTF-8 is written as U+FFFD, so a log line is always valid")
+    require(core, "inline int MPModEscapeLength( const char *s ) {", "names are read with the engine's own escape lengths")
+    require(core, "static const int MP_MOD_PLAYER_PREFIX_V6 = 64;", "a player over IPv6 is their /64")
     loader = read_game("src/mpgame/mp/ModerationFile.h")
     require(loader, "static const int MP_MOD_BANLIST_MAX_BYTES = 512 * 1024;", "ban file size cap")
     require(loader, "static const int MP_MOD_BANLIST_MAX_KEPT_LINES = 256;", "ban file kept-line cap")
@@ -1485,7 +1489,7 @@ def validate_server_moderation() -> None:
     ):
         require(cvars, declaration, "moderation defaults")
     names = function_body(read_game("src/mpgame/Game_local.cpp"), "const idDict* idGameLocal::SetUserInfo(", "user info")
-    require_before(names, "MPModCleanName(", "idStr::IsNumeric(", "the name policy runs on every server-side name")
+    require_before(names, "MPModCleanName(", "MPModNameIsNumeric(", "the name policy runs on every server-side name")
     require(names, "MP_MOD_NAME_VISIBLE_MAX", "names are bounded")
 
     # The mute vote, graceful shutdown and the engine's kick in the admin log.

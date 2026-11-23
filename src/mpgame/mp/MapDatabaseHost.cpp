@@ -873,9 +873,10 @@ void mpMapDatabaseHost::ServerQueueSet( int clientNum, const char *path ) {
 	switch ( result ) {
 		case MP_MAPDB_QUEUE_ADDED:
 		case MP_MAPDB_QUEUE_REPLACED:
-			// everyone sees who asked for what
-			gameLocal.ServerSendChatMessage( -1, gameLocal.userInfo[ clientNum ].GetString( "ui_name", "player" ),
-				MAPDB_STR_QUEUED, name );
+			// everyone sees who asked for what. A muted player's request is taken and
+			// shown to them alone: a line under their name every second is a voice.
+			gameLocal.ServerSendChatMessage( gameLocal.IsClientTextMuted( clientNum ) ? clientNum : -1,
+				gameLocal.userInfo[ clientNum ].GetString( "ui_name", "player" ), MAPDB_STR_QUEUED, name );
 			gameLocal.Printf( "map database: client %d queued %s (%d queued)\n", clientNum,
 				database.Entry( index )->token, database.QueueNum() );
 			PublishServerInfo( false );

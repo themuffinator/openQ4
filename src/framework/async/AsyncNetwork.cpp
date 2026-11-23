@@ -68,6 +68,8 @@ idCVar				idAsyncNetwork::clientMaxRate( "net_clientMaxRate", "128000", CVAR_SYS
 idCVar				idAsyncNetwork::serverMaxUsercmdRelay( "net_serverMaxUsercmdRelay", "5", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "maximum number of usercmds from other clients the server relays to a client", 1, MAX_USERCMD_RELAY, idCmdSystem::ArgCompletion_Integer<1,MAX_USERCMD_RELAY> );
 idCVar				idAsyncNetwork::serverZombieTimeout( "net_serverZombieTimeout", "5", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "disconnected client timeout in seconds" );
 idCVar				idAsyncNetwork::serverMaxClientsPerAddress( "net_serverMaxClientsPerAddress", "0", CVAR_SYSTEM | CVAR_INTEGER | CVAR_ARCHIVE | CVAR_NOCHEAT, "most clients one address may hold on this server; 0 for no limit", 0, MAX_ASYNC_CLIENTS );
+idCVar				idAsyncNetwork::serverRunId( "net_serverRunId", "0", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ROM | CVAR_INTEGER, "counts the servers this process has started; the game module uses it to tell a new server from a new map" );
+idCVar				idAsyncNetwork::serverRconFrom( "net_serverRconFrom", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ROM, "the address the remote console command now running came from, and empty otherwise; the game module's admin log reads it" );
 idCVar				idAsyncNetwork::serverLastDrop( "net_serverLastDrop", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ROM, "the client the server last removed and why, as '<slot> <reason>'; the game module's admin log reads it" );
 idCVar				idAsyncNetwork::serverClientTimeout( "net_serverClientTimeout", "40", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "client time out in seconds" );
 idCVar				idAsyncNetwork::clientServerTimeout( "net_clientServerTimeout", "40", CVAR_SYSTEM | CVAR_INTEGER | CVAR_NOCHEAT, "server time out in seconds" );
@@ -204,7 +206,7 @@ void idAsyncNetwork::Init( void ) {
 	cmdSystem->AddCommand( "serverInfo", GetServerInfo_f, CMD_FL_SYSTEM, "shows server info" );
 	cmdSystem->AddCommand( "LANScan", GetLANServers_f, CMD_FL_SYSTEM, "scans LAN for servers" );
 	cmdSystem->AddCommand( "listServers", ListServers_f, CMD_FL_SYSTEM, "lists scanned servers" );
-	cmdSystem->AddCommand( "rcon", RemoteConsole_f, CMD_FL_SYSTEM, "sends an authenticated remote console command to the server" );
+	cmdSystem->AddCommand( "rcon", RemoteConsole_f, CMD_FL_SYSTEM | CMD_FL_RAWTEXT, "sends an authenticated remote console command to the server" );
 	cmdSystem->AddCommand( "heartbeat", Heartbeat_f, CMD_FL_SYSTEM, "send a heartbeat to the the master servers" );
 	cmdSystem->AddCommand( "kick", Kick_f, CMD_FL_SYSTEM, "kick a client by connection number" );
 	cmdSystem->AddCommand( "checkNewVersion", CheckNewVersion_f, CMD_FL_SYSTEM, "check if a new version of the game is available" );
@@ -797,6 +799,28 @@ idAsyncNetwork::RemoteConsole_f
 ==================
 */
 void idAsyncNetwork::RemoteConsole_f( const idCmdArgs &args ) {
+	// openQ4: send what was typed after "rcon", not the tokens joined again. The tokenizer cuts
+	// "192.0.2.0/24" and "10m" apart and can lose a character of an IPv6 address, and the server
+	// would tokenize the damaged text a second time. A line with "$" keeps the tokens, which hold
+	// the cvar values it asked for.
+	const char *raw = cvarSystem->GetCVarString( "cmd_rawText" );
+	while ( *raw == ' ' || *raw == '\t' ) {
+		raw++;
+	}
+	if ( *raw == '/' || *raw == '\\' ) {
+		raw++;
+	}
+	if ( idStr::Icmpn( raw, "rcon", 4 ) == 0 && ( raw[ 4 ] == ' ' || raw[ 4 ] == '\t' ) && strchr( raw, '$' ) == NULL ) {
+		raw += 4;
+		while ( *raw == ' ' || *raw == '\t' ) {
+			raw++;
+		}
+		idStr line = raw;
+		line.StripTrailingWhitespace();
+		client.RemoteConsole( line.c_str() );
+		line.SecureClear();
+		return;
+	}
 	client.RemoteConsole( args.Args() );
 }
 

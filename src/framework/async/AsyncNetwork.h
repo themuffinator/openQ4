@@ -195,6 +195,8 @@ public:
 	static idCVar			serverMaxUsercmdRelay;			// maximum number of usercmds relayed to other clients
 	static idCVar			serverZombieTimeout;			// time out in seconds for zombie clients
 	static idCVar			serverMaxClientsPerAddress;		// most clients one address may hold; 0 for no limit
+	static idCVar			serverRunId;					// how many servers this process has started
+	static idCVar			serverRconFrom;					// where the rcon command now running came from
 	static idCVar			serverLastDrop;					// "<slot> <reason>" of the client the server last removed
 	static idCVar			serverClientTimeout;			// time out in seconds for connected clients
 	static idCVar			clientServerTimeout;			// time out in seconds for server

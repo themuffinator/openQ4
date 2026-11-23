@@ -746,8 +746,10 @@ void idGameLocal::Init( void ) {
 	memset( &modMutes, 0, sizeof( modMutes ) );
 	memset( modChatFlood, 0, sizeof( modChatFlood ) );
 	memset( modNoticeTime, 0, sizeof( modNoticeTime ) );
-	memset( &modLastRefused, 0, sizeof( modLastRefused ) );
-	modLastRefusedTime = 0;
+	modRefusalWindowStart = 0;
+	modRefusalWindowCount = 0;
+	modBanFileWarned = false;
+	modShutdownRun = 0;
 	modShutdownMode = 0;
 	modActorClient = -1;
 	modShutdownAt = 0;
@@ -1426,6 +1428,38 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 					idGameLocal::userInfo[ clientNum ].Set( "ui_name", cleanName );
 					modifiedInfo = true;
 				}
+				// The clan tag is shown beside the name in every score list, so it answers to
+				// the same rules; it may be empty, and a reserved name is no clan tag either.
+				char cleanClan[ MP_MOD_NAME_BYTES ];
+				const bool clanChanged = MPModCleanText( idGameLocal::userInfo[ clientNum ].GetString( "ui_clan" ), cleanClan, sizeof( cleanClan ), MP_MOD_NAME_VISIBLE_MAX );
+				if ( !botManager.IsBot( clientNum ) && MPModNameIsReserved( cleanClan, g_reservedNames.GetString() ) ) {
+					idGameLocal::userInfo[ clientNum ].Set( "ui_clan", "" );
+					modifiedInfo = true;
+				} else if ( clanChanged ) {
+					idGameLocal::userInfo[ clientNum ].Set( "ui_clan", cleanClan );
+					modifiedInfo = true;
+				}
+				// A muted player keeps the name and the clan tag the mute found them under.
+				// Both are shown to everyone, in the score list and in every kill message,
+				// and would otherwise carry the words the mute stopped.
+				if ( IsClientTextMuted( clientNum ) ) {
+					if ( modMutedName[ clientNum ].Length() == 0 ) {
+						modMutedName[ clientNum ] = idGameLocal::userInfo[ clientNum ].GetString( "ui_name" );
+						modMutedClan[ clientNum ] = idGameLocal::userInfo[ clientNum ].GetString( "ui_clan" );
+					} else {
+						if ( modMutedName[ clientNum ].Cmp( idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) ) != 0 ) {
+							idGameLocal::userInfo[ clientNum ].Set( "ui_name", modMutedName[ clientNum ].c_str() );
+							modifiedInfo = true;
+						}
+						if ( modMutedClan[ clientNum ].Cmp( idGameLocal::userInfo[ clientNum ].GetString( "ui_clan" ) ) != 0 ) {
+							idGameLocal::userInfo[ clientNum ].Set( "ui_clan", modMutedClan[ clientNum ].c_str() );
+							modifiedInfo = true;
+						}
+					}
+				} else if ( modMutedName[ clientNum ].Length() > 0 ) {
+					modMutedName[ clientNum ].Clear();
+					modMutedClan[ clientNum ].Clear();
+				}
 				if ( !botManager.IsBot( clientNum ) && MPModNameIsReserved( idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), g_reservedNames.GetString() ) ) {
 					idGameLocal::userInfo[ clientNum ].Set( "ui_name", va( "%s_", idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) ) );
 					modifiedInfo = true;
@@ -1433,7 +1467,8 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 			}
 
 			// don't let numeric nicknames, it can be exploited to go around kick and ban commands from the server
-			if ( idStr::IsNumeric( this->userInfo[ clientNum ].GetString( "ui_name" ) ) ) {
+			// openQ4 MP-18: what counts is what the name shows; "^13" reads as slot 3 on every score list
+			if ( MPModNameIsNumeric( this->userInfo[ clientNum ].GetString( "ui_name" ) ) ) {
 #if UI_DEBUG
 				common->Printf( "SetUserInfo: client %d changed name from %s to %s_\n", 
 					clientNum, idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ), idGameLocal::userInfo[ clientNum ].GetString( "ui_name" ) );
@@ -2133,6 +2168,10 @@ void idGameLocal::MapRestart( int instance ) {
 		// or an operator asked for the next map
 		if ( RunServerShutdown( true ) ) {
 			return;
+		}
+		// the chat flood window holds game times, and a restart starts the clock again
+		for ( int slot = 0; slot < MAX_CLIENTS; slot++ ) {
+			MPModFloodReset( modChatFlood[ slot ] );
 		}
 
 		if ( mpGame.PickMap( "", true ) ) {
@@ -4778,6 +4817,13 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		ret.consistencyHash = 0;
 		ret.sessionCommand[0] = 0;
 
+		// openQ4 MP-18: the game state's eight-hour restart, a limit vote, a ruleset
+		// change and a series handing on its next map all ask the engine for the
+		// next map here, and none of them passes through MapRestart. A server that
+		// waits to stop when its match ends stops instead of loading that map.
+		if ( sessionCommand.Length() && isMultiplayer && isServer && RunServerShutdown( true ) ) {
+			sessionCommand = "";
+		}
 		// see if a target_sessionCommand has forced a changelevel
 		if ( sessionCommand.Length() ) {
 			idStr::Copynz( ret.sessionCommand, sessionCommand, sizeof( ret.sessionCommand ) );

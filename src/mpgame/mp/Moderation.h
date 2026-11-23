@@ -230,6 +230,22 @@ inline bool MPModSameAddress( const mpModAddress_t &a, const mpModAddress_t &b )
 	return a.family != 0 && MPModAddressInRange( a, b, MPModAddressBits( b ) );
 }
 
+// The range one player is taken to hold: an IPv4 address, or an IPv6 /64. A home
+// connection is given a whole IPv6 /64 and a device takes new addresses inside it
+// whenever it likes, so one IPv6 address names nobody for longer than they choose.
+// A ban of a connected player, a mute that outlasts a reconnect and the test for
+// "the same address" all use it. The engine's connection limit takes the same view
+// (AsyncServer_SameSubscriber).
+static const int MP_MOD_PLAYER_PREFIX_V6 = 64;
+
+inline int MPModPlayerPrefixBits( const mpModAddress_t &address ) {
+	return address.family == 6 ? MP_MOD_PLAYER_PREFIX_V6 : MPModAddressBits( address );
+}
+
+inline bool MPModSamePlayer( const mpModAddress_t &a, const mpModAddress_t &b ) {
+	return a.family != 0 && MPModAddressInRange( a, b, MPModPlayerPrefixBits( b ) );
+}
+
 // Reads an address with an optional port and an optional "/prefix". Without a
 // prefix the range is the one address. An IPv4 peer that arrives through the
 // mapped IPv6 range is the IPv4 address, as the engine has it. False for
@@ -470,20 +486,119 @@ inline void MPModFormatRange( const mpModAddress_t &address, int prefixBits, cha
 // text an operator or a player supplied
 //----------------------------------------------------------------
 
-// Copies text for a list or a log: no control characters, bounded, terminated.
+// The length in bytes of the well-formed UTF-8 character at s and its code point,
+// or 0 when the byte there begins none: a stray continuation byte, a lead byte
+// short of its continuation bytes, an overlong form, a surrogate, or a value past
+// U+10FFFF. An ASCII byte, the terminating NUL included, is one byte.
+inline int MPModUtf8Decode( const char *s, unsigned int &value ) {
+	const unsigned char c = static_cast<unsigned char>( s[ 0 ] );
+	value = c;
+	if ( c < 0x80 ) {
+		return 1;
+	}
+	int length;
+	if ( c >= 0xc2 && c <= 0xdf ) {
+		length = 2;
+		value = c & 0x1fu;
+	} else if ( c >= 0xe0 && c <= 0xef ) {
+		length = 3;
+		value = c & 0x0fu;
+	} else if ( c >= 0xf0 && c <= 0xf4 ) {
+		length = 4;
+		value = c & 0x07u;
+	} else {
+		return 0;
+	}
+	for ( int k = 1; k < length; k++ ) {
+		const unsigned char next = static_cast<unsigned char>( s[ k ] );
+		if ( ( next & 0xc0 ) != 0x80 ) {
+			return 0;
+		}
+		value = ( value << 6 ) | ( next & 0x3fu );
+	}
+	if ( ( length == 3 && ( value < 0x800 || ( value >= 0xd800 && value <= 0xdfff ) ) ) ||
+		( length == 4 && ( value < 0x10000 || value > 0x10ffff ) ) ) {
+		return 0;
+	}
+	return length;
+}
+
+// Copies text for a list or a log: no control characters, only well-formed
+// UTF-8, bounded, terminated, and never cut inside a character.
 inline void MPModCopyText( char *out, int outSize, const char *in ) {
 	if ( outSize <= 0 ) {
 		return;
 	}
 	int length = 0;
-	for ( ; in != 0 && *in != '\0' && length < outSize - 1; in++ ) {
-		const unsigned char c = static_cast<unsigned char>( *in );
-		if ( c < 0x20 || c == 0x7f ) {
+	while ( in != 0 && *in != '\0' ) {
+		unsigned int value = 0;
+		const int bytes = MPModUtf8Decode( in, value );
+		if ( bytes == 0 || value < 0x20 || value == 0x7f || ( value >= 0x80 && value <= 0x9f ) ) {
+			in += bytes > 0 ? bytes : 1;
 			continue;
 		}
-		out[ length++ ] = *in;
+		if ( length + bytes > outSize - 1 ) {
+			break;
+		}
+		for ( int k = 0; k < bytes; k++ ) {
+			out[ length++ ] = in[ k ];
+		}
+		in += bytes;
 	}
 	out[ length ] = '\0';
+}
+
+// A command's line cut into words at spaces and tabs and nowhere else. The
+// console's tokenizer is a script lexer: it cuts "192.0.2.0/24" and "10m" in
+// two, reads "3rd" as a number and a word, splits an IPv6 address at every
+// colon, and takes "1e0f" inside one for a float, losing the "f". A command
+// that reads addresses, lengths of time and free text reads its line with this
+// instead, when the engine provides the line (cmd_rawText). A word in double
+// quotes keeps its spaces and loses the quotes; a word that begins "//" ends
+// the line, as a comment does in a script. False when the line does not fit.
+static const int MP_MOD_MAX_WORDS = 64;
+static const int MP_MOD_WORDS_BYTES = 1024;
+
+typedef struct mpModWords_s {
+	int				count;
+	const char *	word[ MP_MOD_MAX_WORDS ];
+	char			text[ MP_MOD_WORDS_BYTES ];
+} mpModWords_t;
+
+inline bool MPModSplitWords( const char *line, mpModWords_t &words ) {
+	words.count = 0;
+	int used = 0;
+	const char *at = line != 0 ? line : "";
+	for ( ;; ) {
+		while ( *at == ' ' || *at == '\t' || *at == '\n' || *at == '\r' ) {
+			at++;
+		}
+		if ( *at == '\0' || ( at[ 0 ] == '/' && at[ 1 ] == '/' ) ) {
+			return true;
+		}
+		if ( words.count >= MP_MOD_MAX_WORDS ) {
+			return false;
+		}
+		words.word[ words.count ] = words.text + used;
+		const bool quoted = *at == '"';
+		if ( quoted ) {
+			at++;
+		}
+		while ( *at != '\0' && ( quoted ? *at != '"' : ( *at != ' ' && *at != '\t' && *at != '\n' && *at != '\r' ) ) ) {
+			if ( used >= MP_MOD_WORDS_BYTES - 1 ) {
+				return false;
+			}
+			words.text[ used++ ] = *at++;
+		}
+		if ( quoted && *at == '"' ) {
+			at++;
+		}
+		if ( used >= MP_MOD_WORDS_BYTES ) {
+			return false;
+		}
+		words.text[ used++ ] = '\0';
+		words.count++;
+	}
 }
 
 // "30m", "2h", "7d", "1w", "45s"; a bare number is minutes. "perm", "permanent",
@@ -693,6 +808,7 @@ typedef struct mpModBan_s {
 	mpModTime_t		expires;		// 0 never
 	char			name[ MP_MOD_NAME_BYTES ];		// who it was when banned; a label, never matched
 	char			reason[ MP_MOD_REASON_BYTES ];
+	mpModTime_t		refusedLogged;	// not in the file: when a connection this ban refused was last put in the log
 } mpModBan_t;
 
 typedef struct mpModBanList_s {
@@ -926,7 +1042,7 @@ typedef struct mpModMuteList_s {
 inline int MPModMuteFind( const mpModMuteList_t &list, const mpModAddress_t &address, mpModTime_t now ) {
 	for ( int i = 0; i < list.count; i++ ) {
 		const mpModMute_t &mute = list.mutes[ i ];
-		if ( ( mute.expires == 0 || mute.expires > now ) && MPModSameAddress( address, mute.address ) ) {
+		if ( ( mute.expires == 0 || mute.expires > now ) && MPModSamePlayer( address, mute.address ) ) {
 			return i;
 		}
 	}
@@ -936,7 +1052,7 @@ inline int MPModMuteFind( const mpModMuteList_t &list, const mpModAddress_t &add
 inline bool MPModMuteRemove( mpModMuteList_t &list, const mpModAddress_t &address ) {
 	bool removed = false;
 	for ( int i = list.count - 1; i >= 0; i-- ) {
-		if ( MPModSameAddress( address, list.mutes[ i ].address ) ) {
+		if ( MPModSamePlayer( address, list.mutes[ i ].address ) ) {
 			list.mutes[ i ] = list.mutes[ list.count - 1 ];
 			list.count--;
 			removed = true;
@@ -945,7 +1061,9 @@ inline bool MPModMuteRemove( mpModMuteList_t &list, const mpModAddress_t &addres
 	return removed;
 }
 
-// A full list drops its expired mutes, then the one that ends soonest.
+// A full list drops its expired mutes, then the timed one that ends soonest.
+// When every mute in it is permanent, a new timed mute is not listed (it still
+// holds for the player's connection) and a new permanent one replaces the first.
 inline void MPModMuteAdd( mpModMuteList_t &list, const mpModAddress_t &address, mpModTime_t now, mpModTime_t durationSeconds ) {
 	if ( address.family == 0 ) {
 		return;
@@ -967,6 +1085,9 @@ inline void MPModMuteAdd( mpModMuteList_t &list, const mpModAddress_t &address, 
 			if ( a != 0 && ( b == 0 || a < b ) ) {
 				soonest = i;
 			}
+		}
+		if ( list.mutes[ soonest ].expires == 0 && durationSeconds > 0 ) {
+			return;
 		}
 		list.mutes[ soonest ] = list.mutes[ list.count - 1 ];
 		list.count--;
@@ -1036,28 +1157,106 @@ inline int MPModFloodCheck( mpModFlood_t &flood, int now, int messages, int wind
 // the name policy
 //----------------------------------------------------------------
 
-// What a name shows: no colour escapes ("^1"), ASCII lower case. Used to compare
-// names, so "^1Bob" and "bob" are one name.
+// How many bytes the engine's text code takes as one escape at s. This mirrors
+// idStr::IsEscape (idlib/Str.cpp), which this engine-free header cannot call:
+// "^0".."^9", "^:", "^-", "^+" and "^r" are two bytes; "^n" and one more byte is
+// three; "^c" (a colour) and "^i" (an icon) with three more bytes are five.
+// Anything else, "^^" included, is no escape and is drawn as it is written.
+inline int MPModEscapeLength( const char *s ) {
+	if ( s == 0 || s[ 0 ] != '^' ) {
+		return 0;
+	}
+	const char c = s[ 1 ];
+	if ( ( c >= '0' && c <= '9' ) || c == ':' || c == '-' || c == '+' || c == 'r' || c == 'R' ) {
+		return 2;
+	}
+	if ( c == 'n' || c == 'N' ) {
+		return s[ 2 ] != '\0' ? 3 : 0;
+	}
+	if ( c == 'c' || c == 'C' || c == 'i' || c == 'I' ) {
+		return ( s[ 2 ] != '\0' && s[ 3 ] != '\0' && s[ 4 ] != '\0' ) ? 5 : 0;
+	}
+	return 0;
+}
+
+// What a name shows: no escapes ("^1", "^c900"), ASCII lower case. Used to
+// compare names, so "^1Bob", "^c900BOB" and "bob" are one name.
 inline void MPModVisibleName( const char *in, char *out, int outSize ) {
 	if ( outSize <= 0 ) {
 		return;
 	}
 	int length = 0;
-	for ( ; in != 0 && *in != '\0' && length < outSize - 1; in++ ) {
-		if ( *in == '^' && in[ 1 ] != '\0' ) {
-			in++;
+	while ( in != 0 && *in != '\0' && length < outSize - 1 ) {
+		const int escape = MPModEscapeLength( in );
+		if ( escape > 0 ) {
+			in += escape;
 			continue;
 		}
 		out[ length++ ] = ( *in >= 'A' && *in <= 'Z' ) ? static_cast<char>( *in - 'A' + 'a' ) : *in;
+		in++;
 	}
 	out[ length ] = '\0';
 }
 
-// Control characters removed, spaces at either end trimmed, at most maxVisible
-// characters that show (colour escapes are kept and not counted; a UTF-8
-// character counts once and is never cut), and a name that shows nothing
-// replaced. Returns true when out differs from in.
-inline bool MPModCleanName( const char *in, char *out, int outSize, int maxVisible ) {
+// The escapes a name or a clan tag may keep: the colours. "^c" must be followed
+// by its three digits, so no escape takes bytes of a character after it. An icon
+// ("^i") or a repeat ("^n") is no part of a name: an icon the game does not know
+// draws nothing, and a repeat draws dozens.
+inline int MPModNameEscapeLength( const char *s ) {
+	const int length = MPModEscapeLength( s );
+	if ( length == 2 ) {
+		return 2;
+	}
+	if ( length == 5 && ( s[ 1 ] == 'c' || s[ 1 ] == 'C' ) && s[ 2 ] >= '0' && s[ 2 ] <= '9' &&
+		s[ 3 ] >= '0' && s[ 3 ] <= '9' && s[ 4 ] >= '0' && s[ 4 ] <= '9' ) {
+		return 5;
+	}
+	return 0;
+}
+
+// Characters that take no room or show nothing: soft hyphen, zero-width and
+// joining characters, direction marks, fillers, variation selectors and tags.
+// With one of these "adm<zero width>in" would read "admin" and match nothing.
+inline bool MPModCodeIsInvisible( unsigned int code ) {
+	return code == 0x00ad || code == 0x034f || code == 0x061c || code == 0x115f || code == 0x1160 ||
+		code == 0x17b4 || code == 0x17b5 || ( code >= 0x180b && code <= 0x180e ) || ( code >= 0x200b && code <= 0x200f ) ||
+		( code >= 0x202a && code <= 0x202e ) || ( code >= 0x2060 && code <= 0x206f ) || code == 0x3164 ||
+		( code >= 0xfe00 && code <= 0xfe0f ) || code == 0xfeff || code == 0xffa0 || ( code >= 0xe0000 && code <= 0xe0fff );
+}
+
+// Characters that show as a space: they are read as one, so they are trimmed
+// from a name's ends and cannot stand in for a name.
+inline bool MPModCodeIsSpace( unsigned int code ) {
+	return code == 0x00a0 || code == 0x1680 || ( code >= 0x2000 && code <= 0x200a ) || code == 0x2028 ||
+		code == 0x2029 || code == 0x202f || code == 0x205f || code == 0x2800 || code == 0x3000;
+}
+
+// True when the text shows anything: a character that is not a space.
+inline bool MPModTextShows( const char *text ) {
+	while ( text != 0 && *text != '\0' ) {
+		const int escape = MPModEscapeLength( text );
+		if ( escape > 0 ) {
+			text += escape;
+			continue;
+		}
+		if ( *text != ' ' ) {
+			return true;
+		}
+		text++;
+	}
+	return false;
+}
+
+// A name or a clan tag as the server keeps it: well-formed UTF-8 with no
+// control or invisible characters, every kind of space an ordinary one, spaces
+// at either end trimmed, at most maxVisible characters that show (a colour
+// escape is kept whole and not counted; a character counts once and is never
+// cut). Icons and repeats are removed. A caret that starts no colour is
+// removed: left at the end it would join whatever text is printed after the
+// name ("name^" then ": hello" hides the colon; "name^c" hides three
+// characters and recolours the rest). May leave nothing. Returns true when out
+// differs from in.
+inline bool MPModCleanText( const char *in, char *out, int outSize, int maxVisible ) {
 	if ( outSize <= 0 ) {
 		return false;
 	}
@@ -1067,48 +1266,62 @@ inline bool MPModCleanName( const char *in, char *out, int outSize, int maxVisib
 	if ( maxVisible < 1 ) {
 		maxVisible = 1;
 	}
-	int length = 0;
-	int visible = 0;
-	int lastShown = 0;		// length after the last character that is not a space
+	// What will be kept of the bytes, so an escape is measured on that.
+	char text[ 256 ];
+	int textLength = 0;
 	for ( const char *at = in; *at != '\0'; ) {
-		const unsigned char c = static_cast<unsigned char>( *at );
-		if ( c < 0x20 || c == 0x7f ) {
-			at++;
+		unsigned int code = 0;
+		const int bytes = MPModUtf8Decode( at, code );
+		if ( bytes == 0 || code < 0x20 || code == 0x7f || ( code >= 0x80 && code <= 0x9f ) || MPModCodeIsInvisible( code ) ) {
+			at += bytes > 0 ? bytes : 1;
 			continue;
 		}
-		if ( c == '^' ) {
-			const unsigned char code = static_cast<unsigned char>( at[ 1 ] );
-			if ( code < 0x20 || code == 0x7f || code >= 0x80 ) {
-				at++;		// a caret with nothing to colour would swallow whatever follows the name
-				continue;
-			}
-			if ( length + 2 >= outSize ) {
+		if ( MPModCodeIsSpace( code ) ) {
+			if ( textLength + 1 > static_cast<int>( sizeof( text ) ) - 1 ) {
 				break;
 			}
-			out[ length++ ] = '^';
-			out[ length++ ] = static_cast<char>( code );
-			at += 2;
+			text[ textLength++ ] = ' ';
+			at += bytes;
+			continue;
+		}
+		if ( textLength + bytes > static_cast<int>( sizeof( text ) ) - 1 ) {
+			break;
+		}
+		for ( int k = 0; k < bytes; k++ ) {
+			text[ textLength++ ] = at[ k ];
+		}
+		at += bytes;
+	}
+	text[ textLength ] = '\0';
+
+	int length = 0;
+	int visible = 0;
+	int lastShown = 0;		// length after the last character that shows
+	for ( const char *at = text; *at != '\0'; ) {
+		const unsigned char c = static_cast<unsigned char>( *at );
+		if ( c == '^' ) {
+			const int escape = MPModNameEscapeLength( at );
+			if ( escape == 0 ) {
+				// an icon or a repeat goes whole; any other caret goes alone
+				const int other = MPModEscapeLength( at );
+				at += ( other > 0 && ( at[ 1 ] == 'i' || at[ 1 ] == 'I' || at[ 1 ] == 'n' || at[ 1 ] == 'N' ) ) ? other : 1;
+				continue;
+			}
+			if ( length + escape >= outSize ) {
+				break;
+			}
+			for ( int k = 0; k < escape; k++ ) {
+				out[ length++ ] = at[ k ];
+			}
+			at += escape;
 			continue;
 		}
 		if ( c == ' ' && visible == 0 ) {
 			at++;
 			continue;
 		}
-		int bytes = 1;
-		if ( c >= 0xf0 ) {
-			bytes = 4;
-		} else if ( c >= 0xe0 ) {
-			bytes = 3;
-		} else if ( c >= 0xc0 ) {
-			bytes = 2;
-		}
-		// a lead byte without its continuation bytes is one stray byte
-		for ( int k = 1; k < bytes; k++ ) {
-			if ( ( static_cast<unsigned char>( at[ k ] ) & 0xc0 ) != 0x80 ) {
-				bytes = 1;
-				break;
-			}
-		}
+		unsigned int code = 0;
+		const int bytes = MPModUtf8Decode( at, code );		// well formed: the pass above kept nothing else
 		if ( visible >= maxVisible || length + bytes >= outSize ) {
 			break;
 		}
@@ -1124,21 +1337,48 @@ inline bool MPModCleanName( const char *in, char *out, int outSize, int maxVisib
 	// trailing spaces go, and so does a colour that then colours nothing
 	length = lastShown;
 	out[ length ] = '\0';
-	bool shows = false;
-	for ( int i = 0; i < length; i++ ) {
-		if ( out[ i ] == '^' ) {
-			i++;
-			continue;
-		}
-		if ( out[ i ] != ' ' ) {
-			shows = true;
-			break;
-		}
+	return strcmp( in, out ) != 0;
+}
+
+// A name is never empty: one that shows nothing is replaced.
+inline bool MPModCleanName( const char *in, char *out, int outSize, int maxVisible ) {
+	if ( outSize <= 0 ) {
+		return false;
 	}
-	if ( !shows ) {
+	MPModCleanText( in, out, outSize, maxVisible );
+	if ( !MPModTextShows( out ) ) {
 		MPModPrintf( out, outSize, "%s", MP_MOD_DEFAULT_NAME );
 	}
-	return strcmp( in, out ) != 0;
+	return strcmp( in != 0 ? in : "", out ) != 0;
+}
+
+// True when what a name shows reads as a number to the commands that take "a
+// slot or a name" (idStr::IsNumeric: an optional minus, digits, at most one
+// point). Such a name would be taken for a slot, so nobody may have one,
+// whatever colours it is written in.
+inline bool MPModNameIsNumeric( const char *name ) {
+	char visible[ MP_MOD_NAME_BYTES ];
+	MPModVisibleName( name, visible, sizeof( visible ) );
+	const char *at = visible;
+	if ( *at == '\0' ) {
+		return false;
+	}
+	if ( *at == '-' ) {
+		at++;
+	}
+	bool point = false;
+	int digits = 0;
+	for ( ; *at != '\0'; at++ ) {
+		if ( *at == '.' && !point ) {
+			point = true;
+			continue;
+		}
+		if ( *at < '0' || *at > '9' ) {
+			return false;
+		}
+		digits++;
+	}
+	return digits > 0;
 }
 
 // The list is names separated by ';' or ','. A reserved name matches whatever
@@ -1199,25 +1439,34 @@ inline void MPModLogRaw( mpModLogLine_t &line, const char *text ) {
 
 // The inside of a JSON string. An escape is written whole or not at all, and a
 // byte is always left for the closing quote.
+// A character is written whole or not at all, and a byte that is no part of
+// well-formed UTF-8 is written as U+FFFD, so the line is always valid JSON in
+// valid UTF-8 whatever a name or a reason held.
 inline void MPModLogValue( mpModLogLine_t &line, const char *text ) {
 	char piece[ 8 ];
-	for ( ; text != 0 && *text != '\0'; text++ ) {
-		const unsigned char c = static_cast<unsigned char>( *text );
-		if ( c == '"' || c == '\\' ) {
+	while ( text != 0 && *text != '\0' ) {
+		unsigned int code = 0;
+		const int bytes = MPModUtf8Decode( text, code );
+		if ( bytes == 0 ) {
+			MPModPrintf( piece, static_cast<int>( sizeof( piece ) ), "\\ufffd" );
+		} else if ( code == '"' || code == '\\' ) {
 			piece[ 0 ] = '\\';
-			piece[ 1 ] = static_cast<char>( c );
+			piece[ 1 ] = static_cast<char>( code );
 			piece[ 2 ] = '\0';
-		} else if ( c < 0x20 || c == 0x7f ) {
-			MPModPrintf( piece, static_cast<int>( sizeof( piece ) ), "\\u%04x", c );
+		} else if ( code < 0x20 || code == 0x7f ) {
+			MPModPrintf( piece, static_cast<int>( sizeof( piece ) ), "\\u%04x", code );
 		} else {
-			piece[ 0 ] = static_cast<char>( c );
-			piece[ 1 ] = '\0';
+			for ( int k = 0; k < bytes; k++ ) {
+				piece[ k ] = text[ k ];
+			}
+			piece[ bytes ] = '\0';
 		}
 		if ( !MPModLogRoom( line, static_cast<int>( strlen( piece ) ) + 1 ) ) {
 			line.truncated = true;
 			return;
 		}
 		MPModLogRaw( line, piece );
+		text += bytes > 0 ? bytes : 1;
 	}
 }
 
@@ -1305,7 +1554,7 @@ typedef struct mpModAdminTarget_s {
 	bool	host;
 	bool	admin;
 	bool	bot;
-	bool	sameAddress;	// connected from the admin's own address
+	bool	coversAdmin;	// a ban or a mute of the target's range would also reach an admin, the asking one included
 } mpModAdminTarget_t;
 
 inline bool MPModAdminVerbHasTarget( int verb ) {
@@ -1380,9 +1629,10 @@ inline mpModAdminResult_t MPModAdminCheck( int verb, int actorSlot, int targetSl
 	if ( verb == MP_MOD_ADMIN_BAN && maxBanMinutes <= 0 ) {
 		return MP_MOD_ADMIN_REFUSED_BANS_OFF;
 	}
-	// a ban is of an address: this one would shut the admin out as well
-	if ( verb == MP_MOD_ADMIN_BAN && target.sameAddress ) {
-		return MP_MOD_ADMIN_REFUSED_SELF;
+	// A ban and a mute are of a range (MPModPlayerPrefixBits), not of a player. One
+	// that also holds an admin, the asking one or another, would act on that admin.
+	if ( ( verb == MP_MOD_ADMIN_BAN || verb == MP_MOD_ADMIN_MUTE ) && target.coversAdmin ) {
+		return MP_MOD_ADMIN_REFUSED_ADMIN;
 	}
 	return MP_MOD_ADMIN_OK;
 }

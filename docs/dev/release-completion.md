@@ -230,6 +230,24 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   the console history and the server's log, as the rcon password already
   was. Before, a password typed at a console was saved in the history file,
   and one given on the command line could appear in the log.
+- **Commands do what you typed.** `ban`, `unban`, `mute` and `serverShutdown`
+  read the line as it was typed, at the console and through `rcon`. An IPv6
+  address needs no brackets, a reason can begin with a digit, and an address
+  is banned exactly as written.
+- **IPv6 players cannot step round a ban.** Banning or muting a connected
+  IPv6 player covers their whole `/64`, and the per-address limit counts it
+  as one address.
+- **The ban list is never overwritten by mistake.** If the server cannot use
+  `banlist.txt` (too large, more than 512 bans, saved in the wrong
+  encoding), it says so, leaves the file as it is and keeps the bans it
+  already holds.
+- **A mute cannot be talked round.** A muted player keeps the name and clan
+  tag they had, and names can no longer hide a reserved word behind colour
+  codes, icons or invisible characters.
+- **Admins stay logged in across map changes**, and the host can list them
+  (`admin`), end a login (`admin revoke`) or turn admin logins off
+  (`admin off`). An admin password must be at least 8 bytes and is taken as
+  soon as it is set.
 - **What to do.** Server hosts need to change nothing. Bans made before this
   never worked; a ban list left by Quake 4 is kept as comment lines in the new
   `banlist.txt`. Run the commands at the server's console, as the host of a

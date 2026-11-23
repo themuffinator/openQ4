@@ -47,6 +47,10 @@ typedef struct commandDef_s {
 } commandDef_t;
 
 
+// openQ4: the line, as typed, of a running command that asked for it (CMD_FL_RAWTEXT). Private,
+// because a line sent through rcon can assign a password.
+static idCVar cmd_rawText( "cmd_rawText", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ROM | CVAR_PRIVATE, "the line, as it was typed, of the command now running, for a command that reads it itself; empty otherwise" );
+
 class idCmdSystemLocal : public idCmdSystem {
 public:
 	virtual void			Init( void );
@@ -97,6 +101,8 @@ private:
 
 private:	
 	void					ExecuteTokenizedString( const idCmdArgs &args );
+	bool					WantsRawText( const idCmdArgs &args ) const;
+	void					ExecuteWithRawText( const idCmdArgs &args, const char *rawText );
 	void					ExecuteCommandText( const char *text );
 	void					InsertCommandText( const char *text );
 	void					AppendCommandText( const char *text );
@@ -603,7 +609,53 @@ Tokenizes, then executes.
 ============
 */
 void idCmdSystemLocal::ExecuteCommandText( const char *text ) {	
-	ExecuteTokenizedString( idCmdArgs( text, false ) );
+	const idCmdArgs args( text, false );
+	ExecuteWithRawText( args, WantsRawText( args ) ? text : NULL );
+}
+
+/*
+============
+idCmdSystemLocal::WantsRawText
+
+True when the command the arguments name asked for its line as typed (CMD_FL_RAWTEXT).
+============
+*/
+bool idCmdSystemLocal::WantsRawText( const idCmdArgs &args ) const {
+	if ( !args.Argc() || !args.Argv( 0 )[0] ) {
+		return false;
+	}
+	const char *cmdName = args.Argv( 0 );
+	if ( ( cmdName[0] == '/' || cmdName[0] == '\\' ) && cmdName[1] != '\0' ) {
+		++cmdName;
+	}
+	for ( const commandDef_t *cmd = commands; cmd; cmd = cmd->next ) {
+		if ( idStr::Icmp( cmdName, cmd->name ) == 0 ) {
+			return ( cmd->flags & CMD_FL_RAWTEXT ) != 0;
+		}
+	}
+	return false;
+}
+
+/*
+============
+idCmdSystemLocal::ExecuteWithRawText
+
+Runs a tokenized command with its line as typed published in cmd_rawText, or just runs it
+when rawText is NULL. The cvar is private, so the line (which can assign a password through
+rcon) is never shown, and it goes back to what it held however the command ends.
+============
+*/
+void idCmdSystemLocal::ExecuteWithRawText( const idCmdArgs &args, const char *rawText ) {
+	if ( rawText == NULL ) {
+		ExecuteTokenizedString( args );
+		return;
+	}
+	struct rawTextScope_t {
+		idStr previous;
+		rawTextScope_t( const char *text ) : previous( cmd_rawText.GetString() ) { cmd_rawText.SetString( text ); }
+		~rawTextScope_t() { cmd_rawText.SetString( previous.c_str() ); previous.SecureClear(); }
+	} rawTextScope( rawText );
+	ExecuteTokenizedString( args );
 }
 
 /*
@@ -772,6 +824,12 @@ void idCmdSystemLocal::ExecuteCommandBuffer( void ) {
 		} else {
 			args.TokenizeString( text, false );
 		}
+		// a command that reads its own line gets it before the buffer below gives it up
+		idStr rawText;
+		const bool wantsRawText = WantsRawText( args );
+		if ( wantsRawText ) {
+			rawText = text;
+		}
 
 		// delete the text from the command buffer and move remaining commands down
 		// this is necessary because commands (exec) can insert data at the
@@ -790,7 +848,8 @@ void idCmdSystemLocal::ExecuteCommandBuffer( void ) {
 		memset( textBuf + textLength, 0, previousTextLength - textLength );
 
 		// execute the command line that we have already tokenized
-		ExecuteTokenizedString( args );
+		ExecuteWithRawText( args, wantsRawText ? rawText.c_str() : NULL );
+		rawText.SecureClear();
 		if ( privateCommand ) {
 			args.ClearSensitive();
 			idCmdArgs::ClearArgsScratch();

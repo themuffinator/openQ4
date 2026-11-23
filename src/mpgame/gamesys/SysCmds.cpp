@@ -4557,7 +4557,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "sayTeam",				Cmd_SayTeam_f,				CMD_FL_GAME,				"team text chat" );
 	cmdSystem->AddCommand( "listLocations",			Cmd_ListLocations_f,		CMD_FL_GAME,				"lists the landmarks multiplayer place names come from" );
 	cmdSystem->AddCommand( "addChatLine",			Cmd_AddChatLine_f,			CMD_FL_GAME,				"internal use - core to game chat lines" );
-	cmdSystem->AddCommand( "gameKick",				Cmd_Kick_f,					CMD_FL_GAME,				"same as kick, but recognizes player names" );
+	cmdSystem->AddCommand( "gameKick",				Cmd_Kick_f,					CMD_FL_GAME | CMD_FL_RAWTEXT,	"same as kick, but recognizes player names" );
 	cmdSystem->AddCommand( "give",					Cmd_Give_f,					CMD_FL_GAME|CMD_FL_CHEAT,	"gives one or more items" );
 	cmdSystem->AddCommand( "centerview",			Cmd_CenterView_f,			CMD_FL_GAME,				"centers the view" );
 	cmdSystem->AddCommand( "god",					Cmd_God_f,					CMD_FL_GAME|CMD_FL_CHEAT,	"enables god mode" );
@@ -4686,14 +4686,14 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "forceTeamChange",				idMultiplayerGame::ForceTeamChange_f,			CMD_FL_GAME,		"force team change: forceTeamChange <id>" );
 	cmdSystem->AddCommand( "removeClientFromBanList",		idMultiplayerGame::RemoveClientFromBanList_f,	CMD_FL_GAME,		"lift a ban (the older name of unban): removeClientFromBanList <row of banlist|address[/prefix]>" );
 	// openQ4 MP-18: server moderation (mp/Moderation.h). They run on the server: its console, a listen host, or rcon.
-	cmdSystem->AddCommand( "ban",					idGameLocal::Ban_f,			CMD_FL_GAME,	"ban an address or a range and remove its players: ban <client slot|name|address[/prefix]> [time] [reason]" );
-	cmdSystem->AddCommand( "unban",					idGameLocal::Unban_f,		CMD_FL_GAME,	"lift a ban: unban <row of banlist|address[/prefix]>" );
+	cmdSystem->AddCommand( "ban",					idGameLocal::Ban_f,			CMD_FL_GAME | CMD_FL_RAWTEXT,	"ban an address or a range and remove its players: ban <client slot|name|address[/prefix]> [time] [reason]" );
+	cmdSystem->AddCommand( "unban",					idGameLocal::Unban_f,		CMD_FL_GAME | CMD_FL_RAWTEXT,	"lift a ban: unban <row of banlist|address[/prefix]>" );
 	cmdSystem->AddCommand( "banlist",				idGameLocal::BanList_f,		CMD_FL_GAME,	"list the bans; banlist reload reads banlist.txt again" );
-	cmdSystem->AddCommand( "mute",					idGameLocal::Mute_f,		CMD_FL_GAME,	"stop a player's text chat reaching anyone: mute <client slot|name> [time]" );
-	cmdSystem->AddCommand( "unmute",				idGameLocal::Mute_f,		CMD_FL_GAME,	"lift a text mute: unmute <client slot|name>" );
+	cmdSystem->AddCommand( "mute",					idGameLocal::Mute_f,		CMD_FL_GAME | CMD_FL_RAWTEXT,	"stop a player's text chat reaching anyone: mute <client slot|name> [time]" );
+	cmdSystem->AddCommand( "unmute",				idGameLocal::Mute_f,		CMD_FL_GAME | CMD_FL_RAWTEXT,	"lift a text mute: unmute <client slot|name>" );
 	cmdSystem->AddCommand( "status",				idGameLocal::Status_f,		CMD_FL_GAME,	"list the connected clients with their address, ping and mute state" );
 	cmdSystem->AddCommand( "admin",					idGameLocal::Admin_f,		CMD_FL_GAME,	"log in to the server as an admin with the password in net_clientAdminPassword; 'admin logout' gives the right up" );
-	cmdSystem->AddCommand( "serverShutdown",		idGameLocal::Shutdown_f,	CMD_FL_GAME,	"stop the server once the players are told: serverShutdown <match|now|time|cancel> [reason]" );
+	cmdSystem->AddCommand( "serverShutdown",		idGameLocal::Shutdown_f,	CMD_FL_GAME | CMD_FL_RAWTEXT,	"stop the server once the players are told: serverShutdown <match|now|time|cancel> [reason]" );
 
 #ifndef _XBOX
 // shouchard:  more voice chat stuff (non-XBOX)

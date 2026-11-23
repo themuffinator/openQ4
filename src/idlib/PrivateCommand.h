@@ -71,6 +71,68 @@ static inline bool ContainsBoundedCaseInsensitiveToken( const char *commandText,
 	return false;
 }
 
+// openQ4 MP-18: "admin" logs a player in with the password in net_clientAdminPassword and takes no
+// password itself, but typing one after it is the natural mistake. Such a line is private, so the
+// console history, the log and the journal never keep it. True for "admin <word>" in any
+// semicolon-separated part of the line unless the word is one of the command's own.
+static inline bool IsLineEnd( const char value ) {
+	return value == '\0' || value == ';' || value == '\n' || value == '\r';
+}
+
+static inline bool NamesAdminPassword( const char *commandText ) {
+	if ( commandText == NULL ) {
+		return false;
+	}
+	static const char *const ownWords[] = { "logout", "list", "revoke", "off", NULL };
+	static const char command[] = "admin";
+	const std::size_t commandBytes = sizeof( command ) - 1;
+	const char *at = commandText;
+	while ( *at != '\0' ) {
+		while ( *at == ' ' || *at == '\t' || *at == ';' || *at == '\n' || *at == '\r' ) {
+			at++;
+		}
+		if ( *at == '/' || *at == '\\' ) {
+			at++;
+		}
+		bool isAdmin = true;
+		for ( std::size_t index = 0; index < commandBytes; ++index ) {
+			// a mismatch stops the scan before it can pass the terminating NUL
+			if ( FoldASCII( static_cast<unsigned char>( at[ index ] ) ) != static_cast<unsigned char>( command[ index ] ) ) {
+				isAdmin = false;
+				break;
+			}
+		}
+		if ( isAdmin && ( at[ commandBytes ] == ' ' || at[ commandBytes ] == '\t' ) ) {
+			const char *word = at + commandBytes;
+			while ( *word == ' ' || *word == '\t' ) {
+				word++;
+			}
+			if ( !IsLineEnd( *word ) ) {
+				bool own = false;
+				for ( int index = 0; ownWords[ index ] != NULL && !own; ++index ) {
+					const std::size_t length = std::strlen( ownWords[ index ] );
+					own = true;
+					for ( std::size_t k = 0; k < length; ++k ) {
+						if ( FoldASCII( static_cast<unsigned char>( word[ k ] ) ) != static_cast<unsigned char>( ownWords[ index ][ k ] ) ) {
+							own = false;
+							break;
+						}
+					}
+					// the whole word, not a password that begins with one
+					own = own && ( word[ length ] == ' ' || word[ length ] == '\t' || IsLineEnd( word[ length ] ) );
+				}
+				if ( !own ) {
+					return true;
+				}
+			}
+		}
+		while ( !IsLineEnd( *at ) ) {
+			at++;
+		}
+	}
+	return false;
+}
+
 } // namespace idPrivateCommand
 
 #endif /* !__PRIVATECOMMAND_H__ */

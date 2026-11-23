@@ -1221,9 +1221,12 @@ idMultiplayerGame::idMultiplayerGame() {
 	matchAdminCredentialInitialized = false;
 	matchAdminCredentialIsReal = false;
 	matchAdminAuthenticationReady = false;
+	matchAdminSessionId = 0;
 	pendingRefereePasswordIsAdmin = false;
 	memset( matchAdminConnection, 0, sizeof( matchAdminConnection ) );
 	memset( matchAdminRefusalNotice, 0, sizeof( matchAdminRefusalNotice ) );
+	memset( matchAdminLockoutLogged, 0, sizeof( matchAdminLockoutLogged ) );
+	memset( matchAdminGaveReferee, 0, sizeof( matchAdminGaveReferee ) );
 	memset( pendingRefereePassword, 0, sizeof( pendingRefereePassword ) );
 	pendingRefereePasswordLength = 0;
 	pendingRefereePasswordDeadline = 0;
@@ -1745,6 +1748,9 @@ static const int MP_ADMIN_AUTH_REQUEST_BYTES = 15;
 // The engine declares both passwords (AsyncNetwork.cpp) so they are private
 // whichever game module is loaded when they are typed.
 #define MP_ADMIN_SERVER_PASSWORD_CVAR	"net_serverAdminPassword"
+// A shorter admin password is not taken: a login is tried over the network,
+// five times a minute for each connection.
+static const int MP_ADMIN_MIN_PASSWORD_BYTES = 8;
 static const char MP_ADMIN_AUTH_REQUEST_TOKEN[] = "challenge:admin";
 static const char MP_REFEREE_AUTH_PROOF_TAG = 'v';
 static const char MP_ADMIN_AUTH_PROOF_TAG = 'a';
@@ -3758,11 +3764,13 @@ cvar is where the host hands the password over, never where it is kept: it is
 turned into a verifier and cleared. A server without one still answers a login with a
 challenge nobody can satisfy, so the exchange does not say whether a password
 exists. False leaves admin logins refused; the match itself goes on.
+
+A grant is the connection's, so a new match session leaves it alone; a new
+password ends every grant given under the old one.
 ================
 */
 bool idMultiplayerGame::InitializeAdminAuthentication( void ) {
 	matchAdminAuthenticationReady = false;
-	memset( matchAdminConnection, 0, sizeof( matchAdminConnection ) );
 
 	char configured[ MP_REFEREE_AUTH_MAX_PASSWORD_BYTES + 1 ];
 	memset( configured, 0, sizeof( configured ) );
@@ -3777,6 +3785,12 @@ bool idMultiplayerGame::InitializeAdminAuthentication( void ) {
 	if ( length > MP_REFEREE_AUTH_MAX_PASSWORD_BYTES ) {
 		gameLocal.Warning( "ignored an admin password longer than %d bytes",
 			static_cast<int>( MP_REFEREE_AUTH_MAX_PASSWORD_BYTES ) );
+		cvarSystem->SetCVarString( MP_ADMIN_SERVER_PASSWORD_CVAR, "" );
+		length = 0;
+	} else if ( length > 0 && length < MP_ADMIN_MIN_PASSWORD_BYTES ) {
+		gameLocal.Warning( "ignored an admin password shorter than %d bytes; %s",
+			MP_ADMIN_MIN_PASSWORD_BYTES, matchAdminCredentialIsReal ?
+			"the earlier password still stands" : "admin logins stay off" );
 		cvarSystem->SetCVarString( MP_ADMIN_SERVER_PASSWORD_CVAR, "" );
 		length = 0;
 	} else if ( length > 0 ) {
@@ -3801,41 +3815,117 @@ bool idMultiplayerGame::InitializeAdminAuthentication( void ) {
 		}
 		matchAdminCredentialInitialized = true;
 		matchAdminCredentialIsReal = true;
+		// a new password: whoever logged in with the old one logs in again
+		ServerAdminRevokeAll( "the password changed" );
+		common->Printf( "admin logins are on\n" );
 	} else {
 		MPRefereeAuthSecureZero( configured, sizeof( configured ) );
 	}
 
-	if ( !matchAdminCredentialInitialized ) {
-		mpRefereeAuthSalt salt;
-		mpRefereeAuthVerifier verifier;
-		memset( &salt, 0, sizeof( salt ) );
-		memset( &verifier, 0, sizeof( verifier ) );
-		const bool randomReady = sys->SecureRandomBytes( salt.bytes,
-			sizeof( salt.bytes ) ) && sys->SecureRandomBytes( verifier.bytes,
-			sizeof( verifier.bytes ) );
-		const bool installed = randomReady &&
-			matchAdminAuthentication.InstallCredentialVerifier( salt, verifier );
-		MPRefereeAuthSecureZero( &salt, sizeof( salt ) );
-		MPRefereeAuthSecureZero( &verifier, sizeof( verifier ) );
-		if ( !installed ) {
-			gameLocal.Warning( "could not initialize opaque admin authentication" );
-			return false;
-		}
-		matchAdminCredentialInitialized = true;
-		matchAdminCredentialIsReal = false;
+	if ( !matchAdminCredentialInitialized && !InstallOpaqueAdminCredential() ) {
+		return false;
 	}
+	return BindAdminAuthenticationSession();
+}
 
-	matchAdminAuthenticationReady = matchAdminAuthentication.BeginSession(
-		matchSession.GetSessionId(), Max( 0, gameLocal.time ) );
+/*
+================
+idMultiplayerGame::BindAdminAuthenticationSession
+
+The service answers logins for one match session at a time and refuses to
+begin the session it is already in. A password set, or logins turned off,
+while a map runs must not unbind it: it is bound once for each session.
+================
+*/
+bool idMultiplayerGame::BindAdminAuthenticationSession( void ) {
+	const uint64_t sessionId = matchSession.GetSessionId();
+	if ( sessionId != 0 && sessionId == matchAdminSessionId ) {
+		matchAdminAuthenticationReady = true;
+		return true;
+	}
+	matchAdminAuthenticationReady = matchAdminAuthentication.BeginSession( sessionId,
+		Max( 0, gameLocal.time ) );
+	matchAdminSessionId = matchAdminAuthenticationReady ? sessionId : 0;
 	return matchAdminAuthenticationReady;
+}
+
+/*
+================
+idMultiplayerGame::InstallOpaqueAdminCredential
+
+A verifier nobody knows the password of. A server without an admin password
+still answers a login with a challenge, so the exchange does not say whether
+a password exists.
+================
+*/
+bool idMultiplayerGame::InstallOpaqueAdminCredential( void ) {
+	mpRefereeAuthSalt salt;
+	mpRefereeAuthVerifier verifier;
+	memset( &salt, 0, sizeof( salt ) );
+	memset( &verifier, 0, sizeof( verifier ) );
+	const bool randomReady = sys->SecureRandomBytes( salt.bytes,
+		sizeof( salt.bytes ) ) && sys->SecureRandomBytes( verifier.bytes,
+		sizeof( verifier.bytes ) );
+	const bool installed = randomReady &&
+		matchAdminAuthentication.InstallCredentialVerifier( salt, verifier );
+	MPRefereeAuthSecureZero( &salt, sizeof( salt ) );
+	MPRefereeAuthSecureZero( &verifier, sizeof( verifier ) );
+	if ( !installed ) {
+		gameLocal.Warning( "could not initialize opaque admin authentication" );
+		return false;
+	}
+	matchAdminCredentialInitialized = true;
+	matchAdminCredentialIsReal = false;
+	return true;
+}
+
+/*
+================
+idMultiplayerGame::ServerAdminRevokeAll
+
+Ends every admin grant, as a logout does for one: each admin is told, and the
+admin log says why. Returns how many it ended.
+================
+*/
+int idMultiplayerGame::ServerAdminRevokeAll( const char *why ) {
+	int revoked = 0;
+	for ( int slot = 0; slot < MAX_CLIENTS; ++slot ) {
+		if ( ServerAdminLogout( slot ) ) {
+			++revoked;
+			if ( slot < gameLocal.numClients ) {
+				gameLocal.ModerationLogClient( "admin_logout", "server", slot, why, 0 );
+				gameLocal.ServerSendChatMessage( slot, "server", "#str_232652", "" );
+			}
+		}
+		matchAdminCarry[ slot ].Clear();
+	}
+	return revoked;
+}
+
+/*
+================
+idMultiplayerGame::ServerAdminLoginsOff
+
+The host withdraws the admin password while the server runs: every grant
+ends and nobody can log in until a new password is set.
+================
+*/
+void idMultiplayerGame::ServerAdminLoginsOff( void ) {
+	cvarSystem->SetCVarString( MP_ADMIN_SERVER_PASSWORD_CVAR, "" );
+	ServerAdminRevokeAll( "admin logins were turned off" );
+	// logins go on being answered, by a verifier nobody has the password of
+	if ( InstallOpaqueAdminCredential() && matchSessionOperational ) {
+		BindAdminAuthenticationSession();
+	}
 }
 
 /*
 ================
 idMultiplayerGame::ServerAdminLogout
 
-Ends a connection's admin grant. The referee role an admin was given while
-watching goes with it. False when the connection held no grant.
+Ends a connection's admin grant. The referee role the admin login gave a
+watching admin goes with it; one earned with the referee's own password stays.
+False when the connection held no grant.
 ================
 */
 bool idMultiplayerGame::ServerAdminLogout( int clientNum ) {
@@ -3843,9 +3933,13 @@ bool idMultiplayerGame::ServerAdminLogout( int clientNum ) {
 		return false;
 	}
 	const bool held = IsServerAdmin( clientNum );
+	const bool gaveReferee = matchAdminGaveReferee[ clientNum ];
 	matchAdminConnection[ clientNum ] = 0;
+	matchAdminCarry[ clientNum ].Clear();
+	matchAdminGaveReferee[ clientNum ] = false;
 	matchAdminAuthentication.InvalidateSlot( clientNum );
-	if ( !held || !gameLocal.isServer || !matchSessionOperational ) {
+	// a referee who signed in with the referee's own password stays one
+	if ( !held || !gaveReferee || !gameLocal.isServer || !matchSessionOperational ) {
 		return held;
 	}
 	uint32_t generation = 0;
@@ -3890,6 +3984,15 @@ bool idMultiplayerGame::ApplyAdminAuthentication( int clientNum,
 		!actor->human || credential == NULL || !matchAdminAuthenticationReady ||
 		clientNum < 0 || clientNum >= MAX_CLIENTS ||
 		matchConnectionId[ clientNum ] == 0 ) {
+		// the player typed "admin" and is waiting for an answer
+		if ( actor != NULL && actor->slot == clientNum && actor->human && clientNum >= 0 && clientNum < MAX_CLIENTS ) {
+			const int gameNow = Max( 0, gameLocal.time );
+			int &next = matchAdminRefusalNotice[ clientNum ];
+			if ( gameNow >= next || next - gameNow > 2000 ) {
+				next = gameNow + 2000;
+				gameLocal.ServerSendChatMessage( clientNum, "server", "#str_232653", "" );
+			}
+		}
 		execution.outcome = MP_OPERATION_REJECTED;
 		execution.reason = MP_OPERATION_REASON_NOT_AUTHORIZED;
 		execution.protocolReason = MP_MATCH_PROTOCOL_REASON_NOT_AUTHORIZED;
@@ -3909,16 +4012,30 @@ bool idMultiplayerGame::ApplyAdminAuthentication( int clientNum,
 	// connection, however fast it asks.
 	auto refused = [this, clientNum]( const char *why, bool wrongProof ) {
 		static const int ADMIN_REFUSAL_NOTICE_MSEC = 2000;
+		static const int ADMIN_LOCKOUT_LOG_MSEC = 60000;
 		const int gameNow = Max( 0, gameLocal.time );
 		int &next = matchAdminRefusalNotice[ clientNum ];
 		if ( gameNow < next && next - gameNow <= ADMIN_REFUSAL_NOTICE_MSEC ) {
 			return;
 		}
 		next = gameNow + ADMIN_REFUSAL_NOTICE_MSEC;
-		if ( wrongProof ) {
-			gameLocal.ModerationLogClient( "admin_login_failed", "server", clientNum, why, 0 );
-		}
 		gameLocal.ServerSendChatMessage( clientNum, "server", "#str_232653", "" );
+		if ( !wrongProof ) {
+			return;
+		}
+		// The service counts five wrong passwords in a minute and then locks the
+		// connection out for one, so wrong passwords log themselves sparingly. What
+		// it refuses while locked out is one line a minute, however long that lasts.
+		const bool lockedOut = why != NULL && why[ 0 ] != '\0';
+		if ( lockedOut ) {
+			int &nextLog = matchAdminLockoutLogged[ clientNum ];
+			if ( gameNow < nextLog && nextLog - gameNow <= ADMIN_LOCKOUT_LOG_MSEC ) {
+				return;
+			}
+			nextLog = gameNow + ADMIN_LOCKOUT_LOG_MSEC;
+		}
+		gameLocal.ModerationLogClient( "admin_login_failed", "server", clientNum,
+			matchAdminCredentialIsReal ? why : "no admin password is set", 0 );
 	};
 
 	if ( MatchAuthIsAdminChallengeRequest( credential ) ) {
@@ -3977,6 +4094,7 @@ bool idMultiplayerGame::ApplyAdminAuthentication( int clientNum,
 
 	const bool wasAdmin = IsServerAdmin( clientNum );
 	matchAdminConnection[ clientNum ] = matchConnectionId[ clientNum ];
+	matchAdminCarry[ clientNum ] = networkSystem->GetClientAddress( clientNum );
 	if ( !wasAdmin ) {
 		common->Printf( "client %d (%s^0) logged in as an admin\n", clientNum,
 			gameLocal.userInfo[ clientNum ].GetString( "ui_name" ) );
@@ -3994,6 +4112,7 @@ bool idMultiplayerGame::ApplyAdminAuthentication( int clientNum,
 		const mpMatchMutationResult mutation = matchSession.SetParticipantRoles(
 			actor->id, refereeRoles, matchSession.GetSessionRevision() );
 		if ( mutation.WasApplied() ) {
+			matchAdminGaveReferee[ clientNum ] = true;
 			execution.outcome = MP_OPERATION_APPLIED;
 			execution.resultingSessionRevision = matchSession.GetSessionRevision();
 		}
@@ -5458,6 +5577,8 @@ void idMultiplayerGame::ClearMatchOperationTransportSlot( int clientNum ) {
 	matchAdminAuthentication.InvalidateSlot( clientNum );
 	matchAdminConnection[ clientNum ] = 0;
 	matchAdminRefusalNotice[ clientNum ] = 0;
+	matchAdminLockoutLogged[ clientNum ] = 0;
+	matchAdminGaveReferee[ clientNum ] = false;
 	matchViewSentRevision[ clientNum ] = 0;
 }
 
@@ -5854,11 +5975,24 @@ bool idMultiplayerGame::ApplyMatchOperationContinuation( int clientNum,
 			return false;
 		}
 		idEntity *targetEntity = gameLocal.entities[ targetSlot ];
-		if ( targetEntity == NULL ||
-			!targetEntity->IsType( idPlayer::GetClassType() ) ||
-			static_cast<idPlayer *>( targetEntity )->IsFakeClient() ||
-			botManager.IsBot( targetSlot ) ||
-			!networkSystem->ServerDropClient( targetSlot, "#str_07134" ) ) {
+		// openQ4 (MP-18): only the host removes an admin. An admin who is watching
+		// holds the referee role, and through it would otherwise remove another.
+		const bool hostActs = gameLocal.isListenServer && clientNum == gameLocal.localClientNum;
+		const bool removable = targetEntity != NULL &&
+			targetEntity->IsType( idPlayer::GetClassType() ) &&
+			!static_cast<idPlayer *>( targetEntity )->IsFakeClient() &&
+			!botManager.IsBot( targetSlot ) &&
+			( hostActs || !IsServerAdmin( targetSlot ) );
+		bool removed = false;
+		if ( removable ) {
+			// a removal the server began: logged here with the player's address, and
+			// never taken for the engine's console kick or for a lost connection
+			gameLocal.ModerationLogClient( "kick", "match control", targetSlot, "", 0 );
+			BeginServerDrop( targetSlot );
+			removed = networkSystem->ServerDropClient( targetSlot, "#str_07134" );
+			EndServerDrop( targetSlot );
+		}
+		if ( !removed ) {
 			execution.outcome = MP_OPERATION_REJECTED;
 			execution.reason = MP_OPERATION_REASON_CORE_REJECTED;
 			execution.protocolReason = MP_MATCH_PROTOCOL_REASON_CONFLICT;
@@ -9595,7 +9729,9 @@ bool idMultiplayerGame::BeginMatchSession( void ) {
 	if ( !InitializeRefereeAuthentication() ) {
 		return false;
 	}
-	// openQ4 (MP-18): a server that cannot set up admin logins still plays
+	// openQ4 (MP-18): a server that cannot set up admin logins still plays. The
+	// referee role an admin login gave belonged to the session that just ended.
+	memset( matchAdminGaveReferee, 0, sizeof( matchAdminGaveReferee ) );
 	InitializeAdminAuthentication();
 	mpProposalCooldownPolicy_t proposalCooldowns;
 	proposalCooldowns.Clear();
@@ -10627,6 +10763,22 @@ void idMultiplayerGame::ServerClientConnect( int clientNum ) {
 			gameLocal.Error( "competitive connection identity exhausted" );
 		}
 		matchConnectionId[ clientNum ] = ++nextMatchConnectionId;
+		// openQ4 (MP-18): BeginServerDrop and EndServerDrop bracket a removal the
+		// server began; an error raised in between must not mark the next occupant
+		serverDropInFlight[ clientNum ] = false;
+		// openQ4 (MP-18): the engine re-initialises every connected client for a
+		// new map, with no disconnect in between, and each gets a new id here.
+		// An admin's grant is the connection's, so it goes on under the new id.
+		// A slot's next occupant is never given it: a disconnect cleared the
+		// carry first, and the address and port must be the ones that logged in.
+		if ( matchAdminCarry[ clientNum ].Length() > 0 ) {
+			const char *address = networkSystem->GetClientAddress( clientNum );
+			if ( address != NULL && matchAdminCarry[ clientNum ].Cmp( address ) == 0 ) {
+				matchAdminConnection[ clientNum ] = matchConnectionId[ clientNum ];
+			} else {
+				matchAdminCarry[ clientNum ].Clear();
+			}
+		}
 	}
 	memset( &playerState[ clientNum ], 0, sizeof( playerState[ clientNum ] ) );
 	statManager->ClientConnect( clientNum );
@@ -17284,6 +17436,17 @@ void idMultiplayerGame::Run( void ) {
 	RunQueuedClientDrops();
 	// openQ4 MP-18: a shutdown the operator scheduled (serverShutdown)
 	gameLocal.RunServerShutdown( false );
+	// openQ4 MP-18: an admin password set while the server runs is taken now, not
+	// at the next map; the host who sets one through rcon expects admins to log in
+	if ( gameLocal.isServer && matchSessionOperational ) {
+		static idCVar *adminPassword = NULL;
+		if ( adminPassword == NULL ) {
+			adminPassword = cvarSystem->Find( MP_ADMIN_SERVER_PASSWORD_CVAR );
+		}
+		if ( adminPassword != NULL && adminPassword->GetString()[ 0 ] != '\0' ) {
+			InitializeAdminAuthentication();
+		}
+	}
 	CommonRun();
 	PublishMVDMarkers();
 	// openQ4: the map database publishes the map it would load next
@@ -26075,6 +26238,8 @@ void idMultiplayerGame::DisconnectClient( int clientNum ) {
 		clientMatchControlModel.Clear();
 	}
 	if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
+		// openQ4 (MP-18): the connection is over, and so is its admin grant
+		matchAdminCarry[ clientNum ].Clear();
 		ClearMatchOperationTransportSlot( clientNum );
 		ResetVoteCooldownSlot( clientNum );
 		// Series contestant bindings are connection-scoped.  Retain the recorded
@@ -27222,7 +27387,7 @@ void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum ) {
 		return;
 	}
 	const idStr name = gameLocal.userInfo[ clientNum ].GetString( "ui_name" );
-	gameLocal.ServerBan( address, MPModAddressBits( address ), 0, name.c_str(), "", "admin" );
+	gameLocal.ServerBan( address, MPModPlayerPrefixBits( address ), 0, name.c_str(), "", "admin" );
 }
 
 /*

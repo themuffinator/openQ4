@@ -502,6 +502,9 @@ public:
 					}
 	bool			AdminLoginAvailable( void ) const { return matchAdminCredentialIsReal; }
 	bool			ServerAdminLogout( int clientNum );
+	// the host's own control: end every grant, or forget the password as well
+	int				ServerAdminRevokeAll( const char *why );
+	void			ServerAdminLoginsOff( void );
 
 
 	void			PrintMessageEvent( int to, msg_evt_t evt, int parm1 = -1, int parm2 = -1 );
@@ -1062,6 +1065,12 @@ private:
 	mpRefereeAuthenticationService matchAdminAuthentication;
 	uint64_t		matchAdminConnection[ MAX_CLIENTS ];	// the connection that logged in, or 0
 	int				matchAdminRefusalNotice[ MAX_CLIENTS ];	// game time before which a refused login is not reported again
+	// The address and port of the connection that logged in, kept from the login
+	// until that connection ends: a map change re-initialises every client
+	// without a disconnect, and the grant goes with the connection across it.
+	idStr			matchAdminCarry[ MAX_CLIENTS ];
+	int				matchAdminLockoutLogged[ MAX_CLIENTS ];	// game time before which a locked-out login is not logged again
+	bool			matchAdminGaveReferee[ MAX_CLIENTS ];	// this session's referee role came with the admin login
 	mpMatchEvidence	matchEvidence;
 	mpMatchEvidenceObserver matchEvidenceObserver;
 	mpEvidenceStorageWorkspace matchEvidenceWorkspace;
@@ -1118,6 +1127,8 @@ private:
 	bool			matchAdminCredentialInitialized;
 	bool			matchAdminCredentialIsReal;
 	bool			matchAdminAuthenticationReady;
+	uint64_t		matchAdminSessionId;			// the match session the admin service is bound to
+	bool			BindAdminAuthenticationSession( void );
 	bool			pendingRefereePasswordIsAdmin;	// the pending password answers the admin challenge
 	char			pendingRefereePassword[ MP_REFEREE_AUTH_MAX_PASSWORD_BYTES + 1 ];
 	int			pendingRefereePasswordLength;
@@ -1292,6 +1303,7 @@ private:
 						mpOperationExecutionResult_t &execution );
 	bool			InitializeRefereeAuthentication( void );
 	bool			InitializeAdminAuthentication( void );
+	bool			InstallOpaqueAdminCredential( void );
 	bool			ApplyAdminAuthentication( int clientNum,
 						const mpMatchOperationRequest_t &request,
 						mpOperationExecutionResult_t &execution );
