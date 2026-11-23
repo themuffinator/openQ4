@@ -82,6 +82,23 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **What you need to do.** Nothing. No setting changes value.
 - **Developer detail:** [the dependency table](settings-menu-structure.md#dependent-rows).
 
+## Retail Quake 4 render demos play, 23 November 2026
+
+- **Watch demos recorded with the original game.** A `.demo` recorded by
+  retail Quake 4 with `recordDemo` plays from **Demos**, where it is listed as
+  **Retail Quake 4 render demo** with its level, or with `playDemo` and
+  `timeDemo`: the recorded view, HUD, screens, effects and sound, with pause,
+  speed, step and seek. It needs the same Quake 4 game files as the recording.
+- **Damaged files are refused safely.** A cut or corrupted retail demo stops
+  with a warning in the console and returns to the menu.
+- **Step back** now lands on the previous frame of a render demo, after a seek
+  too.
+- **Evidence.** `retail_render_demo_contract.py` (no game files);
+  `retail_render_demo_smoke.py` records a fixture with retail Quake 4 itself,
+  plays it in all four compression schemes on OpenGL and Vulkan, compares
+  openQ4's frames with retail's own captures and plays sixteen damaged copies
+  (Windows). Retail `.netdemo` files are separate work.
+
 ## Music and ambience keep playing when the game runs slowly, 23 November 2026
 
 - **No more gaps in long tracks on slow frames.** Since 0.14.1, music, ambience

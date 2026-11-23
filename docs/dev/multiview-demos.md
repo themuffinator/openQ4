@@ -1025,7 +1025,7 @@ frames while capturing it with `aviDemo`.
   synthesized), has retail compress it into the other three schemes and
   capture its frames with `aviDemo`, then plays all four copies in the staged
   openQ4, captures openQ4's frames by pausing and stepping, compares them with
-  retail's, and plays twelve cut or corrupted copies in one session.
+  retail's, and plays sixteen cut or corrupted copies in one session.
   Results are recorded in the MP-22 entry of the [roadmap](roadmap.md).
 
 ## Campaign render demos (v11), 7 November 2026

@@ -4999,7 +4999,7 @@ prediction/rewind defaults.
 | MP-19 — Partial | Browser with favourites, filters, find player and tiles; LAN scan. 23 November: an openQ4 master program (`tools/master/openq4_master.py`: challenge-verified heartbeats, the legacy and the extended list, a JSON list for HTTPS) and the browser's HTTPS fallback (`net_serverListUrl`, merged with the master's list); the user chose to keep id's master as the default and the list address empty until the project's hosts are chosen. | A discovery service the project controls with a list fallback, recent servers, region sorting; a fresh install on each platform finds a server. |
 | MP-20 — Not started | Stock Quake 4 physics; Classic double jump and hook; `pm_jumpheight`, `pm_slidevelocity` and `pm_powerslide` synced. | Retail 1.4.2 movement parity evidence on the stock maps at 30, 60 and 90 tics; an optional ProMode-style movement ruleset the bots use. |
 | MP-21 — Partial | Render v14 block container with keyframes, 64-bit files and `compressDemo`; MVD 1.3 records with CRCs and readers for 1.0 to 1.2; the update policy. | One container for every stream, `demoConvert`, the format registry, per-version golden fixtures, byte-identical cross-platform reads in CI. |
-| MP-22 — Partial | Server MVDs with markers, keyframes and auto-tracking; render demos record the local view; a deck with pause, speed, step, seek and follow. 23 November: a player records their own view on any server (`record`, `stopRecord`) as a client-view MVD and plays it back as that player; `demoExport` writes PNG pictures and a WAV sound track. | Client-side recording on any server, autoaction, named list, reverse scrub, `timeDemo` for MVD, video and image export, thumbnails and metadata; the retail-demo decision. |
+| MP-22 — Partial | Server MVDs with markers, keyframes and auto-tracking; render demos record the local view; a deck with pause, speed, step, seek and follow. 23 November: a player records their own view on any server (`record`, `stopRecord`) as a client-view MVD and plays it back as that player; `demoExport` writes PNG pictures and a WAV sound track; retail Quake 4 render `.demo` files play. | Client-side recording on any server, autoaction, named list, reverse scrub, `timeDemo` for MVD, video and image export, thumbnails and metadata; the retail-demo decision. |
 | MP-23 — Partial | The render container packs its stream 4.78:1; joints are predicted (v12). | MVD compression and field encodings, 2D/sound/effect encodings, `demoStats`, budgets and targets met byte-exact. |
 | MP-24 — Partial | Native codec flips, truncations and hostile payloads; MVD cut points and recovery; damaged render files play on. | One fuzz corpus for every reader; MVD worker-thread, 64-bit and hours-long recordings; cheats-off, under-load, Vulkan/Linux/macOS/ARM64 recording and playback; cross-platform determinism; a listening check. |
 | MP-25 — Not started; staged plan 21 November | Survey: the server already runs networkless local clients (bots through `InitLocalClient`), and `Draw( clientNum )` and `renderView_t`'s viewport rectangle exist. One human local client, one command generator, one open gamepad, one listener and one active GUI; `src/mpgame/` asks who is local on about 730 lines; whole-target post passes; temporal history slotted only for VR eyes. | Decisions D1-D6 (remote transport, seat identity, stock-interface policy, listener model, keyboard seat, automated seats); then the stages: seats and input, listen-server seats, split views, HUD and menus, audio, remote servers, spectating and demos, cost and qualification. |
@@ -6659,7 +6659,23 @@ Completion substeps:
   pictures, so it gets no track. No optional pipe to an external encoder: the
   [demos guide](../user/multiview-demos.md#export-a-demo-as-pictures) gives
   the `ffmpeg` line instead.
-  Open: the two retail readers, Vulkan, Linux and macOS runs, export verified
+  Progress, 23 November (retail render demos): retail Quake 4 1.4.2 render
+  `.demo` files play from the library (listed as **Retail Quake 4 render
+  demo** with their level) and with `playDemo` and `timeDemo`, with pause,
+  speed, step both ways and replay-based seek
+  ([format and reader](multiview-demos.md#retail-quake-4-render-demos-mp-22-23-november-2026)).
+  The layout was read from the retail executable's writers: byte tokens, GUI
+  window trees and live effect state inside entity and effect records, bounds
+  written maximum first. Every count, index and length is bounded; a damaged
+  file stops with a warning. A step back now lands on the previous frame of any
+  render demo on a frame timeline. `retail_render_demo_contract.py` builds,
+  cuts and corrupts a retail-layout stream; `retail_render_demo_smoke.py`
+  records a fixture with retail Quake 4 (console scripts only), plays it in all
+  four compression schemes on OpenGL and Vulkan, matches openQ4's frames with
+  retail's own `aviDemo` captures (nine cameras, mean luma difference 2-4 of
+  255 against 11-16 to every other camera), and plays sixteen cut or corrupted
+  copies without a crash or fatal error.
+  Open: the retail `.netdemo` reader, Linux and macOS runs, export verified
   frame-exact against captures, and a person watching a recording and
   listening to an export.
 - [ ] **MP-23 — P2, measured optimization: demo storage efficiency.** MVD is

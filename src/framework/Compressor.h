@@ -56,6 +56,8 @@ public:
 	virtual void			Init( idFile *f, bool compress, int wordLength ) = 0;
 	virtual void			FinishCompress( void ) = 0;
 	virtual float			GetCompressionRatio( void ) const = 0;
+							// decompression: every byte of the source file has been taken in
+	virtual bool			InputExhausted( void ) = 0;
 
 							// common idFile interface
 	virtual const char *	GetName( void ) = 0;

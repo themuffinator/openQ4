@@ -5954,6 +5954,8 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 	if ( readDemo->IsRetailRenderStream() ) {
 		renderdemoVersion = 0;
 		renderDemoTimedFrames = true;
+		// its timeline is its frames', which keeps counting across level changes
+		renderDemoFrameClock = true;
 	}
 
 	numDemoFrames = 0;
@@ -10123,11 +10125,13 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 					continue;
 				}
 				// A retail stream has no end record, and the LZSS and Huffman
-				// coders pad their last bytes: a few undecodable bytes after a
-				// complete frame, then the end of the stream, are its end.
+				// coders decode padding past their last real byte: undecodable
+				// bytes after a complete frame, once the file is read to its end
+				// or a few bytes before it, are its end.
 				if ( !renderDemoFramePayloadPending && numDemoFrames > 0 ) {
 					byte rest[64];
-					if ( readDemo->Read( rest, sizeof( rest ) ) < static_cast<int>( sizeof( rest ) ) ) {
+					if ( readDemo->StreamInputExhausted() ||
+						 readDemo->Read( rest, sizeof( rest ) ) < static_cast<int>( sizeof( rest ) ) ) {
 						common->DPrintf( "Render demo '%s' ends with coder padding after frame %d\n",
 							activeRenderDemoName.c_str(), numDemoFrames );
 						readDemo->Close();

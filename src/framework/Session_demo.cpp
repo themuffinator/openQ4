@@ -1725,8 +1725,14 @@ void idSessionLocal::StepDemo( int frames ) {
 		if ( frames > 0 ) {
 			renderDemoStepPending = true;
 		} else {
-			// openQ4 MP-22: back to the frame before this one, from its keyframe
-			SeekDemoMS( Max( 0, DemoCurrentRenderTimeMS( *this ) - 1 ) );
+			// openQ4 MP-22: back to the frame before this one, from its keyframe.
+			// A seek stops at the first frame at or after its target, so on a
+			// frame timeline the target is that frame's own time.
+			int target = DemoCurrentRenderTimeMS( *this ) - 1;
+			if ( renderDemoFrameClock && renderDemoPrevFrameTimeUS < renderDemoFrameTimeUS ) {
+				target = static_cast<int>( renderDemoPrevFrameTimeUS / 1000 );
+			}
+			SeekDemoMS( Max( 0, target ) );
 		}
 	}
 	UpdateDemoMenuGui();

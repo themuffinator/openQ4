@@ -113,6 +113,15 @@ class Chain:
         return marker
 
 
+class ChainBroken(RuntimeError):
+    """The game opened a step file while the harness replaced it (a sharing
+    clash on Windows): the chain of console batches has ended. Nothing about
+    the game; the caller starts it again."""
+
+
+CHAIN_BROKEN = re.compile(r"(?m)^couldn't exec rd_step_\d+\.cfg")
+
+
 class Game:
     """One game process, its console log followed as it is written."""
 
@@ -150,11 +159,14 @@ class Game:
         deadline = time.monotonic() + timeout
         expression = re.compile(pattern, re.M)
         searched = 0
+        broken_from = len(self.text)
         while True:
             self.poll_log()
             match = expression.search(self.text, max(0, searched - 512))
             if match:
                 return match
+            if CHAIN_BROKEN.search(self.text, broken_from):
+                raise ChainBroken(f"the console chain ended before /{pattern}/")
             searched = len(self.text)
             if self.process.poll() is not None:
                 self.poll_log()
@@ -583,33 +595,54 @@ def damage(args) -> dict:
     if root.exists():
         shutil.rmtree(root)
     copies = damaged_copies(source, root / "baseoq4/demos")
-    game, chain = openq4_game(args.runtime_dir, root, args.backend)
-    outcomes = {}
-    game.start()
-    try:
+    outcomes, fatal, restarts = {}, [], 0
+    pending = list(copies)
+
+    def start_game():
+        log = root / "baseoq4/logs/retail_demo.log"
+        if log.exists():
+            log.replace(log.with_name(f"retail_demo.{restarts}.log"))
+        game, chain = openq4_game(args.runtime_dir, root, args.backend)
+        game.start()
         game.wait_for(r"execing rd_step_0", 240)
-        for name in copies:
+        return game, chain
+
+    game, chain = start_game()
+    try:
+        while pending:
+            name = pending[0]
             start = len(game.text)
-            run_batch(game, chain, [f"playDemo damaged_{name}"], 300)
-            quiet_since, seen = time.monotonic(), -1
-            while time.monotonic() - quiet_since < 6.0:
-                game.poll_log()
-                count = len(FRAME_LINE.findall(game.text, start))
-                if count != seen:
-                    seen, quiet_since = count, time.monotonic()
-                if game.process.poll() is not None:
-                    raise RuntimeError(f"openQ4 exited playing damaged_{name}")
-                time.sleep(.1)
-            run_batch(game, chain, ["demoStop", "wait 5"], 120)
+            try:
+                run_batch(game, chain, [f"playDemo damaged_{name}"], 300)
+                quiet_since, seen = time.monotonic(), -1
+                while time.monotonic() - quiet_since < 6.0:
+                    game.poll_log()
+                    count = len(FRAME_LINE.findall(game.text, start))
+                    if count != seen:
+                        seen, quiet_since = count, time.monotonic()
+                    if game.process.poll() is not None:
+                        raise RuntimeError(f"openQ4 exited playing damaged_{name}")
+                    time.sleep(.1)
+                run_batch(game, chain, ["demoStop", "wait 5"], 120)
+            except ChainBroken:
+                # the harness's clash, not the game's: start again and redo this copy
+                restarts += 1
+                if restarts > 3:
+                    raise
+                fatal += [line for line in game.text.splitlines() if "FATAL" in line or "Sys_Error" in line]
+                game.kill()
+                game, chain = start_game()
+                continue
             text = game.text[start:]
             outcomes[name] = {"frames": max([int(n) for n in FRAME_LINE.findall(text)] or [0]),
                               "messages": sorted(set(m.group(0).strip() for m in PROBLEM.finditer(text)))[:4]}
+            pending.pop(0)
     except BaseException:
         game.kill()
         raise
     code = quit_game(game, chain)
-    fatal = [line for line in game.text.splitlines() if "FATAL" in line or "Sys_Error" in line]
-    return {"exit": code, "fatal": fatal, "copies": outcomes}
+    fatal += [line for line in game.text.splitlines() if "FATAL" in line or "Sys_Error" in line]
+    return {"exit": code, "fatal": fatal, "copies": outcomes, "harness_restarts": restarts}
 
 
 def check(report: dict, frames: int) -> list[str]:
