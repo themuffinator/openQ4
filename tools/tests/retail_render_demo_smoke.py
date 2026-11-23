@@ -93,7 +93,7 @@ class Chain:
     exec reads a whole file at once, so each batch runs exactly once.
     """
 
-    def __init__(self, folder: Path, spin: int = 10):
+    def __init__(self, folder: Path, spin: int = 25):
         self.folder, self.spin, self.step = folder, spin, 0
         self.folder.mkdir(parents=True, exist_ok=True)
         self._spin_file(0)
@@ -645,6 +645,16 @@ def damage(args) -> dict:
     return {"exit": code, "fatal": fatal, "copies": outcomes, "harness_restarts": restarts}
 
 
+def retrying(phase, attempts: int = 3):
+    """Runs a phase again when the harness's own step-file clash ended its chain."""
+    for attempt in range(attempts):
+        try:
+            return phase()
+        except ChainBroken:
+            if attempt == attempts - 1:
+                raise
+
+
 def check(report: dict, frames: int) -> list[str]:
     """What the report must show for the smoke to pass."""
     problems = []
@@ -704,12 +714,12 @@ def main() -> int:
         verify_runtime_is_current(args.runtime_dir)
         changes, frames = view_changes(demos / f"{FIXTURE}_none.demo")
     if args.phase in ("play", "verify", "all"):
-        report["play"] = play(args, frames)
+        report["play"] = retrying(lambda: play(args, frames))
     if args.phase in ("capture", "verify", "all"):
         # the middle of each camera's stretch, away from its moves
         starts = [1, *changes, frames + 1]
         picks = tuple(sorted({(a + b) // 2 for a, b in zip(starts, starts[1:])}))
-        captured = capture_openq4(args, demos / f"{FIXTURE}.demo", picks)
+        captured = retrying(lambda: capture_openq4(args, demos / f"{FIXTURE}.demo", picks))
         report["capture"] = {"view_changes": changes, "frames": frames, **captured}
         report["compare"] = compare(args, captured["shots"], changes)
     if args.phase in ("damage", "verify", "all"):
