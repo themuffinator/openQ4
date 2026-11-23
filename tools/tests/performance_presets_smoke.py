@@ -29,7 +29,8 @@ def main():
     parser.add_argument('--expected-auto', choices=PROFILES)
     parser.add_argument('--width', type=int, default=1280)
     parser.add_argument('--height', type=int, default=720)
-    parser.add_argument('--expected-scale', type=int, help='Require this automatic scene scale on startup and explicit detection.')
+    parser.add_argument('--expected-scale', type=int,
+                        help='Require this render scale on startup and after detection (default: 50 with --startup-preset, else 100; presets never change it).')
     parser.add_argument('--expected-post-aa', type=int, help='Require this automatic post-AA mode.')
     parser.add_argument('--legacy-commands', action='store_true', help='Exercise all four stock execMachineSpec mappings in gameplay.')
     parser.add_argument('--expected-startup', choices=PROFILES,
@@ -46,6 +47,8 @@ def main():
         parser.error('Window dimensions must be within the supported display catalog')
     if args.unset_machine_spec and not args.saved_preset:
         parser.error('--unset-machine-spec requires --saved-preset')
+    if args.expected_scale is None:
+        args.expected_scale = 50 if args.startup_preset else 100
     output = (args.output or ROOT / '.tmp/preset-audit' / args.render_api).resolve()
     output.mkdir(parents=True, exist_ok=True)
     runtime = ROOT / '.install'
@@ -82,11 +85,12 @@ def main():
              'rendererVkProbe', 'performancePresetSelfTest']
     for name in sequence:
         lines += [f'echo PRESET_AUDIT_BEGIN_{name}', f'applyPerformancePreset {name}',
-                  'vid_restart', 'waitMsec 3000', 'viewpos', 'gfxInfo', 'r_fullscreen',
+                  'vid_restart', 'waitMsec 3000', 'viewpos', 'gfxInfo', 'r_fullscreen', 'r_screenFraction', 'r_mode',
                   'com_performancePreset', 'r_shadows', 'r_useShadowMap', 'r_ssao', 'r_hdrSceneTarget',
                   'r_ssaoSamples', 'r_shadowMapFilterTaps', 'r_shadowMapSize',
                   f'screenshot "screenshots/{name}.tga"', 'wait 3', f'echo PRESET_AUDIT_END_{name}']
-    legacy = (('low',75,0),('performance',85,0),('balanced',100,2),('ultra',100,4))
+    # The stock quality choices keep the render scale and the display mode.
+    legacy = (('low',args.expected_scale,0),('performance',args.expected_scale,0),('balanced',args.expected_scale,2),('ultra',args.expected_scale,4))
     if args.legacy_commands:
         for level,(name,scale,msaa) in enumerate(legacy):
             lines += [f'echo PRESET_LEGACY_BEGIN_{level}', f'com_machineSpec {level}', 'execMachineSpec',
@@ -120,6 +124,8 @@ def main():
     if args.saved_preset and re.search(r"First-launch performance preset '",text):
         failures.append('existing saved configuration was auto-detected again')
     startup_match = re.search(r'^PRESET_AUDIT_STARTUP\s*$(.*?)^PRESET_AUDIT_STARTUP_END\s*$',text,re.M|re.S)
+    if args.saved_preset and 'r_screenFraction 67 -> 100 (native)' not in text:
+        failures.append('saved preset-lowered render scale was not returned to native')
     if args.expected_startup and not configured:
         for key,value in [('r_screenFraction',args.expected_scale),('r_postAA',args.expected_post_aa)]:
             if value is not None and (not startup_match or re.findall(rf'^"{key}" is:"([^"\n]+)"',startup_match[1],re.M) != [str(value)]):
@@ -127,7 +133,7 @@ def main():
     if configured:
         match = re.search(r'^PRESET_AUDIT_STARTUP\s*$(.*?)^PRESET_AUDIT_STARTUP_END\s*$',text,re.M|re.S)
         expected = {'com_performancePreset':configured,'r_multiSamples':'0',
-                    'r_screenFraction':'50' if args.startup_preset else '67'}
+                    'r_screenFraction':str(args.expected_scale)}
         for key,value in expected.items():
             if not match or re.findall(rf'^"{key}" is:"([^"\n]+)"',match[1],re.M) != [value]:
                 failures.append('startup override not preserved: ' + key)
@@ -144,7 +150,9 @@ def main():
         section = match[1]
         modern = name in ('enhanced', 'quality', 'ultra', 'maximum')
         # Only the two tiers below the documented minimum hardware draw no shadows.
+        # No preset changes the render scale or the display mode.
         expected = {'com_performancePreset': name, 'r_fullscreen': '0',
+            'r_screenFraction': str(args.expected_scale), 'r_mode': '-1',
             'r_shadows': str(int(name not in ('minimum', 'lowpower'))),
             'r_useShadowMap': str(int(modern)), 'r_ssao': str(int(modern)), 'r_hdrSceneTarget': str(int(modern))}
         for key, value in expected.items():

@@ -44,6 +44,7 @@ public:
 	void			Init( idFile *f, bool compress, int wordLength );
 	void			FinishCompress( void );
 	float			GetCompressionRatio( void ) const;
+	bool			InputExhausted( void );
 
 	const char *	GetName( void );
 	const char *	GetFullPath( void );
@@ -96,6 +97,15 @@ idCompressor_None::GetCompressionRatio
 */
 float idCompressor_None::GetCompressionRatio( void ) const {
 	return 0.0f;
+}
+
+/*
+================
+idCompressor_None::InputExhausted
+================
+*/
+bool idCompressor_None::InputExhausted( void ) {
+	return file == NULL || file->Tell() >= file->Length();
 }
 
 /*
@@ -251,6 +261,12 @@ protected:
 	int				readBit;
 	const byte *	readData;
 	bool			readDry;			// openQ4: the last refill from the file came back empty
+
+public:
+	bool			InputExhausted( void ) {
+		return readDry || ( readByte >= readLength && idCompressor_None::InputExhausted() );
+	}
+protected:
 
 	int				writeTotalBytes;
 	int				writeLength;

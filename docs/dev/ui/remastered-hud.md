@@ -287,45 +287,68 @@ places.
 `tools/ui/remastered_hud_competitive.py` into the same documents. In single
 player it is the Remastered layout. In multiplayer:
 
-- **Match bar.** The standing or team panels, the timer and the Tourney strip
-  (`tl-rem`, `tc-strip`) give way to one bar at the top center: three sheared
-  plates from y 6, 26 u tall and 2 u apart, a 60 u timer at 0.72 between 122 u
-  sides at 0.55. In team modes each side's outer 25 u block is the team color
-  at 0.85 with its faction mark, then the team name; your team (or the followed
-  player's) leads. In deathmatch and Tourney the block is the header band with
-  the rank ordinal (the leader's in #FFBE23) and the name, cut at 52 u, with the
-  marker on your side. The scores sit at the inner ends in Chain 21 u.
-- **Timer.** The Remastered timer's states in Chain 15.5 u, with WARM-UP, the
+- **Scoreline.** In Duel, Tourney and the team modes the team panels, the
+  timer and the Tourney strip (`tl-rem`, `tc-strip`) give way to one scoreline
+  at the top center (`scoreline_shown`): plates from y 4, 30 u tall and 2 u
+  apart, a 64 u timer at 0.72 between 56 u score slabs (`mb0`, `mb1`). In team
+  modes a slab is the team color at 0.85 with its faction mark at 0.22 behind
+  the score (Chain 21 u) and the team name under it; your team leads, the
+  Marines for someone who chose to watch (`oq4_sl_left`). In Duel and Tourney
+  the score fills the slab (Chain 24 u) over a lip, #FFBE23 on the leader's
+  side, and the player's name hangs under it on its own plate (`mb*-who`) with
+  the marker on your side. Deathmatch keeps the Remastered standing and timer
+  (`tl-rem`) with network quality under the timer (`ffn`).
+- **Rosters.** 3 u beyond each slab, up to four tiles (`sl{side}t{i}`), best
+  score first: a 20 u plate with a lip in the team's color, the header band for
+  you and a light for the followed player, naming the player by the first two
+  letters of their name (`-ini`; Quake 4 has no portraits); over the tile a bar
+  filling to the ammunition for the weapon in hand in the weapon color code
+  (`-ammo`), and under it health and armor bars, both where the viewer may see
+  them (your side, or both for someone who chose to watch); a skull in #E46D56
+  over dimmed initials for the dead on every side. Under each roster, rows
+  (`slp{side}r{i}`) name where its placed players stand, initials then the
+  place, below the flags or pips where they hang (`hud_teamLocations`).
+- **Timer.** The Remastered timer's states in Chain 17 u, with WARM-UP, the
   countdown and STARTS IN, SUDDEN DEATH and the infinity mark, and under it the
   limit (TO 30), the round, the arena or the warm-up's ready count.
-- **Under the bar.** Two-flag modes hang each side's flag 6 u in from its inner
-  end (AT BASE, TAKEN with the carrier, DROPPED); round modes show five alive
-  pips; Dead Zone puts the holder, CONTESTED or EMPTY under the timer.
-- **Network quality** follows the bar's trailing end at all times: the ping
-  beside four bars (four to 60 ms, three to 120 ms, two to 200 ms, one above),
-  each 2% of this client's incoming packet loss removing one, down to one.
-- **Team status.** Team modes list your team's players (up to eight, best score
-  first) at the leading edge from y 150: the weapon, the name, health in Chain
-  (#E46D56 at 25 and below, #FFBE23 above 100) and armor; your row on the band
-  plate with the marker; the dead at 0.40 under a cross. Spectators see the
-  Marines leading and the Strogg trailing, the followed row lit at 0.22 with
-  the marker; held statistics take the trailing list's place.
+- **Under the scoreline.** Two-flag modes hang each side's flag 6 u in from its
+  inner end (AT BASE, TAKEN with the carrier, DROPPED); round modes show five
+  alive pips; Dead Zone puts the holder, CONTESTED or EMPTY under the timer.
+- **Network quality** follows the scoreline's trailing end at all times: the
+  ping beside four bars (four to 60 ms, three to 120 ms, two to 200 ms, one
+  above), each 2% of this client's incoming packet loss removing one, down to
+  one.
+- **No side lists.** The rosters carry the players; the team status lists that
+  stood at the view's edges were dropped as clutter (visual spec 1.48).
 - **Readouts.** The status bar, the weapon strip and the pickups grow by 15%
   about the bottom edge (`status_scale`, still limited to the span on narrow
-  views). The chat box keeps its 8 u clearance above the bar and never rises
-  toward the team status: short of the 180 u it needs beside the bar, it is
+  views). The chat box keeps its 8 u clearance above the bar and stays low:
+  short of the 180 u it needs beside the bar, it is
   200 u wide, or as wide as the space beside the widest enlarged strip allows,
-  down to 120 u at 4:3. The vote moves to the top-leading corner (36 u down,
-  clear of the team status) and the free camera's name tags add a health line.
+  down to 120 u at 4:3. With the scoreline the vote moves to the top-leading
+  corner (36 u down); the free camera's name tags add a health line.
 - **Narrow views.** Below about 16:9 at the HUD scale in use
-  (`under_match_bar`), the kill feed, the managed-match card and the lag
-  notice step 38 u down, so the feed's longest line clears network quality.
+  (`under_match_bar`, only while the scoreline shows), the kill feed, the
+  managed-match card, the lag notice and the item timers step 38 u down, so the
+  feed's longest line clears network quality.
+- **Item timers** (every Remastered layout, `item_timers`): up to six rows
+  trailing at 633 u from y 96, each with the item's symbol, where it lies (or
+  its name), the time left and a line filling in the item's color as the
+  respawn runs; an item that is there reads #B5C784 with no time.
+- **Kill feed motion** (every Remastered layout): the game names each new line
+  (`oq4_feedIn<slot>`) and each move up (`oq4_feedShift`) from
+  `rvHudLines::Publish`; a line slides in from 22 u and fades in, its weapon
+  mark settles from 155% and its plate glints, and the lines glide up 15 u
+  when the top one leaves.
 
-The game publishes the bar's sides (`oq4_mb0_*`, `oq4_mb1_*`), the line under
-the timer (`oq4_mb_sub`, `oq4_mb_ready`), the team status rows
-(`oq4_ts{team}_count`, `oq4_ts{team}_{row}_*`), the tags' health and
+The game publishes the scoreline's sides (`oq4_mb0_*`, `oq4_mb1_*`), the
+rosters (`oq4_sl_left`, `oq4_sl{side}_count`, `oq4_sl{side}_{i}_*` with
+`_open` saying whether the ammunition and vitals are this viewer's to see,
+`_initials`, `_ammo` as a percentage or -1, and `_location`), the line under the timer
+(`oq4_mb_sub`, `oq4_mb_ready`), the tags' health and
 `oq4_loss` from `idMultiplayerGame::PublishRemasteredCompetitive` and
-`PublishRemasteredHud`.
+`PublishRemasteredHud`, and the item timers (`oq4_it_count`,
+`oq4_it_{i}_kind/_where/_name/_time/_left/_up`) from `PublishClientOptions`.
 
 ## Covered GUIs
 
@@ -333,7 +356,7 @@ the timer (`oq4_mb_sub`, `oq4_mb_ready`), the team status rows
 | --- | --- | --- |
 | `guis/hud.gui`, `guis/q4xhud.gui` | `remastered_marine.rui`, `remastered_marine_awakening.rui` | Status bar, weapon strip, pickups, transmission display, boss bar, notices, interactive brackets, damage direction, missile warning; in multiplayer the powerup slots and developer readouts |
 | `guis/hud_strogg.gui`, `guis/q4xhud_strogg.gui` | `remastered_strogg.rui`, `remastered_strogg_awakening.rui` | The Strogg family of the same groups |
-| `guis/mphud.gui` | `remastered_mp.rui` | Kill feed, standing, team panels with flags and zone, timer, center column notices, aim text, vote, voice, chat lines and, while message mode is open (`guis/mpmsgmode.gui`), the chat input, follow card (Next, Previous, Free camera), the free camera's name tags, respawn prompt, Tourney strip, statistics card, Arena ceremony, lag notice; in Competitive the match bar, network quality and team status |
+| `guis/mphud.gui` | `remastered_mp.rui` | Kill feed, standing, team panels with flags and zone, timer, center column notices, aim text, vote, voice, chat lines and, while message mode is open (`guis/mpmsgmode.gui`), the chat input, follow card (Next, Previous, Free camera), the free camera's name tags, respawn prompt, Tourney strip, statistics card, Arena ceremony, lag notice; in Competitive the scoreline with its rosters and network quality; in every layout the item timers |
 | `guis/hud.gui` while riding the flatbed, `guis/hud_strogg.gui` on the tram | (the on-foot documents) | The ride's silhouette gauge replaces the three gauges (`enterFlatbed`/`enterTram`), traced from the stock truck and tram art |
 | `guis/vehicles/airassault/turretplayerhud.gui` | `remastered_turret.rui` | The Awakening's space cannon (m03's dropship guns): the transmission display, boss bar, notices, damage direction, brackets and missile warning without gauges, strip or powerups; the ship-status panel under the transmission display (damage sections, spinning objective markers, attack darts, and the view cone relative to the ship's nose); the HUD prompt's Exit |
 | `guis/vehicles/mcc/cannonplayerhud.gui` | `remastered_mcc.rui` | The Awakening's MCC cannon (m06): the gun takes no damage, so the readout is the MCC's hull, U.S.S. Hannibal over the stock gauge plate with the hull number (the MCC's health divided by 10), stacked under the transmission display the side gun's HUD lacked, its track filled in proportion and warning at 25%; the HUD prompt's Exit |

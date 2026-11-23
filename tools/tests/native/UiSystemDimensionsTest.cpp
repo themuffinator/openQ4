@@ -67,13 +67,19 @@ static void Run(const std::string& source,const std::string& directory,const cha
   std::fprintf(stderr,"Dimensions locale=%s expansion=%g viewport=%dx%d density=%g text=%g\n",locale,expansion,c.width,c.height,c.density,c.text);
   v.viewport.width=c.width;v.viewport.height=c.height;v.viewport.displayScale=c.density;v.viewport.textScale=c.text;
   Check(v.tx.Edit(View::Owner,{{"r_windowWidth",1280.0},{"r_windowHeight",720.0},{"r_customWidth",1920.0},{"r_customHeight",1080.0},{"r_mode",3.0},{"r_fullscreen",false},{"r_fullscreenDesktop",false}}).code==SettingsCode::Ok,"seed complete dimension draft");v.Sync();v.Frame();
-  for(const auto& field:dimensions)Propose(v,field);
-  Check(v.runtime.FocusControl("settings_custom_height",v.time),"custom sizing help reachable");v.Frame();RowTextFits(v,"dimensions-hint");
-  Check(v.tx.Edit(View::Owner,{{"r_fullscreen",true},{"r_fullscreenDesktop",true}}).code==SettingsCode::Ok,"draft dependency changes");v.Sync();v.Frame();
-  for(const auto& field:dimensions) {
+  // A window takes the window size, an exclusive fullscreen the custom size
+  // (r_mode and r_customWidth/Height count only there): one family at a time.
+  auto inactive=[&](const Dimension& field){
    Check(!v.runtime.CanActivateControl(field.id,v.time),"inactive dimension family rejects input");
    auto opacity=v.runtime.PresentedValue(field.id,"opacity");Check(opacity&&std::abs(opacity->data[0]-.45)<1e-6,"inactive dimension family visibly dims");
-  }
+  };
+  for(const auto& field:dimensions)if(field.custom)inactive(field);else Propose(v,field);
+  Check(v.tx.Edit(View::Owner,{{"r_fullscreen",true},{"r_fullscreenDesktop",false}}).code==SettingsCode::Ok,"exclusive fullscreen draft");v.Sync();v.Frame();
+  for(const auto& field:dimensions)if(field.custom)Propose(v,field);else inactive(field);
+  Check(v.runtime.FocusControl("settings_custom_height",v.time),"custom sizing help reachable");v.Frame();RowTextFits(v,"dimensions-hint");
+  Check(v.tx.Edit(View::Owner,{{"r_fullscreen",true},{"r_fullscreenDesktop",true}}).code==SettingsCode::Ok,"draft dependency changes");v.Sync();v.Frame();
+  for(const auto& field:dimensions)inactive(field);
+  Check(v.tx.Edit(View::Owner,{{"r_fullscreen",false},{"r_fullscreenDesktop",false}}).code==SettingsCode::Ok,"windowed draft again");v.Sync();v.Frame();
  }
  Check(v.tx.Edit(View::Owner,{{"r_fullscreen",false},{"r_fullscreenDesktop",false}}).code==SettingsCode::Ok,"restore editable sizing families");v.Sync();v.Frame();
  for(const auto& guard:StateValues{{"settings.busy",true},{"settings.confirmationVisible",true},{"page.discardVisible",true},{"settings.open",false},{"settings.phase",2.0}}) {

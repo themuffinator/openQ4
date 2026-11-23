@@ -110,13 +110,17 @@ this version on. Buying always switches to what you bought.
 | `hud_crosshairAmmo` | `0` | `1` shows the ammunition of the weapon in hand just right of the crosshair. It turns red when the weapon is low. |
 | `hud_crosshairNames` | `1` | Names the player under your crosshair: `0` nobody, `1` everyone, `2` team mates only. A team mate also shows health and armour. |
 
-## Team list locations
+## Team info
 
-In team modes the Competitive layout lists your team with each player's weapon,
-health and armour. Each row now also names where that player is, and the list
-stays accurate for team mates on the far side of the map: the server sends
-your own team's positions and vitals to you twice a second. Opponents are
-never sent. `hud_teamLocations 0` hides the names.
+The server sends you your own team's positions, health, armour and ammunition
+twice a second, so the Competitive scoreline stays accurate for team mates on
+the far side of the map. Opponents are never sent to players. On a casual
+server someone who chose to spectate is sent every player, so both sides'
+ammunition bars and vitals stay current; a managed match keeps its own rules.
+
+With the Competitive layout, the place each team mate stands is listed under
+your team's player tiles on the scoreline, beside their initials (a spectator
+sees both teams'). `hud_teamLocations 0` hides the places.
 
 ## Item timers
 
@@ -130,9 +134,12 @@ back, with `si_itemTimers`:
 | `2` | Everyone, players included |
 
 When you are allowed to see them, up to six timers appear at the right edge of
-the screen, the items a match turns on first. An item that is there shows its
-name in green; one that is gone shows the time until it returns. A timer shows
-`--` while a Classic mega health is still held by the player who took it.
+the screen, the items a match turns on first. Each shows the item's symbol and
+where it lies on the map, so two armours are easy to tell apart. An item that
+is there reads in green; one that is gone shows the time until it returns, its
+symbol dimmed, with a line underneath that fills in the item's colour as the
+respawn runs. A timer shows `--` while a Classic mega health is still held by
+the player who took it.
 
 `hud_itemTimers 0` hides the timers on your screen. The server sends the list
 only to the people it allows, so a player on a spectators-only server has

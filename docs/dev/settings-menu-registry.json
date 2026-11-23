@@ -1158,6 +1158,26 @@
       "accessibility": "Focusable bindDef row that captures the next key or button for this command."
     },
     {
+      "id": "controls.other.other-video",
+      "pane": "Controls",
+      "section": "Other",
+      "path": "Settings > Controls > Other > Record Video",
+      "source": "controls",
+      "container": "p_set_ctrls_other",
+      "widgets": [
+        "set_ctrls_other_video_key",
+        "set_ctrls_other_video"
+      ],
+      "widget_type": "bind",
+      "label_key": "#str_232913",
+      "target_type": "bind",
+      "target": "toggleVideo",
+      "default": "unbound",
+      "default_keys": [],
+      "restart_required": false,
+      "accessibility": "Focusable bindDef row that captures the next key or button for this command."
+    },
+    {
       "id": "audio.sound_volume",
       "pane": "Audio",
       "section": "Levels",
@@ -4531,6 +4551,166 @@
       "default": "2",
       "restart_required": false,
       "accessibility": "Focusable choiceDef row. Chooses whether the headset shows the player's own body: none, legs and torso, or with arms that reach the hands."
+    },
+    {
+      "id": "game.videoformat",
+      "pane": "Game Options",
+      "section": "Video Capture",
+      "path": "Settings > Game Options > Video Capture > Video Format",
+      "source": "game",
+      "container": "set_game_videoformat",
+      "widgets": [
+        "set_game_videoformat_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_232903",
+      "choices_key": "#str_232904",
+      "values": [
+        "mp4",
+        "mkv",
+        "webm",
+        "mov",
+        "avi",
+        "gif"
+      ],
+      "target_type": "cvar",
+      "target": "com_videoFormat",
+      "default": "mp4",
+      "restart_required": false,
+      "accessibility": "Focusable choiceDef row. Chooses the recording's file format; MKV, WebM, MOV and GIF need FFmpeg, and without it the recording is a Motion JPEG AVI."
+    },
+    {
+      "id": "game.videoquality",
+      "pane": "Game Options",
+      "section": "Video Capture",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Video Capture > Video Quality",
+      "container": "set_game_videoquality",
+      "widgets": [
+        "set_game_videoquality_slider_bar",
+        "set_game_videoquality_value"
+      ],
+      "edit_fields": [
+        {
+          "name": "set_game_videoquality_value",
+          "maxchars": 3
+        }
+      ],
+      "widget_type": "slider_edit",
+      "label_key": "#str_232905",
+      "target": "com_videoQuality",
+      "default": "80",
+      "ui_range": {
+        "low": "1",
+        "high": "100",
+        "step": "1"
+      },
+      "cvar_range": {
+        "low": "1",
+        "high": "100"
+      },
+      "accessibility": "Slider with paired edit field. 1 makes the smallest file, 100 the best picture; 80 is close to the screen."
+    },
+    {
+      "id": "game.videofps",
+      "pane": "Game Options",
+      "section": "Video Capture",
+      "path": "Settings > Game Options > Video Capture > Video Frame Rate",
+      "source": "game",
+      "container": "set_game_videofps",
+      "widgets": [
+        "set_game_videofps_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_232906",
+      "choices_key": "#str_232907",
+      "values": [
+        "24",
+        "30",
+        "60",
+        "120"
+      ],
+      "target_type": "cvar",
+      "target": "com_videoFPS",
+      "default": "60",
+      "restart_required": false,
+      "accessibility": "Focusable choiceDef row. Frames a second; 30 and 60 record frame-exact offline, 24 and 120 follow the clock."
+    },
+    {
+      "id": "game.videoheight",
+      "pane": "Game Options",
+      "section": "Video Capture",
+      "path": "Settings > Game Options > Video Capture > Video Resolution",
+      "source": "game",
+      "container": "set_game_videoheight",
+      "widgets": [
+        "set_game_videoheight_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_232908",
+      "choices_key": "#str_232909",
+      "values": [
+        "0",
+        "480",
+        "720",
+        "1080",
+        "1440",
+        "2160"
+      ],
+      "target_type": "cvar",
+      "target": "com_videoHeight",
+      "default": "0",
+      "restart_required": false,
+      "accessibility": "Focusable choiceDef row. Records at the window's size, or scales down to the chosen height keeping the window's shape."
+    },
+    {
+      "id": "game.videoaudio",
+      "pane": "Game Options",
+      "section": "Video Capture",
+      "path": "Settings > Game Options > Video Capture > Record Sound",
+      "source": "game",
+      "container": "set_game_videoaudio",
+      "widgets": [
+        "set_game_videoaudio_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_232910",
+      "choices_key": "#str_200059",
+      "values": [
+        "0",
+        "1"
+      ],
+      "target_type": "cvar",
+      "target": "com_videoAudio",
+      "default": "1",
+      "restart_required": false,
+      "accessibility": "Focusable choiceDef row. Records the game's sound with the video; GIFs have no sound."
+    },
+    {
+      "id": "game.videotiming",
+      "pane": "Game Options",
+      "section": "Video Capture",
+      "path": "Settings > Game Options > Video Capture > Video Timing",
+      "source": "game",
+      "container": "set_game_videotiming",
+      "widgets": [
+        "set_game_videotiming_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_232911",
+      "choices_key": "#str_232912",
+      "values": [
+        "auto",
+        "fixed",
+        "realtime"
+      ],
+      "target_type": "cvar",
+      "target": "com_videoTiming",
+      "default": "auto",
+      "restart_required": false,
+      "accessibility": "Focusable choiceDef row. Automatic records frame-exact offline and in real time online; Frame-Exact slows the game if encoding falls behind."
     },
     {
       "id": "audio.subtitles",

@@ -285,6 +285,13 @@ static void TestTeamInfo( void ) {
 	CHECK( MPTeamInfoPackWeapon( 16, 16 ) == MP_TEAMINFO_NO_WEAPON );
 	CHECK( MPTeamInfoUnpackWeapon( 7, 16 ) == 7 && MPTeamInfoUnpackWeapon( MP_TEAMINFO_NO_WEAPON, 16 ) == -1 );
 	CHECK( MPTeamInfoUnpackWeapon( 16, 16 ) == -1 );
+	// ammunition as a share of what the weapon holds; unlimited reads full, a last shot never empty
+	CHECK( MPTeamInfoPackAmmo( 50, 100, false ) == 125 && MPTeamInfoPackAmmo( 100, 100, false ) == MP_TEAMINFO_AMMO_FULL );
+	CHECK( MPTeamInfoPackAmmo( 0, 100, false ) == 0 && MPTeamInfoPackAmmo( 1, 400, false ) == 1 );
+	CHECK( MPTeamInfoPackAmmo( 999, 100, false ) == MP_TEAMINFO_AMMO_FULL && MPTeamInfoPackAmmo( 0, 0, true ) == MP_TEAMINFO_AMMO_FULL );
+	CHECK( MPTeamInfoPackAmmo( 10, 0, false ) == MP_TEAMINFO_AMMO_UNKNOWN );
+	CHECK( MPTeamInfoUnpackAmmo( 125 ) == 125 && MPTeamInfoUnpackAmmo( 251 ) == MP_TEAMINFO_AMMO_UNKNOWN &&
+		MPTeamInfoUnpackAmmo( MP_TEAMINFO_AMMO_UNKNOWN ) == MP_TEAMINFO_AMMO_UNKNOWN );
 	CHECK( !MPTeamInfoFresh( 0, 1000 ) );
 	CHECK( MPTeamInfoFresh( 1000, 1000 ) && MPTeamInfoFresh( 1000, 1000 + MP_TEAMINFO_FRESH_MSEC ) );
 	CHECK( !MPTeamInfoFresh( 1000, 1001 + MP_TEAMINFO_FRESH_MSEC ) );

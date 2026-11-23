@@ -489,6 +489,29 @@ SCENARIOS = {
         'followfree', 'waitMsec 400', shot('comp-spec-free-1'), 'waitMsec 1200', shot('comp-spec-free-2'),
         'follownext', 'waitMsec 2500', 'followfree', 'waitMsec 400', shot('comp-spec-free-3'), 'set ui_spectate Play',
     ]),
+    # The scoreline in Duel: you against a bot, then watching two bots (the
+    # rosters' vitals and the item timers open to a spectator).
+    'mp-competitive-duel': ('mp:mp/q4dm1', [
+        'set g_autoExecAfterMapLoad ""', 'waitMsec 2500', 'addbot', 'waitMsec 5000', shot('comp-duel'),
+        # si_itemTimers 2 shows the player the countdowns the pickups start.
+        'set developer 1', 'teleport item_armor_large_1', 'waitMsec 1200', 'teleport powerup_quad_damage_1', 'waitMsec 1200',
+        'teleport item_armor_small_1', 'set developer 0', 'waitMsec 3000', shot('comp-duel-items'),
+        'kill 0', 'waitMsec 400', shot('comp-duel-dead'), 'waitMsec 4000',
+        'addbot', 'waitMsec 1500', 'set ui_spectate Spectate', 'waitMsec 2500', 'follownext', 'waitMsec 8000', shot('comp-duel-spec'),
+        'followfree', 'waitMsec 6000', shot('comp-duel-spec-free'), 'set ui_spectate Play',
+    ]),
+    # Team DM, four a side, watched: both rosters with health, armor and the
+    # dead, the item timers counting as the bots take the armor and mega
+    # health, and the trailing list stepping under them.
+    'mp-competitive-tdm-spec': ('mp:mp/q4dm1', [
+        'set g_autoExecAfterMapLoad ""', 'waitMsec 2500', *['addbot'] * 8, 'waitMsec 4000',
+        # a kill feed line arriving (about 80 ms in) and seated
+        'kill 2', 'waitMsec 80', shot('comp-tdm-feed-arrive'), 'waitMsec 500', shot('comp-tdm-feed-seated'),
+        'set ui_spectate Spectate',
+        'waitMsec 20000', 'follownext', 'waitMsec 2500', shot('comp-tdm-spec'), 'waitMsec 15000', shot('comp-tdm-spec-later'),
+        'followfree', 'waitMsec 15000', shot('comp-tdm-spec-free'),
+        'set ui_hudLayout 1', 'waitMsec 400', shot('comp-tdm-spec-remastered'), 'set ui_hudLayout 3', 'set ui_spectate Play',
+    ]),
     # FLOW-058's evidence at each --size: eight players a team, a long name
     # and the chat input open. (A vote called by the only human passes at
     # once; the native checks place the vote card.)
@@ -524,7 +547,8 @@ SCENARIOS = {
 
 
 AWAKENING = {'turret', 'mcc', 'chaingun', 'speeder', 'gev'}
-COMPETITIVE = {'mp-competitive', 'mp-competitive-ctf', 'mp-competitive-spec', 'mp-competitive-matrix'}
+COMPETITIVE = {'mp-competitive', 'mp-competitive-ctf', 'mp-competitive-spec', 'mp-competitive-matrix', 'mp-competitive-duel',
+               'mp-competitive-tdm-spec'}
 
 
 def main() -> int:
@@ -575,6 +599,11 @@ def main() -> int:
             capture.SCENARIO_CVARS[scenario].update({'si_gameType': 'Tourney', 'si_maxPlayers': '16'})
         if scenario in ('mp-spectator', 'mp-competitive-spec'):
             capture.SCENARIO_CVARS[scenario]['si_warmup'] = '1'
+        if scenario == 'mp-competitive-duel':
+            capture.SCENARIO_CVARS[scenario].update({'si_gameType': 'Duel', 'si_warmup': '1', 'si_itemTimers': '2'})
+        if scenario == 'mp-competitive-tdm-spec':
+            capture.SCENARIO_CVARS[scenario].update({'si_gameType': 'Team DM', 'si_warmup': '1', 'si_maxPlayers': '16',
+                                                     'si_fragLimit': '0', 'si_timeLimit': '0'})
         # The Awakening's scenarios run its game directory over baseoq4.
         args.game_dir = 'q4xbase' if scenario in AWAKENING else 'baseoq4'
         if scenario in AWAKENING:

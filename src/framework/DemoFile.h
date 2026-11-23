@@ -153,6 +153,12 @@ public:
 
 	bool			IsBlockStream() const { return blocks != NULL; }
 
+	// Playback. A retail Quake 4 render demo: byte tokens and commands in the
+	// retail layout (src/renderer/RenderWorld_demo_retail.cpp), not openQ4's.
+	bool			IsRetailRenderStream() const { return retailRenderStream; }
+	// Playback of a scheme 0 to 3 stream: its file has been read to the end.
+	bool			StreamInputExhausted() { return compressor != NULL && compressor->InputExhausted(); }
+
 	// Recording. The bytes written next begin a level segment: the open block
 	// ends, the next one decodes with nothing before it, and the hash-string
 	// table starts again.
@@ -192,6 +198,7 @@ private:
 	static idCompressor *AllocCompressor( int type );
 
 	bool			writing;
+	bool			retailRenderStream;
 	byte *			fileImage;
 	idFile *		f;
 	idCompressor *	compressor;

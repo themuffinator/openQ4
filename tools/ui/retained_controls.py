@@ -42,8 +42,8 @@ from build_retained_screens import (ORANGE, U, Document, absolute, group, keywor
 from retained_controller_test import ROW_LABEL as TEST_LABEL, SHOW as TEST_SHOW, controller_test_modal
 from retained_key_glyphs import bound_keys, em
 from retained_mp_menus import PLACEHOLDER, any_text, row_face, row_states
-from retained_settings_rows import (COLUMN_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, heading, row_chrome,
-                                    rows_value_column, settings_subpage, slider, toggle, value_column)
+from retained_settings_rows import (COLUMN_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, heading, requires,
+                                    row_chrome, rows_value_column, settings_subpage, slider, toggle, value_column)
 
 PREFIX = "controls"
 
@@ -84,7 +84,7 @@ SECTIONS = (
         ("#str_200127", "clientMessageMode 1"), ("#str_200129", "_impulse28"), ("#str_200130", "_impulse29"),
         ("#str_200132", "_ingamestats"), ("#str_201009", "_impulse17"), ("#str_200311", "emote salute"),
         ("#str_200312", "emote cheer"), ("#str_200313", "emote taunt"), ("#str_200314", "emote grab_a"),
-        ("#str_200959", "_voicechat"),
+        ("#str_200959", "_voicechat"), ("#str_232913", "toggleVideo"),
     )),
 )
 BINDINGS = tuple(binding for _section, _heading, rows in SECTIONS for _label, binding in rows)
@@ -202,6 +202,44 @@ def device_rows():
     return (item for _ident, _key, columns in DEVICES for column in columns for item in column if item[0] != "heading")
 
 
+def dependencies() -> dict:
+    """The device rows another setting turns off (retained_settings_rows.
+    requires), each the condition under which it does anything:
+    - Accel Offset, Accel Curve and Sensitivity Cap while Mouse Accel is 0
+      (UsercmdGen reads them only with acceleration);
+    - every controller row with Controller Input off, which closes the
+      controllers, but those that also serve the keyboard or VR (Toggle
+      Crouch, Always Run, the weapon wheel's sensitivity and offset), the
+      reset buttons and the touchscreen;
+    - Rumble Strength, trigger and directional rumble, adaptive triggers and
+      the low battery rumble with Rumble off, and the low battery rumble's
+      strength while its threshold is 0;
+    - the gyro's tuning with both Gyro and the gyro menu pointer off (the
+      pointer keeps the sensor and its tuning), Gyro Activation with Gyro off;
+    - Touchpad Sensitivity with the touchpad off or buttons only (modes 0
+      and 3)."""
+    cvar = lambda name: {"state": f"cvar.{name}"}
+    both = lambda *terms: terms[0] if len(terms) == 1 else {"op": "&&", "args": [terms[0], both(*terms[1:])]}
+    pad = cvar("in_joystick")
+    accel = {"op": "!=", "args": [cvar("cl_mouseAccel"), 0]}
+    rumble = both(pad, cvar("in_joystickRumble"))
+    sensor = both(pad, {"op": "||", "args": [cvar("in_gyro"), cvar("in_gyroMenuPointer")]})
+    mode = cvar("in_touchpadMode")
+    padless = {"controls_controller", "controls_wheelsensitivity", "controls_wheeloffset", "controls_togglecrouch", "controls_alwaysrun",
+               "controls_resetcontroller", "controls_resetkeyboard", "controls_touchscreen"}
+    needs = {ident: pad for ident in (item[1] for tab, _key, columns in DEVICES if tab in ("controller", "aim")
+                                      for column in columns for item in column if item[0] != "heading") if ident not in padless}
+    needs.update({ident: accel for ident in ("controls_macceloffset", "controls_maccelpower", "controls_msenscap")})
+    needs.update({ident: rumble for ident in ("controls_rumblescale", "controls_triggerrumble", "controls_adaptivetriggers",
+                                              "controls_directionalhits", "controls_batterythreshold")})
+    needs["controls_batteryscale"] = both(rumble, {"op": ">", "args": [cvar("in_joystickLowBatteryRumbleThreshold"), 0]})
+    needs.update({ident: sensor for ident in ("controls_gyroturn", "controls_gyrotilt", "controls_gyrospace", "controls_gyroinvertturn",
+                                              "controls_gyroinverttilt", "controls_gyrotightening", "controls_gyrocalibrate")})
+    needs["controls_gyroactive"] = both(pad, cvar("in_gyro"))
+    needs["controls_touchpadsensitivity"] = both(pad, {"op": ">", "args": [mode, 0]}, {"op": "<", "args": [mode, 3]})
+    return needs
+
+
 def setting_rows() -> list:
     """Every device row: (cvar, kind, values or range)."""
     return cvar_settings(device_rows())
@@ -291,12 +329,26 @@ def controls_document() -> dict:
             return button_row(doc, ident, label_key, value_x, None, {"event": event})
         return cvar_row(doc, item, value_x)
 
+    needs = dependencies()
+    first_focus = {}
     for ident, key, columns in DEVICES:
-        tabs.append((ident, key, [[device_row(item) for item in column] for column in columns]))
+        laid = [[device_row(item) for item in column] for column in columns]
+        for node in (node for column in laid for node in column if isinstance(node, dict)):
+            if node["id"] in needs:
+                requires(doc, node, needs[node["id"]])
+        tabs.append((ident, key, laid))
+        # A tab whose first row another setting can turn off opens on its
+        # first row that answers.
+        rows = [item for column in columns for item in column if item[0] != "heading"]
+        if rows[0][1] in needs:
+            spare = next(item[1] for item in rows if item[1] not in needs)
+            first_focus[ident] = [{"op": "if", "condition": needs[rows[0][1]], "then": [{"op": "focus", "control": rows[0][1]}],
+                                   "else": [{"op": "focus", "control": spare}]}]
     # The west face button clears the focused row, as Delete does.
     doc.events["onSecondary"] = [{"op": "action", "action": "controlsClear"}]
     # The prompt bar (section 13.4): Accept reads CHANGE on a row; while the
     # page waits for a key, Accept is the key itself and leaves the bar.
     prompts = {"verbs": (VERB_CHANGE,), "accept_shown": {"op": "<", "args": [{"state": CAPTURE}, 0]}}
     note = {section: "#str_231545" for section, _heading, _rows in SECTIONS}
-    return settings_subpage(doc, PREFIX, "#str_200083", tabs, note=note, prompts=prompts, overlays=[controller_test_modal(doc)])
+    return settings_subpage(doc, PREFIX, "#str_200083", tabs, note=note, prompts=prompts, overlays=[controller_test_modal(doc)],
+                            first_focus=first_focus)

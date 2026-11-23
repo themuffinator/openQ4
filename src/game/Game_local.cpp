@@ -9208,6 +9208,11 @@ float idGameLocal::GetPresentationTicFraction( void ) const {
 	if ( presentationClockSample >= 0.0f ) {
 		return presentationClockSample;
 	}
+	// A fixed-rate video capture runs whole tics per recorded frame: each frame
+	// shows its tic's own pose, not a wall-clock blend that would judder.
+	if ( cvarSystem->GetCVarBool( "com_videoFixedStep" ) ) {
+		return 1.0f;
+	}
 	const double realTime = idLib::sys->GetClockTicks() * 1000.0 / idLib::sys->ClockTicksPerSecond();
 	return presentationClock.Phase( time, Max( 1, GetMSec() ), common->GetUserCmdHz(), realTime,
 		!isMultiplayer && ( g_stopTime.GetBool() || presentationMenuPaused ) );

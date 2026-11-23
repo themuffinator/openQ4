@@ -374,6 +374,19 @@ typedef struct renderGpuFrameTiming_s {
 	unsigned long long	resetCount;
 } renderGpuFrameTiming_t;
 
+// One presented frame read back for video capture (idRenderSystem::PollVideoFrame).
+// pixels hold width x height RGBA8 (BGRA8 when bgra), rows bottom-up unless
+// topDown; tag is the value the capture was requested with. POD: crosses the
+// renderer-module boundary.
+typedef struct renderVideoFrame_s {
+	const byte *		pixels;
+	int					width;
+	int					height;
+	bool				topDown;
+	bool				bgra;
+	long long			tag;
+} renderVideoFrame_t;
+
 // Frame-latched presentation dimensions shared with the game modules. The
 // 3D scene and its post-process chain render at sceneWidth/sceneHeight; final
 // composition and all game/UI drawing remain at outputWidth/outputHeight.
@@ -880,6 +893,20 @@ public:
 	// with nothing uploaded, for any other image or a rectangle outside it;
 	// the caller then uploads the image whole.
 	virtual bool UploadImageRegion( const char *imageName, const byte *data, int x, int y, int width, int height, int rowPitch ) = 0;
+
+	// Appended slots, render API 37. Video capture reads every presented frame
+	// back through the save preview's asynchronous path, into a small ring, so
+	// no frame waits for its own read. RequestVideoFrame marks the next presented
+	// frame for reading under tag (a request not yet presented is retagged);
+	// false when the ring is full or the backend cannot read frames back.
+	// PollVideoFrame hands back the oldest read: 1 ready (pixels mapped until
+	// ReleaseVideoFrame), 0 still on the GPU, -1 none queued or the read failed.
+	// wait blocks on that one read. EndVideoCapture frees the ring. The default
+	// bodies keep backends and test doubles without the readback building.
+	virtual bool RequestVideoFrame( long long tag ) { (void)tag; return false; }
+	virtual int PollVideoFrame( renderVideoFrame_t &frame, bool wait ) { (void)frame; (void)wait; return -1; }
+	virtual void ReleaseVideoFrame() {}
+	virtual void EndVideoCapture() {}
 };
 
 extern idRenderSystem *		renderSystem;

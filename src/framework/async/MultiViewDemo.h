@@ -243,8 +243,11 @@ private:
 	int						timeDemoLastFrameTime;
 	int						timeDemoSlowestFrame;
 	bool					exporting;
-	int						exportStepMS;
+	int						exportFps;
+	int						exportSteps;			// match steps taken, a picture each after the first
 	int						exportFrames;
+	bool					exportSound;			// the sound track is recording (SoundCapture.h)
+	void					FinishExportSound();
 	idStrList				recordingPlayers;		// names seen while recording, for the summary
 	bool					thumbnailTaken;
 	idStr					pendingThumbnail;

@@ -199,20 +199,29 @@ def check_messages() -> None:
 
     team = read("src/mpgame/mp/TeamInfo.cpp")
     frame = function_body(team, "void rvTeamInfo::ServerFrame( void )")
-    require("gameLocal.QueueUnreliableMessage( recipient, msg );" in frame and "SendUnreliableMessage(" not in team
-            and "RecordUnreliableMessage" not in team,
-            "team info goes to the team member alone: not to who follows them, not into a recording")
+    send = function_body(team, "static void TeamInfoSend( int recipient, const mpTeamInfoEntry_t *records, int count )")
+    require("gameLocal.QueueUnreliableMessage( recipient, msg );" in send and "TeamInfoSend( recipient, mates, count );" in frame
+            and "SendUnreliableMessage(" not in team and "RecordUnreliableMessage" not in team,
+            "team info goes to its recipient alone: not to who follows them, not into a recording")
     require("mate->team != member->team" in frame, "a member is sent their own team and nobody else")
+    watch = frame.find("->wantSpectate )")
+    require(0 < watch < frame.find("gameLocal.mpGame.IsManagedMatch()") < frame.find("TeamInfoSend( recipient, watched, count );"),
+            "someone who chose to watch hears about every player, but not in a managed match")
+    trailer = send.rfind("msg.WriteByte( records[ i ].ammo );")
+    require(send.rfind("msg.WriteShort( records[ i ].origin[ 2 ] );") < trailer,
+            "the ammunition trails the entries, so a 0.15.0 client reads the message as before")
     receive = function_body(team, "void rvTeamInfo::ClientReceive( const idBitMsg &msg )")
-    require("entry.clientNum >= MAX_CLIENTS" in receive and "GetRemainingReadBits()" in receive,
-            "a received record is bounded before it is kept")
+    require("entry.clientNum < MAX_CLIENTS" in receive and "GetRemainingReadBits()" in receive
+            and "msg.GetRemainingReadBits() < read * 8" in receive,
+            "a received record is bounded before it is kept, and an older server's missing trailer leaves ammunition unknown")
     resolve = function_body(team, "void rvTeamInfo::Resolve( const idPlayer *player, mpTeamInfoEntry_t &entry ) const")
     uses = function_body(team, "bool rvTeamInfo::UsesRecord( const idPlayer *player ) const")
     require("UsesRecord( player )" in resolve and "TeamInfoFromEntity( player, entry );" in resolve,
             "a row is the server's record when there is one for it and the player's own entity otherwise")
-    require("gameLocal.isClient" in uses and "player->team == local->team" in uses and "!gameLocal.IsServerDemoPlaying()" in uses
-            and "MPTeamInfoFresh(" in uses,
-            "a record is used only while fresh and for the viewer's own side; a server and a demo read the players directly")
+    require("gameLocal.isClient" in uses and "( local->wantSpectate || player->team == local->team )" in uses
+            and "!gameLocal.IsServerDemoPlaying()" in uses and "MPTeamInfoFresh(" in uses,
+            "a record is used only while fresh and for the viewer's own side, or by someone who chose to watch; "
+            "a server and a demo read the players directly")
 
     timers = read("src/mpgame/mp/ItemTimers.cpp")
     frame = function_body(timers, "void rvItemTimers::ServerFrame( void )")
@@ -264,6 +273,8 @@ def check_hud_state() -> None:
     require("neutralView || player->team == localPlayer->team" in rows
             and "const bool neutralView = localPlayer->spectating && localPlayer->wantSpectate;" in rows,
             "an opponent's row is never given a location, and an eliminated player is not a neutral spectator")
+    require('"%s_location"' in rows and "showLocations && open && !dead" in rows,
+            "the scoreline names places only under the tiles this viewer may look over (hud_teamLocations)")
 
 
 def check_strings() -> None:

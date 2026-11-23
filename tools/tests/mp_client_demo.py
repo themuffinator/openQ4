@@ -170,7 +170,7 @@ def check_deck_and_library() -> None:
     require("const int step = ( frames == 0 ? 1 : frames ) * Max( 1, common->GetUserCmdMSec() );" in
             body(mvd, "void idMultiViewDemo::StepFrames( int frames ) {"), "a step is whole tics, back as well as on")
     export = body(mvd, "void idMultiViewDemo::RunPlaybackFrame() {")
-    require('screenshot \\"%s/frame%05d.png\\"' in export and "elapsed = exportStepMS;" in export,
+    require('screenshot \\"%s/frame%05d.png\\"' in export and "elapsed = DemoExportStepMsec( exportSteps++, exportFps );" in export,
             "an export writes a PNG frame each 1000/fps of the match")
     require('AddCommand( "demoExport", Export_f' in mvd, "demoExport is a command")
     require("ClientStamp( markerFrame, marker.gameTime );" in body(mvd, "bool idMultiViewDemo::RecordMarker( const serverMVDMarker_t &input ) {"),
@@ -192,8 +192,50 @@ def check_deck_and_library() -> None:
             "screenshot takes a file name with a size")
 
 
+def check_export_sound() -> None:
+    """demoExport's WAV comes from a loopback mixer that follows the export's steps."""
+    mvd = read("src/framework/async/MultiViewDemo.cpp")
+    capture = read("src/sound/SoundCapture.h")
+    system = read("src/sound/snd_system.cpp")
+    hardware = read("src/sound/OpenAL/AL_SoundHardware.cpp")
+    start = body(mvd, "bool idMultiViewDemo::StartExport( const char *name, int fps, bool quitAfter ) {")
+    require('va( "%s/%s.wav", directory.c_str(), base.c_str() )' in start and
+            start.index("Sound_BeginCapture(") < start.index("StartPlayback( args )"),
+            "the sound track switches to the loopback mixer before the map's sounds load")
+    frame = body(mvd, "void idMultiViewDemo::RunPlaybackFrame() {")
+    shot = frame.index('screenshot \\"%s/frame%05d.png\\"')
+    require("Sound_CaptureAdvance( DemoExportStepMsec( exportFrames, exportFps ) );" in frame[shot - 300:shot],
+            "every exported picture asks for exactly its step of sound")
+    require("FinishExportSound();" in body(mvd, "void idMultiViewDemo::StopPlayback( const char *reason ) {") and
+            "FinishExportSound();" in body(mvd, "void idMultiViewDemo::FinishPlayback( const char *reason, bool warning ) {"),
+            "the track is finished and the playback device reopened however the export ends")
+    require("MVD_EXPORT_SOUND written=1 file=%s rate=%d channels=%d frames=%lld msec=%lld" in mvd,
+            "the export reports the track")
+    require("static const int SOUND_CAPTURE_SLICE_MSEC = 100;" in capture and
+            "bool	Sound_BeginCapture( const char* path, char* reason, int reasonSize );" in capture,
+            "the capture interface")
+    render = body(system, "void idSoundSystemLocal::Render()")
+    require("MixCapture( true );" in render and "soundTime = RealSoundTime();" in render,
+            "a capture's clock moves only by the steps it mixes")
+    require("if( !Sound_CaptureActive() )" in body(system, "int idSoundSystemLocal::RefreshSoundTime()"),
+            "a pause during an export does not read the wall clock")
+    mix = body(system, "void idSoundSystemLocal::MixCapture( bool updateBetweenSlices )")
+    require("SoundCaptureFramesFor( soundCapture.msec, soundCapture.rate )" in mix and "RenderLoopback(" in mix and
+            "currentSoundWorld->Update();" in mix, "each slice renders its exact frames, the voices updated between slices")
+    require("soundClockOffset = Max( soundClockOffset, sys.soundTime - Sys_Milliseconds() );" in
+            body(system, "bool Sound_EndCapture( soundCaptureResult_t& result )"), "the sound clock never runs backwards")
+    require("ALC_FORMAT_CHANNELS_SOFT" in body(hardware, "ALCdevice* idSoundHardware_OpenAL::OpenLoopbackDevice( ALCcontext*& context )"),
+            "the loopback mixer renders the playback device's layout")
+    require("if( loopbackOpen ) return false;" in body(hardware, "bool idSoundHardware_OpenAL::UpdateDeviceMonitoring() {"),
+            "endpoint recovery leaves the loopback mixer alone")
+    require("!Sound_CaptureActive() && Session_ShouldSilenceAudioWhenUnfocused()" in read("src/framework/Session.cpp"),
+            "an export records sound whatever has focus")
+    require("'openq4-sound-capture', openq4_sound_capture_test" in read("meson.build"), "the native capture test runs")
+
+
 def main() -> int:
     try:
+        check_export_sound()
         check_deck_and_library()
         check_container()
         check_recording()

@@ -1059,8 +1059,8 @@ static void Cmd_OpenQ4ReportClientOptions_f( const idCmdArgs &args ) {
 		}
 		mpTeamInfoEntry_t info;
 		mp.teamInfo.Resolve( other, info );
-		gameLocal.Printf( "CLIENTOPT mate slot=%d team=%d source=%s health=%d armor=%d weapon=%d origin=%d,%d,%d location=\"%s\"\n",
-			i, other->team, mp.teamInfo.UsesRecord( other ) ? "record" : "entity", info.health, info.armor, info.weapon,
+		gameLocal.Printf( "CLIENTOPT mate slot=%d team=%d source=%s health=%d armor=%d weapon=%d ammo=%d origin=%d,%d,%d location=\"%s\"\n",
+			i, other->team, mp.teamInfo.UsesRecord( other ) ? "record" : "entity", info.health, info.armor, info.weapon, info.ammo,
 			info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ],
 			mp.locations.NameForPoint( idVec3( info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ] ) ) );
 	}
@@ -1071,8 +1071,8 @@ static void Cmd_OpenQ4ReportClientOptions_f( const idCmdArgs &args ) {
 	for ( int i = 0; i < count; i++ ) {
 		const idEntity *item = gameLocal.entities[ rows[ i ].entityNumber ];
 		const int left = ( rows[ i ].respawnAt > 0 ) ? Max( 0, rows[ i ].respawnAt - gameLocal.realClientTime ) : rows[ i ].respawnAt;
-		gameLocal.Printf( "CLIENTOPT timer row=%d kind=%d entity=%s left_ms=%d\n", i, rows[ i ].kind,
-			item != NULL ? item->name.c_str() : "?", left );
+		gameLocal.Printf( "CLIENTOPT timer row=%d kind=%d entity=%s left_ms=%d total_ms=%d\n", i, rows[ i ].kind,
+			item != NULL ? item->name.c_str() : "?", left, rows[ i ].totalMsec );
 	}
 
 	int tones = 0;

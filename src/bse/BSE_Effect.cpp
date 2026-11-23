@@ -555,6 +555,34 @@ idRenderModel* rvBSE::Render(idRenderModel* model, const struct renderEffect_s* 
 	return renderModel;
 }
 
+/*
+================
+rvBSE::DemoParticleLayout
+
+Starts a scratch copy of the effect exactly as a played one starts, without its
+sounds, and reports which segments allocated particles of which type: the
+segments a retail render demo's effect state lists particles for.
+================
+*/
+void rvBSE::DemoParticleLayout(const rvDeclEffect* declEffect, const renderEffect_s& parms, float time, idList<int>& layout)
+{
+	layout.Clear();
+	if (declEffect == NULL) {
+		return;
+	}
+	renderEffect_s scratchParms = parms;
+	scratchParms.referenceSoundHandle = 0;
+	scratchParms.declEffect = declEffect;
+	rvBSE scratch;
+	scratch.Init(declEffect, &scratchParms, time);
+	layout.SetNum(scratch.mSegments.Num());
+	for (int i = 0; i < scratch.mSegments.Num(); ++i) {
+		const rvSegment& segment = scratch.mSegments[i];
+		layout[i] = segment.mParticles != NULL ? segment.mParticleType : -1;
+	}
+	scratch.Destroy();
+}
+
 void rvBSE::Destroy()
 {
 	// The reference sound emitter belongs to the owner, which keeps it across effect

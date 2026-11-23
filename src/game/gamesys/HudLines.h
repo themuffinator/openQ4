@@ -6,6 +6,9 @@
 // drops the top line at once. The stock GUIs time this in their own scripts;
 // this queue keeps the same timing for the Remastered documents and
 // publishes each slot as fields (<prefix><slot>_<field>, _live, _alpha).
+// openQ4: given an event prefix, a publish also names what changed since the
+// last one, so a document can move its lines: <prefix>Shift when lines moved
+// up a slot, then <prefix>In<slot> for each line that arrived.
 #pragma once
 
 class rvHudLines {
@@ -17,6 +20,8 @@ public:
 	void Clear() {
 		count = 0;
 		topSince = 0;
+		added = 0;
+		shifted = false;
 		for ( int i = 0; i < MaxLines; i++ ) {
 			lines[ i ].Clear();
 		}
@@ -28,6 +33,7 @@ public:
 			RemoveTop( now );
 		}
 		lines[ count++ ] = fields;
+		added = Min( added + 1, MaxLines );
 		if ( count == 1 ) {
 			topSince = now;
 		}
@@ -40,7 +46,8 @@ public:
 		}
 	}
 
-	void Publish( idUserInterface *gui, const char *prefix, int now, int holdMs, int fadeMs, int leaveMs, int capacity ) {
+	void Publish( idUserInterface *gui, const char *prefix, int now, int holdMs, int fadeMs, int leaveMs, int capacity,
+				  const char *eventPrefix = NULL ) {
 		if ( gui == NULL ) {
 			return;
 		}
@@ -64,6 +71,18 @@ public:
 				gui->SetStateString( va( "%s%d_%s", prefix, slot, kv->GetKey().c_str() ), kv->GetValue().c_str() );
 			}
 		}
+		if ( eventPrefix != NULL ) {
+			// the lines that stayed moved up first; the newest lines are the last slots
+			const int arrived = Min( added, Min( count, capacity ) );
+			if ( shifted && count > arrived ) {
+				gui->HandleNamedEvent( va( "%sShift", eventPrefix ) );
+			}
+			for ( int slot = Min( count, capacity ) - arrived; slot < Min( count, capacity ); slot++ ) {
+				gui->HandleNamedEvent( va( "%sIn%d", eventPrefix, slot ) );
+			}
+		}
+		added = 0;
+		shifted = false;
 	}
 
 	// `count` lines at full strength, oldest first, and the slots after them up
@@ -97,6 +116,8 @@ private:
 		}
 		if ( count > 0 ) {
 			lines[ --count ].Clear();
+			shifted = true;
+			added = Min( added, count );
 		}
 		topSince = now;
 	}
@@ -104,4 +125,6 @@ private:
 	idDict	lines[ MaxLines ];
 	int		count;
 	int		topSince;
+	int		added;		// lines added since the last publish, still queued
+	bool	shifted;	// lines moved up a slot since the last publish
 };

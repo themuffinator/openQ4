@@ -2277,21 +2277,33 @@
            {
             "op": "&&",
             "args": [
-             {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
-             {"op": "!", "args": [{"state": "settings.busy"}]}
+             {
+              "op": "&&",
+              "args": [
+               {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
+               {"op": "!", "args": [{"state": "settings.busy"}]}
+              ]
+             },
+             {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
             ]
            },
-           {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
+           {"op": "!", "args": [{"state": "page.discardVisible"}]}
           ]
          },
-         {"op": "!", "args": [{"state": "page.discardVisible"}]}
+         {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
         ]
        },
-       {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
+       {"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]}
       ]
      }
     ]
    }
+  },
+  {
+   "id": "settings_borderless.opacity",
+   "node": "settings_borderless",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]}, 1, 0.45]}
   },
   {
    "id": "settings_fullscreen_policy.enabled",
@@ -2313,21 +2325,33 @@
            {
             "op": "&&",
             "args": [
-             {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
-             {"op": "!", "args": [{"state": "settings.busy"}]}
+             {
+              "op": "&&",
+              "args": [
+               {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
+               {"op": "!", "args": [{"state": "settings.busy"}]}
+              ]
+             },
+             {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
             ]
            },
-           {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
+           {"op": "!", "args": [{"state": "page.discardVisible"}]}
           ]
          },
-         {"op": "!", "args": [{"state": "page.discardVisible"}]}
+         {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
         ]
        },
-       {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
+       {"state": "settings.draft.r_fullscreen"}
       ]
      }
     ]
    }
+  },
+  {
+   "id": "settings_fullscreen_policy.opacity",
+   "node": "settings_fullscreen_policy",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "settings.draft.r_fullscreen"}, 1, 0.45]}
   },
   {
    "id": "settings_msaa.enabled",
@@ -2577,7 +2601,13 @@
          {"op": "!", "args": [{"state": "page.discardVisible"}]}
         ]
        },
-       {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+       {
+        "op": "&&",
+        "args": [
+         {"state": "settings.draft.r_fullscreen"},
+         {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+        ]
+       }
       ]
      }
     ]
@@ -2587,7 +2617,20 @@
    "id": "settings_custom_width.opacity",
    "node": "settings_custom_width",
    "property": "opacity",
-   "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}, 1, 0.45]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"state": "settings.draft.r_fullscreen"},
+       {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+      ]
+     },
+     1,
+     0.45
+    ]
+   }
   },
   {
    "id": "settings_custom_height.enabled",
@@ -2619,7 +2662,13 @@
          {"op": "!", "args": [{"state": "page.discardVisible"}]}
         ]
        },
-       {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+       {
+        "op": "&&",
+        "args": [
+         {"state": "settings.draft.r_fullscreen"},
+         {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+        ]
+       }
       ]
      }
     ]
@@ -2629,7 +2678,20 @@
    "id": "settings_custom_height.opacity",
    "node": "settings_custom_height",
    "property": "opacity",
-   "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}, 1, 0.45]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"state": "settings.draft.r_fullscreen"},
+       {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+      ]
+     },
+     1,
+     0.45
+    ]
+   }
   },
   {
    "id": "settings_display_mode.enabled",
@@ -2654,26 +2716,32 @@
              {
               "op": "&&",
               "args": [
-               {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
-               {"op": "!", "args": [{"state": "settings.busy"}]}
+               {
+                "op": "&&",
+                "args": [
+                 {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
+                 {"op": "!", "args": [{"state": "settings.busy"}]}
+                ]
+               },
+               {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
               ]
              },
-             {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
+             {"op": "!", "args": [{"state": "page.discardVisible"}]}
             ]
            },
-           {"op": "!", "args": [{"state": "page.discardVisible"}]}
+           {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
           ]
          },
-         {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
+         {
+          "op": "&&",
+          "args": [
+           {"state": "settings.display.available"},
+           {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+          ]
+         }
         ]
        },
-       {
-        "op": "&&",
-        "args": [
-         {"state": "settings.display.available"},
-         {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
-        ]
-       }
+       {"state": "settings.draft.r_fullscreen"}
       ]
      }
     ]
@@ -2689,8 +2757,14 @@
      {
       "op": "&&",
       "args": [
-       {"state": "settings.display.available"},
-       {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+       {
+        "op": "&&",
+        "args": [
+         {"state": "settings.display.available"},
+         {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+        ]
+       },
+       {"state": "settings.draft.r_fullscreen"}
       ]
      },
      1,
@@ -2721,26 +2795,32 @@
              {
               "op": "&&",
               "args": [
-               {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
-               {"op": "!", "args": [{"state": "settings.busy"}]}
+               {
+                "op": "&&",
+                "args": [
+                 {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
+                 {"op": "!", "args": [{"state": "settings.busy"}]}
+                ]
+               },
+               {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
               ]
              },
-             {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
+             {"op": "!", "args": [{"state": "page.discardVisible"}]}
             ]
            },
-           {"op": "!", "args": [{"state": "page.discardVisible"}]}
+           {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
           ]
          },
-         {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
+         {
+          "op": "&&",
+          "args": [
+           {"state": "settings.display.available"},
+           {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+          ]
+         }
         ]
        },
-       {
-        "op": "&&",
-        "args": [
-         {"state": "settings.display.available"},
-         {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
-        ]
-       }
+       {"state": "settings.draft.r_fullscreen"}
       ]
      }
     ]
@@ -2756,8 +2836,14 @@
      {
       "op": "&&",
       "args": [
-       {"state": "settings.display.available"},
-       {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+       {
+        "op": "&&",
+        "args": [
+         {"state": "settings.display.available"},
+         {"op": "!", "args": [{"state": "settings.draft.r_fullscreenDesktop"}]}
+        ]
+       },
+       {"state": "settings.draft.r_fullscreen"}
       ]
      },
      1,

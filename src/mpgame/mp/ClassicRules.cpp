@@ -128,6 +128,9 @@ static const classicDefPatch_t classicDefPatches[] = {
 	{ "weapon_nailgun_mp",			"respawn_Tourney",				NULL },
 	{ "projectile_nail",			"speed",						"2000" },
 	{ "projectile_nail",			"def_splash_damage",			NULL },
+	// The zoomed nailgun fires seeking nails, a definition of their own.  They
+	// share the nail's damage but carried their own splash: 25 more a nail.
+	{ "projectile_nail_seek",		"def_splash_damage",			NULL },
 	{ "damage_nailDirect",			"damage",						"10" },
 	{ "damage_nailDirect",			"knockback",					"10" },
 
@@ -139,6 +142,8 @@ static const classicDefPatch_t classicDefPatches[] = {
 	{ "weapon_rocketlauncher_mp",	"respawn_Team DM",				NULL },
 	{ "weapon_rocketlauncher_mp",	"respawn_Tourney",				NULL },
 	{ "projectile_rocket",			"speed",						"650" },
+	{ "projectile_rocket",			"fuse",							"12" },		// Quake 2's 8000 units; the stock 6 s stops slower rockets short
+
 	{ "damage_rocketDirect",		"damage",						"110" },	// Quake 2 rolls 100-120
 	{ "damage_rocketSplash",		"damage",						"120" },
 	{ "damage_rocketSplash",		"radius",						"120" },
@@ -177,6 +182,12 @@ static const classicDefPatch_t classicDefPatches[] = {
 	{ "damage_dmg_splash",			"radius",						"1000" },
 	{ "damage_dmg_splash",			"classic_energy",				"1" },
 
+	// ---- Napalm launcher (expansion maps): no Quake 2 twin; keeps its numbers and ammo ----
+	// Without a respawn key of its own it came back every five seconds.
+	{ "weapon_napalmgun_mp",		"inv_start_ammo_napalmgun",		NULL },
+	{ "weapon_napalmgun_mp",		"inv_ammo_napalmgun",			"10" },
+	{ "weapon_napalmgun_mp",		"respawn",						"30" },
+
 	// ---- Ammo: Quake 2 box sizes, 30 second respawn ----
 	{ "ammo_machinegun_mp",			"inv_ammo_machinegun",			"50" },
 	{ "ammo_machinegun_mp",			"respawn",						"30" },
@@ -199,6 +210,7 @@ static const classicDefPatch_t classicDefPatches[] = {
 	{ "ammo_rocketlauncher_mp",		"respawn",						"30" },
 	{ "ammo_railgun_mp",			"inv_ammo_railgun",				"10" },
 	{ "ammo_railgun_mp",			"respawn",						"30" },
+	{ "ammo_napalmgun_mp",			"respawn",						"30" },
 
 	// ---- Health: stimpack +2 past the limit, +10, +25, timed mega health ----
 	{ "item_health_shard_mp",		"inv_bonushealth",				"2" },
@@ -692,6 +704,30 @@ static bool CanSee( const idEntity *from, const idVec3 &start, const idVec3 &end
 	return tr.fraction >= 1.0f;
 }
 
+/*
+================
+BaseFlag
+
+The team's flag as it stands at its base.  Quake 4's flag pointer follows the
+flag (NULL while it is carried, the dropped copy once it falls), but Threewave
+CTF scored defence around the base itself: guarding the stand counts while the
+flag is away, and a flag dropped across the map is not a base to defend.  The
+base flag stays where it was placed, hidden while it is away.
+================
+*/
+static idEntity *BaseFlag( int team ) {
+	for ( idEntity *ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
+		if ( !ent->IsType( rvItemCTFFlag::GetClassType() ) ) {
+			continue;
+		}
+		const rvItemCTFFlag *flag = static_cast<const rvItemCTFFlag *>( ent );
+		if ( flag->GetFlagTeam() == team && !flag->IsDroppedFlag() ) {
+			return ent;
+		}
+	}
+	return NULL;
+}
+
 static bool Near( const idEntity *a, const idEntity *b, float radius ) {
 	if ( a == NULL || b == NULL ) {
 		return false;
@@ -774,8 +810,8 @@ bool rvClassicRules::AwardFragBonuses( idPlayer *victim, idPlayer *killer ) {
 		return true;
 	}
 
-	// defending the killer's own flag
-	idEntity *flag = mp.GetFlagEntity( killer->team );
+	// defending the killer's own flag, or its base while the flag is away
+	idEntity *flag = BaseFlag( killer->team );
 	if ( flag != NULL && ( Near( victim, flag, CLASSIC_CTF_TARGET_PROTECT_RADIUS ) || Near( killer, flag, CLASSIC_CTF_ATTACKER_PROTECT_RADIUS ) ) ) {
 		mp.AddPlayerTeamScore( killer, CLASSIC_CTF_FLAG_DEFENSE_BONUS );
 		return true;
@@ -834,14 +870,17 @@ bool rvClassicRules::AwardCapture( idPlayer *capturer ) {
 	idMultiplayerGame &mp = gameLocal.mpGame;
 	for ( int i = 0; i < MAX_CLIENTS; i++ ) {
 		idPlayer *p = static_cast<idPlayer *>( gameLocal.entities[ i ] );
-		if ( p == NULL || !p->IsType( idPlayer::GetClassType() ) || p->spectating || p->team != capturer->team ) {
+		if ( p == NULL || !p->IsType( idPlayer::GetClassType() ) || p->spectating ) {
 			continue;
 		}
-		if ( p == capturer ) {
-			mp.AddPlayerTeamScore( p, CLASSIC_CTF_CAPTURE_BONUS );
+		if ( p->team != capturer->team ) {
+			// the carrier they were hurting has scored; that danger is over
+			classicCtf[ i ].lastHurtCarrier = 0;
 			continue;
 		}
-		mp.AddPlayerTeamScore( p, CLASSIC_CTF_TEAM_BONUS );
+		// the capturer takes the capture bonus, team mates the team bonus, and
+		// everyone - the capturer too, as in Threewave - their assists
+		mp.AddPlayerTeamScore( p, ( p == capturer ) ? CLASSIC_CTF_CAPTURE_BONUS : CLASSIC_CTF_TEAM_BONUS );
 		if ( classicCtf[ i ].lastReturnedFlag && gameLocal.time - classicCtf[ i ].lastReturnedFlag < CLASSIC_CTF_RETURN_FLAG_ASSIST_TIMEOUT ) {
 			mp.AddPlayerTeamScore( p, CLASSIC_CTF_RETURN_FLAG_ASSIST_BONUS );
 		}

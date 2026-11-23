@@ -160,7 +160,7 @@ def validate_library_contract() -> None:
     require(legacy_net, "if ( info.compatible ) {", "retail network demo capabilities only when playable")
     require(legacy_net, "DemoRetailProblemString( info.error )", "specific retail network demo problem")
     require(legacy_net, '"#str_41547"', "retail network demo from another release")
-    require(legacy_net, '"#str_232870"', "retail network demo format label")
+    require(legacy_net, '"#str_232880"', "retail network demo format label")
 
     # The browser's Play and the retained Demos page share one typed player.
     browser_play = between(
@@ -327,8 +327,9 @@ def validate_playback_controls() -> None:
         '#define DEMO_MAGIC_HISTORICAL "OpenQ4 RDEMO"',
         '#define DEMO_MAGIC_QUAKE4 "Quake4 RDEMO"',
         "ambiguousQuake4Wrapper",
-        "firstToken != DS_VERSION",
-        "unsupported retail Quake 4 render-demo stream",
+        "firstToken == DS_VERSION && streamVersion >= 1",
+        "head[0] == DS_VERSION && head[5] == DS_SOUND && head[6] == 0",
+        "is not a render demo this build recognizes",
         "allowPreload && com_preloadDemos.GetBool()",
     ):
         require(demo_file, needle, "historical render-demo discrimination")

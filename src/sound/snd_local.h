@@ -350,6 +350,8 @@ public:
 
 	// read a sound command from a demo file
 	virtual bool			ProcessDemoCommand( idDemoFile* readDemo );
+	virtual bool			ProcessRetailDemoCommand( idDemoFile* readDemo );
+	idSoundEmitter*			RetailDemoEmitter( int index, bool allocate );
 
 	// menu sounds
 	virtual int				PlayShaderDirectly( const char* name, int channel = -1 );
@@ -699,6 +701,10 @@ public:
 	// pause and an unpause inside one long blocking step such as a level load would
 	// both read the frame before it and hold the clock for none of that time.
 	int						RefreshSoundTime();
+	// openQ4 MP-22: Sys_Milliseconds, kept from running behind the clock a demo export left
+	int						RealSoundTime() const;
+	// mixes the sound track a demo export asked for (SoundCapture.h)
+	void					MixCapture( bool updateBetweenSlices );
 
 	// may return NULL if there are no more voices left
 	idSoundVoice* 			AllocateVoice( const idSoundSample* leadinSample, const idSoundSample* loopingSample );

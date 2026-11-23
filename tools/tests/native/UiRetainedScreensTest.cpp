@@ -325,6 +325,8 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","ui_identity"
 	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","g_viewKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
 	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch",
 	"vr_playSpace","vr_body",
+	// openQ4: GENERAL's VIDEO CAPTURE section
+	"com_videoFormat","com_videoQuality","com_videoFPS","com_videoHeight","com_videoAudio","com_videoTiming",
 	// openQ4 (PAD): the Controller and Aim tabs
 	"in_aimAssist","in_alwaysRun","in_gyroActivation","in_gyroDeadZone","in_gyroInvertPitch","in_gyroInvertYaw","in_gyroMenuPointer","in_gyroPitchRatio","in_gyroSpace","in_gyroYawRatio","in_joystickAdaptiveTriggers","in_joystickContextActions","in_joystickDevicePin","in_joystickDirectionalRumble","in_joystickLayout","in_joystickLight","in_joystickLookDeadZone","in_joystickLookOuterDeadZone","in_joystickLowBatteryNotice","in_joystickMoveCurve","in_joystickMoveDeadZone","in_joystickMoveDeadZoneAxial","in_joystickMoveOuterDeadZone","in_joystickPitchSpeed","in_joystickPlayerLight","in_joystickResponse","in_joystickTriggerRumble","in_joystickTurnBoost","in_joystickYawSpeed","in_toggleCrouch"};
 
@@ -4772,12 +4774,12 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(diagnostics.empty() && document.Model().id == "openq4.controls" && document.Model().canvasHeight == 720,
 		"the CONTROLS page validates on the 4:3 canvas");
 	CheckSessionActions(document);
-	for (int row = 0; row < 51; ++row) {
+	for (int row = 0; row < 52; ++row) {
 		const auto* node = document.Model().FindNode("controls_bind_"+std::to_string(row));
 		Check(node && node->control && node->control->role == ControlRole::Button && node->control->action == "controlsBind",
 			"each binding row asks the session to wait for a key");
 	}
-	Check(!document.Model().FindNode("controls_bind_51"),"the stock page's 49 bindings, the Classic ruleset's hook and Last Weapon, no more");
+	Check(!document.Model().FindNode("controls_bind_52"),"the stock page's 49 bindings, the Classic ruleset's hook, Last Weapon and Record Video, no more");
 	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other","tab-mouse","tab-controller","tab-aim"})
 		Check(document.Model().FindNode(tab) != nullptr,"the stock tabs, then the devices'");
 	CheckCvarRows(document,{{"controls_freelook","in_freeLook"},{"controls_togglezoom","in_toggleZoom"},
@@ -4866,7 +4868,17 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(!runtime.FocusControl("controls_bind_0",0.77),"another tab's rows take no focus");
 	Check(runtime.RunEvent("onTabPrevious",0.78,effects,error) && runtime.RunEvent("onTabPrevious",0.79,effects,error),"back past the first tab");
 	runtime.Frame(viewport,0.8);
-	Check(tab() == 6 && runtime.FocusedControl() == "controls_response","the tabs wrap to the last, AIM");
+	// Controller Input starts off, which turns the stick rows off: AIM opens
+	// on its first row that answers, and on the sticks once the controller is on.
+	Check(tab() == 6 && runtime.FocusedControl() == "controls_touchscreen","the tabs wrap to the last, AIM, past its rows the controller turns off");
+	Check(!runtime.FocusControl("controls_response",0.8001),"a row the controller turns off takes no focus");
+	host.cvars["in_joystick"] = true;
+	runtime.Frame(viewport,0.8002);
+	Check(runtime.RunEvent("onTabPrevious",0.8003,effects,error) && runtime.RunEvent("onTabNext",0.8003,effects,error),"AIM again");
+	runtime.Frame(viewport,0.8004);
+	Check(runtime.FocusedControl() == "controls_response","with the controller on AIM opens on its first row");
+	host.cvars["in_joystick"] = false;
+	runtime.Frame(viewport,0.8006);
 	Check(runtime.RunEvent("tab_other",0.801,effects,error),"choose OTHER");
 	runtime.Frame(viewport,0.811);
 	Check(tab() == 3 && runtime.FocusedControl() == "controls_bind_38","OTHER opens on its first binding");
@@ -4883,7 +4895,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		Check(runtime.SetState({{"controls.touchLayout",true}},error,0.82),"the session reports the touch controls");
 		runtime.Frame(viewport,0.83);
 		Check(text("controls_touch_layout","display") == "block","TOUCH LAYOUT shows with the touch controls");
-		const auto last = bounds("controls_bind_50"), touchRow = bounds("controls_touch_layout");
+		const auto last = bounds("controls_bind_51"), touchRow = bounds("controls_touch_layout");
 		Check(std::abs(touchRow.x-last.x) < .5f && touchRow.y > last.y,"TOUCH LAYOUT follows the last binding in its column");
 		Check(runtime.FocusControl("controls_touch_layout",0.84),"TOUCH LAYOUT takes focus");
 		runtime.TakeActions();
@@ -4952,6 +4964,13 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	const auto sticks = bounds("controls_controller"), rumble = bounds("controls_rumble"), light = bounds("controls_light");
 	Check(rumble.x > sticks.x+sticks.width && std::abs(rumble.y-sticks.y) < .5f && std::abs(light.x-rumble.x) < .5f &&
 		light.y > rumble.y,"STICKS beside RUMBLE, LIGHTS AND NOTICES under it");
+	// Controller Input off turns the rows that need a controller off: they keep
+	// their place, dimmed, and take no focus; turning it on brings them back.
+	Check(!runtime.FocusControl("controls_promptstyle",1.015) && !runtime.FocusControl("controls_rumble",1.015) &&
+		runtime.FocusControl("controls_alwaysrun",1.015),"Controller Input off rests the controller's rows, not Always Run");
+	{ const auto dimmed = runtime.PresentedValue("controls_rumble","opacity"); Check(dimmed && std::abs(dimmed->data[0]-.4) < 1e-6,"a resting row is dimmed"); }
+	host.cvars["in_joystick"] = true;
+	runtime.Frame(viewport,1.016);
 	Check(runtime.FocusControl("controls_promptstyle",1.02),"focus the prompt style");
 	runtime.TakeActions();
 	press(MenuInput::Right,1.03);
@@ -5003,11 +5022,11 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "controlsBack","Back asks the session to return");
 	const auto portrait = SettingsViewport(document,540,960);
 	runtime.Frame(portrait,2.2);
-	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_50");
+	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_51");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"controls_bind_44","controls_bind_45","controls_bind_50","controls-other-rows",2.3);
-	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_44","controls_bind_45","controls_bind_50",2.4);
+	CheckSettingsPortrait(runtime,document,"controls_bind_45","controls_bind_46","controls_bind_51","controls-other-rows",2.3);
+	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_45","controls_bind_46","controls_bind_51",2.4);
 	host.cvars = saved;
 }
 
@@ -5105,7 +5124,9 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	CheckSessionActions(document);
 	CheckCvarRows(document,{{"game_autoreload","ui_autoReload"},{"game_gunfov","cl_gunfov"},{"game_weaponkick","g_weaponMuzzleKick"},
 		{"game_crosshaircolor","g_crosshairColor"},{"game_hudscale","ui_hudScale"},{"game_console","con_allowConsole"},
-		{"game_vrsnap","vr_snapTurnAngle"},{"game_viewkick","g_viewKick"},{"game_vr","vr_enable"},{"game_vrcrouch","vr_physicalCrouch"}});
+		{"game_vrsnap","vr_snapTurnAngle"},{"game_viewkick","g_viewKick"},{"game_vr","vr_enable"},{"game_vrcrouch","vr_physicalCrouch"},
+		{"game_videoformat","com_videoFormat"},{"game_videoquality","com_videoQuality"},{"game_videofps","com_videoFPS"},
+		{"game_videoheight","com_videoHeight"},{"game_videoaudio","com_videoAudio"},{"game_videotiming","com_videoTiming"}});
 	for (const char* moved : {"game_freelook","game_togglezoom","game_scopesensitivity","game_msensitivity","game_controller","game_promptstyle"})
 		Check(!document.Model().FindNode(moved),"the mouse, controller and aim rows are on CONTROLS");
 	for (const char* setting : {"set.in_freeLook","set.sensitivity","set.in_joystick"})
@@ -5120,7 +5141,7 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	// Every row's CVar, at its type's initial value but for these.
 	const auto saved = host.cvars;
 	host.cvars.insert({{"ui_autoReload",true},{"g_crosshairCustom",std::string("0")},{"g_crosshairSize",32.0},
-		{"g_crosshairColor",std::string("1 0 0 1")}});
+		{"g_crosshairColor",std::string("1 0 0 1")},{"com_videoFormat",std::string("mp4")},{"com_videoAudio",true}});
 	for (const auto& [name, declaration] : document.Model().state)
 		if (!declaration.cvar.empty()) host.cvars.emplace(declaration.cvar,declaration.initial);
 	Runtime runtime(host);
@@ -5142,6 +5163,8 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	const auto gameplay = bounds("game_autoreload"), interface = bounds("game_language"), players = bounds("game_simpleitems");
 	Check(interface.x > gameplay.x+gameplay.width,"the sections stand in two columns");
 	Check(std::abs(players.x-interface.x) < .5f && players.y > interface.y,"ITEMS AND PLAYERS follows INTERFACE");
+	const auto video = bounds("game_videoformat"), forcemodel = bounds("game_forcemodel");
+	Check(std::abs(video.x-interface.x) < .5f && video.y > forcemodel.y,"VIDEO CAPTURE follows ITEMS AND PLAYERS");
 	Check(runtime.FocusControl("game_skipcinematics",0.51),"focus the first column's last row");
 	press(MenuInput::Down,0.52);
 	Check(runtime.FocusedControl() == "game_language","Down goes on to the second column");
@@ -5154,6 +5177,17 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	auto invocation = taken("set.ui_autoReload");
 	Check(std::get<std::string>(invocation.arguments.at("cvar")) == "ui_autoReload" && !std::get<bool>(invocation.arguments.at("value")),
 		"Accept turns Auto Reload off");
+	// Record Sound turns off with an MP4's sound, and a GIF, which has none,
+	// leaves it nothing to do.
+	Check(runtime.FocusControl("game_videoaudio",0.57),"focus Record Sound");
+	press(MenuInput::Accept,0.58);
+	Check(!std::get<bool>(taken("set.com_videoAudio").arguments.at("value")),"Accept turns Record Sound off");
+	host.cvars["com_videoFormat"] = std::string("gif");
+	runtime.Frame(viewport,0.6);
+	Check(!runtime.FocusControl("game_videoaudio",0.61),"a GIF has no sound to record");
+	host.cvars["com_videoFormat"] = std::string("mp4");
+	runtime.Frame(viewport,0.62);
+	Check(runtime.FocusControl("game_videoaudio",0.63),"an MP4 records sound again");
 	// HUD: the crosshair colour list reads g_crosshairColor and offers the
 	// next colour.
 	Check(runtime.RunEvent("onTabNext",1.25,effects,error),"the next tab");
@@ -5217,8 +5251,8 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	const auto panel = bounds("game-panel"), row = bounds("game_enhancedphysics");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"game_skipcinematics","game_language","game_forcemodel","game-general-rows",2.2);
-	CheckSettingsTextScale(host,runtime,document,"game-general","game_skipcinematics","game_language","game_forcemodel",2.3);
+	CheckSettingsPortrait(runtime,document,"game_skipcinematics","game_language","game_videotiming","game-general-rows",2.2);
+	CheckSettingsTextScale(host,runtime,document,"game-general","game_skipcinematics","game_language","game_videotiming",2.3);
 	host.cvars = saved;
 }
 

@@ -52,7 +52,7 @@ Choose a layout with **Settings → Game Options → HUD → HUD Layout**:
 
 - **Remastered** (default): the HUD follows your screen. The status bar sits centred on the bottom edge, the radio in the top-right corner and objective notices in the top corners; multiplayer's kill feed, standing, timer and chat keep to the edges.
 - **Minimal**: health, armour, ammunition and the crosshair, keeping prompts, chat and votes.
-- **Competitive** (multiplayer): a match bar at the top with both sides' scores, the timer and network quality, your team's health and armour at the left edge, and a larger status bar.
+- **Competitive** (multiplayer): in Duel, Tourney and team games a scoreline across the top with large scores, the timer between them and each side's players by their initials (with their ammunition, health and armour where you may see them, where they stand, and a skull when they are dead); in deathmatch the leader and runner-up with the timer at the top left. Network quality shows at all times and the status bar is larger.
 - **Classic**: the original Quake 4 positions.
 
 In the Remastered layout, vehicles get the same centred status bar with an Exit prompt naming your jump key (the air-defence cannon keeps its scope and adds the radio display). The objectives display lists every objective, with the completed ones below. The scoreboard adds your place, ping bars and the Tourney bracket. After you die in multiplayer, a Respawn prompt names your attack key once you can return, with a countdown while overtime delays your respawn.

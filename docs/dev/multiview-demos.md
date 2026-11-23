@@ -533,7 +533,7 @@ runtime before and after and records exit 0. Repeat with
 | Native openQ4 `.mvd` 1.3 | Yes | Yes | Yes, through keyframes, then replay | Full-world free roam, player follow, markers and auto-tracking | Markers, keyframes and user-info updates are optional records. |
 | Native openQ4 `.mvd` 1.0-1.2 | Yes | Yes | Yes, replay based | Full-world free roam, player follow and auto-tracking | 1.0/1.1 retain legacy instance-0 capture semantics; protocol/content checks still apply. |
 | Native or historical openQ4 render `.demo` | Yes | Yes | Yes: a v14 recording from the last level start or keyframe, then replay; older ones replay from the first frame | Fixed recorded camera | Presentation stream; it has no off-camera game state. A v11 campaign demo spans single-player levels as segments whose starts are markers ([campaign render demos](#campaign-render-demos-v11-7-november-2026)); a v14 one is a container of checked blocks ([block container](#block-container-keyframes-and-large-files-v14-14-november-2026)). |
-| Retail Quake 4 render `.demo` | No | No | No | Recorded camera only in the original engine | Detected as legacy; the byte-oriented retail stream needs a separate decoder. |
+| Retail Quake 4 render `.demo` | Yes | Yes | Yes, replay based | Fixed recorded camera | Its own reader ([retail render demos](#retail-quake-4-render-demos-mp-22-23-november-2026)); needs the recording's levels and effect declarations. |
 | Quake 4 1.4.2 network demo `.ndmo85` | Yes | Yes | Yes, replay based | A client recording: the recorder's view; a server recording: free roam and player follow | Decoded into MVD records in memory; needs `si_fps` 60 and the recording's paks ([retail network demos](#retail-quake-4-142-network-demos-mp-22-23-november-2026)). |
 | Retail Quake 4 `.netdemo` before 1.4.2 | No | No | No | Depends on original client/server recording | `NDMO` header shown; other protocols and layouts are not decoded. |
 | openQ4 `.cdemo` | Best effort | No | No | Simulation-defined | Unversioned developer artifact; safe only with the matching engine/game build. |
@@ -541,9 +541,13 @@ runtime before and after and records exit 0. Repeat with
 
 Render-demo wrapper compatibility includes the current `openQ4 RDEMO` and
 historical `OpenQ4 RDEMO` spellings. `Quake4 RDEMO` is ambiguous: early
-openQ4 and retail Quake 4 both used it. The decoder accepts it only when the
-decoded first token proves it is the 32-bit openQ4 stream; a retail
-byte-oriented stream is reported as unsupported.
+openQ4 and retail Quake 4 both used it. The first four decoded bytes read as
+the int `DS_VERSION` in both, so the decoder looks further: an openQ4 stream
+follows with a stream version from 1 to the current one, a retail stream with
+its savegame version and then the bytes `DS_SOUND` and `SCMD_STATE`, which
+every retail recording starts with. Anything else is refused as unrecognized.
+A retail stream plays through its own reader
+([retail render demos](#retail-quake-4-render-demos-mp-22-23-november-2026)).
 
 Render demos can pause, change rate, step, and seek by consuming their command
 stream. Rewinding a v14 recording opens the file at the last level start or
@@ -615,7 +619,8 @@ from unfinished work instead of treating every historical bullet as outstanding.
   bounded restart/replay rewind.
 - Explicit MVD follow-next and free-roam actions alongside attack/jump.
 - Historical openQ4 render-wrapper recognition and clear rejection of retail
-  render and network demo streams.
+  network demo streams; retail render demos play through their own reader
+  since 23 November 2026.
 
 Competitive playback work delivered since: previous, slot and name follow
 (23 October 2026), and structured markers, killer/action/team auto-tracking
@@ -868,8 +873,7 @@ one tic back through the keyframe before it. `demoExport <demo>.mvd [fps]
 [quit]` plays like a timedemo with 1000/fps of the match a frame and buffers a
 `screenshot "exports/<demo>/frame%05d.png"` each frame, which runs at the head
 of the next frame's command buffer before playback moves on, so each picture is
-the frame shown; sound is not written (the sound world's AVI hooks are empty
-and the OpenAL backend has no loopback renderer). A client recording now has
+the frame shown; sound came in the fourth round (below). A client recording now has
 markers: the client's game runs `PublishMVDMarkers` (phase, round, pause,
 score, flag and powerup changes it can see) and marks each kill from the death
 message, and the recorder stamps them on its own clock. Every finished
@@ -880,10 +884,154 @@ made where there is a view takes a 320x240 `demos/<name>_thumb.png` three
 seconds in (`screenshot <file> <width> <height>`), which the library shows and
 deletes with the demo.
 
-**Open.** Recording across a map change, sound in exports, and the prediction's
+**Sound in exports (fourth round, same day).** `demoExport` writes
+`exports/<demo>/<demo>.wav` beside the pictures (`src/sound/SoundCapture.h`).
+Before `StartPlayback` loads the map, `Sound_BeginCapture` reads the open
+device's `ALC_FREQUENCY` and `ALC_OUTPUT_MODE_SOFT` (mono, stereo, HRTF
+stereo, quad, 5.1, 6.1, 7.1), opens the file and restarts the sound system
+onto an `ALC_SOFT_loopback` device in that format: 16-bit, at the device's
+rate, HRTF and the output limiter as the device had them; a layout the mixer
+cannot render falls back to stereo. The map's samples then load straight onto
+the loopback context, and nothing reaches the speakers. Each picture the
+export buffers calls `Sound_CaptureAdvance` with its step, and that frame's
+`idSoundSystemLocal::Render` mixes it after the world and the hardware update
+(`MixCapture`): `alcRenderSamplesSOFT` renders `msec * rate / 1000` minus the
+frames already written, in slices of at most 100 ms with the playing world and
+the voices updated between them so a stream's ~1 s queue refills as in a live
+frame, and the sound clock moves on by exactly the slice instead of reading
+`Sys_Milliseconds`. `RefreshSoundTime`, the reverb slots' idle clock and the
+listener gain (no device pause) follow the export, endpoint monitoring and
+device events stay off, and the session does not silence the playing world for
+lost focus. The steps themselves are now whole milliseconds that add up to
+`n * 1000 / fps` (`DemoExportStepMsec`: 33, 33, 34 at 30 a second): the old
+fixed `1000 / fps` step made 30 and 60 a second pictures 1% and 4% shorter
+than the match, which a track at the match's own rate would have shown.
+`FinishPlayback` and `StopPlayback` call `Sound_EndCapture`, which mixes the
+last step no sound frame reached, rewrites the RIFF header (PCM for one or two
+channels, `WAVE_FORMAT_EXTENSIBLE` with OpenAL Soft's speaker mask above that),
+reports `MVD_EXPORT_SOUND written=1 file=... rate channels frames msec peak rms
+complete` and restarts onto the playback device; the sound clock keeps any lead
+the export built over the wall clock (`soundClockOffset`), so it never runs
+backwards. A track that cannot be made (sound off, no loopback in the runtime,
+for example Apple's OpenAL framework, a settings change holding the device, an
+unwritable file) leaves the device alone and reports `MVD_EXPORT_SOUND
+written=0 reason="..."`; a mixer lost mid-export writes silence for the rest
+so the track keeps its length. Stream blocks still decode on job workers, so a
+stream that starts in an export starts a frame late, as it does live.
+`SoundCaptureTest` checks the step and frame arithmetic, the headers and the
+levels; `mp_client_demo.py` pins the wiring, and `mp_client_demo_smoke.py`
+exports the client recording with sound on and reads the WAV back: format,
+rate and channels as reported, exactly `pictures * 100 ms` at 10 a second, not
+silent, and the device opened again. On 23 November it passed on Windows
+(OpenGL, a headphone endpoint with automatic HRTF): 330 pictures and a
+33.000 s, 48 kHz HRTF stereo track (1,584,000 frames, peak 27,684, every
+second audible). The same export with `s_numberOfSpeakers 6` wrote a 5.1
+`WAVE_FORMAT_EXTENSIBLE` track (mask 0x60F) of the same length, with sound in
+the front, centre and side channels. The render-demo `aviDemo` path, which
+wrote no pictures here, now records a video file with its sound through video
+capture ([Record Video](../user/video-capture.md)), which shares this
+loopback mixer.
+
+**Open.** Recording across a map change, and the prediction's
 lead: playback predicts to the recorder's frame as the clock reconstructs it,
 which matches the recorded view to within the frame-time jitter of the
 original client.
+
+## Retail Quake 4 render demos (MP-22), 23 November 2026
+
+openQ4 plays render demos recorded by retail Quake 4 1.4.2 (`recordDemo`,
+`demoShot`) from the library and with `playDemo` and `timeDemo`. The decision
+to build readers for both retail formats is the user's, 23 November 2026; the
+network demo reader has [its own section](#retail-quake-4-142-network-demos-mp-22-23-november-2026).
+
+### What retail writes
+
+Retail keeps Doom 3's render-demo wrapper (`Quake4 RDEMO`, a compression
+scheme, the LZW, LZSS and Huffman compressors openQ4 already has) and its
+three top-level tokens, but writes every token and every command as one byte
+and lays its records out after its own structures. The layout below was read
+from the retail executable's writers (`Quake4.exe` 1.4.3 as Steam ships it;
+the Hex-Rays reconstruction misses most of what follows) and checked against
+recordings that executable made:
+
+- `DS_VERSION`, then retail's savegame version as an int.
+- `DS_SOUND`, a command byte, then the Doom 3 sound commands with three
+  changes: a listener placement carries the game time after the listener id,
+  the free flag is a byte, and shader parms are the 40-byte struct in openQ4's
+  field order. `SCMD_STATE` is retail's sound savegame layout: the listener,
+  then each live emitter with its parms, eight channel slots of 125 bytes and
+  the shader and sample names playing on them.
+- `DS_RENDER`, a command byte (1 to 20). Entity, light and effect records are
+  the retail structures with pointers as presence words and names after them.
+  Three things in them are easy to get wrong:
+  - `idFile::WriteBounds` writes a bounds' maximum before its minimum. Read
+    the other way round, every entity has inverted bounds, gets no area
+    references and its dynamic model is never drawn.
+  - An entity record carries each GUI it has: an int id, the GUI's state
+    dictionary, its whole window tree (each `idWindow` writes its geometry,
+    fourteen typed window variables, its registers and its children, an
+    `idSimpleWindow` twelve variables) and the cursor.
+  - An effect record carries `rvBSE`'s live state: the effect, then each
+    segment and every live particle, each particle type with its own record.
+    Retail writes neither the segment count nor which segments hold particle
+    pools; its reader takes both from the effect as it starts it.
+  - The map header is four ints (0, then 224 and 216, retail's entity and
+    light record sizes, then a word whose meaning is not known), the 256-byte
+    map name and the start time.
+  - `DC_UPDATE_*` records carry only a handle; the full record follows when
+    the definition is next drawn. `DC_DEFINE_MODEL` is never written. Each
+    frame has two identical main views and, where the level has one, a
+    portal-sky view before them. The stream ends after the last
+    `DC_END_FRAME`, without `DS_FINISHED`.
+
+### Playback
+
+`idDemoFile::IsRetailRenderStream()` routes the stream: the session reads byte
+tokens, `idRenderWorld::ProcessRetailDemoCommand`
+(`src/renderer/RenderWorld_demo_retail.cpp`) the render commands and
+`idSoundWorld::ProcessRetailDemoCommand` the sound commands.
+
+- **GUIs.** The window tree is read and checked but not rebuilt: the GUI the
+  state dictionary names is loaded and given that state, so a screen shows what
+  it showed, drawn by openQ4. A GUI already on the entity with the same file
+  is reused across updates.
+- **Effects.** The reader asks the effect manager
+  (`rvBSEManager::DemoParticleLayout`) to start a scratch copy of the effect as
+  retail would, and reads the state segment by segment with the pools that
+  copy allocated. The particles are not restored: the effect runs from the
+  start time its state records, through the same silent pre-roll openQ4's own
+  demos use. A recording of an effect this installation does not declare
+  cannot be read past and stops.
+- **Timing.** A frame lasts as long as the recorded view times say, so playback
+  keeps the recording's pace; the two-tic frame retail assumes is not used.
+- **Portal skies** are drawn before the main view, as the game draws them.
+- **Controls.** Pause, speed and step work as for openQ4's older render demos;
+  seeking replays from the first frame. There is no keyframe or summary, so the
+  library shows no length.
+
+Every count, index and length is bounded before use, every float that places
+something is checked finite, and a record that does not fit stops playback
+with a warning naming it. Nothing in the reader trusts retail's own playback,
+which keeps no bounds: retail itself crashed after 130 of the fixture's 136
+frames while capturing it with `aviDemo`.
+
+### Validation
+
+- `tools/tests/retail_render_demo.py` decodes an uncompressed retail stream on
+  its own, as a check of the layout: it reads the fixture below to its last
+  byte. With no effect declarations it finds each effect's segment layout by
+  search, accepting one only when the next commands decode.
+- `tools/tests/retail_render_demo_contract.py` builds a retail-layout stream
+  with every record kind, decodes it, cuts it at every byte and corrupts it
+  3,000 times (every outcome a `DemoError`), and pins the engine wiring and the
+  library string in all twelve languages. It needs no game files.
+- `tools/tests/retail_render_demo_smoke.py` records the fixture with retail
+  Quake 4 itself (`.tmp/runtime/retail-audio`, console scripts only, no input
+  synthesized), has retail compress it into the other three schemes and
+  capture its frames with `aviDemo`, then plays all four copies in the staged
+  openQ4, captures openQ4's frames by pausing and stepping, compares them with
+  retail's, and plays sixteen cut or corrupted copies in one session.
+  Results are recorded in the MP-22 entry of the [roadmap](roadmap.md).
 
 ## Retail Quake 4 1.4.2 network demos (MP-22), 23 November 2026
 

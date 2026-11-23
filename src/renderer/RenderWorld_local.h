@@ -447,6 +447,15 @@ public:
 
 
 	//--------------------------
+	// RenderWorld_demo_retail.cpp: retail Quake 4 render demos (MP-22)
+
+	bool					ProcessRetailDemoCommand( idDemoFile *readDemo, renderView_t *demoRenderView, renderView_t *portalSkyRenderView, int *demoTimeOffset );
+	bool					ReadRetailRenderEntity( idDemoFile *demo );
+	bool					ReadRetailRenderLight( idDemoFile *demo );
+	bool					ReadRetailRenderEffect( idDemoFile *demo, const renderView_t *demoRenderView );
+	int						retailDemoViewTime = 0;		// playback: the time of the view last read
+
+	//--------------------------
 	// RenderWorld.cpp
 
 	void					ResizeInteractionTable();

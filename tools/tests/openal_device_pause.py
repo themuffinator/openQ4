@@ -50,7 +50,7 @@ class idSoundHardware_OpenAL {
 public:
     ALCdevice* openalDevice=&first;ALCcontext* openalContext=&context;
     /* @PAUSE_FIELDS@ */
-    bool deferredUpdatesAvailable=true,deferredUpdatesActive=false;
+    bool deferredUpdatesAvailable=true,deferredUpdatesActive=false,loopbackOpen=false;
     int lastResetTime=0,retries=0;
     List<Voice*> zombieVoices,freeVoices;
     void SetDevicePaused(bool);void Update();void EndDeferredUpdates();
@@ -94,7 +94,17 @@ int main(){try {
         current=&context;hardware.SetDevicePaused(true);require(gain==0,"owned context did not receive pending mute");
         hardware.SetDevicePaused(false);require(gain==1,"fallback remained muted");
     }
-    std::puts("OpenAL suspension: paired extension, mute fallback, deferred flush, duplicate events, player mute, device retry and context ownership passed");return 0;
+    {
+        // A loopback mixer (demo export, video capture) is never paused and
+        // keeps mixing through an app suspension; only the player's mute holds.
+        extension=true;functions=3;pauses=resumes=0;gain=1;current=&context;systemValue.muted=false;
+        idSoundHardware_OpenAL hardware;hardware.loopbackOpen=true;
+        hardware.SetDevicePaused(true);require(pauses==0,"suspension paused a loopback mixer");
+        gain=1;hardware.Update();require(gain==1,"suspension silenced a loopback mixer");
+        systemValue.muted=true;hardware.Update();require(gain==0,"a loopback mixer ignored the player's mute");
+        hardware.SetDevicePaused(false);require(resumes==0,"resumed a loopback mixer that was never paused");
+    }
+    std::puts("OpenAL suspension: paired extension, mute fallback, deferred flush, duplicate events, player mute, device retry, context ownership and loopback mixers passed");return 0;
 }catch(const std::exception& e){std::fprintf(stderr,"%s\n",e.what());return 1;}}
 '''
 

@@ -495,7 +495,7 @@ def source_checks(failures: list[str]) -> None:
     for language in ("brazilian", "czech", "english", "french", "german", "hungarian", "italian", "polish",
                      "russian", "spanish", "turkish", "ukrainian"):
         strings = read(f"content/baseoq4/pak0/strings/{language}_openq4.lang")
-        for number in (232870, 232871, 232872):
+        for number in (232880, 232881, 232882):
             require(f'"#str_{number}"' in strings, f"{language} has #str_{number}", failures)
     docs = read("docs/user/multiview-demos.md")
     require(".ndmo85" in docs, "the player guide names .ndmo85", failures)

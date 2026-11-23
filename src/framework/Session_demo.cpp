@@ -172,10 +172,10 @@ static const char *DemoMVDProblemString( const idStr &error ) {
 // openQ4 MP-22: why a retail Quake 4 network demo cannot play
 static const char *DemoRetailProblemString( const idStr &error ) {
 	if ( error.Find( "another Quake 4 release" ) >= 0 ) {
-		return "#str_232871";
+		return "#str_232881";
 	}
 	if ( error.Find( "paks" ) >= 0 ) {
-		return "#str_232872";
+		return "#str_232882";
 	}
 	if ( error.Find( "game frames a second" ) >= 0 ) {
 		return "#str_41563";
@@ -219,10 +219,86 @@ struct demoRenderSessionInfo_t {
 	int				timelineDurationMS = -1;
 };
 
+/*
+================
+DemoReadRetailRenderMap
+
+The level a retail Quake 4 render demo opens with. Retail starts every
+recording with its version, the sound world's state and then the map load;
+the state is read through (its savegame layout) to reach the map's name.
+================
+*/
+static bool DemoReadRetailRenderMap( idDemoFile &probe, idStr &mapName ) {
+	mapName.Clear();
+	unsigned char token = 0, command = 0;
+	int value = 0;
+	auto skip = [&]( int bytes ) -> bool {
+		byte scratch[128];
+		while ( bytes > 0 ) {
+			const int step = Min( bytes, static_cast<int>( sizeof( scratch ) ) );
+			if ( probe.Read( scratch, step ) != step ) {
+				return false;
+			}
+			bytes -= step;
+		}
+		return true;
+	};
+	if ( probe.Read( &token, 1 ) != 1 || token != DS_VERSION || probe.ReadInt( value ) != sizeof( value ) ||
+		 probe.Read( &token, 1 ) != 1 || token != DS_SOUND || probe.Read( &command, 1 ) != 1 || command != 0 ) {
+		return false;
+	}
+	// listener origin, axis, id, time, sound clocks
+	int emitters = 0;
+	if ( !skip( 12 + 36 + 4 * 4 ) || probe.ReadInt( emitters ) != sizeof( emitters ) || emitters < 0 || emitters > 8192 ) {
+		return false;
+	}
+	for ( int i = 1; i < emitters; i++ ) {
+		int handle = 0;
+		if ( probe.ReadInt( handle ) != sizeof( handle ) ) {
+			return false;
+		}
+		if ( handle < 0 ) {
+			continue;
+		}
+		// origin, listener, parms, amplitude, eight channel slots, distances, flags
+		if ( !skip( 12 + 4 + 40 + 4 + 4 + 8 * 125 + 4 + 1 + 4 + 4 + 1 + 4 + 4 + 12 ) ) {
+			return false;
+		}
+		for ( int listed = 0; ; listed++ ) {
+			int slot = -1;
+			if ( probe.ReadInt( slot ) != sizeof( slot ) || listed > 8 ) {
+				return false;
+			}
+			if ( slot < 0 ) {
+				break;
+			}
+			for ( int name = 0; name < 2; name++ ) {
+				int length = 0;
+				if ( probe.ReadInt( length ) != sizeof( length ) || length < 0 || length >= MAX_STRING_CHARS || !skip( length ) ) {
+					return false;
+				}
+			}
+		}
+	}
+	char name[256];
+	if ( probe.Read( &token, 1 ) != 1 || token != DS_RENDER || probe.Read( &command, 1 ) != 1 || command != 13 ||
+		 !skip( 4 * 4 ) || probe.Read( name, sizeof( name ) ) != static_cast<int>( sizeof( name ) ) ) {
+		return false;
+	}
+	name[ sizeof( name ) - 1 ] = '\0';
+	mapName = name;
+	return true;
+}
+
 static bool DemoReadRenderSessionInfo( const char *path, demoRenderSessionInfo_t &info ) {
 	idDemoFile probe;
 	if ( !probe.OpenForReading( path, false, true ) ) {
 		return false;
+	}
+	if ( probe.IsRetailRenderStream() ) {
+		// no openQ4 header: nothing of a campaign to check
+		probe.Close();
+		return true;
 	}
 	int token = DS_FINISHED;
 	if ( probe.ReadInt( token ) != sizeof( token ) || token != DS_VERSION ||
@@ -510,9 +586,14 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 
 		bool decodedOpenQ4Stream = false;
 		bool supportedOpenQ4Stream = false;
+		bool retailStream = false;
+		idStr retailMap;
 		int streamVersion = 1;
 		idDemoFile probe;
-		if ( probe.OpenForReading( entry.path.c_str(), false, true ) ) {
+		if ( probe.OpenForReading( entry.path.c_str(), false, true ) && probe.IsRetailRenderStream() ) {
+			retailStream = true;
+			DemoReadRetailRenderMap( probe, retailMap );
+		} else if ( probe.IsOpen() ) {
 			int firstToken = DS_FINISHED;
 			if ( probe.ReadInt( firstToken ) == sizeof( firstToken ) ) {
 				if ( firstToken == DS_VERSION ) {
@@ -531,7 +612,24 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 		}
 		probe.Close();
 
-		if ( ambiguousWrapper && !decodedOpenQ4Stream ) {
+		if ( retailStream ) {
+			// MP-22: retail Quake 4's render demos play through their own reader
+			entry.type = DEMO_LIBRARY_RENDER;
+			entry.format = DemoLocalized( "#str_232870" );
+			entry.status = DemoLocalized( "#str_41546" );
+			entry.details = DemoLocalized( "#str_41551" );
+			entry.playable = true;
+			entry.compatible = true;
+			entry.capabilities =
+				DEMO_CAP_PLAY | DEMO_CAP_PAUSE | DEMO_CAP_RATE |
+				DEMO_CAP_SEEK | DEMO_CAP_STEP;
+			if ( !retailMap.IsEmpty() ) {
+				idStr map = retailMap;
+				map.StripLeadingOnce( "maps/" );
+				map.StripFileExtension();
+				entry.mapName = DemoSanitizeText( Session_LevelDisplayName( map, "" ) );
+			}
+		} else if ( ambiguousWrapper && !decodedOpenQ4Stream ) {
 			entry.type = DEMO_LIBRARY_LEGACY_RENDER;
 			entry.format = DemoLocalized( "#str_41544" );
 			entry.status = DemoLocalized( "#str_41547" );
@@ -631,7 +729,7 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 		// before it). 1.4.2's plays through the MVD player; the header names any other.
 		entry.type = DEMO_LIBRARY_LEGACY_NET;
 		// .netdemo is what Quake 4 wrote before 1.4.2 named its demos by protocol
-		const char *formatLabel = DemoPathEndsWith( entry.path, ".netdemo" ) ? "#str_41543" : "#str_232870";
+		const char *formatLabel = DemoPathEndsWith( entry.path, ".netdemo" ) ? "#str_41543" : "#str_232880";
 		entry.format = DemoLocalized( formatLabel );
 		mvdFileInfo_t info;
 		const bool read = idAsyncNetwork::multiViewDemo.QueryFileInfo( entry.path.c_str(), info );
@@ -1675,8 +1773,14 @@ void idSessionLocal::StepDemo( int frames ) {
 		if ( frames > 0 ) {
 			renderDemoStepPending = true;
 		} else {
-			// openQ4 MP-22: back to the frame before this one, from its keyframe
-			SeekDemoMS( Max( 0, DemoCurrentRenderTimeMS( *this ) - 1 ) );
+			// openQ4 MP-22: back to the frame before this one, from its keyframe.
+			// A seek stops at the first frame at or after its target, so on a
+			// frame timeline the target is that frame's own time.
+			int target = DemoCurrentRenderTimeMS( *this ) - 1;
+			if ( renderDemoFrameClock && renderDemoPrevFrameTimeUS < renderDemoFrameTimeUS ) {
+				target = static_cast<int>( renderDemoPrevFrameTimeUS / 1000 );
+			}
+			SeekDemoMS( Max( 0, target ) );
 		}
 	}
 	UpdateDemoMenuGui();

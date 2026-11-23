@@ -475,6 +475,7 @@ idDemoFile::idDemoFile() {
 	compressor = NULL;
 	blocks = NULL;
 	writing = false;
+	retailRenderStream = false;
 	closedBytes = 0;
 	closedStreamBytes = 0;
 }
@@ -514,6 +515,7 @@ bool idDemoFile::OpenForReading( const char *fileName, bool allowPreload, bool q
 	bool ambiguousQuake4Wrapper = false;
 
 	Close();
+	retailRenderStream = false;
 
 	f = fileSystem->OpenFileRead( fileName );
 	if ( !f ) {
@@ -596,20 +598,30 @@ bool idDemoFile::OpenForReading( const char *fileName, bool allowPreload, bool q
 	compressor->Init( f, false, 8 );
 
 	// The earliest openQ4 builds and retail Quake 4 used the same wrapper
-	// spelling.  Probe the decoded token before accepting it: openQ4 streams
-	// begin with the 32-bit DS_VERSION token, while retail streams use a
-	// byte-oriented command layout.  Reinitialize the decompressor afterward
-	// so callers still see the stream from byte zero.
+	// spelling. Probe the decoded bytes before accepting it: an openQ4 stream
+	// begins with the 32-bit DS_VERSION token and a stream version, retail's
+	// with the byte DS_VERSION, its 32-bit savegame version, then the byte
+	// DS_SOUND and SCMD_STATE (0) that every retail recording starts with. The
+	// first four bytes read as the int DS_VERSION in both, so only the stream
+	// version tells them apart. Reinitialize the decompressor afterward so
+	// callers still see the stream from byte zero.
 	if ( ambiguousQuake4Wrapper ) {
-		int firstToken = DS_FINISHED;
-		if ( ReadInt( firstToken ) != sizeof( firstToken ) ||
-			 firstToken != DS_VERSION ) {
+		byte head[8] = {};
+		const int headBytes = Read( head, sizeof( head ) );
+		const int firstToken = head[0] | ( head[1] << 8 ) | ( head[2] << 16 ) | ( head[3] << 24 );
+		const int streamVersion = head[4] | ( head[5] << 8 ) | ( head[6] << 16 ) | ( head[7] << 24 );
+		const bool openQ4Stream = headBytes == static_cast<int>( sizeof( head ) ) &&
+			firstToken == DS_VERSION && streamVersion >= 1 && streamVersion <= OPENQ4_RENDERDEMO_CURRENT_VERSION;
+		const bool retailStream = !openQ4Stream && headBytes >= 7 &&
+			head[0] == DS_VERSION && head[5] == DS_SOUND && head[6] == 0;
+		if ( !openQ4Stream && !retailStream ) {
 			Close();
 			if ( !quiet ) {
-				common->Warning( "Demo '%s' uses the unsupported retail Quake 4 render-demo stream", fileName );
+				common->Warning( "Demo '%s' is not a render demo this build recognizes", fileName );
 			}
 			return false;
 		}
+		retailRenderStream = retailStream;
 		delete compressor;
 		compressor = NULL;
 		if ( f->Seek( DEMO_WRAPPER_BYTES, FS_SEEK_SET ) != 0 ) {

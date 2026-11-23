@@ -214,6 +214,8 @@ public:
 	static int			GetAmmoIndexForName			( const char *ammoname );
 	static const char*	GetAmmoNameForIndex			( int index );
 	int					GetAmmoType					( void ) const;
+	// openQ4: what the owner can carry for this weapon
+	int					GetMaxAmmo					( void ) const { return maxAmmo; }
 	int					AmmoAvailable				( void ) const;
 	int					AmmoInClip					( void ) const;
 	void				ResetAmmoClip				( void );

@@ -83,6 +83,7 @@ rvItemTimers::Clear
 */
 void rvItemTimers::Clear( void ) {
 	memset( respawnAt, 0, sizeof( respawnAt ) );
+	memset( respawnTotal, 0, sizeof( respawnTotal ) );
 	nextSendTime = 0;
 	memset( clientRows, 0, sizeof( clientRows ) );
 	clientRowCount = 0;
@@ -116,6 +117,30 @@ bool rvItemTimers::Tracked( const idItem *item ) const {
 
 /*
 ================
+rvItemTimers::DefinedRespawnMsec
+
+openQ4: what the item's spawn arguments give this game type, the way Tracked
+reads them. A client that first hears of an item part-way through its respawn
+measures the countdown against this; one that saw it taken measures from there.
+================
+*/
+int rvItemTimers::DefinedRespawnMsec( const idEntity *ent ) {
+	if ( ent == NULL ) {
+		return 0;
+	}
+	const idDict &args = ent->spawnArgs;
+	float respawn = args.GetFloat( va( "respawn_%s", gameLocal.serverInfo.GetString( "si_gameType" ) ), "-1.0" );
+	if ( respawn < 0.0f ) {
+		respawn = args.GetFloat( "respawn", "0" );
+	}
+	if ( !( respawn > 0.0f ) || respawn > MP_ITEMTIMER_STATE_MAX_SECONDS ) {
+		return 0;
+	}
+	return SEC2MS( respawn );
+}
+
+/*
+================
 rvItemTimers::OnPickup
 ================
 */
@@ -127,6 +152,7 @@ void rvItemTimers::OnPickup( const idItem *item, float respawnSeconds ) {
 		return;
 	}
 	respawnAt[ item->entityNumber ] = Max( 1, gameLocal.time + SEC2MS( respawnSeconds ) );
+	respawnTotal[ item->entityNumber ] = SEC2MS( respawnSeconds );
 	nextSendTime = 0;
 }
 
@@ -285,6 +311,7 @@ int rvItemTimers::RowsFromTracked( const itemTimerTracked_t *tracked, int tracke
 		row.entityNumber = entry.entityNumber;
 		row.state = MPItemTimerPackState( respawnAt[ entry.entityNumber ], gameLocal.time );
 		row.respawnAt = 0;
+		row.totalMsec = 0;
 	}
 	return count;
 }
@@ -378,6 +405,12 @@ rvItemTimers::ClientReceive
 void rvItemTimers::ClientReceive( const idBitMsg &msg ) {
 	const int now = ( gameLocal.realClientTime != 0 ) ? gameLocal.realClientTime : 1;
 	const int count = msg.ReadByte();
+	// openQ4: what the last list said, to measure each countdown against the
+	// whole respawn (the HUD's progress); a fresh list still holds the old one.
+	itemTimerRow_t previous[ MP_ITEMTIMERS_MAX_ROWS ];
+	const int previousCount = ( clientReceived != 0 && now - clientReceived >= 0 && now - clientReceived <= MP_ITEMTIMERS_FRESH_MSEC )
+		? clientRowCount : 0;
+	memcpy( previous, clientRows, sizeof( previous ) );
 	int kept = 0;
 	for ( int i = 0; i < count; i++ ) {
 		if ( msg.GetRemainingReadBits() < 4 * 8 ) {
@@ -400,6 +433,26 @@ void rvItemTimers::ClientReceive( const idBitMsg &msg ) {
 			row.respawnAt = 0;
 		} else {
 			row.respawnAt = now + Min( state, MP_ITEMTIMER_STATE_MAX_SECONDS ) * 1000;
+		}
+		row.totalMsec = 0;
+		if ( row.respawnAt > 0 ) {
+			const int leftMsec = row.respawnAt - now;
+			const itemTimerRow_t *before = NULL;
+			for ( int j = 0; j < previousCount; j++ ) {
+				if ( previous[ j ].entityNumber == entityNumber ) {
+					before = &previous[ j ];
+					break;
+				}
+			}
+			if ( before != NULL && before->respawnAt > 0 && before->totalMsec >= leftMsec ) {
+				// still the same countdown
+				row.totalMsec = before->totalMsec;
+			} else if ( before != NULL ) {
+				// seen there, or held, and now counting: this is the whole of it
+				row.totalMsec = leftMsec;
+			} else {
+				row.totalMsec = Max( leftMsec, DefinedRespawnMsec( gameLocal.entities[ entityNumber ] ) );
+			}
 		}
 	}
 	clientRowCount = kept;
@@ -436,6 +489,7 @@ int rvItemTimers::GetRows( itemTimerRow_t *rows, int maxRows ) const {
 	for ( int i = 0; i < count; i++ ) {
 		const int at = respawnAt[ rows[ i ].entityNumber ];
 		rows[ i ].respawnAt = ( at < 0 ) ? -1 : ( at == 0 || at <= gameLocal.time ) ? 0 : gameLocal.realClientTime + ( at - gameLocal.time );
+		rows[ i ].totalMsec = ( rows[ i ].respawnAt > 0 ) ? Max( respawnTotal[ rows[ i ].entityNumber ], at - gameLocal.time ) : 0;
 	}
 	return count;
 }

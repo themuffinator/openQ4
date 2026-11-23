@@ -1181,6 +1181,14 @@ if get_option('build_native_tests')
   )
   test('openq4-sound-memory-trim', openq4_sound_memory_trim_test, timeout: 30)
 
+  openq4_sound_capture_test = executable(
+    'openq4-sound-capture-test',
+    files('tools/tests/native/SoundCaptureTest.cpp'),
+    include_directories: root_include_dir,
+    install: false,
+  )
+  test('openq4-sound-capture', openq4_sound_capture_test, timeout: 30)
+
   openq4_voice_packet_test = executable(
     'openq4-voice-packet-test',
     files('tools/tests/native/VoicePacketTest.cpp'),

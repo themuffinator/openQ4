@@ -244,7 +244,7 @@ static void ProductionPopup(const std::string& source,const std::string& locales
         const bool loaded=runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics);
         for(const auto& d:diagnostics)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"production framed SYSTEM loads");
         std::string error;double time=1;Viewport vp;vp.width=1280;vp.height=720;vp.displayScale=expansion==1?1.25f:2.f;SystemCanvas(vp);
-        runtime.SetReducedMotion(true,time);Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true}},error,time),"real SYSTEM editing state");
+        runtime.SetReducedMotion(true,time);Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.draft.r_fullscreen",true},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true}},error,time),"real SYSTEM editing state");
         // Two displays show the device and span rows; the device slots read these
         // labels. The second is a long name of short words, as the builder cuts
         // names to 48 code points: where it is wider than the safe area the list
@@ -343,7 +343,7 @@ static void WrappedOpening(const std::string& source,const std::string& locales,
     Runtime runtime(host);std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics),"production SYSTEM loads");
     std::string error;double time=1;Viewport vp;vp.width=c.width;vp.height=c.height;vp.displayScale=c.density;vp.textScale=c.text;SystemCanvas(vp);
     runtime.SetReducedMotion(true,time);
-    Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true},
+    Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.draft.r_fullscreen",true},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true},
         {"settings.display.available",true},{"settings.display.spanAvailable",true},{"settings.display.count",2.},{"settings.display.optionCount",3.},
         {"settings.display.0.label",std::string("1: Primary monitor")},{"settings.display.1.label",c.label}},error,time),"published display lists");
     auto frame=[&]{time+=.02;++host.frame;runtime.Frame(vp,time);Check(host.errors==0,"no SYSTEM Runtime error");};
@@ -384,7 +384,7 @@ static void SequentialOpenings(const std::string& source,const std::string& loca
         Runtime runtime(host);std::vector<Diagnostic> diagnostics;Check(runtime.LoadDocument(source,"guis/menu/settings/system.rui",diagnostics),"production SYSTEM loads");
         std::string error;double time=1;Viewport vp;vp.textScale=2;SystemCanvas(vp);
         runtime.SetReducedMotion(true,time);
-        Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},
+        Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.draft.r_fullscreen",true},{"settings.busy",false},{"settings.confirmationVisible",false},
             {"settings.renderer.available",true},{"settings.draft.r_screen",1.}},error,time),"real SYSTEM editing state");
         auto frame=[&]{time+=.02;++host.frame;runtime.Frame(vp,time);Check(host.errors==0,"no SYSTEM Runtime error");};
         auto key=[&](MenuInput input){runtime.MenuAction(input,true,time);runtime.MenuAction(input,false,time);};

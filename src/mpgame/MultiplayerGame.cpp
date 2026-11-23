@@ -23183,6 +23183,46 @@ static idStr OQ4_HudPlain( const char *text ) {
 	return plain;
 }
 
+/*
+================
+OQ4_HudInitials
+
+openQ4: a player's tile on the Competitive scoreline names them by the first
+two letters or digits of their name, the first in capitals ("Bi" for
+Bidwell). Quake 4 ships no portraits to show instead. UTF-8 letters are kept
+whole.
+================
+*/
+static idStr OQ4_HudInitials( const char *plain ) {
+	idStr initials;
+	int taken = 0;
+	for ( const char *c = plain ? plain : ""; *c != '\0' && taken < 2; ) {
+		const unsigned char lead = (unsigned char)*c;
+		int length = 1;
+		if ( lead >= 0xF0 ) {
+			length = 4;
+		} else if ( lead >= 0xE0 ) {
+			length = 3;
+		} else if ( lead >= 0xC0 ) {
+			length = 2;
+		}
+		if ( lead < 0x80 && !idStr::CharIsAlpha( lead ) && !idStr::CharIsNumeric( lead ) ) {
+			c++;
+			continue;
+		}
+		for ( int i = 0; i < length && c[ i ] != '\0'; i++ ) {
+			char ch = c[ i ];
+			if ( length == 1 ) {
+				ch = taken == 0 ? idStr::ToUpper( ch ) : idStr::ToLower( ch );
+			}
+			initials.Append( ch );
+		}
+		c += length;
+		taken++;
+	}
+	return initials;
+}
+
 static idStr OQ4_HudOrdinal( int place ) {
 	if ( place < 1 ) {
 		return "";
@@ -23302,6 +23342,9 @@ void idMultiplayerGame::PublishRemasteredNameTags( idUserInterface *_mphud, idPl
 	}
 }
 
+// openQ4: the players the Competitive scoreline shows beside each side's score
+static const int MP_SCORELINE_ROSTER = 4;
+
 /*
 ================
 idMultiplayerGame::PublishRemasteredCompetitive
@@ -23312,7 +23355,10 @@ against the leader, or 2nd place when that side leads (a free spectator sees
 the leader and 2nd); in Tourney your arena's two players.  Under the timer it
 names the limit, the round or the arena.  The team status lists each team's
 players, best score first: the weapon, health, armor and whether they are
-dead, you or followed.
+dead, you or followed.  The scoreline's rosters (team modes, Duel and Tourney)
+put up to four players beside each side's score, each by initials, with the
+ammunition for the weapon in hand and where they stand where this viewer may
+see it.
 ================
 */
 void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, idPlayer *localPlayer, idPlayer *followed, int limit ) {
@@ -23415,6 +23461,72 @@ void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, i
 			_mphud->SetStateBool( va( "oq4_ts%d_%d_followed", team, i ), player == followed );
 		}
 	}
+
+	// openQ4: the scoreline's rosters. Your team takes the leading side, the
+	// Marines for someone who chose to watch; in Duel and Tourney each side is
+	// its player. Up to four players a side, best score first. Whether a player
+	// is dead shows on both sides, as the round modes' pips do; the weapon in
+	// hand, health and armor only on your own side, or on both for someone who
+	// chose to watch.
+	const int leftTeam = ( teamGame && !neutralView && localPlayer->team == TEAM_STROGG ) ? 1 : 0;
+	_mphud->SetStateInt( "oq4_sl_left", leftTeam );
+	for ( int side = 0; side < 2; side++ ) {
+		idStaticList<idPlayer *, MAX_CLIENTS> roster;
+		if ( teamGame ) {
+			const int team = side == 0 ? leftTeam : 1 - leftTeam;
+			for ( int i = 0; i < Min( gameLocal.numClients, MAX_CLIENTS ); i++ ) {
+				idPlayer *player = OQ4_HudClient( i );
+				if ( player != NULL && !player->spectating && player->team == ( team ? TEAM_STROGG : TEAM_MARINE ) ) {
+					roster.Append( player );
+				}
+			}
+			for ( int i = 1; i < roster.Num(); i++ ) {
+				for ( int j = i; j > 0 && GetScore( roster[ j ] ) > GetScore( roster[ j - 1 ] ); j-- ) {
+					idPlayer *swap = roster[ j ];
+					roster[ j ] = roster[ j - 1 ];
+					roster[ j - 1 ] = swap;
+				}
+			}
+		} else if ( sides[ side ] != NULL ) {
+			roster.Append( sides[ side ] );
+		}
+		const int count = Min( roster.Num(), MP_SCORELINE_ROSTER );
+		_mphud->SetStateInt( va( "oq4_sl%d_count", side ), count );
+		for ( int i = 0; i < MP_SCORELINE_ROSTER; i++ ) {
+			idPlayer *player = i < count ? roster[ i ] : NULL;
+			mpTeamInfoEntry_t info;
+			memset( &info, 0, sizeof( info ) );
+			info.weapon = -1;
+			bool open = false;
+			bool dead = false;
+			if ( player != NULL ) {
+				teamInfo.Resolve( player, info );
+				const bool mine = teamGame ? player->team == localPlayer->team : player == localPlayer;
+				open = neutralView || ( !localPlayer->wantSpectate && mine );
+				dead = info.health <= 0 || ( player == localPlayer && player->pfl.dead );
+			}
+			const idStr name = player ? OQ4_HudPlain( player->GetUserInfo()->GetString( "ui_name" ) ) : idStr();
+			// the ammunition for the weapon in hand, as a percentage, -1 when not known
+			const int ammo = open && !dead && info.ammo != MP_TEAMINFO_AMMO_UNKNOWN
+				? ( info.ammo * 100 + MP_TEAMINFO_AMMO_FULL / 2 ) / MP_TEAMINFO_AMMO_FULL : -1;
+			const char *prefix = va( "oq4_sl%d_%d", side, i );
+			_mphud->SetStateString( va( "%s_name", prefix ), name.c_str() );
+			_mphud->SetStateString( va( "%s_initials", prefix ), OQ4_HudInitials( name.c_str() ).c_str() );
+			_mphud->SetStateInt( va( "%s_ammo", prefix ), ammo );
+			// where the player stands (hud_teamLocations), under the tiles this
+			// viewer may look over; your own place is on your screen already
+			const bool placed = showLocations && open && !dead && !( player == localPlayer && !localPlayer->spectating );
+			_mphud->SetStateString( va( "%s_location", prefix ), placed
+				? locations.NameForPoint( idVec3( info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ] ) ) : "" );
+			_mphud->SetStateBool( va( "%s_open", prefix ), open );
+			_mphud->SetStateInt( va( "%s_weapon", prefix ), open && !dead ? info.weapon : -1 );
+			_mphud->SetStateInt( va( "%s_health", prefix ), open && !dead ? Max( 0, info.health ) : 0 );
+			_mphud->SetStateInt( va( "%s_armor", prefix ), open && !dead ? Max( 0, info.armor ) : 0 );
+			_mphud->SetStateBool( va( "%s_dead", prefix ), dead );
+			_mphud->SetStateBool( va( "%s_you", prefix ), player != NULL && player == localPlayer && !localPlayer->spectating );
+			_mphud->SetStateBool( va( "%s_followed", prefix ), player != NULL && player == followed );
+		}
+	}
 }
 
 /*
@@ -23456,24 +23568,43 @@ void idMultiplayerGame::PublishClientOptions( idUserInterface *_mphud, idPlayer 
 	for ( int i = 0; i < MP_ITEMTIMERS_HUD_ROWS; i++ ) {
 		idStr name;
 		idStr time;
+		idStr where;
 		bool up = false;
+		int kind = 0;
+		float left = 0.0f;
 		if ( i < count ) {
+			kind = rows[ i ].kind;
 			const idDeclEntityDef *def = gameLocal.FindEntityDef( rvItemTimers::DefNameForKind( rows[ i ].kind ), false );
 			if ( def != NULL ) {
 				name = common->GetLocalizedString( def->dict.GetString( "inv_name" ) );
 			}
+			// openQ4: where the item lies tells two armours apart
+			const idEntity *item = ( rows[ i ].entityNumber >= 0 && rows[ i ].entityNumber < MAX_GENTITIES )
+				? gameLocal.entities[ rows[ i ].entityNumber ] : NULL;
+			if ( item != NULL ) {
+				where = locations.NameForPoint( item->GetPhysics()->GetOrigin() );
+			}
 			if ( rows[ i ].respawnAt < 0 ) {
 				time = "--";
+				left = 1.0f;
 			} else if ( rows[ i ].respawnAt == 0 || rows[ i ].respawnAt <= now ) {
 				up = true;
 			} else {
 				const int seconds = ( rows[ i ].respawnAt - now + 999 ) / 1000;
 				time = va( "%d:%02d", seconds / 60, seconds % 60 );
+				// the share of the respawn still to run, in twentieths so the
+				// HUD's state changes once a step
+				left = rows[ i ].totalMsec > 0
+					? idMath::ClampFloat( 0.0f, 1.0f, ceilf( 20.0f * (float)( rows[ i ].respawnAt - now ) / (float)rows[ i ].totalMsec ) / 20.0f )
+					: 1.0f;
 			}
 		}
 		_mphud->SetStateString( va( "oq4_it_%d_name", i ), name.c_str() );
 		_mphud->SetStateString( va( "oq4_it_%d_time", i ), time.c_str() );
+		_mphud->SetStateString( va( "oq4_it_%d_where", i ), where.c_str() );
 		_mphud->SetStateBool( va( "oq4_it_%d_up", i ), up );
+		_mphud->SetStateInt( va( "oq4_it_%d_kind", i ), kind );
+		_mphud->SetStateFloat( va( "oq4_it_%d_left", i ), left );
 	}
 
 	// The time of day, for people who play past it.
@@ -23575,7 +23706,7 @@ void idMultiplayerGame::PublishRemasteredHud( idUserInterface *_mphud, idPlayer 
 	const bool teamGame = gameLocal.IsTeamGame();
 	const mpGameState_t state = gameState->GetMPGameState();
 
-	remasteredKills.Publish( _mphud, "oq4_feed", now, 2000, 1000, 3100, tourney ? 2 : 4 );
+	remasteredKills.Publish( _mphud, "oq4_feed", now, 2000, 1000, 3100, tourney ? 2 : 4, "oq4_feed" );
 	PublishRemasteredChat( _mphud, now );
 
 	_mphud->SetStateBool( "oq4_team_game", teamGame );

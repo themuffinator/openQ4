@@ -54,6 +54,10 @@ def prompt_style(style: int) -> list[str]:
     return [f'set in_promptStyle {style}', f'testPromptDevice {"controller" if style else "desktop"}']
 
 
+# The video capture CVars the GAME OPTIONS page's VIDEO CAPTURE rows set, read back.
+VIDEO_SETTINGS = ['com_videoFormat', 'com_videoQuality', 'com_videoFPS', 'com_videoHeight', 'com_videoAudio', 'com_videoTiming']
+
+
 def menu_step(direction: str) -> list[str]:
     """Steps that press one semantic menu direction (no device input) and
     report where the focus went."""
@@ -1208,6 +1212,50 @@ SCENARIOS = {
         'screenshot "screenshots/game-mp-game.tga"', 'openq4_retainedGui event onBack', 'waitMsec 1500', 'openq4_retainedGui report',
         'openq4_guiGet desktop::active', 'openq4_guiGet desktop::curr', 'screenshot "screenshots/game-mp-game-back.tga"',
     ]),
+    # The video capture rows (recordVideo): GENERAL's VIDEO CAPTURE section
+    # steps each of its CVars from the page, a GIF leaves Record Sound nothing
+    # to do, and CONTROLS > OTHER ends with Record Video (toggleVideo).
+    'game-video': (None, [
+        'waitMsec 9000', *VIDEO_SETTINGS, 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_gameoptions',
+        'waitMsec 1500', 'openq4_retainedGui focus game_videoformat', 'waitMsec 400', 'openq4_retainedGui report',
+        'screenshot "screenshots/game-video.tga"',
+        *menu_step('accept'), *menu_step('down'), *menu_step('accept'),
+        'openq4_retainedGui focus game_videoquality', *menu_step('right'),
+        'openq4_retainedGui focus game_videofps', *menu_step('accept'), *menu_step('up'), *menu_step('accept'),
+        'openq4_retainedGui focus game_videoheight', *menu_step('accept'), *menu_step('down'), *menu_step('accept'),
+        'openq4_retainedGui focus game_videoaudio', *menu_step('accept'),
+        'openq4_retainedGui focus game_videotiming', *menu_step('accept'), *menu_step('down'), *menu_step('accept'),
+        'waitMsec 400', *VIDEO_SETTINGS, 'screenshot "screenshots/game-video-set.tga"',
+        'set com_videoFormat gif', 'waitMsec 400', 'openq4_retainedGui focus game_videoaudio', 'openq4_retainedGui report',
+        'screenshot "screenshots/game-video-gif.tga"',
+        'openq4_retainedGui event onBack', 'waitMsec 1500', 'bind F10 toggleVideo', 'openq4_guiAction set_b_controls', 'waitMsec 1500',
+        'openq4_retainedGui event tab_other', 'waitMsec 500', 'openq4_retainedGui focus controls_bind_51',
+        'waitMsec 400', 'openq4_retainedGui report', 'screenshot "screenshots/controls-record-video.tga"',
+    ]),
+    # In a level: the in-game menu's GAME OPTIONS route opens the page, its
+    # rows choose an AVI (which needs no FFmpeg) at 30 frames a second, and
+    # the Record Video command (toggleVideo) records with them.
+    'game-video-map': ('game/airdefense1', [
+        'openq4_assertMenuActivation 10000', 'waitMsec 1500', 'GuiEvent fromMp_toGameoptions', 'waitMsec 2000',
+        'openq4_retainedGui report', 'openq4_retainedGui focus game_videoformat', *menu_step('accept'),
+        *[step for _ in range(4) for step in menu_step('down')], *menu_step('accept'),
+        'openq4_retainedGui focus game_videofps', *menu_step('accept'), *menu_step('up'), *menu_step('accept'),
+        'waitMsec 400', *VIDEO_SETTINGS, 'screenshot "screenshots/game-video-map.tga"',
+        'openq4_retainedGui event onBack', 'waitMsec 1500', 'toggleVideo videomenu', 'waitMsec 3000', 'toggleVideo', 'waitMsec 3000',
+    ]),
+    # The classic pages (ui_retained 0): Game Options ends with VIDEO CAPTURE,
+    # reached by its section, its rows following their CVars, and Controls >
+    # Other ends with Record Video.
+    'game-video-stock': (None, [
+        'waitMsec 9000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_gameoptions', 'waitMsec 1500',
+        'openq4_guiSet gui::game_section_choice 8', 'openq4_guiSet gui::gui_set_game_scroll 90', 'waitMsec 1000',
+        'openq4_guiGet set_game_video::visible', 'openq4_guiGet set_game_videotiming::visible', 'openq4_guiGet set_game_content::rect',
+        'screenshot "screenshots/stock-video.tga"',
+        'set com_videoFormat webm', 'set com_videoQuality 65', 'set com_videoFPS 30', 'set com_videoHeight 1080',
+        'set com_videoAudio 0', 'set com_videoTiming realtime', 'waitMsec 800', 'screenshot "screenshots/stock-video-set.tga"',
+        'bind F10 toggleVideo', 'openq4_guiAction set_b_controls', 'waitMsec 1500', 'openq4_guiAction set_b_controls_4', 'waitMsec 800',
+        'waitMsec 400', 'openq4_guiGet set_ctrls_other_video::visible', 'screenshot "screenshots/stock-record-video.tga"',
+    ]),
     # The settings tree (UI-01): every tab of every settings sub-page, as the
     # settings tree audit of 20 November 2026 laid them out, each reached by
     # its tab event from the SETTINGS page and left with Back.
@@ -1747,7 +1795,8 @@ SCENARIO_FILES = {'arenafail': {
         'openq4_retainedGui menu accept 0', 'waitMsec 900', 'ui_arenaProgress', 'openq4_retainedGui report',
         'screenshot "screenshots/arenafail-browser.tga"'],
 }}
-SCENARIO_CVARS = {'mpcard-prompts': {'ui_retainedMultiplayer': '1'}, 'mpcard-triggers': {'ui_retainedMultiplayer': '1'},
+SCENARIO_CVARS = {'game-video-stock': {'ui_retained': '0'},
+                  'mpcard-prompts': {'ui_retainedMultiplayer': '1'}, 'mpcard-triggers': {'ui_retainedMultiplayer': '1'},
                   'settings-controller': {'ui_retained': '0'},
                   'mpadmin': {'bot_minPlayers': '3'}, 'mpadminremote': {'net_ip': '127.0.0.1', 'ui_autoJoin': '1', 'ui_spectate': 'Play'},
                   # An Arena match is a local multiplayer game, where the menu probe is a cheat.

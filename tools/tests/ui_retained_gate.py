@@ -5769,8 +5769,8 @@ def main() -> int:
     stock_controls = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.gui').read_text(encoding='utf-8', errors='replace')
     stock_bindings = [binding.strip('"') for binding in re.findall(r'bindDef\s+\w+\s*\{[^}]*?\bbind\s+("[^"]+"|\S+)', stock_controls)]
     session_bindings = re.findall(r'"([^"]+)"', re.search(r'RETAINED_CONTROLS_BINDINGS\[\] = \{([^}]*)\};', menu).group(1))
-    assert list(retained_controls.BINDINGS) == stock_bindings == session_bindings and len(stock_bindings) == 51
-    assert [controls_document['state'][f'controls.{row}.keys']['keyBinding'] for row in range(51)] == session_bindings
+    assert list(retained_controls.BINDINGS) == stock_bindings == session_bindings and len(stock_bindings) == 52
+    assert [controls_document['state'][f'controls.{row}.keys']['keyBinding'] for row in range(52)] == session_bindings
     controls_publish = function_body(menu, 'void idSessionLocal::PublishRetainedControls(')
     assert controls_publish.index('gui->SetKeyBindingNames();') < controls_publish.index('retainedControlsCapture >= 0') < controls_publish.index('gui->StateChanged(')
     assert {name: action['arguments']['command'] for name, action in controls_document['actions'].items()

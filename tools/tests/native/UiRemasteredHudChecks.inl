@@ -1244,9 +1244,12 @@ static void CheckRemasteredMpHud(ScreenHost& host, const char* path) {
 	runtime.Shutdown();
 }
 
-// Competitive (ui_hudLayout 3; 13.9, 14.9): the match bar at the top center,
-// network quality beside it, the team status at the leading edge, the vote in
-// the top-leading corner and the chat clear of the enlarged status bar.
+// Competitive (ui_hudLayout 3; 13.9, 14.9): deathmatch keeps the standing and
+// the timer with network quality under it; Duel, Tourney and the team modes
+// get the scoreline at the top center (score slabs beside the timer, each
+// side's roster further out, network quality after it), no side team lists,
+// the vote in the top-leading corner, the chat clear of the enlarged status
+// bar, the item timers trailing, and the kill feed's arrival and glide.
 static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	const auto source = Read(path);
 	std::vector<Diagnostic> diagnostics;
@@ -1258,34 +1261,78 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	Runtime::EventEffects effects;
 	StateValues values = RemasteredLayout(1280,720);
 	values.insert({{"gametype",1.0},{"oq4_state",3.0},{"oq4_timed",true},{"oq4_clock_warn",0.0},{"oq4_clock",std::string("7:05")},
-		{"oq4_mb_sub",std::string("TO 30")},{"oq4_mb0_name",std::string("You")},{"oq4_mb0_rank",std::string("2ND")},{"oq4_mb0_score",19.0},
-		{"oq4_mb0_you",true},{"oq4_mb1_name",std::string("Sarge")},{"oq4_mb1_rank",std::string("1ST")},{"oq4_mb1_score",24.0},
-		{"oq4_mb1_lead",true},{"oq4_ping",40.0},{"oq4_loss",0.0},{"player1_name",std::string("Sarge")},{"oq4_rank1",std::string("1ST")}});
+		{"oq4_mb_sub",std::string("TO 30")},{"oq4_mb0_name",std::string("You")},{"oq4_mb0_score",19.0},
+		{"oq4_mb0_you",true},{"oq4_mb1_name",std::string("Sarge")},{"oq4_mb1_score",24.0},
+		{"oq4_mb1_lead",true},{"oq4_ping",40.0},{"oq4_loss",0.0},{"player1_name",std::string("Sarge")},{"oq4_rank1",std::string("1ST")},
+		{"player2_name",std::string("You")},{"oq4_rank2",std::string("2ND")},{"oq4_row2_you",true}});
 	Check(runtime.SetState(values,error,0),error.c_str());
 	Check(runtime.RunEvent("hudJoin",0,effects,error),"the join program runs");
 	runtime.Frame(RemasteredViewport(1280,720),.1);
 	Check(host.errors == 0,"Competitive frames without runtime errors");
 
-	// The bar: three plates from y 6, 26 u tall, 2 u apart, a 60 u timer
-	// between 122 u sides (the top-center box starts at 160 dp at 16:9).
+	// Deathmatch: the standing and the timer stay top-leading, network quality
+	// under the timer; no scoreline, and the vote keeps its Remastered place.
+	Check(!Shown(runtime,"matchbar") && Shown(runtime,"tl-rem") && Shown(runtime,"standing1") && Shown(runtime,"standing2") &&
+		Shown(runtime,"timer"),"Competitive deathmatch keeps the standing and the timer top-leading");
+	Bounds timerRow, ffaNet;
+	Check(Shown(runtime,"ffn") && runtime.GetBounds("timer-c",timerRow) && runtime.GetBounds("ffn",ffaNet) &&
+		ffaNet.y >= timerRow.y+timerRow.height && Near(ffaNet.x,10*1.5f,1.5f),"network quality sits under the deathmatch timer");
+	Check(runtime.SetState({{"voteNotice",1.0},{"voteInfo_1",std::string("Map: q4dm7")}},error,.11),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),.115);
+	Bounds ffaVote;
+	Check(Shown(runtime,"vote") && runtime.GetBounds("vote",ffaVote) && Near(ffaVote.y,150*1.5f,1.f),
+		"the deathmatch vote keeps its place under the standing");
+	Check(runtime.SetState({{"voteNotice",0.0}},error,.12),error.c_str());
+
+	// Duel: the scoreline, the timer 64 u wide between 56 u slabs 2 u apart
+	// from y 4, 30 u tall (the top-center box starts at 160 dp at 16:9).
+	Check(runtime.SetState({{"gametype",9.0},{"oq4_sl0_count",1.0},{"oq4_sl1_count",1.0},{"oq4_sl0_0_open",true},{"oq4_sl0_0_you",true},
+		{"oq4_sl0_0_weapon",7.0},{"oq4_sl0_0_health",60.0},{"oq4_sl0_0_armor",150.0},{"oq4_sl1_0_weapon",-1.0},
+		{"oq4_sl0_0_initials",std::string("Yo")},{"oq4_sl1_0_initials",std::string("Sa")},{"oq4_sl0_0_ammo",40.0},
+		{"oq4_sl1_0_ammo",-1.0}},error,.13),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),.135);
 	Bounds side0, timer, side1;
-	Check(Shown(runtime,"matchbar") && !Shown(runtime,"tl-rem") && !Shown(runtime,"tc-strip"),
-		"Competitive trades the standing, timer and strip for the match bar");
+	Check(Shown(runtime,"matchbar") && !Shown(runtime,"tl-rem") && !Shown(runtime,"tc-strip") && !Shown(runtime,"ffn"),
+		"Duel trades the standing, timer and strip for the scoreline");
 	Check(runtime.GetBounds("mb0-plate",side0) && runtime.GetBounds("mbt-plate",timer) && runtime.GetBounds("mb1-plate",side1),
-		"the bar's plates are laid out");
-	Check(Near(side0.x,160+166*1.5f) && Near(side0.width,122*1.5f) && Near(side0.y,6*1.5f) && Near(side0.height,26*1.5f) &&
-		Near(timer.x,160+290*1.5f) && Near(timer.width,60*1.5f) && Near(side1.x,160+352*1.5f),"the sides flank the 60 u timer 2 u apart");
-	// Deathmatch: the rank ordinal on the band, the leader's in #FFBE23, the
-	// name and your marker; the scores at the inner ends in Chain.
-	Check(Shown(runtime,"mb0-band") && Shown(runtime,"mb0-rank") && Shown(runtime,"mb0-name") && !Shown(runtime,"mb0-block0") &&
-		!Shown(runtime,"mb0-block1") && !Shown(runtime,"mb0-team"),"deathmatch sides hold the rank and the name");
+		"the scoreline's plates are laid out");
+	Check(Near(side0.x,160+230*1.5f) && Near(side0.width,56*1.5f) && Near(side0.y,4*1.5f) && Near(side0.height,30*1.5f) &&
+		Near(timer.x,160+288*1.5f) && Near(timer.width,64*1.5f) && Near(side1.x,160+354*1.5f),"the slabs flank the 64 u timer 2 u apart");
+	// The scores fill the slabs; the leader's lip is #FFBE23; the names hang
+	// under the slabs, yours white with the marker.
+	const auto score0 = runtime.PresentedValue("mb0-dscore","text"), score1 = runtime.PresentedValue("mb1-dscore","text");
+	Check(Shown(runtime,"mb0-dscore") && !Shown(runtime,"mb0-score") && score0 && score0->text == "19" && score1 && score1->text == "24",
+		"each Duel slab shows its player's score");
+	Check(Shown(runtime,"mb1-lip") && !Shown(runtime,"mb0-lip") && Shown(runtime,"mb0-rest") && !Shown(runtime,"mb0-block0") &&
+		!Shown(runtime,"mb0-block1") && !Shown(runtime,"mb0-team"),"the leader's slab carries the lip");
+	Bounds who0, who1;
+	const auto name0 = runtime.PresentedValue("mb0-name","text"), nameColour = runtime.PresentedValue("mb0-name","color");
+	Check(Shown(runtime,"mb0-who") && Shown(runtime,"mb1-who") && name0 && name0->text == "You" && nameColour &&
+		Near(float(nameColour->data[2]),1),"the names hang under the slabs, yours white");
+	Check(runtime.GetBounds("mb0-who",who0) && runtime.GetBounds("mb1-who",who1) && Near(who0.x+who0.width,160+280*1.5f,1.5f) &&
+		Near(who1.x,160+360*1.5f,1.5f) && Near(who0.y,36*1.5f,1.f),"the names hang 6 u in from the inner ends");
 	Check(Shown(runtime,"mb0-marker") && !Shown(runtime,"mb1-marker"),"you lead with the marker");
-	const auto leader = runtime.PresentedValue("mb1-rank","color"), you = runtime.PresentedValue("mb0-rank","color");
-	Check(leader && Near(float(leader->data[2]),0x23/255.f,.01f) && you && Near(float(you->data[2]),1),"the leader's ordinal is #FFBE23");
-	const auto score0 = runtime.PresentedValue("mb0-score","text"), score1 = runtime.PresentedValue("mb1-score","text");
-	Check(score0 && score0->text == "19" && score1 && score1->text == "24","each side shows its score");
-	Bounds score;
-	Check(runtime.GetBounds("mb0-score",score) && Near(score.x+score.width,160+(166+122-7)*1.5f,1.5f),"the score sits at the inner end");
+	// The rosters: one tile a side 3 u beyond the slab, named by initials;
+	// yours on the band with your ammunition and vitals, the opponent's
+	// initials alone.
+	Bounds tile0, tile1, hpTrack, hpFill, arFill;
+	Check(Shown(runtime,"sl0t0") && !Shown(runtime,"sl0t1") && Shown(runtime,"sl1t0") && runtime.GetBounds("sl0t0",tile0) &&
+		runtime.GetBounds("sl1t0",tile1) && Near(tile0.x,160+207*1.5f) && Near(tile0.width,20*1.5f) && Near(tile1.x,160+413*1.5f),
+		"each side's tile sits 3 u beyond its slab");
+	const auto initials0 = runtime.PresentedValue("sl0t0-ini","text"), initials1 = runtime.PresentedValue("sl1t0-ini","text");
+	const auto initialsColour = runtime.PresentedValue("sl1t0-ini","color");
+	Check(initials0 && initials0->text == "Yo" && initials1 && initials1->text == "Sa" && initialsColour &&
+		Near(float(initialsColour->data[0]),0xE4/255.f,.01f),"each tile names its player by initials");
+	Check(Shown(runtime,"sl0t0-band") && Shown(runtime,"sl0t0-vitals") && Shown(runtime,"sl0t0-ammo") && !Shown(runtime,"sl1t0-vitals") &&
+		!Shown(runtime,"sl1t0-ammo"),"your tile shows your ammunition and vitals, the opponent's neither");
+	Bounds ammoTrack, ammoFill;
+	const auto ammoColour = runtime.PresentedValue("sl0t0-ammo-fill","background-color");
+	Check(runtime.GetBounds("sl0t0-ammo",ammoTrack) && runtime.GetBounds("sl0t0-ammo-fill",ammoFill) &&
+		Near(ammoFill.width,ammoTrack.width*.4f,1.f) && ammoTrack.y+ammoTrack.height <= tile0.y+.5f && ammoColour &&
+		Near(float(ammoColour->data[0]),0,.01f) && Near(float(ammoColour->data[1]),1,.01f),
+		"the ammunition bar over the tile fills in the weapon's color");
+	Check(runtime.GetBounds("sl0t0-hp",hpTrack) && runtime.GetBounds("sl0t0-hp-fill",hpFill) && runtime.GetBounds("sl0t0-ar-fill",arFill) &&
+		Near(hpFill.width,hpTrack.width*.6f,1.f) && Near(arFill.width,hpTrack.width,1.f),"health and armor fill to 100");
 	// The timer: the time over the limit.
 	const auto clock = runtime.PresentedValue("mbt-clock","text"), sub = runtime.PresentedValue("mbt-sub","text");
 	Check(Shown(runtime,"mbt-clock") && clock && clock->text == "7:05" && Shown(runtime,"mbt-sub") && sub && sub->text == "TO 30",
@@ -1293,33 +1340,52 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	Check(runtime.SetState({{"oq4_clock_warn",2.0},{"oq4_clock",std::string("0:08")}},error,.2),error.c_str());
 	Check(runtime.RunEvent("oq4_clockWarn",.2,effects,error),"the clock warning runs");
 	runtime.Frame(RemasteredViewport(1280,720),.25);
-	Check(Shown(runtime,"mbt-urgent") && !Shown(runtime,"mbt-clock"),"the last ten seconds pulse in the bar");
+	Check(Shown(runtime,"mbt-urgent") && !Shown(runtime,"mbt-clock"),"the last ten seconds pulse in the scoreline");
 	Check(runtime.SetState({{"oq4_clock_warn",0.0},{"oq4_state",1.0},{"showready",true},{"oq4_mb_ready",std::string("READY 3/8")}},error,.3),error.c_str());
 	runtime.Frame(RemasteredViewport(1280,720),.35);
 	const auto ready = runtime.PresentedValue("mbt-sub","text");
 	Check(Shown(runtime,"mbt-warm") && ready && ready->text == "READY 3/8","warm-up reads WARM-UP over the ready count");
 	Check(runtime.SetState({{"oq4_state",3.0},{"showready",false}},error,.4),error.c_str());
 
-	// The kill feed keeps its place beside the bar at 16:9 and steps 38 u
-	// under it on narrower views, where its longest line would meet the
-	// network readout.
+	// The kill feed keeps its place beside the scoreline at 16:9 and steps
+	// 38 u under it on narrower views, where its longest line would meet the
+	// network readout; the item timers step down with it.
 	Check(runtime.SetState({{"oq4_feed0_live",true},{"oq4_feed0_alpha",1.0},{"oq4_feed0_attacker",std::string("Vex")},
-		{"oq4_feed0_victim",std::string("Kaz")},{"oq4_feed0_weapon",7.0},{"oq4_feed0_kind",0.0},{"oq4_feed0_hasAttacker",true}},error,.41),error.c_str());
+		{"oq4_feed0_victim",std::string("Kaz")},{"oq4_feed0_weapon",7.0},{"oq4_feed0_kind",0.0},{"oq4_feed0_hasAttacker",true},
+		{"oq4_it_count",1.0},{"oq4_it_0_kind",1.0},{"oq4_it_0_up",true},{"oq4_it_0_name",std::string("Quad Damage")}},error,.41),error.c_str());
 	runtime.Frame(RemasteredViewport(1280,720),.415);
-	Bounds feedLine;
-	Check(Shown(runtime,"feed0") && runtime.GetBounds("feed0-c",feedLine) && Near(feedLine.y,(24-11.5f)*1.5f,1.f),
-		"the kill feed keeps its place beside the bar at 16:9");
+	Bounds feedLine, itemRow;
+	Check(Shown(runtime,"feed0") && runtime.GetBounds("feed0-c",feedLine) && Near(feedLine.y,(24-11.5f)*1.5f,1.f) &&
+		runtime.GetBounds("itimer0",itemRow) && Near(itemRow.y,96*1.5f,1.f),"the kill feed and the item timers keep their places at 16:9");
 	Check(runtime.SetState(RemasteredLayout(960,720),error,.42),error.c_str());
 	runtime.Frame(RemasteredViewport(960,720),.425);
-	Check(runtime.GetBounds("feed0-c",feedLine) && Near(feedLine.y,(24-11.5f+38)*1.5f,1.f),"at 4:3 the kill feed steps under the bar");
+	Check(runtime.GetBounds("feed0-c",feedLine) && Near(feedLine.y,(24-11.5f+38)*1.5f,1.f) && runtime.GetBounds("itimer0",itemRow) &&
+		Near(itemRow.y,(96+38)*1.5f,1.f),"at 4:3 the kill feed and the item timers step under the scoreline");
+	// Deathmatch has no scoreline to step under.
+	Check(runtime.SetState({{"gametype",1.0}},error,.426),error.c_str());
+	runtime.Frame(RemasteredViewport(960,720),.427);
+	Check(runtime.GetBounds("feed0-c",feedLine) && Near(feedLine.y,(24-11.5f)*1.5f,1.f),"deathmatch's kill feed stays up at 4:3");
 	Check(runtime.SetState(RemasteredLayout(1280,720),error,.43),error.c_str());
-	Check(runtime.SetState({{"oq4_feed0_live",false}},error,.435),error.c_str());
+	// A line arrives from the trailing side, fading in; the lines glide up
+	// when the top one leaves.
+	Check(runtime.SetState({{"gametype",9.0}},error,.4302),error.c_str());
+	Check(runtime.RunEvent("oq4_feedIn0",.4305,effects,error),"a feed line arrives");
+	runtime.Frame(RemasteredViewport(1280,720),.4325);
+	const auto arriving = runtime.PresentedValue("feed0-c","opacity"), sliding = runtime.PresentedValue("feed0-c","transform");
+	const auto popping = runtime.PresentedValue("feed0-mark","transform");
+	Check(arriving && arriving->data[0] < .99 && sliding && sliding->data[0] > 1 && popping && popping->data[2] > 1.01,
+		"an arriving line slides and fades in, its weapon mark settling");
+	Check(runtime.RunEvent("oq4_feedShift",.433,effects,error),"the feed shifts");
+	runtime.Frame(RemasteredViewport(1280,720),.434);
+	const auto gliding = runtime.PresentedValue("feed0","transform");
+	Check(gliding && gliding->data[1] > 1,"the lines glide up into the slot that emptied");
+	Check(runtime.SetState({{"oq4_feed0_live",false},{"oq4_it_count",0.0}},error,.435),error.c_str());
 
-	// Network quality follows the bar's trailing end at all times: four bars
-	// by the ping, each 2% of loss removing one.
+	// Network quality follows the scoreline's trailing end at all times: four
+	// bars by the ping, each 2% of loss removing one.
 	runtime.Frame(RemasteredViewport(1280,720),.45);
 	Bounds net;
-	Check(Shown(runtime,"mbn") && runtime.GetBounds("mbn",net) && Near(net.x,160+480*1.5f,1.5f),"network quality follows the bar");
+	Check(Shown(runtime,"mbn") && runtime.GetBounds("mbn",net) && Near(net.x,160+505*1.5f,1.5f),"network quality follows the scoreline");
 	const auto lit3 = runtime.PresentedValue("mbn-b3","background-color");
 	Check(lit3 && Near(float(lit3->data[0]),0xB5/255.f,.01f) && Near(float(lit3->data[3]),.9f,.01f),"a 40 ms ping lights all four bars");
 	Check(runtime.SetState({{"oq4_loss",5.0}},error,.5),error.c_str());
@@ -1329,44 +1395,47 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 		"5% loss leaves two amber bars");
 	Check(runtime.SetState({{"oq4_loss",0.0}},error,.6),error.c_str());
 
-	// Team modes: your team leads with its color and mark; flags hang under
-	// the bar from the inner ends; your team's list sits at the leading edge.
-	Check(runtime.SetState({{"gametype",4.0},{"oq4_team_game",true},{"oq4_my_team",1.0},{"marine_score",3.0},{"strogg_score",2.0},
-		{"oq4_flag1_state",1.0},{"oq4_flag1_carrier",std::string("Vex")},{"oq4_flag0_state",2.0},{"oq4_ts1_count",2.0},
-		{"oq4_ts1_0_name",std::string("You")},{"oq4_ts1_0_weapon",7.0},{"oq4_ts1_0_health",125.0},{"oq4_ts1_0_armor",50.0},
-		{"oq4_ts1_0_you",true},{"oq4_ts1_1_name",std::string("Kaz")},{"oq4_ts1_1_dead",true},{"oq4_ts1_1_health",0.0}},error,.7),error.c_str());
+	// Team modes: your team leads with its color, mark and name; flags hang
+	// under the slabs from the inner ends; the rosters show your team's
+	// weapons and vitals, the other team's marks, and a skull for the dead;
+	// your team's list sits at the leading edge.
+	Check(runtime.SetState({{"gametype",4.0},{"oq4_team_game",true},{"oq4_my_team",1.0},{"oq4_sl_left",1.0},{"marine_score",3.0},
+		{"strogg_score",2.0},{"oq4_flag1_state",1.0},{"oq4_flag1_carrier",std::string("Vex")},{"oq4_flag0_state",2.0},
+		{"oq4_sl0_count",2.0},{"oq4_sl0_0_health",125.0},{"oq4_sl0_1_dead",true},{"oq4_sl0_1_weapon",-1.0},
+		{"oq4_sl1_count",1.0},{"oq4_sl1_0_weapon",-1.0}},error,.7),error.c_str());
 	runtime.Frame(RemasteredViewport(1280,720),.75);
 	Check(Shown(runtime,"mb0-block1") && Shown(runtime,"mb0-logo1") && Shown(runtime,"mb1-block0") && Shown(runtime,"mb0-team") &&
-		!Shown(runtime,"mb0-band") && !Shown(runtime,"mb0-name"),"team modes lead with your team's block, mark and name");
+		!Shown(runtime,"mb0-who") && !Shown(runtime,"mb0-dscore") && !Shown(runtime,"mb0-lip"),
+		"team modes lead with your team's block, mark and name");
 	const auto teamName = runtime.PresentedValue("mb0-team","text");
 	const auto teamScore = runtime.PresentedValue("mb0-score","text");
 	Check(teamName && teamName->text == "#str_200199" && teamScore && teamScore->text == "2","the Strogg side leads with the Strogg score");
+	const auto lip0 = runtime.PresentedValue("sl0t0-lip","background-color");
+	Check(lip0 && Near(float(lip0->data[0]),1,.01f) && Near(float(lip0->data[1]),0x7B/255.f,.01f),"a Strogg tile's lip is the team's color");
+	const auto overHealth = runtime.PresentedValue("sl0t0-hp-fill","background-color");
+	Check(overHealth && Near(float(overHealth->data[2]),0x23/255.f,.01f),"health above 100 fills #FFBE23");
+	const auto deadInitials = runtime.PresentedValue("sl0t1-ini","opacity");
+	Check(Shown(runtime,"sl0t1") && Shown(runtime,"sl0t1-skull") && Shown(runtime,"sl0t1-deadp") && !Shown(runtime,"sl0t1-vitals") &&
+		!Shown(runtime,"sl0t1-plate") && !Shown(runtime,"sl0t1-ammo") && deadInitials && Near(float(deadInitials->data[0]),.35f,.01f),
+		"the dead show a skull over their dimmed initials");
+	const auto marineInitials = runtime.PresentedValue("sl1t0-ini","color");
+	Check(marineInitials && Near(float(marineInitials->data[0]),0xAA/255.f,.01f) && !Shown(runtime,"sl1t0-vitals") &&
+		!Shown(runtime,"sl1t0-ammo"),"the other team shows its initials in its color without vitals");
 	Bounds flag0, flag1;
 	Check(Shown(runtime,"mbf0") && Shown(runtime,"mbf0-taken") && Shown(runtime,"mbf0-carrier") && Shown(runtime,"mbf0-1taken") &&
 		Shown(runtime,"mbf1-dropped") && Shown(runtime,"mbf1-0dropped") && !Shown(runtime,"mbf1-taken"),
-		"each side's flag hangs under the bar with its state and carrier");
-	Check(runtime.GetBounds("mbf0",flag0) && runtime.GetBounds("mbf1",flag1) && Near(flag0.x+flag0.width,160+282*1.5f,1.5f) &&
-		Near(flag1.x,160+358*1.5f,1.5f) && Near(flag0.y,34*1.5f,1.f),"the flags hang 6 u in from the inner ends");
-	Bounds row0, row1, head;
-	Check(Shown(runtime,"tsl") && !Shown(runtime,"tst") && Shown(runtime,"tsl0") && Shown(runtime,"tsl1") && !Shown(runtime,"tsl2"),
-		"your team's list shows its players");
-	Check(runtime.GetBounds("tsl0",row0) && runtime.GetBounds("tsl1",row1) && Near(row0.x,8*1.5f) && Near(row0.y,150*1.5f) &&
-		Near(row0.width,138*1.5f) && Near(row1.y-row0.y,16.5f*1.5f),"the rows sit from y 150 on a 16.5 u pitch");
-	Check(Shown(runtime,"tsl0-band") && Shown(runtime,"tsl0-marker") && Shown(runtime,"tsl0-w7") && !Shown(runtime,"tsl0-plate"),
-		"your row uses the band plate, the marker and your weapon");
-	const auto overcharged = runtime.PresentedValue("tsl0-hp","color");
-	Check(overcharged && Near(float(overcharged->data[2]),0x23/255.f,.01f),"health above 100 reads #FFBE23");
-	const auto deadName = runtime.PresentedValue("tsl1-name","opacity");
-	Check(Shown(runtime,"tsl1-dead") && !Shown(runtime,"tsl1-hp") && deadName && Near(float(deadName->data[0]),.4f),
-		"the dead keep their row at 0.40 under a cross");
-	Check(runtime.GetBounds("tsl-head",head) && head.y+head.height <= row0.y+1,"the team name sits above the list");
+		"each side's flag hangs under the scoreline with its state and carrier");
+	Check(runtime.GetBounds("mbf0",flag0) && runtime.GetBounds("mbf1",flag1) && Near(flag0.x+flag0.width,160+280*1.5f,1.5f) &&
+		Near(flag1.x,160+360*1.5f,1.5f) && Near(flag0.y,36*1.5f,1.f),"the flags hang 6 u in from the inner ends");
+	// The side team lists are gone: the rosters carry the players.
+	Check(!Shown(runtime,"tsl") && !Shown(runtime,"tst"),"no side team lists beside the rosters");
 
-	// The vote takes the top-leading corner, clear of the team status.
+	// The vote takes the top-leading corner.
 	Check(runtime.SetState({{"voteNotice",1.0},{"voteInfo_1",std::string("Map: q4dm7")},{"oq4_vote_yes",3.0}},error,.8),error.c_str());
 	runtime.Frame(RemasteredViewport(1280,720),.85);
 	Bounds ballot;
-	Check(Shown(runtime,"vote") && runtime.GetBounds("vote",ballot) && Near(ballot.y,36*1.5f,1.f) && ballot.y+ballot.height < head.y,
-		"the vote sits in the top-leading corner clear of the team status");
+	Check(Shown(runtime,"vote") && runtime.GetBounds("vote",ballot) && Near(ballot.y,36*1.5f,1.f),
+		"the vote sits in the top-leading corner");
 	Check(runtime.SetState({{"voteNotice",0.0}},error,.9),error.c_str());
 
 	// Chat clears the 15% larger status bar by 8 u (21:9, where the box spans
@@ -1379,9 +1448,8 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	const float px = 1080/720.f;
 	Check(Shown(runtime,"chat0") && runtime.GetBounds("chat0",chat) && Near(chat.y+chat.height,1080-(51*1.15f+8)*1.5f*px,3.f),
 		"chat clears the enlarged status bar by 8 u");
-	// Narrower views keep the box low, under eight team rows (which end at
-	// 280 u): 200 u wide at 16:9, and at 4:3 as wide as the space beside the
-	// widest enlarged strip allows, down to 120 u.
+	// Narrower views keep the box low: 200 u wide at 16:9, and at 4:3 as wide
+	// as the space beside the widest enlarged strip allows, down to 120 u.
 	Check(runtime.SetState(RemasteredLayout(1280,720),error,1.12),error.c_str());
 	StateValues lines;
 	for (int i = 0; i < 4; ++i) {
@@ -1402,13 +1470,14 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 		Check(runtime.GetBounds("chatbox",box) && Near(box.width,expected,1.f) && Near(box.y+box.height,720-(51*1.15f+8)*1.5f,2.f),
 			width == 1280 ? "at 16:9 the box stays 8 u above the enlarged status bar, 200 u wide" :
 				"at 4:3 the box narrows beside the enlarged strip instead of rising");
-		Check(top > 280*1.5f,"four chat lines stay under eight team rows");
+		Check(top > 200*1.5f,"four chat lines stay low");
 	}
 	Check(runtime.SetState(RemasteredLayout(1280,720),error,1.2),error.c_str());
 
-	// The open input shows the history that fits under the team status: with
-	// eight rows (to 280 u) six of eight messages at 16:9, the newest.
-	StateValues history{{"oq4_chatting",true},{"oq4_chat_count",8.0},{"oq4_ts1_count",8.0}};
+	// The open input shows the history that fits under the vote card in the
+	// top-leading corner: at 16:9 all eight short messages.
+	StateValues history{{"oq4_chatting",true},{"oq4_chat_count",8.0},{"voteNotice",1.0}};
+	for (int k = 1; k <= 6; ++k) history.insert({"voteInfo_"+std::to_string(k),std::string("Map: q4dm7")});
 	for (int i = 0; i < 8; ++i) {
 		const std::string key = "oq4_chat"+std::to_string(i);
 		history.insert({{key+"_live",true},{key+"_alpha",1.0},{key+"_name",std::string("Kaz")},{key+"_text",std::string("on the bridge")},
@@ -1416,12 +1485,12 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	}
 	Check(runtime.SetState(history,error,1.21),error.c_str());
 	runtime.Frame(RemasteredViewport(1280,720),1.22);
-	Bounds oldest;
-	Check(!Shown(runtime,"chat0") && !Shown(runtime,"chat1") && Shown(runtime,"chat2") && Shown(runtime,"chat7") && Shown(runtime,"chatin"),
-		"the input's history keeps the newest messages that fit");
-	Check(runtime.GetBounds("chat2",oldest) && oldest.y > 280*1.5f,"the history stays under eight team rows");
+	Bounds oldest, card;
+	Check(Shown(runtime,"chat0") && Shown(runtime,"chat7") && Shown(runtime,"chatin"),"the input's history shows the messages that fit");
+	Check(runtime.GetBounds("chat0",oldest) && runtime.GetBounds("vote",card) && oldest.y > card.y+card.height,
+		"the history stays under the vote card");
 	// At 4:3 the box narrows to 120 u: the prompts wrap onto a second row and
-	// wrapped history is clipped at the room's top, never reaching the rows.
+	// wrapped history is clipped at the room's top, never reaching the card.
 	StateValues wrapped;
 	for (int i = 0; i < 8; ++i)
 		wrapped.insert({"oq4_chat"+std::to_string(i)+"_text",std::string("hold the lower ramp until the quad is up then push through")});
@@ -1435,12 +1504,13 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 		runtime.SetState({{"oq4.chatPrompts",double(measured.height)}},error,1.2226),"the prompt row's height reads back");
 	host.draws.clear();
 	runtime.Frame(RemasteredViewport(960,720),1.223);
-	Bounds log, promptRow, line7;
-	Check(runtime.GetBounds("chatlog",log) && log.y >= 280*1.5f-.5f && runtime.GetBounds("chat7",line7) && line7.height > 20*1.5f,
-		"wrapped history is clipped at the room's top under eight team rows");
+	Bounds log, promptRow, line7, card43;
+	Check(runtime.GetBounds("vote",card43) && runtime.GetBounds("chatlog",log) && log.y >= card43.y+card43.height-.5f &&
+		runtime.GetBounds("chat7",line7) && line7.height > 20*1.5f,"wrapped history is clipped at the room's top under the vote card");
 	float inkTop = 1e9f;
 	for (const auto& draw : host.draws) for (const auto& v : draw.vertices)
-		if (v.x < 120*1.5f && v.y > 200*1.5f && v.y < log.y+log.height && std::abs(v.b-0x8D/255.f) < .02f && v.r > .99f && v.a > .99f)
+		if (v.x < 120*1.5f && v.y > card43.y+card43.height && v.y < log.y+log.height && std::abs(v.b-0x8D/255.f) < .02f && v.r > .99f &&
+			v.a > .99f)
 			inkTop = std::min(inkTop,v.y);
 	Check(inkTop >= log.y-.5f,"no history ink above the room");
 	// The engine peer reads the first line whose top the room holds (a layout
@@ -1460,25 +1530,55 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	Check(cut && cut->data[0] < .01 && whole && whole->data[0] > .99,"the cut line fades and the whole ones stay");
 	Check(runtime.GetBounds("chatin-prompts",promptRow) && promptRow.height > 15*1.5f,"the prompts wrap in a 120 u box");
 	Check(runtime.SetState(RemasteredLayout(1280,720),error,1.224),error.c_str());
-	StateValues rest{{"oq4_chatting",false},{"oq4_chat_count",0.0},{"oq4_ts1_count",2.0}};
+	StateValues rest{{"oq4_chatting",false},{"oq4_chat_count",0.0},{"voteNotice",0.0}};
 	for (int i = 0; i < 8; ++i) rest.insert({"oq4_chat"+std::to_string(i)+"_live",false});
 	Check(runtime.SetState(rest,error,1.23),error.c_str());
 
-	// Spectating: both lists flank the view, the followed row lit; held
-	// statistics take the trailing list's place. Tags add a health line.
+	// Spectating: both rosters show weapons' ammunition and vitals, the
+	// followed tile lit, and no side lists. Tags add a health line.
 	Check(runtime.SetState({{"oq4_spectating",true},{"oq4_following",true},{"oq4_follow_name",std::string("Nyx")},{"oq4_my_team",1.0},
-		{"oq4_ts1_0_you",false},{"oq4_ts1_0_followed",true},{"oq4_ts0_count",1.0},{"oq4_ts0_0_name",std::string("Orin")},
-		{"oq4_ts0_0_health",80.0},{"oq4_ts0_0_weapon",1.0}},error,1.3),error.c_str());
+		{"oq4_sl_left",0.0},{"oq4_sl1_count",2.0},{"oq4_sl1_0_followed",true},{"oq4_sl1_0_open",true},{"oq4_sl1_0_weapon",7.0},
+		{"oq4_sl1_0_health",90.0},{"oq4_sl1_0_ammo",75.0},{"oq4_sl0_count",1.0},{"oq4_sl0_0_open",true},{"oq4_sl0_0_weapon",1.0},
+		{"oq4_sl0_0_ammo",20.0},{"oq4_sl0_0_dead",false},{"oq4_sl0_0_you",false}},error,1.3),error.c_str());
 	runtime.Frame(RemasteredViewport(1280,720),1.35);
-	Bounds trailing;
-	const auto leadingName = runtime.PresentedValue("tsl0-name","text");
-	Check(Shown(runtime,"tsl") && Shown(runtime,"tst") && leadingName && leadingName->text == "Orin","spectators see both teams, the Marines leading");
-	// The trailing anchor's box ends at the view's edge (box left 320 dp at 16:9).
-	Check(runtime.GetBounds("tst0",trailing) && Near(trailing.x+trailing.width,320+(494+138)*1.5f,1.5f),"the Strogg list trails 8 u from the edge");
-	Check(Shown(runtime,"tst0-lit1") && Shown(runtime,"tst0-marker") && !Shown(runtime,"tst0-band"),"the followed row is lit with the marker");
-	Check(runtime.SetState({{"stat_visible",1.0}},error,1.4),error.c_str());
-	runtime.Frame(RemasteredViewport(1280,720),1.45);
-	Check(!Shown(runtime,"tst") && Shown(runtime,"tsl"),"held statistics take the trailing list's place");
+	Check(!Shown(runtime,"tsl") && !Shown(runtime,"tst"),"spectators see no side lists");
+	Check(Shown(runtime,"sl1t0-lit1") && !Shown(runtime,"sl1t0-lit0") && Shown(runtime,"sl1t0-vitals") && Shown(runtime,"sl0t0-vitals") &&
+		Shown(runtime,"sl1t0-ammo") && Shown(runtime,"sl0t0-ammo"),"spectators see both rosters' ammunition and vitals, the followed tile lit");
+	// Where they stand: a row under the roster for each placed player, below
+	// the flags in a two-flag mode, growing outward from the roster's inner end.
+	Check(runtime.SetState({{"oq4_sl1_0_initials",std::string("Ny")},{"oq4_sl1_0_location",std::string("Upper Atrium")},
+		{"oq4_sl0_0_location",std::string("")}},error,1.355),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),1.357);
+	Bounds placeRow;
+	const auto placeText = runtime.PresentedValue("slp1r0-place","text"), placeInitials = runtime.PresentedValue("slp1r0-ini","text");
+	Check(Shown(runtime,"slp1r0") && !Shown(runtime,"slp1r1") && !Shown(runtime,"slp0r0") && placeText && placeText->text == "Upper Atrium" &&
+		placeInitials && placeInitials->text == "Ny","a placed player's row names the initials and the place");
+	Check(runtime.GetBounds("slp1r0",placeRow) && Near(placeRow.x,160+413*1.5f,1.5f) && Near(placeRow.y,51*1.5f,1.f),
+		"the rows hang under the roster, below the flags");
+	// The item timers: a heavy armor counting down (its symbol at 0.45, the
+	// time, a line filling in #FA2B05 as the respawn runs) and a quad that is
+	// there (#B5C784, no time, no line), named by place.
+	Check(runtime.SetState({{"oq4_it_count",2.0},{"oq4_it_0_kind",6.0},{"oq4_it_0_up",false},{"oq4_it_0_time",std::string("0:06")},
+		{"oq4_it_0_left",0.25},{"oq4_it_0_name",std::string("Large Armor")},{"oq4_it_0_where",std::string("Upper Atrium")},
+		{"oq4_it_1_kind",1.0},{"oq4_it_1_up",true},{"oq4_it_1_time",std::string("")},{"oq4_it_1_name",std::string("Quad Damage")},
+		{"oq4_it_1_where",std::string("")}},error,1.36),error.c_str());
+	runtime.Frame(RemasteredViewport(1280,720),1.37);
+	Bounds row0Item, track0, fill0;
+	const auto place0 = runtime.PresentedValue("itimer0-name","text"), place1 = runtime.PresentedValue("itimer1-name","text");
+	const auto dim = runtime.PresentedValue("itimer0-sym","opacity"), lit = runtime.PresentedValue("itimer1-sym","opacity");
+	const auto upColour = runtime.PresentedValue("itimer1-name","color"), fillColour = runtime.PresentedValue("itimer0-fill","background-color");
+	Check(Shown(runtime,"itimer0") && Shown(runtime,"itimer1") && !Shown(runtime,"itimer2") && Shown(runtime,"itimer0-k6") &&
+		!Shown(runtime,"itimer0-k1") && Shown(runtime,"itimer1-k1"),"each timer row shows its item's symbol");
+	Check(place0 && place0->text == "Upper Atrium" && place1 && place1->text == "Quad Damage","a row names the item's place, else the item");
+	Check(dim && Near(float(dim->data[0]),.45f,.01f) && lit && Near(float(lit->data[0]),1,.01f) && upColour &&
+		Near(float(upColour->data[0]),0xB5/255.f,.01f),"a counting item dims its symbol; one that is there reads #B5C784");
+	Check(Shown(runtime,"itimer0-track") && !Shown(runtime,"itimer1-track") && runtime.GetBounds("itimer0-track",track0) &&
+		runtime.GetBounds("itimer0-fill",fill0) && Near(fill0.width,track0.width*.75f,1.f) && fillColour &&
+		Near(float(fillColour->data[0]),0xFA/255.f,.01f) && Near(float(fillColour->data[1]),0x2B/255.f,.01f),
+		"the progress line fills in the item's color as the respawn runs");
+	Check(runtime.GetBounds("itimer0",row0Item) && Near(row0Item.x+row0Item.width,320+633*1.5f,1.5f) && Near(row0Item.y,96*1.5f,1.f),
+		"the timers trail at 633 u from y 96");
+	Check(runtime.SetState({{"oq4_it_count",0.0}},error,1.395),error.c_str());
 	Check(runtime.SetState({{"stat_visible",0.0},{"oq4_following",false},{"oq4_tags",1.0},{"oq4_tag0_x",0.5},{"oq4_tag0_y",0.4},
 		{"oq4_tag0_name",std::string("Nyx")},{"oq4_tag0_team",1.0},{"oq4_tag0_health",60.0}},error,1.5),error.c_str());
 	runtime.Frame(RemasteredViewport(1280,720),1.55);
@@ -1486,10 +1586,10 @@ static void CheckRemasteredCompetitiveHud(ScreenHost& host, const char* path) {
 	Check(Shown(runtime,"tag0") && Shown(runtime,"tag0-hp") && runtime.GetBounds("tag0-hp",track) && runtime.GetBounds("tag0-hp-fill",fill) &&
 		track.width > 0 && Near(fill.width,track.width*.6f,1.f),"a Competitive tag's health line fills to the health");
 
-	// Remastered drops the bar, the lists and the tags' health line.
+	// Remastered drops the scoreline, the lists and the tags' health line.
 	RemasteredLayoutPreference(host,1);
 	runtime.Frame(RemasteredViewport(1280,720),1.6);
-	Check(!Shown(runtime,"matchbar") && !Shown(runtime,"tsl") && !Shown(runtime,"tst") && !Shown(runtime,"tag0-hp") && Shown(runtime,"tl-rem"),
+	Check(!Shown(runtime,"matchbar") && !Shown(runtime,"tag0-hp") && Shown(runtime,"tl-rem"),
 		"Remastered returns the standing and drops the Competitive groups");
 	Check(host.errors == 0,"no runtime diagnostics across the Competitive exercise");
 	runtime.Shutdown();

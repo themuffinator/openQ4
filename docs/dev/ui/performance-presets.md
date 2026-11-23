@@ -3,7 +3,9 @@
 SYSTEM uses the same nine performance profiles and hardware-detection policy as
 the existing engine commands (seven until Maximum and Low were added; the dated
 sections below describe the ladder as it stood on their date). `framework/PerformancePreset` owns the profile
-records, their ordered 55 assignments and the read-only detection decision.
+records, their ordered 54 assignments and the read-only detection decision.
+No profile and no detection result owns the render scale (`r_screenFraction`)
+or the display mode; see "Presets keep native resolution" below.
 Common retains its original setters, readback checks, modified flags and rollback;
 it publishes the selected profile name only after all other writes succeed.
 
@@ -15,7 +17,7 @@ The retained settings service exposes two typed draft operations:
 | `settings.system.autodetect` | None | Observe the existing platform/memory signals and expand the selected profile into the current draft. |
 
 These operations validate the entire merged draft. They replace exactly the
-55 profile fields and preserve the other 19 catalog fields, including custom
+54 profile fields and preserve the other 24 catalog fields, including custom
 Brightness and Ambient Brightness edits. They do not set CVars, run commands,
 restart devices or persist configuration. The complete local Number draft
 barrier also applies to these bulk changes.
@@ -40,7 +42,7 @@ unrelated renderer diagnostics and explicitly protected values stay protected.
 
 The isolated and root standalone suites compile the production model and
 transaction and exercise the actual Common, SYSTEM host, service and adapter
-method bodies. Golden profiles, detection boundaries, all 55 assignments,
+method bodies. Golden profiles, detection boundaries, all 54 assignments,
 untouched values, reentry, failed allocation, legacy flag/value restoration and
 the local draft barrier are covered. Windows and Linux sanitizer runs also
 reject compiled behavioral mutations. The separate MSVC debug-library test
@@ -843,3 +845,50 @@ once.
   session reported `taaRequested=1` and resolved 119 frames.
 - Not run: any ARM board, Pi or Asahi machine. The rule is covered by the
   model suite only. What the light grid and TAA cost on a Pi is not measured.
+
+## Presets keep native resolution, 23 November 2026
+
+The user asked that native resolution be the default and that graphics presets
+never change it. The display side already held: `r_mode -2` (desktop native)
+and `r_fullscreenDesktop 1` are the defaults, and no profile ever wrote the
+display mode, window size or custom size. The scene resolution did not:
+Minimum ran at 50%, Low Power and Low at 75% and Performance at 85%, and
+detection lowered any tier further to fit a scene pixel budget on a large
+drawable (a 4K integrated GPU got Performance at 50%).
+
+- `r_screenFraction` is no longer a preset target. The footprint is 54
+  assignments; `PerformancePreset::screenFraction`, the detection's
+  `screenFraction` and `scenePixelBudget`, and their self-test intent and
+  progression checks are gone. Choosing a preset, Auto-Detect, the first
+  launch's detection, the system check and the stock `execMachineSpec`
+  choices leave the render scale where the player set it (100 by default).
+  The SYSTEM catalog keeps `r_screenFraction` as an ordinary setting, so the
+  SYSTEM journal and catalog versions do not change.
+- The drawable still chooses the tier: the resolution-class ceilings that
+  lower a tier above 1080p (integrated) or 1440p (8 GiB class) are unchanged,
+  and `PerformancePresetReason::Resolution` now only names them.
+- The system check's detail line drops the render scale: `#str_232020` and
+  `#str_232021` now read "Frame rate cap %d" and "No frame rate cap" in all
+  twelve languages.
+- Migration: `r_screenFractionPresetMigrated` returns a scale below 100 to
+  100 once when `com_performancePreset` names a preset, because the old
+  presets or detection put it there. It runs on the saved configuration
+  before `autoexec.cfg`, so a scale an autoexec sets survives, and a new
+  configuration only records the flag. A custom selection is left alone.
+- The preset system version moves from `1.46eb190c` to `1.42bd63cb`, so
+  configurations saved earlier are offered the system check once.
+
+Validation:
+
+- `openq4-ui-performance-presets` (551,632 checks) and
+  `openq4-ui-system-presets` pass under MSVC. The native test now asserts that
+  no target is a render-scale, display-mode, window-size or dynamic-resolution
+  CVar, and that every detected record expands without `r_screenFraction`.
+- `ui_performance_presets.py --mutations`: the real SYSTEM host and Common
+  bodies pass and all 30 mutations are rejected (the two scene-budget
+  mutations were removed with the budget). `ui_system_settings_host.py`,
+  `performance_preset_check.py` (the pin against a compiled model) and
+  `lang_table_encoding.py` pass.
+- `performance_presets_smoke.py` now reads `r_screenFraction` and `r_mode`
+  back after every preset in gameplay and after the stock choices, and
+  requires the saved-config migration line.

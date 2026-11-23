@@ -1,12 +1,13 @@
 """The retained GAME OPTIONS settings page (docs/dev/ui-visual-design.md
 sections 7, 9 and 13.7; UI-01): the stock page's rows
 (guis/menu/settings/game.gui) in the settings sub-page
-(retained_settings_rows), in nine sections on five tabs of at most two
-columns: GENERAL (gameplay | interface, items and players), HUD (HUD |
-crosshair), VIEW WEAPON (its place | its view), ACCESSIBILITY (motion |
-visibility) and VIRTUAL REALITY. The stock page's mouse and controller
-sections, with Free Look, Toggle Zoom and Scope Sensitivity, are the CONTROLS
-page's MOUSE and CONTROLLER tabs (retained_controls, issue #220).
+(retained_settings_rows), in ten sections on five tabs of at most two
+columns: GENERAL (gameplay | interface, items and players, video capture),
+HUD (HUD | crosshair), VIEW WEAPON (its place | its view), ACCESSIBILITY
+(motion | visibility) and VIRTUAL REALITY. The stock page's mouse and
+controller sections, with Free Look, Toggle Zoom and Scope Sensitivity, are
+the CONTROLS page's MOUSE and CONTROLLER tabs (retained_controls, issue
+#220).
 
 The stock page grouped its rows by where they were added; the tabs group
 them by what they change (the settings tree audit of 20 November 2026). The
@@ -29,14 +30,21 @@ from __future__ import annotations
 
 from build_retained_screens import U, Document, absolute, image, keyword, length, number
 from retained_mp_menus import value_row
-from retained_settings_rows import (COLUMN_W, ROW_PITCH, choice, cvar_row, cvar_settings, heading, rows_value_column, setting_row,
-                                    settings_subpage, show_tab, slider, toggle)
+from retained_settings_rows import (COLUMN_W, ROW_PITCH, choice, cvar_row, cvar_settings, heading, requires, rows_value_column,
+                                    setting_row, settings_subpage, show_tab, slider, toggle)
 
 PREFIX = "game"
 CROSSHAIRS = 20                            # the custom crosshairs (player_marine_mp_ui's mtr_crosshair keys)
 # The crosshair colours the stock page offers (#str_229942), as g_crosshairColor.
 CROSSHAIR_COLORS = ("1 1 1 1", "1 0 0 1", "1 0.5 0 1", "1 1 0 1", "0 1 0 1", "0 1 1 1", "0 0 1 1", "1 0 0.5 1")
 LANGUAGES = 12                             # #str_229908, in sys_lang's order (RETAINED_GAME_LANGUAGES)
+# The video capture rows' values (src/framework/VideoCapture.cpp): every
+# container, the common frame rates, the window's own size (0) or a height it
+# is scaled down to, and the timings.
+VIDEO_FORMATS = ("mp4", "mkv", "webm", "mov", "avi", "gif")
+VIDEO_FPS = (24, 30, 60, 120)
+VIDEO_HEIGHTS = (0, 480, 720, 1080, 1440, 2160)
+VIDEO_TIMINGS = ("auto", "fixed", "realtime")
 
 
 def verb_choice(ident: str, label: str, verb: str, key: str, count: int, enabled: int | None = None) -> tuple:
@@ -122,6 +130,18 @@ SECTIONS = (
         choice("game_vrplayspace", "#str_231760", "vr_playSpace", "#str_231761", (0, 1, 2)),
         choice("game_vrbody", "#str_232514", "vr_body", "#str_232515", (0, 1, 2)),
     )),
+    # Video capture (recordVideo, docs/user/video-capture.md), on GENERAL
+    # under Screenshot Format's column: the strip has no room for a sixth tab
+    # in every language. The codec, bitrates, encoder and FFmpeg's path stay
+    # console settings.
+    ("video", "#str_232900", (
+        choice("game_videoformat", "#str_232903", "com_videoFormat", "#str_232904", VIDEO_FORMATS),
+        slider("game_videoquality", "#str_232905", "com_videoQuality", 1, 100, 1),
+        choice("game_videofps", "#str_232906", "com_videoFPS", "#str_232907", VIDEO_FPS),
+        choice("game_videoheight", "#str_232908", "com_videoHeight", "#str_232909", VIDEO_HEIGHTS),
+        toggle("game_videoaudio", "#str_232910", "com_videoAudio"),
+        choice("game_videotiming", "#str_232911", "com_videoTiming", "#str_232912", VIDEO_TIMINGS),
+    )),
 )
 VIEW_PLACE = 5                             # the view weapon's rows that place it: Show Gun to the Z offset
 # The session's verbs, in the order HandleRetainedGameRequest takes them.
@@ -137,12 +157,56 @@ def setting_rows() -> list:
 # whole sections under their headings, or a run of one section's rows
 # (section, first, end) where the tab is that section alone.
 TABS = (
-    ("general", "#str_231542", (("gameplay",), ("interface", "players"))),
+    ("general", "#str_231542", (("gameplay",), ("interface", "players", "video"))),
     ("hud", "#str_231235", (("hud",), ("crosshair",))),
     ("viewweapon", "#str_229952", (("viewweapon", 0, VIEW_PLACE), ("viewweapon", VIEW_PLACE, None))),
     ("accessibility", "#str_232542", (("motion",), ("visibility",))),
     ("vr", "#str_230120", (("vr", 0, 6), ("vr", 6, None))),
 )
+
+
+def _cvar(name: str) -> dict:
+    return {"state": f"cvar.{name}"}
+
+
+def _all(*terms) -> dict:
+    result = terms[0]
+    for term in terms[1:]:
+        result = {"op": "&&", "args": [result, term]}
+    return result
+
+
+def dependencies() -> dict:
+    """The rows another setting turns off (retained_settings_rows.requires),
+    each the condition under which it does anything:
+    - the HUD's sizes and opacity with the Classic layout, which draws the
+      stock HUD unchanged (idLegacyHudLayout::Read), and Damage Direction,
+      Pickup Messages and the Weapon Strip with Classic or Minimal, which
+      leaves them out;
+    - Weapon FOV with Show Gun off (the view weapon is not drawn), and
+      Weapon FOV Aspect while Weapon FOV is 0 too (it adjusts only a set FOV);
+    - every VR row with VR Mode off (no OpenXR session), Snap Turn Angle with
+      smooth turning, and the Aim Laser and Two-Handed Grip with head aim;
+    - Record Sound while the video format is GIF, which has no sound.
+    The gun's offsets, position and kick stay: they still move the hidden
+    weapon, whose barrel some weapons fire from."""
+    layout = _cvar("ui_hudLayout")
+    remastered = {"op": "!=", "args": [layout, 0]}
+    trimmed = _all(remastered, {"op": "!=", "args": [layout, 2]})
+    shown = _cvar("ui_showGun")
+    vr = _cvar("vr_enable")
+    hand_aim = _all(vr, {"op": "==", "args": [_cvar("vr_aimMode"), 1]})
+    return {
+        **{ident: remastered for ident in ("game_hudscale", "game_hudwidth", "game_hudinset", "game_hudopacity")},
+        **{ident: trimmed for ident in ("game_damagedirection", "game_pickups", "game_weaponstrip")},
+        "game_gunfov": shown,
+        "game_gunfovadjust": _all(shown, {"op": ">", "args": [_cvar("cl_gunfov"), 0]}),
+        **{row[1]: vr for row in next(rows for section, _heading, rows in SECTIONS if section == "vr")[1:]},
+        "game_vrsnap": _all(vr, {"op": "!=", "args": [_cvar("vr_turnMode"), 1]}),
+        "game_vrlaser": hand_aim,
+        "game_vrtwohanded": hand_aim,
+        "game_videoaudio": {"op": "!=", "args": [_cvar("com_videoFormat"), "gif"]},
+    }
 
 
 def crosshair_row(doc: Document, ident: str, label: str, verb: str, value_x: float) -> dict:
@@ -193,6 +257,8 @@ def game_document() -> dict:
     sections = {section: (heading_key, rows) for section, heading_key, rows in SECTIONS}
     value_x = rows_value_column(row for _section, _heading, rows in SECTIONS for row in rows)
     built = {row[1]: game_row(doc, row, value_x) for _section, _heading, rows in SECTIONS for row in rows}
+    for ident, condition in dependencies().items():
+        requires(doc, built[ident], condition)
     tabs = []
     for ident, key, columns in TABS:
         laid = []

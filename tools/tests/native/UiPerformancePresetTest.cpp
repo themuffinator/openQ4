@@ -46,24 +46,27 @@ static void AssignmentCapture(){
  Check(!flags[0]&&!flags[1],"invalid reuse detaches old storage");
 }
 static void Profiles(){
- const std::vector<std::string> keys={"com_machineSpec","r_rendererBenchmarkPreset","r_screenFraction","r_multiSamples","r_postAA","com_maxfps","image_anisotropy","image_usePrecompressedTextures","image_downSize","image_downSizeLimit","image_downSizeSpecular","image_downSizeBump","image_downSizeSpecularLimit","image_downSizeBumpLimit","image_ignoreHighQuality","image_writeGeneratedImages","s_maxSoundsPerShader","r_useShadowMap","r_shadowMapSize","r_shadowMapMaxUpdatesPerView","r_bloom","r_ssao","r_hdrToneMap","r_motionBlur","r_crt","r_useLightGrid","r_rendererUploadMegs","r_rendererUploadFrameBuffers","s_numberOfSpeakers","s_useEAXReverb","s_maxEmitterChannels","r_shadowMapPointSize","r_shadowMapFilterTaps","r_shadowMapPointFilterTaps","r_shadowMapFilterMode","r_shadowMapPointFilterMode","r_shadowMapAtlasSize","r_ssaoSamples","r_bloomMipCount","r_motionBlurSamples","r_shadowMapPointLights","r_hdrSceneTarget","r_shadows","r_skipBump","r_skipSpecular","r_skipSky","image_picmip","r_shadowMapCSM","r_shadowMapCascadeCount","r_shadowMapProjectedCSM","r_shadowMapCascadeStabilize","r_motionBlurObjectVectors","r_shadowMapHashedAlpha","r_shadowMapTranslucentReceivers","com_performancePreset"};
+ const std::vector<std::string> keys={"com_machineSpec","r_rendererBenchmarkPreset","r_multiSamples","r_postAA","com_maxfps","image_anisotropy","image_usePrecompressedTextures","image_downSize","image_downSizeLimit","image_downSizeSpecular","image_downSizeBump","image_downSizeSpecularLimit","image_downSizeBumpLimit","image_ignoreHighQuality","image_writeGeneratedImages","s_maxSoundsPerShader","r_useShadowMap","r_shadowMapSize","r_shadowMapMaxUpdatesPerView","r_bloom","r_ssao","r_hdrToneMap","r_motionBlur","r_crt","r_useLightGrid","r_rendererUploadMegs","r_rendererUploadFrameBuffers","s_numberOfSpeakers","s_useEAXReverb","s_maxEmitterChannels","r_shadowMapPointSize","r_shadowMapFilterTaps","r_shadowMapPointFilterTaps","r_shadowMapFilterMode","r_shadowMapPointFilterMode","r_shadowMapAtlasSize","r_ssaoSamples","r_bloomMipCount","r_motionBlurSamples","r_shadowMapPointLights","r_hdrSceneTarget","r_shadows","r_skipBump","r_skipSpecular","r_skipSky","image_picmip","r_shadowMapCSM","r_shadowMapCascadeCount","r_shadowMapProjectedCSM","r_shadowMapCascadeStabilize","r_motionBlurObjectVectors","r_shadowMapHashedAlpha","r_shadowMapTranslucentReceivers","com_performancePreset"};
  // Independent golden setter values for the revised quality progression.
  // Maximum asks for 8 samples, the most the Vulkan renderer draws (FPS-05).
  const std::vector<std::vector<int>> numbers={
- {0,50,0,0,30,1,1,1,512,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,24,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
- {0,75,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
- {0,75,0,0,60,2,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
- {1,85,0,1,60,2,1,0,0,0,0,64,0,0,1,0,0,1024,2,0,0,0,0,0,1,16,4,0,1,40,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
- {2,100,2,1,120,4,1,0,0,0,0,64,0,0,1,0,0,1024,0,0,0,0,0,0,1,16,4,0,1,48,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
- {2,100,0,2,144,16,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,0,1,1,0,0,0,0,0,4,1,1,1,1,1},
- {3,100,2,2,144,16,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,512,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,1,4,0,1,1,1,1},
- {3,100,4,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,0,0,1,32,4,0,1,48,512,13,9,2,0,8192,32,5,8,1,1,1,0,0,0,0,1,4,0,1,1,1,1},
- {3,100,8,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,2048,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1}};
+ {0,0,0,30,1,1,1,512,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,24,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
+ {0,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1},
+ {0,0,0,60,2,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
+ {1,0,1,60,2,1,0,0,0,0,64,0,0,1,0,0,1024,2,0,0,0,0,0,1,16,4,0,1,40,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
+ {2,2,1,120,4,1,0,0,0,0,64,0,0,1,0,0,1024,0,0,0,0,0,0,1,16,4,0,1,48,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1},
+ {2,0,2,144,16,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,0,1,1,0,0,0,0,0,4,1,1,1,1,1},
+ {3,2,2,144,16,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,512,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,1,4,0,1,1,1,1},
+ {3,4,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,0,0,1,32,4,0,1,48,512,13,9,2,0,8192,32,5,8,1,1,1,0,0,0,0,1,4,0,1,1,1,1},
+ {3,8,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,2048,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1}};
  const char* names[]={"minimum","lowpower","low","performance","balanced","enhanced","quality","ultra","maximum"};
  const char* renderer[]={"low","low","low","baseline","baseline","modern","modern","high-end","high-end"};
  Check(PerformancePresetCount==9&&numbers.size()==9,"nine profiles");
  std::set<std::string> targets;for(const auto* key:PerformancePresetTargets())targets.insert(key);
- Check(targets.size()==55,"exact unique target count");
+ Check(targets.size()==54,"exact unique target count");
+ // Presets never own the render scale or the display resolution.
+ for(const char* key:{"r_screenFraction","r_mode","r_customWidth","r_customHeight","r_fullscreen","r_fullscreenDesktop","r_windowWidth","r_windowHeight","r_rendererDynamicResolution","r_dynamicResolutionMinScale"})
+  Check(!targets.contains(key),"no preset target changes resolution");
  for(int n=0;n<PerformancePresetCount;++n){
   Check(FindPerformancePreset(names[n])==&PerformancePresets()[n],"canonical lookup");
   PerformancePresetAssignments out;std::string error;
@@ -72,7 +75,7 @@ static void Profiles(){
   for(size_t i=0;i<out.size();++i){
    Check(out[i].key==keys[i],"exact setter order");seen.insert(out[i].key);
    if(i==1)Check(std::get<std::string>(out[i].value)==renderer[n],"benchmark classification");
-   else if(i==54)Check(std::get<std::string>(out[i].value)==names[n],"marker last");
+   else if(i==53)Check(std::get<std::string>(out[i].value)==names[n],"marker last");
    else Check(std::get<int>(out[i].value)==numbers[n][index++],"golden profile value");
   }Check(seen==targets,"all and only declared targets");
  }
@@ -83,7 +86,7 @@ static void Profiles(){
  Check(!ExpandPerformancePreset(invalid,output,error),"invalid source name");
  for(size_t i=0;i<output.size();++i)Check(output[i].key==saved[i].key && output[i].value==saved[i].value,"failed expansion unchanged");
  auto normalization=*FindPerformancePreset("performance");normalization.anisotropy=17;
- Check(ExpandPerformancePreset(normalization,output,error)&&std::get<int>(output[6].value)==17,"legacy normalization probe reaches setter unchanged");
+ Check(ExpandPerformancePreset(normalization,output,error)&&std::get<int>(output[5].value)==17,"legacy normalization probe reaches setter unchanged");
 }
 static void Detection(){
  using GPU=RendererGpuClass;
@@ -222,11 +225,16 @@ static void DetectionResolution(){
  PerformancePresetSignals s;
  s.systemRamMB=16384;s.videoRamMB=128;s.gpuClass=GPU::Integrated;
  s.modernEffects=true;s.logicalCpus=8;s.drawableWidth=1920;s.drawableHeight=1080;
- auto expect=[&](const char* name,int scale,int aa){
+ // The second number is the render scale detection used to choose before
+ // presets stopped owning it. Every machine now keeps the player's scale
+ // (native by default); a large drawable lowers the tier instead.
+ auto expect=[&](const char* name,int,int aa){
   const auto detection=DetectPerformancePreset(s);PerformancePreset resolved;
   Check(ResolveDetectedPerformancePreset(detection,resolved),"detected record resolves");
-  Check(std::string(resolved.name)==name&&resolved.screenFraction==scale&&resolved.postAA==aa,"independent automatic scene/AA expectation");
-  Check(resolved.screenFraction<=detection.preset->screenFraction,"automatic scale never supersamples or exceeds template");
+  Check(std::string(resolved.name)==name&&resolved.postAA==aa,"independent automatic tier/AA expectation");
+  PerformancePresetAssignments out;std::string error;
+  Check(ExpandPerformancePreset(resolved,out,error),"detected record expands");
+  for(const auto& assignment:out)Check(std::string(assignment.key)!="r_screenFraction","detection never sets the render scale");
  };
  Check(PerformancePresetClassPixels(540)==656100&&PerformancePresetClassPixels(720)==1166400&&PerformancePresetClassPixels(1080)==2624400&&
   PerformancePresetClassPixels(1440)==4665600&&PerformancePresetClassPixels(2160)==10497600,"resolution classes");
@@ -281,26 +289,12 @@ static void DetectionResolution(){
   s.drawableWidth=bad;s.drawableHeight=1080;expect("performance",85,1);
   s.drawableWidth=1920;s.drawableHeight=bad;expect("performance",85,1);
  }
- // Pixel arithmetic stays bounded, scale is monotonic and selected from the UI
- // catalog. Huge, valid drawables may exhaust the supported 10% scale floor.
- for(auto gpu:{GPU::Unknown,GPU::Integrated,GPU::Discrete,GPU::Virtual,GPU::Software})for(int vram:{128,8192,32768})for(bool mobile:{false,true}){
-  s.gpuClass=gpu;s.videoRamMB=vram;s.mobile=mobile;int previous=100;
-  for(int width:{320,640,1280,1920,2560,3840,5120,7680,16384,32768}){
-   s.drawableWidth=width;s.drawableHeight=width*9/16;
-   const auto d=DetectPerformancePreset(s);
-   Check(d.screenFraction<=previous&&std::set<int>({10,25,50,75,85,100}).contains(d.screenFraction),"monotonic selectable automatic scale");
-   const long long work=1LL*s.drawableWidth*s.drawableHeight*d.screenFraction*d.screenFraction;
-   Check(d.screenFraction==10||work<=1LL*d.scenePixelBudget*10000,"scene pixel budget or supported minimum scale");
-   Check(d.scenePixelBudget>=PerformancePresetClassPixels(540)&&d.scenePixelBudget<=PerformancePresetClassPixels(2160),"budget is a known class");
-   previous=d.screenFraction;
-  }
- }
  s.gpuClass=GPU::Software;s.videoRamMB=128;s.mobile=false;s.drawableWidth=32768;s.drawableHeight=18432;
  auto output=*FindPerformancePreset("ultra");PerformancePresetDetection missing;
  Check(!ResolveDetectedPerformancePreset(missing,output)&&std::string(output.name)=="ultra","failed resolution leaves output unchanged");
- auto invalid=DetectPerformancePreset(s);invalid.screenFraction=201;
- Check(!ResolveDetectedPerformancePreset(invalid,output)&&output.screenFraction==100,"invalid recommendation cannot change output");
- Check(FindPerformancePreset("performance")->screenFraction==85&&FindPerformancePreset("balanced")->postAA==1,"automatic adaptations leave manual recipes immutable");
+ auto invalid=DetectPerformancePreset(s);invalid.postAA=9;
+ Check(!ResolveDetectedPerformancePreset(invalid,output)&&std::string(output.name)=="ultra","invalid recommendation cannot change output");
+ Check(FindPerformancePreset("balanced")->postAA==1,"automatic adaptations leave manual recipes immutable");
  // A detected start presents at the display's whole-hertz rate (FPS-02); an
  // unknown or implausible rate keeps the tier's manual-choice cap.
  {
@@ -414,7 +408,8 @@ static void SystemVersion(){
  for(size_t i=revision.size();i<version.size();++i)
   Check((version[i]>='0'&&version[i]<='9')||(version[i]>='a'&&version[i]<='f'),"fingerprint is lower-case hex");
  Check(PerformancePresetFingerprintMachines()==9042,"detection matrix covers every GPU class, memory band, resolution class and platform ceiling");
- Check(version=="1.46eb190c","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
+ if(version!="1.42bd63cb")std::fprintf(stderr,"preset system version is %s\n",version.c_str());
+ Check(version=="1.42bd63cb","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
 }
 int main(){
 #if defined(_WIN32) && defined(_DEBUG)

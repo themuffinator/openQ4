@@ -341,6 +341,8 @@ public:
 	// read a sound command from a demo file
 	// returns false when malformed or truncated input stops demo playback
 	virtual bool			ProcessDemoCommand( idDemoFile* demo ) = 0;
+	// the same for a retail Quake 4 render demo: one sound command after its DS_SOUND byte
+	virtual bool			ProcessRetailDemoCommand( idDemoFile* demo ) = 0;
 
 	// when cinematics are skipped, we need to advance sound time this much
 	virtual void			Skip( int time ) = 0;

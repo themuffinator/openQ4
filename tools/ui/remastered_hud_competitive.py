@@ -1,15 +1,19 @@
 """The Competitive HUD preset (ui_hudLayout 3; ui-visual-design.md 13.9, 14.9).
 
-In multiplayer, Competitive moves the standing or team panels and the timer
-into one match bar at the top center (your side, the timer, the other side),
-keeps network quality beside it at all times, lists your team's players at
-the leading edge and enlarges the status bar by 15% about the bottom edge.
-The kill feed, the center column, the powerups and the managed-match card keep
-their places; the vote takes the top-leading corner the standing left and the
-Tourney strip leaves the top. Spectators see both teams' lists flanking the
-view. Constructions are the design atlas's (multiplayer sheet); coordinates
-are the 640x480 u anchor canvases. The game publishes the bar's sides
-(oq4_mb*), the line under the timer and the team status rows (oq4_ts*).
+In team modes, Duel and Tourney, Competitive moves the team panels and the
+timer into one scoreline at the top center: the timer between two score slabs,
+and further out each side's roster, up to four players as tiles with the weapon
+in hand, health and armor bars where this viewer may see them, and a skull for
+the dead. Network quality follows its trailing end at all times. Deathmatch
+keeps the Remastered standing and timer top-leading, with network quality
+under the timer. Competitive lists your team's players at the leading edge and
+enlarges the status bar by 15% about the bottom edge. The kill feed, the center
+column, the powerups and the managed-match card keep their places; the vote
+takes the top-leading corner the panels left and the Tourney strip leaves the
+top. The rosters replace the side team lists, which were clutter beside them. Constructions are the design atlas's (multiplayer
+sheet); coordinates are the 640x480 u anchor canvases. The game publishes the
+sides (oq4_mb*), the rosters (oq4_sl*), the line under the timer, the team
+status rows (oq4_ts*) and the item timers (oq4_it_*).
 """
 from __future__ import annotations
 
@@ -18,23 +22,36 @@ import hud_svg
 from remastered_hud_base import (AND, NOT, OR, S, HudDocument, cancel, face_metrics, fitted_plate_path, num, op, play, pts_path, rgb,
                                  sel, stroke, tr, u, vec, when)
 from remastered_hud_mp import (BAND, ERR, FEED_COLOURS, MAR, MAR_T, NAME, OK, STR, STR_T, VALUE, WHITE, bound_label, colour_of,
-                               declare, ellipsis, flag_paths, flex_row, label, marker_vec, net_level, plate_vec, text_at)
+                               declare, ellipsis, flag_paths, flex_row, label, marker_vec, net_level, plate_vec, scoreline_shown,
+                               text_at, under_match_bar)
 from remastered_hud_status import MP_ROSTER, full
 
-# The match bar (atlas matchBar): three sheared plates from y 6, 26 u tall and
-# 2 u apart, a 60 u timer between two 122 u sides.
-BAR_Y, BAR_H, SIDE_W, TIMER_W = 6.0, 26.0, 122.0, 60.0
-SIDE_X = (320 - TIMER_W / 2 - 2 - SIDE_W, 320 + TIMER_W / 2 + 2)
+# The scoreline: sheared plates from y 4, 30 u tall and 2 u apart, a 64 u
+# timer at 0.72 between two 56 u score slabs; 3 u further out each side's
+# roster, four 20 u tiles on a 22 u pitch, each a 20 u plate over two vitals
+# bars that end with the slabs.
+BAR_Y, BAR_H, TIMER_W, SCORE_W = 4.0, 30.0, 64.0, 56.0
+SCORE_X = (320 - TIMER_W / 2 - 2 - SCORE_W, 320 + TIMER_W / 2 + 2)
+TILE_W, TILE_H, TILE_PITCH, ROSTER_GAP, ROSTER = 20.0, 20.0, 22.0, 3.0, 4
+VITAL_Y, VITAL_H, VITAL_PITCH = BAR_Y + TILE_H + 2.2, 2.4, 3.4
+# The ammunition bar over each tile, in the 4 u above the scoreline.
+AMMO_Y, AMMO_H = 1.0, 1.8
+# Where a roster's players stand: names cut at 66 u.
+PLACE_W = 66.0
+BAR_END = SCORE_X[1] + SCORE_W + ROSTER_GAP + ROSTER * TILE_PITCH - (TILE_PITCH - TILE_W)
 UNDER_Y = BAR_Y + BAR_H + 2
-# Team status (atlas teamList): 138x14.5 u plates on a 16.5 u pitch from y 150.
-LIST_W, LIST_ROW, LIST_PITCH, LIST_Y, LIST_ROWS = 138.0, 14.5, 16.5, 150.0, 8
 TEAM_NAMES = ("#str_200197", "#str_200199")
-# A team mate's location beside their row, and the client options every layout
-# shows (MP-15): item timers on 8.6 u plates trailing at 633 u from y 96, the
-# time of day above them, and the ammunition 13 u right of the crosshair.
-LOCATION_W = 78.0
-ITEM_ROWS, ITEM_W, ITEM_ROW, ITEM_PITCH, ITEM_Y, ITEM_RIGHT = 6, 112.0, 8.6, 9.8, 96.0, 633.0
+# The client options every layout shows (MP-15): item timers on 13 u plates
+# trailing at 633 u from y 96 on a 15 u pitch, the time of day above them, and
+# the ammunition 13 u right of the crosshair.
+ITEM_ROWS, ITEM_W, ITEM_ROW, ITEM_PITCH, ITEM_Y, ITEM_RIGHT = 6, 118.0, 13.0, 15.0, 96.0, 633.0
 AT_BASE, TAKEN, DROPPED = "#str_231251", "#str_231252", "#str_231253"
+# The item timers' kinds (rvItemTimers: quad, haste, regeneration,
+# invisibility, mega health, heavy and light armor): the atlas symbol, its tint
+# (the powerups keep their own colors) and the progress color.
+ITEM_KINDS = ((1, "item_quaddamage", None, "#00E3F1"), (2, "item_haste", None, "#B7E500"), (3, "item_regen", None, "#FF4A3D"),
+              (4, "item_invis", None, "#7D8CFF"), (5, "item_health", "#F7C004", "#F7C004"), (6, "item_armor", "#FA2B05", "#FA2B05"),
+              (7, "item_armor", "#FFBE23", "#FFBE23"))
 
 
 def competitive() -> dict:
@@ -51,63 +68,214 @@ def plate_at(ident: str, x: float, y: float, w: float, h: float, alpha: float, c
                     [plate_vec(ident + "-p", h, alpha, colour)])
 
 
+def sheared_rect(ident: str, x: float, y: float, w: float, h: float, colour: list, cy: float, **props) -> dict:
+    """A plain sheared band at (x, y) u inside a plate whose shear centers on
+    cy u, leaning with the plates (0.22)."""
+    pts = [(x, y), (x + w, y), (x + w, y + h), (x, y + h)]
+    return vec(ident, [pts_path("r", [(u(px - 0.22 * (py - cy)), u(py)) for px, py in pts], fill=ui.solid(colour))], props or None)
+
+
 def side_team(side: int) -> dict:
-    """The team on a side of the bar: yours leads."""
-    mine = S("oq4_my_team")
-    return mine if side == 0 else op("-", 1, mine)
+    """The team on a side of the scoreline: yours leads, the Marines for
+    someone who chose to watch (oq4_sl_left)."""
+    left = S("oq4_sl_left")
+    return left if side == 0 else op("-", 1, left)
 
 
-# ------------------------------------------------------------------ the match bar
+# ------------------------------------------------------------------ the scoreline
 
-def bar_side(doc: HudDocument, side: int) -> list:
-    """One side: the plate at 0.55, its outer 25 u block (the team color at 0.85
-    with the faction mark, or the rank in deathmatch), the team or player name
-    and the score in Chain 21 u at its inner end."""
-    x = SIDE_X[side]
-    outer = x if side == 0 else x + SIDE_W - 25
+def score_side(doc: HudDocument, side: int) -> list:
+    """One side's score slab: the plate at 0.62, in team modes the team color
+    at 0.85 over it with the faction mark at 0.22 behind the score in Chain
+    21 u and the team's name under it in Lowpixel at 0.85. In Duel and Tourney
+    the score in Chain 24 u fills the slab over a 2.5 u lip along its foot,
+    #FFBE23 on the leader's side, and the player's name hangs under it on its
+    own plate, growing outward from the inner end: #E4EBD2, white for you with
+    the marker."""
+    x = SCORE_X[side]
     team = side_team(side)
     teams = team_mode()
     prefix = f"oq4_mb{side}"
     ident = f"mb{side}"
-    nodes = [plate_at(ident + "-plate", x, BAR_Y, SIDE_W, BAR_H, 0.55)]
-    # The outer block: a team's color and mark, or the deathmatch band.
+    nodes = [plate_at(ident + "-plate", x, BAR_Y, SCORE_W, BAR_H, 0.62)]
     for t, colour in enumerate((MAR, STR)):
-        block = plate_at(f"{ident}-block{t}", outer, BAR_Y, 25, BAR_H, 0.85, colour, display=ui.keyword("none"))
+        block = plate_at(f"{ident}-block{t}", x, BAR_Y, SCORE_W, BAR_H, 0.85, colour, display=ui.keyword("none"))
         doc.show(block["id"], AND(teams, op("==", team, t)))
-        logo = ui.group(f"{ident}-logo{t}", {**ui.absolute(left=u(outer + 4.5), top=u(BAR_Y + 5), width=u(16), height=u(16)),
-                                             "display": ui.keyword("none")},
-                        hud_svg.icon_nodes("marinelogo" if t == 0 else "strogglogo", f"{ident}-logo{t}-g", 0, 0, u(16), tint=WHITE))
+        logo = ui.group(f"{ident}-logo{t}", {**ui.absolute(left=u(x + SCORE_W / 2 - 13), top=u(BAR_Y + 2), width=u(26), height=u(26)),
+                                             "display": ui.keyword("none"), "opacity": num(0.22)},
+                        hud_svg.icon_nodes("marinelogo" if t == 0 else "strogglogo", f"{ident}-logo{t}-g", 0, 0, u(26), tint=WHITE))
         doc.show(logo["id"], AND(teams, op("==", team, t)))
         nodes += [block, logo]
-    band = plate_at(ident + "-band", outer, BAR_Y, 25, BAR_H, 0.55, BAND, display=ui.keyword("none"))
-    doc.show(band["id"], NOT(teams))
-    rank = text_at(doc, ident + "-rank", S(prefix + "_rank"), 7.6, WHITE, center=outer + 12.5, baseline=BAR_Y + 16.5, width=25,
-                   extra={"letter-spacing": ui.length(u(0.3)), "display": ui.keyword("none")})
-    doc.bind(ident + "-rank.color", ident + "-rank", "color", colour_of([(S(prefix + "_lead"), rgb(VALUE))], WHITE))
-    doc.show(rank["id"], NOT(teams))
-    nodes += [band, rank]
-    # The name: the team's in its text color, or the player's cut at 52 u.
-    name_kw = {"x": x + 31} if side == 0 else {"right": x + SIDE_W - 31}
-    team_name = text_at(doc, ident + "-team", sel(op("==", team, 0), TEAM_NAMES[0], TEAM_NAMES[1]), 7.4, rgb(MAR_T),
-                        baseline=BAR_Y + 16.8, extra={"letter-spacing": ui.length(u(0.7)), "display": ui.keyword("none")}, **name_kw)
-    doc.bind(ident + "-team.color", ident + "-team", "color", colour_of([(op("==", team, 0), rgb(MAR_T))], rgb(STR_T)))
+    lead = AND(NOT(teams), S(prefix + "_lead"))
+    lip = sheared_rect(ident + "-lip", 2.5, BAR_H - 3.5, SCORE_W - 5, 2.5, rgb(VALUE, 0.9), BAR_H / 2,
+                       **{**ui.absolute(left=u(x), top=u(BAR_Y), width=u(SCORE_W), height=u(BAR_H)), "display": ui.keyword("none")})
+    doc.show(lip["id"], lead)
+    rest = sheared_rect(ident + "-rest", 2.5, BAR_H - 3.5, SCORE_W - 5, 2.5, [1, 1, 1, 0.22], BAR_H / 2,
+                        **{**ui.absolute(left=u(x), top=u(BAR_Y), width=u(SCORE_W), height=u(BAR_H)), "display": ui.keyword("none")})
+    doc.show(rest["id"], AND(NOT(teams), NOT(S(prefix + "_lead"))))
+    nodes += [lip, rest]
+    team_score = sel(op("==", team, 0), S("marine_score"), S("strogg_score"))
+    score = text_at(doc, ident + "-score", op("numberText", team_score), 21, WHITE, center=x + SCORE_W / 2, baseline=BAR_Y + 19.2,
+                    width=SCORE_W, face="chain", extra={"display": ui.keyword("none")})
+    doc.show(score["id"], teams)
+    duel_score = text_at(doc, ident + "-dscore", op("numberText", S(prefix + "_score")), 24, WHITE, center=x + SCORE_W / 2,
+                         baseline=BAR_Y + 21.4, width=SCORE_W, face="chain", extra={"display": ui.keyword("none")})
+    doc.show(duel_score["id"], NOT(teams))
+    nodes += [score, duel_score]
+    team_name = text_at(doc, ident + "-team", sel(op("==", team, 0), TEAM_NAMES[0], TEAM_NAMES[1]), 5.6, WHITE,
+                        center=x + SCORE_W / 2, baseline=BAR_Y + 25.6, width=SCORE_W,
+                        extra={"letter-spacing": ui.length(u(0.6)), "opacity": num(0.85), "display": ui.keyword("none")})
     doc.show(team_name["id"], teams)
-    player = text_at(doc, ident + "-name", S(prefix + "_name"), 10.6, rgb(NAME), baseline=BAR_Y + 16.8,
-                     extra={**ellipsis(52), "display": ui.keyword("none")}, **name_kw)
-    doc.bind(ident + "-name.color", ident + "-name", "color", colour_of([(S(prefix + "_you"), WHITE)], rgb(NAME)))
-    doc.show(player["id"], NOT(teams))
-    mark = marker_vec(ident + "-marker", x - 6 if side == 0 else x + SIDE_W + 1, BAR_Y + 10)
+    # Duel and Tourney: the name on a 13 u plate under the slab, 6 u in from
+    # the inner end like the flags, cut at 110 u.
+    you = S(prefix + "_you")
+    name = bound_label(doc, ident + "-name", S(prefix + "_name"), 9.6, rgb(NAME), line=13, **ellipsis(110))
+    doc.bind(ident + "-name.color", ident + "-name", "color", colour_of([(you, WHITE)], rgb(NAME)))
+    mark = marker_vec(ident + "-marker", -6 if side == 0 else 0, 4)
     mark["properties"]["display"] = ui.keyword("none")
-    doc.show(mark["id"], AND(NOT(teams), S(prefix + "_you")))
-    nodes += [team_name, player, mark]
-    score = sel(teams, sel(op("==", team, 0), S("marine_score"), S("strogg_score")), S(prefix + "_score"))
-    score_kw = {"right": x + SIDE_W - 7} if side == 0 else {"x": x + 7}
-    nodes.append(text_at(doc, ident + "-score", op("numberText", score), 21, WHITE, baseline=BAR_Y + 20.6, face="chain", **score_kw))
+    doc.show(mark["id"], you)
+    if side == 1:
+        mark["properties"].update(ui.absolute(left=ui.length(100, "%"), top=0, width=u(6), height=u(13)))
+    strip = flex_row(ident + "-strip", [plate_vec(ident + "-strip-p", 13, 0.5), name],
+                     **{"height": ui.length(u(13)), "padding-left": ui.length(u(6)), "padding-right": ui.length(u(7))})
+    place = {"right": u(640 - (x + SCORE_W - 6))} if side == 0 else {"left": u(x + 6)}
+    holder = ui.group(ident + "-who", {**ui.absolute(top=u(UNDER_Y), height=u(13), **place), "display": ui.keyword("none")},
+                      [strip, mark])
+    doc.bind(ident + "-who.display", ident + "-who", "display", sel(AND(NOT(teams), op("!=", S(prefix + "_name"), "")), "block", "none"))
+    return nodes + [team_name, holder]
+
+
+def tile_x(side: int, i: int) -> float:
+    """A roster tile's leading edge: tile 0 sits next to the slab."""
+    if side == 0:
+        return SCORE_X[0] - ROSTER_GAP - TILE_W - i * TILE_PITCH
+    return SCORE_X[1] + SCORE_W + ROSTER_GAP + i * TILE_PITCH
+
+
+def vital_bar(doc: HudDocument, ident: str, y: float, value, colours: list, default: list) -> dict:
+    """A track at white 0.18 the tile's width, filled to the value of 100."""
+    fill = ui.group(ident + "-fill", {"position": ui.keyword("absolute"), "left": ui.length(0), "top": ui.length(0),
+                                      "width": ui.length(0, "%"), "height": ui.length(100, "%"), "display": ui.keyword("block"),
+                                      "background-color": ui.colour(default)})
+    doc.bind(ident + "-fill.width", fill["id"], "width", op("clamp", value, 0, 100))
+    doc.bind(ident + "-fill.bg", fill["id"], "background-color", colour_of(colours, default))
+    return ui.group(ident, {**ui.absolute(left=u(1), top=u(y), width=u(TILE_W - 2), height=u(VITAL_H)), "display": ui.keyword("block"),
+                            "background-color": ui.colour([1, 1, 1, 0.18])}, [fill])
+
+
+def roster(doc: HudDocument, side: int) -> list:
+    """One side's roster, best score first from the slab outward: each tile a
+    20 u plate at 0.55 with a 1.6 u lip in the team's color (the header band's
+    in Duel and Tourney), lit in the team's text color at 0.28 for the player
+    you follow and on the header-band plate for you. It names the player by
+    the first two letters of their name in Lowpixel 10 u, in the team's text
+    color (#E4EBD2 in Duel and Tourney), white for you and the player you
+    follow; Quake 4 ships no portraits. Over the tile, where this viewer may
+    see it, a 1.8 u bar fills to the ammunition for the weapon in hand in the
+    weapon color code. Under it health and armor bars fill to 100: health white
+    (#E46D56 at 25 and below, #FFBE23 above 100), armor #B5C784. The dead keep
+    their initials at 0.35 under a skull in #E46D56 over a plate at 0.30."""
+    declare(doc, {f"oq4_sl{side}_count": 0})
+    team = side_team(side)
+    teams = team_mode()
+    nodes = []
+    for i in range(ROSTER):
+        p = f"oq4_sl{side}_{i}"
+        declare(doc, {p + "_name": "", p + "_initials": "", p + "_open": False, p + "_weapon": -1, p + "_ammo": -1, p + "_health": 0,
+                      p + "_armor": 0, p + "_dead": False, p + "_you": False, p + "_followed": False})
+        rid = f"sl{side}t{i}"
+        dead, opened, you, followed = S(p + "_dead"), S(p + "_open"), S(p + "_you"), S(p + "_followed")
+        alive_plate = plate_at(rid + "-plate", 0, 0, TILE_W, TILE_H, 0.55)
+        doc.show(alive_plate["id"], AND(NOT(dead), NOT(you)))
+        dead_plate = plate_at(rid + "-deadp", 0, 0, TILE_W, TILE_H, 0.30, display=ui.keyword("none"))
+        doc.show(dead_plate["id"], dead)
+        band = plate_at(rid + "-band", 0, 0, TILE_W, TILE_H, 0.35, BAND, display=ui.keyword("none"))
+        doc.show(band["id"], AND(you, NOT(dead)))
+        # The lip takes the side's color; the light for the player you follow
+        # the side's text color (white in Duel and Tourney).
+        lip = ui.group(rid + "-lip", {**ui.absolute(left=u(2.2), top=u(0.6), width=u(TILE_W - 4.4), height=u(1.6)),
+                                      "display": ui.keyword("block"), "background-color": ui.colour(rgb(BAND, 0.95))})
+        doc.bind(rid + "-lip.bg", rid + "-lip", "background-color",
+                 colour_of([(AND(teams, op("==", team, 0)), rgb(MAR, 0.95)), (teams, rgb(STR, 0.95))], rgb(BAND, 0.95)))
+        lits = []
+        for t, colour in enumerate((rgb(MAR_T, 0.28), rgb(STR_T, 0.28), [1, 1, 1, 0.22])):
+            lit = vec(f"{rid}-lit{t}", [fitted_plate_path("l", u(TILE_H - 3), r=u(1), fill=ui.solid(colour), pad=0, top=u(1.5))],
+                      {**ui.absolute(left=u(1), top=0, width=u(TILE_W - 2), height=u(TILE_H)), "display": ui.keyword("none")})
+            doc.show(lit["id"], AND(followed, AND(teams, op("==", team, t)) if t < 2 else NOT(teams)))
+            lits.append(lit)
+        initials = text_at(doc, rid + "-ini", S(p + "_initials"), 10, rgb(MAR_T), center=TILE_W / 2, baseline=13.8, width=TILE_W,
+                           extra={"letter-spacing": ui.length(u(0.3)), "opacity": num(1)})
+        doc.bind(rid + "-ini.color", rid + "-ini", "color",
+                 colour_of([(OR(you, followed), WHITE), (AND(teams, op("==", team, 0)), rgb(MAR_T)), (teams, rgb(STR_T))], rgb(NAME)))
+        doc.bind(rid + "-ini.opacity", rid + "-ini", "opacity", sel(dead, 0.35, 1))
+        skull = ui.group(rid + "-skull", {**ui.absolute(left=u(TILE_W / 2 - 6), top=u(4), width=u(12), height=u(12)),
+                                          "display": ui.keyword("none")},
+                         hud_svg.icon_nodes("skull", rid + "-skull-g", 0, 0, u(12), tint=rgb(ERR, 0.95)))
+        doc.show(skull["id"], dead)
+        # The ammunition for the weapon in hand, over the tile in the weapon's color.
+        ammo = S(p + "_ammo")
+        weapon = S(p + "_weapon")
+        fill = ui.group(rid + "-ammo-fill", {"position": ui.keyword("absolute"), "left": ui.length(0), "top": ui.length(0),
+                                             "width": ui.length(0, "%"), "height": ui.length(100, "%"), "display": ui.keyword("block"),
+                                             "background-color": ui.colour([1, 1, 1, 0.9])})
+        doc.bind(rid + "-ammo-fill.width", fill["id"], "width", op("clamp", ammo, 0, 100))
+        doc.bind(rid + "-ammo-fill.bg", fill["id"], "background-color",
+                 colour_of([(op("==", weapon, index), rgb(colour, 0.95)) for index, colour in enumerate(FEED_COLOURS)], [1, 1, 1, 0.9]))
+        ammo_bar = ui.group(rid + "-ammo", {**ui.absolute(left=u(1), top=u(AMMO_Y - BAR_Y), width=u(TILE_W - 2), height=u(AMMO_H)),
+                                            "display": ui.keyword("none"), "background-color": ui.colour([1, 1, 1, 0.15])}, [fill])
+        doc.show(ammo_bar["id"], AND(opened, NOT(dead), op(">=", ammo, 0)))
+        health = S(p + "_health")
+        hp = vital_bar(doc, rid + "-hp", VITAL_Y - BAR_Y, health,
+                       [(op("<=", health, 25), rgb(ERR, 0.9)), (op(">", health, 100), rgb(VALUE, 0.9))], [1, 1, 1, 0.9])
+        armor = vital_bar(doc, rid + "-ar", VITAL_Y - BAR_Y + VITAL_PITCH, S(p + "_armor"), [], rgb(OK, 0.9))
+        vitals = full(rid + "-vitals", [hp, armor], display=ui.keyword("none"))
+        doc.show(vitals["id"], AND(opened, NOT(dead)))
+        tile = ui.group(rid, {**ui.absolute(left=u(tile_x(side, i)), top=u(BAR_Y), width=u(TILE_W), height=u(BAR_H)),
+                              "display": ui.keyword("none")},
+                        [alive_plate, dead_plate, band, lip, *lits, initials, skull, ammo_bar, vitals])
+        doc.show(rid, op(">", S(f"oq4_sl{side}_count"), i))
+        nodes.append(tile)
     return nodes
 
 
+def roster_places(doc: HudDocument, side: int) -> dict:
+    """Where the players on a roster stand (hud_teamLocations): under the
+    roster, one 7.5 u row a placed player on an 8.5 u pitch in tile order,
+    each a plate at 0.45 with the initials in the team's text color (#E4EBD2 in
+    Duel and Tourney) and the place in Lowpixel at 0.80, cut at 66 u, growing
+    outward from the roster's inner end. It starts 2 u under the scoreline, or
+    under the flags or the alive pips where they hang. The game names a place
+    only for the tiles this viewer may look over, never their own."""
+    team = side_team(side)
+    teams = team_mode()
+    gametype = S("gametype")
+    hanging = OR(op("==", gametype, 4), op("==", gametype, 6), S("oq4_pips"))
+    rows = []
+    for i in range(ROSTER):
+        p = f"oq4_sl{side}_{i}"
+        declare(doc, {p + "_location": ""})
+        rid = f"slp{side}r{i}"
+        initials = bound_label(doc, rid + "-ini", S(p + "_initials"), 6, rgb(MAR_T), line=7.5,
+                               **{"margin-right": ui.length(u(3)), "letter-spacing": ui.length(u(0.2))})
+        doc.bind(rid + "-ini.color", rid + "-ini", "color",
+                 colour_of([(AND(teams, op("==", team, 0)), rgb(MAR_T)), (teams, rgb(STR_T))], rgb(NAME)))
+        place = bound_label(doc, rid + "-place", S(p + "_location"), 6.2, [1, 1, 1, 0.8], line=7.5, **ellipsis(PLACE_W))
+        row = flex_row(rid, [plate_vec(rid + "-plate", 7.5, 0.45), initials, place],
+                       **{"height": ui.length(u(7.5)), "padding-left": ui.length(u(4)), "padding-right": ui.length(u(5)),
+                          "margin-bottom": ui.length(u(1)), "display": ui.keyword("none")})
+        doc.bind(rid + ".display", rid, "display",
+                 sel(AND(op(">", S(f"oq4_sl{side}_count"), i), op("!=", S(p + "_location"), "")), "flex", "none"))
+        rows.append(row)
+    edge = {"right": u(640 - (tile_x(0, 0) + TILE_W))} if side == 0 else {"left": u(tile_x(1, 0))}
+    column = ui.group(f"slp{side}", {**ui.absolute(top=u(UNDER_Y), **edge), "display": ui.keyword("flex"),
+                                     "flex-direction": ui.keyword("column"),
+                                     "align-items": ui.keyword("flex-end" if side == 0 else "flex-start")}, rows)
+    doc.bind(f"slp{side}.top", f"slp{side}", "top", sel(hanging, u(UNDER_Y + 15), u(UNDER_Y)))
+    return column
+
+
 def bar_timer(doc: HudDocument) -> list:
-    """The timer plate at 0.72: the time in Chain 15.5 u with the Remastered
+    """The timer plate at 0.72: the time in Chain 17 u with the Remastered
     timer's states (WARM-UP, the countdown in #FFBE23, #FFBE23 in the last
     minute, #E46D56 pulsing in the last ten seconds, the infinity mark in
     sudden death and review), and under it in Lowpixel 700 at 0.55 the limit,
@@ -127,35 +295,35 @@ def bar_timer(doc: HudDocument) -> list:
     sub_text = sel(warmup, sel(S("showready"), S("oq4_mb_ready"), ""),
                    sel(AND(live, S("overtime")), S("overtimetext"), S("oq4_mb_sub")))
     has_sub = OR(countdown, sudden, op("!=", sub_text, ""))
-    clock = text_at(doc, "mbt-clock", S("oq4_clock"), 15.5, WHITE, center=320, baseline=BAR_Y + 14.6, width=TIMER_W, face="chain",
+    clock = text_at(doc, "mbt-clock", S("oq4_clock"), 17, WHITE, center=320, baseline=BAR_Y + 16.4, width=TIMER_W, face="chain",
                     extra={"display": ui.keyword("none")})
     doc.bind("mbt-clock.color", "mbt-clock", "color",
              colour_of([(countdown, rgb(VALUE)), (last_minute, rgb(VALUE)), (untimed, [1, 1, 1, 0.7])], WHITE))
     doc.show("mbt-clock", AND(OR(countdown, live), NOT(last_ten)))
-    urgent = text_at(doc, "mbt-urgent", S("oq4_clock"), 15.5, rgb(ERR), center=320, baseline=BAR_Y + 14.6, width=TIMER_W, face="chain",
+    urgent = text_at(doc, "mbt-urgent", S("oq4_clock"), 17, rgb(ERR), center=320, baseline=BAR_Y + 16.4, width=TIMER_W, face="chain",
                      extra={"display": ui.keyword("none"), "opacity": num(1)})
     doc.show("mbt-urgent", last_ten)
-    warm = text_at(doc, "mbt-warm", None, 9.6, WHITE, center=320, baseline=BAR_Y + 14.6, width=TIMER_W,
+    warm = text_at(doc, "mbt-warm", None, 10.4, WHITE, center=320, baseline=BAR_Y + 15.8, width=TIMER_W,
                    extra={"letter-spacing": ui.length(u(0.4)), "display": ui.keyword("none")})
     warm["properties"]["text"] = ui.text("#str_231206")
     doc.show("mbt-warm", warmup)
-    infinity = ui.group("mbt-inf", {**ui.absolute(left=u(320 - 7), top=u(BAR_Y + 3.5), width=u(14), height=u(14)),
+    infinity = ui.group("mbt-inf", {**ui.absolute(left=u(320 - 7.5), top=u(BAR_Y + 4.5), width=u(15), height=u(15)),
                                     "display": ui.keyword("none")},
-                        hud_svg.icon_nodes("icon_infinity", "mbt-inf-g", 0, 0, u(14), tint=WHITE))
+                        hud_svg.icon_nodes("icon_infinity", "mbt-inf-g", 0, 0, u(15), tint=WHITE))
     doc.show("mbt-inf", OR(sudden, review))
     nodes += [clock, urgent, warm, infinity]
     # Without a line under it, the time sits 3 u lower, centred on the plate.
     for ident in ("mbt-clock", "mbt-urgent", "mbt-warm"):
-        size = u(9.6 if ident == "mbt-warm" else 15.5)
+        size = u(10.4 if ident == "mbt-warm" else 17)
         face = "lowpixel" if ident == "mbt-warm" else "chain"
-        top = u(BAR_Y + 14.6) - size * face_metrics(face)["ascent"]
+        top = u(BAR_Y + (15.8 if ident == "mbt-warm" else 16.4)) - size * face_metrics(face)["ascent"]
         doc.bind(ident + ".top", ident, "top", sel(has_sub, top, top + u(3)))
-    sub = text_at(doc, "mbt-sub", sub_text, 5.9, [1, 1, 1, 0.55], center=320, baseline=BAR_Y + 22.6, width=TIMER_W + 10,
+    sub = text_at(doc, "mbt-sub", sub_text, 5.9, [1, 1, 1, 0.55], center=320, baseline=BAR_Y + 25.4, width=TIMER_W + 10,
                   extra={"letter-spacing": ui.length(u(0.55))})
-    starts = text_at(doc, "mbt-starts", None, 5.9, [1, 1, 1, 0.55], center=320, baseline=BAR_Y + 22.6, width=TIMER_W + 10,
+    starts = text_at(doc, "mbt-starts", None, 5.9, [1, 1, 1, 0.55], center=320, baseline=BAR_Y + 25.4, width=TIMER_W + 10,
                      extra={"letter-spacing": ui.length(u(0.55)), "display": ui.keyword("none")})
     starts["properties"]["text"] = ui.text("#str_231207")
-    sd = text_at(doc, "mbt-sd", None, 5.9, [1, 1, 1, 0.55], center=320, baseline=BAR_Y + 22.6, width=TIMER_W + 10,
+    sd = text_at(doc, "mbt-sd", None, 5.9, [1, 1, 1, 0.55], center=320, baseline=BAR_Y + 25.4, width=TIMER_W + 10,
                  extra={"letter-spacing": ui.length(u(0.55)), "display": ui.keyword("none")})
     sd["properties"]["text"] = ui.text("#str_231208")
     doc.show("mbt-sub", NOT(OR(countdown, sudden)))
@@ -180,7 +348,7 @@ def under_bar(doc: HudDocument) -> list:
         team = side_team(side)
         # 6 u from the inner end: the leading side's plate grows toward the
         # leading edge with its words.
-        place = {"right": u(640 - (SIDE_X[0] + SIDE_W - 6))} if side == 0 else {"left": u(SIDE_X[1] + 6)}
+        place = {"right": u(640 - (SCORE_X[0] + SCORE_W - 6))} if side == 0 else {"left": u(SCORE_X[1] + 6)}
         ident = f"mbf{side}"
         state = sel(op("==", team, 0), S("oq4_flag0_state"), S("oq4_flag1_state"))
         icons = []
@@ -206,7 +374,7 @@ def under_bar(doc: HudDocument) -> list:
         doc.bind(ident + ".display", ident, "display", sel(two_flag, "block", "none"))
         nodes.append(holder)
         # Round modes: five alive pips on a 40x11 u plate.
-        px = SIDE_X[0] + SIDE_W - 46 if side == 0 else SIDE_X[1] + 6
+        px = SCORE_X[0] + SCORE_W - 46 if side == 0 else SCORE_X[1] + 6
         pips = []
         alive = sel(op("==", team, 0), S("oq4_alive0"), S("oq4_alive1"))
         for k in range(5):
@@ -242,35 +410,37 @@ def under_bar(doc: HudDocument) -> list:
     return nodes + [zone]
 
 
-def net_quality(doc: HudDocument) -> dict:
-    """Network quality (13.13) at all times, following the bar's trailing end:
-    the ping in Chain at 0.75 beside four rising bars, lit by the ping and
-    loss."""
+def net_quality(doc: HudDocument, ident: str = "mbn", place: dict | None = None) -> dict:
+    """Network quality (13.13) at all times: the ping in Chain at 0.75 beside
+    four rising bars, lit by the ping and the loss. It follows the
+    scoreline's trailing end, or in deathmatch sits under the timer."""
     ping = S("oq4_ping")
     lit = net_level(doc)
     bars = []
     for k in range(4):
         h = 2 + k * 1.6
-        bar = ui.group(f"mbn-b{k}", {"position": ui.keyword("relative"), "display": ui.keyword("block"), "width": ui.length(u(2.2)),
-                                     "height": ui.length(u(h)), "margin-left": ui.length(u(1.2)),
-                                     "background-color": ui.colour([1, 1, 1, 0.2])})
-        doc.bind(f"mbn-b{k}.bg", bar["id"], "background-color",
+        bar = ui.group(f"{ident}-b{k}", {"position": ui.keyword("relative"), "display": ui.keyword("block"), "width": ui.length(u(2.2)),
+                                         "height": ui.length(u(h)), "margin-left": ui.length(u(1.2)),
+                                         "background-color": ui.colour([1, 1, 1, 0.2])})
+        doc.bind(f"{ident}-b{k}.bg", bar["id"], "background-color",
                  colour_of([(AND(op("<", k, lit), op(">=", lit, 3)), rgb(OK, 0.9)), (AND(op("<", k, lit), op("==", lit, 2)), rgb("#E3AD36", 0.9)),
                             (op("<", k, lit), rgb(ERR, 0.9))], [1, 1, 1, 0.2]))
         bars.append(bar)
-    row = flex_row("mbn", [bound_label(doc, "mbn-ping", op("numberText", ping), 8, [1, 1, 1, 0.75], face="chain", line=10),
-                           label("mbn-ms", "#str_231228", 6, [1, 1, 1, 0.6], line=10, **{"margin-left": ui.length(u(1.5)),
-                                                                                          "margin-right": ui.length(u(1))}),
-                           flex_row("mbn-bars", bars, **{"align-items": ui.keyword("flex-end"), "height": ui.length(u(7))})],
-                   **{"position": ui.keyword("absolute"), "left": ui.length(u(SIDE_X[1] + SIDE_W + 6)), "top": ui.length(u(BAR_Y + 8)),
-                      "height": ui.length(u(10))})
+    if place is None:
+        place = {"position": ui.keyword("absolute"), "left": ui.length(u(BAR_END + 6)), "top": ui.length(u(BAR_Y + 10)),
+                 "height": ui.length(u(10))}
+    row = flex_row(ident, [bound_label(doc, f"{ident}-ping", op("numberText", ping), 8, [1, 1, 1, 0.75], face="chain", line=10),
+                           label(f"{ident}-ms", "#str_231228", 6, [1, 1, 1, 0.6], line=10, **{"margin-left": ui.length(u(1.5)),
+                                                                                              "margin-right": ui.length(u(1))}),
+                           flex_row(f"{ident}-bars", bars, **{"align-items": ui.keyword("flex-end"), "height": ui.length(u(7))})],
+                   **place)
     return row
 
 
 def match_bar(doc: HudDocument) -> dict:
-    declare(doc, {"marine_score": 0, "strogg_score": 0, "oq4_my_team": 0, "oq4_team_game": False, "oq4_ping": 0, "oq4_zone": 0,
-                  "oq4_pips": False, "oq4_state": 0, "oq4_countdown": False, "oq4_timed": False, "oq4_clock_warn": 0, "oq4_clock": "",
-                  "showready": False, "overtime": False, "overtimetext": ""})
+    declare(doc, {"marine_score": 0, "strogg_score": 0, "oq4_my_team": 0, "oq4_sl_left": 0, "oq4_team_game": False, "oq4_ping": 0,
+                  "oq4_zone": 0, "oq4_pips": False, "oq4_state": 0, "oq4_countdown": False, "oq4_timed": False, "oq4_clock_warn": 0,
+                  "oq4_clock": "", "showready": False, "overtime": False, "overtimetext": ""})
     for side in (0, 1):
         declare(doc, {f"oq4_mb{side}_name": "", f"oq4_mb{side}_rank": "", f"oq4_mb{side}_score": 0, f"oq4_mb{side}_you": False,
                       f"oq4_mb{side}_lead": False})
@@ -278,104 +448,20 @@ def match_bar(doc: HudDocument) -> dict:
         declare(doc, {f"oq4_flag{flag}_state": 0, f"oq4_flag{flag}_carrier": ""})
     for team in range(2):
         declare(doc, {f"oq4_alive{team}": 0})
-    nodes = bar_side(doc, 0) + bar_side(doc, 1) + bar_timer(doc) + under_bar(doc) + [net_quality(doc)]
+    nodes = (roster(doc, 0) + roster(doc, 1) + score_side(doc, 0) + score_side(doc, 1) + bar_timer(doc) + under_bar(doc) +
+             [roster_places(doc, 0), roster_places(doc, 1), net_quality(doc)])
     group = full("matchbar", nodes, display=ui.keyword("none"))
-    doc.show("matchbar", competitive())
+    doc.show("matchbar", scoreline_shown())
     return group
 
 
-# ------------------------------------------------------------------ team status
-
-def team_list(doc: HudDocument, ident: str, team, *, trailing: bool) -> dict:
-    """One team's status (atlas teamList): the team name above, then one
-    138x14.5 u plate per player on a 16.5 u pitch with the weapon (an x for
-    the dead, whose rows drop to 0.40), the name cut at 46 u, health in Chain
-    (#E46D56 at 25 and below, #FFBE23 above 100) and armor at 0.60. Your row
-    uses the header-band plate and the marker; a followed player's row is lit
-    in the team's text color at 0.22 with the marker."""
-    x = 494.0 if trailing else 8.0
-    is_marine = op("==", team, 0)
-    text_colour = colour_of([(is_marine, rgb(MAR_T))], rgb(STR_T))
-    head_kw = {"right": x + LIST_W} if trailing else {"x": x}
-    head = text_at(doc, ident + "-head", sel(is_marine, TEAM_NAMES[0], TEAM_NAMES[1]), 6.8, rgb(MAR_T), baseline=LIST_Y - 3,
-                   extra={"letter-spacing": ui.length(u(0.7))}, **head_kw)
-    doc.bind(ident + "-head.color", ident + "-head", "color", text_colour)
-    rows = [head]
-    count = sel(is_marine, S("oq4_ts0_count"), S("oq4_ts1_count"))
-    for i in range(LIST_ROWS):
-        def f(name, i=i):
-            return sel(is_marine, S(f"oq4_ts0_{i}_{name}"), S(f"oq4_ts1_{i}_{name}"))
-        rid = f"{ident}{i}"
-        y = LIST_Y + i * LIST_PITCH
-        you, dead, followed = f("you"), f("dead"), f("followed")
-        plate = plate_at(rid + "-plate", 0, 0, LIST_W, LIST_ROW, 0.45)
-        doc.show(plate["id"], NOT(you))
-        band = plate_at(rid + "-band", 0, 0, LIST_W, LIST_ROW, 0.3, BAND, display=ui.keyword("none"))
-        doc.show(band["id"], you)
-        lit = []
-        for t, colour in enumerate((MAR_T, STR_T)):
-            node = vec(f"{rid}-lit{t}", [fitted_plate_path("l", u(11.5), r=u(1), fill=ui.solid(rgb(colour, 0.22)), pad=0, top=u(1.5))],
-                       {**ui.absolute(left=u(1.5), top=0, width=u(LIST_W - 3), height=u(LIST_ROW)), "display": ui.keyword("none")})
-            doc.show(node["id"], AND(followed, op("==", team, t)))
-            lit.append(node)
-        mark = marker_vec(rid + "-marker", LIST_W + 1 if trailing else -6, 4.5)
-        mark["properties"]["display"] = ui.keyword("none")
-        doc.show(mark["id"], OR(you, followed))
-        icon_x = LIST_W - 21 if trailing else 4
-        weapons = []
-        for index, glyph in enumerate(MP_ROSTER):
-            holder = ui.group(f"{rid}-w{index}", {**ui.absolute(left=u(icon_x), top=u(2.5), width=u(17), height=u(9.5)),
-                                                  "display": ui.keyword("none")},
-                              hud_svg.icon_nodes(glyph, f"{rid}-w{index}-g", 0, 0, u(9.5), tint=rgb(FEED_COLOURS[index])))
-            doc.show(holder["id"], AND(NOT(dead), op("==", f("weapon"), index)))
-            weapons.append(holder)
-        cross = vec(rid + "-dead", [pts_path("a", [(u(icon_x + 5), u(4)), (u(icon_x + 11), u(10.5))], closed=False,
-                                             stroke=stroke([1, 1, 1, 0.4], u(1.4), cap="round")),
-                                    pts_path("b", [(u(icon_x + 11), u(4)), (u(icon_x + 5), u(10.5))], closed=False,
-                                             stroke=stroke([1, 1, 1, 0.4], u(1.4), cap="round"))], {"display": ui.keyword("none")})
-        doc.show(cross["id"], dead)
-        name_kw = {"right": LIST_W - 26} if trailing else {"x": 26}
-        name = text_at(doc, rid + "-name", f("name"), 9, rgb(MAR_T), baseline=10.6, extra={**ellipsis(46), "opacity": num(1)}, **name_kw)
-        doc.bind(rid + "-name.color", rid + "-name", "color", colour_of([(OR(you, followed), WHITE), (is_marine, rgb(MAR_T))], rgb(STR_T)))
-        doc.bind(rid + "-name.opacity", rid + "-name", "opacity", sel(dead, 0.4, 1))
-        health = text_at(doc, rid + "-hp", op("numberText", f("health")), 10.6, WHITE, baseline=11, face="chain",
-                         right=34 if trailing else LIST_W - 34, extra={"display": ui.keyword("none")})
-        doc.bind(rid + "-hp.color", rid + "-hp", "color",
-                 colour_of([(op("<=", f("health"), 25), rgb(ERR)), (op(">", f("health"), 100), rgb(VALUE))], WHITE))
-        doc.show(health["id"], NOT(dead))
-        armor = text_at(doc, rid + "-ar", op("numberText", f("armor")), 9, [1, 1, 1, 0.6], baseline=11, face="chain",
-                        right=10 if trailing else LIST_W - 10, extra={"display": ui.keyword("none")})
-        doc.bind(rid + "-ar.color", rid + "-ar", "color", colour_of([(op(">", f("armor"), 0), [1, 1, 1, 0.6])], [1, 1, 1, 0.25]))
-        doc.show(armor["id"], NOT(dead))
-        # Where the player is (MP-15): beside the row on the view's side, cut at 78 u.
-        place_kw = {"right": -4} if trailing else {"x": LIST_W + 4}
-        place = text_at(doc, rid + "-loc", f("location"), 7.4, [1, 1, 1, 0.72], baseline=10.2,
-                        extra={**ellipsis(LOCATION_W), "display": ui.keyword("none")}, **place_kw)
-        doc.show(place["id"], AND(NOT(dead), op("!=", f("location"), "")))
-        row = ui.group(rid, {**ui.absolute(left=u(x), top=u(y), width=u(LIST_W), height=u(LIST_ROW)), "display": ui.keyword("none")},
-                       [plate, band, *lit, mark, *weapons, cross, name, health, armor, place])
-        doc.show(rid, op(">", count, i))
-        rows.append(row)
-    return full(ident, rows, display=ui.keyword("none"))
-
-
-def team_status(doc: HudDocument) -> tuple:
-    """Team modes: your team's list at the leading edge; spectators see the
-    Marines there and the Strogg at the trailing edge, where held statistics
-    take the trailing list's place. Returns (leading, trailing)."""
-    declare(doc, {"oq4_spectating": False, "oq4_my_team": 0, "stat_visible": 0})
-    for team in range(2):
-        declare(doc, {f"oq4_ts{team}_count": 0})
-        for i in range(LIST_ROWS):
-            declare(doc, {f"oq4_ts{team}_{i}_name": "", f"oq4_ts{team}_{i}_weapon": -1, f"oq4_ts{team}_{i}_health": 0,
-                          f"oq4_ts{team}_{i}_armor": 0, f"oq4_ts{team}_{i}_dead": False, f"oq4_ts{team}_{i}_you": False,
-                          f"oq4_ts{team}_{i}_followed": False, f"oq4_ts{team}_{i}_location": ""})
-    spectating = S("oq4_spectating")
-    leading = team_list(doc, "tsl", sel(spectating, 0, S("oq4_my_team")), trailing=False)
-    doc.show("tsl", AND(competitive(), team_mode()))
-    trailing = team_list(doc, "tst", 1, trailing=True)
-    doc.show("tst", AND(competitive(), team_mode(), spectating, op("==", S("stat_visible"), 0)))
-    return leading, trailing
+def deathmatch_net(doc: HudDocument) -> dict:
+    """Deathmatch's network quality in Competitive: under the Remastered timer
+    in its column, 3 u below."""
+    row = net_quality(doc, "ffn", {"position": ui.keyword("relative"), "height": ui.length(u(10)), "margin-top": ui.length(u(3)),
+                                   "margin-left": ui.length(u(4)), "display": ui.keyword("none")})
+    doc.bind("ffn.display", "ffn", "display", sel(AND(competitive(), NOT(scoreline_shown())), "flex", "none"))
+    return row
 
 
 # ---------------------------------------------------------------- client options
@@ -391,12 +477,24 @@ def crosshair_ammo(doc: HudDocument) -> dict:
     return node
 
 
+def item_timers_drop() -> dict:
+    """How far the item timers step down: under the scoreline with the kill
+    feed on narrow views (UNDER_BAR_DROP)."""
+    from remastered_hud_mp import UNDER_BAR_DROP
+    return sel(under_match_bar(), u(UNDER_BAR_DROP), 0)
+
+
 def item_timers(doc: HudDocument) -> dict:
     """The item timers the server admits this player to (si_itemTimers,
-    hud_itemTimers): up to six rows trailing at 633 u from y 96, each a plate
-    at 0.35 with the item's name and the time left in Chain (#FFBE23); an item
-    that is there reads in #B5C784 with no time. The time of day
-    (hud_localClock) sits above them at 0.60."""
+    hud_itemTimers), spectators by default: up to six 118x13 u rows trailing
+    at 633 u from y 96 on a 15 u pitch, each a plate at 0.45 with the item's
+    symbol (the powerups in their own colors, mega health #F7C004, heavy armor
+    #FA2B05, light armor #FFBE23), where it lies (its name where the map names
+    no place) and the time left in Chain #FFBE23 over a 1 u line filling in
+    the item's color as the respawn runs. An item that is there reads in
+    #B5C784 at full strength with no time; one counting down dims its symbol
+    to 0.45; a held item reads --. The time of day (hud_localClock) sits above
+    them at 0.60."""
     declare(doc, {"oq4_it_count": 0, "oq4_local_clock": ""})
     clock = text_at(doc, "localclock", S("oq4_local_clock"), 7.4, [1, 1, 1, 0.6], baseline=ITEM_Y - 4, face="chain",
                     right=ITEM_RIGHT, extra={"display": ui.keyword("none"), "max-width": ui.length(u(ITEM_W))})
@@ -404,18 +502,39 @@ def item_timers(doc: HudDocument) -> dict:
     rows = [clock]
     x = ITEM_RIGHT - ITEM_W
     for i in range(ITEM_ROWS):
-        declare(doc, {f"oq4_it_{i}_name": "", f"oq4_it_{i}_time": "", f"oq4_it_{i}_up": False})
+        p = f"oq4_it_{i}"
+        declare(doc, {p + "_name": "", p + "_time": "", p + "_up": False, p + "_where": "", p + "_kind": 0, p + "_left": 0})
         rid = f"itimer{i}"
-        up = S(f"oq4_it_{i}_up")
-        plate = plate_at(rid + "-plate", 0, 0, ITEM_W, ITEM_ROW, 0.35)
-        # A fixed box: the name is cut only when it would reach the time.
-        name = text_at(doc, rid + "-name", S(f"oq4_it_{i}_name"), 6.8, [1, 1, 1, 0.8], x=5, baseline=6.6,
-                       extra={**ellipsis(ITEM_W - 34), "width": ui.length(u(ITEM_W - 34))})
+        up, kind = S(p + "_up"), S(p + "_kind")
+        plate = plate_at(rid + "-plate", 0, 0, ITEM_W, ITEM_ROW, 0.45)
+        icons = []
+        for value, glyph, tint, _ in ITEM_KINDS:
+            holder = ui.group(f"{rid}-k{value}", {**ui.absolute(left=0, top=0, width=u(10), height=u(10)), "display": ui.keyword("none")},
+                              hud_svg.icon_nodes(glyph, f"{rid}-k{value}-g", 0, 0, u(10), tint=rgb(tint) if tint else None))
+            doc.show(holder["id"], op("==", kind, value))
+            icons.append(holder)
+        symbol = ui.group(rid + "-sym", {**ui.absolute(left=u(4), top=u(1.5), width=u(10), height=u(10)), "display": ui.keyword("block"),
+                                         "opacity": num(1)}, icons)
+        doc.bind(rid + "-sym.opacity", rid + "-sym", "opacity", sel(up, 1, 0.45))
+        # A fixed box: the place is cut only when it would reach the time.
+        place = text_at(doc, rid + "-name", sel(op("!=", S(p + "_where"), ""), S(p + "_where"), S(p + "_name")), 6.6, [1, 1, 1, 0.8],
+                        x=17, baseline=8.4, extra={**ellipsis(ITEM_W - 50), "width": ui.length(u(ITEM_W - 50))})
         doc.bind(rid + "-name.color", rid + "-name", "color", colour_of([(up, rgb(OK))], [1, 1, 1, 0.8]))
-        time = text_at(doc, rid + "-time", S(f"oq4_it_{i}_time"), 7.6, rgb(VALUE), baseline=6.8, face="chain",
+        time = text_at(doc, rid + "-time", S(p + "_time"), 8.4, rgb(VALUE), baseline=8.8, face="chain",
                        right=ITEM_W - 5, extra={"max-width": ui.length(u(28))})
+        fill = ui.group(rid + "-fill", {"position": ui.keyword("absolute"), "left": ui.length(0), "top": ui.length(0),
+                                         "width": ui.length(0, "%"), "height": ui.length(100, "%"), "display": ui.keyword("block"),
+                                         "background-color": ui.colour(rgb(VALUE, 0.9))})
+        doc.bind(rid + "-fill.width", fill["id"], "width", op("*", 100, op("-", 1, op("clamp", S(p + "_left"), 0, 1))))
+        doc.bind(rid + "-fill.bg", fill["id"], "background-color",
+                 colour_of([(op("==", kind, value), rgb(progress, 0.9)) for value, _, _, progress in ITEM_KINDS], rgb(VALUE, 0.9)))
+        track = ui.group(rid + "-track", {**ui.absolute(left=u(17), top=u(ITEM_ROW - 2.2), width=u(ITEM_W - 24), height=u(1)),
+                                          "display": ui.keyword("none"), "background-color": ui.colour([1, 1, 1, 0.15])}, [fill])
+        doc.show(track["id"], AND(NOT(up), op("!=", S(p + "_time"), ""), op("!=", S(p + "_time"), "--")))
         row = ui.group(rid, {**ui.absolute(left=u(x), top=u(ITEM_Y + i * ITEM_PITCH), width=u(ITEM_W), height=u(ITEM_ROW)),
-                             "display": ui.keyword("none")}, [plate, name, time])
+                             "display": ui.keyword("none")}, [plate, symbol, place, time, track])
         doc.show(rid, op(">", S("oq4_it_count"), i))
         rows.append(row)
-    return full("itimers", rows)
+    group = full("itimers", rows)
+    doc.bind("itimers.top", "itimers", "top", item_timers_drop())
+    return group

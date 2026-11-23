@@ -112,7 +112,10 @@
 // 36 - idFileSystem appends GetFileOrigin: the image loader skips Quake 4's
 //      precomputed image-program results when an input comes from outside
 //      the shipped packs (a stale module would call past the vtable).
-#define RENDER_API_VERSION			36
+// 37 - idRenderSystem appends RequestVideoFrame, PollVideoFrame,
+//      ReleaseVideoFrame and EndVideoCapture: the continuous readback of
+//      presented frames that video capture records.
+#define RENDER_API_VERSION			37
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;
