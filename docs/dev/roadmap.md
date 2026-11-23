@@ -1194,7 +1194,7 @@ diagnostics establish whole-frame ownership or production performance.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | REN-01 — Closed | All nine shared classic domains own stock (and, for subview forms stock content never authors, validation-room) views on a fresh GL/Vulkan package under the default preset, with 4x MSAA and with the post chain off: byte-identical to classic, visible content controls, named zero-commit rollback. They now draw into the scene target the classic walker uses. Defaults stay off. | Human appearance review of the retained captures and physical Linux/macOS/Android runs belong to platform qualification; default promotion is a separate owner decision. |
-| REN-02 — Partial | Shared material/light contracts and corridors provide foundations; the remaining decline reasons are inventoried. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
+| REN-02 — Partial | In the laboratory the classic-lighting corridor owns classic stage shapes, cutouts, baked light and stencil-shadowed lights, each matched against native ARB2, and the aggregate executor composes with the shared domains behind `r_rendererOwnershipCompose`. No stock view is owned yet; the remaining decline reasons are inventoried. | Take the stock shapes the census names (skinned receivers, lit surfaces without a forward command, stage colour), shadow-mapped lights and the point-cube pool; move the corridor onto the sealed interaction stream; then measure benefit on owned stock views before parity promotion. |
 | REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). The opt-in modern OpenGL receivers filter projected shadows with the classic kernel and PCSS-lite blocker search since 17 November; a widened PCSS radius now softens the same pixels as the classic receivers (84% overlap), where before it changed none. The 9 November [stencil-parity audit](shadowmapping-audit-2026-11-09.md) fixed prelight-only (`noDynamicShadows`) lights losing their shadows, `noSelfShadow` world geometry no longer shadowing `noSelfShadow` receivers under prelit lights, the one-sided five-tap kernel and the packed-depth wrap at the far envelope. | Physical platforms; the audit's open parity items (casters outside an off-centre light's box, images for the two fixed rules). The cascade range end is closed (19 November, whole-light last cascade). |
 | REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. | lavapipe residual, mods authored outside the laboratory, physical Linux/Apple fallback. |
@@ -1292,9 +1292,47 @@ diagnostics establish whole-frame ownership or production performance.
   Step 2 is done for corridor-owned classic surfaces: ambient lights draw
   with ARB2's ambient normal cube there and match native ARB2
   (`production-fixed-ambient`, byte-identical in display frames).
-  Remaining, in order: finish step 1's cutout/light-grid combinations,
-  represent stencil-fallback and multiple point shadows, reconcile the two
-  ownership models, then measure benefit before any promotion.
+  Progress, 23 November: step 1's combinations are owned for one stage set.
+  A per-draw classic stage (`uClassicStage`) lets the depth and forward
+  passes test a cutout's alpha and add baked light through the stage's
+  texture matrices, colour and vertex colour, as ARB2 does. Cutouts with a
+  texture matrix, vertex colour or a conditioned stage match native ARB2 at
+  mean 0.25 levels with 3 to 5 bounded hole-edge pixels, and byte for byte in
+  display frames apart from those pixels (`production-fixed-cutout-*`).
+  Baked-light receivers are composed frames inside the controls' limits
+  (`production-fixed-grid-*`); see the inventory for what those controls do
+  and do not prove. Several stage sets with baked light, and several
+  alpha-tested stages, decline by name.
+  Step 4 is done for classic receivers of stencil-shadowed lights: a light
+  ARB2 shadows with stencil volumes by policy is drawn by the corridor with
+  ARB2's own stencil pass (`production-fixed-stencil`: mean 0.25 levels; in a
+  display frame the specimen is byte-identical and 3 pixels of the whole
+  frame differ by 1 level). Shadow-mapped lights, a stencil light that also
+  lights a PBR surface, and the point-cube pool remain.
+  Step 5: `r_rendererOwnershipCompose` (default 0) lets the aggregate
+  executor and the shared world domains be requested together with one owner
+  per pass. The aggregate executor composes the frame it owns while the
+  shared interaction stream is sealed and left undrawn, and a frame it
+  declines is drawn by that stream, byte-identical to ARB2
+  (`production-fixed-compose`, `production-fixed-stencil-compose-fallback`).
+  The corridor still derives its own interactions; moving it onto the sealed
+  stream remains.
+  Named rollbacks: `r_rendererModernClassicShapes` (bit 1 stage state, bit 2
+  stencil lights) and `r_rendererOwnershipCompose 0`. No parity mask,
+  promotion token or default changed.
+  Step 6 is not reached: no stock view is owned. Of eight
+  `game/airdefense1` poses with the modern path requested and shadows off,
+  the corridor declines four on skinned character geometry and four on a lit
+  surface without a forward command, and the frames' first blockers are
+  stage colour and stage conditions on shapes the corridor does not take
+  ([census](modern-lit-frame-inventory.md#stock-views-step-6)). Requesting
+  the path there costs a declined frame 8.4 ms against ARB2's 4.9 ms on
+  average (shared-machine numbers, not budget evidence), so there is a cost
+  to remove and no benefit to show yet.
+  Remaining, in order: the stock shapes that census names, shadow-mapped
+  lights and the point-cube pool, the corridor on the sealed interaction
+  stream, then measured CPU/GPU benefit on owned stock views before any
+  promotion.
 - [ ] **REN-03 — P1, qualification and implementation: shadow production scope.**
   Qualify point/projected/CSM, stencil/map hybrids, moments, movers, near emitters,
   dynamic/cutout/custom receivers and constrained budgets through full scenes and
