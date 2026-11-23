@@ -12,28 +12,6 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
-## Watch Quake 4 1.4.2 network demos, 23 November 2026
-
-- **Play the original game's network demos.** A `.ndmo85` file recorded with
-  Quake 4 1.4.2's `recordNetDemo` plays from **Demos** or with
-  `playNetDemo name.ndmo85`: copy it into the `demos/` folder in your save
-  path. 1.4.2 ships two in `q4mp/demos`, `id_perftest.ndmo85` and
-  `id_serverdemo.ndmo85`.
-- **As it was recorded.** A player's recording shows their view with their
-  HUD; a server's recording lets you follow any player or fly freely. Pause,
-  speed, frame steps and seeking work; seeking back replays from the start.
-- **A benchmark again.** `playNetTimeDemo id_perftest.ndmo85` (or `timeDemo`)
-  times id's own performance demo.
-- **Limits.** Demos from releases before 1.4.2 (`.netdemo`) and demos recorded
-  at a tick rate other than 60 are listed with the reason and do not play. A
-  damaged file is refused and never stops openQ4.
-- **Evidence.** `retail_netdemo_contract.py` reads both shipped demos with an
-  independent reader and pins the reader's bounds; `mp_retail_netdemo_smoke.py`
-  plays both to their ends from the library and the console, times one,
-  refuses every damaged copy, and finds the decl numbering it rebuilds for a
-  recording identical to the retail dedicated server's (Windows, OpenGL). Not
-  run: Vulkan, Linux, macOS and a person watching.
-
 ## Point lights keep their shadows in crowded views on Vulkan, 23 November 2026
 
 - **Lights no longer shine through walls when a view runs out of shadow
@@ -245,6 +223,28 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   back on and they come back with the values you left.
 - **What you need to do.** Nothing. No setting changes value.
 - **Developer detail:** [the dependency table](settings-menu-structure.md#dependent-rows).
+
+## Watch Quake 4 1.4.2 network demos, 23 November 2026
+
+- **Play the original game's network demos.** A `.ndmo85` file recorded with
+  Quake 4 1.4.2's `recordNetDemo` plays from **Demos** or with
+  `playNetDemo name.ndmo85`: copy it into the `demos/` folder in your save
+  path. 1.4.2 ships two in `q4mp/demos`, `id_perftest.ndmo85` and
+  `id_serverdemo.ndmo85`.
+- **As it was recorded.** A player's recording shows their view with their
+  HUD; a server's recording lets you follow any player or fly freely. Pause,
+  speed, frame steps and seeking work; seeking back replays from the start.
+- **A benchmark again.** `playNetTimeDemo id_perftest.ndmo85` (or `timeDemo`)
+  times id's own performance demo.
+- **Limits.** Demos from releases before 1.4.2 (`.netdemo`) and demos recorded
+  at a tick rate other than 60 are listed with the reason and do not play. A
+  damaged file is refused and never stops openQ4.
+- **Evidence.** `retail_netdemo_contract.py` reads both shipped demos with an
+  independent reader and pins the reader's bounds; `mp_retail_netdemo_smoke.py`
+  plays both to their ends from the library and the console, times one,
+  refuses every damaged copy, and finds the decl numbering it rebuilds for a
+  recording identical to the retail dedicated server's (Windows, OpenGL). Not
+  run: Vulkan, Linux, macOS and a person watching.
 
 ## Retail Quake 4 render demos play, 23 November 2026
 
