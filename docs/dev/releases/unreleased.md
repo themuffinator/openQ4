@@ -512,6 +512,10 @@ the [development roadmap](../roadmap.md) for current scope.
 - Demo playback lists the players to follow by name, steps back a frame,
   and `demoExport` writes a demo as pictures; the library shows who played and
   a picture from each recording, and `demoFind` searches it.
+- `demoExport` also writes the demo's sound, a WAV file exactly as long as the
+  pictures, in your sound device's rate and speaker layout. Nothing plays
+  through your speakers while it runs. See
+  [Export a demo as pictures](../../user/multiview-demos.md#export-a-demo-as-pictures).
 - `ui_autoAction "demo ss stats"` records every match you play, screenshots the
   result and writes its stats; servers can do the same with `si_autoAction`.
   `timeDemo name.mvd` benchmarks a multi-view demo. See
