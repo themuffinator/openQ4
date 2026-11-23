@@ -382,6 +382,13 @@ void R_FreeLightDefDerivedData( idRenderLightLocal *ldef ) {
 	ldef->references = NULL;
 
 	R_FreeLightDefFrustum( ldef );
+
+	if ( ldef->shadowMapPrelightCaster != NULL ) {
+		R_FreeStaticTriSurf( ldef->shadowMapPrelightCaster );
+		ldef->shadowMapPrelightCaster = NULL;
+	}
+	ldef->shadowMapPrelightCasterSource = NULL;
+	ldef->shadowMapPrelightCasterSourceIndexes = 0;
 }
 
 /*

@@ -159,6 +159,12 @@ public:
 	int						shadowMapStencilFallbackFrame;	// the frame something last asked for that fallback
 	int						shadowMapStencilFallbackCleanViews;	// views the light has been through since
 
+	struct srfTriangles_s *	shadowMapPrelightCaster;	// the prelight volume's front caps as a shadow-map caster
+													// (R_ShadowMapPrelightCaster), owned by the light
+	const struct srfTriangles_s *shadowMapPrelightCasterSource;	// the prelight geometry that was asked for it,
+													// whether or not it gave one
+	int						shadowMapPrelightCasterSourceIndexes;	// and its index count then
+
 	float					modelMatrix[16];		// this is just a rearrangement of parms.axis and parms.origin
 
 	idRenderWorldLocal *	world;

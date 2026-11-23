@@ -753,6 +753,71 @@ static void R_RecordShadowMapCaster( viewLight_t *vLight,
 		static_cast<unsigned int>( vLight->shadowMapCasterSignature ) + mixed );
 }
 
+/*
+=================
+R_ShadowMapLinkPrelightCaster
+
+The static world of a prelit light as one shadow-map caster: the front caps
+of its prelight volume (R_ShadowMapPrelightCaster). The world surfaces of
+such a light stand aside for it in idInteraction::AddActiveInteraction, so a
+light that takes it draws the static world once, from the triangles its
+stencil shadow is built from, instead of each surface whole.
+
+Linked for every view the light is in, whichever world areas the view
+reaches: the volume is the light's, not the view's. It is a GLOBAL caster,
+as the prelight volume is a GLOBAL shadow in stencil.
+=================
+*/
+void R_ShadowMapLinkPrelightCaster( viewLight_t *vLight ) {
+	if ( vLight == NULL || vLight->lightDef == NULL || tr.viewDef == NULL ) {
+		return;
+	}
+	if ( !r_shadows.GetBool() || !r_useShadowMap.GetBool()
+			|| ( vLight->pointLight && !vLight->parallel && !r_shadowMapPointLights.GetBool() ) ) {
+		return;
+	}
+	idRenderLightLocal *lightDef = vLight->lightDef;
+	srfTriangles_t *casterTris = R_ShadowMapPrelightCaster( lightDef );
+	if ( casterTris == NULL ) {
+		return;
+	}
+	if ( !R_EnsureShadowMapCasterCaches( casterTris, NULL ) ) {
+		// The world surfaces stood aside for this caster, so without it the
+		// map lacks the whole static world: the light goes back to its
+		// stencil volumes.
+		lightDef->shadowMapStencilFallbackSticky = true;
+		lightDef->shadowMapStencilFallbackFrame = tr.frameCount;
+		lightDef->shadowMapStencilFallbackCleanViews = 0;
+		return;
+	}
+	R_TouchShadowMapCache( casterTris->ambientCache );
+	R_TouchShadowMapCache( casterTris->indexCache );
+
+	vLight->shadowMapCasterCount++;
+	vLight->shadowMapStaticCasterCount++;
+	// a static caster of the light's own: what it holds is its identity
+	int hash = static_cast<int>( 2166136261u );
+	hash = R_ShadowMapHashString( hash, "prelight front caps" );
+	hash = R_ShadowMapHashInt( hash, casterTris->numVerts );
+	hash = R_ShadowMapHashInt( hash, casterTris->numIndexes );
+	for ( int corner = 0; corner < 2; ++corner ) {
+		for ( int component = 0; component < 3; ++component ) {
+			hash = R_ShadowMapHashFloat( hash, casterTris->bounds[ corner ][ component ] );
+		}
+	}
+	unsigned int mixed = static_cast<unsigned int>( hash );
+	mixed ^= mixed >> 16;
+	mixed *= 0x85ebca6bu;
+	mixed ^= mixed >> 13;
+	mixed *= 0xc2b2ae35u;
+	mixed ^= mixed >> 16;
+	vLight->shadowMapCasterSignature = static_cast<int>(
+		static_cast<unsigned int>( vLight->shadowMapCasterSignature ) + mixed );
+
+	R_LinkShadowMapCasterSurf( &vLight->globalShadowMapCasters, casterTris, NULL, NULL,
+		tr.defaultMaterial, vLight->scissorRect );
+}
+
 static void R_RecordShadowMapRejectedCaster( viewLight_t *vLight, const shadowMapCasterRejectReason_t reason ) {
 	if ( vLight != NULL ) {
 		vLight->shadowMapRejectedCasterCount++;
@@ -2325,6 +2390,11 @@ void idInteraction::AddActiveInteraction( void ) {
 		entityDef->parms.hModel != NULL &&
 		entityDef->parms.hModel->IsStaticWorldModel() &&
 		R_LightHasRealPrelightModel( lightDef->parms );
+	// And where the light gives one, they cast as one caster: the front caps
+	// of that volume, linked once for the light
+	// (R_ShadowMapLinkPrelightCaster). The world surfaces stand aside for it.
+	const bool worldCastsFromPrelight =
+		prelightOwnsShadows && R_ShadowMapPrelightCaster( lightDef ) != NULL;
 
 	// for each surface of this entity / light interaction
 	for ( int i = 0; i < numSurfaces; i++ ) {
@@ -2478,7 +2548,6 @@ void idInteraction::AddActiveInteraction( void ) {
 		if ( !interactionHasShadows ) {
 			continue;
 		}
-
 		bool shadowSuppressed = false;
 		if ( !r_skipSuppress.GetBool() ) {
 			if ( entityDef->parms.suppressShadowInViewID &&
@@ -2578,7 +2647,18 @@ void idInteraction::AddActiveInteraction( void ) {
 				R_RecordShadowMapRejectedCaster( vLight, R_ClassifyShadowMapCasterReject( entityDef, vEntity, sint, shadowShader, isViewOnlyEntity, translucentShadowMapSupported, skipPointLightEmitterCaster, sameSpectrumShadowMapCaster, casterLODAdmitted ) );
 			}
 
-			if ( allowShadowMapCaster ) {
+			// The prelight's front caps hold every world triangle stencil casts
+			// from, so a world surface that would be drawn into the map, or that
+			// stencil has a volume for, is in the map already. A cutout is not:
+			// dmap gives a volume with a perforated caster no front caps, and
+			// such a light has no caster of this kind.
+			const bool castsThroughPrelight =
+				worldCastsFromPrelight &&
+				shadowShader->Coverage() != MC_PERFORATED &&
+				( allowShadowMapCaster || sint->shadowStencilEligible );
+			if ( castsThroughPrelight ) {
+				linkedShadowMapCaster = true;
+			} else if ( allowShadowMapCaster ) {
 				srfTriangles_t *casterTris = sint->ambientTris;
 				const bool haveCasterGeometry = R_EnsureShadowMapCasterCaches( casterTris, entityDef );
 

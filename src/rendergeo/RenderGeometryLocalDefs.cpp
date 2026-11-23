@@ -106,6 +106,9 @@ idRenderLightLocal::idRenderLightLocal() {
 	shadowMapStencilFallbackSticky = false;
 	shadowMapStencilFallbackFrame = 0;
 	shadowMapStencilFallbackCleanViews = 0;
+	shadowMapPrelightCaster = NULL;
+	shadowMapPrelightCasterSource = NULL;
+	shadowMapPrelightCasterSourceIndexes = 0;
 	world					= NULL;
 	index					= 0;
 	areaNum					= 0;

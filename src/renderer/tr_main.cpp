@@ -1012,6 +1012,10 @@ void R_SetViewMatrix( viewDef_t *viewDef ) {
 	world->modelMatrix[0*4+0] = 1;
 	world->modelMatrix[1*4+1] = 1;
 	world->modelMatrix[2*4+2] = 1;
+	// including its last row: a shadow-map caster pass multiplies whole model
+	// matrices, and a caster drawn in world space (the prelight front caps)
+	// came out with w = 0 and wrote no depth at all
+	world->modelMatrix[3*4+3] = 1;
 
 	// transform by the camera placement
 	origin = viewDef->renderView.vieworg;

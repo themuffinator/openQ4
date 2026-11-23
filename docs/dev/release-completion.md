@@ -12,6 +12,37 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Sunlight and off-centre lamps cast the original shadows with shadow maps on, 23 November 2026
+
+- **Sunlit maps keep their shadows.** With shadow maps on (the Quality tier
+  and above), some outdoor lights lit places the original shadows keep dark.
+  In the multiplayer map q4cmp13 the three sunlights left up to a third of a
+  view lit that should be in shadow; the large fill lights of q4ctf2 did the
+  same to a lesser degree. They now cast the shadows the original game does:
+  the worst sunlight goes from 31% of a view wrongly lit to under 1%.
+- **Lamps mounted outside the area they light stop casting extra shadows.**
+  A lamp whose source sits outside the box it lights, a common way to fake
+  soft fill light, shadowed the area with whatever lies between the two,
+  which the original shadows ignore, and with ground that the original
+  shadows let it shine through. Seen from where a player stands the
+  difference is small (2% of one outdoor view in MCC Landing); seen from the
+  lamp it was up to half the view.
+- **What you need to do.** Nothing. `r_shadowMapPrelightCasters 0` brings the
+  earlier behaviour back for comparison. The original stencil shadows and
+  the Balanced tier are unchanged.
+- **What is not shown.** About a quarter of these lights keep the earlier
+  behaviour: those whose stored shadow volume also holds a see-through
+  grating, and those the map compiler gave no volume. Where the shadow map
+  is coarse, a strip close behind the surface that casts a shadow can be lit
+  that the original shadows keep dark: one light in Air Defense 1 went
+  from 0.15% to 1.9% of a view that way. One graphics card on Windows was
+  measured.
+- **Checks.** The stencil parity scan on OpenGL and Vulkan; the
+  continuous-motion receiver check, the moving-door and caster-cycle
+  scenarios on both; the in-engine shadow self-tests.
+- **Developer detail:** [what the stock volumes hold](shadowmapping-audit-2026-11-09.md#what-the-stock-volumes-hold)
+  and REN-03 in the [roadmap](roadmap.md).
+
 ## Sharper textures when upscaling, and on Vulkan with NVIDIA cards, 23 November 2026
 
 - **Lower resolution scales keep more texture detail.** When the 3D scene is

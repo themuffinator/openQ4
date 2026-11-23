@@ -443,6 +443,14 @@ bool R_ShadowMapClipPlanesMirrorWinding( const idPlane clipPlanes[4] ) {
 	return determinant < 0.0;
 }
 
+// Measured on 23 November 2026 (shadowmapping-audit-2026-11-09.md, "What the
+// stock volumes hold"): for the two synthesized projections, parallel and
+// distant point, this verdict leaves open casters storing the triangles
+// turned towards the light and sealed hulls their far shell, the reverse of
+// what R_ShadowMapCasterFaces intends. The static world of such a light does
+// not depend on it (the prelight front caps are stored in both windings);
+// its other casters do. Not changed: see the audit for what a correction
+// costs and what it needs first.
 bool R_ShadowMapLightMirrorsCasterWinding( const viewLight_t *vLight ) {
 	if ( vLight == NULL || R_ClassifyShadowMapLight( vLight ).pointLight ) {
 		return false;

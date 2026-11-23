@@ -1610,6 +1610,7 @@ extern idCVar r_shadowMapModernStrict;	// fail-visible modern shadow contract br
 extern idCVar r_shadowMapTranslucentReceivers;	// translucent surfaces sample the shadow map like opaque receivers
 extern idCVar r_shadowMapSubviewPolicy;	// 0 = full renders in subviews, 1 = reuse-or-stencil, 2 = always stencil
 extern idCVar r_shadowMapReportInterval;	// frames between shadow-map diagnostic reports
+extern idCVar r_shadowMapPrelightCasters;	// 0 = world surfaces whole, 1 = prelight front caps for lights whose source lies outside their box, 2 = for every prelit light
 extern idCVar r_shadowMapConservativeCasters;	// 1 = keep shadow-map caster submission independent from visible receiver scissors
 extern idCVar r_shadowMapProjectedCSM;	// 1 = allow ordinary projected lights to use CSM when r_shadowMapCSM is enabled
 extern idCVar r_shadowMapDepthCompare;	// 1 = use sampler2DShadow compare mode for projected depth maps
@@ -2068,6 +2069,15 @@ void R_PurgeFramebufferCopyFBOs( void );
 // regenerated dynamic-model tris re-upload every frame, which costs more
 // than the client-memory index draw it replaces and causes pacing spikes)
 bool R_StaticIndexCacheAllowed( const idRenderEntityLocal *def );
+
+// The static world of a prelit light as one shadow-map caster: the front caps
+// of its prelight volume (tr_light.cpp). NULL when the light has none to give.
+bool R_ShadowMapLightSourceOutsideVolume( const renderLight_t &parms );
+srfTriangles_t *R_ShadowMapPrelightCaster( idRenderLightLocal *light );
+srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri );
+bool R_ShadowMapPrelightCasterSelfTest( void );
+// links it into the view light's caster chain (Interaction.cpp)
+void R_ShadowMapLinkPrelightCaster( viewLight_t *vLight );
 
 
 /*

@@ -1593,6 +1593,243 @@ static idRenderModel *R_ViewLightPrelightModel( viewLight_t *vLight ) {
 	return prelightModel;
 }
 
+/*
+=================
+R_ShadowMapLightSourceOutsideVolume
+
+A point light whose source (origin plus light_center) lies outside its own
+radius box, and every parallel light, whose source is nowhere near it.
+Geometry between that source and the box is in no stencil volume of the light
+and in every map drawn from whole surfaces.
+=================
+*/
+bool R_ShadowMapLightSourceOutsideVolume( const renderLight_t &parms ) {
+	if ( !parms.pointLight ) {
+		return false;
+	}
+	if ( parms.parallel ) {
+		return true;
+	}
+	for ( int axis = 0; axis < 3; ++axis ) {
+		if ( idMath::Fabs( parms.lightCenter[axis] ) > idMath::Fabs( parms.lightRadius[axis] ) ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+=================
+R_ShadowMapBuildPrelightCaster
+
+The front caps of a prelight shadow volume as ordinary caster geometry. dmap
+builds that volume from the world triangles that face away from the light,
+cut to the light's shadow frustums; the front caps are those pieces where they
+lie, and the stencil shadow of the static world is their shadow and nothing
+else. A map drawn from them shadows what stencil shadows: no triangle that
+faces the light, nothing outside the volume, and a surface that lies in the
+light's boundary plane exactly as far as dmap kept it.
+
+Each cap is stored in both windings, so that whichever face a caster pass
+discards one copy is drawn: the set is already the one the stencil rule
+selects, and it must not be selected again by a rule or a projection
+handedness that could disagree.
+
+NULL when the volume carries no separate front caps. dmap folds them away
+when a perforated surface casts into the volume, and such a light keeps its
+per-surface casters, which hold the cutouts.
+=================
+*/
+srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri ) {
+	if ( shadowTri == NULL || shadowTri->shadowVertexes == NULL || shadowTri->indexes == NULL
+			|| shadowTri->numVerts <= 0 ) {
+		return NULL;
+	}
+	const int first = shadowTri->numShadowIndexesNoFrontCaps;
+	const int count = shadowTri->numIndexes - first;
+	if ( first < 0 || count < 3 || count % 3 != 0 ) {
+		return NULL;
+	}
+
+	int *remap = (int *)Mem_Alloc( shadowTri->numVerts * sizeof( remap[0] ) );
+	for ( int i = 0; i < shadowTri->numVerts; ++i ) {
+		remap[i] = -1;
+	}
+	int numVerts = 0;
+	bool valid = true;
+	for ( int i = 0; i < count && valid; ++i ) {
+		const int source = shadowTri->indexes[first + i];
+		// a front cap lies on the casting geometry: the unprojected vertexes
+		if ( source < 0 || source >= shadowTri->numVerts
+				|| shadowTri->shadowVertexes[source].xyz.w != 1.0f ) {
+			valid = false;
+		} else if ( remap[source] < 0 ) {
+			remap[source] = numVerts++;
+		}
+	}
+	if ( !valid || numVerts < 3 ) {
+		Mem_Free( remap );
+		return NULL;
+	}
+
+	srfTriangles_t *tri = R_AllocStaticTriSurf();
+	R_AllocStaticTriSurfVerts( tri, numVerts );
+	R_AllocStaticTriSurfIndexes( tri, count * 2 );
+	tri->numVerts = numVerts;
+	tri->numIndexes = count * 2;
+	for ( int i = 0; i < shadowTri->numVerts; ++i ) {
+		if ( remap[i] >= 0 ) {
+			idDrawVert &vert = tri->verts[ remap[i] ];
+			vert.Clear();
+			vert.xyz = shadowTri->shadowVertexes[i].xyz.ToVec3();
+		}
+	}
+	for ( int i = 0; i < count; i += 3 ) {
+		const glIndex_t a = remap[ shadowTri->indexes[first + i + 0] ];
+		const glIndex_t b = remap[ shadowTri->indexes[first + i + 1] ];
+		const glIndex_t c = remap[ shadowTri->indexes[first + i + 2] ];
+		tri->indexes[i + 0] = a;
+		tri->indexes[i + 1] = b;
+		tri->indexes[i + 2] = c;
+		tri->indexes[count + i + 0] = a;
+		tri->indexes[count + i + 1] = c;
+		tri->indexes[count + i + 2] = b;
+	}
+	Mem_Free( remap );
+	R_BoundTriSurf( tri );
+	return tri;
+}
+
+/*
+=================
+R_ShadowMapPrelightCaster
+
+The caster for a light, built once and kept with it. NULL when the setting
+leaves this light to its world surfaces, or when its prelight volume cannot
+give one.
+=================
+*/
+srfTriangles_t *R_ShadowMapPrelightCaster( idRenderLightLocal *light ) {
+	if ( light == NULL ) {
+		return NULL;
+	}
+	const int setting = r_shadowMapPrelightCasters.GetInteger();
+	if ( setting <= 0 || !r_useOptimizedShadows.GetBool()
+			|| light->parms.noShadows || light->parms.noDynamicShadows ) {
+		return NULL;
+	}
+	if ( setting < 2 && !R_ShadowMapLightSourceOutsideVolume( light->parms ) ) {
+		return NULL;
+	}
+	idRenderModel *prelightModel = R_SanitizePrelightModelPointer( light->parms.prelightModel );
+	if ( !R_IsUsablePrelightModel( prelightModel ) || prelightModel->NumSurfaces() < 1 ) {
+		return NULL;
+	}
+	const modelSurface_t *surface = prelightModel->Surface( 0 );
+	const srfTriangles_t *shadowTri = surface != NULL ? surface->geometry : NULL;
+	if ( shadowTri == NULL ) {
+		return NULL;
+	}
+#if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
+	if ( shadowTri->primBatchMesh != NULL ) {
+		return NULL;
+	}
+#endif
+	if ( light->shadowMapPrelightCasterSource != shadowTri
+			|| light->shadowMapPrelightCasterSourceIndexes != shadowTri->numIndexes ) {
+		if ( light->shadowMapPrelightCaster != NULL ) {
+			R_FreeStaticTriSurf( light->shadowMapPrelightCaster );
+		}
+		light->shadowMapPrelightCaster = R_ShadowMapBuildPrelightCaster( shadowTri );
+		light->shadowMapPrelightCasterSource = shadowTri;
+		light->shadowMapPrelightCasterSourceIndexes = shadowTri->numIndexes;
+	}
+	return light->shadowMapPrelightCaster;
+}
+
+/*
+=================
+R_ShadowMapPrelightCasterSelfTest
+=================
+*/
+bool R_ShadowMapPrelightCasterSelfTest( void ) {
+	// a volume of one triangle: three silhouette quads, a rear cap, a front cap
+	shadowCache_t verts[6];
+	const idVec3 corners[3] = { idVec3( 0.0f, 0.0f, 64.0f ), idVec3( 32.0f, 0.0f, 64.0f ), idVec3( 0.0f, 32.0f, 64.0f ) };
+	for ( int i = 0; i < 3; ++i ) {
+		verts[i * 2 + 0].xyz.Set( corners[i].x, corners[i].y, corners[i].z, 1.0f );
+		verts[i * 2 + 1].xyz.Set( corners[i].x * 4.0f, corners[i].y * 4.0f, 0.0f, 1.0f );
+	}
+	glIndex_t indexes[24] = {
+		0, 1, 2,  2, 1, 3,  2, 3, 4,  4, 3, 5,  4, 5, 0,  0, 5, 1,	// silhouette
+		1, 3, 5,													// rear cap
+		4, 2, 0 };													// front cap
+	srfTriangles_t volume;
+	memset( &volume, 0, sizeof( volume ) );
+	volume.numVerts = 6;
+	volume.shadowVertexes = verts;
+	volume.indexes = indexes;
+	volume.numIndexes = 24;
+	volume.numShadowIndexesNoCaps = 18;
+	volume.numShadowIndexesNoFrontCaps = 21;
+
+	srfTriangles_t *caster = R_ShadowMapBuildPrelightCaster( &volume );
+	bool passed = caster != NULL && caster->numVerts == 3 && caster->numIndexes == 6
+		&& caster->bounds[0].Compare( idVec3( 0.0f, 0.0f, 64.0f ), 0.01f )
+		&& caster->bounds[1].Compare( idVec3( 32.0f, 32.0f, 64.0f ), 0.01f );
+	if ( passed ) {
+		// the same triangle, once in each winding
+		const idVec3 &a = caster->verts[ caster->indexes[0] ].xyz;
+		const idVec3 &b = caster->verts[ caster->indexes[1] ].xyz;
+		const idVec3 &c = caster->verts[ caster->indexes[2] ].xyz;
+		const idVec3 &d = caster->verts[ caster->indexes[3] ].xyz;
+		const idVec3 &e = caster->verts[ caster->indexes[4] ].xyz;
+		const idVec3 &f = caster->verts[ caster->indexes[5] ].xyz;
+		const float first = ( b - a ).Cross( c - a ).z;
+		const float second = ( e - d ).Cross( f - d ).z;
+		passed = first * second < 0.0f && idMath::Fabs( first + second ) < 0.01f;
+	}
+	if ( caster != NULL ) {
+		R_FreeStaticTriSurf( caster );
+	}
+	// a volume whose caps were folded into the silhouette gives none, and
+	// neither does one whose cap reaches a projected vertex
+	volume.numShadowIndexesNoFrontCaps = 24;
+	srfTriangles_t *none = R_ShadowMapBuildPrelightCaster( &volume );
+	volume.numShadowIndexesNoFrontCaps = 21;
+	indexes[21] = 5;
+	verts[5].xyz.w = 0.0f;
+	srfTriangles_t *projected = R_ShadowMapBuildPrelightCaster( &volume );
+	passed = passed && none == NULL && projected == NULL;
+	if ( none != NULL ) {
+		R_FreeStaticTriSurf( none );
+	}
+	if ( projected != NULL ) {
+		R_FreeStaticTriSurf( projected );
+	}
+
+	renderLight_t parms;
+	memset( &parms, 0, sizeof( parms ) );
+	parms.pointLight = true;
+	parms.lightRadius.Set( 184.0f, 160.0f, 176.0f );
+	parms.lightCenter.Set( -40.0f, 0.0f, 176.0f );
+	passed = passed && !R_ShadowMapLightSourceOutsideVolume( parms );
+	parms.lightCenter.Set( -40.0f, 0.0f, 184.0f );	// mcc_landing's light_9081
+	passed = passed && R_ShadowMapLightSourceOutsideVolume( parms );
+	parms.lightCenter.Set( 0.0f, 0.0f, 1.0f );
+	parms.parallel = true;
+	passed = passed && R_ShadowMapLightSourceOutsideVolume( parms );
+	parms.pointLight = false;
+	passed = passed && !R_ShadowMapLightSourceOutsideVolume( parms );
+
+	if ( !passed ) {
+		common->Printf( "Prelight caster self-test FAILED\n" );
+		return false;
+	}
+	common->Printf( "Prelight caster self-test passed: front caps in both windings, folded and projected caps refused\n" );
+	return true;
+}
+
 #ifdef OPENQ4_RENDERER_VK_MODULE
 // whether any surface with geometry of a model, drawn with an entity's skin
 // and custom shader, uses authored GLSL lighting
@@ -3848,6 +4085,7 @@ void R_RemoveUnecessaryViewLights( void ) {
 	// go through each visible light
 	for ( vLight = tr.viewDef->viewLights ; vLight ; vLight = vLight->next ) {
 		R_AddOptimizedPrelightShadows( vLight );
+		R_ShadowMapLinkPrelightCaster( vLight );
 
 		// if the light didn't have any lit surfaces visible, there is no need to
 		// draw any of the shadows.  We still keep the vLight for debugging
