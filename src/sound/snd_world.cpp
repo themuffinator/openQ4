@@ -1550,6 +1550,388 @@ bool idSoundWorldLocal::ProcessDemoCommand( idDemoFile* readDemo )
 }
 
 /*
+========================
+idSoundWorldLocal::RetailDemoEmitter
+
+A retail render demo names emitters by retail's own indexes, which playback
+recreates as it meets them: retail's index i is this world's emitter i.
+========================
+*/
+idSoundEmitter* idSoundWorldLocal::RetailDemoEmitter( int index, bool allocate )
+{
+	if( index <= 0 || index >= SOUND_SAVEGAME_MAX_EMITTERS )
+	{
+		return NULL;
+	}
+	if( allocate )
+	{
+		while( emitters.Num() <= index )
+		{
+			idSoundEmitterLocal* emitter = emitterAllocator.Alloc();
+			if( emitter == NULL )
+			{
+				return NULL;
+			}
+			emitter->Init( emitters.Append( emitter ), this );
+		}
+	}
+	return EmitterForIndex( index );
+}
+
+/*
+========================
+idSoundWorldLocal::ProcessRetailDemoCommand
+
+Retail Quake 4 writes the Doom 3 sound commands with a byte opcode, a listener
+time after each placement, a byte for the free flag and the shader parms as
+their in-memory struct, which has openQ4's field order. Its SCMD_STATE is its
+savegame layout: the listener, then each live emitter with its eight channel
+slots and the shaders playing on them, which playback restarts.
+========================
+*/
+static bool RetailSoundReadByte( idDemoFile* demo, idSoundDemoCommandReader& reader, unsigned char& value, const char* fieldName )
+{
+	if( demo->Read( &value, 1 ) != 1 )
+	{
+		return reader.Fail( va( "has a truncated %s", fieldName ) );
+	}
+	return true;
+}
+
+static bool RetailSoundReadParms( idSoundDemoCommandReader& reader, soundShaderParms_t& parms )
+{
+	if( !ReadDemoShaderParms( reader, parms ) )
+	{
+		return false;
+	}
+	if( FLOAT_IS_NAN( parms.volume ) || FLOAT_IS_NAN( parms.minDistance ) || FLOAT_IS_NAN( parms.maxDistance ) ||
+		FLOAT_IS_NAN( parms.frequencyShift ) )
+	{
+		return reader.Fail( "contains non-finite shader parms" );
+	}
+	return true;
+}
+
+static bool RetailSoundReadString( idDemoFile* demo, idSoundDemoCommandReader& reader, idStr& value, const char* fieldName )
+{
+	int length = 0;
+	if( demo->ReadInt( length ) != sizeof( length ) || length < 0 || length >= MAX_STRING_CHARS )
+	{
+		return reader.Fail( va( "has an invalid %s", fieldName ) );
+	}
+	value.Fill( ' ', length );
+	if( length > 0 && demo->Read( &value[0], length ) != length )
+	{
+		return reader.Fail( va( "has a truncated %s", fieldName ) );
+	}
+	return true;
+}
+
+bool idSoundWorldLocal::ProcessRetailDemoCommand( idDemoFile* readDemo )
+{
+	if( readDemo == NULL || !readDemo->IsOpen() )
+	{
+		return false;
+	}
+	unsigned char command = 0;
+	if( readDemo->Read( &command, 1 ) != 1 )
+	{
+		return StopMalformedSoundDemo( readDemo, "retail sound command", "is truncated" );
+	}
+
+	idSoundDemoCommandReader reader( readDemo, SoundDemoCommandName( command ) );
+	switch( command )
+	{
+		case SCMD_STATE:
+		{
+			idVec3 origin;
+			idMat3 axis;
+			int listenerId = 0, gameTime = 0, game44kHz = 0, soundTime = 0, numEmitters = 0;
+			if( !reader.ReadVec3( origin, "listener origin" ) ||
+				!reader.ReadMat3( axis, "listener axis" ) ||
+				!reader.ReadInt( listenerId, "listener id" ) ||
+				!reader.ReadInt( gameTime, "listener time" ) ||
+				!reader.ReadInt( game44kHz, "sound time" ) ||
+				!reader.ReadInt( soundTime, "sound time" ) ||
+				!reader.ReadInt( numEmitters, "emitter count" ) )
+			{
+				return false;
+			}
+			if( numEmitters < 0 || numEmitters > SOUND_SAVEGAME_MAX_EMITTERS )
+			{
+				return reader.Fail( va( "contains invalid emitter count %d", numEmitters ) );
+			}
+			ClearAllSoundEmitters();
+			PlaceListener( origin, axis, listenerId );
+			for( int i = 1; i < numEmitters; i++ )
+			{
+				int handle = 0;
+				if( !reader.ReadInt( handle, "emitter index" ) )
+				{
+					return false;
+				}
+				if( handle < 0 )
+				{
+					continue;
+				}
+				if( handle != i )
+				{
+					return reader.Fail( va( "lists emitter %d in slot %d", handle, i ) );
+				}
+				idVec3 emitterOrigin, spatialized;
+				int emitterListener = 0, ampTime = 0, area = 0, removeStatus = 0;
+				float amplitude = 0.0f, distance = 0.0f, maxDistance = 0.0f, realDistance = 0.0f;
+				unsigned char hasShakes = 0, playing = 0;
+				soundShaderParms_t parms;
+				int slotChannel[8] = {};
+				if( !reader.ReadVec3( emitterOrigin, "emitter origin" ) ||
+					!reader.ReadInt( emitterListener, "emitter listener id" ) ||
+					!RetailSoundReadParms( reader, parms ) ||
+					!reader.ReadFloat( amplitude, "emitter amplitude" ) ||
+					!reader.ReadInt( ampTime, "emitter amplitude time" ) )
+				{
+					return false;
+				}
+				for( int slot = 0; slot < 8; slot++ )
+				{
+					unsigned char triggered = 0;
+					int triggerTime = 0;
+					int fields[5] = {};
+					float rest[15] = {};
+					soundShaderParms_t channelParms;
+					if( !RetailSoundReadByte( readDemo, reader, triggered, "channel state" ) ||
+						!reader.ReadInt( triggerTime, "channel time" ) ||
+						!ReadDemoShaderParms( reader, channelParms ) )
+					{
+						return false;
+					}
+					// leadin sample, choice, logical channel, shader, decoder
+					for( int k = 0; k < 5; k++ )
+					{
+						if( !reader.ReadInt( fields[k], "channel field" ) )
+						{
+							return false;
+						}
+					}
+					// diversity, last volume, six speaker volumes, fade times and
+					// volumes, frequency shift time and values
+					for( int k = 0; k < 15; k++ )
+					{
+						if( !reader.ReadFloat( rest[k], "channel field" ) )
+						{
+							return false;
+						}
+					}
+					slotChannel[slot] = fields[2];
+				}
+				if( !reader.ReadFloat( distance, "emitter distance" ) ||
+					!RetailSoundReadByte( readDemo, reader, hasShakes, "emitter shake flag" ) ||
+					!reader.ReadInt( area, "emitter area" ) ||
+					!reader.ReadFloat( maxDistance, "emitter distance" ) ||
+					!RetailSoundReadByte( readDemo, reader, playing, "emitter playing flag" ) ||
+					!reader.ReadFloat( realDistance, "emitter distance" ) ||
+					!reader.ReadInt( removeStatus, "emitter status" ) ||
+					!reader.ReadVec3( spatialized, "emitter origin" ) )
+				{
+					return false;
+				}
+				idSoundEmitter* emitter = RetailDemoEmitter( i, true );
+				if( emitter == NULL )
+				{
+					return reader.Fail( "could not allocate an emitter" );
+				}
+				emitter->UpdateEmitter( emitterOrigin, vec3_origin, emitterListener, &parms );
+				for( int listed = 0; ; listed++ )
+				{
+					int slot = -1;
+					if( !reader.ReadInt( slot, "channel slot" ) )
+					{
+						return false;
+					}
+					if( slot < 0 )
+					{
+						break;
+					}
+					if( slot >= 8 || listed >= 8 )
+					{
+						return reader.Fail( va( "contains invalid channel slot %d", slot ) );
+					}
+					idStr shaderName, sampleName;
+					if( !RetailSoundReadString( readDemo, reader, shaderName, "channel shader" ) ||
+						!RetailSoundReadString( readDemo, reader, sampleName, "channel sample" ) )
+					{
+						return false;
+					}
+					const idSoundShader* shader = declManager->FindSound( shaderName );
+					if( shader != NULL )
+					{
+						emitter->StartSound( shader, ( s_channelType )slotChannel[slot], 0.0f, 0 );
+					}
+				}
+			}
+			UnPause();
+			return true;
+		}
+		case SCMD_PLACE_LISTENER:
+		{
+			idVec3 origin;
+			idMat3 axis;
+			int listenerId = 0, gameTime = 0;
+			if( !reader.ReadVec3( origin, "listener origin" ) ||
+				!reader.ReadMat3( axis, "listener axis" ) ||
+				!reader.ReadInt( listenerId, "listener id" ) ||
+				!reader.ReadInt( gameTime, "listener time" ) )
+			{
+				return false;
+			}
+			PlaceListener( origin, axis, listenerId );
+			return true;
+		}
+		case SCMD_ALLOC_EMITTER:
+		{
+			int index = 0;
+			if( !reader.ReadInt( index, "emitter index" ) )
+			{
+				return false;
+			}
+			idSoundEmitter* emitter = RetailDemoEmitter( index, true );
+			if( emitter == NULL )
+			{
+				return reader.Fail( va( "contains invalid emitter index %d", index ) );
+			}
+			emitters[index]->Reset();
+			return true;
+		}
+		case SCMD_FREE:
+		case SCMD_UPDATE:
+		case SCMD_START:
+		case SCMD_MODIFY:
+		case SCMD_STOP:
+		case SCMD_FADE:
+		{
+			int index = 0;
+			if( !reader.ReadInt( index, "emitter index" ) )
+			{
+				return false;
+			}
+			idSoundEmitter* emitter = index == 0 ? DemoEmitterForIndex( 0 ) : RetailDemoEmitter( index, false );
+			// read the whole command before refusing it, so the message names the record
+			switch( command )
+			{
+				case SCMD_FREE:
+				{
+					unsigned char immediate = 0;
+					if( !RetailSoundReadByte( readDemo, reader, immediate, "immediate flag" ) )
+					{
+						return false;
+					}
+					if( emitter == NULL )
+					{
+						return reader.Fail( va( "references unavailable emitter %d", index ) );
+					}
+					emitter->Free( immediate != 0 );
+					return true;
+				}
+				case SCMD_UPDATE:
+				{
+					int listenerId = 0;
+					idVec3 origin, velocity;
+					soundShaderParms_t parms;
+					if( !reader.ReadVec3( origin, "emitter origin" ) ||
+						!reader.ReadVec3( velocity, "emitter velocity" ) ||
+						!reader.ReadInt( listenerId, "listener id" ) ||
+						!RetailSoundReadParms( reader, parms ) )
+					{
+						return false;
+					}
+					if( emitter == NULL )
+					{
+						return reader.Fail( va( "references unavailable emitter %d", index ) );
+					}
+					emitter->UpdateEmitter( origin, velocity, listenerId, &parms );
+					return true;
+				}
+				case SCMD_START:
+				{
+					int channel = 0, shaderFlags = 0;
+					float diversity = 0.0f;
+					idStr shaderName;
+					if( !reader.ReadHashString( shaderName, "sound shader name" ) ||
+						!reader.ReadInt( channel, "channel" ) ||
+						!reader.ReadFloat( diversity, "diversity" ) ||
+						!reader.ReadInt( shaderFlags, "sound shader flags" ) )
+					{
+						return false;
+					}
+					if( FLOAT_IS_NAN( diversity ) || diversity < 0.0f || diversity > 1.0f )
+					{
+						return reader.Fail( va( "contains invalid diversity %g", diversity ) );
+					}
+					if( emitter == NULL )
+					{
+						return reader.Fail( va( "references unavailable emitter %d", index ) );
+					}
+					emitter->StartSound( declManager->FindSound( shaderName ), ( s_channelType )channel, diversity, shaderFlags );
+					return true;
+				}
+				case SCMD_MODIFY:
+				{
+					int channel = 0;
+					soundShaderParms_t parms;
+					if( !reader.ReadInt( channel, "channel" ) || !RetailSoundReadParms( reader, parms ) )
+					{
+						return false;
+					}
+					if( emitter == NULL )
+					{
+						return reader.Fail( va( "references unavailable emitter %d", index ) );
+					}
+					emitter->ModifySound( ( s_channelType )channel, &parms );
+					return true;
+				}
+				case SCMD_STOP:
+				{
+					int channel = 0;
+					if( !reader.ReadInt( channel, "channel" ) )
+					{
+						return false;
+					}
+					if( emitter == NULL )
+					{
+						return reader.Fail( va( "references unavailable emitter %d", index ) );
+					}
+					emitter->StopSound( ( s_channelType )channel );
+					return true;
+				}
+				default:
+				{
+					int channel = 0;
+					float to = 0.0f, over = 0.0f;
+					if( !reader.ReadInt( channel, "channel" ) ||
+						!reader.ReadFloat( to, "target volume" ) ||
+						!reader.ReadFloat( over, "fade duration" ) )
+					{
+						return false;
+					}
+					if( FLOAT_IS_NAN( to ) || FLOAT_IS_NAN( over ) )
+					{
+						return reader.Fail( "contains a non-finite fade" );
+					}
+					if( emitter == NULL )
+					{
+						return reader.Fail( va( "references unavailable emitter %d", index ) );
+					}
+					emitter->FadeSound( ( s_channelType )channel, to, over );
+					return true;
+				}
+			}
+		}
+		default:
+			return reader.Fail( va( "has unknown retail command %d", static_cast<int>( command ) ) );
+	}
+}
+
+/*
 =================
 idSoundWorldLocal::AVIOpen
 =================

@@ -77,6 +77,12 @@ public:
 	virtual int							AddTraceModel(idTraceModel* model) = 0;
 	virtual idTraceModel*				GetTraceModel(int index) = 0;
 	virtual void						FreeTraceModel(int index) = 0;
+
+	// Retail render demos (MP-22): per segment of the effect as it would start
+	// from parms at time, the PTYPE_* of the particles it allocates, or -1 for
+	// none, in layout[0..maxSegments). Returns the segment count, or -1 when
+	// effects do not run here or the effect has more than maxSegments segments.
+	virtual int							DemoParticleLayout(const class rvDeclEffect* declEffect, const renderEffect_t* parms, float time, int* layout, int maxSegments) = 0;
 };
 
 extern	rvBSEManager			*bse;

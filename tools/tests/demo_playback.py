@@ -321,8 +321,9 @@ def validate_playback_controls() -> None:
         '#define DEMO_MAGIC_HISTORICAL "OpenQ4 RDEMO"',
         '#define DEMO_MAGIC_QUAKE4 "Quake4 RDEMO"',
         "ambiguousQuake4Wrapper",
-        "firstToken != DS_VERSION",
-        "unsupported retail Quake 4 render-demo stream",
+        "firstToken == DS_VERSION && streamVersion >= 1",
+        "head[0] == DS_VERSION && head[5] == DS_SOUND && head[6] == 0",
+        "is not a render demo this build recognizes",
         "allowPreload && com_preloadDemos.GetBool()",
     ):
         require(demo_file, needle, "historical render-demo discrimination")

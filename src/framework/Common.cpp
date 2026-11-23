@@ -930,6 +930,10 @@ public:
 		traceModels[index] = NULL;
 	}
 
+	virtual int					DemoParticleLayout( const rvDeclEffect *, const renderEffect_t *, float, int *, int ) {
+		return -1;
+	}
+
 private:
 	idList<idTraceModel *>		traceModels;
 };

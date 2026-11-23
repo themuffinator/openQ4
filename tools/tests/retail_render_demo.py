@@ -472,7 +472,7 @@ def read_sound(r: Reader, stats: dict) -> None:
 
 
 def decode(data: bytes) -> dict:
-    if not data.startswith(MAGIC):
+    if not data.startswith(MAGIC) or len(data) < len(MAGIC) + 4:
         raise DemoError("not a Quake4 RDEMO file")
     scheme = struct.unpack_from("<i", data, len(MAGIC))[0]
     if scheme != 0:
@@ -501,6 +501,54 @@ def decode(data: bytes) -> dict:
     stats["view_count"] = len(views)
     stats["view_times"] = [v["time"] for v in views if v["kind"] == "RENDERVIEW"]
     return stats
+
+
+def command_offsets(data: bytes) -> dict:
+    """Where a few kinds of record first start in an uncompressed stream, for
+    tests that cut or corrupt one: the offset of its DS_ byte, and for some the
+    offset of a count or index inside it."""
+    marks = {}
+    read_render, read_sound, read_entity = globals()["read_render"], globals()["read_sound"], globals()["read_entity"]
+    read_gui, hash_string = globals()["read_gui"], Reader.hash_string
+
+    def on_render(r, stats, **kw):
+        if kw.get("probe_effects", True):
+            name = DC_NAMES.get(r.data[r.pos])
+            if name and name not in marks:
+                marks[name] = r.pos - 1
+        return read_render(r, stats, **kw)
+
+    def on_sound(r, stats):
+        if r.data[r.pos] == 0 and "SCMD_STATE" not in marks:
+            marks["SCMD_STATE"] = r.pos - 1
+        return read_sound(r, stats)
+
+    def on_entity(r):
+        start = r.pos
+        entity = read_entity(r)
+        if entity["joints"] and "JOINTS" not in marks:
+            marks["JOINTS"] = start + 4 * 4 + 24 + 4 * 7 + 12 + 36 + 4 * 5 + 4 * SHADER_PARMS + 4 * ENTITY_GUIS + 4
+        return entity
+
+    def on_gui(r):
+        if "ENTITYDEF_GUI" not in marks:
+            marks["ENTITYDEF_GUI"] = marks.get("ENTITYDEF", r.pos)
+            marks["ENTITYDEF_GUI_STATE"] = r.pos + 4
+        return read_gui(r)
+
+    def on_hash(self):
+        if "HASH" not in marks and self.remaining() >= 4 and struct.unpack_from("<i", self.data, self.pos)[0] >= 0:
+            marks["HASH"] = self.pos
+        return hash_string(self)
+
+    globals().update(read_render=on_render, read_sound=on_sound, read_entity=on_entity, read_gui=on_gui)
+    Reader.hash_string = on_hash
+    try:
+        decode(data)
+    finally:
+        globals().update(read_render=read_render, read_sound=read_sound, read_entity=read_entity, read_gui=read_gui)
+        Reader.hash_string = hash_string
+    return marks
 
 
 def main() -> int:

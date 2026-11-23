@@ -758,6 +758,11 @@ public:
 	int					numDemoFrames;		// for timeDemo and demoShot
 	int					demoTimeOffset;
 	renderView_t		currentDemoRenderView;
+	// A retail render demo's portal-sky view: the one the frame being read gave
+	// (time 0: none yet) and the one the frame on screen gave, drawn first.
+	renderView_t		retailPortalSkyPending;
+	renderView_t		retailPortalSkyView;
+	int					retailLastFrameViewTime;	// the previous retail frame's view time, -1 before one
 	// the next one will be read when 
 	// com_frameTime + demoTimeOffset > currentDemoRenderView.
 
@@ -1036,6 +1041,7 @@ public:
 	void				CompressDemoFile( const char *scheme, const char *name );
 	void				TimeRenderDemo( const char *name, bool twice = false );
 	void				AVIRenderDemo( const char *name );
+	void				DrawRetailPortalSky();
 	void				AVICmdDemo( const char *name );
 	void				AVIGame( const char *name );
 	void				BeginAVICapture( const char *name );

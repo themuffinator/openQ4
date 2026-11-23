@@ -238,6 +238,27 @@ idTraceModel* rvBSEManagerLocal::GetTraceModel(int index)
 }
 
 /*
+================
+rvBSEManagerLocal::DemoParticleLayout
+================
+*/
+int rvBSEManagerLocal::DemoParticleLayout(const rvDeclEffect* declEffect, const renderEffect_t* parms, float time, int* layout, int maxSegments)
+{
+	if (declEffect == NULL || parms == NULL || layout == NULL || maxSegments < 0) {
+		return -1;
+	}
+	idList<int> segments;
+	rvBSE::DemoParticleLayout(declEffect, *parms, time, segments);
+	if (segments.Num() > maxSegments) {
+		return -1;
+	}
+	for (int i = 0; i < segments.Num(); ++i) {
+		layout[i] = segments[i];
+	}
+	return segments.Num();
+}
+
+/*
 =======================
 rvBSEManagerLocal::FreeTraceModel
 =======================

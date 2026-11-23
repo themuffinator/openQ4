@@ -459,6 +459,12 @@ public:
 	void					Init(const rvDeclEffect* declEffect, struct renderEffect_s* parms, float time);
 	void					Destroy(void);
 
+	// Retail render demos (MP-22): an effect record carries the effect's live
+	// state, whose segments and particle pools the stream does not name; retail
+	// reads them from the effect as it starts it. layout gets, per segment, the
+	// PTYPE_* of the particles it holds, or -1 for none.
+	static void				DemoParticleLayout(const rvDeclEffect* declEffect, const struct renderEffect_s& parms, float time, idList<int>& layout);
+
 	void					SetFlag(bool on, int flag) { on ? mFlags |= flag : mFlags &= ~flag; }
 
 	bool					GetLooping(void) const { return(!!(mFlags & EFLAG_LOOPING)); }
@@ -632,6 +638,7 @@ public:
 	virtual int							AddTraceModel(idTraceModel* model);
 	virtual idTraceModel*				GetTraceModel(int index);
 	virtual void						FreeTraceModel(int index);
+	virtual int							DemoParticleLayout(const rvDeclEffect* declEffect, const renderEffect_t* parms, float time, int* layout, int maxSegments);
 private:
 	static		idBlockAlloc<rvBSE, 256, 0>	effects;
 	static		idList<idTraceModel*>		mTraceModels;

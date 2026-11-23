@@ -529,16 +529,20 @@ runtime before and after and records exit 0. Repeat with
 | Native openQ4 `.mvd` 1.3 | Yes | Yes | Yes, through keyframes, then replay | Full-world free roam, player follow, markers and auto-tracking | Markers, keyframes and user-info updates are optional records. |
 | Native openQ4 `.mvd` 1.0-1.2 | Yes | Yes | Yes, replay based | Full-world free roam, player follow and auto-tracking | 1.0/1.1 retain legacy instance-0 capture semantics; protocol/content checks still apply. |
 | Native or historical openQ4 render `.demo` | Yes | Yes | Yes: a v14 recording from the last level start or keyframe, then replay; older ones replay from the first frame | Fixed recorded camera | Presentation stream; it has no off-camera game state. A v11 campaign demo spans single-player levels as segments whose starts are markers ([campaign render demos](#campaign-render-demos-v11-7-november-2026)); a v14 one is a container of checked blocks ([block container](#block-container-keyframes-and-large-files-v14-14-november-2026)). |
-| Retail Quake 4 render `.demo` | No | No | No | Recorded camera only in the original engine | Detected as legacy; the byte-oriented retail stream needs a separate decoder. |
+| Retail Quake 4 render `.demo` | Yes | Yes | Yes, replay based | Fixed recorded camera | Its own reader ([retail render demos](#retail-quake-4-render-demos-mp-22-23-november-2026)); needs the recording's levels and effect declarations. |
 | Retail Quake 4 `.netdemo` | No | No | No | Depends on original client/server recording | `NDMO` metadata is shown, but retail packet protocols are not decoded. |
 | openQ4 `.cdemo` | Best effort | No | No | Simulation-defined | Unversioned developer artifact; safe only with the matching engine/game build. |
 | `.mvd.part`, `.part`, or `.ucmd` | No | No | No | None | Shown as incomplete rather than a healthy recording; `mvdRecover` publishes the complete prefix of a `.mvd.part` as a new demo. |
 
 Render-demo wrapper compatibility includes the current `openQ4 RDEMO` and
 historical `OpenQ4 RDEMO` spellings. `Quake4 RDEMO` is ambiguous: early
-openQ4 and retail Quake 4 both used it. The decoder accepts it only when the
-decoded first token proves it is the 32-bit openQ4 stream; a retail
-byte-oriented stream is reported as unsupported.
+openQ4 and retail Quake 4 both used it. The first four decoded bytes read as
+the int `DS_VERSION` in both, so the decoder looks further: an openQ4 stream
+follows with a stream version from 1 to the current one, a retail stream with
+its savegame version and then the bytes `DS_SOUND` and `SCMD_STATE`, which
+every retail recording starts with. Anything else is refused as unrecognized.
+A retail stream plays through its own reader
+([retail render demos](#retail-quake-4-render-demos-mp-22-23-november-2026)).
 
 Render demos can pause, change rate, step, and seek by consuming their command
 stream. Rewinding a v14 recording opens the file at the last level start or
@@ -610,7 +614,8 @@ from unfinished work instead of treating every historical bullet as outstanding.
   bounded restart/replay rewind.
 - Explicit MVD follow-next and free-roam actions alongside attack/jump.
 - Historical openQ4 render-wrapper recognition and clear rejection of retail
-  render and network demo streams.
+  network demo streams; retail render demos play through their own reader
+  since 23 November 2026.
 
 Competitive playback work delivered since: previous, slot and name follow
 (23 October 2026), and structured markers, killer/action/team auto-tracking
@@ -879,6 +884,102 @@ deletes with the demo.
 lead: playback predicts to the recorder's frame as the clock reconstructs it,
 which matches the recorded view to within the frame-time jitter of the
 original client.
+
+## Retail Quake 4 render demos (MP-22), 23 November 2026
+
+openQ4 plays render demos recorded by retail Quake 4 1.4.2 (`recordDemo`,
+`demoShot`) from the library and with `playDemo` and `timeDemo`. The decision
+to build readers for both retail formats is the user's, 23 November 2026; the
+`.netdemo` reader is separate work.
+
+### What retail writes
+
+Retail keeps Doom 3's render-demo wrapper (`Quake4 RDEMO`, a compression
+scheme, the LZW, LZSS and Huffman compressors openQ4 already has) and its
+three top-level tokens, but writes every token and every command as one byte
+and lays its records out after its own structures. The layout below was read
+from the retail executable's writers (`Quake4.exe` 1.4.3 as Steam ships it;
+the Hex-Rays reconstruction misses most of what follows) and checked against
+recordings that executable made:
+
+- `DS_VERSION`, then retail's savegame version as an int.
+- `DS_SOUND`, a command byte, then the Doom 3 sound commands with three
+  changes: a listener placement carries the game time after the listener id,
+  the free flag is a byte, and shader parms are the 40-byte struct in openQ4's
+  field order. `SCMD_STATE` is retail's sound savegame layout: the listener,
+  then each live emitter with its parms, eight channel slots of 125 bytes and
+  the shader and sample names playing on them.
+- `DS_RENDER`, a command byte (1 to 20). Entity, light and effect records are
+  the retail structures with pointers as presence words and names after them.
+  Three things in them are easy to get wrong:
+  - `idFile::WriteBounds` writes a bounds' maximum before its minimum. Read
+    the other way round, every entity has inverted bounds, gets no area
+    references and its dynamic model is never drawn.
+  - An entity record carries each GUI it has: an int id, the GUI's state
+    dictionary, its whole window tree (each `idWindow` writes its geometry,
+    fourteen typed window variables, its registers and its children, an
+    `idSimpleWindow` twelve variables) and the cursor.
+  - An effect record carries `rvBSE`'s live state: the effect, then each
+    segment and every live particle, each particle type with its own record.
+    Retail writes neither the segment count nor which segments hold particle
+    pools; its reader takes both from the effect as it starts it.
+  - The map header is four ints (0, then 224 and 216, retail's entity and
+    light record sizes, then a word whose meaning is not known), the 256-byte
+    map name and the start time.
+  - `DC_UPDATE_*` records carry only a handle; the full record follows when
+    the definition is next drawn. `DC_DEFINE_MODEL` is never written. Each
+    frame has two identical main views and, where the level has one, a
+    portal-sky view before them. The stream ends after the last
+    `DC_END_FRAME`, without `DS_FINISHED`.
+
+### Playback
+
+`idDemoFile::IsRetailRenderStream()` routes the stream: the session reads byte
+tokens, `idRenderWorld::ProcessRetailDemoCommand`
+(`src/renderer/RenderWorld_demo_retail.cpp`) the render commands and
+`idSoundWorld::ProcessRetailDemoCommand` the sound commands.
+
+- **GUIs.** The window tree is read and checked but not rebuilt: the GUI the
+  state dictionary names is loaded and given that state, so a screen shows what
+  it showed, drawn by openQ4. A GUI already on the entity with the same file
+  is reused across updates.
+- **Effects.** The reader asks the effect manager
+  (`rvBSEManager::DemoParticleLayout`) to start a scratch copy of the effect as
+  retail would, and reads the state segment by segment with the pools that
+  copy allocated. The particles are not restored: the effect runs from the
+  start time its state records, through the same silent pre-roll openQ4's own
+  demos use. A recording of an effect this installation does not declare
+  cannot be read past and stops.
+- **Timing.** A frame lasts as long as the recorded view times say, so playback
+  keeps the recording's pace; the two-tic frame retail assumes is not used.
+- **Portal skies** are drawn before the main view, as the game draws them.
+- **Controls.** Pause, speed and step work as for openQ4's older render demos;
+  seeking replays from the first frame. There is no keyframe or summary, so the
+  library shows no length.
+
+Every count, index and length is bounded before use, every float that places
+something is checked finite, and a record that does not fit stops playback
+with a warning naming it. Nothing in the reader trusts retail's own playback,
+which keeps no bounds: retail itself crashed after 130 of the fixture's 136
+frames while capturing it with `aviDemo`.
+
+### Validation
+
+- `tools/tests/retail_render_demo.py` decodes an uncompressed retail stream on
+  its own, as a check of the layout: it reads the fixture below to its last
+  byte. With no effect declarations it finds each effect's segment layout by
+  search, accepting one only when the next commands decode.
+- `tools/tests/retail_render_demo_contract.py` builds a retail-layout stream
+  with every record kind, decodes it, cuts it at every byte and corrupts it
+  3,000 times (every outcome a `DemoError`), and pins the engine wiring and the
+  library string in all twelve languages. It needs no game files.
+- `tools/tests/retail_render_demo_smoke.py` records the fixture with retail
+  Quake 4 itself (`.tmp/runtime/retail-audio`, console scripts only, no input
+  synthesized), has retail compress it into the other three schemes and
+  capture its frames with `aviDemo`, then plays all four copies in the staged
+  openQ4, captures openQ4's frames by pausing and stepping, compares them with
+  retail's, and plays twelve cut or corrupted copies in one session.
+  Results are recorded in the MP-22 entry of the [roadmap](roadmap.md).
 
 ## Campaign render demos (v11), 7 November 2026
 

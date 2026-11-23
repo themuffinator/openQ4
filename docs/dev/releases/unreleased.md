@@ -509,6 +509,13 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Render demos recorded with the original Quake 4 (`recordDemo`) now play:
+  from **Demos**, where they are listed as **Retail Quake 4 render demo** with
+  their level, or with `playDemo`. They show the recorded view, HUD, screens,
+  effects and sound with your openQ4 graphics settings, and need the same
+  Quake 4 game files as the recording. Retail `.netdemo` files are still not
+  playable. See
+  [What each format can do](../../user/multiview-demos.md#what-each-format-can-do).
 - Demo playback lists the players to follow by name, steps back a frame,
   and `demoExport` writes a demo as pictures; the library shows who played and
   a picture from each recording, and `demoFind` searches it.

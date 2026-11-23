@@ -206,6 +206,9 @@ jobs:
             tools/tests/match_control_ui_contract.py \
             tools/tests/campaign_demo_contract.py \
             tools/tests/demo_playback.py \
+            tools/tests/retail_render_demo.py \
+            tools/tests/retail_render_demo_contract.py \
+            tools/tests/retail_render_demo_smoke.py \
             tools/tests/docs_link_integrity.py \
             tools/tests/dmap_render_geometry_lifecycle.py \
             tools/tests/dmap_vertex_sharing.py \
@@ -836,6 +839,7 @@ jobs:
           python tools/tests/match_control_ui_contract.py
           python tools/tests/campaign_demo_contract.py
           python tools/tests/demo_playback.py
+          python tools/tests/retail_render_demo_contract.py
           python tools/tests/docs_link_integrity.py
           python tools/tests/dmap_render_geometry_lifecycle.py
           python tools/tests/dmap_vertex_sharing.py

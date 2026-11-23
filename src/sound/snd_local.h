@@ -350,6 +350,8 @@ public:
 
 	// read a sound command from a demo file
 	virtual bool			ProcessDemoCommand( idDemoFile* readDemo );
+	virtual bool			ProcessRetailDemoCommand( idDemoFile* readDemo );
+	idSoundEmitter*			RetailDemoEmitter( int index, bool allocate );
 
 	// menu sounds
 	virtual int				PlayShaderDirectly( const char* name, int channel = -1 );

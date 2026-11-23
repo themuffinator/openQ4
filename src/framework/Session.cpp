@@ -5943,6 +5943,15 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 	// that's default for <= legacy engine v1.1
 	renderdemoVersion = 1;
 	savegameVersion = 16;
+	// a retail stream reads its 2D model in the legacy layout (renderdemoVersion
+	// 0) and paces its frames by their view times
+	memset( &retailPortalSkyPending, 0, sizeof( retailPortalSkyPending ) );
+	memset( &retailPortalSkyView, 0, sizeof( retailPortalSkyView ) );
+	retailLastFrameViewTime = -1;
+	if ( readDemo->IsRetailRenderStream() ) {
+		renderdemoVersion = 0;
+		renderDemoTimedFrames = true;
+	}
 
 	numDemoFrames = 0;
 	memset( &currentDemoRenderView, 0, sizeof( currentDemoRenderView ) );
@@ -5972,6 +5981,20 @@ void idSessionLocal::StartPlayingRenderDemo( idStr demoName ) {
 		UpdateDemoMenuGui();
 		SetGUI( guiDemoMenu, NULL );
 		UpdateDemoMenuGui();
+	}
+}
+
+/*
+================
+idSessionLocal::DrawRetailPortalSky
+
+A retail render demo records the portal-sky view the frame drew before its
+main view; playback draws it the same way, as the game does.
+================
+*/
+void idSessionLocal::DrawRetailPortalSky() {
+	if ( readDemo != NULL && readDemo->IsRetailRenderStream() && retailPortalSkyView.time != 0 ) {
+		rw->RenderScene( &retailPortalSkyView, RF_DEFER_COMMAND_SUBMIT | RF_PORTAL_SKY );
 	}
 }
 
@@ -10051,7 +10074,74 @@ void idSessionLocal::AdvanceRenderDemo( bool singleFrameOnly ) {
 			break;
 		}
 		int		ds = DS_FINISHED;
-		const int tokenBytes = readDemo->ReadInt( ds );
+		if ( readDemo->IsRetailRenderStream() ) {
+			// A retail Quake 4 render demo: byte tokens, retail records. Its end
+			// is the end of the stream, which reads as DS_FINISHED below.
+			unsigned char retailToken = DS_FINISHED;
+			if ( readDemo->Read( &retailToken, 1 ) == 1 && retailToken != DS_FINISHED ) {
+				if ( retailToken == DS_RENDER ) {
+					renderDemoFramePayloadPending = true;
+					if ( rw->ProcessRetailDemoCommand( readDemo, &currentDemoRenderView, &retailPortalSkyPending, &demoTimeOffset ) ) {
+						renderDemoFramePayloadPending = false;
+						// the recording's own clock: the view times of its frames
+						const int viewTime = currentDemoRenderView.time;
+						const int deltaMS = retailLastFrameViewTime < 0 ? 0 : idMath::ClampInt( 0, 1000, viewTime - retailLastFrameViewTime );
+						retailLastFrameViewTime = viewTime;
+						renderDemoPendingFrameDeltaUS = deltaMS * 1000;
+						retailPortalSkyView = retailPortalSkyPending;
+						retailPortalSkyPending.time = 0;
+						CompleteRenderDemoFrame();
+						framesLeft--;
+						if ( paced && static_cast<double>( renderDemoFrameTimeUS ) > renderDemoPlayClockUS ) {
+							framesLeft = 0;
+						}
+					}
+					continue;
+				}
+				if ( retailToken == DS_SOUND ) {
+					renderDemoFramePayloadPending = true;
+					if ( !sw->ProcessRetailDemoCommand( readDemo ) ) {
+						common->Warning( "Render demo '%s' contains a malformed sound command; playback stopped safely",
+							activeRenderDemoName.c_str() );
+						Stop();
+						StartMenu( false );
+						break;
+					}
+					continue;
+				}
+				if ( retailToken == DS_VERSION ) {
+					// retail's savegame version, which nothing here depends on
+					int retailVersion = 0;
+					if ( readDemo->ReadInt( retailVersion ) != sizeof( retailVersion ) ) {
+						common->Warning( "Render demo '%s' has a truncated version token; playback stopped safely",
+							activeRenderDemoName.c_str() );
+						Stop();
+						StartMenu( false );
+						break;
+					}
+					common->Printf( "reading a retail Quake 4 render demo\n" );
+					continue;
+				}
+				// A retail stream has no end record, and the LZSS and Huffman
+				// coders pad their last bytes: a few undecodable bytes after a
+				// complete frame, then the end of the stream, are its end.
+				if ( !renderDemoFramePayloadPending && numDemoFrames > 0 ) {
+					byte rest[64];
+					if ( readDemo->Read( rest, sizeof( rest ) ) < static_cast<int>( sizeof( rest ) ) ) {
+						common->DPrintf( "Render demo '%s' ends with coder padding after frame %d\n",
+							activeRenderDemoName.c_str(), numDemoFrames );
+						readDemo->Close();
+						continue;
+					}
+				}
+				common->Warning( "Render demo '%s' contains invalid retail token %d; playback stopped safely",
+					activeRenderDemoName.c_str(), static_cast<int>( retailToken ) );
+				Stop();
+				StartMenu( false );
+				break;
+			}
+		}
+		const int tokenBytes = readDemo->IsRetailRenderStream() ? 0 : readDemo->ReadInt( ds );
 		if ( tokenBytes != 0 && tokenBytes != sizeof( ds ) ) {
 			common->Warning( "Render demo '%s' has a truncated top-level token; playback stopped safely",
 				activeRenderDemoName.c_str() );
@@ -10497,6 +10587,7 @@ void idSessionLocal::Draw() {
 			// Playback controls are translucent, so keep the current recorded
 			// frame live behind them even though this GUI does not request the
 			// ordinary in-game "gameDraw" path.
+			DrawRetailPortalSky();
 			rw->RenderScene( &currentDemoRenderView );
 			renderSystem->DrawDemoPics();
 		} else if ( guiActive == guiSystem || guiActive->State().GetBool( "gameDraw" ) ) {
@@ -10559,6 +10650,7 @@ void idSessionLocal::Draw() {
 			menuIntroBlackoutFadeStart = -1;
 		}
 	} else if ( readDemo ) {
+		DrawRetailPortalSky();
 		rw->RenderScene( &currentDemoRenderView );
 		renderSystem->DrawDemoPics();
 	} else if ( mapSpawned ) {

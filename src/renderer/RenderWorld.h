@@ -694,6 +694,11 @@ public:
 	// the next renderScene
 	virtual bool			ProcessDemoCommand( idDemoFile *readDemo, renderView_t *demoRenderView, int *demoTimeOffset ) = 0;
 
+	// The same for a retail Quake 4 render demo (idDemoFile::IsRetailRenderStream):
+	// one render command after its DS_RENDER byte. portalSkyRenderView gets the
+	// recorded portal-sky view, which playback draws before the main view.
+	virtual bool			ProcessRetailDemoCommand( idDemoFile *readDemo, renderView_t *demoRenderView, renderView_t *portalSkyRenderView, int *demoTimeOffset ) = 0;
+
 	// this is used to regenerate all interactions ( which is currently only done during influences ), there may be a less 
 	// expensive way to do it
 	virtual void			RegenerateWorld( void ) = 0;
