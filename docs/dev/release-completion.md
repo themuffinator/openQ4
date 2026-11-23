@@ -43,6 +43,17 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **Developer detail:** [what the stock volumes hold](shadowmapping-audit-2026-11-09.md#what-the-stock-volumes-hold)
   and REN-03 in the [roadmap](roadmap.md).
 
+## Logs say why two stock maps' AI cannot path, 23 November 2026
+
+- `game/tram1b` and `game/mcc_1` warned that AI "requested use_aas ... but no
+  such AAS is loaded", directly under a line loading that file. That read like
+  a pathing defect, but it is not one. The shipped `tram1b.aas32` and
+  `mcc_1.aas48` contain no navigation areas, and Quake 4 1.4.2 refuses them
+  too. The AI that ask for them ride trams or are hidden stand-ins that never
+  move. The log now says the file has no navigation areas, and the AI warning
+  names the file that did not load. Gameplay is unchanged. Evidence:
+  [retail baseline ledger](retail-baseline-ledger.md#stock-aas-refusals-on-tram1b-and-mcc_1-23-november-2026).
+
 ## Linux downloads as .tar.gz, and a faster, rehearsable release workflow, 23 November 2026
 
 - **Linux packages also as `.tar.gz`.** Each Linux release now offers the

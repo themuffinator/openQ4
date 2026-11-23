@@ -263,6 +263,12 @@ area span past the index, would otherwise be read unchecked by the tactical
 sensor, so the file loads with a warning and without tactical features;
 navigation is unaffected. Each case was exercised with a modified `core2.aas32`.
 
+A non-placeholder file with no vertices, edges or faces is refused, as retail
+1.4.2 refuses it. When its only area is the reserved area 0, the loader says the
+file "has no navigation areas (its compile kept none)" instead of "invalid
+data". Stock `tram1b.aas32` and `mcc_1.aas48` ship like that; see the
+[retail baseline ledger](retail-baseline-ledger.md#stock-aas-refusals-on-tram1b-and-mcc_1-23-november-2026).
+
 Without features `rvAASTacticalSensor` checks `GetNumFeatures()` before every use
 and takes no action, so AI still navigates, chases and attacks but picks no
 cover or lean positions from the mesh.

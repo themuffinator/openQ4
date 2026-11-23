@@ -617,10 +617,25 @@ void idAI::SetAAS( void ) {
 		}
 	}
 	// A Printf here meant an AI that can never path looked like ordinary startup
-	// chatter. Name the AAS it asked for: on stock content most .aas files are
-	// placeholders, so the missing type is the whole answer.
-	gameLocal.Warning( "%s requested use_aas '%s' but no such AAS is loaded; this AI cannot path",
-		name.c_str(), use_aas.c_str() );
+	// chatter. Name the file it needed: "no such AAS is loaded" read like a
+	// load-order bug on maps whose [Load AAS] block shows that file being read,
+	// when it was read and refused. On stock content most .aas files are
+	// placeholders, and tram1b.aas32 and mcc_1.aas48 have no navigation areas;
+	// retail 1.4.2 refuses the same files and prints "has no AAS file" here.
+	const idDict *aasTypes = gameLocal.FindEntityDefDict( "aas_types", false );
+	const idKeyValue *kv = aasTypes ? aasTypes->MatchPrefix( "type" ) : NULL;
+	while ( kv && kv->GetValue().Cmp( use_aas ) != 0 ) {
+		kv = aasTypes->MatchPrefix( "type", kv );
+	}
+	if ( !kv ) {
+		gameLocal.Warning( "%s requested use_aas '%s', which is not an aas_types entry; this AI cannot path",
+			name.c_str(), use_aas.c_str() );
+		return;
+	}
+	idStr aasFile = gameLocal.GetMapName();
+	aasFile.SetFileExtension( use_aas );
+	gameLocal.Warning( "%s requested use_aas '%s', but %s did not load (missing, a placeholder or no navigation areas: see [Load AAS]); this AI cannot path",
+		name.c_str(), use_aas.c_str(), aasFile.c_str() );
 }
 
 /*

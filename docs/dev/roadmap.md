@@ -4046,7 +4046,7 @@ historical saves and recovering safely from damage.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | Q4-01 — Closed | Retail gap ledger, 165-path overlay audit and original-content SP/MP/render controls recorded. | Keep new reports classified; broader progression/effect/network acceptance belongs to its owning tasks. |
-| Q4-02 — Partial | All 31 stock stage transitions with start-of-map save/load pass GL/Vulkan; fresh Turbo hangar lift progression passes with failing old-behavior control. | Ordered gameplay between triggers: AI, set pieces, bosses, vehicles, cinematics/terminals and checkpoints on supported paths. Already-stuck lift saves remain limited. |
+| Q4-02 — Partial | All 31 stock stage transitions with start-of-map save/load pass GL/Vulkan; fresh Turbo hangar lift progression passes with failing old-behavior control; 0.16.0 C2 sweep and chain warnings classified (23 kinds, none a defect); tram1b/mcc_1 AAS refusals proven retail content and pinned. | Ordered gameplay between triggers: AI, set pieces, bosses, vehicles, cinematics/terminals and checkpoints on supported paths; classify warnings raised during play. Already-stuck lift saves remain limited. |
 | Q4-03 — Partial | Retail normal/tangent and initial-light questions settled; telemetry repaired; stock spark stop/restart/delete/save lifecycle passes both APIs. | Per-effect visual/audio parity, collision/child effects/trails, subviews, high refresh and full save/demo lifecycle. |
 | Q4-04 — Partial | Thirteen-map integration; targeted freeze, speeder, boss, corpse-pin, isolation and occupied turret/walker save checks; bounded M01/M02 repairs recorded. | All thirteen ordered playthroughs; complete boss kills, walker repair/unlock/demolition, squad/extraction routes, sustained turret effects and actual Awakening-to-Arena switch. |
 | Q4-05 — Partial | Recovery UI and object/handle/reference/animation/AF/event cleanup hardened; corruption/reload and historical-save regressions pass scoped tests. | Broader owning graphs and interruption boundaries across target platforms; maintain valid saves and explicit refusal without inventing header-only recovery. |
@@ -4101,6 +4101,18 @@ Completion substeps must keep three forms of evidence distinct:
   An isolated module with the old Turbo mover behaviour reproduces his idle
   stall at the lift's top. This closes the fresh-sequence check for #184/#198;
   it does not repair already-stuck saves or qualify the full map/campaign.
+  Progress, 23 November: the REL-01 sweep's `tram1b` report, AI that "cannot
+  path" although `tram1b.aas32` was being loaded, is retail content, not an AI
+  defect. The shipped [`tram1b.aas32` and `mcc_1.aas48`](retail-baseline-ledger.md#stock-aas-refusals-on-tram1b-and-mcc_1-23-november-2026)
+  are compiles that kept no navigation areas, and retail 1.4.2 refuses both
+  with the same check. The AI that request them are tram occupants or hidden,
+  passive stand-ins that never path. The loader and AI warnings now name the
+  cause and the file. `stock_aas_availability.py` pins both messages, and
+  given the retail packs, also pins the two empty files and their placed
+  users. The ledger also classifies the C2 sweep's 21 map-start warning kinds,
+  the same on both renderers. It adds two more kinds from REL-01's C2 chain
+  rerun on OpenGL, which again passes all 62 loads in order with no errors.
+  None is an openQ4 defect. Gameplay between triggers remains unplayed.
 - [ ] **Q4-03 — P1, investigation and qualification: remaining BSE/effect parity.**
   Resolve initial-light current-versus-spawn transform and rotated model-particle
   normal/tangent questions from the October audit. Qualify light/sound/decal,
