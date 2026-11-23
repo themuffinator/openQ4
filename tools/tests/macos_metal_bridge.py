@@ -2950,7 +2950,10 @@ def validate_packaging_and_release_contract() -> None:
     require(package, "DETERMINISTIC_ARCHIVE_TIMESTAMP", "POSIX archive deterministic metadata")
     require(package, "ZipInfo(arcname, date_time=DETERMINISTIC_ARCHIVE_TIMESTAMP)", "POSIX archive deterministic metadata")
     require(package, "mode = 0o100755", "POSIX archive executable mode preservation")
-    require(package, "info.mode = 0o755", "POSIX archive executable mode preservation")
+    # Tar entries take their mode from one stream writer since a39a3cda2.
+    require(package, "mode = 0o755 if relative_path.as_posix() in executable_archive_paths else 0o644",
+            "POSIX archive executable mode preservation")
+    require(package, "info.mode = mode", "POSIX archive executable mode preservation")
     require(package, "create_macos_dmg", "macOS DMG creation")
     require(package, "hdiutil_path", "macOS DMG hdiutil lookup")
     require(package, '"-format",\n            "UDZO"', "macOS compressed DMG format")
