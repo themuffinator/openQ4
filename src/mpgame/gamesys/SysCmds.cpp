@@ -1071,8 +1071,8 @@ static void Cmd_OpenQ4ReportClientOptions_f( const idCmdArgs &args ) {
 	for ( int i = 0; i < count; i++ ) {
 		const idEntity *item = gameLocal.entities[ rows[ i ].entityNumber ];
 		const int left = ( rows[ i ].respawnAt > 0 ) ? Max( 0, rows[ i ].respawnAt - gameLocal.realClientTime ) : rows[ i ].respawnAt;
-		gameLocal.Printf( "CLIENTOPT timer row=%d kind=%d entity=%s left_ms=%d\n", i, rows[ i ].kind,
-			item != NULL ? item->name.c_str() : "?", left );
+		gameLocal.Printf( "CLIENTOPT timer row=%d kind=%d entity=%s left_ms=%d total_ms=%d\n", i, rows[ i ].kind,
+			item != NULL ? item->name.c_str() : "?", left, rows[ i ].totalMsec );
 	}
 
 	int tones = 0;

@@ -61,7 +61,7 @@ def main() -> int:
 
     require(
         read(RENDERER / "RenderModuleAPI.h"),
-        "#define RENDER_API_VERSION\t\t\t36",
+        "#define RENDER_API_VERSION\t\t\t37",
         "renderer ABI v36",
     )
     require(

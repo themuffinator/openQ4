@@ -4866,7 +4866,17 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(!runtime.FocusControl("controls_bind_0",0.77),"another tab's rows take no focus");
 	Check(runtime.RunEvent("onTabPrevious",0.78,effects,error) && runtime.RunEvent("onTabPrevious",0.79,effects,error),"back past the first tab");
 	runtime.Frame(viewport,0.8);
-	Check(tab() == 6 && runtime.FocusedControl() == "controls_response","the tabs wrap to the last, AIM");
+	// Controller Input starts off, which turns the stick rows off: AIM opens
+	// on its first row that answers, and on the sticks once the controller is on.
+	Check(tab() == 6 && runtime.FocusedControl() == "controls_touchscreen","the tabs wrap to the last, AIM, past its rows the controller turns off");
+	Check(!runtime.FocusControl("controls_response",0.8001),"a row the controller turns off takes no focus");
+	host.cvars["in_joystick"] = true;
+	runtime.Frame(viewport,0.8002);
+	Check(runtime.RunEvent("onTabPrevious",0.8003,effects,error) && runtime.RunEvent("onTabNext",0.8003,effects,error),"AIM again");
+	runtime.Frame(viewport,0.8004);
+	Check(runtime.FocusedControl() == "controls_response","with the controller on AIM opens on its first row");
+	host.cvars["in_joystick"] = false;
+	runtime.Frame(viewport,0.8006);
 	Check(runtime.RunEvent("tab_other",0.801,effects,error),"choose OTHER");
 	runtime.Frame(viewport,0.811);
 	Check(tab() == 3 && runtime.FocusedControl() == "controls_bind_38","OTHER opens on its first binding");
@@ -4952,6 +4962,13 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	const auto sticks = bounds("controls_controller"), rumble = bounds("controls_rumble"), light = bounds("controls_light");
 	Check(rumble.x > sticks.x+sticks.width && std::abs(rumble.y-sticks.y) < .5f && std::abs(light.x-rumble.x) < .5f &&
 		light.y > rumble.y,"STICKS beside RUMBLE, LIGHTS AND NOTICES under it");
+	// Controller Input off turns the rows that need a controller off: they keep
+	// their place, dimmed, and take no focus; turning it on brings them back.
+	Check(!runtime.FocusControl("controls_promptstyle",1.015) && !runtime.FocusControl("controls_rumble",1.015) &&
+		runtime.FocusControl("controls_alwaysrun",1.015),"Controller Input off rests the controller's rows, not Always Run");
+	{ const auto dimmed = runtime.PresentedValue("controls_rumble","opacity"); Check(dimmed && std::abs(dimmed->data[0]-.4) < 1e-6,"a resting row is dimmed"); }
+	host.cvars["in_joystick"] = true;
+	runtime.Frame(viewport,1.016);
 	Check(runtime.FocusControl("controls_promptstyle",1.02),"focus the prompt style");
 	runtime.TakeActions();
 	press(MenuInput::Right,1.03);

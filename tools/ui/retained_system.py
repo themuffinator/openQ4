@@ -632,11 +632,14 @@ def system_document() -> dict:
              op("select", st("settings.display.spanAvailable"), "#str_230088", "#str_230089"))
     fullscreen = row(doc, "settings_fullscreen", "#str_200147", "toggle", x, value=draft("r_fullscreen"), action=edit("r_fullscreen"))
     gate(doc, "settings_fullscreen", QUIET, None)
+    # Borderless shapes only a window and the Fullscreen Policy only
+    # fullscreen (RenderSystem_init.cpp, sdl3_backend.cpp): each waits for
+    # Fullscreen's draft to reach it.
     borderless = row(doc, "settings_borderless", "#str_229909", "toggle", x, value=draft("r_borderless"), action=edit("r_borderless"))
-    gate(doc, "settings_borderless", QUIET, None)
+    gate(doc, "settings_borderless", both(QUIET, no(draft("r_fullscreen"))), opacity=dim(no(draft("r_fullscreen")), 0.45))
     policy = choice(doc, "settings_fullscreen_policy", "#str_229910", x, edit("r_fullscreenDesktop"), draft("r_fullscreenDesktop"),
                     [(("#str_229911", 0), True), (("#str_229911", 1), False)])
-    gate(doc, "settings_fullscreen_policy", QUIET, None)
+    gate(doc, "settings_fullscreen_policy", both(QUIET, draft("r_fullscreen")), opacity=dim(draft("r_fullscreen"), 0.45))
     msaa = choice(doc, "settings_msaa", "#str_41093", x, edit("r_multiSamples"), draft("r_multiSamples"),
                   listed("#str_230020", (0, 2, 4, 8, 16)))
     gate(doc, "settings_msaa", both(QUIET, st("settings.msaaAvailable")), opacity=dim(st("settings.msaaAvailable"), 0.45))
@@ -656,7 +659,10 @@ def system_document() -> dict:
                       listed("#str_232549", (30, 60, 75, 90, 120, 144, 165, 240, 360, 0)))
     gate(doc, "settings_framecap", EDITABLE)
     windowed = no(draft("r_fullscreen"))
-    exclusive = no(draft("r_fullscreenDesktop"))
+    # The display resolution, custom size and refresh rate size only an
+    # exclusive fullscreen (r_fullscreen 1, r_fullscreenDesktop 0); a window
+    # takes the window size and desktop fullscreen the desktop's.
+    exclusive = both(draft("r_fullscreen"), no(draft("r_fullscreenDesktop")))
     sizing_live = both(LIVE)
     width = size_row(doc, "settings_window_width", "#str_229946", x, edit("r_windowWidth"), "r_windowWidth", 320)
     height = size_row(doc, "settings_window_height", "#str_229947", x, edit("r_windowHeight"), "r_windowHeight", 240)
@@ -674,7 +680,7 @@ def system_document() -> dict:
                      [(st(f"settings.display.refresh.{index}.label"), index) for index in range(system_display_catalog.REFRESH_SLOTS)],
                      count=st("settings.display.refresh.optionCount"))
     for ident in ("settings_display_mode", "settings_display_refresh"):
-        gate(doc, ident, both(QUIET, EXCLUSIVE_LISTS), opacity=dim(EXCLUSIVE_LISTS, 0.45))
+        gate(doc, ident, both(QUIET, EXCLUSIVE_LISTS, draft("r_fullscreen")), opacity=dim(both(EXCLUSIVE_LISTS, draft("r_fullscreen")), 0.45))
 
     # IMAGE QUALITY: resolution, anti-aliasing and filtering, and the
     # surfaces the renderer draws; EFFECTS: the lighting and post-processing.

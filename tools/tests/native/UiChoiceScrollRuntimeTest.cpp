@@ -232,7 +232,7 @@ static void SystemCandidate(const std::string& source) {
         runtime.SetReducedMotion(true,time);
         Check(runtime.SetState({{"settings.open",true},{"settings.phase",1.},{"settings.busy",false},{"settings.confirmationVisible",false},{"settings.renderer.available",true},
             {"settings.render.canChoose",true},{"settings.msaaAvailable",true},
-            {"settings.display.available",true},{"settings.display.spanAvailable",true},{"settings.display.count",2.},{"settings.display.optionCount",3.},
+            {"settings.draft.r_fullscreen",true},{"settings.display.available",true},{"settings.display.spanAvailable",true},{"settings.display.count",2.},{"settings.display.optionCount",3.},
             {"settings.display.0.label",std::string("1: Primary monitor")},{"settings.display.1.label",std::string("2: Secondary monitor")},
             {"settings.display.mode.optionCount",4.},{"settings.display.mode.selected",0.},{"settings.display.mode.0.label",std::string("Desktop Native (1920 \xC3\x97 1080)")},{"settings.display.mode.1.label",std::string("1280 \xC3\x97 720 (16:9)")},{"settings.display.mode.2.label",std::string("2560 \xC3\x97 1080 (21:9)")},{"settings.display.mode.3.label",std::string("Custom (1600 \xC3\x97 900)")},{"settings.display.refresh.optionCount",3.},{"settings.display.refresh.selected",0.},{"settings.display.refresh.0.label",std::string("Auto")},{"settings.display.refresh.1.label",std::string("60 Hz")},{"settings.display.refresh.2.label",std::string("144 Hz")}},error,time),
             "SYSTEM editing state and display lists");frame();

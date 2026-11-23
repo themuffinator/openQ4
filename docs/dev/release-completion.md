@@ -12,6 +12,76 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## A Competitive scoreline with rosters, and item timers with symbols, 23 November 2026
+
+- **Duel, Tourney and team games read like a broadcast.** With the Competitive
+  HUD layout the top center is now a scoreline: large scores on slabs either
+  side of the timer (team-colored with the faction mark in team games, the
+  leader's lip gold in Duel and Tourney, with the players' names under them)
+  and, further out, up to four players a side as tiles with the weapon in hand
+  and health and armor bars, a skull while they are dead and a light on the
+  player you follow. Deathmatch keeps the leader, the runner-up and the timer
+  at the top left, with network quality under the timer.
+- **Fair to players, full for spectators.** A player sees weapons and vitals
+  only for their own side; the other side shows its mark, and whether each of
+  its players is dead, as the round modes' alive pips already did. Someone who
+  chose to watch sees both sides in full. A player out for the round sees only
+  their own team.
+- **Item timers you can read at a glance.** Each row shows the item's symbol,
+  where it lies on the map (so two armours are told apart), the time left and
+  a line filling in the item's color as it respawns. A client measures the
+  line against the whole respawn when it saw the item taken, and against the
+  item's defined respawn when it first hears of it part-way. A spectator's
+  right-hand team list steps down under the timers.
+- **What you need to do.** Nothing. Choose **Competitive** under **Settings →
+  Game Options → HUD → HUD Layout** to see the scoreline; item timers follow the
+  server's `si_itemTimers` as before (spectators only by default).
+- **Checks.** Native checks cover deathmatch's layout, the Duel and team
+  scoreline geometry, roster visibility, vitals, the dead, the narrow-view
+  step, the item timer rows and the spectator list's step; the two-client
+  `mp_client_options_smoke.py` passes 27 of 27, including the new check that a
+  remote client's countdown knows its whole respawn. Engine captures with bots
+  show Duel (playing, then spectating), Team DM spectating at 16:9 and 4:3,
+  CTF and deathmatch. Visual specification 1.47 and register revision 27
+  (`FLOW-073`, superseding `FLOW-058`, and `FLOW-074`, both pending); the
+  revision also re-binds `audio-voice-evidence.md` and `performance-presets.md`,
+  which AUD-03 and the native-resolution presets changed without re-binding.
+  Human judgement while casting, 21:9 and 9:16 captures and the rosters in MVD
+  playback remain.
+
+## The Classic ruleset plays by its own numbers, 23 November 2026
+
+- **Quad damage hits four times as hard under Classic**, as Quake 2's did,
+  instead of Quake 4's three.
+- **Zoomed nailgun fire plays by Classic's numbers.** Its seeking nails had
+  kept Quake 4's 25-point splash on top of every 10-point nail.
+- **The napalm launcher on the expansion maps** comes back after 30 seconds
+  like every other Classic weapon, instead of every 5, and its pickup gives a
+  box of napalm.
+- **Rockets fly as far as before.** Classic's slower rockets now last long
+  enough to cross the big maps instead of vanishing after 3,900 units.
+- **Scout carriers take no armour** under Classic, as under Quake 4's rules.
+- **Health that Regeneration builds past 100 drains** once the powerup runs
+  out, like mega health's, instead of staying for good.
+- **Threewave CTF bonuses follow Threewave.** Fragging near your flag's base
+  counts while the flag is away, a dropped flag is no longer a base to
+  defend, the capturer earns capture assists too, and a capture ends the
+  bonus for fragging whoever was hurting the carrier.
+
+## Settings that do nothing are greyed out, 23 November 2026
+
+- **See at a glance what applies.** On every settings page, a row that another
+  setting has switched off is now dimmed and skipped by the keyboard and
+  controller: the rumble, gyro and stick options while Controller Input is
+  off, the acceleration options while Mouse Accel is 0, the HUD size and
+  message options under the Classic HUD, the VR options while VR Mode is off,
+  the subtitle options while subtitles are off, Surround Speakers while
+  Headphone HRTF is on, Borderless Window in fullscreen, and the fullscreen
+  resolution, refresh rate and policy in a window. Turn the setting they need
+  back on and they come back with the values you left.
+- **What you need to do.** Nothing. No setting changes value.
+- **Developer detail:** [the dependency table](settings-menu-structure.md#dependent-rows).
+
 ## Music and ambience keep playing when the game runs slowly, 23 November 2026
 
 - **No more gaps in long tracks on slow frames.** Since 0.14.1, music, ambience
@@ -159,14 +229,18 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   one to follow. `demoPlayers` lists them at the console.
 - **Step back** a frame at a time, as well as forward.
 - **Export.** `demoExport name.mvd 30` writes a demo as PNG pictures for a
-  video editor. Sound is not exported yet.
+  video editor, with its sound as a WAV file exactly as long as the pictures.
+  Nothing plays through your speakers while it runs, and your sound device
+  comes back afterwards. The demos guide has the `ffmpeg` line that joins
+  them into a video.
 - **Find your demos.** The library names the players, or whose view a
   recording shows, shows a picture from the recording itself, and
   `demoFind <text>` searches them all.
 - **Markers in your own recordings**, for kills and the match's changes.
 - **Evidence.** `mp_client_demo_smoke.py` and `mp_autoaction_smoke.py` check
-  each on a cheats-off dedicated server (Windows, OpenGL). The new deck
-  buttons were not pressed by a person.
+  each on a cheats-off dedicated server (Windows, OpenGL); the export's WAV is
+  read back for its format, length and level. The new deck buttons were not
+  pressed by a person, and nobody has listened to an export yet.
 
 ## Record every match automatically, time a demo, and seek recordings faster, 23 November 2026
 

@@ -230,6 +230,10 @@ public:
 	static void				ResetFlag( int type );
 	virtual void			Think( void );
 
+	// openQ4: the Classic ruleset scores defence around the base flag
+	int						GetFlagTeam( void ) const { return team; }
+	bool					IsDroppedFlag( void ) const { return dropped; }
+
 	virtual bool			Collide( const trace_t &collision, const idVec3 &velocity );
 
 private:

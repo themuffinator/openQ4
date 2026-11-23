@@ -6,10 +6,12 @@
 #undef main
 
 struct Field { const char* id; const char* key; StateValue target; const char* label; };
+// In the order each answers from the seeded fullscreen draft: the Fullscreen
+// Policy only while Fullscreen is on, Borderless only once it is off.
 static const Field fields[] = {
+ {"settings_fullscreen_policy","r_fullscreenDesktop",false,"#str_229910"},
  {"settings_fullscreen","r_fullscreen",false,"#str_200147"},
  {"settings_borderless","r_borderless",true,"#str_229909"},
- {"settings_fullscreen_policy","r_fullscreenDesktop",false,"#str_229910"},
  {"settings_msaa","r_multiSamples",16.0,"#str_41093"}
 };
 static void Inside(const Bounds& a,const Bounds& b,const char* why) {
@@ -51,7 +53,11 @@ static void Run(const std::string& source,const std::string& directory,const cha
   std::fprintf(stderr,"Display controls locale=%s expansion=%g viewport=%dx%d density=%g text=%g\n",locale,expansion,c.width,c.height,c.density,c.text);
   v.viewport.width=c.width;v.viewport.height=c.height;v.viewport.displayScale=c.density;v.viewport.textScale=c.text;
   Check(v.tx.Edit(View::Owner,{{"r_fullscreen",true},{"r_borderless",false},{"r_fullscreenDesktop",true},{"r_multiSamples",0.0}}).code==SettingsCode::Ok,"seed opposite display drafts");v.Sync();v.Frame();
+  Check(!v.runtime.CanActivateControl("settings_borderless",v.time),"Borderless waits for a windowed draft");
   for(const auto& field:fields)Propose(v,field);
+  Check(!v.runtime.CanActivateControl("settings_fullscreen_policy",v.time),"the Fullscreen Policy waits for a fullscreen draft");
+  auto dimmed=v.runtime.PresentedValue("settings_fullscreen_policy","opacity");
+  Check(dimmed&&std::abs(dimmed->data[0]-.45)<1e-6,"a windowed draft dims the Fullscreen Policy");
   Check(SettingsValuesEqual(v.host.live,baseline),"all display choices leave original host snapshot intact");
   // Existing popup cancellation must also preserve a nonlisted custom value.
   Check(v.tx.Edit(View::Owner,{{"r_multiSamples",3.0}}).code==SettingsCode::Ok,"counted host permits observed custom baseline shape");v.Sync();v.Frame();

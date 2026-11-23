@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "SoundSettings.h"
 #include "SoundRestart.h"
 #include "SoundMemoryTrim.h"
+#include "SoundCapture.h"
 #include "VoiceChat.h"
 
 // NOCHEAT as in retail Quake4.exe 1.4.2: a multiplayer spawn or join without
@@ -886,8 +887,16 @@ void idSoundSystemLocal::Render()
 
 	hardware.Update();
 
-	// The sound system doesn't use game time or anything like that because the sounds are decoded in real time.
-	soundTime = Sys_Milliseconds();
+	if( Sound_CaptureActive() )
+	{
+		// openQ4 MP-22: a demo export's clock moves only by the steps it mixes
+		MixCapture( true );
+	}
+	else
+	{
+		// The sound system doesn't use game time or anything like that because the sounds are decoded in real time.
+		soundTime = RealSoundTime();
+	}
 	settingsUpdate.completed = true;
 }
 
@@ -1013,8 +1022,256 @@ idSoundSystemLocal::RefreshSoundTime
 */
 int idSoundSystemLocal::RefreshSoundTime()
 {
-	soundTime = Sys_Milliseconds();
+	// a demo export's clock follows the steps it mixes, not the wall clock
+	if( !Sound_CaptureActive() )
+	{
+		soundTime = RealSoundTime();
+	}
 	return soundTime;
+}
+
+/*
+========================
+openQ4 MP-22: a demo export's sound track (SoundCapture.h)
+
+The export switches the sound system onto a loopback mixer and asks for each
+step's share of the track; the sound frame after the request mixes it, in
+slices of at most SOUND_CAPTURE_SLICE_MSEC with the voices updated between
+them, and moves the sound clock on by exactly as much. Afterwards the clock
+never runs backwards: when the export ran ahead of real time it stays ahead
+by that much.
+========================
+*/
+namespace
+{
+struct soundCaptureState_t
+{
+	bool				active = false;
+	bool				failed = false;		// a stretch was written as silence
+	idFile*				file = NULL;
+	idStr				path;
+	idStr				failure;
+	int					rate = 0;
+	int					channels = 0;
+	int64_t				msec = 0;			// exported time mixed so far
+	int64_t				frames = 0;			// sample frames written
+	int					pendingMsec = 0;	// asked for, not yet mixed
+	soundCaptureLevel_t	level;
+	idList<short>		scratch;
+};
+soundCaptureState_t	soundCapture;
+int					soundClockOffset = 0;	// added to Sys_Milliseconds once an export ran ahead
+
+void Sound_CaptureCopyString( char* out, int size, const char* text )
+{
+	if( out != NULL && size > 0 )
+	{
+		idStr::Copynz( out, text != NULL ? text : "", size );
+	}
+}
+}
+
+int idSoundSystemLocal::RealSoundTime() const
+{
+	return Sys_Milliseconds() + soundClockOffset;
+}
+
+/*
+========================
+idSoundSystemLocal::MixCapture
+
+Mixes what the export asked for. Between slices the playing world and the
+voices update, so streams refill as they would in a live frame.
+========================
+*/
+void idSoundSystemLocal::MixCapture( bool updateBetweenSlices )
+{
+	bool first = true;
+	while( soundCapture.active && soundCapture.pendingMsec > 0 )
+	{
+		if( !first && updateBetweenSlices )
+		{
+			if( currentSoundWorld != NULL )
+			{
+				currentSoundWorld->Update();
+			}
+			hardware.Update();
+		}
+		first = false;
+		const int slice = Min( soundCapture.pendingMsec, SOUND_CAPTURE_SLICE_MSEC );
+		soundCapture.pendingMsec -= slice;
+		soundCapture.msec += slice;
+		const int64_t target = SoundCaptureFramesFor( soundCapture.msec, soundCapture.rate );
+		const int frames = static_cast<int>( target - soundCapture.frames );
+		const int samples = frames * soundCapture.channels;
+		if( frames > 0 )
+		{
+			soundCapture.scratch.SetNum( samples );
+			if( !hardware.IsLoopback() || !hardware.RenderLoopback( soundCapture.scratch.Ptr(), frames ) )
+			{
+				// The track keeps its length: the exported frames still line up after it.
+				memset( soundCapture.scratch.Ptr(), 0, samples * sizeof( short ) );
+				if( !soundCapture.failed )
+				{
+					soundCapture.failed = true;
+					soundCapture.failure = va( "the loopback mixer stopped at %.1f seconds; the rest is silence",
+						static_cast<double>( soundCapture.msec - slice ) * 0.001 );
+					common->Warning( "Demo export sound: %s", soundCapture.failure.c_str() );
+				}
+			}
+			SoundCaptureMeasure( soundCapture.level, soundCapture.scratch.Ptr(), samples );
+			const int bytes = samples * static_cast<int>( sizeof( short ) );
+			if( soundCapture.file != NULL && soundCapture.file->Write( soundCapture.scratch.Ptr(), bytes ) != bytes && !soundCapture.failed )
+			{
+				soundCapture.failed = true;
+				soundCapture.failure = "the sound track could not be written in full";
+				common->Warning( "Demo export sound: %s", soundCapture.failure.c_str() );
+			}
+			soundCapture.frames = target;
+		}
+		soundTime += slice;
+	}
+}
+
+bool Sound_CaptureActive()
+{
+	return soundCapture.active;
+}
+
+bool Sound_BeginCapture( const char* path, char* reason, int reasonSize )
+{
+	Sound_CaptureCopyString( reason, reasonSize, "" );
+	idSoundSystemLocal& sys = soundSystemLocal;
+	const char* refusal = NULL;
+	if( soundCapture.active )
+	{
+		refusal = "a sound track is already being recorded";
+	}
+	else if( path == NULL || path[0] == '\0' )
+	{
+		refusal = "no file name";
+	}
+	else if( s_noSound.GetBool() )
+	{
+		refusal = "sound is off (s_noSound 1)";
+	}
+	else if( sys.hardware.GetOpenALDevice() == NULL )
+	{
+		refusal = "no sound device is open";
+	}
+	else if( SoundSettings_BlockAutomaticRestart() )
+	{
+		refusal = "a sound settings change holds the device";
+	}
+	else if( !idSoundHardware_OpenAL::LoopbackAvailable() )
+	{
+		refusal = "the OpenAL runtime has no loopback mixer (ALC_SOFT_loopback)";
+	}
+	if( refusal != NULL )
+	{
+		Sound_CaptureCopyString( reason, reasonSize, refusal );
+		return false;
+	}
+
+	int rate = 48000, channels = 2;
+	bool hrtf = false;
+	sys.hardware.GetOutputFormat( rate, channels, hrtf );
+	if( SoundCaptureChannelMask( channels ) == 0 )
+	{
+		channels = 2;
+	}
+
+	idFile* file = fileSystem->OpenFileWrite( path );
+	if( file == NULL )
+	{
+		Sound_CaptureCopyString( reason, reasonSize, va( "cannot write %s", path ) );
+		return false;
+	}
+
+	sys.hardware.RequestLoopback( rate, channels, hrtf );
+	sys.Restart();
+	if( !sys.hardware.IsLoopback() )
+	{
+		// Init went back to the playback device
+		sys.hardware.EndLoopback();
+		fileSystem->CloseFile( file );
+		fileSystem->RemoveFile( path );
+		Sound_CaptureCopyString( reason, reasonSize, "the loopback mixer did not open" );
+		return false;
+	}
+
+	soundCapture = soundCaptureState_t();
+	soundCapture.active = true;
+	soundCapture.file = file;
+	soundCapture.path = path;
+	sys.hardware.GetOutputFormat( soundCapture.rate, soundCapture.channels, hrtf );
+	// the header is rewritten with the length at the end
+	uint8_t header[SOUND_CAPTURE_WAV_HEADER_MAX];
+	const int headerSize = SoundCaptureWriteWavHeader( header, soundCapture.channels, soundCapture.rate, 0 );
+	if( headerSize == 0 || file->Write( header, headerSize ) != headerSize )
+	{
+		soundCapture.failed = true;
+		soundCapture.failure = "the sound track could not be written";
+	}
+	common->Printf( "Recording the sound track to %s: %d Hz, %d channels\n", path, soundCapture.rate, soundCapture.channels );
+	return true;
+}
+
+void Sound_CaptureAdvance( int msec )
+{
+	if( soundCapture.active && msec > 0 )
+	{
+		soundCapture.pendingMsec += msec;
+	}
+}
+
+bool Sound_EndCapture( soundCaptureResult_t& result )
+{
+	result = soundCaptureResult_t();
+	if( !soundCapture.active )
+	{
+		return false;
+	}
+	idSoundSystemLocal& sys = soundSystemLocal;
+	// the last step asked for, which no sound frame mixed
+	sys.MixCapture( false );
+
+	result.rate = soundCapture.rate;
+	result.channels = soundCapture.channels;
+	result.frames = soundCapture.frames;
+	result.msec = soundCapture.msec;
+	result.peak = soundCapture.level.peak;
+	result.rms = soundCapture.level.samples > 0 ? idMath::Sqrt( static_cast<float>( soundCapture.level.sumSquares / soundCapture.level.samples ) ) : 0.0;
+	Sound_CaptureCopyString( result.path, sizeof( result.path ), soundCapture.path.c_str() );
+
+	uint8_t header[SOUND_CAPTURE_WAV_HEADER_MAX];
+	const int headerSize = SoundCaptureWriteWavHeader( header, soundCapture.channels, soundCapture.rate, soundCapture.frames );
+	bool written = false;
+	if( soundCapture.file != NULL )
+	{
+		written = headerSize > 0 && soundCapture.file->Seek( 0, FS_SEEK_SET ) == 0 &&
+			soundCapture.file->Write( header, headerSize ) == headerSize;
+		fileSystem->CloseFile( soundCapture.file );
+		soundCapture.file = NULL;
+	}
+	if( !written && !soundCapture.failed )
+	{
+		soundCapture.failed = true;
+		soundCapture.failure = "the sound track's header could not be written";
+	}
+	result.written = written;
+	result.complete = written && !soundCapture.failed;
+	Sound_CaptureCopyString( result.reason, sizeof( result.reason ), soundCapture.failure.c_str() );
+
+	// the clock never runs backwards, whichever way the export ran
+	soundClockOffset = Max( soundClockOffset, sys.soundTime - Sys_Milliseconds() );
+	soundCapture.active = false;
+	soundCapture.scratch.Clear();
+	sys.hardware.EndLoopback();
+	sys.Restart();
+	common->Printf( "The sound track is finished; %s\n", sys.hardware.GetOpenALDevice() != NULL ? "the playback device is open again" :
+		"the playback device did not open again" );
+	return true;
 }
 
 /*

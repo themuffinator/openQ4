@@ -398,7 +398,9 @@ def validate_frame_timing() -> None:
     demo = read("src/framework/Session_demo.cpp")
 
     frame = between(session, "void idSessionLocal::Frame() {", "idSessionLocal::RunGameTic", "Session Frame")
-    require(frame, "const bool shouldWaitForGameTic = aviCaptureMode;", "only fixed-rate capture waits for tics")
+    require(frame, "const int captureTics = aviCaptureMode ? com_aviDemoTics.GetInteger() : VideoCapture_FixedTicsPerFrame();",
+            "aviDemo and fixed-rate video capture set the tics a frame")
+    require(frame, "const bool shouldWaitForGameTic = captureTics > 0;", "only fixed-rate capture waits for tics")
     for needle in ("minTic = lastGameTic + USERCMD_PER_DEMO_FRAME", "minTic = lastDemoTic + USERCMD_PER_DEMO_FRAME",
                    "numCmdsToRun < fixedTic", "if ( timeHitch && writeDemo )", "int fixedTic = USERCMD_PER_DEMO_FRAME"):
         reject(frame, needle, "a recording or playback holding the game to two tics a frame")

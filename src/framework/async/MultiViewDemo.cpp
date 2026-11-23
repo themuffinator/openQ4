@@ -17,6 +17,7 @@ their layout, and corrupt/truncated streams fail at a bounded record.
 #include "../../idlib/NumericString.h"
 #include "MvdStorageBudget.h"
 #include "MvdNavigation.h"
+#include "../../sound/SoundCapture.h"
 
 #include <time.h>
 
@@ -885,8 +886,10 @@ void idMultiViewDemo::ClearState() {
 	timeDemoSlowestFrame = 0;
 	markers.clear();
 	exporting = false;
-	exportStepMS = 0;
+	exportFps = 0;
+	exportSteps = 0;
 	exportFrames = 0;
+	exportSound = false;
 	exportDirectory.Clear();
 	recordingPlayers.Clear();
 	thumbnailTaken = false;
@@ -908,7 +911,7 @@ void idMultiViewDemo::Init() {
 	cmdSystem->AddCommand( "recordMVD", Record_f, CMD_FL_SYSTEM, "records a server-side multi-view demo" );
 	cmdSystem->AddCommand( "stopMVD", Stop_f, CMD_FL_SYSTEM, "stops MVD recording or playback" );
 	cmdSystem->AddCommand( "playMVD", Play_f, CMD_FL_SYSTEM, "plays a multi-view demo" );
-	cmdSystem->AddCommand( "demoExport", Export_f, CMD_FL_SYSTEM, "writes a multi-view demo as PNG frames: demoExport <demo>.mvd [fps] [quit]" );
+	cmdSystem->AddCommand( "demoExport", Export_f, CMD_FL_SYSTEM, "writes a multi-view demo as PNG frames and a WAV sound track: demoExport <demo>.mvd [fps] [quit]" );
 	cmdSystem->AddCommand( "mvdInfo", Info_f, CMD_FL_SYSTEM, "validates and describes a multi-view demo" );
 	cmdSystem->AddCommand( "mvdRecover", Recover_f, CMD_FL_SYSTEM, "salvages the complete part of an interrupted .mvd.part recording into a new demo" );
 	cmdSystem->AddCommand( "mvdStatus", Status_f, CMD_FL_SYSTEM, "reports multi-view playback time and camera state" );
@@ -3598,29 +3601,87 @@ idMultiViewDemo::StartExport
 
 openQ4 MP-22: writes a multi-view demo, or a recording of one player's view,
 as a PNG sequence, exports/<demo>/frame00000.png on: every frame moves the
-match on by 1000/fps milliseconds, whatever the time it took, and the next
-frame's command buffer takes the screenshot of the state it shows. Sound is
-not written yet.
+match on by 1000/fps milliseconds (in whole milliseconds that add up, 33, 33
+and 34 at 30 a second), whatever the time it took, and the next frame's command
+buffer takes the screenshot of the state it shows.
+
+The sound track, exports/<demo>/<demo>.wav, comes from a loopback mixer the
+sound system switches to before the map loads (SoundCapture.h): each exported
+frame mixes exactly its share, so n pictures last as long as the track's
+n * 1000/fps milliseconds. The playback device opens again when the export ends.
 ==================
 */
 bool idMultiViewDemo::StartExport( const char *name, int fps, bool quitAfter ) {
+	if ( state != MVD_IDLE ) {
+		common->Printf( "MVD system is already busy\n" );
+		return false;
+	}
+	idStr base = BuildPlaybackName( name );
+	base.StripPath();
+	base.StripFileExtension();
+	const idStr directory = va( "exports/%s", base.c_str() );
+	const idStr soundTrack = va( "%s/%s.wav", directory.c_str(), base.c_str() );
+	// before the map loads, so its sounds load straight onto the loopback mixer
+	char soundRefusal[160];
+	const bool sound = !base.IsEmpty() && Sound_BeginCapture( soundTrack.c_str(), soundRefusal, sizeof( soundRefusal ) );
+
 	idCmdArgs args;
 	args.AppendArg( "demoExport" );
 	args.AppendArg( name );
 	if ( !StartPlayback( args ) ) {
+		if ( sound ) {
+			soundCaptureResult_t discarded;
+			Sound_EndCapture( discarded );
+			fileSystem->RemoveFile( soundTrack.c_str() );
+		}
 		return false;
 	}
-	idStr base = fileName;
-	base.StripPath();
-	base.StripFileExtension();
 	exporting = true;
+	exportSound = sound;
 	timeDemoQuit = quitAfter;
-	exportStepMS = Max( 1, 1000 / idMath::ClampInt( 1, 120, fps ) );
+	exportFps = idMath::ClampInt( 1, 120, fps );
+	exportSteps = 0;
 	exportFrames = 0;
-	exportDirectory = va( "exports/%s", base.c_str() );
+	exportDirectory = directory;
 	common->Printf( "Exporting '%s' to %s/ at %d frames a second\n", fileName.c_str(), exportDirectory.c_str(),
-		1000 / exportStepMS );
+		exportFps );
+	if ( !sound ) {
+		common->Printf( "The export has no sound track: %s\n", base.IsEmpty() ? "no demo name" : soundRefusal );
+		common->Printf( "MVD_EXPORT_SOUND written=0 reason=\"%s\"\n", base.IsEmpty() ? "no demo name" : soundRefusal );
+	}
 	return true;
+}
+
+/*
+==================
+idMultiViewDemo::FinishExportSound
+
+Finishes the sound track of an export, however the export ended, and opens
+the playback device again.
+==================
+*/
+void idMultiViewDemo::FinishExportSound() {
+	if ( !exportSound ) {
+		return;
+	}
+	exportSound = false;
+	soundCaptureResult_t track;
+	if ( !Sound_EndCapture( track ) ) {
+		return;
+	}
+	if ( !track.written ) {
+		common->Warning( "The export's sound track was not written: %s", track.reason );
+		common->Printf( "MVD_EXPORT_SOUND written=0 reason=\"%s\"\n", track.reason );
+		return;
+	}
+	common->Printf( "Wrote the sound track %s: %.2f seconds, %d Hz, %d channels\n", track.path,
+		static_cast<double>( track.msec ) * 0.001, track.rate, track.channels );
+	if ( !track.complete ) {
+		common->Warning( "The export's sound track is not complete: %s", track.reason );
+	}
+	common->Printf( "MVD_EXPORT_SOUND written=1 file=%s rate=%d channels=%d frames=%lld msec=%lld peak=%d rms=%.1f complete=%d\n",
+		track.path, track.rate, track.channels, static_cast<long long>( track.frames ), static_cast<long long>( track.msec ),
+		track.peak, track.rms, track.complete ? 1 : 0 );
 }
 
 void idMultiViewDemo::Export_f( const idCmdArgs &args ) {
@@ -4303,6 +4364,8 @@ void idMultiViewDemo::StopPlayback( const char *reason ) {
 	}
 	const idStr stoppedFile = fileName;
 	const idStr stoppedReason = reason != NULL ? reason : "stopped";
+	// an export stopped early keeps the sound track of what it wrote
+	FinishExportSound();
 	game->SetDemoState( DEMO_NONE, false, false );
 	if ( sessLocal.sw != NULL ) {
 		sessLocal.sw->SetSlowmoSpeed( 1.0f );
@@ -4333,8 +4396,9 @@ void idMultiViewDemo::FinishPlayback( const char *reason, bool warning ) {
 	const bool timed = timeDemo || exporting;
 	const bool quitAfter = timeDemoQuit;
 	if ( exporting ) {
+		FinishExportSound();
 		common->Printf( "MVD_EXPORT frames=%d directory=%s fps=%d complete=%d\n", exportFrames,
-			exportDirectory.c_str(), 1000 / Max( 1, exportStepMS ), warning ? 0 : 1 );
+			exportDirectory.c_str(), exportFps, warning ? 0 : 1 );
 	}
 	if ( timeDemo && timeDemoFrames > 0 ) {
 		const float seconds = Max( 1, timeDemoLastFrameTime - timeDemoStartTime ) * 0.001f;
@@ -4648,8 +4712,11 @@ void idMultiViewDemo::RunPlaybackFrame() {
 	if ( exporting ) {
 		// openQ4 MP-22: an export frame is 1000/fps of the match; the screenshot of
 		// the frame shown runs first in the next frame's command buffer
-		elapsed = exportStepMS;
+		elapsed = DemoExportStepMsec( exportSteps++, exportFps );
 		if ( playbackGameTime > header.startGameTime ) {
+			// this frame's sound mixes the picture's share of the track, so the
+			// track lasts exportFrames * 1000 / fps milliseconds
+			Sound_CaptureAdvance( DemoExportStepMsec( exportFrames, exportFps ) );
 			cmdSystem->BufferCommandText( CMD_EXEC_APPEND,
 				va( "screenshot \"%s/frame%05d.png\"\n", exportDirectory.c_str(), exportFrames++ ) );
 		}

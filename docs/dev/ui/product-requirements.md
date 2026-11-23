@@ -877,8 +877,8 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **126 partial, 231 pending and 0 verified requirements**, counting the
-42 superseded rows at their recorded states. `BEH-002`
+There are **126 partial, 233 pending and 0 verified requirements**, counting the
+43 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -1349,3 +1349,21 @@ increment re-binds the retained screens notes, which also record the
 CONTROLLER and AIM tabs and the CONTROLLER TEST panel. All normative
 requirements, constraints, dependencies, historical rows and acceptance gates
 remain unchanged.
+
+## Revision 27: Competitive's scoreline and the item timers
+
+Visual specification 1.47 turns Competitive's match bar into a scoreline at the
+product owner's request, after Quake Champions' team, Duel and free-for-all
+layouts: in Duel, Tourney and the team modes large scores sit on slabs beside
+the timer, and each side's players stand further out as tiles with their
+weapon, health and armor where the viewer may see them and a skull for the
+dead, while deathmatch keeps the Remastered standing and timer top-leading. It
+also gives the item timers symbols, places and progress lines and steps the
+spectators' trailing list under them. `FLOW-073` supersedes the pending
+`FLOW-058`, carrying no evidence, and `FLOW-074` appends the item timers, which
+the specification had not described. Both are pending. The revision re-binds
+the visual specification, the Remastered HUD notes, and the audio voice
+evidence and performance preset notes that later commits had changed without
+re-binding; no evidence scope or result changes. There are 359
+rows, 316 active requirements and 43 historical superseded rows; the 358
+migration variants and seven final gates remain unaccepted.

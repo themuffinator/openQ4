@@ -130,9 +130,12 @@ back, with `si_itemTimers`:
 | `2` | Everyone, players included |
 
 When you are allowed to see them, up to six timers appear at the right edge of
-the screen, the items a match turns on first. An item that is there shows its
-name in green; one that is gone shows the time until it returns. A timer shows
-`--` while a Classic mega health is still held by the player who took it.
+the screen, the items a match turns on first. Each shows the item's symbol and
+where it lies on the map, so two armours are easy to tell apart. An item that
+is there reads in green; one that is gone shows the time until it returns, its
+symbol dimmed, with a line underneath that fills in the item's colour as the
+respawn runs. A timer shows `--` while a Classic mega health is still held by
+the player who took it.
 
 `hud_itemTimers 0` hides the timers on your screen. The server sends the list
 only to the people it allows, so a player on a spectators-only server has

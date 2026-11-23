@@ -38,6 +38,39 @@ With `ui_retained 1` (the default) the Settings screen opens the retained SETTIN
 
 The retained pages also offer rows the classic page lacks: Frame Rate Cap (`com_maxfps`: 30, 60, 75, 90, 120, 144, 165, 240, 360 or Unlimited), Anisotropic Filtering (`image_anisotropy`: Off, 2x, 4x, 8x, 16x), Shadow Maps (`r_useShadowMap`, available while Shadows is on) and Motion Blur (`r_motionBlur`), all of which the performance presets set; Character Self-Shadows needs Shadow Maps. VR Mode, Room Scale, Two-Handed Grip and Physical Crouch are toggles there. The rest of this document describes the classic pages (`ui_retained 0`), whose layout is unchanged.
 
+### Dependent rows
+
+On the retained pages a row that another setting has turned off is dimmed and disabled: it keeps showing its value, Up and Down pass over it, and a click does nothing until the setting it needs allows it again. Each dependency below was checked against the code that reads both settings; a row that still has some effect stays enabled. The DISPLAY page follows the draft, so turning Fullscreen on enables its rows before Apply. The tables live in `tools/ui/retained_system.py`, `retained_game.py` (`dependencies()`), `retained_controls.py` (`dependencies()`) and `retained_audio.py` (`DEPENDENCIES`); the shared helper is `retained_settings_rows.requires`.
+
+| Page | Row | Enabled while | Why |
+|---|---|---|---|
+| Display | Borderless Window | Fullscreen is off | `r_borderless` only shapes a window. |
+| Display | Fullscreen Policy | Fullscreen is on | `r_fullscreenDesktop` is read only for fullscreen. |
+| Display | Window Width, Window Height | Fullscreen is off | A window's size (unchanged). |
+| Display | Display Resolution, Custom FS Width/Height, Refresh Rate | Fullscreen is on and the policy is exclusive | Desktop fullscreen uses the desktop's mode, a window its window size. |
+| Display | Shadow Maps | Enable Shadows is on | Unchanged. |
+| Display | Character Self-Shadows | Shadows and Shadow Maps are on | Unchanged. |
+| Display | MSAA, Rendering Device, Renderer, Auto-Detect | The renderer or device reports it can | Unchanged capability gates. |
+| Controls | Accel Offset, Accel Curve, Sensitivity Cap | Mouse Accel is not 0 | Read only inside the acceleration branch. |
+| Controls | Every Controller and Aim tab row except those listed below | Controller Input is on | Controller input off closes the controllers. Toggle Crouch, Always Run, Wheel Sensitivity and Wheel Offset (also keyboard and VR), the two reset buttons and Touchscreen stay enabled. |
+| Controls | Rumble Strength, Trigger Rumble, Adaptive Triggers, Directional Hits, Low Battery Rumble | Rumble is on | The rumble senders return early with rumble off. |
+| Controls | Low Battery Cap | Rumble is on and Low Battery Rumble is above 0 | A threshold of 0 never applies the strength. |
+| Controls | Gyro Turn Ratio, Gyro Tilt Ratio, Gyro Turning, Invert Gyro Turn/Tilt, Gyro Tightening, Calibrate Gyro | Gyro or Gyro Menu Pointer is on | The menu pointer keeps the sensor and its tuning. |
+| Controls | Gyro Active | Gyro is on | Gameplay only. |
+| Controls | Touchpad Sensitivity | Touchpad Mode is a pointer mode (not Off or buttons only) | Modes 0 and 3 never move a pointer. |
+| Game Options | HUD Size, Width, Safe Area Inset, Opacity | HUD Layout is not Classic | Classic draws the stock HUD unchanged. |
+| Game Options | Damage Direction, Pickup Messages, Weapon Strip | HUD Layout is Remastered or Competitive | Classic lacks them and Minimal leaves them out. |
+| Game Options | Weapon FOV | Show Gun is on | The hidden view weapon is not drawn. |
+| Game Options | Weapon FOV Aspect | Show Gun is on and Weapon FOV is above 0 | It adjusts only a set weapon FOV. |
+| Game Options | Every Virtual Reality row after VR Mode | VR Mode is on | No OpenXR session without it. |
+| Game Options | Snap Turn Angle | Turning is Snap | Smooth turning has its own speed. |
+| Game Options | Laser Sight, Two-Handed Grip | Aim is hand aim | Head aim draws no laser and has no grip. |
+| Game Options | Custom crosshair picker | Custom Crosshair is on | Unchanged. |
+| Audio | Subtitle Size, Subtitle Background, Speaker Names, Untranscribed Speech | Subtitles is on | No subtitle is drawn with them off. |
+| Audio | Surround Speakers | Headphone HRTF is not On | HRTF On always outputs stereo HRTF. |
+
+Checked and left enabled because the setting still has an effect: the gun's X/Y/Z offsets, Gun Position and Weapon Kick with Show Gun off (they move the hidden weapon, whose barrel some weapons fire from); Preload Light Grids with Irradiance Volumes off (it still uploads the grids); Corpse Time with Corpse Sink off; the crosshair size and colour with the custom crosshair off. No menu row depends on vertex buffers: only GPU skinning (`r_gpuSkinning`, console only) needs them, and `r_renderer` Best and ARB2 select the same path on desktop OpenGL.
+
 ## Widget Type Key
 
 | Type | Meaning |

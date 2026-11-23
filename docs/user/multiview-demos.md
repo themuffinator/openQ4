@@ -270,7 +270,20 @@ to the display's rate.
 own view, as one PNG picture every thirtieth of a second of the match, in
 `exports/match_name/` in your save path (`frame00000.png` on); add `quit` to
 quit afterwards. Any video editor or encoder turns the pictures into a video.
-Sound is not exported yet.
+
+The sound comes with it: `exports/match_name/match_name.wav` is the match as
+you would have heard it, at your sound device's rate and in its speaker layout
+(stereo, or 5.1 and so on), and exactly as long as the pictures. Nothing plays
+through your speakers while the export runs; your sound device comes back when
+it ends. To make a video with `ffmpeg`:
+
+```text
+ffmpeg -framerate 30 -i frame%05d.png -i match_name.wav -c:v libx264 -pix_fmt yuv420p -c:a aac match_name.mp4
+```
+
+Use the same number for `-framerate` as you gave `demoExport`. The sound track
+needs sound to be on (`s_noSound 0`); otherwise, or if your sound library cannot
+mix into a file, the console says why and only the pictures are written.
 
 ### Add markers and notes
 

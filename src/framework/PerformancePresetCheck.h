@@ -24,7 +24,7 @@ struct PerformancePresetCheck {
 	PerformancePresetReason reason = PerformancePresetReason::Unknown;
 	int systemRamMB = 0, videoRamMB = 0, logicalCpus = 0;
 	int drawableWidth = 0, drawableHeight = 0, displayRefreshHz = 0;
-	int screenFraction = 100, maxFps = 0, postAA = 0;
+	int maxFps = 0, postAA = 0;
 	std::string summary;           // the detection's reasoning, for the log
 };
 } // namespace openq4

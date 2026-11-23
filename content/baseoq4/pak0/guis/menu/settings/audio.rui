@@ -382,6 +382,66 @@
  },
  "bindings": [
   {
+   "id": "audio_speakers.enabled",
+   "node": "audio_speakers",
+   "property": "enabled",
+   "value": {"op": "!=", "args": [{"state": "audio.hrtf"}, 2]}
+  },
+  {
+   "id": "audio_speakers.opacity",
+   "node": "audio_speakers",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "audio.hrtf"}, 2]}, 1, 0.4]}
+  },
+  {
+   "id": "audio_subtitle_size.enabled",
+   "node": "audio_subtitle_size",
+   "property": "enabled",
+   "value": {"state": "audio.subtitles"}
+  },
+  {
+   "id": "audio_subtitle_size.opacity",
+   "node": "audio_subtitle_size",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "audio.subtitles"}, 1, 0.4]}
+  },
+  {
+   "id": "audio_subtitle_background.enabled",
+   "node": "audio_subtitle_background",
+   "property": "enabled",
+   "value": {"state": "audio.subtitles"}
+  },
+  {
+   "id": "audio_subtitle_background.opacity",
+   "node": "audio_subtitle_background",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "audio.subtitles"}, 1, 0.4]}
+  },
+  {
+   "id": "audio_subtitle_speakers.enabled",
+   "node": "audio_subtitle_speakers",
+   "property": "enabled",
+   "value": {"state": "audio.subtitles"}
+  },
+  {
+   "id": "audio_subtitle_speakers.opacity",
+   "node": "audio_subtitle_speakers",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "audio.subtitles"}, 1, 0.4]}
+  },
+  {
+   "id": "audio_subtitle_untranscribed.enabled",
+   "node": "audio_subtitle_untranscribed",
+   "property": "enabled",
+   "value": {"state": "audio.subtitles"}
+  },
+  {
+   "id": "audio_subtitle_untranscribed.opacity",
+   "node": "audio_subtitle_untranscribed",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"state": "audio.subtitles"}, 1, 0.4]}
+  },
+  {
    "id": "audio-header.display",
    "node": "audio-header",
    "property": "display",

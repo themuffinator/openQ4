@@ -29,8 +29,8 @@ from __future__ import annotations
 
 from build_retained_screens import U, Document, absolute, image, keyword, length, number
 from retained_mp_menus import value_row
-from retained_settings_rows import (COLUMN_W, ROW_PITCH, choice, cvar_row, cvar_settings, heading, rows_value_column, setting_row,
-                                    settings_subpage, show_tab, slider, toggle)
+from retained_settings_rows import (COLUMN_W, ROW_PITCH, choice, cvar_row, cvar_settings, heading, requires, rows_value_column,
+                                    setting_row, settings_subpage, show_tab, slider, toggle)
 
 PREFIX = "game"
 CROSSHAIRS = 20                            # the custom crosshairs (player_marine_mp_ui's mtr_crosshair keys)
@@ -145,6 +145,48 @@ TABS = (
 )
 
 
+def _cvar(name: str) -> dict:
+    return {"state": f"cvar.{name}"}
+
+
+def _all(*terms) -> dict:
+    result = terms[0]
+    for term in terms[1:]:
+        result = {"op": "&&", "args": [result, term]}
+    return result
+
+
+def dependencies() -> dict:
+    """The rows another setting turns off (retained_settings_rows.requires),
+    each the condition under which it does anything:
+    - the HUD's sizes and opacity with the Classic layout, which draws the
+      stock HUD unchanged (idLegacyHudLayout::Read), and Damage Direction,
+      Pickup Messages and the Weapon Strip with Classic or Minimal, which
+      leaves them out;
+    - Weapon FOV with Show Gun off (the view weapon is not drawn), and
+      Weapon FOV Aspect while Weapon FOV is 0 too (it adjusts only a set FOV);
+    - every VR row with VR Mode off (no OpenXR session), Snap Turn Angle with
+      smooth turning, and the Aim Laser and Two-Handed Grip with head aim.
+    The gun's offsets, position and kick stay: they still move the hidden
+    weapon, whose barrel some weapons fire from."""
+    layout = _cvar("ui_hudLayout")
+    remastered = {"op": "!=", "args": [layout, 0]}
+    trimmed = _all(remastered, {"op": "!=", "args": [layout, 2]})
+    shown = _cvar("ui_showGun")
+    vr = _cvar("vr_enable")
+    hand_aim = _all(vr, {"op": "==", "args": [_cvar("vr_aimMode"), 1]})
+    return {
+        **{ident: remastered for ident in ("game_hudscale", "game_hudwidth", "game_hudinset", "game_hudopacity")},
+        **{ident: trimmed for ident in ("game_damagedirection", "game_pickups", "game_weaponstrip")},
+        "game_gunfov": shown,
+        "game_gunfovadjust": _all(shown, {"op": ">", "args": [_cvar("cl_gunfov"), 0]}),
+        **{row[1]: vr for row in next(rows for section, _heading, rows in SECTIONS if section == "vr")[1:]},
+        "game_vrsnap": _all(vr, {"op": "!=", "args": [_cvar("vr_turnMode"), 1]}),
+        "game_vrlaser": hand_aim,
+        "game_vrtwohanded": hand_aim,
+    }
+
+
 def crosshair_row(doc: Document, ident: str, label: str, verb: str, value_x: float) -> dict:
     """The custom crosshair: a slider over the crosshairs, its number and the
     crosshair it names, which the session publishes (game.crosshairImage);
@@ -193,6 +235,8 @@ def game_document() -> dict:
     sections = {section: (heading_key, rows) for section, heading_key, rows in SECTIONS}
     value_x = rows_value_column(row for _section, _heading, rows in SECTIONS for row in rows)
     built = {row[1]: game_row(doc, row, value_x) for _section, _heading, rows in SECTIONS for row in rows}
+    for ident, condition in dependencies().items():
+        requires(doc, built[ident], condition)
     tabs = []
     for ident, key, columns in TABS:
         laid = []

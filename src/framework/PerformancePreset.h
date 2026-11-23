@@ -12,7 +12,8 @@ struct PerformancePreset {
 	const char *name;
 	int machineSpec;
 	const char *rendererBenchmarkPreset;
-	int screenFraction;
+	// No render scale: presets never set r_screenFraction or the display mode,
+	// so the scene stays at the player's choice (native by default).
 	int multiSamples;
 	int postAA;
 	int maxFps;
@@ -59,7 +60,7 @@ struct PerformancePreset {
 };
 inline constexpr const char* PerformancePresetDefaultName = "balanced";
 inline constexpr int PerformancePresetCount = 9;
-inline constexpr int PerformancePresetTargetCount = 55;
+inline constexpr int PerformancePresetTargetCount = 54;
 const std::array<PerformancePreset,PerformancePresetCount>& PerformancePresets() noexcept;
 const std::array<const char*,PerformancePresetTargetCount>& PerformancePresetTargets() noexcept;
 const PerformancePreset* FindPerformancePreset(std::string_view name) noexcept;
@@ -111,19 +112,18 @@ inline constexpr int PerformancePresetVram8GiB=7680;
 inline constexpr int PerformancePresetVram12GiB=11520;
 inline constexpr int PerformancePresetVram16GiB=15360;
 inline constexpr int PerformancePresetVram24GiB=23040;
-// Phones report less than their label too: a 12 GiB flagship is above 10 GiB.
-inline constexpr int PerformancePresetMobileFlagshipRamMB=10240;
-// The scene pixels of a resolution class named by its 16:9 height. A class
-// spans shapes up to 20.25:9, so 16:10 and 3:2 laptop panels and 20:9 phones
-// share the class of their 16:9 sibling, and the next class up fits at 75%.
+// The pixels of a resolution class named by its 16:9 height. A class spans
+// shapes up to 20.25:9, so 16:10 and 3:2 laptop panels and 20:9 phones share
+// the class of their 16:9 sibling. Detection uses them to pick the tier.
 constexpr long long PerformancePresetClassPixels(int height) noexcept{return 9LL*height*height/4;}
 struct PerformancePresetDetection {
  const PerformancePreset* preset=nullptr; // Immutable shared profile, never a mutable host view.
  PerformancePresetReason reason=PerformancePresetReason::Unknown;
  int systemRamMB=0, videoRamMB=0;
- // Automatic recommendations can reduce the template's scene scale and omit
- // unsupported post AA. Manual presets remain immutable and hardware-neutral.
- int screenFraction=100, postAA=0, scenePixelBudget=0;
+ // Automatic recommendations can omit unsupported post AA. They never lower
+ // the render scale or the display resolution: a large drawable lowers the
+ // tier instead. Manual presets remain immutable and hardware-neutral.
+ int postAA=0;
  // A first launch presents at the display's rate rather than the tier's
  // manual-choice cap (FPS-02); the tier's cap when the rate is unknown. A
  // power-limited device (phone, Deck, Pi, ARM board, explicit request) keeps

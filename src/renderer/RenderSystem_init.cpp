@@ -7041,6 +7041,7 @@ idRenderSystemLocal::ShutdownOpenGL
 void idRenderSystemLocal::ShutdownOpenGL( void ) {
 	R_RenderThread_Shutdown();
 	CancelSavePreview();
+	EndVideoCapture();
 	r_recoverableRendererRestore = false;
 	if ( !glConfig.isInitialized ) {
 		R_ClearActiveRenderTextures();

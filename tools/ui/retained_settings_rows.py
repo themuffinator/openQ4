@@ -283,6 +283,27 @@ def cvar_row(doc: Document, row: tuple, value_x: float) -> dict:
     raise SystemExit(f"{ident}: a {kind} row names no CVar")
 
 
+DEPENDENT_DIM = 0.4                       # a row another setting has turned off, as the DISPLAY page dims its own
+
+
+def requires(doc: Document, node: dict, condition: dict, low: float = DEPENDENT_DIM) -> None:
+    """A row that does nothing while `condition` is false (another setting
+    has turned it off: Rumble Strength while Rumble is off): every control it
+    holds (a fine slider and its typed number) is disabled, so Up and Down
+    pass over it and a click is refused, and dimmed, keeping its value
+    shown. The settings tree's dependencies are listed in
+    docs/dev/settings-menu-structure.md."""
+    controls = _controls(node)
+    if not controls:
+        raise SystemExit(f"{node['id']} holds no control to disable")
+    for control in controls:
+        ident = control["id"]
+        if any(binding["node"] == ident and binding["property"] in ("enabled", "opacity") for binding in doc.bindings):
+            raise SystemExit(f"{ident} already decides whether it is enabled")
+        doc.bind(f"{ident}.enabled", ident, "enabled", condition)
+        doc.bind(f"{ident}.opacity", ident, "opacity", {"op": "select", "args": [condition, 1, low]})
+
+
 def check_settings_text(tabs: list, note: str | dict | None) -> None:
     """Every shipped language's text fits: the tabs in the strip between its
     keycaps, each heading in its column, the note on the heading line, and

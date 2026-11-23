@@ -82,9 +82,14 @@ static void OneDisplay(View& v) {
  PublishSizes(v,Usual);
  Check(v.Element(Resolution)->IsVisible(true)&&v.Element(Refresh)->IsVisible(true),"one display keeps the size and rate rows");
  // Down wraps from the tab's last row, and Up climbs to the tab, past both.
+ // The rate row sizes an exclusive fullscreen, so the draft asks for one.
+ Draft(v,{{"r_fullscreen",true}});
  Check(v.runtime.FocusControl(Refresh,v.time),"focus the tab's last row");v.Frame();
  v.Key(MenuInput::Down);v.Frame();Check(v.runtime.FocusedControl()=="settings_fullscreen","keyboard order passes over the hidden rows");
  v.Key(MenuInput::Up);v.Frame();Check(v.runtime.FocusedControl()=="tab-screen","Up from the first shown row reaches the tab past the hidden rows");
+ // Borderless shapes only a window.
+ Check(!v.runtime.FocusControl("settings_borderless",v.time),"Borderless waits for a windowed draft");
+ Draft(v,{{"r_fullscreen",false}});
  Check(v.runtime.FocusControl("settings_borderless",v.time),"focus the row after Fullscreen");
  v.Key(MenuInput::Previous);v.Frame();Check(v.runtime.FocusedControl()=="settings_fullscreen","Previous reaches Fullscreen");
  v.Key(MenuInput::Previous);v.Frame();Check(v.runtime.FocusedControl()!=Device&&v.runtime.FocusedControl()!=Span,"Previous passes over the hidden rows");
@@ -238,9 +243,13 @@ static void Sizing(View& v) {
  Draft(v,{{"r_fullscreenDesktop",true}});
  Check(!v.runtime.CanActivateControl(Resolution,v.time)&&!v.runtime.CanActivateControl(Refresh,v.time),"the desktop policy disables both rows");
  Check(std::abs(strength(Resolution)-.45)<1e-6&&std::abs(strength(Refresh)-.45)<1e-6,"the desktop policy dims both rows");
+ // A window keeps its window size: both rows wait for fullscreen.
  Draft(v,{{"r_fullscreenDesktop",false},{"r_fullscreen",false}});
- Check(v.runtime.CanActivateControl(Resolution,v.time)&&v.runtime.CanActivateControl(Refresh,v.time),"the exclusive policy enables both rows, even while windowed");
- Check(std::abs(strength(Resolution)-1)<1e-6&&std::abs(strength(Refresh)-1)<1e-6,"the exclusive policy restores both rows");
+ Check(!v.runtime.CanActivateControl(Resolution,v.time)&&!v.runtime.CanActivateControl(Refresh,v.time),"a windowed draft disables both rows");
+ Check(std::abs(strength(Resolution)-.45)<1e-6&&std::abs(strength(Refresh)-.45)<1e-6,"a windowed draft dims both rows");
+ Draft(v,{{"r_fullscreen",true}});
+ Check(v.runtime.CanActivateControl(Resolution,v.time)&&v.runtime.CanActivateControl(Refresh,v.time),"exclusive fullscreen enables both rows");
+ Check(std::abs(strength(Resolution)-1)<1e-6&&std::abs(strength(Refresh)-1)<1e-6,"exclusive fullscreen restores both rows");
  // Without lists neither row can pick.
  Publish(v,{false,false,0,{}});
  Check(!v.runtime.CanActivateControl(Resolution,v.time)&&!v.runtime.CanActivateControl(Refresh,v.time),"size and rate rows without lists cannot act");

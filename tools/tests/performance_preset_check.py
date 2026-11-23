@@ -173,14 +173,14 @@ def versions() -> None:
         print("skipped the version mutations: no C++ compiler")
         return
     source = read("src/framework/PerformancePreset.cpp")
-    preset = '{ "minimum", 0, "low",\n\t\t50, 0, 0, 30,'
+    preset = '{ "minimum", 0, "low",\n\t\t0, 0, 30,'
     rule = "tier=vram<=2048?Performance:Balanced;"
     check(source.replace("\r\n", "\n").count(preset) == 1 and source.count(rule) == 1, "the mutation anchors exist")
     out = Path(tempfile.mkdtemp(prefix="preset-check-", dir=ROOT / ".tmp"))
     try:
         shipped = compile_version(compiler, out, "shipped", source)
         normal = source.replace("\r\n", "\n")
-        changed_preset = compile_version(compiler, out, "preset", normal.replace(preset, preset.replace("50, 0, 0, 30", "50, 0, 0, 31")))
+        changed_preset = compile_version(compiler, out, "preset", normal.replace(preset, preset.replace("0, 0, 30,", "0, 0, 31,")))
         changed_rule = compile_version(compiler, out, "rule", normal.replace(rule, rule.replace("2048", "4096")))
         pinned = re.search(r'version=="(\d+\.[0-9a-f]{8})"', read("tools/tests/native/UiPerformancePresetTest.cpp"))
         check(pinned is not None and pinned.group(1) == shipped, f"the native test pins the shipped version {shipped}")
