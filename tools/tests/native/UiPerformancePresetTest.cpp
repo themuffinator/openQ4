@@ -58,7 +58,7 @@ static void Profiles(){
  {2,0,2,144,16,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,0,1,1,0,0,0,0,0,4,1,1,1,1,1,1},
  {3,2,2,144,16,1,0,0,0,0,64,0,0,1,0,1,2048,0,1,1,1,0,0,1,32,4,0,1,48,512,9,9,2,0,4096,20,5,8,1,1,1,0,0,0,0,1,4,0,1,1,1,1,1},
  {3,4,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,0,0,1,32,4,0,1,48,512,13,9,2,0,8192,32,5,8,1,1,1,0,0,0,0,1,4,0,1,1,1,1,1},
- {3,8,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,2048,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1,1}};
+ {3,8,3,240,16,1,0,0,0,0,64,0,0,1,0,1,4096,0,1,1,1,1,0,1,32,4,0,1,48,1024,13,13,2,1,16384,32,5,16,1,1,1,0,0,0,0,1,4,1,1,1,1,1,1}};
  const char* names[]={"minimum","lowpower","low","performance","balanced","enhanced","quality","ultra","maximum"};
  const char* renderer[]={"low","low","low","baseline","baseline","modern","modern","high-end","high-end"};
  Check(PerformancePresetCount==9&&numbers.size()==9,"nine profiles");
@@ -408,8 +408,8 @@ static void SystemVersion(){
  for(size_t i=revision.size();i<version.size();++i)
   Check((version[i]>='0'&&version[i]<='9')||(version[i]>='a'&&version[i]<='f'),"fingerprint is lower-case hex");
  Check(PerformancePresetFingerprintMachines()==9042,"detection matrix covers every GPU class, memory band, resolution class and platform ceiling");
- if(version!="1.8bdab863")std::fprintf(stderr,"preset system version is %s\n",version.c_str());
- Check(version=="1.8bdab863","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
+ if(version!="1.ac7c9a1f")std::fprintf(stderr,"preset system version is %s\n",version.c_str());
+ Check(version=="1.ac7c9a1f","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
 }
 int main(){
 #if defined(_WIN32) && defined(_DEBUG)

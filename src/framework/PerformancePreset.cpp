@@ -88,6 +88,10 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 	// target (FPS-02): it is the choice for players who want everything on.
 	// MSAA is 8 samples, the most the Vulkan renderer draws, so Maximum is one
 	// image on both renderers (FPS-05); 16 stays a manual choice for OpenGL.
+	// Point cubes are 1024, not 2048: a 2048 cube is 96 MB, so the default
+	// r_shadowMapPointCacheMegs held five and a Vulkan view's pool twelve, and
+	// views with a hundred shadowing point lights (mcc_landing) put most of
+	// them on stencil shadows (#258).
 	// CRT and exposure/strength
 	// controls are artistic preferences, not quality levels; experimental
 	// rendering modes stay opt-in.
@@ -95,7 +99,7 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		8, 3, 240,
 		16, 0, 0, 0, 1, 0,
 		1, 4096, 0, 1, 1, 1, 1, 0, 1, 32, 4,
-		0, 1, 48, 2048, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1, 1, 1, 1 }
+		0, 1, 48, 1024, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1, 1, 1, 1 }
 }};
 static const std::array<const char*,PerformancePresetTargetCount> Targets{{
 	"com_performancePreset",
