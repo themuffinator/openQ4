@@ -26,8 +26,10 @@ All writable data stays below ``--output``.
   ``timeDemoQuit`` in a fresh process, which must render it and quit.
 * ``lifecycle``: cold start on an empty profile, warm start on its caches,
   start after its generated cache is corrupted, then one session that resizes
-  the window and restarts the renderer (also switching OpenGL to Vulkan and
-  back), pauses and resumes the world, runs slow motion and quits. Every phase
+  the window, restarts the renderer, pauses and resumes the world, runs slow
+  motion, saves, changes map and quits. The same profile then relaunches on
+  Vulkan (the API changes only at engine start), restarts that renderer in
+  gameplay, and relaunches on OpenGL again. Every phase
   must reach its end marker, draw its captures and exit with code 0 without a
   crash report; the time from the quit to process exit is recorded.
 
@@ -69,7 +71,7 @@ RESTORE_STARTED = re.compile(r"Game Map Init SaveGame")
 RESTORE_FAILED = re.compile(r"could not restore saved state[^\r\n]*|WARNING:.*Savegame '[^']+' "
                             r"(?:has|was|wire|is|failed)[^\r\n]*")
 PRESET_CHECK = re.compile(r"[Pp]erformance ?[Pp]reset[^\r\n]*check[^\r\n]*")
-RENDER_API = re.compile(r"Renderer API: requested=(\S+) active=(\S+)")
+RENDER_API = re.compile(r"^Renderer API: (\S+)", re.MULTILINE)
 SETA = re.compile(r'^seta\s+(\S+)\s+"((?:[^"\\]|\\.)*)"\s*$')
 BIND = re.compile(r'^bind\s+"?([^"\s]+)"?\s+"((?:[^"\\]|\\.)*)"\s*$')
 
@@ -601,8 +603,7 @@ def command_lifecycle(args: argparse.Namespace) -> int:
         *play, shot("session-start"),
         "set r_customWidth 1280", "set r_customHeight 720", "set r_windowWidth 1280", "set r_windowHeight 720",
         "vid_restart", "wait 60", shot("after-resize"),
-        "set r_renderApi vulkan", "vid_restart", "wait 90", shot("after-vulkan"),
-        "set r_renderApi gl", "vid_restart", "wait 90", shot("after-gl"),
+        "vid_restart", "wait 90", shot("after-restart"),
         "set g_stopTime 1", "wait 60", shot("paused"), "set g_stopTime 0", "wait 30",
         "set timescale 0.25", "wait 120", shot("slow-motion"), "set timescale 1", "wait 30",
         "saveGame rel_lifecycle", "wait 10", "disconnect", "wait 30", "map " + args.second_map, "wait 120",
@@ -611,15 +612,20 @@ def command_lifecycle(args: argparse.Namespace) -> int:
                     timeout=args.timeout + 300)
     # The second map's after-load config is empty, so the first one ends the run
     # after the map change by quitting from its own tail.
-    result = run_launch(second, ["session-start", "after-resize", "after-vulkan", "after-gl", "paused", "slow-motion"],
-                        report)
-    apis = result.get("renderApis", [])
-    report["sessionRenderApis"] = apis
-    if not any(active == "vulkan" for _, active in apis):
-        report.setdefault("problems", []).append("the session never ran on Vulkan after switching")
+    result = run_launch(second, ["session-start", "after-resize", "after-restart", "paused", "slow-motion"], report)
     sizes = {c["name"]: (c.get("width"), c.get("height")) for c in result["captures"]}
     if sizes.get("after-resize") not in ((1280, 720),):
         report.setdefault("problems", []).append(f"the resized capture is {sizes.get('after-resize')}, not 1280x720")
+    # The renderer API changes only at engine start (r_renderApi): relaunch the
+    # same profile on Vulkan, restart its renderer in gameplay, and back.
+    vulkan = run_launch(Launch("vulkan", runtime, basepath, home, renderer="vulkan", startup=["+map", args.map],
+                               after_load=[*play, shot("vulkan"), "vid_restart", "wait 90", shot("vulkan-restart")],
+                               timeout=args.timeout), ["vulkan", "vulkan-restart"], report)
+    report["vulkanRenderApis"] = vulkan.get("renderApis", [])
+    if "vulkan" not in vulkan.get("renderApis", []):
+        report.setdefault("problems", []).append(f"the Vulkan relaunch ran {vulkan.get('renderApis')}")
+    run_launch(Launch("back-to-gl", runtime, basepath, home, startup=["+map", args.map],
+                      after_load=[*play, shot("back-to-gl")], timeout=args.timeout), ["back-to-gl"], report)
     return finish(output, report)
 
 

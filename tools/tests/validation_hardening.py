@@ -552,10 +552,26 @@ def validate_windows_pdb_architecture_match() -> None:
     for path in (
         install_root / "openQ4-client_x64.pdb",
         install_root / "openQ4-ded_x64.pdb",
+        install_root / "openQ4-updater_x64.pdb",
+        install_root / "renderer-gl_x64.pdb",
         game_dir / "game-sp_x64.pdb",
         game_dir / "game-mp_x64.pdb",
     ):
         write_file(path)
+
+    # The renderer modules' and the updater's symbols are required too: a crash
+    # in a renderer module is symbolized from the release's symbols archive.
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_windows_symbols(root, install_root, game_dir, {"x64"}),
+            "renderer-vk_x64.pdb",
+            "missing renderer module PDB",
+        ),
+    )
+    write_file(install_root / "renderer-vk_x64.pdb")
 
     with_host_flags(
         True,

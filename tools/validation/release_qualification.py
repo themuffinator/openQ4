@@ -241,6 +241,18 @@ MATRIX: tuple[Case, ...] = (
          ("{python}", tool("bse_lifecycle_runtime.py"), "--install-root", "{runtime}", "--basepath", "{basepath}",
           "--output", "{out}"), timeout=1200, needs=("basepath",),
          harness="tools/tests/bse_lifecycle_runtime.py"),
+    # REL-04: the package checks a promotion relies on.
+    Case("rel04.package.symbols", "REL-04", "Release symbols match the binaries",
+         "Every openQ4 image in the runtime has a PDB in the release's symbols archive whose GUID matches the "
+         "image's CodeView record, so a crash in any of them can be symbolized.",
+         ("{python}", "{root}/tools/validation/release_qualification.py", "check-symbols", "--runtime", "{runtime}",
+          "--symbols", "{symbols}", "--output", "{out}"), timeout=600, needs=("symbols",),
+         harness="tools/validation/release_qualification.py"),
+    Case("rel04.package.signing", "REL-04", "Code signing status",
+         "Records each Windows image's Authenticode status. Windows packages are unsigned; this case states it "
+         "and fails only if an image claims a signature that does not verify.",
+         ("{python}", "{root}/tools/validation/release_qualification.py", "check-signing", "--runtime", "{runtime}",
+          "--output", "{out}"), timeout=600, harness="tools/validation/release_qualification.py"),
     # REL-02: engine captures the matrix can take, and the reviews it cannot.
     Case("rel02.captures.generated-images", "REL-02", "Engine render-target captures",
          "Generated images and front-end captures through the engine's screenshot command on both renderers.",
@@ -575,6 +587,8 @@ def needs_met(case: Case, candidate: dict[str, Any]) -> str | None:
             return "no Awakening content was frozen with the candidate"
         if need == "previous" and not inputs.get("previous"):
             return "no previous release runtime was frozen with the candidate"
+        if need == "symbols" and not symbols_archive(candidate):
+            return "no symbols archive beside the frozen package"
         if need == "clean-source":
             engine = candidate.get("engine") or {}
             if engine.get("dirty") or not candidate.get("sourceCommit"):
@@ -591,6 +605,7 @@ def expand(case: Case, candidate: dict[str, Any], out: Path) -> list[str]:
         "previous": inputs.get("previous") or "", "out": str(out),
         "client": str(runtime / client_name()), "ded": str(runtime / ded_name()),
         "commit": candidate.get("sourceCommit") or "",
+        "symbols": symbols_archive(candidate) or "",
     }
     return [part.format(**values) for part in case.command]
 
@@ -673,7 +688,8 @@ def run_case(case: Case, candidate: dict[str, Any], output: Path, args: argparse
     crashes_before = set(crash_reports(runtime))
     record["freeCommitGB"] = wait_for_memory(args.min_free_gb)
     case_dir.mkdir(parents=True, exist_ok=True)
-    command = expand(case, candidate, case_dir)
+    # Several harnesses insist on creating their own output directory.
+    command = expand(case, candidate, case_dir / "output")
     record["command"] = command
     environment = dict(os.environ)
     # The candidate is frozen and checked by hash around every case, which is
@@ -844,6 +860,102 @@ def check_layout(runtime: Path) -> list[str]:
     return problems
 
 
+def symbols_archive(candidate: dict[str, Any]) -> str | None:
+    package = (candidate.get("package") or {}).get("path")
+    if not package or not package.endswith(".zip"):
+        return None
+    symbols = Path(package[:-4] + "-symbols.zip")
+    return str(symbols) if symbols.is_file() else None
+
+
+def codeview_record(image: Path) -> tuple[bytes, int, str] | None:
+    """GUID, age and PDB name from a PE image's RSDS CodeView record."""
+    data = image.read_bytes()
+    offset = data.rfind(b"RSDS")
+    while offset >= 0:
+        end = data.find(b"\0", offset + 24)
+        if end > offset + 24:
+            name = data[offset + 24:end].decode("latin-1", errors="replace")
+            if name.lower().endswith(".pdb"):
+                guid = data[offset + 4:offset + 20]
+                age = int.from_bytes(data[offset + 20:offset + 24], "little")
+                return guid, age, name
+        offset = data.rfind(b"RSDS", 0, offset)
+    return None
+
+
+def openq4_images(runtime: Path) -> list[Path]:
+    """The images openQ4 builds; bundled third-party libraries carry their own symbols, or none."""
+    images = []
+    for path in sorted(runtime.rglob("*")):
+        if path.is_file() and path.suffix.lower() in (".exe", ".dll") and path.name.lower() != "openal32.dll":
+            images.append(path)
+    return images
+
+
+def check_symbols(runtime: Path, symbols: Path) -> dict[str, Any]:
+    with zipfile.ZipFile(symbols) as archive:
+        entries = {Path(info.filename).name.lower(): info for info in archive.infolist() if not info.is_dir()}
+        results, problems = [], []
+        for image in openq4_images(runtime):
+            record = codeview_record(image)
+            relative = image.relative_to(runtime).as_posix()
+            if record is None:
+                problems.append(f"{relative} has no CodeView record")
+                continue
+            guid, age, name = record
+            pdb = Path(name.replace("\\", "/")).name.lower()
+            info = entries.get(pdb)
+            if info is None:
+                problems.append(f"{relative}: {pdb} is not in the symbols archive")
+                results.append({"image": relative, "pdb": pdb, "present": False})
+                continue
+            content = archive.read(info)
+            matches = guid in content
+            if not matches:
+                problems.append(f"{relative}: {pdb} does not carry the image's GUID")
+            results.append({"image": relative, "pdb": pdb, "present": True, "guidMatches": matches, "age": age})
+    return {"symbols": str(symbols), "images": results, "problems": problems, "passed": not problems}
+
+
+def command_check_symbols(args: argparse.Namespace) -> int:
+    report = check_symbols(args.runtime.resolve(), args.symbols.resolve())
+    if args.output:
+        args.output.mkdir(parents=True, exist_ok=True)
+        (args.output / "symbols.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2))
+    return 0 if report["passed"] else 1
+
+
+def command_check_signing(args: argparse.Namespace) -> int:
+    runtime = args.runtime.resolve()
+    statuses: dict[str, str] = {}
+    if sys.platform == "win32":
+        images = [str(path) for path in sorted(runtime.rglob("*"))
+                  if path.is_file() and path.suffix.lower() in (".exe", ".dll")]
+        script = ("$files = $env:OPENQ4_REL_FILES | ConvertFrom-Json; foreach ($f in $files) { "
+                  "'{0}|{1}' -f $f, (Get-AuthenticodeSignature -LiteralPath $f).Status }")
+        output = subprocess.run(["powershell", "-NoProfile", "-Command", script], capture_output=True, text=True,
+                                timeout=600, env=dict(os.environ, OPENQ4_REL_FILES=json.dumps(images))).stdout
+        for line in output.splitlines():
+            if "|" in line:
+                name, status = line.rsplit("|", 1)
+                statuses[Path(name).relative_to(runtime).as_posix()] = status.strip()
+        missing = sorted(Path(image).relative_to(runtime).as_posix() for image in images
+                         if Path(image).relative_to(runtime).as_posix() not in statuses)
+        for name in missing:
+            statuses[name] = "Unchecked"
+    broken = sorted(name for name, status in statuses.items() if status not in ("NotSigned", "Valid"))
+    report = {"runtime": str(runtime), "statuses": statuses, "unsigned": sorted(n for n, s in statuses.items()
+                                                                                 if s == "NotSigned"),
+              "invalid": broken, "passed": not broken}
+    if args.output:
+        args.output.mkdir(parents=True, exist_ok=True)
+        (args.output / "signing.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(json.dumps(report, indent=2))
+    return 0 if report["passed"] else 1
+
+
 def command_check_layout(args: argparse.Namespace) -> int:
     runtime = args.runtime.resolve()
     problems = check_layout(runtime)
@@ -891,7 +1003,7 @@ def write_report(output: Path) -> Path:
         status = by_case.get(case.id, {}).get("status", "pending" if case.kind == "automated" else "awaiting review")
         counts[status] = counts.get(status, 0) + 1
     lines += ["", "**Latest results:** " + ", ".join(f"{count} {status}" for status, count in sorted(counts.items())), ""]
-    for task in ("REL-01", "REL-02", "REL-03"):
+    for task in ("REL-01", "REL-02", "REL-03", "REL-04"):
         lines += [f"## {task}", "", "| Case | Row | Latest | Attempts | Detail |", "| --- | --- | --- | --- | --- |"]
         for case in (c for c in MATRIX if c.task == task):
             result = by_case.get(case.id)
@@ -932,7 +1044,7 @@ def self_test() -> int:
     ids = [case.id for case in MATRIX]
     assert len(ids) == len(set(ids)), "duplicate case ids"
     for case in MATRIX:
-        assert case.task in ("REL-01", "REL-02", "REL-03"), case.id
+        assert case.task in ("REL-01", "REL-02", "REL-03", "REL-04"), case.id
         assert case.id.startswith(case.task.lower().replace("-", "") + "."), case.id
         if case.kind == "automated":
             assert case.command and case.harness and case.summary, case.id
@@ -981,6 +1093,29 @@ def self_test() -> int:
         problems = check_runtime(runtime, manifest, deep=False)
         assert "added extra.dll" in problems and "removed baseoq4/pak0.pk4" in problems, problems
         assert crash_reports(runtime) == ["old.log"]
+
+        # Each image's PDB must be in the symbols archive and carry its GUID.
+        guid = bytes(range(16))
+        image_dir = root / "symbol-runtime"
+        image_dir.mkdir()
+        (image_dir / "openQ4-client_x64.exe").write_bytes(b"MZ" + b"RSDS" + guid + (3).to_bytes(4, "little") +
+                                                         b"E:\\build\\openQ4-client_x64.pdb\0")
+        (image_dir / "renderer-vk_x64.dll").write_bytes(b"MZ" + b"RSDS" + bytes(16) + (1).to_bytes(4, "little") +
+                                                       b"renderer-vk_x64.pdb\0")
+        (image_dir / "OpenAL32.dll").write_bytes(b"MZ no record")
+        symbols_zip = root / "openq4-0.16.0-windows-x64-symbols.zip"
+        with zipfile.ZipFile(symbols_zip, "w") as archive:
+            archive.writestr("openq4-0.16.0-windows-x64-symbols/openQ4-client_x64.pdb", b"MSF" + guid)
+        result = check_symbols(image_dir, symbols_zip)
+        assert [r["image"] for r in result["images"]] == ["openQ4-client_x64.exe", "renderer-vk_x64.dll"], result
+        assert result["images"][0]["guidMatches"] and result["problems"] == [
+            "renderer-vk_x64.dll: renderer-vk_x64.pdb is not in the symbols archive"], result
+        with zipfile.ZipFile(symbols_zip, "w") as archive:
+            archive.writestr("s/openQ4-client_x64.pdb", b"MSF other")
+            archive.writestr("s/renderer-vk_x64.pdb", b"MSF" + bytes(16))
+        result = check_symbols(image_dir, symbols_zip)
+        assert result["problems"] == ["openQ4-client_x64.exe: openq4-client_x64.pdb does not carry the image's GUID"], \
+            result
 
         # A runtime extracted from an archive matches it entry for entry.
         archive = root / "package.zip"
@@ -1068,7 +1203,7 @@ def main(argv: list[str] | None = None) -> int:
     run = commands.add_parser("run", help="run matrix cases against the frozen candidate")
     run.add_argument("--output", type=Path, required=True)
     run.add_argument("--case", nargs="+")
-    run.add_argument("--task", nargs="+", choices=("REL-01", "REL-02", "REL-03"))
+    run.add_argument("--task", nargs="+", choices=("REL-01", "REL-02", "REL-03", "REL-04"))
     run.add_argument("--rerun-failed", action="store_true", help="only cases whose latest attempt did not pass")
     run.add_argument("--skip-passed", action="store_true")
     run.add_argument("--min-free-gb", type=float, default=8.0, help="free commit to wait for before each case")
@@ -1082,6 +1217,13 @@ def main(argv: list[str] | None = None) -> int:
     human.add_argument("--device", action="append")
     report = commands.add_parser("report", help="write summary.md")
     report.add_argument("--output", type=Path, required=True)
+    symbols = commands.add_parser("check-symbols", help="check the symbols archive against the runtime's images")
+    symbols.add_argument("--runtime", type=Path, required=True)
+    symbols.add_argument("--symbols", type=Path, required=True)
+    symbols.add_argument("--output", type=Path)
+    signing = commands.add_parser("check-signing", help="record each image's code signature status")
+    signing.add_argument("--runtime", type=Path, required=True)
+    signing.add_argument("--output", type=Path)
     layout = commands.add_parser("check-layout", help="check a runtime's package layout")
     layout.add_argument("--runtime", type=Path, required=True)
     layout.add_argument("--output", type=Path)
@@ -1090,6 +1232,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     handlers = {"freeze": command_freeze, "run": command_run, "record-human": command_record_human,
                 "report": command_report, "check-layout": command_check_layout, "list": command_list,
+                "check-symbols": command_check_symbols, "check-signing": command_check_signing,
                 "self-test": lambda _: self_test()}
     return handlers[args.command](args)
 

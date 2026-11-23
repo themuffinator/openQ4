@@ -509,6 +509,8 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- The Windows symbols download now includes the OpenGL and Vulkan renderer
+  modules and the updater, so crash reports from them can be read.
 - Multiplayer-only settings are kept between sessions. Field of view, the
   HUD's damage numbers, speedometer, input display, item timers, hit sound and
   other multiplayer options, and the Create Server bot and server options, were

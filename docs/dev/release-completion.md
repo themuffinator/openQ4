@@ -12,6 +12,21 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Windows crash reports from the renderers and the updater can be read, 23 November 2026
+
+- **For crash reports.** The Windows symbols download that accompanies each
+  release (`openq4-<version>-windows-<arch>-symbols.zip`) now carries the
+  debug symbols of both renderer modules and the updater, not only the
+  engine, the dedicated server and the game modules. Crashes inside the
+  OpenGL or Vulkan renderer, where many of them happen, can be symbolized from
+  a release again. The game package itself is unchanged.
+- **Evidence.** The REL-04 symbols check of the 0.16.0 candidates found the
+  three PDBs missing. `package_nightly.py` and the stage validator in
+  `openq4_validate.py` now require them. Packaging candidate C2's staged
+  install with the fixed packager gives a byte-identical runtime archive and a
+  symbols archive whose seven PDBs each carry their image's GUID
+  (`release_qualification.py check-symbols`).
+
 ## Multiplayer settings and field of view are kept between sessions, 23 November 2026
 
 - **Your multiplayer settings stay set.** openQ4 starts on its single-player

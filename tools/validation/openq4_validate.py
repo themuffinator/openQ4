@@ -1851,12 +1851,12 @@ def validate_windows_symbols(root: Path, install_root: Path, game_dir: Path, arc
     if not (install_root / "OpenAL32.dll").is_file():
         raise ValidationError("Windows staged payload is missing OpenAL32.dll.")
 
+    # The renderer modules and the updater ship beside the engine, and a crash
+    # in one of them is symbolized from the release's symbols archive too.
     required_symbols = {
-        install_root / f"openQ4-client_{arch}.pdb"
+        install_root / f"{name}_{arch}.pdb"
         for arch in arches
-    } | {
-        install_root / f"openQ4-ded_{arch}.pdb"
-        for arch in arches
+        for name in ("openQ4-client", "openQ4-ded", "openQ4-updater", "renderer-gl", "renderer-vk")
     } | {
         game_dir / f"game-sp_{arch}.pdb"
         for arch in arches
@@ -1873,6 +1873,9 @@ def validate_windows_symbols(root: Path, install_root: Path, game_dir: Path, arc
     staged_symbols = (
         sorted(install_root.glob("openQ4-client_*.pdb"))
         + sorted(install_root.glob("openQ4-ded_*.pdb"))
+        + sorted(install_root.glob("openQ4-updater_*.pdb"))
+        + sorted(install_root.glob("renderer-gl_*.pdb"))
+        + sorted(install_root.glob("renderer-vk_*.pdb"))
         + sorted(game_dir.glob("game-sp_*.pdb"))
         + sorted(game_dir.glob("game-mp_*.pdb"))
     )

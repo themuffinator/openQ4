@@ -631,10 +631,15 @@ def get_required_game_module_binaries(platform: str, arch: str) -> tuple[str, st
     )
 
 
-def get_required_windows_root_symbols(arch: str) -> tuple[str, str]:
+def get_required_windows_root_symbols(arch: str) -> tuple[str, ...]:
+    # Every shipped openQ4 image beside the game modules: crash dumps from the
+    # renderer modules and the updater need their PDBs as much as the engine's.
     return (
         f"{PRODUCT_NAME}-client_{arch}.pdb",
         f"{PRODUCT_NAME}-ded_{arch}.pdb",
+        f"{PRODUCT_NAME}-updater_{arch}.pdb",
+        f"renderer-gl_{arch}.pdb",
+        f"renderer-vk_{arch}.pdb",
     )
 
 

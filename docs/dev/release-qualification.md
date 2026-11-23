@@ -103,18 +103,20 @@ loopback networking. None synthesises device input or captures the desktop.
 | `rel01.sp.campaign-transitions` | REL-01 | All 31 stock stages in order: save, load, and the map's own end-level change. |
 | `rel01.sp.campaign-saves` | REL-01 | Saves on five campaign maps reload in a fresh process. |
 | `rel01.campaign.switch` | REL-01 | Quake 4 and The Awakening are discovered and switched in place. |
-| `rel01.install.clean` | REL-01 | First launch detects a preset silently, writes its config, plays; the second launch changes nothing it read. |
+| `rel01.install.clean` | REL-01 | A player's first starts: the menu detects a preset silently and writes the config, a level drops nothing, the next menu start changes nothing; then multiplayer-only settings survive a level and a menu start. |
 | `rel01.install.upgrade` | REL-01 | A profile made by the previous release keeps every player choice; its save restores and resaves. |
 | `rel01.content-packs` | REL-01 | A missing or stale pack is reported, localized, naming the pack. |
 | `rel01.localization` | REL-01 | A complete non-English language drives the front end and gameplay text. |
 | `rel03.soak-gl`, `-vk` | REL-03 | One process tours eight SP maps for several cycles with a `vid_restart`; memory sampled at every stop. |
-| `rel03.lifecycle` | REL-03 | Cold start, warm start, start after generated-cache damage, resize and renderer restarts (OpenGL to Vulkan and back), pause, slow motion, map change and quit. |
+| `rel03.lifecycle` | REL-03 | Cold start, warm start, start after generated-cache damage, a session with resize and renderer restarts, pause, slow motion, save, map change and quit, then the same profile relaunched on Vulkan (the API changes only at engine start) and back on OpenGL. |
 | `rel03.network.reconnect-impaired` | REL-03 | Joins and reconnects through simulated loss and latency. |
 | `rel03.network.ipv6` | REL-03 | The same joins over IPv6 loopback. |
 | `rel03.renderer.vk-recovery` | REL-03 | Same-process Vulkan startup recovery, then gameplay. |
 | `rel03.effects.lifecycle` | REL-03 | Effects across map changes, restores and renderer restarts. |
 | `rel02.captures.generated-images` | REL-02 | Engine render-target captures of generated images on both renderers. |
 | `rel02.human.*` | REL-02 | Matched visual acceptance, motion, latency, audible sound, accessibility and VR comfort reviews. |
+| `rel04.package.symbols` | REL-04 | Every openQ4 image has a PDB in the release's symbols archive whose GUID matches its CodeView record. |
+| `rel04.package.signing` | REL-04 | Records each Windows image's Authenticode status; fails only on a signature that does not verify. |
 
 The profile and lifecycle cases come from
 `tools/tests/release_profile_runtime.py`. The
@@ -149,6 +151,21 @@ python tools/validation/release_qualification.py record-human --output <evidence
 
 Fullscreen and input-control tests need the project owner's prior permission for
 that session; a historical plan or an earlier approval is not permission.
+
+## Package checks for promotion (REL-04)
+
+- **Provenance.** `verify_release_source_provenance.py` against the candidate's
+  build directory, and `freeze`'s commit binding.
+- **Exact package.** `freeze --package` proves the runtime holds exactly the
+  archive's files.
+- **Layout.** `rel01.package.layout`.
+- **Symbols.** `rel04.package.symbols` against the archive beside the package.
+- **Signing.** `rel04.package.signing`. Windows packages are unsigned, so
+  SmartScreen may warn on first launch; a signed release needs a code-signing
+  certificate, which is a project decision.
+- **Licences.** The package carries `LICENSE`, `LICENSING.md`, the
+  `licenses/` notices and the documentation's `LICENSES/` copies.
+
 
 ## Candidates
 
@@ -191,5 +208,24 @@ Three defects, all also in 0.15.0, came out of these runs:
 
 The fix (`seta` archives cvars no code declares; the menu settings are
 declared before the configs; the model falls back to the def's default) is in
-the source after C1, pinned by `archived_settings_across_modules.py`. C1 stays
-rejected, and the remaining cases move to the next candidate.
+`8016bc922`, pinned by `archived_settings_across_modules.py`.
+
+The remaining quick cases also ran on C1, with fixes to the harnesses rather
+than the product: `localization` passed; the dedicated-client, reconnect, IPv6,
+pack-report, campaign-switch, Vulkan-recovery and generated-image cases stopped
+at once because the runner created their output directory and they insist on
+making it; `lifecycle` passed every phase but asked for an in-game switch from
+OpenGL to Vulkan, which `r_renderApi` only makes at engine start;
+`campaign-saves` passed eight of ten legs, and the other two (and
+`effects.lifecycle`) timed out in the NVIDIA OpenGL driver's startup shader
+compile (logs end at `R_ARB2_Init ... Available.`) while free commit memory sat
+at 3 to 7 GB under other sessions' clients.
+
+Two REL-04 package checks came out of C1 as well. Its symbols archive held the
+PDBs of the client, dedicated server and game modules, but none for
+`renderer-gl_x64.dll`, `renderer-vk_x64.dll` or `openQ4-updater_x64.exe`, so a
+crash in a renderer module could not be symbolized from a release. The
+packager and the stage validator now require all seven. Every Windows image is
+unsigned (`NotSigned`), which the promotion record has to state.
+
+C1 stays rejected, and every case runs again on the next candidate.
