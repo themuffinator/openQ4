@@ -544,6 +544,11 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Zooming in with the machine gun, nailgun or railgun, and crewing the
+  air-defence cannon, cost far less: their scope pictures are drawn once and
+  reused instead of being redrawn every frame (the railgun scope went from
+  about 4 ms a frame to under 1 ms in testing). The weapon and quick-chat
+  wheels and the HUD artwork load faster, their files a quarter of the size.
 - The Competitive HUD layout has a scoreline across the top in Duel, Tourney
   and team games: large scores either side of the timer and, further out, up
   to four players a side named by their initials, with a bar for the

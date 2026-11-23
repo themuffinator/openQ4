@@ -121,6 +121,20 @@ def surround(ident, aperture, tint):
     return art(ident, [compound(ident, [full, aperture], tint)])
 
 
+def still(ident, children, surround=None):
+    """A run of optic art that never moves or changes, centered like the
+    optical center, under one isolating group the size of the view (opacity
+    just under 1): the runtime caches it as a layer and composites a quad a
+    frame instead of resubmitting its antialiased rings and gradients, tens of
+    thousands of vertices at 720p and ten times that at 4K. A layer keeps only
+    what lies inside its group, and hazes reach past the 960 dp center, so the
+    group spans the view. Each run keeps its place between the moving parts,
+    so nothing changes order; a full-view surround drawn just before the run
+    joins it."""
+    return ui.group(ident, {**ui.FULL, 'display': ui.keyword('block'), 'opacity': ui.number(0.999)},
+                    ([surround] if surround else []) + [center(ident + '-center', children)])
+
+
 def rotate_binding(doc, ident, source):
     doc.bind(f'{ident}.transform', ident, 'transform', [0, 0, 1, 1, {'state': source}])
 
@@ -159,8 +173,9 @@ def machinegun(doc):
         dots.append(ui.path(f'dot-{i}', points, fill=ui.solid([0, 0, 0, .34])))
     rotate_binding(doc, 'compass', 'playerYaw')
     return [lens_focus(184),
-            surround('veil', circle(182), ui.rgb('#363636', .4)),
-            center('optical-center', [art('glow', glow), art('compass', moving(dots), transform=ui.rotation(0)), art('marks', marks)])]
+            still('glow-still', [art('glow', glow)], surround('veil', circle(182), ui.rgb('#363636', .4))),
+            center('optical-center', [art('compass', moving(dots), transform=ui.rotation(0))]),
+            still('marks-still', [art('marks', marks)])]
 
 
 def railgun(doc):
@@ -196,7 +211,9 @@ def railgun(doc):
     doc.timelines.add('diamond-sweep', 2000, [ui.track('sweep', 'transform', [(0, ui.transform()), (1000, ui.transform(sx=680/440, sy=680/440)), (2000, ui.transform(sx=680/440, sy=680/440))]),
                                             ui.track('sweep', 'opacity', [(0, ui.number(0)), (500, ui.number(1)), (1000, ui.number(0)), (2000, ui.number(0))])], iterations=0)
     doc.events['onInit'] = [{'op': 'playTimeline', 'timeline': name} for name in ('ring-turn', 'diamond-sweep')]
-    return [surround('outer-haze', diamond(556), ui.rgb('#838383', .51)), center('optical-center', [art('glow', glow), art('haze', haze), art('marks', marks+bars), turning, *cells, sweep])]
+    return [still('optic-still', [art('glow', glow), art('haze', haze), art('marks', marks+bars)],
+                  surround('outer-haze', diamond(556), ui.rgb('#838383', .51))),
+            center('optical-center', [turning, *cells, sweep])]
 
 
 def nailgun(doc):
@@ -244,7 +261,11 @@ def nailgun(doc):
     doc.events['lockStop'] = [{'op':'setState','values':{'locked':False,'lockStatus':0}},{'op':'playTimeline','timeline':'unlock'}]
     doc.events['lockStart'] = []
     doc.events['zoomIn'] = [{'op':'call','event':'lockStop'}]
-    return [surround('outer-haze',circle(356),ui.rgb('#828282',.5)), center('optical-center',[glow,compass,art('haze',haze),art('marks',marks),arrow,*lines,readouts])]
+    # The glow's opacity follows the lock, so it stays its own layer (cached by
+    # the runtime as a single large mesh); the haze and marks around it never change.
+    return [surround('outer-haze',circle(356),ui.rgb('#828282',.5)),
+            center('optical-center',[glow,compass]), still('optic-still',[art('haze',haze),art('marks',marks)]),
+            center('optical-top',[arrow,*lines,readouts])]
 
 
 def document(kind):

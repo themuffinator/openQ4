@@ -2333,3 +2333,64 @@ scripts (`run_matrix.sh`, `run_toggles.sh`, `run_msaa.sh`, `run_default.sh`,
 markers and the pause), the bisection build logs under `.tmp/perf/bisect-logs/<sha>/`, and
 the 0.13.2 game-library checkout the first bisection candidate needed
 (`.tmp/perf/game-repo/`).
+
+## 20. Static optic art and HUD document size (FPS-06), 23 November 2026
+
+A round of optimizations confined to the retained HUD documents (`.rui`) and
+their generators; no engine code changed. Each HUD document was measured with
+the native `--hud-bench` and in the engine with `ui_retainedProfile` (and
+`ui_hudProfile` for events) in hidden-window scenes, baseline and candidate
+built from the same engine and staged side by side.
+
+**Where the vertices were.** At rest in the engine the Marine and Strogg HUDs
+cost 0.07 and 0.14 ms a frame (their gauges are already cached layers) and the
+tank HUD 0.08-0.21 ms. The outliers were the static optics: the air-defence
+cannon's HUD drew 218k vertices a frame at 720p and the zoom scopes 117k
+(machine gun), 170k (nailgun) and 137k (railgun), because their rings,
+radial gradients and hazes are large antialiased meshes resubmitted every
+frame, ten times that at 4K.
+
+**The change.** Each run of optic art that never moves or changes now sits
+under an isolating group (opacity 0.999) the size of the view, which the
+runtime caches as a layer and composites as one quad a frame. Runs keep their
+places between the moving parts (the compasses, the nailgun's lock lines,
+arrow, readouts and lock-driven glow, the railgun's turning ring, ammunition
+cells and sweep), so nothing changes order. Two traps found on the way: a
+nested opacity layer inside such a group keeps it from caching (the cannon's
+glow now carries its 0.44 in its gradient stops), and a layer keeps only what
+lies inside its group's box, so a group inside the 960 dp optical center cut
+the hazes off at wide views; the groups span the view instead.
+
+| HUD (engine) | Before | After |
+| --- | --- | --- |
+| Air-defence cannon, 720p | 218k vertices, 0.82-0.98 ms | 20k, 0.39-0.57 ms |
+| Air-defence cannon, 4K | 414k, 2.3-7.6 ms | 40k, 0.83-0.99 ms |
+| Machine gun scope, 1080p moving, OpenGL | 166k, 1.36 ms | 25k, 0.91 ms |
+| Railgun scope, 1080p moving, OpenGL | 234k, 4.11 ms | 34k, 0.68 ms |
+| Nailgun scope, 1080p moving, OpenGL | 264k, 1.82 ms | 47k, 0.62 ms |
+| Scopes at 4K over the Marine HUD | 207k / 326k / 347k | 40k / 65k / 55k |
+
+The moving-scope rows are `ui_scope_performance.py`, which passes on both
+builds; on Vulkan the three scopes went from 5.5, 7.0 and 4.0 ms to 0.7-1.6,
+0.8-3.5 and 0.9-2.2 ms over three runs on a shared machine. Pictures of the
+frozen cannon view differ by at most 2/255 inside the optic; the scopes match
+side by side (the remaining differences are the scene's smoke and the railgun
+sweep's phase between runs).
+
+**Document size.** The four weapon wheels, the quick-chat wheel, the HUD
+artwork catalog and its coverage registry were written indented, about four
+times their content. They are now compact JSON with identical content:
+weapon wheels 5.1-7.5 MB to 1.1-1.7 MB, quick chat 4.2 to 0.9 MB, the
+artwork catalog 8.2 to 2.1 MB. Loading a weapon wheel through the native
+loader took 142 ms with the indented file and 87 ms compact, process start
+included; the catalog is parsed once a level on a loading worker.
+
+**Smaller items.** The kill feed's glide, which moved four lines with a track
+each, now moves the feed in one track; ten state declarations the Competitive
+scoreline no longer reads are gone. A kill feed event costs 1-2 ms in the
+debug-optimized engine either way, most of it flushing that frame's pending
+HUD state before the event runs.
+
+**Left alone.** The vehicle HUD's gauges (16k uncached vertices) have moving
+fills, where a cached layer would be invalidated as they move; the Awakening
+speeder's race pips (23k in the bench) were not measured in the engine.

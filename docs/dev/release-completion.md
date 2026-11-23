@@ -12,6 +12,27 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Lighter zoom scopes and cannon optics, smaller HUD files, 23 November 2026
+
+- **Scopes and the cannon draw once.** The user asked for a round of HUD
+  optimizations confined to the `.rui` documents. The air-defence cannon's
+  optic and the machine gun, nailgun and railgun scopes resubmitted large
+  antialiased rings and gradients every frame: 218k vertices for the cannon at
+  720p, 166-264k for the moving scopes at 1080p and up to 414k at 4K. Their
+  unchanging art now sits under isolating groups the runtime caches as layers:
+  20k for the cannon, 25-47k for the scopes, the railgun scope from 4.1 to
+  0.7 ms a frame on OpenGL. Moving parts keep their order and behaviour.
+- **Smaller files.** The weapon wheels, quick-chat wheel, HUD artwork catalog
+  and its coverage registry are compact JSON with the same content, about a
+  quarter of their size (a weapon wheel loads about 55 ms faster).
+- **What you need to do.** Nothing; nothing looks different.
+- **Checks.** Engine profiles of each HUD before and after; frozen A/B
+  pictures of the cannon (within 2/255 in the optic) and the scopes;
+  `ui_scope_performance.py` passes on OpenGL and Vulkan; the native retained
+  screen, scope, quick chat, HUD, Remastered HUD and coverage tests and every
+  generator's `--check` pass. Details:
+  [performance report section 20](performance-report.md#20-static-optic-art-and-hud-document-size-fps-06-23-november-2026).
+
 ## Kane stands unarmed on the MCC, 23 November 2026
 
 - **No gun stance without a gun.** The MCC's campaign maps put the weapons
