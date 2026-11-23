@@ -245,7 +245,7 @@ def main() -> int:
         require(public_header, token, "public renderer module ABI")
 
     module_api = read(RENDERER / "RenderModuleAPI.h")
-    require(module_api, "#define RENDER_API_VERSION\t\t\t37", "renderer module ABI v37")
+    require(module_api, "#define RENDER_API_VERSION\t\t\t38", "renderer module ABI v38")
 
     core = read(RENDERER / "GpuFrameTimingCore.h")
     require(core, "elapsedMicroseconds == 0", "zero-duration rejection")

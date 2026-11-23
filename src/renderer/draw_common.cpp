@@ -47,6 +47,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "RendererMetrics.h"
 #include "ScenePackets.h"
 #include "MotionBlurCore.h"
+#include "DepthOfFieldCore.h"
 #include "ARBHeatHazeDepthReject.h"
 
 #ifndef GL_FRAMEBUFFER_SRGB
@@ -4756,6 +4757,268 @@ static void RB_STD_MotionBlur( void ) {
 		logged = true;
 		common->Printf( "OpenGL: first motion blur pass drew%s\n",
 			rbMotionVectorImageValid ? " (with object vectors)" : " (camera only)" );
+	}
+}
+
+/*
+=====================
+Depth of field
+
+The r_dof camera (cheat cvars, for promotional captures) and the game's
+request (the weapon wheel's focus on the view weapon); DepthOfField.cpp
+resolves both into one depthOfFieldSettings_t and DepthOfFieldCore.h packs
+the uniform block that glprogs/dof.fs reads. Runs before motion blur and
+bloom, on the main scene view only, so the HUD and menus stay sharp. The
+Vulkan port is VK_Post_DepthOfField in Vulkan/vk_PostProcess.cpp.
+=====================
+*/
+enum rbDofTarget_t {
+	RB_DOF_FOCUS0 = 0,
+	RB_DOF_FOCUS1,
+	RB_DOF_PREFILTER,
+	RB_DOF_TILES,
+	RB_DOF_TILES_DILATED,
+	RB_DOF_GATHER,
+	RB_DOF_POSTFILTER,
+	RB_DOF_TARGET_COUNT
+};
+
+static const char *const rbDofTargetNames[RB_DOF_TARGET_COUNT] = {
+	"_dofFocus0", "_dofFocus1", "_dofPrefilter", "_dofTiles", "_dofTilesDilated", "_dofGather", "_dofPostfilter"
+};
+
+static newShaderStage_t rbDofStage;
+static bool rbDofStageInitialized = false;
+static idImage *rbDofImages[RB_DOF_TARGET_COUNT];
+static idRenderTexture *rbDofRenderTextures[RB_DOF_TARGET_COUNT];
+static int rbDofFocusCurrent = RB_DOF_FOCUS0;
+static bool rbDofFocusValid = false;
+static int rbDofFocusMsec = 0;
+static const idRenderWorldLocal *rbDofFocusWorld = NULL;
+static int rbDofFocusVideoRestart = -1;
+
+static void RB_InitDepthOfFieldStage( void ) {
+	if ( rbDofStageInitialized ) {
+		return;
+	}
+	memset( &rbDofStage, 0, sizeof( rbDofStage ) );
+	rbDofStage.glslProgram = true;
+	idStr::Copynz( rbDofStage.glslProgramName, "dof.fs", sizeof( rbDofStage.glslProgramName ) );
+	rbDofStage.numShaderParms = 1;
+	idStr::Copynz( rbDofStage.shaderParmNames[0], "dofParams", sizeof( rbDofStage.shaderParmNames[0] ) );
+	rbDofStage.shaderParmNumRegisters[0] = 4;
+	static const char *const textures[4] = { "Scene", "DepthBuffer", "AuxA", "AuxB" };
+	rbDofStage.numShaderTextures = 4;
+	for ( int i = 0; i < 4; i++ ) {
+		idStr::Copynz( rbDofStage.shaderTextureNames[i], textures[i], sizeof( rbDofStage.shaderTextureNames[i] ) );
+	}
+	rbDofStageInitialized = true;
+}
+
+/*
+=====================
+RB_DepthOfFieldAvailable
+
+Whether this back end can draw the depth of field at all; the game asks so
+the weapon wheel can keep its own soft focus when it cannot.
+=====================
+*/
+bool RB_DepthOfFieldAvailable( void ) {
+	if ( r_skipPostProcess.GetBool() || !glConfig.GLSLProgramAvailable ) {
+		return false;
+	}
+	RB_InitDepthOfFieldStage();
+	return R_ValidateGLSLProgram( &rbDofStage );
+}
+
+static void RB_ForgetDepthOfFieldFocus( void ) {
+	rbDofFocusValid = false;
+	rbDofFocusMsec = 0;
+}
+
+static bool RB_EnsureDepthOfFieldTarget( int index, int width, int height ) {
+	idImageOpts opts;
+	opts.textureType = TT_2D;
+	opts.format = FMT_RGBA16F;
+	opts.width = Max( 1, width );
+	opts.height = Max( 1, height );
+	opts.numLevels = 1;
+	opts.isPersistant = true;
+	rbDofImages[index] = globalImages->ScratchImage( rbDofTargetNames[index], &opts, TF_LINEAR, TR_CLAMP, TD_DEFAULT );
+	if ( rbDofImages[index] == NULL ) {
+		return false;
+	}
+	if ( rbDofRenderTextures[index] == NULL ) {
+		rbDofRenderTextures[index] = tr.CreateRenderTexture( rbDofImages[index], NULL );
+	} else if ( rbDofRenderTextures[index]->GetWidth() != opts.width || rbDofRenderTextures[index]->GetHeight() != opts.height ) {
+		tr.ResizeRenderTexture( rbDofRenderTextures[index], opts.width, opts.height );
+	}
+	return rbDofRenderTextures[index] != NULL;
+}
+
+static void RB_BindDepthOfFieldProgram( const depthOfFieldBlock_t &block, idImage *primary, idImage *depth,
+		idImage *auxA, idImage *auxB ) {
+	idImage *const inputs[4] = { primary, depth, auxA, auxB };
+	for ( int i = 3; i >= 0; i-- ) {
+		GL_SelectTexture( i );
+		( inputs[i] != NULL ? inputs[i] : globalImages->blackImage )->Bind();
+	}
+	glUseProgramObjectARB( (GLhandleARB)rbDofStage.glslProgramObject );
+	for ( int i = 0; i < rbDofStage.numShaderTextures; i++ ) {
+		if ( rbDofStage.shaderTextureLocations[i] >= 0 ) {
+			glUniform1iARB( rbDofStage.shaderTextureLocations[i], i );
+		}
+	}
+	if ( rbDofStage.shaderParmLocations[0] >= 0 ) {
+		glUniform4fvARB( rbDofStage.shaderParmLocations[0], DOF_BLOCK_VECTORS, &block.v[0][0] );
+	}
+}
+
+static void RB_UnbindDepthOfFieldProgram( void ) {
+	glUseProgramObjectARB( 0 );
+	for ( int i = 3; i >= 0; i-- ) {
+		GL_SelectTexture( i );
+		globalImages->BindNull();
+	}
+}
+
+static void RB_DrawDepthOfFieldPass( int targetIndex, const depthOfFieldBlock_t &block, idImage *primary,
+		idImage *depth, idImage *auxA, idImage *auxB ) {
+	idRenderTexture *target = rbDofRenderTextures[targetIndex];
+	const int width = target->GetWidth();
+	const int height = target->GetHeight();
+	RB_BindPostProcessRenderTexture( target, width, height );
+	RB_BeginFullscreenPostProcessPass( 0, 0, width, height );
+	RB_BindDepthOfFieldProgram( block, primary, depth, auxA, auxB );
+	RB_DrawFullscreenPostProcessQuadUnitUV();
+	RB_UnbindDepthOfFieldProgram();
+	RB_EndFullscreenPostProcessPass();
+}
+
+static void RB_STD_DepthOfField( void ) {
+	if ( !RB_IsMainScenePostProcessView() ) {
+		return;
+	}
+	const int viewportWidth = backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1;
+	const int viewportHeight = backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1;
+	depthOfFieldSettings_t settings;
+	if ( !R_DepthOfField_ResolveView( backEnd.viewDef, viewportWidth, viewportHeight, settings ) ) {
+		RB_ForgetDepthOfFieldFocus();
+		return;
+	}
+	if ( !RB_DepthOfFieldAvailable() ) {
+		static bool warned = false;
+		if ( !warned ) {
+			warned = true;
+			common->Warning( "OpenGL: the depth of field program is unavailable" );
+		}
+		return;
+	}
+	idImage *sceneImage = globalImages->currentRenderImage;
+	idImage *depthImage = globalImages->currentDepthImage;
+	if ( sceneImage == NULL || depthImage == NULL ) {
+		return;
+	}
+	const bool targetsReady =
+		RB_EnsureDepthOfFieldTarget( RB_DOF_FOCUS0, 1, 1 )
+		&& RB_EnsureDepthOfFieldTarget( RB_DOF_FOCUS1, 1, 1 )
+		&& RB_EnsureDepthOfFieldTarget( RB_DOF_PREFILTER, settings.gatherWidth, settings.gatherHeight )
+		&& RB_EnsureDepthOfFieldTarget( RB_DOF_TILES, settings.tileWidth, settings.tileHeight )
+		&& RB_EnsureDepthOfFieldTarget( RB_DOF_TILES_DILATED, settings.tileWidth, settings.tileHeight )
+		&& RB_EnsureDepthOfFieldTarget( RB_DOF_GATHER, settings.gatherWidth, settings.gatherHeight )
+		&& RB_EnsureDepthOfFieldTarget( RB_DOF_POSTFILTER, settings.gatherWidth, settings.gatherHeight );
+	if ( !targetsReady ) {
+		return;
+	}
+
+	RB_LogComment( "---------- RB_STD_DepthOfField ----------\n" );
+	RB_CaptureCurrentRenderImage( viewportWidth, viewportHeight );
+	if ( !backEnd.currentDepthCopied ) {
+		RB_CaptureCurrentDepthImage( viewportWidth, viewportHeight );
+	}
+	const int sceneTextureWidth = sceneImage->GetOpts().width;
+	const int sceneTextureHeight = sceneImage->GetOpts().height;
+	const int depthTextureWidth = depthImage->GetOpts().width;
+	const int depthTextureHeight = depthImage->GetOpts().height;
+	if ( sceneTextureWidth <= 0 || sceneTextureHeight <= 0 || depthTextureWidth <= 0 || depthTextureHeight <= 0 ) {
+		return;
+	}
+	const float sceneUVScale[2] = {
+		static_cast<float>( viewportWidth ) / static_cast<float>( sceneTextureWidth ),
+		static_cast<float>( viewportHeight ) / static_cast<float>( sceneTextureHeight )
+	};
+	const float depthUVScale[2] = {
+		static_cast<float>( viewportWidth ) / static_cast<float>( depthTextureWidth ),
+		static_cast<float>( viewportHeight ) / static_cast<float>( depthTextureHeight )
+	};
+	const float depthProjection[2] = {
+		backEnd.viewDef->projectionMatrix[10],
+		backEnd.viewDef->projectionMatrix[14]
+	};
+
+	// The autofocus history belongs to one world and one GL context.
+	if ( rbDofFocusWorld != backEnd.viewDef->renderWorld || rbDofFocusVideoRestart != tr.videoRestartCount ) {
+		RB_ForgetDepthOfFieldFocus();
+		rbDofFocusWorld = backEnd.viewDef->renderWorld;
+		rbDofFocusVideoRestart = tr.videoRestartCount;
+	}
+
+	idRenderTexture *originalRenderTexture = backEnd.renderTexture;
+	depthOfFieldBlock_t block;
+	idImage *focusImage = NULL;
+	if ( settings.autoFocus ) {
+		const float elapsed = R_DepthOfField_FocusElapsed( rbDofFocusMsec );
+		const float blend = DepthOfFieldCore_FocusBlend( R_DepthOfField_FocusSpeed(), elapsed );
+		const int next = rbDofFocusCurrent == RB_DOF_FOCUS0 ? RB_DOF_FOCUS1 : RB_DOF_FOCUS0;
+		DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_FOCUS, viewportWidth, viewportHeight,
+			depthProjection, sceneUVScale, depthUVScale, blend, rbDofFocusValid );
+		RB_DrawDepthOfFieldPass( next, block, NULL, depthImage, rbDofImages[rbDofFocusCurrent], NULL );
+		rbDofFocusCurrent = next;
+		rbDofFocusValid = true;
+		focusImage = rbDofImages[rbDofFocusCurrent];
+	} else {
+		RB_ForgetDepthOfFieldFocus();
+	}
+
+	DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_PREFILTER, viewportWidth, viewportHeight,
+		depthProjection, sceneUVScale, depthUVScale, 1.0f, false );
+	RB_DrawDepthOfFieldPass( RB_DOF_PREFILTER, block, sceneImage, depthImage, focusImage, NULL );
+	DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_TILE_MAX, viewportWidth, viewportHeight,
+		depthProjection, sceneUVScale, depthUVScale, 1.0f, false );
+	RB_DrawDepthOfFieldPass( RB_DOF_TILES, block, rbDofImages[RB_DOF_PREFILTER], NULL, NULL, NULL );
+	DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_TILE_DILATE, viewportWidth, viewportHeight,
+		depthProjection, sceneUVScale, depthUVScale, 1.0f, false );
+	RB_DrawDepthOfFieldPass( RB_DOF_TILES_DILATED, block, rbDofImages[RB_DOF_TILES], NULL, NULL, NULL );
+	DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_GATHER, viewportWidth, viewportHeight,
+		depthProjection, sceneUVScale, depthUVScale, 1.0f, false );
+	RB_DrawDepthOfFieldPass( RB_DOF_GATHER, block, rbDofImages[RB_DOF_PREFILTER], NULL,
+		rbDofImages[RB_DOF_TILES_DILATED], NULL );
+	DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_POSTFILTER, viewportWidth, viewportHeight,
+		depthProjection, sceneUVScale, depthUVScale, 1.0f, false );
+	RB_DrawDepthOfFieldPass( RB_DOF_POSTFILTER, block, rbDofImages[RB_DOF_GATHER], NULL, NULL, NULL );
+
+	RB_RestorePostProcessTarget( originalRenderTexture, viewportWidth, viewportHeight );
+	RB_BeginFullscreenPostProcessPass(
+		backEnd.viewDef->viewport.x1 + backEnd.viewDef->scissor.x1,
+		backEnd.viewDef->viewport.y1 + backEnd.viewDef->scissor.y1,
+		backEnd.viewDef->scissor.x2 - backEnd.viewDef->scissor.x1 + 1,
+		backEnd.viewDef->scissor.y2 - backEnd.viewDef->scissor.y1 + 1 );
+	DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_COMPOSITE, viewportWidth, viewportHeight,
+		depthProjection, sceneUVScale, depthUVScale, 1.0f, false );
+	RB_BindDepthOfFieldProgram( block, sceneImage, depthImage, focusImage, rbDofImages[RB_DOF_POSTFILTER] );
+	RB_DrawFullscreenPostProcessQuadUnitUV();
+	RB_UnbindDepthOfFieldProgram();
+	GL_SelectTexture( 0 );
+	RB_EndFullscreenPostProcessPass();
+
+	// The scene changed after the capture above; later passes take a fresh copy.
+	backEnd.currentRenderCopied = false;
+	static bool logged = false;
+	if ( !logged ) {
+		logged = true;
+		common->Printf( "OpenGL: first depth of field pass drew (%s, %d samples, %dx%d gather)\n",
+			settings.weaponFocus ? "view weapon focus" : ( settings.autoFocus ? "autofocus" : "manual focus" ),
+			settings.samples, settings.gatherWidth, settings.gatherHeight );
 	}
 }
 
@@ -17902,6 +18165,9 @@ void	RB_STD_DrawView( void ) {
 
 	// Apply SSAO before bloom and tonemapping so indirect shadowing modulates the lit scene.
 	RB_STD_SSAO();
+
+	// Depth of field before motion blur and bloom, as a camera would.
+	RB_STD_DepthOfField();
 
 	// Apply camera motion blur before bloom.
 	RB_STD_MotionBlur();

@@ -2104,6 +2104,86 @@ bool R_ResolvePreferredDDSImageSource( const char *cname, idStr &ddsName, ID_TIM
 	return resolve.result;
 }
 
+/*
+=============
+R_RGBAIsRXGBNormalMap
+
+Whether decoded bump-map pixels keep the normal's X in alpha (Quake 4's RXGB
+layout) rather than in red. BC7 has no such convention and every BC7 encoder
+writes X in red, but a texture pack that decodes Quake 4's own DXT5 normal maps
+and re-encodes them as BC7 carries the RXGB layout across: red is left empty,
+or holds the height Quake 4's parallax guide reads, and X stays in alpha.
+Reading that as an ordinary normal map sets X to -1 everywhere, which lights
+one half of a mirrored face and darkens the other (#255).
+
+The layout shows as alpha that varies while red does not, or as (A,G,B)
+fitting unit normals far better than (R,G,B). Blue, the normal's Z, points out
+of the surface either way, which keeps grey height maps out.
+=============
+*/
+static bool R_RGBAIsRXGBNormalMap( const byte *rgba, int width, int height ) {
+	const int count = width * height;
+	if ( rgba == NULL || count <= 0 ) {
+		return false;
+	}
+	const int step = Max( 1, count / 4096 );
+	int redMin = 255, redMax = 0, alphaMin = 255, alphaMax = 0;
+	double blueSum = 0.0, rgbError = 0.0, agbError = 0.0;
+	int samples = 0;
+	for ( int i = 0; i < count; i += step ) {
+		const byte *texel = rgba + (size_t)i * 4;
+		redMin = Min( redMin, (int)texel[0] );
+		redMax = Max( redMax, (int)texel[0] );
+		alphaMin = Min( alphaMin, (int)texel[3] );
+		alphaMax = Max( alphaMax, (int)texel[3] );
+		blueSum += texel[2];
+		const float r = texel[0] / 127.5f - 1.0f;
+		const float g = texel[1] / 127.5f - 1.0f;
+		const float b = texel[2] / 127.5f - 1.0f;
+		const float a = texel[3] / 127.5f - 1.0f;
+		rgbError += idMath::Fabs( idMath::Sqrt( r * r + g * g + b * b ) - 1.0f );
+		agbError += idMath::Fabs( idMath::Sqrt( a * a + g * g + b * b ) - 1.0f );
+		samples++;
+	}
+	if ( alphaMax - alphaMin < 32 || blueSum < 160.0 * samples ) {
+		return false;
+	}
+	return redMax - redMin <= 8 || agbError < rgbError * 0.5;
+}
+
+/*
+=============
+R_BC7LevelsAreRXGBNormalMap
+
+R_RGBAIsRXGBNormalMap for BC7 data that goes to the GPU as it is: decodes one
+small mip level, not the whole image.
+=============
+*/
+static bool R_BC7LevelsAreRXGBNormalMap( const byte *fileBuffer, int fileSize, const idList<int> &levelOffsets, const idList<int> &levelSizes,
+		int width, int height ) {
+	const int numLevels = levelOffsets.Num();
+	if ( numLevels <= 0 || levelSizes.Num() != numLevels ) {
+		return false;
+	}
+	int level = numLevels - 1;
+	for ( int i = 0; i < numLevels; i++ ) {
+		if ( Max( Max( 1, width >> i ), Max( 1, height >> i ) ) <= 256 ) {
+			level = i;
+			break;
+		}
+	}
+	const int paddedWidth = ( ( Max( 1, width >> level ) + 3 ) / 4 ) * 4;
+	const int paddedHeight = ( ( Max( 1, height >> level ) + 3 ) / 4 ) * 4;
+	const int64 blockBytes = (int64)( paddedWidth / 4 ) * ( paddedHeight / 4 ) * 16;
+	if ( levelSizes[level] < blockBytes || levelOffsets[level] < 0 || (int64)levelOffsets[level] + blockBytes > fileSize ) {
+		return false;
+	}
+	idList<byte> rgba;
+	rgba.SetNum( paddedWidth * paddedHeight * 4 );
+	BC7_DecodeImage( fileBuffer + levelOffsets[level], rgba.Ptr(), paddedWidth, paddedHeight );
+	return R_RGBAIsRXGBNormalMap( rgba.Ptr(), paddedWidth, paddedHeight );
+}
+
 static imageDDSPrefetchTake_t ddsPrefetchTake = NULL;
 
 void R_SetDDSPrefetchSource( imageDDSPrefetchTake_t take ) {
@@ -2260,9 +2340,18 @@ bool R_LoadPrecompressedDDS( const char *cname, idBinaryImage &image, ID_TIME_T 
 		// alpha. BC7 has no such convention - every common encoder writes plain
 		// XYZ in RGB - so forcing that layout on BC7 made ordinary BC7 normal
 		// maps sample X = 1.0 everywhere and flattened all bump lighting.
-		const bool rxgbNormal =
+		// A pack that carried Quake 4's RXGB layout into BC7 is the
+		// exception, recognised from the pixels (#255).
+		bool rxgbNormal =
 			info.format == DDS_STORED_FORMAT_RXGB ||
 			( usage == TD_BUMP && textureFormat == FMT_DXT5 );
+		if ( !rxgbNormal && usage == TD_BUMP && textureFormat == FMT_BC7 &&
+			 R_BC7LevelsAreRXGBNormalMap( buffer, fileSize, levelOffsets, levelSizes, info.width, info.height ) ) {
+			rxgbNormal = true;
+			if ( image_showPrecompressedTextures.GetBool() ) {
+				common->Printf( "BC7 normal map %s keeps X in alpha (RXGB layout); reading it that way\n", name.c_str() );
+			}
+		}
 		const textureColor_t colorFormat = rxgbNormal ? CFM_NORMAL_DXT5 : CFM_DEFAULT;
 		image.Load2DFromOwnedCompressedData( selectedWidth, selectedHeight, selectedLevels, textureFormat, colorFormat,
 			buffer, levelOffsets.Ptr() + firstLevel, levelSizes.Ptr() + firstLevel );
@@ -2706,6 +2795,40 @@ bool R_ImageDDS_RunSelfTest() {
 		}
 	}
 
+	// Normal-map layout recognition (#255): a bumpy normal field stored as an
+	// ordinary normal map, as RXGB with red empty, as RXGB with a height in
+	// red, as an ordinary map with a mask in alpha, and a grey height map.
+	{
+		const int size = 16;
+		byte plain[size * size * 4], rxgbEmpty[size * size * 4], rxgbHeight[size * size * 4], plainMasked[size * size * 4], grey[size * size * 4];
+		for ( int y = 0; y < size; y++ ) {
+			for ( int x = 0; x < size; x++ ) {
+				const int i = ( y * size + x ) * 4;
+				const float nx = 0.6f * idMath::Sin( x * 0.7f );
+				const float ny = 0.5f * idMath::Cos( y * 0.9f );
+				const float nz = idMath::Sqrt( Max( 0.0f, 1.0f - nx * nx - ny * ny ) );
+				const byte bx = (byte)( ( nx + 1.0f ) * 127.5f );
+				const byte by = (byte)( ( ny + 1.0f ) * 127.5f );
+				const byte bz = (byte)( ( nz + 1.0f ) * 127.5f );
+				const byte h = (byte)( ( x * 37 + y * 11 ) & 255 );
+				plain[i + 0] = bx; plain[i + 1] = by; plain[i + 2] = bz; plain[i + 3] = 255;
+				rxgbEmpty[i + 0] = 0; rxgbEmpty[i + 1] = by; rxgbEmpty[i + 2] = bz; rxgbEmpty[i + 3] = bx;
+				rxgbHeight[i + 0] = h; rxgbHeight[i + 1] = by; rxgbHeight[i + 2] = bz; rxgbHeight[i + 3] = bx;
+				plainMasked[i + 0] = bx; plainMasked[i + 1] = by; plainMasked[i + 2] = bz; plainMasked[i + 3] = h;
+				grey[i + 0] = h; grey[i + 1] = h; grey[i + 2] = h; grey[i + 3] = (byte)( 255 - h );
+			}
+		}
+		if ( R_RGBAIsRXGBNormalMap( plain, size, size ) || R_RGBAIsRXGBNormalMap( plainMasked, size, size ) ||
+			 R_RGBAIsRXGBNormalMap( grey, size, size ) ) {
+			common->Warning( "Image DDS self-test failed: an ordinary normal or height map was read as RXGB" );
+			return false;
+		}
+		if ( !R_RGBAIsRXGBNormalMap( rxgbEmpty, size, size ) || !R_RGBAIsRXGBNormalMap( rxgbHeight, size, size ) ) {
+			common->Warning( "Image DDS self-test failed: an RXGB normal map stored as RGBA was not recognised" );
+			return false;
+		}
+	}
+
 	common->Printf( "Image DDS self-test passed\n" );
 	return true;
 }
@@ -2875,6 +2998,20 @@ static void LoadDDS( const char *name, byte **pic, int *width, int *height, ID_T
 		decoder.DecompressNormalMapDXT5( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );
 	} else {
 		decoder.DecompressImageDXT5( buffer + dataOffset, decodedRgba, paddedWidth, paddedHeight );
+	}
+
+	// Bump maps leave here with X in red, as DecompressNormalMapDXT5 writes
+	// RXGB. BC7 and uncompressed packs normally store X in red already, but
+	// one that carried Quake 4's RXGB layout across keeps it in alpha (#255).
+	if ( decodeRXGBNormalMap && ( compression == DDS_COMPRESSION_BC7 || compression == DDS_COMPRESSION_NONE ) &&
+		 R_RGBAIsRXGBNormalMap( decodedRgba, paddedWidth, paddedHeight ) ) {
+		if ( image_showPrecompressedTextures.GetBool() ) {
+			common->Printf( "Normal map %s keeps X in alpha (RXGB layout); reading it that way\n", name );
+		}
+		for ( int64 i = 0; i < (int64)paddedWidth * paddedHeight; i++ ) {
+			decodedRgba[i * 4 + 0] = decodedRgba[i * 4 + 3];
+			decodedRgba[i * 4 + 3] = 255;
+		}
 	}
 
 	byte *ddsRgba = decodedRgba;

@@ -522,6 +522,10 @@ def dialogs(doc: Document) -> list:
     doc.bind("confirmation-message.text", "confirmation-message", "text", st("settings.message"))
     doc.bind("confirmation-countdown.text", "confirmation-countdown", "text",
              {"op": "numberText", "args": [op("ceil", st("settings.remaining"))], "decimals": 0})
+    # The Keep countdown only means something while Keep is offered; during
+    # recovery it would read 0 under "Settings need attention" (#260).
+    doc.bind("confirmation-countdown.display", "confirmation-countdown", "display",
+             op("select", st("settings.canConfirm"), "block", "none"))
     confirm = dialog(doc, "confirmation", "#str_229993", [message, countdown], [keep, revert, retry], st("settings.confirmationVisible"),
                      "settings_revert", "confirmationBack")
 

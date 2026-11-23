@@ -877,8 +877,8 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **126 partial, 236 pending and 0 verified requirements**, counting the
-45 superseded rows at their recorded states. `BEH-002`
+There are **126 partial, 237 pending and 0 verified requirements**, counting the
+46 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -1393,3 +1393,15 @@ re-binds the visual specification and the Remastered HUD notes; no evidence
 scope or result changes. There are 362 rows, 317 active requirements and 45
 historical superseded rows; the 358 migration variants and seven final gates
 remain unaccepted.
+
+## Revision 30: the weapon wheel's depth of field
+
+Visual specification 1.50 replaces the wheel's Gaussian scene focus with the
+renderer's depth of field, focused on the view weapon and the world within
+128 units, at the product owner's request; the Gaussian stays as the fallback
+where the renderer declines, and the crosshair hides while the wheel is open.
+`WID-039` supersedes `WID-037`, carrying no evidence, and is pending. The
+revision re-binds the visual specification; no evidence scope or result
+changes. There are 363 rows, 317 active requirements and 46 historical
+superseded rows; the 358 migration variants and seven final gates remain
+unaccepted.

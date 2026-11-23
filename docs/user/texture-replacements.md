@@ -187,6 +187,13 @@ openQ4 rebuilds Z from them.
 > channels into the DXT5 normal-map layout. openQ4 reads BC7 normal maps as
 > plain RGB, so such a pack shows flat lighting; encode it again without
 > `-r2a`. Only DXT5 and true `RXGB` files use the swapped layout.
+>
+> **After 0.15.0:** openQ4 recognises a BC7 normal map that keeps X in alpha,
+> as Quake 4's own DXT5 normal maps do, and reads it correctly. Such files come
+> from converting Quake 4's normal maps to BC7 without moving the channels back,
+> or from `-r2a`. In 0.15.0 they light one half of a mirrored face and darken
+> the other, or look flat; re-encoding them in the ordinary layout fixes them
+> there too.
 
 ### Stale files
 

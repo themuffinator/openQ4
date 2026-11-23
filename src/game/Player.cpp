@@ -4625,8 +4625,9 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 // RAVEN BEGIN
 // mekberg: removed check for weapon->ShowCrosshair.
 //			we want to show the crosshair regardless for NPC tags
-			// openQ4 VR: the weapon hand aims, so a screen-centre crosshair would lie
-			if ( cursor && health > 0 && !IsVRHandAiming() ) {
+			// openQ4 VR: the weapon hand aims, so a screen-centre crosshair would lie.
+			// The weapon wheel hides it, as it does over a vehicle's.
+			if ( cursor && health > 0 && !IsVRHandAiming() && weaponWheelBlend <= 0.01f ) {
 				// Pass the current weapon to the cursor gui for custom crosshairs
 // mekberg: adjustable crosshair size.
 				int crossSize = cvarSystem->GetCVarInteger( "g_crosshairSize" );

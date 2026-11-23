@@ -740,6 +740,12 @@ name contains GetName() upon entry
 		// production mode where source/derived-option checks are omitted.
 		_name += "s1";
 	}
+	if ( _usage == TD_BUMP ) {
+		// Reject bump maps decoded before BC7 and uncompressed normal maps that
+		// keep X in alpha were recognised (#255). Quake 4's own precomputed
+		// bump maps upload as they are and never reach this cache.
+		_name += "n1";
+	}
 	if ( _cube != CF_2D ) {
 		// Cube faces are assembled on the CPU before they reach the generated
 		// file, so a change to that assembly invalidates every cached cube even

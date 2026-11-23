@@ -6659,6 +6659,9 @@ idRenderSystemLocal::Clear
 void idRenderSystemLocal::Clear( void ) {
 	registered = false;
 	frameCount = 0;
+	depthOfFieldRequestAmount = 0.0f;
+	depthOfFieldRequestFlags = 0;
+	depthOfFieldRequestFrame = -1;
 	viewCount = 0;
 	videoRestartCount = 0;
 	glContextGeneration = 0;
@@ -6899,6 +6902,8 @@ void idRenderSystemLocal::BeginLevelLoad( void ) {
 	// of the new map, costing a full-screen copy per loading-screen present.
 	underwaterAmount = 0.0f;
 	underwaterTint.Zero();
+	depthOfFieldRequestAmount = 0.0f;
+	depthOfFieldRequestFrame = -1;
 
 	// The caller runs declManager->BeginLevelLoad() immediately before this, and
 	// that purge can reach the generated glyph atlas materials. Put them back

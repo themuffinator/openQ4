@@ -34,6 +34,42 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   recording identical to the retail dedicated server's (Windows, OpenGL). Not
   run: Vulkan, Linux, macOS and a person watching.
 
+## Depth of field for captures and the weapon wheel, 23 November 2026
+
+- **The weapon wheel focuses on your weapon.** The renderer's depth of field
+  keeps the view weapon and the world within 128 units sharp and blurs the
+  distance with round bokeh, in place of the whole-screen Gaussian, which
+  stays as the fallback where the renderer declines. The crosshair hides
+  while the wheel is open. Visual spec 1.50, register revision 30
+  (`WID-039` supersedes `WID-037`, pending).
+- **`r_dof` camera for promotional shots** (REN-12, partial): a thin-lens
+  model following the field of view, autofocus with an eased pull, focus
+  range, near/far scales, bladed bokeh with highlight weighting, quality up
+  to 192 samples at full resolution, and a focus view. Every cvar is a cheat
+  with no menu entry. Render API 38 appends `SetViewDepthOfField`.
+- Evidence: Windows x64 captures on OpenGL and Vulkan at 2560x1440 on
+  airdefense2; `openq4-depth-of-field-core`, `retained_view_effects.py` and
+  the retained-screens wheel checks pass. Not yet run: Linux, macOS, the
+  Android emulator (GLES declines by design) and a cost measurement.
+
+## Texture packs' converted normal maps light correctly; a clearer settings failure, 23 November 2026
+
+- **BC7 normal maps that keep X in alpha are read correctly** (#255). A pack
+  that converts Quake 4's own DXT5 normal maps to BC7 carries their layout
+  across, X in alpha with red empty or holding a height. openQ4 read X from
+  red, which lit one half of a mirrored face and darkened the other. It now
+  recognises the layout from the pixels, whether the file uploads as it is
+  or is decoded to rebuild a bump map, and caches of rebuilt bump maps are
+  made again once. Evidence: hidef2k's `anderson_local.dds` rebuilt with
+  `image_usePrecompressedTextures 2` on Vulkan; X averages 118 of 255 where
+  it averaged 32 before; `imageDDSSelfTest` covers the recognition. Not yet
+  run: a BC7 normal map uploaded as it is, and OpenGL.
+- **A failed display change says why in the log** (#260). The settings
+  recovery window only says the changes could not be applied; the reason is
+  now a console warning every time, not only with `ui_retainedTrace 1`. The
+  Keep countdown no longer shows a stray 0 under "Settings need attention".
+  The macOS check that fails for the reporter is still unknown.
+
 ## Initials and ammunition on the scoreline, no side lists, and a moving kill feed, 23 November 2026
 
 - **Players by initials, ammunition at a glance.** On the user's review the

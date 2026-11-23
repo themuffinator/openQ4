@@ -94,7 +94,7 @@ def check_build() -> None:
 
 def check_abi() -> None:
     api = read("src/renderer/RenderModuleAPI.h")
-    require(api, "#define RENDER_API_VERSION			37", "renderer module ABI v37")
+    require(api, "#define RENDER_API_VERSION			38", "renderer module ABI v38")
     require(api, "void			( *RendererDeviceEvent )( int event );	// renderDeviceEvent_t",
             "the device lifetime service retains its signature")
     services = api[api.index("typedef struct renderModuleServices_s {"):api.index("} renderModuleServices_t;")]
@@ -115,8 +115,9 @@ def check_abi() -> None:
     if slots[:4] != ["GetVRGraphicsBinding", "SetVRFrame", "SetVRRenderTarget", "GetVRFrameResult"] \
             or slots[4:] != ["PresentScaledScene", "BeginGuiRoot", "BeginSavePreview", "PollSavePreview", "CancelSavePreview",
                              "ReloadGeneratedCacheImages", "UploadImageRegion",
-                             "RequestVideoFrame", "PollVideoFrame", "ReleaseVideoFrame", "EndVideoCapture"]:
-        raise AssertionError(f"the VR slots must retain their order before scaled presentation, GUI roots, checkpoint previews, the pure image-cache reload, region uploads and video capture, found {slots}")
+                             "RequestVideoFrame", "PollVideoFrame", "ReleaseVideoFrame", "EndVideoCapture",
+                             "SetViewDepthOfField"]:
+        raise AssertionError(f"the VR slots must retain their order before scaled presentation, GUI roots, checkpoint previews, the pure image-cache reload, region uploads, video capture and the depth-of-field request, found {slots}")
 
     # game modules call through idVRSystem too: its slots only ever grow at the end
     vr_system = read("src/framework/VRSystem.h")

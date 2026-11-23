@@ -67,7 +67,7 @@ const ID_TIME_T FILE_NOT_FOUND_TIMESTAMP=-1;
 inline ID_TIME_T FS_CombineContentStamps(ID_TIME_T a,ID_TIME_T b){return a==0?b:b==0?a:b>a?b:a;}
 using cubeFiles_t=int;const int CF_CAMERA=1,MAX_IMAGE_NAME=1024;
 struct idSuppressRetailProgramDDS{};
-struct Common{template<class...T>void Warning(const char*,T...){};} commonStorage;Common*common=&commonStorage;
+struct Common{template<class...T>void Warning(const char*,T...){};template<class...T>void Printf(const char*,T...){};} commonStorage;Common*common=&commonStorage;
 static int faceRead=0,missingFace=-1,rotations=0;static bool mismatchedFace=false;
 void R_LoadImageProgram(const char*,byte**p,int*w,int*h,ID_TIME_T*t){int face=faceRead++;*w=7;*h=mismatchedFace&&face==missingFace?3:7;*t=73;if(p){*p=face==missingFace&&!mismatchedFace?nullptr:(byte*)Mem_Alloc(7*7*4);if(*p)memset(*p,face+1,7*7*4);}}
 void R_RotatePic(byte*p,int){TEST(p);++rotations;}void R_HorizontalFlip(byte*p,int,int){TEST(p);++rotations;}void R_VerticalFlip(byte*p,int,int){TEST(p);++rotations;}
@@ -84,7 +84,9 @@ static imageDownsizePolicy_t livePolicy{};static int policyReads=0;
 void R_GetImageDownsizePolicy(const char*,textureUsage_t,bool,imageDownsizePolicy_t&out){++policyReads;out=livePolicy;}
 struct idDxtEncoder{void Fill(const byte*src,byte*dst,int w,int h,int d){if(++encodeCalls==failEncodeAt)throw std::runtime_error("encoder refusal");TEST(w>=4&&h>=4&&w%4==0&&h%4==0);for(int i=0;i<w*h*4;++i)TEST(src[i]==src[i%4]);memset(dst,src[0],size_t(w)*h/d);}
  void CompressImageDXT1Fast(const byte*s,byte*d,int w,int h){Fill(s,d,w,h,2);}void CompressImageDXT5Fast(const byte*s,byte*d,int w,int h){Fill(s,d,w,h,1);}void CompressImageDXT1HQ(const byte*s,byte*d,int w,int h){Fill(s,d,w,h,2);}void CompressImageDXT5HQ(const byte*s,byte*d,int w,int h){Fill(s,d,w,h,1);}void CompressNormalMapDXT5HQ(const byte*s,byte*d,int w,int h){Fill(s,d,w,h,1);}void CompressNormalMapDXT5Fast(const byte*s,byte*d,int w,int h){Fill(s,d,w,h,1);}void CompressYCoCgDXT5HQ(const byte*s,byte*d,int w,int h){Fill(s,d,w,h,1);}void CompressYCoCgDXT5Fast(const byte*s,byte*d,int w,int h){Fill(s,d,w,h,1);}};
-struct FakeCvar{bool value=false;bool GetBool()const{return value;}}image_highQualityCompression;
+struct FakeCvar{bool value=false;bool GetBool()const{return value;}}image_highQualityCompression,image_showPrecompressedTextures;
+// The pixel check for BC7 normal maps that keep X in alpha (#255) has its own self-test.
+static bool R_BC7LevelsAreRXGBNormalMap(const byte*,int,const idList<int>&,const idList<int>&,int,int){return false;}
 static bool failConversion=false;
 struct idColorSpace{static void ConvertRGBToCoCg_Y(byte*,byte*,int,int){if(failConversion)throw std::runtime_error("conversion failure");}};
 struct idEtcEncoder{void CompressImageETC2_RGB8(const byte*s,byte*d,int w,int h){idDxtEncoder{}.Fill(s,d,w,h,2);}void CompressImageETC2_RGBA8(const byte*s,byte*d,int w,int h){idDxtEncoder{}.Fill(s,d,w,h,1);}void CompressImageEAC_RG11(const byte*s,byte*d,int w,int h){idDxtEncoder{}.Fill(s,d,w,h,1);}};
