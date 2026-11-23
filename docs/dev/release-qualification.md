@@ -112,6 +112,7 @@ loopback networking. None synthesises device input or captures the desktop.
 | `rel03.network.reconnect-impaired` | REL-03 | Joins and reconnects through simulated loss and latency. |
 | `rel03.network.ipv6` | REL-03 | The same joins over IPv6 loopback. |
 | `rel03.renderer.vk-recovery` | REL-03 | Same-process Vulkan startup recovery, then gameplay. |
+| `rel03.audio.recovery` | REL-03 | Output interrupted during tones, a paused line and Ogg streams; memory trim and purged-sample replay; speaker layout and HRTF changed during dialogue, rendered through OpenAL Soft's wave writer. |
 | `rel03.effects.lifecycle` | REL-03 | Effects across map changes, restores and renderer restarts. |
 | `rel02.captures.generated-images` | REL-02 | Engine render-target captures of generated images on both renderers. |
 | `rel02.human.*` | REL-02 | Matched visual acceptance, motion, latency, audible sound, accessibility and VR comfort reviews. |
@@ -133,9 +134,10 @@ These REL rows have no automated case and stay open whatever the matrix shows:
 - **Multiplayer demos (MVD) and match recordings.** `mp_mvd_smoke.py` replays a
   match report made by a listen-server match, and those harnesses bind every
   interface, which raises a firewall prompt for a client path without a rule.
-- **Device, surface and audio-device loss on real hardware,** background and
-  suspend, and high-DPI displays. The audio recovery harness drives the staged
-  `.install` only, and an unplugged device needs a person.
+- **Device and surface loss on real hardware,** an unplugged audio device,
+  background and suspend, and high-DPI displays. `rel03.audio.recovery`
+  interrupts OpenAL's output in software; a real disconnect, a GPU reset and a
+  sleeping laptop need a person and the hardware.
 - **Other platforms.** Linux, Steam Deck, macOS, Windows ARM64 and Android need
   their own candidate packages and runs on their hardware.
 
@@ -229,3 +231,50 @@ packager and the stage validator now require all seven. Every Windows image is
 unsigned (`NotSigned`), which the promotion record has to state.
 
 C1 stays rejected, and every case runs again on the next candidate.
+
+### C2: 0.16.0 candidate from `8016bc922`, 23 November 2026
+
+**Passes the Windows x64 automated matrix except audio output recovery; not promoted.** C2 is C1's source
+plus the settings fix and the MP-12/14/16/18 votes commit, built and packaged
+the same way. Provenance verified; the extracted runtime holds exactly the 440
+files of `openq4-0.16.0-windows-x64.zip` (SHA-256 `ec7e200e…`, manifest
+`ba7051f02a12190317fb3e268c883e3249d87a07cf65ace382d6e4f42b0e5f7e`); the
+client's version resource carries build 2664, the commit's history length. Same
+machine, driver 591.74 for both renderers, packs-only retail view, previous
+release the official 0.15.0 archive.
+
+| Case | Attempts | Result |
+| --- | --- | --- |
+| `rel01.package.layout`, `rel01.ded.startup` | pass | |
+| `rel01.install.clean` | pass | Menu, level and menu starts change nothing; the seven seeded multiplayer-only settings (`g_fov`, `hud_damageNumbers`, `hud_showSpeed`, `hud_itemTimers`, `hud_hitSound`, `si_roundLimit`, `bot_minPlayers`) survive a level and a menu start. |
+| `rel01.install.upgrade` | pass | 0.15.0 made the profile and an airdefense1 save (build 2636, portable v5); C2 kept every player choice and binding, restored the save and resaved it (build 2664, v5). Migrations: `ui_model` `marine` → `model_player_marine`, `g_crosshairCustomFile` `0` → the first crosshair; new settings appear at their defaults. 0.15.0 itself never saved the profile's `g_fov`, the defect C2 fixes. |
+| `rel01.sp.save-load`, `rel01.sp.demo` | pass | |
+| `rel01.sp.campaign-saves` | pass | Ten legs on five campaign maps. |
+| `rel01.campaign.switch` | pass | Quake 4 and The Awakening discovered and switched in place. |
+| `rel01.content-packs`, `rel01.localization` | pass | |
+| `rel01.mp.dedicated-client` | pass | LAN scan and three joins of a pure dedicated server. |
+| `rel01.mp.listen-gl` | pass | 20 of 20 stock MP maps host bot matches and draw. |
+| `rel01.mp.listen-vk` | pass | 40 of 40 runs: every map on Vulkan with validation, beside its OpenGL reference; no VUIDs. |
+| `rel01.sp.stock-maps-gl` | pass | 29 of 29 stock SP maps load and draw their opening view. |
+| `rel01.sp.stock-maps-vk` | fail, fail | Each attempt: 57 of 58 runs passed with validation and no VUIDs. `mcc_2` on Vulkan captured a black frame: the map opens with scripted white and black fades (`mcc_2.script` lines 1005-1047), and the OpenGL capture landed mid-white-fade. `tram1b` on Vulkan logged two more copies of a warning both renderers log (a tramcar AI asking for `aas32`), because its run lasted longer and reached a scripted spawn. And the check that resolves `--source-commit` failed once with git unavailable mid-run (the commit resolves). Attempt 2 failed only on `mcc_2` again, this time on OpenGL while Vulkan drew: the black frame follows the fade timing, not a renderer. |
+| `rel01.sp.campaign-transitions` | fail, pass | The walk passed: 62 of 62 loads in order to `core2`, no errors, 405 warnings. The case failed writing its report, given a directory for a file; attempt 2 passed in 1354 s. |
+| `rel03.lifecycle` | pass | Cold start to the map 13.2 s, warm 9.5 s; 24 damaged cache files recovered; resize to 1280x720 and renderer restarts in a session; Vulkan relaunch with its own restart; every exit code 0, quit to exit 1.3-2.6 s, no warnings. |
+| `rel03.soak-gl` | fail, pass | All 16 stops and the `vid_restart`; process memory grew at most 1.14 times. The second visit to `medlabs` captured a black frame: its conveyor ride fades to black between tracks (`medlabs.script` `endOfTrack`), and the first visit's capture shows the ride. Attempt 2 passed every stop. |
+| `rel03.soak-vk` | pass | All 16 stops and the `vid_restart`; process memory 1.14 times, Vulkan allocations 1.08 times. |
+| `rel03.network.reconnect-impaired`, `rel03.network.ipv6` | pass | |
+| `rel03.renderer.vk-recovery` | fail, pass | Attempt 1 refused its runtime path (the harness accepts only `.install` or `.tmp/stock-runtime/`); attempt 2 ran on the runner's hard-linked view and passed. |
+| `rel03.audio.recovery` | fail | **A product defect.** After a software output interruption the two Ogg stream fixtures never resume (one stays `initial` with a block queued, one `stopped`), so the dialogue-volume and trim checks that need them fail too; a dialogue line paused across an outage resumes 1355 ms on over 788 ms; the surround run fails `layout_routing`. No sound code changed between 0.15.0 and C2; the harness last passed on 25 October, before stream decoding moved to job workers (`8d3859db1`, `39aa329a9`). Being fixed separately; the next candidate reruns it. |
+| `rel03.effects.lifecycle` | pass | |
+| `rel02.captures.generated-images` | pass | |
+| `rel04.package.symbols` | fail | C2's own symbols archive predates `be420c1ad`: no PDBs for the renderer modules or the updater. The fixed packager, run on C2's staged install, gives the same runtime archive byte for byte and a symbols archive whose seven PDBs match their images. |
+| `rel04.package.signing` | pass | Every image `NotSigned`. |
+
+The sweeps wrote 49 contact sheets (`rel01.sp.stock-maps-vk` and
+`rel01.mp.listen-vk`, `output/sheets/`): each map's opening view on Vulkan beside
+OpenGL, for the matched visual review.
+
+**Not proven by C2:** audio output recovery (above); any platform but Windows x64; multiplayer demos; device,
+surface and audio-device loss on real hardware, suspend and high-DPI; every
+REL-02 human review; a signed package. **Found in passing, not a REL defect:**
+`tram1b` loads `tram1b.aas32` yet some AI report no `aas32` loaded and cannot
+path, on both renderers (Q4-02 follow-up).

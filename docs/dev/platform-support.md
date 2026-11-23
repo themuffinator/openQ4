@@ -151,6 +151,9 @@ PLAT-01 covers Linux x64/Steam Deck hardware breadth; PLAT-02 Linux ARM64;
 PLAT-03 Windows ARM64; PLAT-04 macOS arm64 signoff; and PLAT-05 package, ABI and
 architecture decisions. REL-01 through REL-04 apply to every final package.
 The support tiers above remain unchanged until their evidence gates are met.
+[Release qualification](release-qualification.md) runs one platform's frozen
+package through the REL matrix. Up to 23 November 2026 only Windows x64
+packages have run it; every other platform needs its own package and run.
 
 ## SDL3 implementation record (Linux/macOS)
 

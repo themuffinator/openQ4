@@ -144,7 +144,7 @@ def run(args, root, speakers, steps):
         'com_skipLoadingContinue': '1', 'com_maxfps': '60', 'ui_autoJoin': '0', 'ui_retained': '1',
         'sys_lang': 'english', 'g_autoExecAfterMapLoad': 'audio-output.cfg', 'g_autoExecAfterMapLoadDelayMs': '3000',
     }
-    exe = ROOT / '.install' / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64')
+    exe = args.runtime_dir / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64')
     command = [str(exe)]
     for key, value in cvars.items():
         command += ['+set', key, value]
@@ -156,7 +156,7 @@ def run(args, root, speakers, steps):
         startup.wShowWindow = 0
         options.update(startupinfo=startup, creationflags=subprocess.CREATE_NO_WINDOW)
     with (root / 'process.log').open('w') as out:
-        process = subprocess.run(command, cwd=ROOT / '.install', stdout=out, stderr=subprocess.STDOUT, timeout=args.timeout, **options)
+        process = subprocess.run(command, cwd=args.runtime_dir, stdout=out, stderr=subprocess.STDOUT, timeout=args.timeout, **options)
     log = (game / 'logs/openq4.log').read_text(encoding='utf-8', errors='replace')
     return process.returncode, log, command
 
@@ -296,6 +296,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--assets', type=Path, help='Read-only Quake 4 install root (the folder holding q4base)')
     parser.add_argument('--output', type=Path)
+    parser.add_argument('--runtime-dir', type=Path, default=ROOT / '.install', help='staged or extracted package to run')
     parser.add_argument('--map', default='game/airdefense1')
     parser.add_argument('--renderer', default='gl', choices=['gl', 'vk'])
     parser.add_argument('--timeout', type=int, default=600)
@@ -311,7 +312,8 @@ def main():
         parser.error('--assets and --output are required')
     if args.fixtures is not None:
         args.fixtures = args.fixtures.resolve(strict=True)
-    verify_runtime_is_current(ROOT / '.install')
+    args.runtime_dir = args.runtime_dir.resolve()
+    verify_runtime_is_current(args.runtime_dir)
     output_root = args.output.resolve()
     report = {'microphone': False, 'host_input': False, 'output': 'OpenAL wave writer', 'runs': {}}
     passed = True
@@ -324,10 +326,10 @@ def main():
         report['runs'][name] = {'checks': checks, **details}
         passed &= all(checks.values())
         print(json.dumps({name: checks}, indent=2))
-    exe = ROOT / '.install' / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64')
+    exe = args.runtime_dir / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64')
     report.update(passed=passed, executable_sha256=hashlib.sha256(exe.read_bytes()).hexdigest(),
-                  runtime_sha256={str(p.relative_to(ROOT / '.install')): hashlib.sha256(p.read_bytes()).hexdigest()
-                                  for p in (ROOT / '.install/baseoq4').iterdir()
+                  runtime_sha256={str(p.relative_to(args.runtime_dir)): hashlib.sha256(p.read_bytes()).hexdigest()
+                                  for p in (args.runtime_dir / 'baseoq4').iterdir()
                                   if p.is_file() and p.suffix.lower() in ('.dll', '.so', '.dylib', '.pk4')},
                   harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
     (output_root / 'result.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')

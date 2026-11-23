@@ -95,6 +95,9 @@ class Case:
     harness: str = ""
     procedure: str = ""
     env: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    # "stock-runtime": the harness accepts only .install or a named directory
+    # below .tmp/stock-runtime, so it runs on a hard-linked view of the candidate.
+    view: str = ""
 
 
 def tool(name: str) -> str:
@@ -164,7 +167,7 @@ MATRIX: tuple[Case, ...] = (
          "and fires the map's own end-level target, so the session performs the real level change with the "
          "player's persistent state, on the shipped physics default.",
          ("{python}", tool("physics_campaign.py"), "--exe", "{client}", "--retail", "{basepath}", "--save-root",
-          "{out}/saves", "--parts", "chain", "--mode", "legacy", "--output", "{out}"), timeout=9000,
+          "{out}/saves", "--parts", "chain", "--mode", "legacy", "--output", "{out}/campaign-chain.json"), timeout=9000,
          needs=("basepath",), harness="tools/tests/physics_campaign.py"),
     Case("rel01.sp.campaign-saves", "REL-01", "SP saves across campaign maps",
          "Saves made on five stock campaign maps reload into the same map in a fresh process.",
@@ -235,7 +238,14 @@ MATRIX: tuple[Case, ...] = (
          "Same-process Vulkan startup recovery followed by stock-map gameplay.",
          ("{python}", tool("renderer_vulkan_recovery_gameplay.py"), "--runtime-dir", "{runtime}", "--basepath",
           "{basepath}", "--output-dir", "{out}"), timeout=2400, needs=("basepath",), renderer="vulkan",
-         harness="tools/tests/renderer_vulkan_recovery_gameplay.py"),
+         harness="tools/tests/renderer_vulkan_recovery_gameplay.py", view="stock-runtime"),
+    Case("rel03.audio.recovery", "REL-03", "Audio output loss and recovery",
+         "Rendered through OpenAL Soft's wave writer: the output is interrupted while tones, a paused line and Ogg "
+         "streams play, audio memory is trimmed and a purged sample replays; then the speaker layout and HRTF "
+         "change during dialogue and the device resets in place.",
+         ("{python}", tool("audio_output_recovery_runtime.py"), "--runtime-dir", "{runtime}", "--assets", "{basepath}",
+          "--output", "{out}"), timeout=1800, needs=("basepath",),
+         harness="tools/tests/audio_output_recovery_runtime.py"),
     Case("rel03.effects.lifecycle", "REL-03", "Effect runtime across map changes and restores",
          "BSE effects survive map changes, save restores and renderer restarts without leaks.",
          ("{python}", tool("bse_lifecycle_runtime.py"), "--install-root", "{runtime}", "--basepath", "{basepath}",
@@ -596,9 +606,32 @@ def needs_met(case: Case, candidate: dict[str, Any]) -> str | None:
     return None
 
 
-def expand(case: Case, candidate: dict[str, Any], out: Path) -> list[str]:
+STOCK_RUNTIME_PARENT = ROOT / ".tmp" / "stock-runtime"
+
+
+def make_link_view(runtime: Path, view: Path) -> None:
+    """A tree of hard links to the candidate's package files: the same bytes, no copy."""
+    parent = STOCK_RUNTIME_PARENT.resolve()
+    if view.resolve().parent != parent or view.is_symlink():
+        raise SystemExit(f"refusing runtime view outside {parent}: {view}")
+    remove_link_view(view)
+    for name, source in runtime_files(runtime):
+        target = view / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        os.link(source, target)
+
+
+def remove_link_view(view: Path) -> None:
+    if not view.exists():
+        return
+    if view.resolve().parent != STOCK_RUNTIME_PARENT.resolve() or view.is_symlink():
+        raise SystemExit(f"refusing to remove {view}")
+    shutil.rmtree(view)  # removes the links; the candidate's files keep their other name
+
+
+def expand(case: Case, candidate: dict[str, Any], out: Path, runtime: Path | None = None) -> list[str]:
     inputs = candidate.get("inputs", {})
-    runtime = Path(candidate["runtime"])
+    runtime = runtime or Path(candidate["runtime"])
     values = {
         "python": sys.executable, "root": str(ROOT), "runtime": str(runtime),
         "basepath": inputs.get("basepath") or "", "awakening": inputs.get("awakening") or "",
@@ -685,11 +718,18 @@ def run_case(case: Case, candidate: dict[str, Any], output: Path, args: argparse
         record.update(status="blocked", reason="runtime differs from the frozen candidate", runtimeProblems=before[:20],
                       seconds=0)
         return record
-    crashes_before = set(crash_reports(runtime))
+    run_runtime = runtime
+    view = None
+    if case.view == "stock-runtime":
+        view = STOCK_RUNTIME_PARENT / f"rel-{case.id}"
+        make_link_view(runtime, view)
+        run_runtime = view
+        record["runtimeView"] = str(view)
+    crashes_before = set(crash_reports(runtime)) | set(crash_reports(run_runtime))
     record["freeCommitGB"] = wait_for_memory(args.min_free_gb)
     case_dir.mkdir(parents=True, exist_ok=True)
     # Several harnesses insist on creating their own output directory.
-    command = expand(case, candidate, case_dir / "output")
+    command = expand(case, candidate, case_dir / "output", run_runtime)
     record["command"] = command
     environment = dict(os.environ)
     # The candidate is frozen and checked by hash around every case, which is
@@ -714,7 +754,9 @@ def run_case(case: Case, candidate: dict[str, Any], output: Path, args: argparse
     record["seconds"] = round(time.monotonic() - started, 1)
     record["exitCode"] = exit_code
     record["timedOut"] = timed_out
-    new_crashes = sorted(set(crash_reports(runtime)) - crashes_before)
+    new_crashes = sorted((set(crash_reports(runtime)) | set(crash_reports(run_runtime))) - crashes_before)
+    if view is not None:
+        remove_link_view(view)
     record["crashReports"] = new_crashes
     after = check_runtime(runtime, candidate["files"], deep=False)
     record["runtimeProblemsAfter"] = after[:20]
@@ -1116,6 +1158,21 @@ def self_test() -> int:
         result = check_symbols(image_dir, symbols_zip)
         assert result["problems"] == ["openQ4-client_x64.exe: openq4-client_x64.pdb does not carry the image's GUID"], \
             result
+
+        # A hard-linked view holds the same files and goes away without touching them.
+        STOCK_RUNTIME_PARENT.mkdir(parents=True, exist_ok=True)
+        view = STOCK_RUNTIME_PARENT / "rel-selftest-view"
+        make_link_view(runtime, view)
+        assert sorted(n for n, _ in runtime_files(view)) == sorted(n for n, _ in runtime_files(runtime))
+        assert os.path.samefile(view / client_name(), runtime / client_name())
+        remove_link_view(view)
+        assert not view.exists() and (runtime / client_name()).is_file()
+        try:
+            make_link_view(runtime, root / "elsewhere")
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("a view outside .tmp/stock-runtime was made")
 
         # A runtime extracted from an archive matches it entry for entry.
         archive = root / "package.zip"
