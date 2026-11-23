@@ -2370,6 +2370,10 @@ void RB_BindStageTexture( const float *shaderRegisters, const textureStage_t *te
 void RB_FinishStageTexture( const textureStage_t *texture, const drawSurf_t *surf );
 bool RB_DrawSurfHasSoftParticleStage( const drawSurf_t *surf );
 void RB_StencilShadowPass( const drawSurf_t *drawSurfs );
+// REN-02 step 4: the ARB2 light loop's stencil decision and one shadow chain,
+// for the modern classic-lighting corridor.
+bool RB_ARB2_LightShadowsByStencilPolicy( const viewLight_t *vLight );
+void RB_ARB2_StencilShadowPassForLight( const viewDef_t *viewDef, viewLight_t *vLight, const drawSurf_t *shadows );
 void RB_STD_DrawView( void );
 // Temporarily use the same scene coordinates while building/submitting modern
 // packets that the later legacy scene target uses. End restores all rectangles.

@@ -743,6 +743,15 @@ int RB_LightGridClassicAlbedoStages( const drawSurf_t *surf, idImage **bumpImage
 	return 0;
 }
 
+bool RB_ARB2_LightShadowsByStencilPolicy( const viewLight_t *vLight ) {
+	( void )vLight;
+	return false;
+}
+
+void RB_ARB2_StencilShadowPassForLight( const viewDef_t *viewDef, viewLight_t *vLight, const drawSurf_t *shadows ) {
+	( void )viewDef; ( void )vLight; ( void )shadows;
+}
+
 void RB_DetermineLightScale( void ) {
 	RB_GLESD3_DetermineLightScale();
 }

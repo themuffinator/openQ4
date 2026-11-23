@@ -498,6 +498,33 @@ struct modernClassicPrimitive_t {
 	GLuint textures[6];
 };
 static idList<modernClassicPrimitive_t> rg_modernClassicPrimitives;
+// REN-02 step 4: the corridor's primitives grouped by light, in ARB2's order
+// (local receivers, then global), so a stencil-shadowed light can draw its
+// volumes between them exactly as the classic light loop does.
+struct modernClassicLight_t {
+	const viewLight_t *	light;
+	int					firstPrimitive;
+	int					numLocal;
+	int					numGlobal;
+	bool				stencilShadowed;
+};
+static idList<modernClassicLight_t> rg_modernClassicLights;
+static int rg_modernClassicStencilLights = 0;
+// Stencil-shadow graph passes the corridor's view accounts for this frame.
+static int rg_modernClassicStencilPassesOwned = 0;
+// Why the corridor last declined a frame: the first reason it met, for the
+// "Modern classic lighting" telemetry line. "none" while it owns the view.
+static char rg_modernClassicDecline[128] = "none";
+
+static void R_ModernGLExecutor_ClassicDecline( const char *reason, const char *detail = NULL ) {
+	if ( idStr::Icmp( rg_modernClassicDecline, "none" ) != 0 ) { return; }
+	if ( detail != NULL && detail[0] != '\0' ) {
+		idStr::snPrintf( rg_modernClassicDecline, sizeof( rg_modernClassicDecline ), "%s:%s", reason, detail );
+	} else {
+		idStr::Copynz( rg_modernClassicDecline, reason, sizeof( rg_modernClassicDecline ) );
+	}
+}
+
 static const modernGLSubmitCommand_t *rg_modernClassicCollectCommand = NULL;
 static bool rg_modernClassicCollectValid = false;
 static const viewDef_t *rg_modernClassicView = NULL;
@@ -512,6 +539,31 @@ static bool R_ModernGLExecutor_ClassicCorridorShaderKind( const int kind ) {
 	return kind == MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE || kind == MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST;
 }
 static void R_ModernGLExecutor_DeleteClassicLighting( void );
+
+// True for a light of the view the classic-lighting corridor owns. The
+// corridor admits a view only when it can draw the stencil volumes of every
+// shadowing light in it (REN-02 step 4).
+static bool R_ModernGLExecutor_ClassicCorridorLight( const viewLight_t *viewLight ) {
+	if ( rg_modernClassicView == NULL || viewLight == NULL ) { return false; }
+	for ( const viewLight_t *light = rg_modernClassicView->viewLights; light != NULL; light = light->next ) {
+		if ( light == viewLight ) { return true; }
+	}
+	return false;
+}
+
+// Lights on the stencil-fallback policy whose shadows no modern owner draws.
+// The clustered passes count every such light; the corridor's are drawn.
+static int R_ModernGLExecutor_UnownedShadowFallbackLights( const int clusterFallbackLights ) {
+	if ( rg_modernClassicView == NULL || rg_modernClassicStencilLights <= 0 ) { return clusterFallbackLights; }
+	int unowned = 0;
+	for ( int i = 0; i < R_ModernShadowPlanner_NumDescriptors(); ++i ) {
+		const modernShadowLightDescriptor_t *descriptor = R_ModernShadowPlanner_DescriptorByIndex( i );
+		if ( descriptor != NULL && descriptor->policy == MODERN_SHADOW_POLICY_STENCIL_FALLBACK
+				&& !R_ModernGLExecutor_ClassicCorridorLight( descriptor->viewLight ) ) { unowned++; }
+	}
+	return unowned;
+}
+
 static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame &packetFrame, const modernGLExecutorStats_t &stats );
 
 static idList<const LightGrid *> rg_modernGLBakedGridCommands;
@@ -2058,6 +2110,11 @@ static void R_ModernGLExecutor_RecordPacketFallbackBlockers( const idScenePacket
 		if ( !materialPass ) {
 			continue;
 		}
+		if ( draw.passCategory == RENDER_PASS_STENCIL_SHADOW && rg_modernClassicView != NULL && draw.viewDef == rg_modernClassicView ) {
+			// REN-02 step 4: the classic-lighting corridor draws this view's
+			// stencil volumes through ARB2's own stencil pass.
+			continue;
+		}
 		if ( draw.passCategory == RENDER_PASS_FOG_BLEND && draw.viewDef == rg_modernGLLinearFogBlendView ) {
 			// The sealed fog transaction validates its own receiver/frustum
 			// geometry. Fog volume materials are not surface PBR materials.
@@ -2843,6 +2900,27 @@ static void R_ModernGLExecutor_AnalyzeModernVisibleOwnershipReadiness( const idS
 	stats.modernVisibleLegacyPasses -= gridOwnerChange;
 	stats.modernVisibleCompatibilityModernPasses += gridOwnerChange;
 	stats.modernVisibleCompatibilityLegacyPasses -= gridOwnerChange;
+	// REN-02 step 4: likewise for stencil shadows. The corridor admits a view
+	// only when every light with casters is one ARB2 shadows with stencil
+	// volumes by policy, and it then draws those volumes itself, so a
+	// stencil-shadow pass confined to that view is owned.
+	bool corridorStencil = rg_modernClassicView != NULL;
+	for ( int i = 0; corridorStencil && i < packetFrame.NumDrawPackets(); ++i ) {
+		const drawPacket_t &draw = packetFrame.DrawPacket( i );
+		if ( draw.passCategory == RENDER_PASS_STENCIL_SHADOW && draw.viewDef != rg_modernClassicView
+				&& !R_ModernGLExecutor_DrawPacketUsesLegacySidecarView( draw ) ) { corridorStencil = false; }
+	}
+	int ownedStencilPasses = 0;
+	for ( int i = 0; corridorStencil && i < graph.NumPasses(); ++i ) {
+		const renderGraphPass_t &pass = graph.Pass( i );
+		if ( pass.enabled && pass.category == RENDER_PASS_STENCIL_SHADOW ) { ownedStencilPasses++; }
+	}
+	const int stencilOwnerChange = ownedStencilPasses - rg_modernClassicStencilPassesOwned;
+	rg_modernClassicStencilPassesOwned = ownedStencilPasses;
+	stats.modernVisibleModernPasses += stencilOwnerChange;
+	stats.modernVisibleLegacyPasses -= stencilOwnerChange;
+	stats.modernVisibleCompatibilityModernPasses += stencilOwnerChange;
+	stats.modernVisibleCompatibilityLegacyPasses -= stencilOwnerChange;
 	R_ModernGLExecutor_RecordPacketFallbackBlockers( packetFrame, stats );
 	R_ModernGLExecutor_DeclinePBRUnderSSAO( packetFrame, graph, stats );
 
@@ -3137,6 +3215,7 @@ static void R_ModernGLExecutor_AnalyzeFrame(
 	}
 
 	const int graphPassCount = graph.NumPasses();
+	rg_modernClassicStencilPassesOwned = 0;
 	for ( int i = 0; i < graphPassCount; ++i ) {
 		const renderGraphPass_t &pass = graph.Pass( i );
 		R_ModernGLExecutor_CountModernVisibleOwner( pass, stats );
@@ -5668,7 +5747,8 @@ static void R_ModernGLExecutor_ExecuteVisibleDepthPass(
 			continue;
 		}
 		if ( command.passCategory != category ) {
-			if ( category == RENDER_PASS_SHADOW_MAP && command.passCategory == RENDER_PASS_STENCIL_SHADOW ) {
+			if ( category == RENDER_PASS_SHADOW_MAP && command.passCategory == RENDER_PASS_STENCIL_SHADOW
+					&& !( rg_modernClassicView != NULL && command.viewDef == rg_modernClassicView ) ) {
 				stats.visibleStencilShadowFallbackDraws++;
 			}
 			continue;
@@ -6824,7 +6904,7 @@ static void R_ModernGLExecutor_SubmitDeferredResolve( modernGLExecutorStats_t &s
 	stats.deferredResolvePointLights = clusterStats.pointLights;
 	stats.deferredResolveProjectedLights = clusterStats.projectedLights;
 	stats.deferredResolveShadowMappedLights = clusterStats.shadowMappedLights;
-	stats.deferredResolveShadowFallbackLights = clusterStats.shadowFallbackLights;
+	stats.deferredResolveShadowFallbackLights = R_ModernGLExecutor_UnownedShadowFallbackLights( clusterStats.shadowFallbackLights );
 	stats.deferredResolveShadowSkippedLights = clusterStats.shadowSkippedLights;
 	stats.deferredResolveShadowDescriptors = clusterStats.shadowDescriptorCount;
 	stats.deferredResolveFogFallbackLights = clusterStats.fogLights;
@@ -7216,14 +7296,21 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	rg_modernClassicView = NULL;
 	rg_modernClassicExecuted = false;
 	rg_modernClassicPrimitives.SetNum( 0, false );
+	rg_modernClassicLights.SetNum( 0, false );
+	rg_modernClassicStencilLights = 0;
+	idStr::Copynz( rg_modernClassicDecline, "none", sizeof( rg_modernClassicDecline ) );
 	// REN-02 step 3: the corridor accumulates classic light exactly as ARB2
 	// writes its framebuffer, and the forward pass passes it through unchanged
 	// in a display-referred frame (decoding it only for the linear scene), so
 	// it serves both modes.
-	if ( !stats.submitPlanReady || !r_rendererModernQuality.GetBool() || stats.pipelineGBufferCommands != 0
-			|| r_multiSamples.GetInteger() > 1 || r_shadows.GetBool() || !r_useScissor.GetBool()
-			|| r_enhancedMaterials.GetBool() || r_celShading.GetBool() || r_celShadingWorld.GetBool()
-			|| rg_modernClassicProgram == 0 || r_testARBProgram.GetBool() ) { return; }
+	const char *precondition = !stats.submitPlanReady ? "no-submit-plan"
+		: !r_rendererModernQuality.GetBool() ? "modern-quality-off"
+		: stats.pipelineGBufferCommands != 0 ? "gbuffer-pipeline"
+		: r_multiSamples.GetInteger() > 1 ? "msaa"
+		: !r_useScissor.GetBool() ? "no-scissor"
+		: ( r_enhancedMaterials.GetBool() || r_celShading.GetBool() || r_celShadingWorld.GetBool() ) ? "enhanced-or-cel"
+		: ( rg_modernClassicProgram == 0 || r_testARBProgram.GetBool() ) ? "program" : NULL;
+	if ( precondition != NULL ) { R_ModernGLExecutor_ClassicDecline( precondition ); return; }
 	const viewDef_t *root = NULL;
 	bool extended = false;
 	// Preparing a light grid loads and binds its images behind the state cache.
@@ -7241,9 +7328,19 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 		if ( material == NULL || material->hasPBR ) { continue; }
 		const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
 		if ( draw == NULL || draw->geometryRecord == NULL || draw->geometryRecord->skinningMode != GEOMETRY_SKINNING_NONE
-				|| draw->geometryRecord->deformMode != GEOMETRY_DEFORM_NONE ) { return; }
-		if ( !R_MaterialResourceTable_ClassicCorridorPathEligible( *material ) || command.weaponDepthHack || command.modelDepthHack != 0
-				|| command.negativeScale || ( root != NULL && root != command.viewDef ) ) { return; }
+				|| draw->geometryRecord->deformMode != GEOMETRY_DEFORM_NONE ) {
+			R_ModernGLExecutor_ClassicDecline( "skinned-or-deformed-geometry", material->materialName );
+			return;
+		}
+		if ( !R_MaterialResourceTable_ClassicCorridorPathEligible( *material ) ) {
+			R_ModernGLExecutor_ClassicDecline( "material-shape", material->materialName );
+			return;
+		}
+		if ( command.weaponDepthHack || command.modelDepthHack != 0 || command.negativeScale || ( root != NULL && root != command.viewDef ) ) {
+			R_ModernGLExecutor_ClassicDecline( command.negativeScale ? "negative-scale"
+				: ( command.weaponDepthHack || command.modelDepthHack != 0 ) ? "depth-hack" : "second-view", material->materialName );
+			return;
+		}
 		// REN-02 step 1: a cutout's alpha test and a receiver's baked light
 		// sample one classic stage in the depth and forward passes. Decline
 		// what that stage cannot stand for, and honour the named rollback for
@@ -7257,21 +7354,38 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 		}
 		if ( baked || material->alphaTest ) {
 			modernClassicStage_t classicStage;
-			if ( ( R_MaterialResourceTable_ClassicCorridorOnly( *material )
-						&& ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_STAGES ) == 0 )
-					|| !R_ModernGLExecutor_ClassicStageForCommand( command, baked, classicStage ) ) { return; }
+			if ( R_MaterialResourceTable_ClassicCorridorOnly( *material )
+					&& ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_STAGES ) == 0 ) {
+				R_ModernGLExecutor_ClassicDecline( "rollback-stages", material->materialName );
+				return;
+			}
+			if ( !R_ModernGLExecutor_ClassicStageForCommand( command, baked, classicStage ) ) {
+				R_ModernGLExecutor_ClassicDecline( baked ? "baked-light-stage" : "cutout-stage", material->materialName );
+				return;
+			}
 		}
 		root = command.viewDef;
 		extended = extended || !R_MaterialResourceTable_ClassicDiffusePathEligible( *material );
 	}
-	if ( !extended || root == NULL ) { return; }
+	if ( !extended || root == NULL ) {
+		// Nothing here needs the corridor: the forward pass owns the proven
+		// diffuse class by itself.
+		R_ModernGLExecutor_ClassicDecline( "no-classic-fixed-surface" );
+		return;
+	}
 	for ( int i = 0; i < packetFrame.NumScenes(); ++i ) {
 		const viewDef_t *view = packetFrame.Scene( i ).viewDef;
-		if ( view != NULL && view->viewEntitys != NULL && !R_ModernGLExecutor_ViewDefUsesLegacySidecar( view ) && view != root ) { return; }
+		if ( view != NULL && view->viewEntitys != NULL && !R_ModernGLExecutor_ViewDefUsesLegacySidecar( view ) && view != root ) {
+			R_ModernGLExecutor_ClassicDecline( "second-view" );
+			return;
+		}
 	}
 	const renderGraphResourceHandle_t *depth = R_RenderGraphResources_FindHandle( "sceneDepth" );
 	if ( depth == NULL || root->viewport.x1 != 0 || root->viewport.y1 != 0
-			|| root->viewport.x2 + 1 != depth->width || root->viewport.y2 + 1 != depth->height ) { return; }
+			|| root->viewport.x2 + 1 != depth->width || root->viewport.y2 + 1 != depth->height ) {
+		R_ModernGLExecutor_ClassicDecline( "viewport" );
+		return;
+	}
 	const backEndState_t savedBackend = backEnd;
 	GLint matrixMode = GL_MODELVIEW, scissor[4];
 	glGetIntegerv( GL_SCISSOR_BOX, scissor );
@@ -7282,13 +7396,37 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	backEnd.currentSpace = NULL;
 	RB_DetermineLightScale();
 	rg_modernClassicCollectValid = backEnd.overBright == 1.0f;
+	if ( !rg_modernClassicCollectValid ) { R_ModernGLExecutor_ClassicDecline( "overbright" ); }
 	for ( viewLight_t *light = root->viewLights; light != NULL && rg_modernClassicCollectValid; light = light->next ) {
 		if ( light->lightShader->IsFogLight() || light->lightShader->IsBlendLight() ) { continue; }
 		backEnd.vLight = light;
+		// REN-02 step 4: a light ARB2 shadows with stencil volumes by policy is
+		// drawn the same way here. A shadow-mapped light with casters is not
+		// represented, and neither is a stencil light that also lights a PBR
+		// surface, which the forward pass would leave unshadowed.
+		modernClassicLight_t segment = { light, rg_modernClassicPrimitives.Num(), 0, 0, false };
+		if ( r_shadows.GetBool() && ( light->globalShadows != NULL || light->localShadows != NULL ) ) {
+			if ( ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_STENCIL_SHADOWS ) == 0
+					|| !RB_ARB2_LightShadowsByStencilPolicy( light ) ) {
+				R_ModernGLExecutor_ClassicDecline( RB_ARB2_LightShadowsByStencilPolicy( light ) ? "rollback-stencil" : "shadow-mapped-light",
+					light->lightShader->GetName() );
+				rg_modernClassicCollectValid = false;
+				break;
+			}
+			segment.stencilShadowed = true;
+		}
 		const drawSurf_t *chains[] = { light->localInteractions, light->globalInteractions, light->translucentInteractions };
 		for ( int chain = 0; chain < 3; ++chain ) {
+			if ( chain == 1 ) { segment.numLocal = rg_modernClassicPrimitives.Num() - segment.firstPrimitive; }
 			for ( const drawSurf_t *surface = chains[chain]; surface != NULL && rg_modernClassicCollectValid; surface = surface->nextOnLight ) {
-				if ( surface->material->HasPBR() ) { continue; }
+				if ( surface->material->HasPBR() ) {
+					if ( segment.stencilShadowed ) {
+						R_ModernGLExecutor_ClassicDecline( "pbr-under-stencil-light", surface->material->GetName() );
+						rg_modernClassicCollectValid = false;
+						break;
+					}
+					continue;
+				}
 				rg_modernClassicCollectCommand = NULL;
 				for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
 					const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
@@ -7298,9 +7436,20 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 							&& owner->geo != NULL && surface->geo != NULL && owner->geo->ambientCache != NULL
 							&& owner->geo->ambientCache == surface->geo->ambientCache ) { rg_modernClassicCollectCommand = &command; break; }
 				}
-				if ( rg_modernClassicCollectCommand == NULL || chain == 2 ) { rg_modernClassicCollectValid = false; break; }
+				if ( rg_modernClassicCollectCommand == NULL || chain == 2 ) {
+					R_ModernGLExecutor_ClassicDecline( chain == 2 ? "translucent-interaction" : "interaction-without-command", surface->material->GetName() );
+					rg_modernClassicCollectValid = false;
+					break;
+				}
 				RB_CreateSingleDrawInteractions( surface, R_ModernGLExecutor_CollectClassicInteraction );
+				if ( !rg_modernClassicCollectValid ) { R_ModernGLExecutor_ClassicDecline( "interaction-resource", surface->material->GetName() ); }
 			}
+		}
+		segment.numGlobal = rg_modernClassicPrimitives.Num() - segment.firstPrimitive - segment.numLocal;
+		// ARB2 skips a light without interactions before it touches the stencil.
+		if ( light->localInteractions != NULL || light->globalInteractions != NULL ) {
+			rg_modernClassicLights.Append( segment );
+			rg_modernClassicStencilLights += segment.stencilShadowed ? 1 : 0;
 		}
 	}
 	glPopMatrix();
@@ -7309,29 +7458,135 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	backEnd = savedBackend;
 	rg_modernClassicCollectCommand = NULL;
 	if ( rg_modernClassicCollectValid && R_ModernGLExecutor_PrepareClassicTarget( *depth ) ) { rg_modernClassicView = root; }
-	else { rg_modernClassicPrimitives.SetNum( 0, false ); }
+	else {
+		R_ModernGLExecutor_ClassicDecline( "target" );
+		rg_modernClassicPrimitives.SetNum( 0, false );
+		rg_modernClassicLights.SetNum( 0, false );
+		rg_modernClassicStencilLights = 0;
+	}
 	R_GLStateCache_InvalidateAll( "classic lighting preflight" );
 }
 
-static void R_ModernGLExecutor_SubmitClassicLighting( modernGLExecutorStats_t &stats ) {
-	if ( rg_modernClassicView == NULL ) { return; }
+// The accumulation state every corridor interaction draws with.
+static void R_ModernGLExecutor_BindClassicLightingState( void ) {
 	R_GLStateCache().BindVertexArray( rg_modernGLExecutorVAO );
 	R_GLStateCache().BindFramebuffer( GL_FRAMEBUFFER, rg_modernClassicFramebuffer );
 	R_GLStateCache().SetViewport( 0, 0, rg_modernClassicWidth, rg_modernClassicHeight );
-	R_GLStateCache().SetScissorTestEnabled( false );
 	R_GLStateCache().SetColorMask( GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE );
 	R_GLStateCache().SetDepthTestEnabled( true );
 	R_GLStateCache().SetDepthFunc( GL_EQUAL );
 	R_GLStateCache().SetDepthMask( GL_FALSE );
-	R_GLStateCache().SetStencilTestEnabled( false );
 	R_GLStateCache().SetBlendEnabled( true );
 	R_GLStateCache().SetBlendFunc( GL_ONE, GL_ONE );
+	R_GLStateCache().SetScissorTestEnabled( true );
+	R_GLStateCache().UseProgram( rg_modernClassicProgram );
+}
+
+/*
+==================
+R_ModernGLExecutor_ClassicStencilShadows
+
+REN-02 step 4: one shadow chain of a stencil-shadowed light, drawn into the
+corridor's depth-stencil by ARB2's own stencil pass so the volumes rasterize
+exactly as they do natively. The pass is fixed-function: hand the context to
+the classic backend, then take the corridor's state back.
+==================
+*/
+static void R_ModernGLExecutor_ClassicStencilShadows( modernGLExecutorStats_t &stats, const viewLight_t *light, const drawSurf_t *shadows, const bool clear ) {
+	if ( !clear && shadows == NULL ) { return; }
+	idGLDebugScope stencilScope( "ModernGLExecutor classic stencil shadows" );
+	R_ModernGLExecutor_FullRestoreForLegacyHandoff( stats, "classic stencil shadows", true );
+	RB_SetDefaultGLState();
+	backEnd.glState.faceCulling = -1;
+	const viewDef_t *savedView = backEnd.viewDef;
+	viewLight_t *savedLight = backEnd.vLight;
+	const viewEntity_t *savedSpace = backEnd.currentSpace;
+	const idScreenRect savedScissor = backEnd.currentScissor;
+	GLint matrixMode = GL_MODELVIEW;
+	glGetIntegerv( GL_MATRIX_MODE, &matrixMode );
+	glBindFramebuffer( GL_FRAMEBUFFER, rg_modernClassicFramebuffer );
+	glDrawBuffer( GL_COLOR_ATTACHMENT0 );
+	glReadBuffer( GL_COLOR_ATTACHMENT0 );
+	glViewport( 0, 0, rg_modernClassicWidth, rg_modernClassicHeight );
+	glMatrixMode( GL_PROJECTION );
+	glPushMatrix();
+	glLoadMatrixf( rg_modernClassicView->projectionMatrix );
+	glMatrixMode( GL_MODELVIEW );
+	glPushMatrix();
+	glEnable( GL_SCISSOR_TEST );
+	glEnable( GL_STENCIL_TEST );
+	glStencilMask( 0xff );
+	if ( clear ) {
+		// ARB2 clears the stencil inside the light's scissor before its volumes.
+		glScissor( rg_modernClassicView->viewport.x1 + light->scissorRect.x1, rg_modernClassicView->viewport.y1 + light->scissorRect.y1,
+			light->scissorRect.x2 + 1 - light->scissorRect.x1, light->scissorRect.y2 + 1 - light->scissorRect.y1 );
+		glClearStencil( R_ModernGLExecutor_SafeStencilClearValue() );
+		glClear( GL_STENCIL_BUFFER_BIT );
+	}
+	if ( shadows != NULL ) {
+		RB_ARB2_StencilShadowPassForLight( rg_modernClassicView, const_cast<viewLight_t *>( light ), shadows );
+	}
+	glMatrixMode( GL_PROJECTION );
+	glPopMatrix();
+	glMatrixMode( GL_MODELVIEW );
+	glPopMatrix();
+	glMatrixMode( matrixMode );
+	backEnd.viewDef = savedView;
+	backEnd.vLight = savedLight;
+	backEnd.currentSpace = savedSpace;
+	backEnd.currentScissor = savedScissor;
+	// The fixed-function pass bypassed the modern cache and the vertex-cache
+	// bind filter; rebuild everything the interactions depend on.
+	idVertexCache::InvalidateBufferBindings();
+	R_GLStateCache_InvalidateAll( "classic stencil shadows" );
+	R_ModernGLExecutor_InvalidateSubmitStateMemos();
+	R_ModernGLExecutor_ResetVertexInputCache();
+	R_ModernGLExecutor_BindClassicLightingState();
+}
+
+static void R_ModernGLExecutor_SubmitClassicLighting( modernGLExecutorStats_t &stats ) {
+	if ( rg_modernClassicView == NULL ) { return; }
+	R_ModernGLExecutor_BindClassicLightingState();
+	R_GLStateCache().SetScissorTestEnabled( false );
+	R_GLStateCache().SetStencilTestEnabled( false );
 	glClearColor( 0, 0, 0, 0 );
 	glClear( GL_COLOR_BUFFER_BIT );
 	R_GLStateCache().SetScissorTestEnabled( true );
-	R_GLStateCache().UseProgram( rg_modernClassicProgram );
 	rg_modernClassicExecuted = true;
-	for ( int i = 0; i < rg_modernClassicPrimitives.Num(); ++i ) {
+	// Walk the lights in ARB2's order: global volumes, local receivers, local
+	// volumes, global receivers (RB_ARB2_DrawInteractions' stencil branch).
+	int lightIndex = 0, phase = -1;
+	for ( int i = 0; i <= rg_modernClassicPrimitives.Num() && rg_modernClassicExecuted; ++i ) {
+		while ( lightIndex < rg_modernClassicLights.Num() ) {
+			const modernClassicLight_t &segment = rg_modernClassicLights[lightIndex];
+			const int localEnd = segment.firstPrimitive + segment.numLocal;
+			const int globalEnd = localEnd + segment.numGlobal;
+			if ( globalEnd == segment.firstPrimitive ) { ++lightIndex; continue; }
+			if ( phase < 0 ) {
+				if ( i < segment.firstPrimitive ) { break; }
+				if ( segment.stencilShadowed ) {
+					R_ModernGLExecutor_ClassicStencilShadows( stats, segment.light, segment.light->globalShadows, true );
+					glStencilFunc( GL_GEQUAL, 128, 255 );
+					glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+				}
+				R_GLStateCache().SetStencilTestEnabled( segment.stencilShadowed );
+				phase = 0;
+			}
+			if ( phase == 0 ) {
+				if ( i < localEnd ) { break; }
+				if ( segment.stencilShadowed && segment.numGlobal > 0 ) {
+					R_ModernGLExecutor_ClassicStencilShadows( stats, segment.light, segment.light->localShadows, false );
+					glStencilFunc( GL_GEQUAL, 128, 255 );
+					glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+					R_GLStateCache().SetStencilTestEnabled( true );
+				}
+				phase = 1;
+			}
+			if ( i < globalEnd ) { break; }
+			phase = -1;
+			++lightIndex;
+		}
+		if ( i >= rg_modernClassicPrimitives.Num() ) { break; }
 		const modernClassicPrimitive_t &primitive = rg_modernClassicPrimitives[i];
 		const modernGLSubmitCommand_t &command = primitive.command;
 		GLuint indexBuffer = command.indexBuffer;
@@ -7358,6 +7613,12 @@ static void R_ModernGLExecutor_SubmitClassicLighting( modernGLExecutorStats_t &s
 			static_cast<GLenum>( command.indexType ), R_ModernGLExecutor_BufferOffset( offset ) );
 	}
 	if ( !rg_modernClassicExecuted ) { stats.forwardPlusResourceFallbackDraws++; }
+	if ( rg_modernClassicStencilLights > 0 ) {
+		// Leave the stencil as the classic passes that follow expect it.
+		glStencilFunc( GL_ALWAYS, 128, 255 );
+		glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
+		R_GLStateCache().SetStencilTestEnabled( false );
+	}
 	R_ModernGLExecutor_InvalidateSubmitStateMemos();
 }
 
@@ -7431,7 +7692,7 @@ static void R_ModernGLExecutor_SubmitForwardPlus( modernGLExecutorStats_t &stats
 	stats.forwardPlusPointLights = clusterStats.pointLights;
 	stats.forwardPlusProjectedLights = clusterStats.projectedLights;
 	stats.forwardPlusShadowMappedLights = clusterStats.shadowMappedLights;
-	stats.forwardPlusShadowFallbackLights = clusterStats.shadowFallbackLights;
+	stats.forwardPlusShadowFallbackLights = R_ModernGLExecutor_UnownedShadowFallbackLights( clusterStats.shadowFallbackLights );
 	stats.forwardPlusShadowSkippedLights = clusterStats.shadowSkippedLights;
 	stats.forwardPlusShadowDescriptors = clusterStats.shadowDescriptorCount;
 	if ( clusterRequired && !stats.forwardPlusClusterReady ) {
@@ -8549,9 +8810,11 @@ static bool R_ModernGLExecutor_ModernVisibleShadowReceiversReady( const modernSh
 				blockedLights++;
 			}
 		} else if ( descriptor->policy == MODERN_SHADOW_POLICY_STENCIL_FALLBACK ) {
-			// modern frames cannot draw stencil volumes; this light's shadows
-			// would silently vanish
-			blockedLights++;
+			// The forward pass cannot draw stencil volumes, so this light's
+			// shadows would silently vanish, unless it belongs to the view
+			// the classic-lighting corridor owns: the corridor draws that
+			// view's volumes and declines any light it cannot (REN-02 step 4).
+			if ( !R_ModernGLExecutor_ClassicCorridorLight( descriptor->viewLight ) ) { blockedLights++; }
 		}
 	}
 	// The modern point path samples one bound cube for every point light.
@@ -8743,6 +9006,10 @@ static void R_ModernGLExecutor_FinalizePassOwnership( const idRenderGraph &graph
 			if ( R_ModernGLExecutor_PassExistsInGraph( graph, RENDER_PASS_STENCIL_SHADOW ) ) {
 				R_ModernGLExecutor_SetPassOwnership( RENDER_PASS_STENCIL_SHADOW, MODERN_GL_PASS_OWNER_MODERN, true, true, "modern-shadow-map-replaces-stencil" );
 			}
+		}
+		if ( shadowOwnershipModern && rg_modernClassicExecuted && rg_modernClassicStencilPassesOwned > 0
+				&& R_ModernGLExecutor_PassExistsInGraph( graph, RENDER_PASS_STENCIL_SHADOW ) ) {
+			R_ModernGLExecutor_SetPassOwnership( RENDER_PASS_STENCIL_SHADOW, MODERN_GL_PASS_OWNER_MODERN, true, true, "classic-corridor-stencil-volumes" );
 		}
 		if ( ( gbufferModern || forwardModern ) && R_ModernGLExecutor_PassExistsInGraph( graph, RENDER_PASS_AMBIENT ) ) {
 			// Clustered forward owns the complete authored PBR response, including
@@ -10579,9 +10846,10 @@ bool R_ModernGLExecutor_ModernVisiblePostProcessHandoffActive( void ) {
 }
 
 void R_ModernGLExecutor_PrintGfxInfo( void ) {
-	common->Printf( "Modern classic lighting: ready=%d executed=%d primitives=%d extent=%dx%d\n",
+	common->Printf( "Modern classic lighting: ready=%d executed=%d primitives=%d extent=%dx%d lights=%d stencilLights=%d decline=%s\n",
 		rg_modernClassicView != NULL ? 1 : 0, rg_modernClassicExecuted ? 1 : 0,
-		rg_modernClassicPrimitives.Num(), rg_modernClassicWidth, rg_modernClassicHeight );
+		rg_modernClassicPrimitives.Num(), rg_modernClassicWidth, rg_modernClassicHeight,
+		rg_modernClassicLights.Num(), rg_modernClassicStencilLights, rg_modernClassicDecline );
 	common->Printf( "Modern PBR display: linear=%d output=%s\n",
 		R_ModernGLExecutor_PBRLinearSceneActive() ? 1 : 0,
 		R_ModernGLExecutor_PBRLinearSceneActive() ? "filmic-sRGB" : "legacy-or-diagnostic" );

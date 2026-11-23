@@ -318,7 +318,7 @@ GRID_STAGE_KINDS = ('-grid-texmatrix', '-grid-vertex', '-grid-condition', '-grid
 # flat-bump baseline and the diffuse stage state at ten times that intensity.
 GRID_STRONG_KINDS = ('-grid-strong', '-grid-flat-stage', '-grid-flat-vertex')
 DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage', '-ambient', '-grid', '-fog',
-                          *CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS)
+                          *CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS, '-stencil')
 # Mixed-material model (REN-05): one skinned mesh, PBR above its equator and
 # classic below, on CPU skinning and packed MD5R.
 for backend in ('cpu','md5r'):
@@ -375,6 +375,22 @@ for kind in GRID_STRONG_KINDS:
 CASES['production-fixed-grid-multistage-fallback'] = dict(CASES['production-fixed-grid'])
 CASES['production-fixed-grid-multistage-native'] = dict(CASES['production-fixed-grid-native'])
 CASES['production-fixed-stages-fallback'] = {**CASES['production-fixed-cutout-texmatrix'], 'r_rendererModernClassicShapes': '0'}
+# REN-02 step 4: every light shadows with stencil volumes (r_useShadowMap 0),
+# and a second sphere casts across the specimen. The rollback control clears
+# the stencil bit, which hands the frame back to ARB2.
+for suffix in ('', '-native'):
+    CASES['production-fixed-stencil'+suffix] = {**CASES['production-fixed-bump'+suffix], 'r_shadows': '1', 'r_useShadowMap': '0',
+                                                'g_showPlayerShadow': '0'}
+# These controls remove the laboratory's PBR stations (ISOLATED_PREFIXES), and
+# without them switching PBR off no longer makes the modern visible path
+# decline. Their native reference turns that path off.
+CASES['production-fixed-stencil-native']['r_rendererModernVisible'] = '0'
+CASES['production-fixed-stencil-off-fallback'] = {**CASES['production-fixed-stencil'], 'r_rendererModernClassicShapes': '1'}
+CASES['production-fixed-stencil-clear'] = {**CASES['production-fixed-stencil'], 'r_shadows': '0'}
+# These controls need a view without PBR receivers: a stencil-shadowed light
+# cannot shadow the forward pass's PBR surfaces. They remove the laboratory's
+# PBR stations for the rest of the process, so they run in their own batch.
+ISOLATED_PREFIXES = ('production-fixed-stencil',)
 for kind in DISPLAY_CORRIDOR_KINDS:
     CASES[f'production-fixed{kind}-display'] = {**CASES[f'production-fixed{kind}'], 'r_pbrLinearScene': '0'}
 
@@ -388,6 +404,7 @@ FALLBACK_CASES = {'multi-budget','shadow-capacity','local-global','production-re
 FALLBACK_CASES.update(('fog-fallback','blend-fallback','lightgrid-fallback'))
 FALLBACK_CASES.update(f'production-fixed-{boundary}-fallback' for boundary in ('shadow','msaa'))
 FALLBACK_CASES.update(('production-fixed-grid-multistage-fallback','production-fixed-stages-fallback'))
+FALLBACK_CASES.add('production-fixed-stencil-off-fallback')
 # Controls whose PBR specimen is deliberately hidden (background captures for
 # composite oracles): no native owner is expected to admit anything there.
 HIDDEN_SPECIMEN_CASES: set[str] = set()
@@ -398,6 +415,7 @@ LEGACY_CASES = {'legacy','master-off','multi-legacy','shadow-capacity-legacy','l
 LEGACY_CASES.update(('production-fixed-colored-native','production-fixed-master-off'))
 LEGACY_CASES.add('production-fixed-grid-native')
 LEGACY_CASES.add('production-fixed-grid-multistage-native')
+LEGACY_CASES.add('production-fixed-stencil-native')
 LEGACY_CASES.update(f'production-fixed{kind}-native' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS))
 LEGACY_CASES.update(f'production-fixed-{boundary}-native' for boundary in ('shadow','msaa'))
 LEGACY_CASES.update(f'production-{light}-native' for light in ('points','projector'))
@@ -1380,10 +1398,13 @@ def compare_material_captures(results: list[dict]) -> None:
     exact_pairs += [('production-minimal','hdr'),('production-fixed-minimal','production-fixed')]
     exact_pairs += [('hdr-restored','hdr')]
     exact_pairs += [('production-fixed-'+suffix,'production-fixed') for suffix in ('restored','image-reload','shader-reload','partial-restart','full-restart','resize')]
-    # A declined frame is drawn by the classic light loop, whose native PBR
-    # owner still shades the laboratory's PBR stations, while the PBR-off
-    # reference shows their classic stand-ins. Compare what both draw the same
-    # way: the classic specimen, pixel for pixel.
+    # The isolated controls have no PBR station in view, so a declined frame
+    # is the native frame byte for byte.
+    exact_pairs += [('production-fixed-stencil-off-fallback','production-fixed-stencil-native')]
+    # Elsewhere a declined frame is drawn by the classic light loop, whose
+    # native PBR owner still shades the laboratory's PBR stations, while the
+    # PBR-off reference shows their classic stand-ins. Compare what both draw
+    # the same way: the classic specimen, pixel for pixel.
     for left,right in (('production-fixed-shadow-fallback','production-fixed-shadow-native'),
                        ('production-fixed-grid-multistage-fallback','production-fixed-grid-multistage-native'),
                        ('production-fixed-stages-fallback','production-fixed-cutout-texmatrix-native')):
@@ -1534,7 +1555,7 @@ def compare_material_captures(results: list[dict]) -> None:
             if proof['meanAbsoluteByteError']>1 or proof['maximumByteError']>3:
                 by_case['production-curved']['failures'].append('curved classic surface differs from the native lighting reference')
     for case in ('production-fixed','production-fixed-bump','production-fixed-diffuse','production-fixed-colored','production-fixed-cutout','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-grid',
-                 *(f'production-fixed{kind}' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS))):
+                 *(f'production-fixed{kind}' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS)), 'production-fixed-stencil'):
         if case not in by_case or case+'-native' not in by_case: continue
         modern=by_case[case]
         pfm=Path(modern.get('linearScreenshot',''))
@@ -1615,7 +1636,8 @@ def compare_material_captures(results: list[dict]) -> None:
                              ('production-fixed-cutout-condition','production-fixed-cutout-bump','cutout conditioned specular'),
                              ('production-fixed-grid-texmatrix','production-fixed-grid','baked bump texture matrix'),
                              ('production-fixed-grid-vertex','production-fixed-grid','baked vertex colour'),
-                             ('production-fixed-grid-stage','production-fixed-grid','baked stage colour and matrix')):
+                             ('production-fixed-grid-stage','production-fixed-grid','baked stage colour and matrix'),
+                             ('production-fixed-stencil','production-fixed-stencil-clear','stencil shadow')):
         if left not in by_case or right not in by_case: continue
         paths=[Path(by_case[name].get('linearScreenshot','')) for name in (left,right)]
         if not all(p.is_file() for p in paths): continue
@@ -2047,8 +2069,12 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
     if ( case.endswith('-display') and case.startswith('production-fixed') ) and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('the display-referred frame did not run the classic-lighting corridor')
     if case in ('production-fixed','production-fixed-bump','production-fixed-colored','production-fixed-cutout-bump','production-fixed-vertex','production-fixed-texmatrix','production-fixed-condition','production-fixed-multistage','production-fixed-ambient','production-fixed-fog','production-fixed-restored','production-fixed-image-reload','production-fixed-shader-reload','production-fixed-partial-restart','production-fixed-full-restart','production-fixed-resize','production-fixed-minimal','production-fixed-bright',
-                *(f'production-fixed{kind}' for kind in CUTOUT_STAGE_KINDS)) and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
+                *(f'production-fixed{kind}' for kind in CUTOUT_STAGE_KINDS), 'production-fixed-stencil') and not re.search(r'Modern classic lighting: ready=1 executed=1 primitives=[1-9]\d*',text):
         failures.append('classic compatibility lighting was not submitted')
+    if case == 'production-fixed-stencil-clear' and not re.search(r'Modern classic lighting: ready=1 executed=1 .*stencilLights=0\b',text):
+        failures.append('the unshadowed twin still drew a stencil-shadowed light')
+    if case in ('production-fixed-stencil','production-fixed-stencil-display') and not re.search(r'Modern classic lighting: ready=1 executed=1 .*stencilLights=[1-9]',text):
+        failures.append('no stencil-shadowed light was drawn by the classic-lighting corridor')
     if case.startswith('production-fixed') and case.endswith('-native'):
         visible = next((line for line in telemetry if line.startswith('Modern visible frame:')), '')
         if re.search(r'\bexec=1\b', visible):
@@ -2417,12 +2443,28 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             if case.startswith('production-fixed-grid-stage'): material='classic_grid_stage'
             for name in ('flat-stage','flat-vertex'):
                 if case.startswith('production-fixed-grid-'+name): material='classic_grid_'+name.replace('-','_')
+            if case.startswith('production-fixed-stencil'): material='classic_bump'
             vertex_model=case.startswith(('production-fixed-vertex','production-fixed-cutout-vertex','production-fixed-grid-vertex',
                                                       'production-fixed-grid-flat-vertex'))
             commands += ['g_stopTime 0',f'script "${removed}.remove()"','wait 3',
                          f'spawn func_static name pbr_classic model "{lab.VERTEX_COLOR_MODEL if vertex_model else lab.MODEL}" shader "{lab.PREFIX}/{material}" origin "100 160 480" solid 0',
                          'wait 30','g_stopTime 1']
             scene_setups.add('classic')
+            # REN-02 step 4: a sphere between the key light and the specimen,
+            # offset so its shadow's edge crosses the specimen.
+            if case.startswith(ISOLATED_PREFIXES) and 'isolated' not in scene_setups:
+                commands += ['g_stopTime 0']
+                commands += [f'script "${station["name"]}.remove()"' for station in manifest['stations'] if station['name'] != 'metal_3']
+                commands += ['wait 30','g_stopTime 1']
+                scene_setups.add('isolated')
+            wanted = case.startswith('production-fixed-stencil')
+            if wanted and 'fixed-caster' not in scene_setups:
+                commands += ['g_stopTime 0',f'spawn func_static name fixed_caster model "{lab.MODEL}" shader "{lab.PREFIX}/classic_bump" origin "112 -80 612" solid 0',
+                             'wait 30','g_stopTime 1']
+                scene_setups.add('fixed-caster')
+            elif not wanted and 'fixed-caster' in scene_setups:
+                commands += ['g_stopTime 0','script "$fixed_caster.remove()"','wait 30','g_stopTime 1']
+                scene_setups.discard('fixed-caster')
             # REN-02: a classic ambient light (step 2) or fog light (step 3)
             # beside the fixed lights.
             for extra, shader, color in (('ambient', 'ambient', '0.25 0.2 0.15'), ('fog', 'fog', '1 1 1')):
@@ -2589,6 +2631,8 @@ def main() -> int:
         parser.error('select rendering controls, or explicitly prepare/update the fixture')
     if args.prepare and args.update_fixture: parser.error('choose --prepare or --update-fixture')
     if any(case not in CASES for case in cases): parser.error('unknown capture case')
+    if args.batch and any(case.startswith(ISOLATED_PREFIXES) for case in cases) and not all(case.startswith(ISOLATED_PREFIXES) for case in cases):
+        parser.error('the isolated stencil controls remove the PBR stations; batch them on their own')
     if args.backend!='vk' and not args.gl_native and any(case.startswith('vk-direct-') for case in cases):
         parser.error('vk-direct controls require a native PBR owner: Vulkan or --gl-native')
     if args.backend!='vk' and 'ibl-shared' in cases:

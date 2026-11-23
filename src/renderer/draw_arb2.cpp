@@ -17082,7 +17082,9 @@ static void RB_SharedWorldInteractionGLRestoreState( void ) {
 	if ( glConfig.depthBoundsTestAvailable ) {
 		glDisable( GL_DEPTH_BOUNDS_TEST_EXT );
 	}
-	const int maxUnit = Min( 8, Min( glConfig.maxTextureUnits,
+	// BindNull clears the legacy bind tracker, which covers
+	// MAX_MULTITEXTURE_UNITS units; on a unit past it, it only warned.
+	const int maxUnit = Min( MAX_MULTITEXTURE_UNITS - 1, Min( glConfig.maxTextureUnits,
 		glConfig.maxTextureImageUnits ) - 1 );
 	for ( int unit = maxUnit; unit >= 1; --unit ) {
 		GL_SelectTextureNoClient( unit );
@@ -17346,6 +17348,55 @@ static bool RB_ShadowMapVolumetricParams( const viewLight_t *vLight, volumetricS
 	}
 	R_Volumetric_FillProjectedShadow( g_projectedShadowMapState, composedRects, params );
 	return true;
+}
+
+/*
+==================
+RB_ARB2_LightShadowsByStencilPolicy
+
+REN-02 step 4: true when the light loop below shadows this light with stencil
+volumes for a reason that never depends on shadow-map resources or a frame's
+update budget, so another owner of the view can make the same decision.
+==================
+*/
+bool RB_ARB2_LightShadowsByStencilPolicy( const viewLight_t *vLight ) {
+	if ( vLight == NULL || !r_shadows.GetBool() ) {
+		return false;
+	}
+	if ( !r_useShadowMap.GetBool() ) {
+		return true;
+	}
+	if ( RB_ShadowMapLightPolicySupportReason( vLight ) != SHADOWMAP_SUPPORT_OK ) {
+		return true;
+	}
+	return R_ClassifyShadowMapLight( vLight ).pointLight && !r_shadowMapPointLights.GetBool();
+}
+
+/*
+==================
+RB_ARB2_StencilShadowPassForLight
+
+REN-02 step 4: one shadow chain of a light into the bound framebuffer, drawn
+by the same code and programs as the stencil branch of the light loop below.
+The caller has bound a depth-stencil target holding the view's depth, loaded
+the view's projection, cleared the stencil inside the light's scissor, and
+restores GL state afterwards.
+==================
+*/
+void RB_ARB2_StencilShadowPassForLight( const viewDef_t *viewDef, viewLight_t *vLight, const drawSurf_t *shadows ) {
+	backEnd.viewDef = const_cast<viewDef_t *>( viewDef );
+	backEnd.vLight = vLight;
+	backEnd.currentSpace = NULL;
+	backEnd.currentScissor = vLight->scissorRect;
+	glEnable( GL_STENCIL_TEST );
+	glStencilMask( 0xff );
+	if ( r_useShadowVertexProgram.GetBool() && R_BindARBProgram( GL_VERTEX_PROGRAM_ARB, VPROG_STENCIL_SHADOW, "stencil shadow vertex program", true ) ) {
+		glEnable( GL_VERTEX_PROGRAM_ARB );
+		RB_StencilShadowPass( shadows );
+		glDisable( GL_VERTEX_PROGRAM_ARB );
+	} else {
+		RB_StencilShadowPass( shadows );
+	}
 }
 
 void RB_ARB2_DrawInteractions( void ) {
