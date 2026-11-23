@@ -339,6 +339,9 @@ def main() -> int:
         sent = after(client, "OPT_CLIENT_TIMERS")
         rows = facts(sent.split("OPT_CLIENT_COMPETITIVE")[0], "timer")
         check("si_itemTimers 2 sends the list to a player", any(int(r["left_ms"]) > 0 for r in rows), rows[:3])
+        counting = [r for r in picked + rows if int(r["left_ms"]) > 0]
+        check("a counting timer knows its whole respawn (the HUD's progress)",
+              bool(counting) and all(int(r.get("total_ms", "0")) >= int(r["left_ms"]) for r in counting), counting[:3])
         hud = fact(sent, "hud") or {}
         check("item timers in the HUD state", int(hud.get("it_count", "0")) > 0 and hud.get("it0", "/").split("/")[0] != "", hud)
         competitive = fact(after(client, "OPT_CLIENT_COMPETITIVE"), "hud") or {}

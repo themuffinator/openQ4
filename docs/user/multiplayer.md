@@ -222,6 +222,15 @@ their slot. A managed match limits who may follow whom; see
 [Spectate a managed match](competitive-matches.md#spectate-a-managed-match).
 Demo playback has its own camera controls.
 
+With the **Competitive** HUD layout (**Settings → Game Options → HUD → HUD Layout**), a spectator in
+Duel, Tourney or a team game sees the scoreline across the top: both sides'
+scores with the timer between them and up to four players a side, each with
+their weapon, health and armour, a skull while they are dead, and the player
+you follow lit. Both teams' full lists flank the view, and the item timers
+(shown to spectators by default) sit above the right-hand list with where each
+item lies and how long until it returns. A player who is out for the round
+sees only their own team's weapons and vitals.
+
 #### Auto-follow
 
 `follow auto <mode>` hands the camera to the server, which moves it between the

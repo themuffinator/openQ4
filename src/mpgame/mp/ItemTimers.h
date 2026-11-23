@@ -100,6 +100,7 @@ typedef struct itemTimerRow_s {
 	int		entityNumber;
 	int		state;			// wire state when it arrived
 	int		respawnAt;		// client real time the item returns, 0 when it is there
+	int		totalMsec;		// the whole respawn while it counts, 0 when not known
 } itemTimerRow_t;
 
 // a tracked item as a send collects it once, before choosing each recipient's rows
@@ -149,9 +150,13 @@ private:
 	int						CollectTracked( itemTimerTracked_t *tracked, int maxTracked ) const;
 	int						RowsFromTracked( const itemTimerTracked_t *tracked, int trackedCount, itemTimerRow_t *rows, int maxRows, int instance ) const;
 	bool					Tracked( const idItem *item ) const;
+	// the respawn an item's definition gives this game type, in msec (0 when none)
+	static int				DefinedRespawnMsec( const idEntity *ent );
 
 	// server: game time the item returns, 0 while it is there, -1 while held
 	int						respawnAt[ MAX_GENTITIES ];
+	// server: the length of the respawn counting down, for the host's own HUD
+	int						respawnTotal[ MAX_GENTITIES ];
 	int						nextSendTime;
 
 	// client

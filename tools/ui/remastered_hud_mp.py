@@ -389,17 +389,23 @@ FEED_FIELDS = {"attacker": "", "victim": "", "weapon": -1, "kind": 0, "quad": Fa
 
 
 # Competitive: on a view too narrow for the kill feed's longest line beside
-# the match bar's network readout (about 16:10 and narrower at any HUD scale),
+# the scoreline's network readout (about 16:10 and narrower at any HUD scale),
 # the top-trailing groups step down under the bar by this much.
 UNDER_BAR_DROP = 38
 
 
+def scoreline_shown() -> dict:
+    """Competitive's scoreline holds the top center in every mode but
+    deathmatch, which keeps the Remastered standing and timer."""
+    return AND(op("==", S("hud.layout"), 3), op("!=", S("gametype"), 1))
+
+
 def under_match_bar() -> dict:
-    """True in Competitive when the trailing anchor's edge lies within
-    806 u of the view's center (scaled), so the feed's 204 u line, 3 u in
-    from it, would meet the network readout ending 190 u right of center."""
+    """True while the scoreline shows and the trailing anchor's edge lies
+    within 844 u of the view's center (scaled), so the feed's 204 u line, 3 u
+    in from it, would meet the network readout ending 215 u right of center."""
     room = op("/", op("-", S("hud.width"), op("*", 2, S("hud.right"))), S("hud.scale"))
-    return AND(op("==", S("hud.layout"), 3), op("<", room, u(806)))
+    return AND(scoreline_shown(), op("<", room, u(844)))
 
 
 def kill_feed(doc: HudDocument) -> dict:
@@ -860,9 +866,11 @@ def timer(doc: HudDocument) -> dict:
                               "margin-top": ui.length(u(2)), "display": ui.keyword("none")})
     doc.show("round-clock", op("!=", S("roundtime"), ""))
     doc.bind("round-c.display", "round-c", "display", sel(S("showround"), "flex", "none"))
+    # Competitive deathmatch keeps network quality under the timer (13.13).
+    from remastered_hud_competitive import deathmatch_net
     column = ui.group("timer", {**ui.absolute(left=u(6), top=u(82)), "display": ui.keyword("flex"),
                                 "flex-direction": ui.keyword("column"), "align-items": ui.keyword("flex-start")},
-                      [content, round_plate, *match_notes(doc)])
+                      [content, round_plate, *match_notes(doc), deathmatch_net(doc)])
     team = AND(S("oq4_team_game"), op("!=", gametype, 2))
     doc.bind("timer.top", "timer", "top", sel(op("==", gametype, 8), u(107), sel(team, u(90), u(82))))
     # Tourney sets its timer under the message bar (tourney).
@@ -1032,10 +1040,11 @@ def vote(doc: HudDocument) -> dict:
                        {"padding-left": ui.length(u(6)), "padding-top": ui.length(u(4)), "padding-bottom": ui.length(u(5))},
                        plate, [head, *lines, tallies, ramp_row])
     doc.bind("vote.display", "vote", "display", sel(op("!=", S("voteNotice"), 0), "block", "none"))
-    # Competitive: the top-leading corner the standing left (36 u from the top
-    # inset, the card's cl anchor rebased onto tl's), clear of the team status.
+    # Competitive: the top-leading corner the panels left (36 u from the top
+    # inset, the card's cl anchor rebased onto tl's), clear of the team status;
+    # deathmatch keeps its standing there, and the vote its place.
     rebased = op("+", op("/", op("-", S("hud.top"), op("/", S("hud.height"), 2)), S("hud.scale")), u(240) + u(36))
-    doc.bind("vote.top", "vote", "top", sel(op("==", S("hud.layout"), 3), rebased, u(150)))
+    doc.bind("vote.top", "vote", "top", sel(scoreline_shown(), rebased, u(150)))
     return card
 
 
@@ -1133,7 +1142,7 @@ def chat_history_room() -> tuple:
     for k in range(1, 7):
         fields = op("+", fields, sel(op("!=", S(f"voteInfo_{k}"), ""), u(12), 0))
     rebased = op("+", op("/", op("-", S("hud.top"), op("/", S("hud.height"), 2)), S("hud.scale")), u(240) + u(36))
-    vote_top = sel(competitive(), rebased, u(150))
+    vote_top = sel(scoreline_shown(), rebased, u(150))
     vote_bottom = op("-", half, op("-", op("+", op("+", vote_top, u(45)), fields), u(240)))
     limit = op("min", sel(team_shown, team_top, far), sel(op("!=", S("voteNotice"), 0), vote_bottom, far))
     bottom, _ = chat_geometry()
@@ -2130,10 +2139,11 @@ def mp_document() -> dict:
     timers = item_timers(doc)
     doc.on("hudJoin", *doc.joins)
     doc.on("onInit", *doc.joins)
-    # Competitive (ui_hudLayout 3) trades the standing or team panels, the
-    # timer and the Tourney strip for the match bar and the team status.
+    # Competitive (ui_hudLayout 3) trades the team panels, the timer and the
+    # Tourney strip for the scoreline and the team status; deathmatch keeps
+    # the standing and the timer.
     remastered_top = full("tl-rem", [stand, teams, clock])
-    doc.show("tl-rem", NOT(competitive()))
+    doc.show("tl-rem", NOT(scoreline_shown()))
     strip_slot = full("tc-strip", [strip, bar])
     doc.show("tc-strip", NOT(competitive()))
     # Minimal (ui_hudLayout 2) keeps the held statistics, the vote, chat and

@@ -10,6 +10,13 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 
+- **A scoreline worth watching.** The Competitive HUD layout now puts the
+  score across the top in Duel, Tourney and team games: big scores either side
+  of the clock, and each side's players beside them with their weapon, health
+  and armour bars, and a skull while they are down. Spectators see both sides
+  at a glance, and the item timers show each powerup and armour with where it
+  lies and how close it is to returning.
+
 - **Native resolution, always.** The game starts at your display's native
   resolution with the 3D scene at full size, and no graphics preset or
   Auto-Detect ever changes your resolution or resolution scale again. The
@@ -521,6 +528,15 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- The Competitive HUD layout has a scoreline across the top in Duel, Tourney
+  and team games: large scores either side of the timer and, further out, up
+  to four players a side with their weapon, health and armour where you may
+  see them (your own side, or both sides when you spectate) and a skull while
+  they are dead. Deathmatch keeps the leader, the runner-up and the timer at
+  the top left. Item timers in every layout now show each item's symbol, where
+  it lies and a line filling as it respawns. See
+  [Spectate](../../user/multiplayer.md#spectate) and
+  [Item timers](../../user/multiplayer-client-options.md#item-timers).
 - Classic multiplayer ruleset corrections: quad damage is four times, seeking
   nails lose Quake 4's splash, the expansion maps' napalm launcher respawns in
   30 seconds, Scout carriers take no armour, health from Regeneration drains
