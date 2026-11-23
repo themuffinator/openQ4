@@ -218,7 +218,7 @@ performs the real level change with persistent player state and entity filter.
 - 393 warnings of 96 kinds remain on OpenGL (395 of 97 on Vulkan), classified
   by kind. Expected retail or
   authored-content conditions: `mcc_1.aas48` and `tram1b.aas32` are refused as
-  invalid data, as retail's loader also refuses them; `process2.reverb` lists
+  invalid data, as retail's loader also refuses them ([details](#stock-aas-refusals-on-tram1b-and-mcc_1-23-november-2026)); `process2.reverb` lists
   areas beyond the map's 96; entities and rigid bodies start in solid,
   articulated-figure joints are outside their bodies, unhidden AI is placed in
   maps, and `idTrigger_Timer` has `random >= wait`. Engine diagnostics: decls
@@ -436,3 +436,141 @@ Other retained warnings include duplicate materials, malformed
 `sound/m03_airassault.sndshd`, invalid trench `aas96` navigation data and an
 unresolved trench turret script function. These remain outside this bounded
 vehicle qualification; the run is not a clean-content or full-progression pass.
+
+## Stock AAS refusals on tram1b and mcc_1, 23 November 2026
+
+The REL-01 sweep of 0.16.0 candidate C2 (`8016bc922`, release build,
+packs-only retail assets) logged on both renderers that `game/tram1b` AI
+"requested use_aas 'aas32' but no such AAS is loaded", directly below
+`loading maps/game/tram1b.aas32`. The AI were `monster_strogg_marine_1`, the
+tramcar driver Cortez and the Strogg tramcar gunners. `game/mcc_1` logged the
+same for `examGrunt01` and `aas48`. The
+[2 November chain](#campaign-transition-chain-2-november-2026) had already
+classified both refusals. This section records why they happen and why
+no AI on either map needs those files.
+
+- **No load-order defect.** Each file is read once and refused. The later
+  copies in each log are the end-of-load warning summary. Vulkan's two extra
+  lines are tramcar gunners that spawned later, because its run lasted longer.
+- **The shipped files hold no navigation.** In pak002, `maps/game/tram1b.aas32`
+  (2,908 bytes, 14 September 2005) has 108 planes, no vertices and only the
+  reserved index-0 edge, face, area, node, portal and cluster.
+  `mcc_1.aas48` (65,615 bytes) has 2,152 planes and the same empty sections.
+  Their CRCs match the maps, so neither is out of date. Both are finished
+  compiles that kept no areas, not the placeholder (dummy) files, whose
+  sections are all empty. tram1b's `aas32` settings flood from the player
+  start (`playerFlood = 1`), and the flood kept nothing.
+- **Retail 1.4.2 refuses them the same way.** In `Quake4.exe` (FileVersion
+  1.4.2.0), `idAASFileLocal::Load` calls `FinishAreas` and then `IsDummyFile`.
+  At `0x101d575e` it tests the vertex, edge and face counts (`+0x80`, `+0x90`,
+  `+0xb0`). If any is zero, it prints `error loading %s (invalid data).`
+  (string at `0x102ef3d4`) and returns false. The 1.4.2 SDK's `idAI::SetAAS`
+  then prints `WARNING: %s has no AAS file` for each AI that asks for that
+  type.
+- **None of these AI paths.**
+  - Cortez and the Strogg gunners ride the trams: they are the
+    `def_occupant` of the tramcar driver and gunner positions
+    (`def/levels/tram1b.def`, `def/vehicles/tramcar.def`), with cover, hide
+    and rush turned off.
+  - `monster_strogg_marine_1` is a hidden, passive, notarget marine that
+    nothing targets or scripts.
+  - `examGrunt01` is a hidden, passive grunt that a trigger shows.
+    `mcc_1.script` only plays
+    `aiScriptedAnimLoop( $examGrunt01, "exam_table", 0 )` on it and hides it
+    again.
+
+openQ4 still refuses both files, as retail does, but its messages now say why.
+If a file's only area is the reserved one, the loader reports that it "has no
+navigation areas (its compile kept none), so it is not loaded". Damaged files
+still get "invalid data". The AI warning names the file that did not load,
+for example `... but maps/game/tram1b.aas32 did not load (missing, a
+placeholder or no navigation areas: see [Load AAS])`.
+
+`tools/tests/stock_aas_availability.py` pins both messages in CI. With
+`--basepath`, it reads only the retail PK4s, and loose files are ignored.
+- **AAS files:** of the 145 shipped files of the 29 stock SP maps, 66 hold
+  navigation, 77 are placeholders and exactly these two are empty.
+- **Placed AI:** of 981 placed entities that resolve a `use_aas`, only
+  `examGrunt01` and `monster_strogg_marine_1` request a type that does not
+  load. Both are hidden, passive and notarget.
+- **Not covered:** vehicle occupants and other spawned AI are not placed
+  entities, so the runtime log covers them instead.
+
+A hidden client ran with no input, a release-style staged package (build
+`0.15.0-nightly.20260319.1+gb23148cf.dirty` with this change) and the
+packs-only retail view, for 25 seconds from map start. The client's SHA-256 is
+`04f330addb13c9d95b53c0ad283dad09fe9c45422f50c9504eef24665a217c67`, and the
+SP module's is `f9c813b019a5c85ee638416c34a0393fceef51f51bb6d516d439a4fd70e49855`. It ran `game/tram1b` on OpenGL and
+Vulkan, and `game/mcc_1` on OpenGL. All three runs print the new messages,
+exit 0 and log no errors. Each logs the same number of warnings as the C2
+sweep (6, 6 and 4). `mcc_1.aas32` still loads (`done.`).
+
+### C2 stock-map sweep warnings
+
+The same sweep loaded each of the 29 maps once per renderer, for about a
+minute from map start. It logged 203 warning lines on OpenGL and 205 on Vulkan,
+of 21 kinds. Every kind appears on the same maps with both renderers. Each kind
+is a retail or authored-content condition or an engine diagnostic; none is an
+openQ4 defect.
+
+- **Authored content:**
+  - Entities start in solid on 6 maps, and rigid bodies on 8.
+  - Articulated-figure joints lie outside their bodies (dispersal, medlabs).
+  - Placed AI are unhidden on 10 maps.
+  - core2 has an `idTrigger_Timer` with `random >= wait`.
+  - Models lack named joints (dispersal, putra), including `look_joint`
+    entries (convoy1, convoy2, mcc_landing).
+  - Effect entities name no effect (convoy2b, dispersal).
+  - medlabs has an entity without health and a sound whose maximum
+    distance is below its minimum.
+  - Location entities cannot be added (medlabs, tram1) or overlap (dispersal).
+  - No pack contains the images of four materials: `textures/proto/cap_lg`,
+    `textures/terminal/t9_wall_1_glow`, `textures/objective_2` and
+    `default_global_startoff`.
+  - The reverb tables of hub1, mcc_landing, network1 and process2 name areas
+    of an older compile.
+- **Checked for this section:**
+  - storage1 warns `Entity '$bridge_gui' is a null entity`. Its main script
+    threads `gui_in()` on every visit, but `bridge_gui` has `filter_second 1`
+    and exists only on the second visit. The 1.4.2 SDK interpreter prints the
+    same warning.
+  - convoy2's `vehicle_gev_7` is a bare GEV placed at (14008, -25360, 408).
+    That point lies outside every render area of the map (x -24472 to 5912,
+    y -16800 to 33088). Within seconds of map start, the GEV falls out of the
+    world ("rigid body moved outside world bounds"). No script refers to it.
+- **Engine diagnostics:** sound and material decls were loaded without
+  precache, on 7 and 3 maps.
+- **Retail AAS refusals:** see above.
+
+### C2 campaign chain warnings
+
+REL-01 ran the transition chain on C2 with OpenGL and legacy physics
+(`physics_campaign.py --parts chain`), and it passes again. All 62 loads
+happen in order, the game ends with `core2`'s `endGame`, and nothing errors.
+The log holds 244 warning lines, or 405 when each load's end-of-load summary
+is counted. They cover all 21 sweep kinds and two more; none is an openQ4
+defect:
+
+- **The chain skips a pickup.** On arrival in convoy1, the log warns
+  `player1 is not carrying weapon 'weapon_grenadelauncher'`. Its `main()`
+  selects the launcher, which a player receives on mcc_landing
+  (`weapon_grenadelauncher_1` and `target_give giveLauncher`). The chain
+  skips that pickup. The sweep does not warn, because a direct `+map` start
+  under `developer 1` fires convoy1's `devmap` relay, which hands the
+  launcher out.
+- **Retained HUD coverage notes.** The vehicle HUD's `icon_locked` and the
+  objective images `hub1_obj_6`, `storage1_second_obj_1` and `network1_obj_1`
+  have no retained mapping, so they draw with the stock presentation. This is
+  retained-UI coverage, not progression.
+
+The chain counts three bodies leaving the world. Two are convoy2's GEV,
+logged on both of that map's loads. The third is process2's
+`ammo_grenadelauncher_moveable_1`, placed at z 11320. That is 8 units below
+the floor of render area 85 (z 11328), and no area lies beneath it below
+z 10624. It falls from map start: eight seconds in, it is at z -617, moving at
+1,765 units per second. It leaves the world after the restore. This is an
+authored placement, not a restore defect; the sweep's few seconds of play were
+too short to show it.
+
+These runs classify warnings from map start and level changes only. Warnings
+raised later in play still need classifying, together with the playthroughs.

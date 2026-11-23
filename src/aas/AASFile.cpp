@@ -1484,7 +1484,16 @@ bool idAASFileLocal::Load( const idStr &fileName, unsigned int mapFileCRC ) {
 
 	if ( !IsDummyFile( mapFileCRC ) ) {
 		if ( vertices.Num() == 0 || edges.Num() == 0 || faces.Num() == 0 ) {
-			common->Warning( "error loading %s (invalid data).", name.c_str() );
+			// Retail 1.4.2 refuses these files the same way (Quake4.exe
+			// 0x101d575e). When the only area is the reserved area 0, the file
+			// is a finished compile that kept no navigation at all, not damage:
+			// stock tram1b.aas32 and mcc_1.aas48 ship like that. Say so, so a
+			// log reader does not chase a corrupt or half-loaded file.
+			if ( areas.Num() <= 1 ) {
+				common->Warning( "%s has no navigation areas (its compile kept none), so it is not loaded.", name.c_str() );
+			} else {
+				common->Warning( "error loading %s (invalid data).", name.c_str() );
+			}
 			return false;
 		}
 
