@@ -63,4 +63,118 @@ public:
 		return { copy, false };
 	}
 };
+
+// Producer-only cache of immutable owned vertex-class streams: vertices, CPU
+// vertex-cache bytes, shadow vertices and the static per-vertex/per-face tables
+// of geometry the caller classified as static (world areas and static models).
+// The classification only selects candidates. A stream is immutable because
+// the complete range compared equal on this acquisition: the source address and
+// length are lookup hints, never a version or lifetime guarantee. Submitted
+// leases own their bytes and survive replacement, refusal, eviction and Clear.
+//
+// A range that compares unequal was rewritten in place, so it is posed or
+// deformed data that reached the static path. Its payload is dropped and the
+// range is refused (the caller takes its ordinary per-view copy) for a doubling
+// number of acquisitions, up to maximumRefusals, before it is tried again.
+// A stream that derives its tangents once therefore costs two per-view copies,
+// while one animated in place costs a comparison every 256 acquisitions rather
+// than a comparison, an allocation and a release on every view.
+//
+// Eviction is least-recently-used and incremental, as for the index cache.
+class idFrameSnapshotRetainedStreams {
+public:
+	// Vertex consumers may load 16-byte aligned vectors from these bytes.
+	struct alignas( 16 ) cell_t { unsigned char bytes[16]; };
+	class block_t {
+		std::unique_ptr<cell_t[]> cells;
+		std::size_t length;
+	public:
+		// Default-initialized: the caller overwrites the complete range.
+		explicit block_t( std::size_t bytes ) : cells( new cell_t[( bytes + sizeof( cell_t ) - 1 ) / sizeof( cell_t )] ), length( bytes ) {}
+		const void *data() const { return cells.get(); }
+		void *data() { return cells.get(); }
+		std::size_t size() const { return length; }
+	};
+	using lease_t = std::shared_ptr<const block_t>;
+	struct result_t { lease_t lease; bool reused; };
+	static constexpr std::size_t maximumEntries = 32768;
+	static constexpr unsigned maximumRefusals = 256;
+private:
+	struct key_t {
+		const void *source;
+		std::size_t bytes;
+		bool operator==( const key_t &other ) const { return source == other.source && bytes == other.bytes; }
+	};
+	struct hash_t {
+		std::size_t operator()( const key_t &key ) const {
+			std::size_t hash = ( reinterpret_cast<std::uintptr_t>( key.source ) >> 4 ) ^ ( key.bytes * 0x9e3779b1u );
+			hash ^= hash >> 17;
+			hash *= 0xed5ad4bbu;
+			return hash ^ ( hash >> 11 );
+		}
+	};
+	struct entry_t {
+		lease_t lease;				// empty while the range is refused
+		std::list<key_t>::iterator recency;
+		unsigned refusals;			// acquisitions still to refuse
+		unsigned nextRefusals;		// length of the next refusal run
+	};
+	using map_t = std::unordered_map<key_t, entry_t, hash_t>;
+	map_t entries;
+	std::list<key_t> recency;		// front: most recently acquired
+	std::size_t residentBytes = 0;
+	const std::size_t budget;
+	void Erase( map_t::iterator found ) {
+		if ( found->second.lease ) residentBytes -= found->second.lease->size();
+		recency.erase( found->second.recency );
+		entries.erase( found );
+	}
+	static lease_t Own( const void *source, std::size_t bytes ) {
+		auto copy = std::make_shared<block_t>( bytes );
+		std::memcpy( copy->data(), source, bytes );
+		return copy;
+	}
+public:
+	explicit idFrameSnapshotRetainedStreams( std::size_t bytes = 128 * 1024 * 1024 ) : budget( bytes ) {}
+	void Clear() { entries.clear(); recency.clear(); residentBytes = 0; }
+	std::size_t Size() const { return entries.size(); }
+	std::size_t ResidentBytes() const { return residentBytes; }
+	result_t Acquire( const void *source, std::size_t bytes ) {
+		if ( source == nullptr || bytes == 0 || bytes > budget ) return {};
+		const key_t key{ source, bytes };
+		auto found = entries.find( key );
+		if ( found != entries.end() ) {
+			entry_t &entry = found->second;
+			recency.splice( recency.begin(), recency, entry.recency );
+			if ( entry.refusals > 0 ) {
+				--entry.refusals;
+				return {};
+			}
+			if ( entry.lease ) {
+				if ( std::memcmp( entry.lease->data(), source, bytes ) == 0 ) return { entry.lease, true };
+				// Rewritten in place. The submitted version stays with its leases.
+				residentBytes -= bytes;
+				entry.lease.reset();
+				entry.nextRefusals = entry.nextRefusals >= maximumRefusals / 2 ? maximumRefusals : entry.nextRefusals * 2;
+				entry.refusals = entry.nextRefusals - 1;	// this acquisition is the first
+				return {};
+			}
+			// The refusal run ended: take a new version. This entry holds no
+			// bytes and is the most recent, so pressure never evicts it here.
+			while ( residentBytes + bytes > budget ) Erase( entries.find( recency.back() ) );
+			entry.lease = Own( source, bytes );
+			residentBytes += bytes;
+			return { entry.lease, false };
+		}
+		// Bound both payload memory and bookkeeping for tiny ranges.
+		while ( !recency.empty() && ( residentBytes + bytes > budget || entries.size() >= maximumEntries ) ) {
+			Erase( entries.find( recency.back() ) );
+		}
+		recency.push_front( key );
+		const lease_t copy = Own( source, bytes );
+		entries.emplace( key, entry_t{ copy, recency.begin(), 0, 1 } );
+		residentBytes += bytes;
+		return { copy, false };
+	}
+};
 #endif

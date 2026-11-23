@@ -6028,6 +6028,7 @@ static bool R_TryFullVidRestartInternal( const renderWindowRequest_t *request, b
 		R_FreeDerivedData();
 		if ( frameData != NULL ) { R_ToggleSmpFrame(); R_ToggleSmpFrame(); }
 		vertexCache.PurgeAll();
+		R_ClearRetainedSnapshotStreams();
 		if ( !R_ImagePolicyBeforeTeardown( error, errorSize ) ) R_RejectRecoverableRendererRestart( error );
 		R_ShutdownDeviceForRestart();
 		tr.viewDef = NULL; tr.primaryView = NULL; backEnd.viewDef = NULL;
@@ -6247,6 +6248,8 @@ void R_VidRestart_f( const idCmdArgs &args ) {
 
 	// free the vertex caches so they will be regenerated again
 	vertexCache.PurgeAll();
+	// the overlap snapshot's retained versions were keyed by those caches
+	R_ClearRetainedSnapshotStreams();
 
 	if ( full ) {
 		R_PerformFullVidRestart( forceWindow );

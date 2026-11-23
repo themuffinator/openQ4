@@ -739,6 +739,7 @@ void R_SetBackEndFrameData( frameData_t *frame );
 void R_SnapshotRenderView( viewDef_t *view );
 void R_PrepareRenderFrameResources( const emptyCommand_t *commands );
 void R_RetireRenderSnapshots( frameData_t *frame );
+void R_ClearRetainedSnapshotStreams();
 
 
 //=======================================================================
@@ -2640,6 +2641,7 @@ int R_CountFrameData( void );
 void R_ToggleSmpFrame( void );
 void *R_FrameAlloc( int bytes );
 void *R_ClearedFrameAlloc( int bytes );
+bool R_FrameMemoryContains( const void *data );
 void R_FrameFree( void *data );
 
 // R_StaticAlloc/R_ClearedStaticAlloc/R_StaticFree live in the shared

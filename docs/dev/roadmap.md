@@ -1199,7 +1199,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-04 — Closed | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed; the picture is still at rest (#216). A temporally upscaled scene samples sharper texture mips (16-18% more detail at 50% scale, stability unchanged), and Vulkan corrects the NVIDIA driver's softer anisotropic filter, so its frames hold OpenGL's detail. | Human review of ghosting and disocclusion on the reference display and physical Linux/macOS/Android belong to platform qualification. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. | lavapipe residual, mods authored outside the laboratory, physical Linux/Apple fallback. |
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
-| REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
+| REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and the opt-in Vulkan render thread exist: stage 1 (tic overlap) and stage 2 (front-end overlap) with retained index and static vertex streams. 23 November, Windows x64 Vulkan: the per-frame join that had removed all overlap since 6 November is fixed; frozen Quality captures are bit-identical between modes 0, 1 and 2 on four single-player views and within the mode 0 floor in multiplayer; 100 resize/scale cycles and a restart per mode stay within the memory, handle, cache and Vulkan-allocation bounds with validation clean. | Matched benefit without tail regression: five quiet paired mode 0/1/2 runs and the every-frame Quality floor (shared-machine runs show mode 1 ahead of mode 0 and mode 2 behind it); snapshot cost reduction beyond copying; physical display/input qualification; Wayland/macOS runtime coverage. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 | REN-09 — Partial | Per-light shadowed scattering replaces the REN-06 leaf on GL and Vulkan: falloff/projection images, point, projected and cascaded-sun maps, stencil-light policy (none by default), composite before fog and translucents, status reporting, exact rollback; frozen outdoor/indoor captures pass under TAA and 4x MSAA. 23 November 2026: moving casters and a moving flashlight, temporal history, resolution scale and dynamic resolution, mirrors and remote cameras, a backend decline and VR stereo pass on GL and Vulkan; scratch targets are pooled by view size. Evidence: [volumetric lighting](volumetric-lighting.md). | Per-tier cost against FPS-01 on a quiet reference machine (a shared-machine ladder is recorded), the owner's visual review of the defaults (contact sheets captured, no default changed; 12 whites out the Tram 1 opening), and physical Linux/macOS/Android runs with the Apple GL 2.1 and GLES declines (PLAT). |
 | REN-10 — Closed | HBAO (`r_ssaoMethod 1`), GTAO (`2`) and a brute-force reference (`3`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. GTAO closer to the reference than SSAO with fewer halos, HBAO as close as SSAO; backend parity, exact rollback, cost at or near SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
@@ -1850,11 +1850,63 @@ diagnostics establish whole-frame ownership or production performance.
       2.90 to 5.23 ms amid competing workloads, so no timing gain is claimed.
       See [retention evidence](presentation-owners.md#retained-index-streams-4-november-2026).
 
-      **Still open:** quiet paired mode 0/1/2 measurements, further snapshot cost
-      reduction (including retained immutable vertex streams), the
-      every-frame Quality floor, physical display/input qualification and
-      Wayland/macOS runtime coverage. Do not promote the default from
-      shared-machine measurements.
+      **Retained vertex streams, overlap repair and qualification,
+      23 November.** Mode 2 now also retains the vertex-class streams of
+      static geometry (world areas and static models drawn through their own
+      triangle records): vertices, CPU vertex-cache bytes, shadow vertices and
+      the per-vertex and per-face tables. Posed, deformed, frame-allocated and
+      GPU-skinned geometry keeps its per-view copies. The classification only
+      selects candidates: every acquisition compares the complete range, a
+      range rewritten in place is refused for a doubling run of acquisitions,
+      leases survive replacement and eviction and release at retirement, and
+      the cache holds at most 128 MiB and 32,768 entries. `r_vkSnapshotRetain`
+      is now 0, 1 (index streams) or 2 (both, the default); cached versions are
+      dropped when the vertex caches are purged or a world is freed. Native
+      tests cover replacement, lifetime, eviction, refusal and stale reuse with
+      four new negative controls. Same-binary comparisons: copied bytes fall
+      from 6.86 to 2.65 MB/frame (61.4%). Elapsed snapshot time does not fall
+      (4.90 and 6.18 ms/frame on a shared machine): a stack sample attributes
+      the largest share of it, about 40%, to the validating comparison, so no
+      CPU gain is claimed.
+
+      Qualifying the modes found that modes 1 and 2 had not overlapped at all
+      since 6 November: the engine clears the VR frame on every frame, and
+      that call joined the render thread unconditionally. The join is removed
+      for an already clear frame and pinned by the contract test. With the
+      overlap restored, on Windows x64 Vulkan with a hidden window and
+      validation layers on:
+      - **Parity.** Frozen Quality captures (HUD hidden, temporal AA on) are
+        bit-identical between modes 0, 1 and 2 on four single-player views
+        (`airdefense1` twice, `hub2`, `medlabs`), as is the worker-drawn scene
+        readback. A multiplayer listen server cannot be frozen and stays
+        within the mode 0 frame-to-frame floor. Every measured window ran
+        entirely on the render thread with no early join; mode 2 started 24
+        to 149 of 150 front ends while the backend was still busy.
+      - **Bounds.** 100 window-resize and scene-scale cycles and a full
+        `vid_restart` per mode, with mode 0 as the control: private bytes grew
+        1.0% (mode 1) and 1.4% (mode 2) between the second and the last
+        20-cycle period, both below the control's 1.7%; handles and Vulkan
+        allocations stayed flat; the retained caches stayed under 6 MiB; no
+        validation message. A first run failed and is kept: dead entries
+        filled the vertex cache across restarts, which the purge-time drop
+        fixes.
+      - **Timing, shared machine (95% host CPU, five to six competing
+        clients).** Mode 1 beat mode 0 in all six paired windows (median of
+        window means 8.3 to 8.6 ms against 10.6 to 10.9 ms). Mode 2 was slower
+        in all six (11.6 to 13.0 ms), its snapshot costing 4.6 to 7.5 ms a
+        frame. Neither is budget evidence; `r_vkRenderThread` stays 0 and the
+        Quality floor is not claimed.
+
+      See [vertex retention](presentation-owners.md#retained-vertex-streams-23-november-2026)
+      and [qualification evidence](presentation-owners.md#overlap-repair-and-mode-qualification-23-november-2026).
+
+      **Still open:** quiet paired mode 0/1/2 measurements (five matched runs)
+      and the every-frame Quality floor; snapshot cost reduction beyond
+      copying (a sound version identity so unchanged streams are not re-read,
+      arena-backed per-view containers, frame-temporary index streams
+      churning the index cache at its entry cap); physical display/input
+      qualification and Wayland/macOS runtime coverage. Do not promote the
+      default from shared-machine measurements.
 - [x] **REN-08 — P1, qualification and targeted implementation: complete post-
   processing combinations.** Qualify motion blur independently of TAA: it has its
   own history, limited rigid-opaque object vectors and subview/time-gap resets;

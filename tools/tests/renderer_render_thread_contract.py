@@ -204,12 +204,25 @@ def check_console() -> None:
                   "an error off the main thread unwinds before touching main-thread state")
 
 
+def check_idle_entries() -> None:
+    # The engine clears the VR frame on every frame without a headset. An
+    # unconditional join there removed all overlap in modes 1 and 2 from
+    # 6 to 23 November; a real frame, or one releasing images, still joins.
+    vr = function_body(read(RENDERER / "RenderSystem_vr.cpp"), "void idRenderSystemLocal::SetVRFrame(")
+    require_order(vr, "if ( !vrFrame.active && ( frame == NULL || ( !frame->active && !frame->releaseImages ) ) ) {",
+                  'R_RenderThread_Sync( "vr frame" );',
+                  "clearing an already clear VR frame returns before the render-thread join")
+    require_order(vr, 'R_RenderThread_Sync( "vr frame" );', "memset( &vrFrame, 0, sizeof( vrFrame ) );",
+                  "a VR frame change still joins before the backend's frame state changes")
+
+
 def main() -> int:
     check_thread()
     check_frame()
     check_world()
     check_vulkan()
     check_console()
+    check_idle_entries()
     print("renderer_render_thread_contract: ok")
     return 0
 

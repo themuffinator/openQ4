@@ -1502,6 +1502,8 @@ idRenderWorldLocal::FreeWorld
 */
 void idRenderWorldLocal::FreeWorld() {
 	R_RenderThread_Sync( "world" );
+	// the overlap snapshot's retained versions describe this world's geometry
+	R_ClearRetainedSnapshotStreams();
 	int i;
 
 	// drop every memoized draw-surf area before the defs and portal areas the

@@ -58,7 +58,7 @@ void R_FreeDeferredTriSurfs(frameData_t* frame){
 struct idCmdArgs {};
 void R_FrameOwnershipSelfTest_f(const idCmdArgs&){}
 void R_FrameSnapshotStats_f(const idCmdArgs&){}
-void R_ClearRetainedSnapshotIndexes(){}
+void R_ClearRetainedSnapshotStreams(){}
 enum{CMD_FL_RENDERER=1};
 struct Cmd {void AddCommand(const char*,void(*)(const idCmdArgs&),int,const char*){}} cmdStorage,*cmdSystem=&cmdStorage;
 int R_CountFrameData(){return 0;}
