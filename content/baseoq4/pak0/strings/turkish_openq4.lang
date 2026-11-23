@@ -1951,4 +1951,12 @@
 	"#str_232824"	"%d saat kaldı"
 	"#str_232825"	"%d dakika kaldı"
 	"#str_232826"	"AYRINTILAR"
+	"#str_232830"	"Bağlantın koparsa döndüğünde takımını ve puanını korumak için şunu yaz: ghost "
+	"#str_232831"	"Tekrar hoş geldin: takımın ve puanın geri yüklendi."
+	"#str_232832"	"Bu dönüş kodu burada bilinmiyor ya da süresi doldu."
+	"#str_232833"	"Kullanım: ghost <kod>, katıldığında sunucunun söylediği altı harf"
+	"#str_232834"	"identityReset sana her sunucuda yeni bir kimlik verir: hiçbiri seni yeniden tanımaz, eski kimliğe bağlı yasaklar ve sıralamalar artık sana uygulanmaz. Bunu yapmak için identityReset confirm yaz."
+	"#str_232835"	"Kimliğin sıfırlandı: artık her sunucu seni yeni bir oyuncu olarak görüyor."
+	"#str_232836"	"Kimlik göndermiyorsun: ui_identity 0."
+	"#str_232837"	"Oyuncu kimliği"
 }

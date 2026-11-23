@@ -906,6 +906,59 @@ static void TestText( void ) {
 	}
 }
 
+// MP-17: bans on a player identity share the list and the file with address bans.
+static void TestIdentityBans( void ) {
+	char identity[ MP_MOD_IDENTITY_BYTES ];
+	CHECK( MPModParseIdentity( "id:00112233AABBCCDD", identity ) && std::string( identity ) == "00112233aabbccdd" );
+	CHECK( MPModParseIdentity( "00112233aabbccdd", identity ) );
+	CHECK( !MPModParseIdentity( "id:00112233aabbccd", identity ) );
+	CHECK( !MPModParseIdentity( "id:00112233aabbccdx", identity ) );
+	CHECK( !MPModParseIdentity( 0, identity ) );
+
+	mpModBanList_t list;
+	memset( &list, 0, sizeof( list ) );
+	const int address = MPModBanAdd( list, Address( "192.0.2.7" ), 32, 1000, 0, "Alice", "" );
+	const int byIdentity = MPModBanAddIdentity( list, "id:00112233aabbccdd", 1000, 600, "Alice", "cheating" );
+	CHECK( address == 0 && byIdentity == 1 && list.count == 2 );
+	CHECK( MPModBanIsIdentity( list.bans[ 1 ] ) && !MPModBanIsIdentity( list.bans[ 0 ] ) );
+	CHECK( MPModBanFindIdentity( list, "00112233aabbccdd", 1500 ) == 1 );
+	CHECK( MPModBanFindIdentity( list, "00112233aabbccdd", 1600 ) == -1 );		// expired
+	CHECK( MPModBanFindIdentity( list, "ffffffffffffffff", 1500 ) == -1 );
+	CHECK( MPModBanFindIdentity( list, "", 1500 ) == -1 );
+	// an identity ban covers no address, and an address ban no identity
+	mpModAddress_t none;
+	MPModClearAddress( none );
+	CHECK( MPModBanFind( list, Address( "192.0.2.7" ), 1500 ) == 0 );
+	CHECK( MPModBanFind( list, none, 1500 ) == -1 );
+	CHECK( MPModBanFindRange( list, none, 0 ) == -1 );
+	// banning the same identity again replaces the row
+	CHECK( MPModBanAddIdentity( list, "00112233AABBCCDD", 2000, 0, "Alice2", "again" ) == 1 && list.count == 2 );
+	CHECK( list.bans[ 1 ].expires == 0 && std::string( list.bans[ 1 ].name ) == "Alice2" );
+	CHECK( MPModBanAddIdentity( list, "not an identity", 2000, 0, "", "" ) == -1 );
+
+	char target[ MP_MOD_RANGE_TEXT_BYTES ];
+	MPModBanTarget( list.bans[ 1 ], target, sizeof( target ) );
+	CHECK( std::string( target ) == "id:00112233aabbccdd" );
+	MPModBanTarget( list.bans[ 0 ], target, sizeof( target ) );
+	CHECK( std::string( target ) == "192.0.2.7/32" );
+	CHECK( MPModBanFindTarget( list, "id:00112233aabbccdd" ) == 1 );
+	CHECK( MPModBanFindTarget( list, "id:00112233aabbccde" ) == -1 );
+	CHECK( MPModBanFindTarget( list, "192.0.2.7" ) == 0 );
+	CHECK( MPModBanFindTarget( list, "id:garbage" ) == -1 );
+
+	// the file line round-trips, and an older build's reader skips it
+	char line[ MP_MOD_LINE_BYTES ];
+	CHECK( MPModBanFormatLine( list.bans[ 1 ], line, sizeof( line ) ) > 0 );
+	CHECK( std::string( line ) == "ban identity 00112233aabbccdd 2000 0 \"Alice2\" \"again\"" );
+	mpModBan_t read;
+	CHECK( MPModBanParseLine( line, read ) && MPModBanIsIdentity( read ) && std::string( read.identity ) == "00112233aabbccdd" &&
+		read.created == 2000 && read.expires == 0 && std::string( read.reason ) == "again" );
+	CHECK( !MPModBanParseLine( "ban identity id:00112233aabbccdd 2000 0", read ) );
+	CHECK( !MPModBanParseLine( "ban identity 00112233aabbcc 2000 0", read ) );
+	CHECK( !MPModBanParseLine( "ban mystery 00112233aabbccdd 2000 0", read ) );
+	CHECK( MPModBanParseLine( "ban address 192.0.2.0/24 1 0", read ) && !MPModBanIsIdentity( read ) );
+}
+
 int main( void ) {
 	TestAddresses();
 	TestDurations();
@@ -919,6 +972,7 @@ int main( void ) {
 	TestNames();
 	TestLog();
 	TestAdmins();
+	TestIdentityBans();
 	if ( failures != 0 ) {
 		std::printf( "%d moderation core check(s) failed\n", failures );
 		return 1;

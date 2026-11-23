@@ -60,6 +60,35 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   start and a menu start. The packaged fix is qualified on the next candidate,
   recorded in [release qualification](release-qualification.md).
 
+## Servers recognise returning players; identity bans, rankings and your match history, 23 November 2026
+
+- **A dropped connection costs you nothing.** Leave a casual match and come
+  back within five minutes, and you get your team and score back. Your game
+  proves to each server that you are the same player as before, with a key
+  that never leaves your computer and is different for every server, so no
+  two servers can tell they have seen the same player. Nothing is uploaded and
+  there is no account.
+- **No identity?** Turn **Player Identity** off in Player Setup (or set
+  `ui_identity 0`) and your game sends none. The server then tells you a
+  six-letter code; type `ghost <code>` when you come back.
+- **Bans that follow the player.** Banning a player now also bans their
+  identity, so a new address alone does not bring them back. `status` shows
+  identities, and `ban id:<identity>` and `unban id:<identity>` take one.
+- **Rankings, if the server wants them.** `g_ranking 1` keeps a local Elo
+  table by game type, updated when each casual match ends; `rankings` lists it.
+- **Your history.** Your game keeps a line for every match you finish in
+  `profile/history.ndjson`; `history` shows the last ten.
+- **Starting over.** `identityReset confirm` makes you a new player on every
+  server.
+- **Compatibility.** Players and servers on 0.15.0 neither send nor ask for
+  identities and play as before.
+- **Evidence.** `mp_identity.py` runs Ed25519 signing against RFC 8032's
+  vectors and the identity core's native test, and pins the wiring;
+  `mp_identity_smoke.py` qualifies identities, a returning player on both
+  paths, rankings, history, identity bans and `identityReset` on a pure
+  dedicated server with three hidden clients (Windows). Not run: Linux,
+  macOS, IPv6 and a person playing.
+
 ## Votes for modifiers, arenas, presets and spectator chat; ban lengths and reasons, 23 November 2026
 
 - **Vote on how the match plays.** `callvote quadhog 1` (or `vampiric`,

@@ -352,6 +352,31 @@ On **Create Server → Rules** they are **Item Timers**, **Highlight Limit** (Of
 no limit) and **Allow Forced Models**.
 See [Multiplayer Client Options](multiplayer-client-options.md#for-server-operators).
 
+## Identities, returning players and rankings
+
+> **After 0.15.0.** This describes the development build.
+
+Players' games prove an identity to your server when they join (see
+[Your identity](multiplayer.md#your-identity-and-coming-back-after-a-dropped-connection)).
+Your server keeps its own random id in `identity_server.txt` in its save
+folder; keep that file to keep your players' identities across restarts and
+moves.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `g_identity` | `1` | Ask each player whose game offers one for their identity. `status` shows it and `ban id:<identity>` bans it |
+| `g_reconnectRestore` | `300` | Seconds a player who leaves a casual match keeps their team and score for their return, by identity or by the six-letter ghost code the server told them. `0` forgets them at once |
+| `g_ranking` | `0` | Keep a local ranking table in `ranking.txt`: an Elo rating for each identity and game type, updated when a casual match ends |
+
+**Rankings.** With `g_ranking 1`, the end of every casual match rates the
+players who proved an identity: in team modes each against the other team's
+average, in free-for-all modes every player against every other by score. A
+player's first twenty rated matches count more (K 48, then 32). Tourney and
+matches with fewer than two rated players (one a side in team modes) are not
+rated. `rankings [game type]` lists the table, best first. The file is written
+whole each time; a file this build cannot read is left as it is and not
+updated.
+
 ## Maps, rotation and the map queue
 
 **New in 0.15.0.** openQ4 keeps one list of the multiplayer maps your server
@@ -489,6 +514,11 @@ the [competitive matches guide](competitive-matches.md). While one runs, the
 queue and the pick are off and a map's `set` lines are not applied.
 
 ## Console commands
+
+The identity commands (after 0.15.0): `identity` (your identity on this
+server), `identityReset confirm`, `ghost <code>`, `history` (on a player's
+game) and `rankings [game type]` (on the server).
+
 
 | Command | What it does |
 |---|---|

@@ -1951,4 +1951,12 @@
 	"#str_232824"	"faltam %d horas"
 	"#str_232825"	"faltam %d minutos"
 	"#str_232826"	"DETALHES"
+	"#str_232830"	"Se perder a conexão, digite isto ao voltar para manter sua equipe e pontuação: ghost "
+	"#str_232831"	"Bem-vindo de volta: sua equipe e pontuação foram restauradas."
+	"#str_232832"	"Esse código de retorno não é conhecido aqui ou expirou."
+	"#str_232833"	"Uso: ghost <código>, as seis letras que o servidor informou quando você entrou"
+	"#str_232834"	"identityReset dá a você uma nova identidade em todos os servidores: nenhum deles o reconhecerá de novo, e banimentos e classificações ligados à identidade antiga deixam de se aplicar. Digite identityReset confirm para fazê-lo."
+	"#str_232835"	"Sua identidade foi redefinida: todos os servidores agora o veem como um novo jogador."
+	"#str_232836"	"Você não envia identidade: ui_identity é 0."
+	"#str_232837"	"Identidade do jogador"
 }

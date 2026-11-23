@@ -1951,4 +1951,12 @@
 	"#str_232824"	"noch %d Stunden"
 	"#str_232825"	"noch %d Minuten"
 	"#str_232826"	"DETAILS"
+	"#str_232830"	"Falls die Verbindung abreißt, gib nach der Rückkehr dies ein, um Team und Punkte zu behalten: ghost "
+	"#str_232831"	"Willkommen zurück: Team und Punkte sind wiederhergestellt."
+	"#str_232832"	"Dieser Rückkehrcode ist hier unbekannt oder abgelaufen."
+	"#str_232833"	"Verwendung: ghost <Code>, die sechs Buchstaben, die der Server dir beim Beitritt genannt hat"
+	"#str_232834"	"identityReset gibt dir auf jedem Server eine neue Identität: Keiner erkennt dich wieder, und Sperren und Ranglisten der alten Identität gelten nicht mehr für dich. Gib identityReset confirm ein, um es zu tun."
+	"#str_232835"	"Deine Identität wurde zurückgesetzt: Jeder Server sieht dich jetzt als neuen Spieler."
+	"#str_232836"	"Du sendest keine Identität: ui_identity ist 0."
+	"#str_232837"	"Spieleridentität"
 }

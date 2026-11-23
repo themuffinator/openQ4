@@ -11196,6 +11196,8 @@ void Session_DeclareMultiplayerMenuGameCVars( void ) {
 		{ "si_maxBrightskin",		"1",	CVAR_FLOAT | CVAR_SERVERINFO },
 		{ "si_forcedModels",		"1",	CVAR_BOOL | CVAR_SERVERINFO },
 		{ "ui_weaponOrder",			"",		CVAR_USERINFO },
+		// MP-17: Player Setup's Player Identity, on unless the player turns it off
+		{ "ui_identity",			"1",	CVAR_BOOL | CVAR_USERINFO },
 		{ "g_inactivity",			"0",	CVAR_INTEGER },
 		{ "hud_hitSound",			"1",	CVAR_INTEGER },
 		{ "hud_crosshairAmmo",		"0",	CVAR_BOOL },

@@ -1951,4 +1951,12 @@
 	"#str_232824"	"%d hours left"
 	"#str_232825"	"%d minutes left"
 	"#str_232826"	"DETAILS"
+	"#str_232830"	"If you lose your connection, type this when you return to keep your team and score: ghost "
+	"#str_232831"	"Welcome back: your team and score are restored."
+	"#str_232832"	"That return code is not known here, or it has expired."
+	"#str_232833"	"Usage: ghost <code>, the six letters the server told you when you joined"
+	"#str_232834"	"identityReset gives you a new identity on every server: none of them will recognise you again, and bans and rankings tied to your old identity no longer apply to you. Type identityReset confirm to do it."
+	"#str_232835"	"Your identity was reset: every server now sees you as a new player."
+	"#str_232836"	"You send no identity: ui_identity is 0."
+	"#str_232837"	"Player Identity"
 }

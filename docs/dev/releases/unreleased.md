@@ -511,6 +511,15 @@ the [development roadmap](../roadmap.md) for current scope.
 
 - The Windows symbols download now includes the OpenGL and Vulkan renderer
   modules and the updater, so crash reports from them can be read.
+- Servers recognise a returning player. Your game proves to each server that
+  you are the same player as before, with a key kept only on your computer and
+  different for every server; leave a casual match and return within five
+  minutes and your team and score come back (`ghost <code>` does it without an
+  identity). Bans also cover the player's identity, `status` shows it, a
+  server may keep a local ranking table (`g_ranking 1`, `rankings`), and your
+  game keeps your match history (`history`). Turn it off with Player Setup's
+  **Player Identity**. See
+  [Your identity](../../user/multiplayer.md#your-identity-and-coming-back-after-a-dropped-connection).
 - Multiplayer-only settings are kept between sessions. Field of view, the
   HUD's damage numbers, speedometer, input display, item timers, hit sound and
   other multiplayer options, and the Create Server bot and server options, were

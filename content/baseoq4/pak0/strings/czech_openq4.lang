@@ -1951,4 +1951,12 @@
 	"#str_232824"	"zbývá %d hodin"
 	"#str_232825"	"zbývá %d minut"
 	"#str_232826"	"PODROBNOSTI"
+	"#str_232830"	"Pokud ztratíte spojení, po návratu napište toto a zachováte si tým a skóre: ghost "
+	"#str_232831"	"Vítejte zpět: váš tým a skóre jsou obnoveny."
+	"#str_232832"	"Tento kód návratu zde není znám nebo vypršel."
+	"#str_232833"	"Použití: ghost <kód>, šest písmen, které vám server sdělil při připojení"
+	"#str_232834"	"identityReset vám dá novou identitu na každém serveru: žádný vás už nepozná a zákazy i žebříčky vázané na starou identitu se na vás nevztahují. Napište identityReset confirm."
+	"#str_232835"	"Vaše identita byla obnovena: každý server vás nyní vidí jako nového hráče."
+	"#str_232836"	"Neposíláte žádnou identitu: ui_identity je 0."
+	"#str_232837"	"Identita hráče"
 }

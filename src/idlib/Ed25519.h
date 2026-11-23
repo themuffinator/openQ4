@@ -21,6 +21,7 @@ version.
 namespace idCrypto {
 
 static constexpr std::size_t SHA512_DIGEST_BYTES = 64;
+static constexpr std::size_t ED25519_SEED_BYTES = 32;
 static constexpr std::size_t ED25519_PUBLIC_KEY_BYTES = 32;
 static constexpr std::size_t ED25519_SIGNATURE_BYTES = 64;
 
@@ -30,13 +31,26 @@ void SHA512( const void *data, std::size_t dataBytes,
 
 // RFC 8032 Ed25519 (pure, no context) verification. Rejects a signature whose
 // scalar is not reduced (S >= L) and a public key that does not decode to a
-// curve point. Verification only: openQ4 never holds a signing key, so there
-// is no secret data here and no constant-time requirement beyond the final
-// comparison. The arithmetic follows TweetNaCl (Bernstein, van Gastel,
+// curve point. The updater verifies with it; the release signing key is never
+// held by openQ4. The arithmetic follows TweetNaCl (Bernstein, van Gastel,
 // Janssen, Lange, Schwabe, Smetsers; public domain).
 bool Ed25519Verify( const std::uint8_t signature[ ED25519_SIGNATURE_BYTES ],
 	const void *message, std::size_t messageBytes,
 	const std::uint8_t publicKey[ ED25519_PUBLIC_KEY_BYTES ] );
+
+// RFC 8032 Ed25519 key derivation and signing from a 32-byte seed (the RFC's
+// private key). openQ4 signs only with a player's own identity key (roadmap
+// MP-17), derived on the player's machine and never sent. The scalar
+// multiplication runs the same ladder whatever the key's bits, through
+// mask-selected swaps, and the secret intermediates are wiped before return.
+void Ed25519PublicKey( const std::uint8_t seed[ ED25519_SEED_BYTES ],
+	std::uint8_t publicKey[ ED25519_PUBLIC_KEY_BYTES ] );
+void Ed25519Sign( std::uint8_t signature[ ED25519_SIGNATURE_BYTES ],
+	const void *message, std::size_t messageBytes,
+	const std::uint8_t seed[ ED25519_SEED_BYTES ] );
+
+// Overwrites secret bytes in a way the optimizer may not remove.
+void SecureWipe( void *data, std::size_t bytes );
 
 } // namespace idCrypto
 

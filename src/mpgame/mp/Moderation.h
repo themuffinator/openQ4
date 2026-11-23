@@ -16,8 +16,9 @@
 //   - the name policy: control characters, length, reserved names
 //   - the NDJSON lines of the admin log
 //
-// Identity bans wait for MP-17; a ban line names its kind so they can join the
-// same file. tools/tests/native/MpModerationTest.cpp compiles this alone.
+// A ban line names its kind: an address range, or (MP-17) a player identity,
+// the sixteen hex digits of the key that player holds on this server.
+// tools/tests/native/MpModerationTest.cpp compiles this alone.
 //----------------------------------------------------------------
 
 #ifndef __GAME_MP_MODERATION_H__
@@ -39,6 +40,8 @@ typedef long long mpModTime_t;		// seconds since 1970-01-01 UTC
 static const int MP_MOD_NAME_BYTES = 64;
 static const int MP_MOD_REASON_BYTES = 128;
 static const int MP_MOD_RANGE_TEXT_BYTES = 64;		// "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128"
+static const int MP_MOD_IDENTITY_BYTES = 17;		// MP-17: an identity's sixteen hex digits
+#define MP_MOD_IDENTITY_PREFIX	"id:"				// how commands and menus write one: "id:00112233aabbccdd"
 static const int MP_MOD_MAX_BANS = 512;
 static const int MP_MOD_MAX_MUTES = 64;
 static const int MP_MOD_LINE_BYTES = 512;
@@ -808,6 +811,7 @@ typedef struct mpModBan_s {
 	mpModTime_t		expires;		// 0 never
 	char			name[ MP_MOD_NAME_BYTES ];		// who it was when banned; a label, never matched
 	char			reason[ MP_MOD_REASON_BYTES ];
+	char			identity[ MP_MOD_IDENTITY_BYTES ];	// MP-17: an identity ban; its address is empty (family 0)
 	mpModTime_t		refusedLogged;	// not in the file: when a connection this ban refused was last put in the log
 } mpModBan_t;
 
@@ -818,6 +822,55 @@ typedef struct mpModBanList_s {
 
 inline bool MPModBanExpired( const mpModBan_t &ban, mpModTime_t now ) {
 	return ban.expires != 0 && ban.expires <= now;
+}
+
+// MP-17: "id:" in front of an identity. (idlib forbids strncmp in the game.)
+inline bool MPModHasIdentityPrefix( const char *text ) {
+	return text != 0 && text[ 0 ] == 'i' && text[ 1 ] == 'd' && text[ 2 ] == ':';
+}
+
+// MP-17: a ban on a player identity rather than an address range.
+inline bool MPModBanIsIdentity( const mpModBan_t &ban ) {
+	return ban.address.family == 0 && ban.identity[ 0 ] != '\0';
+}
+
+// Sixteen hex digits, with or without "id:" in front; read back in lower case.
+inline bool MPModParseIdentity( const char *text, char out[ MP_MOD_IDENTITY_BYTES ] ) {
+	if ( text == 0 ) {
+		return false;
+	}
+	if ( MPModHasIdentityPrefix( text ) ) {
+		text += sizeof( MP_MOD_IDENTITY_PREFIX ) - 1;
+	}
+	if ( strlen( text ) != MP_MOD_IDENTITY_BYTES - 1 ) {
+		return false;
+	}
+	for ( int i = 0; i < MP_MOD_IDENTITY_BYTES - 1; i++ ) {
+		char c = text[ i ];
+		if ( c >= 'A' && c <= 'F' ) {
+			c = static_cast<char>( c - 'A' + 'a' );
+		}
+		if ( !( ( c >= '0' && c <= '9' ) || ( c >= 'a' && c <= 'f' ) ) ) {
+			return false;
+		}
+		out[ i ] = c;
+	}
+	out[ MP_MOD_IDENTITY_BYTES - 1 ] = '\0';
+	return true;
+}
+
+// The identity ban in force for this identity, or -1.
+inline int MPModBanFindIdentity( const mpModBanList_t &list, const char *identity, mpModTime_t now ) {
+	if ( identity == 0 || identity[ 0 ] == '\0' ) {
+		return -1;
+	}
+	for ( int i = 0; i < list.count; i++ ) {
+		const mpModBan_t &ban = list.bans[ i ];
+		if ( MPModBanIsIdentity( ban ) && !MPModBanExpired( ban, now ) && strcmp( ban.identity, identity ) == 0 ) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 // The first ban in force that covers the address, or -1.
@@ -836,7 +889,7 @@ inline int MPModBanFindRange( const mpModBanList_t &list, const mpModAddress_t &
 	MPModMaskAddress( masked, prefixBits );
 	for ( int i = 0; i < list.count; i++ ) {
 		const mpModBan_t &ban = list.bans[ i ];
-		if ( ban.prefixBits == prefixBits && ban.address.family == masked.family &&
+		if ( masked.family != 0 && ban.prefixBits == prefixBits && ban.address.family == masked.family &&
 			memcmp( ban.address.bytes, masked.bytes, sizeof( masked.bytes ) ) == 0 ) {
 			return i;
 		}
@@ -899,13 +952,88 @@ inline int MPModBanAdd( mpModBanList_t &list, const mpModAddress_t &address, int
 	return index;
 }
 
+// MP-17: adds an identity ban, or replaces the one already on that identity.
+// Returns its index, or -1 for no identity or a list full of bans in force.
+inline int MPModBanAddIdentity( mpModBanList_t &list, const char *identity, mpModTime_t now,
+		mpModTime_t durationSeconds, const char *name, const char *reason ) {
+	char canonical[ MP_MOD_IDENTITY_BYTES ];
+	if ( !MPModParseIdentity( identity, canonical ) ) {
+		return -1;
+	}
+	int index = -1;
+	for ( int i = 0; i < list.count && index < 0; i++ ) {
+		if ( MPModBanIsIdentity( list.bans[ i ] ) && strcmp( list.bans[ i ].identity, canonical ) == 0 ) {
+			index = i;
+		}
+	}
+	if ( index < 0 ) {
+		if ( list.count >= MP_MOD_MAX_BANS ) {
+			MPModBanPurgeExpired( list, now );
+		}
+		if ( list.count >= MP_MOD_MAX_BANS ) {
+			return -1;
+		}
+		index = list.count++;
+	}
+	mpModBan_t &ban = list.bans[ index ];
+	memset( &ban, 0, sizeof( ban ) );
+	memcpy( ban.identity, canonical, sizeof( canonical ) );
+	ban.created = now;
+	if ( durationSeconds > MP_MOD_MAX_DURATION_SECONDS ) {
+		durationSeconds = MP_MOD_MAX_DURATION_SECONDS;
+	}
+	ban.expires = durationSeconds > 0 ? now + durationSeconds : 0;
+	MPModCopyText( ban.name, sizeof( ban.name ), name );
+	MPModCopyText( ban.reason, sizeof( ban.reason ), reason );
+	return index;
+}
+
+// What a ban covers, as the commands and menus write it: "id:<identity>" or
+// the range.
+inline void MPModBanTarget( const mpModBan_t &ban, char *out, int outSize ) {
+	if ( MPModBanIsIdentity( ban ) ) {
+		MPModPrintf( out, outSize, "%s%s", MP_MOD_IDENTITY_PREFIX, ban.identity );
+	} else {
+		MPModFormatRange( ban.address, ban.prefixBits, out, outSize );
+	}
+}
+
+// The row of the ban on exactly this target, as the commands and menus write
+// one: "id:<identity>", or an address and prefix. -1 for none.
+inline int MPModBanFindTarget( const mpModBanList_t &list, const char *text ) {
+	char identity[ MP_MOD_IDENTITY_BYTES ];
+	if ( text != 0 && MPModHasIdentityPrefix( text ) ) {
+		if ( !MPModParseIdentity( text, identity ) ) {
+			return -1;
+		}
+		for ( int i = 0; i < list.count; i++ ) {
+			if ( MPModBanIsIdentity( list.bans[ i ] ) && strcmp( list.bans[ i ].identity, identity ) == 0 ) {
+				return i;
+			}
+		}
+		return -1;
+	}
+	mpModAddress_t address;
+	int prefixBits = 0;
+	if ( text == 0 || !MPModParseAddress( text, address, prefixBits ) ) {
+		return -1;
+	}
+	return MPModBanFindRange( list, address, prefixBits );
+}
+
 // One ban as a line of the file, without the line end:
 //   ban address 192.0.2.0/24 1795000000 0 "name" "reason"
+//   ban identity 00112233aabbccdd 1795000000 0 "name" "reason"
 // Returns the length, or 0 when it does not fit.
 inline int MPModBanFormatLine( const mpModBan_t &ban, char *out, int outSize ) {
 	char range[ MP_MOD_RANGE_TEXT_BYTES ];
-	MPModFormatRange( ban.address, ban.prefixBits, range, sizeof( range ) );
-	int length = MPModPrintf( out, outSize, "ban address %s %lld %lld ", range, ban.created, ban.expires );
+	int length = 0;
+	if ( MPModBanIsIdentity( ban ) ) {
+		length = MPModPrintf( out, outSize, "ban identity %s %lld %lld ", ban.identity, ban.created, ban.expires );
+	} else {
+		MPModFormatRange( ban.address, ban.prefixBits, range, sizeof( range ) );
+		length = MPModPrintf( out, outSize, "ban address %s %lld %lld ", range, ban.created, ban.expires );
+	}
 	if ( length <= 0 || length >= outSize ) {
 		return 0;
 	}
@@ -997,14 +1125,25 @@ inline bool MPModBanParseLine( const char *line, mpModBan_t &ban ) {
 		return false;
 	}
 	at = MPModReadToken( at, token, sizeof( token ) );
-	if ( at == 0 || strcmp( token, "address" ) != 0 ) {
+	if ( at == 0 ) {
 		return false;
 	}
-	at = MPModReadToken( at, token, sizeof( token ) );
-	if ( at == 0 || !MPModParseAddress( token, ban.address, ban.prefixBits ) || !MPModRangeIsAllowed( ban.address, ban.prefixBits ) ) {
+	if ( strcmp( token, "identity" ) == 0 ) {
+		// MP-17: the identity is written bare, sixteen lower-case hex digits
+		at = MPModReadToken( at, token, sizeof( token ) );
+		if ( at == 0 || MPModHasIdentityPrefix( token ) ||
+			!MPModParseIdentity( token, ban.identity ) ) {
+			return false;
+		}
+	} else if ( strcmp( token, "address" ) == 0 ) {
+		at = MPModReadToken( at, token, sizeof( token ) );
+		if ( at == 0 || !MPModParseAddress( token, ban.address, ban.prefixBits ) || !MPModRangeIsAllowed( ban.address, ban.prefixBits ) ) {
+			return false;
+		}
+		MPModMaskAddress( ban.address, ban.prefixBits );
+	} else {
 		return false;
 	}
-	MPModMaskAddress( ban.address, ban.prefixBits );
 	at = MPModReadToken( at, token, sizeof( token ) );
 	if ( at == 0 || !MPModParseTime( token, ban.created ) ) {
 		return false;

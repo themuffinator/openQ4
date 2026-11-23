@@ -346,6 +346,7 @@ typedef struct mpChatLine_s {
 // openQ4 MP-18: a ban as the menus read it. Quake 4 kept a GUID here that no
 // client sends; guid is now the banned range ("192.0.2.0/24").
 #include "mp/Moderation.h"
+#include "mp/Identity.h"
 typedef struct mpBanInfo_s {
 	char			name[ MP_MOD_NAME_BYTES ];
 	char			guid[ MP_MOD_RANGE_TEXT_BYTES ];
@@ -1041,7 +1042,53 @@ public:
 // RITUAL END
 	static const char*	teamNames[ TEAM_MAX ];
 
+	// openQ4 MP-17: player identity, reconnect restoration, the local ranking
+	// table and the player's match history (mp/Identity.h, mp/IdentityHost.cpp).
+	void			IdentityServerInit( void );
+	void			IdentityClientConnect( int clientNum );
+	void			IdentityClientBegin( int clientNum, bool isBot );
+	void			IdentityUserInfoChanged( int clientNum );
+	void			IdentityClientDisconnect( int clientNum );
+	void			IdentityServerFrame( void );
+	void			IdentityNewMatch( void );
+	void			IdentityMatchEnded( void );
+	void			ServerReceiveIdentity( int clientNum, const idBitMsg &msg );
+	void			ClientReceiveIdentityChallenge( const idBitMsg &msg );
+	const char *	ClientIdentity( int clientNum ) const;	// sixteen hex digits, or "" when none was proved
+	bool			IdentityRankingEnabled( void ) const;
+	void			IdentityRecordHistory( void );		// the client's side: this match in its own history
+	static void		IdentityReset_f( const idCmdArgs &args );
+	static void		Identity_f( const idCmdArgs &args );
+	static void		Ghost_f( const idCmdArgs &args );
+	static void		Rankings_f( const idCmdArgs &args );
+	static void		History_f( const idCmdArgs &args );
+
 private:
+	// MP-17, the server's side
+	unsigned char	identityServerId[ MP_ID_SERVER_ID_BYTES ];
+	bool			identityServerIdReady = false;
+	unsigned char	identityNonce[ MAX_CLIENTS ][ MP_ID_NONCE_BYTES ];
+	bool			identityPending[ MAX_CLIENTS ];
+	int				identityChallengeTime[ MAX_CLIENTS ];
+	char			identityFingerprint[ MAX_CLIENTS ][ MP_ID_FINGERPRINT_TEXT_BYTES ];
+	char			identityGhost[ MAX_CLIENTS ][ MP_ID_GHOST_CODE_LENGTH + 1 ];
+	bool			identityGhostTold[ MAX_CLIENTS ];
+	bool			identityRestored[ MAX_CLIENTS ];
+	bool			identityBegun[ MAX_CLIENTS ];		// the connection has the map
+	bool			identityAsked[ MAX_CLIENTS ];		// and was challenged: once a connection
+	mpIdReturnStore_t identityReturns;
+	int				identityMatchStamp = 1;
+	bool			identityMatchRated = false;
+	void			IdentityProved( int clientNum, const char *fingerprint );
+	void			IdentityTellGhost( int clientNum );
+	void			IdentitySendChallenge( int clientNum );
+	void			IdentityWriteChallenge( int clientNum );
+	int				identityChallengeSends[ MAX_CLIENTS ];
+	bool			IdentityRestore( int clientNum, const char *fingerprint, const char *ghost );
+	bool			IdentityCasual( void ) const;
+	// MP-17, the client's side
+	bool			IdentityLoadSeed( unsigned char seed[ MP_ID_SEED_BYTES ], bool create );
+
 	mpModifierState_t	modifiers;			// the modifier switches as latched by SetGameType
 	bool			modifierRestartPending;	// a restart is queued to latch new modifier switches
 	bool			modifierPublishPending;	// si_modifiers changed and the server info has not been rescanned

@@ -480,4 +480,99 @@ bool Ed25519Verify( const std::uint8_t signature[ ED25519_SIGNATURE_BYTES ],
 	return Equal32( signature, encoded );
 }
 
+void SecureWipe( void *data, std::size_t bytes ) {
+	volatile std::uint8_t *cursor = static_cast<volatile std::uint8_t *>( data );
+	while ( bytes-- != 0 ) {
+		*cursor++ = 0;
+	}
+}
+
+namespace {
+
+// The secret scalar and the nonce prefix: SHA-512 of the seed, its first half
+// clamped (RFC 8032 section 5.1.5).
+static void ExpandSeed( std::uint8_t expanded[ SHA512_DIGEST_BYTES ], const std::uint8_t seed[ ED25519_SEED_BYTES ] ) {
+	SHA512( seed, ED25519_SEED_BYTES, expanded );
+	expanded[ 0 ] &= 248;
+	expanded[ 31 ] &= 127;
+	expanded[ 31 ] |= 64;
+}
+
+static void PublicKeyFromExpanded( std::uint8_t publicKey[ ED25519_PUBLIC_KEY_BYTES ], const std::uint8_t expanded[ SHA512_DIGEST_BYTES ] ) {
+	gf p[ 4 ];
+	ScalarMultiplyBase( p, expanded );
+	PointPack( publicKey, p );
+	SecureWipe( p, sizeof( p ) );
+}
+
+// SHA-512 of the parts, reduced modulo L.
+static void HashModOrder( std::uint8_t out[ 32 ], const std::uint8_t *first, std::size_t firstBytes,
+		const std::uint8_t *second, std::size_t secondBytes, const void *message, std::size_t messageBytes ) {
+	std::vector<std::uint8_t> hashed( firstBytes + secondBytes + messageBytes );
+	if ( firstBytes != 0 ) {
+		std::memcpy( hashed.data(), first, firstBytes );
+	}
+	if ( secondBytes != 0 ) {
+		std::memcpy( hashed.data() + firstBytes, second, secondBytes );
+	}
+	if ( messageBytes != 0 ) {
+		std::memcpy( hashed.data() + firstBytes + secondBytes, message, messageBytes );
+	}
+	std::uint8_t digest[ SHA512_DIGEST_BYTES ];
+	SHA512( hashed.data(), hashed.size(), digest );
+	SecureWipe( hashed.data(), hashed.size() );
+	std::int64_t wide[ 64 ];
+	for ( int i = 0; i < 64; ++i ) {
+		wide[ i ] = digest[ i ];
+	}
+	ReduceModOrder( out, wide );
+	SecureWipe( digest, sizeof( digest ) );
+	SecureWipe( wide, sizeof( wide ) );
+}
+
+} // namespace
+
+void Ed25519PublicKey( const std::uint8_t seed[ ED25519_SEED_BYTES ],
+		std::uint8_t publicKey[ ED25519_PUBLIC_KEY_BYTES ] ) {
+	std::uint8_t expanded[ SHA512_DIGEST_BYTES ];
+	ExpandSeed( expanded, seed );
+	PublicKeyFromExpanded( publicKey, expanded );
+	SecureWipe( expanded, sizeof( expanded ) );
+}
+
+void Ed25519Sign( std::uint8_t signature[ ED25519_SIGNATURE_BYTES ],
+		const void *message, std::size_t messageBytes,
+		const std::uint8_t seed[ ED25519_SEED_BYTES ] ) {
+	std::uint8_t expanded[ SHA512_DIGEST_BYTES ];
+	std::uint8_t publicKey[ ED25519_PUBLIC_KEY_BYTES ];
+	ExpandSeed( expanded, seed );
+	PublicKeyFromExpanded( publicKey, expanded );
+
+	// r = SHA-512( prefix || M ) mod L; R = [r]B
+	std::uint8_t r[ 32 ];
+	HashModOrder( r, expanded + 32, 32, nullptr, 0, message, messageBytes );
+	gf p[ 4 ];
+	ScalarMultiplyBase( p, r );
+	PointPack( signature, p );
+
+	// h = SHA-512( R || A || M ) mod L; S = ( r + h * a ) mod L
+	std::uint8_t h[ 32 ];
+	HashModOrder( h, signature, 32, publicKey, ED25519_PUBLIC_KEY_BYTES, message, messageBytes );
+	std::int64_t x[ 64 ] = { 0 };
+	for ( int i = 0; i < 32; ++i ) {
+		x[ i ] = r[ i ];
+	}
+	for ( int i = 0; i < 32; ++i ) {
+		for ( int j = 0; j < 32; ++j ) {
+			x[ i + j ] += std::int64_t( h[ i ] ) * expanded[ j ];
+		}
+	}
+	ReduceModOrder( signature + 32, x );
+
+	SecureWipe( expanded, sizeof( expanded ) );
+	SecureWipe( r, sizeof( r ) );
+	SecureWipe( p, sizeof( p ) );
+	SecureWipe( x, sizeof( x ) );
+}
+
 } // namespace idCrypto

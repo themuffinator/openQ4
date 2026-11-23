@@ -1960,4 +1960,12 @@
 	"#str_232824"	"%d ore rimaste"
 	"#str_232825"	"%d minuti rimasti"
 	"#str_232826"	"DETTAGLI"
+	"#str_232830"	"Se perdi la connessione, al ritorno digita questo per mantenere squadra e punteggio: ghost "
+	"#str_232831"	"Bentornato: squadra e punteggio ripristinati."
+	"#str_232832"	"Questo codice di ritorno non è noto qui oppure è scaduto."
+	"#str_232833"	"Uso: ghost <codice>, le sei lettere che il server ti ha comunicato all'ingresso"
+	"#str_232834"	"identityReset ti dà una nuova identità su ogni server: nessuno ti riconoscerà più, e ban e classifiche legati alla vecchia identità non ti riguardano più. Digita identityReset confirm per farlo."
+	"#str_232835"	"La tua identità è stata reimpostata: ogni server ora ti vede come un nuovo giocatore."
+	"#str_232836"	"Non invii alcuna identità: ui_identity è 0."
+	"#str_232837"	"Identità del giocatore"
 }

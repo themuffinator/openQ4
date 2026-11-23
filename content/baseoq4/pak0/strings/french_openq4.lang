@@ -1960,4 +1960,12 @@
 	"#str_232824"	"%d heures restantes"
 	"#str_232825"	"%d minutes restantes"
 	"#str_232826"	"DÉTAILS"
+	"#str_232830"	"Si vous perdez la connexion, tapez ceci à votre retour pour garder votre équipe et votre score : ghost "
+	"#str_232831"	"Bon retour : votre équipe et votre score sont rétablis."
+	"#str_232832"	"Ce code de retour est inconnu ici, ou il a expiré."
+	"#str_232833"	"Utilisation : ghost <code>, les six lettres que le serveur vous a données à votre arrivée"
+	"#str_232834"	"identityReset vous donne une nouvelle identité sur chaque serveur : aucun ne vous reconnaîtra plus, et les bannissements et classements liés à l'ancienne ne s'appliquent plus. Tapez identityReset confirm pour le faire."
+	"#str_232835"	"Votre identité a été réinitialisée : chaque serveur vous voit désormais comme un nouveau joueur."
+	"#str_232836"	"Vous n'envoyez aucune identité : ui_identity vaut 0."
+	"#str_232837"	"Identité du joueur"
 }

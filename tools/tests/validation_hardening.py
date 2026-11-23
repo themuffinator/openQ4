@@ -750,6 +750,13 @@ def validate_validation_wiring() -> None:
         # Bans, mutes, the chat flood window and the per-address limit on a staged
         # dedicated server with a bot and two clients; mp_moderation.py is wired.
         "mp_moderation_smoke.py",
+        # Identities, a returning player by identity and by ghost code, rankings,
+        # history and identity bans on a staged dedicated server with three
+        # clients; mp_identity.py is wired.
+        "mp_identity_smoke.py",
+        # The modifier, arena, preset and spectator chat votes on a staged hidden
+        # listen server; mp_casual_match_flow_contract.py pins their wiring.
+        "mp_vote_extensions_smoke.py",
         # A 12-player match over a simulated small path MTU.
         "mp_path_mtu_soak.py",
         "mp_mod_admission_smoke.py",

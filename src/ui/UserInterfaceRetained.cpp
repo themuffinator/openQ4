@@ -386,6 +386,8 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		"1 0.1 0.85","1 1 1"};
 	static const std::map<std::string,PlayerSetting> settings = {
 		{"ui_handicap",{0,1,100,true}},
+		// Player Setup's Player Identity (MP-17).
+		{"ui_identity",{1}},
 		// Player Setup's HUD tab and the card's Settings page: the multiplayer
 		// HUD's options and how a spectator follows a player.
 		{"hud_hitSound",{0,0,3,true,{},{0,1,2,3}}},{"hud_crosshairNames",{0,0,2,true,{},{0,1,2}}},{"hud_crosshairAmmo",{1}},

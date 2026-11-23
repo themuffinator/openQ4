@@ -1951,4 +1951,12 @@
 	"#str_232824"	"még %d óra"
 	"#str_232825"	"még %d perc"
 	"#str_232826"	"RÉSZLETEK"
+	"#str_232830"	"Ha megszakad a kapcsolat, visszatéréskor írd be ezt, hogy megtartsd a csapatodat és a pontjaidat: ghost "
+	"#str_232831"	"Üdv újra: a csapatod és a pontjaid visszaállítva."
+	"#str_232832"	"Ezt a visszatérési kódot itt nem ismerjük, vagy lejárt."
+	"#str_232833"	"Használat: ghost <kód>, a hat betű, amelyet a szerver a csatlakozáskor közölt"
+	"#str_232834"	"Az identityReset minden szerveren új identitást ad: egyik sem ismer fel újra, és a régi identitáshoz kötött kitiltások és rangsorok rád már nem vonatkoznak. Írd be: identityReset confirm."
+	"#str_232835"	"Az identitásod visszaállítva: mostantól minden szerver új játékosnak lát."
+	"#str_232836"	"Nem küldesz identitást: az ui_identity értéke 0."
+	"#str_232837"	"Játékosidentitás"
 }

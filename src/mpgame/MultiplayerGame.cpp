@@ -10574,6 +10574,8 @@ void idMultiplayerGame::Reset() {
 	// the next map starts its own event stream
 	liveEvents.Close();
 	Clear();
+	// openQ4 MP-17: a new map is a new match; places kept on the last one are gone
+	IdentityNewMatch();
 	// openQ4 briefly shipped several function-key defaults as GUI command text.
 	// Key bindings execute console/usercmd actions, so preserve the stock Quake 4
 	// impulses and migrate only those exact historical defaults.  Custom and
@@ -17125,6 +17127,8 @@ void idMultiplayerGame::OnMatchEnded( void ) {
 	// field.  rvGameState calls this at the transition boundary.
 	BeginArenaCampaignResult();
 	botManager.OnMatchEnd();
+	// openQ4 MP-17: the local ranking table, from the final board
+	IdentityMatchEnded();
 }
 
 /*
@@ -17695,6 +17699,8 @@ void idMultiplayerGame::Run( void ) {
 	PublishMVDMarkers();
 	// openQ4: the map database publishes the map it would load next
 	mpMapHost.ServerThink();
+	// openQ4 MP-17: the server's id, and a ghost code for players with no identity
+	IdentityServerFrame();
 	// openQ4: a casual session has no roster transactions, so it mirrors every
 	// join, spectate and leave in every phase.  Syncing only in warmup and
 	// countdown left anyone who entered or changed sides during live play with
@@ -26684,6 +26690,8 @@ void idMultiplayerGame::DisconnectClient( int clientNum ) {
 		clientMatchControlModel.Clear();
 	}
 	if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) {
+		// openQ4 MP-17: a leaver's place is kept for their return, then the slot forgets them
+		IdentityClientDisconnect( clientNum );
 		// openQ4 (MP-18): the connection is over, and so is its admin grant
 		matchAdminCarry[ clientNum ].Clear();
 		ClearMatchOperationTransportSlot( clientNum );
@@ -27898,9 +27906,8 @@ void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum, int seconds, 
 		HandleServerAdminKickPlayer( clientNum );
 		return;
 	}
-	const idStr name = gameLocal.userInfo[ clientNum ].GetString( "ui_name" );
-	gameLocal.ServerBan( address, MPModPlayerPrefixBits( address ), static_cast<mpModTime_t>( Max( 0, seconds ) ), name.c_str(),
-		RetainedAdminBanReasonText( reason ), "admin" );
+	// the range they hold and (MP-17) their identity
+	gameLocal.ServerBanClient( clientNum, static_cast<mpModTime_t>( Max( 0, seconds ) ), RetainedAdminBanReasonText( reason ), "admin" );
 }
 
 /*

@@ -445,6 +445,37 @@ them on:
   the pause lasts, that side may take a player in even with `si_spectatorLock`
   on.
 
+### Your identity, and coming back after a dropped connection
+
+> **After 0.15.0.** This describes the development build; 0.15.0 has none of it.
+
+openQ4 lets each server recognise you when you come back, with no account and
+nothing sent anywhere else. The first time a server asks, your game makes a
+random key and keeps it in `identity.key` in your save folder. Each server sees
+a different key derived from it, so two servers cannot tell that they have
+seen the same player. Your identity is sixteen letters and digits, such as
+`3f9a0c1d22e4b781`; `identity` shows yours on the server you are on.
+
+- **A dropped connection costs you nothing.** If you leave a casual match and
+  come back within five minutes (the server's `g_reconnectRestore`), you get
+  your team and your score back. Tourney is the exception: its bracket keeps
+  its own places.
+- **No identity?** Set `ui_identity 0` and your game sends none. When the
+  server keeps places, it tells you a six-letter return code instead; type
+  `ghost <code>` after you reconnect.
+- **Starting again.** `identityReset confirm` gives you a new identity on every
+  server. Bans and rankings tied to the old one no longer apply to you, and
+  no server recognises you any more. Deleting `identity.key` does the same.
+- **Your match history.** When a match ends, your game adds a line to
+  `profile/history.ndjson` in your save folder: when, where, the map and mode,
+  your score, your place and the result. `history` lists your last ten
+  matches. Nothing is uploaded.
+- **Rankings.** A server can keep a local ranking table (see
+  [Rankings](server-setup.md#identities-returning-players-and-rankings)).
+  `rcon rankings`, where the server allows it, shows it.
+
+Servers older than this build never ask, and your game sends nothing to them.
+
 ## Your multiplayer settings
 
 **Multiplayer → Player Setup**, or the in-match menu's **Settings** tab, holds

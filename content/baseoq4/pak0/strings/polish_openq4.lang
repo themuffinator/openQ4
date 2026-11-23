@@ -2007,4 +2007,12 @@
 	"#str_232824"	"zostało godzin: %d"
 	"#str_232825"	"zostało minut: %d"
 	"#str_232826"	"SZCZEGÓŁY"
+	"#str_232830"	"Jeśli stracisz połączenie, po powrocie wpisz to, aby zachować drużynę i wynik: ghost "
+	"#str_232831"	"Witaj ponownie: drużyna i wynik zostały przywrócone."
+	"#str_232832"	"Ten kod powrotu jest tu nieznany albo wygasł."
+	"#str_232833"	"Użycie: ghost <kod>, sześć liter, które serwer podał przy dołączeniu"
+	"#str_232834"	"identityReset daje ci nową tożsamość na każdym serwerze: żaden cię już nie rozpozna, a bany i rankingi powiązane ze starą tożsamością przestają cię dotyczyć. Wpisz identityReset confirm, aby to zrobić."
+	"#str_232835"	"Twoja tożsamość została zresetowana: każdy serwer widzi cię teraz jako nowego gracza."
+	"#str_232836"	"Nie wysyłasz tożsamości: ui_identity ma wartość 0."
+	"#str_232837"	"Tożsamość gracza"
 }

@@ -223,9 +223,12 @@ def check_enforcement() -> None:
     mp = read("src/mpgame/MultiplayerGame.cpp")
     require('"kick %i ban"' not in mp, "the Admin page's Ban no longer runs a kick the engine reads as one word")
     page = function_body(mp, "void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum, int seconds, int reason )")
-    require("gameLocal.ServerBan( address, MPModPlayerPrefixBits( address ), static_cast<mpModTime_t>( Max( 0, seconds ) )," in page
-            and "RetainedAdminBanReasonText( reason )" in page,
-            "the Admin page's Ban bans the range the player holds (their address, or their IPv6 /64) for its length and reason")
+    require("gameLocal.ServerBanClient( clientNum, static_cast<mpModTime_t>( Max( 0, seconds ) ), RetainedAdminBanReasonText( reason )," in page,
+            "the Admin page's Ban bans the player for its length and reason: by the range they hold (their address, or "
+            "their IPv6 /64) and, since MP-17, their identity")
+    client_ban = function_body(read("src/mpgame/Game_network.cpp"), "int idGameLocal::ServerBanClient(")
+    require("ServerBan( address, MPModPlayerPrefixBits( address ), durationSeconds," in client_ban,
+            "a connected player's ban covers the range they hold")
     require(mp.count('gameLocal.ModerationLogClient( "kick", "vote",') == 2
             and 'gameLocal.ModerationLogClient( "kick", "admin", clientNum, "", 0 );' in mp, "vote and Admin page kicks reach the admin log")
 
@@ -593,9 +596,8 @@ def check_admins() -> None:
             and "MPModSamePlayer( clientModAddress[ i ], clientModAddress[ targetSlot ] )" in request[gate:check]
             and "target.coversAdmin = true;" in request[gate:check],
             "the target is the player the admin chose; the host, another admin, a bot and a range that holds an admin are refused")
-    require("MPModAdminBanSeconds( seconds, maxBanMinutes ), targetName.c_str(), reason, \"admin\" ) >= 0;" in request[act:]
-            and "ServerBan( address, MPModPlayerPrefixBits( address )," in request[act:],
-            "an admin's ban is of the player's own range, for no longer than the host allows")
+    require("ServerBanClient( targetSlot, MPModAdminBanSeconds( seconds, maxBanMinutes ), reason, \"admin\" ) >= 0;" in request[act:],
+            "an admin's ban is of the player's own range (and, since MP-17, their identity), for no longer than the host allows")
     for forbidden in ("MPModParseAddress", "RemoveBan", "ScheduleServerShutdown", "MPModFormatAddress", "BufferCommandText( CMD_EXEC_NOW, reason",
                       "GetBanListCount"):
         require(forbidden not in request, f"an admin's request never reaches {forbidden}: no addresses, no unban, no shutdown")

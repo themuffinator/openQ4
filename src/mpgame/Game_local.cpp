@@ -1519,6 +1519,9 @@ const idDict* idGameLocal::SetUserInfo( int clientNum, const idDict &userInfo, b
 		if ( !isClient ) {
 			// now mark this client in game
 			mpGame.EnterGame( clientNum );
+			// openQ4 MP-17: the userinfo that offers an identity can arrive after the
+			// player has the map; the challenge goes out then
+			mpGame.IdentityUserInfoChanged( clientNum );
 		}
 	}
 

@@ -365,6 +365,10 @@ void rvGameState::GameStateChanged( void ) {
 			gameLocal.mpGame.isBuyingAllowedRightNow = false;
 			// RITUAL END
 			gameLocal.mpGame.ShowStatSummary();
+			// openQ4 MP-17: the match goes in the player's own history
+			if ( previousGameState->currentState == GAMEON || previousGameState->currentState == SUDDENDEATH ) {
+				gameLocal.mpGame.IdentityRecordHistory();
+			}
 		}
 
 		gameLocal.mpGame.ScheduleTimeAnnouncements( );
@@ -811,6 +815,8 @@ bool rvGameState::NewState( mpGameState_t newState ) {
 				gameLocal.mpGame.SetPlayerScore( p, 0 );
 				gameLocal.mpGame.SetPlayerTeamScore( p, 0 );
 			}
+			// openQ4 MP-17: the places kept for leavers belonged to the warmup
+			gameLocal.mpGame.IdentityNewMatch();
 
 			gameLocal.mpGame.ClearTeamScores();
 			gameLocal.mpGame.OnMatchStarted();

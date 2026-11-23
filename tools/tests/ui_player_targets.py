@@ -143,6 +143,9 @@ struct Game {
     mpModAddress_t GetClientModAddress(int)const{mpModAddress_t a;a.family=addressed?4:0;return a;}
     int ServerBan(const mpModAddress_t&,int bits,mpModTime_t seconds,const char*,const char*,const char* by){
         commandsObject.commands.emplace_back("ServerBan /"+std::to_string(bits)+" "+std::to_string(seconds)+" "+by);return 0;}
+    // MP-17: a connected player's ban covers their range (and their identity); the range is what this test reads
+    int ServerBanClient(int client,mpModTime_t seconds,const char* reason,const char* by){
+        mpModAddress_t address=GetClientModAddress(client);return ServerBan(address,MPModPlayerPrefixBits(address),seconds,"",reason,by);}
 }gameLocal;
 @VALID@
 @CURRENT@
