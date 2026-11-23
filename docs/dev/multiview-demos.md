@@ -855,10 +855,30 @@ someone else started alone, a host whose server records records once, and two
 seconds into the review take the screenshot, write `stats/<name>.json` and stop
 the demo.
 
-**Open.** Markers for a client view, recording across a map change, and the
-prediction's lead: playback predicts to the recorder's frame as the clock
-reconstructs it, which matches the recorded view to within the frame-time
-jitter of the original client.
+**Deck, export and library (third round, same day).** The deck's **Players**
+button opens a framed list of up to 16 recorded players (`demo_player<n>_*`
+GUI state, `demoFollowRow`), and `demoPlayers` lists them at the console.
+`StepFrames` takes a negative count, so **Step back** and `demoStep -1` seek
+one tic back through the keyframe before it. `demoExport <demo>.mvd [fps]
+[quit]` plays like a timedemo with 1000/fps of the match a frame and buffers a
+`screenshot "exports/<demo>/frame%05d.png"` each frame, which runs at the head
+of the next frame's command buffer before playback moves on, so each picture is
+the frame shown; sound is not written (the sound world's AVI hooks are empty
+and the OpenAL backend has no loopback renderer). A client recording now has
+markers: the client's game runs `PublishMVDMarkers` (phase, round, pause,
+score, flag and powerup changes it can see) and marks each kill from the death
+message, and the recorder stamps them on its own clock. Every finished
+recording ends with an optional summary record (type 23: the names seen while
+recording); the library shows them, or whose view a client recording is, and
+`demoFind` searches name, map, mode, server, players and recorder. A recording
+made where there is a view takes a 320x240 `demos/<name>_thumb.png` three
+seconds in (`screenshot <file> <width> <height>`), which the library shows and
+deletes with the demo.
+
+**Open.** Recording across a map change, sound in exports, and the prediction's
+lead: playback predicts to the recorder's frame as the clock reconstructs it,
+which matches the recorded view to within the frame-time jitter of the
+original client.
 
 ## Campaign render demos (v11), 7 November 2026
 

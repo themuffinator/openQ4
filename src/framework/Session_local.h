@@ -140,6 +140,11 @@ struct demoLibraryEntry_t {
 	idStr					format;
 	idStr					status;
 	idStr					details;
+	// openQ4 MP-22: what demoFind searches
+	idStr					serverName;
+	idStr					players;
+	idStr					recorder;
+	bool					clientView = false;
 };
 
 // A v11 or v12 render demo's time at a frame index: each recorded frame is
@@ -1048,6 +1053,11 @@ public:
 	void				RefreshDemoLibrary();
 	void				RefreshDemoLibraryList();
 	void				UpdateDemoMenuGui();
+	// openQ4 MP-22: the deck's player list (a multi-view demo's recorded players)
+	static const int	DEMO_PLAYER_ROWS = 16;
+	bool				demoPlayersOpen = false;
+	int					demoPlayerRowSlots[ DEMO_PLAYER_ROWS ] = {};
+	int					demoPlayerRows = 0;
 	bool				HandleDemoMenuCommand( const char *menuCommand );
 	bool				IsDemoPlaybackActive() const;
 	void				SetDemoPaused( bool paused );
@@ -1055,7 +1065,7 @@ public:
 	void				SetDemoSpeed( float speed );
 	bool				SeekDemoMS( int timeMS );
 	bool				SkipDemoMS( int deltaMS );
-	void				StepDemo();
+	void				StepDemo( int frames = 1 );	// openQ4 MP-22: negative steps back
 	void				StopDemoPlayback();
 	
 	void				FinishCmdLoad();

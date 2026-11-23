@@ -4224,6 +4224,14 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 		R_ScreenshotFilename( lastNumber, "screenshots/shot", checkname, R_ScreenshotExtension() );
 		break;
 	case 4:
+		if ( !idStr::IsNumeric( args.Argv( 1 ) ) ) {
+			// openQ4 MP-22: screenshot <filename> <width> <height>, as a demo's thumbnail is taken
+			checkname = args.Argv( 1 );
+			width = atoi( args.Argv( 2 ) );
+			height = atoi( args.Argv( 3 ) );
+			blends = 1;
+			break;
+		}
 		width = atoi( args.Argv( 1 ) );
 		height = atoi( args.Argv( 2 ) );
 		blends = atoi( args.Argv( 3 ) );
@@ -4236,7 +4244,7 @@ void R_ScreenShot_f( const idCmdArgs &args ) {
 		R_ScreenshotFilename( lastNumber, "screenshots/shot", checkname, R_ScreenshotExtension() );
 		break;
 	default:
-		common->Printf( "usage: screenshot\n       screenshot <filename>\n       screenshot <width> <height>\n       screenshot <width> <height> <blends>\n" );
+		common->Printf( "usage: screenshot\n       screenshot <filename>\n       screenshot <width> <height>\n       screenshot <width> <height> <blends>\n       screenshot <filename> <width> <height>\n" );
 		return;
 	}
 

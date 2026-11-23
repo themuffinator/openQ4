@@ -1959,4 +1959,9 @@
 	"#str_232835"	"Kimliğin sıfırlandı: artık her sunucu seni yeni bir oyuncu olarak görüyor."
 	"#str_232836"	"Kimlik göndermiyorsun: ui_identity 0."
 	"#str_232837"	"Oyuncu kimliği"
+	"#str_232840"	"Oyuncular"
+	"#str_232841"	"Bir oyuncuyu izle"
+	"#str_232842"	"Geri adım"
+	"#str_232843"	"Oyuncular: %s"
+	"#str_232844"	"%s görünümü"
 }

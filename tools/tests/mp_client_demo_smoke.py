@@ -111,12 +111,16 @@ def main() -> int:
         *section("AGAIN", [f"record {DEMO}", "waitMsec 1000", "stopRecord", "waitMsec 500"]),
         "waitMsec 1000", "quit"])
     write_script(games["player"] / "mp22_viewer_boot.cfg", [
-        "waitMsec 2000", *section("INFO", [f"mvdInfo {DEMO}"]), f"playMVD {DEMO}"])
+        "waitMsec 2000", *section("INFO", [f"mvdInfo {DEMO}"]), *section("FIND", ["demoFind recorder"]),
+        f"playMVD {DEMO}"])
     write_script(games["player"] / "mp22_viewer.cfg", [
         "echo MP22_VIEW_LOADED", "waitMsec 3000",
-        *section("STATUS", ["mvdStatus"]),
+        *section("STATUS", ["mvdStatus", "mvdMarkers"]),
         *section("FOLLOW", ["demoFollow next", "demoFreeRoam"]),
         *section("SHOT", ["screenshot", "waitMsec 1500"]),
+        # paused, three frames on, then one back from the keyframe before it
+        *section("STEP", ["demoPause 1", "waitMsec 500", "mvdStatus", "demoStep 3", "waitMsec 1500", "mvdStatus",
+                          "demoStep -1", "waitMsec 3000", "mvdStatus", "demoPause 0"]),
         *section("SEEK", ["demoSeek 1", "waitMsec 6000", "mvdStatus"]),
         # well past the keyframe at ten seconds, then back to it
         "waitMsec 15000",
@@ -209,6 +213,11 @@ def main() -> int:
         check("a second recording under the same name gets a new name",
               f"Recording your view to 'demos/{DEMO}_000.mvd'" in again, again)
         finish("rec", 60)
+        thumb = games["player"] / "demos" / f"{DEMO}_thumb.png"
+        head = thumb.read_bytes()[:24] if thumb.is_file() else b""
+        check("the recording leaves a 320x240 thumbnail beside it for the library",
+              head[:8] == b"\x89PNG\r\n\x1a\n" and int.from_bytes(head[16:20], "big") == 320 and
+              int.from_bytes(head[20:24], "big") == 240, str(thumb))
         server.inject(["quit"])
         report["exit_codes"]["server"] = processes.pop("server").wait(timeout=60)
 
@@ -223,11 +232,17 @@ def main() -> int:
         check("mvdInfo reads a clean one-player recording with snapshots and the recorder's commands",
               info is not None and int(info[2]) > 50 and info[5] == "yes" and info[6].startswith("one player's") and
               int(info[7]) > 100 and float(info[4]) >= args.record_seconds - 2, described[-700:])
+        found = part("viewer", "FIND", args.startup_timeout)
+        check("demoFind finds a recording by its recorder, and the library knows whose view it is",
+              re.search(rf"DEMO_FIND demos/{DEMO}\.mvd\s+mp/q4dm1\s+DM\s+view of Recorder", found) is not None, found[-600:])
         texts = wait("playback starts", lambda t: "\nMP22_VIEW_LOADED" in t["viewer"], args.startup_timeout)
         playing = re.search(r"Playing the recorded view of client (\d+) 'demos/" + DEMO + r"\.mvd'", texts["viewer"])
         check("playMVD plays the recording as its recorder's view", playing is not None, texts["viewer"][-600:])
         status = part("viewer", "STATUS")
         view = re.search(r"MVD_VIEW client=(\d+) sequence=(\d+) snapshots=(\d+)", status)
+        listed = re.search(r"markers: (\d+)", described)
+        check("a client recording marks what its game saw: kills and the match's changes",
+              listed is not None and int(listed[1]) >= 1 and re.search(r"\bkill\b", status) is not None, status[-600:])
         check("the game takes the recorded snapshots as the recorder's client",
               view is not None and playing is not None and view[1] == playing[1] and int(view[3]) > 20, status)
         refused = part("viewer", "FOLLOW")
@@ -241,6 +256,11 @@ def main() -> int:
         flat = flat_image(image) if image else None
         report["screenshot"] = str(image) if image else shot[-300:]
         check("a screenshot of the playback is not one flat colour", flat is False, report["screenshot"])
+        stepped = part("viewer", "STEP", args.timeout)
+        times = [int(value) for value in re.findall(r"MVD_STATUS playing=1 paused=1 seeking=0 time=(\d+)", stepped)]
+        report["steps"] = times
+        check("demoStep moves a paused demo by whole frames, three on and one back",
+              len(times) == 3 and times[1] - times[0] == 48 and times[2] - times[1] == -16, json.dumps(times))
         rewound = part("viewer", "SEEK")
         after = re.search(r"MVD_STATUS playing=1 paused=0 seeking=0 time=(\d+)", rewound)
         check("a rewind replays from the start and plays on", after is not None and int(after[1]) >= 1000, rewound)
@@ -269,6 +289,22 @@ def main() -> int:
               result is not None and result[6] == "1" and int(result[1]) >= float(result[5]) * 50 and float(result[3]) > 0,
               timed[-500:])
         finish("timer", 60)
+
+        # demoExport: a PNG frame each tenth of a second of the match, then quit
+        logs_of["exporter"] = games["player"] / "logs/openq4-exporter.log"
+        write_script(games["player"] / "mp22_exporter.cfg", ["waitMsec 2000", f"demoExport {DEMO}.mvd 10 quit"])
+        launch("exporter", paths["engine"], dict(common | window, logFileName="logs/openq4-exporter.log"),
+               ["+exec", "mp22_exporter.cfg"])
+        exported = wait("the export", lambda t: "MVD_EXPORT" in t["exporter"], args.startup_timeout + args.record_seconds * 3,
+                        may_end=("exporter",))["exporter"]
+        finish("exporter", 120)
+        result = re.search(r"MVD_EXPORT frames=(\d+) directory=(\S+) fps=(\d+) complete=(\d)", exported)
+        frames = sorted((games["player"] / "exports" / DEMO).glob("frame*.png"))
+        report["export"] = {"line": result.groups() if result else None, "files": len(frames)}
+        check("demoExport writes the recording as a PNG frame a tenth of a second",
+              result is not None and result[4] == "1" and result[3] == "10" and len(frames) == int(result[1]) and
+              len(frames) >= args.record_seconds * 9 and frames[0].read_bytes()[:8] == b"\x89PNG\r\n\x1a\n",
+              json.dumps(report["export"]))
 
         # A recording cut short, and one whose game data differs from this game's
         demo = (games["player"] / "demos" / f"{DEMO}.mvd").read_bytes()

@@ -1959,4 +1959,9 @@
 	"#str_232835"	"Az identitásod visszaállítva: mostantól minden szerver új játékosnak lát."
 	"#str_232836"	"Nem küldesz identitást: az ui_identity értéke 0."
 	"#str_232837"	"Játékosidentitás"
+	"#str_232840"	"Játékosok"
+	"#str_232841"	"Játékos követése"
+	"#str_232842"	"Visszalépés"
+	"#str_232843"	"Játékosok: %s"
+	"#str_232844"	"%s nézete"
 }

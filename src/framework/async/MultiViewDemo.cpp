@@ -131,6 +131,7 @@ enum mvdRecordType_t {
 	MVD_RECORD_INDEX					= 20,
 	MVD_RECORD_MARKER_TABLE			= 21,
 	MVD_RECORD_KEYFRAME_TABLE		= 22,
+	MVD_RECORD_SUMMARY				= 23,	// openQ4 MP-22, optional: who was seen, before the end record
 	// openQ4 MP-22: a client-view recording. Each payload opens with the
 	// recording's own clock (frame, time); the network state record is version 2.
 	MVD_RECORD_CLIENT_SNAPSHOT		= 30,	// the whole unreliable snapshot message, after the recorder's frame
@@ -379,6 +380,25 @@ static idStr MVD_PackDifference( const char *recorded ) {
 	return out;
 }
 
+/*
+==================
+MVD_ReadSummary
+
+openQ4 MP-22: the summary dictionary's players. A damaged summary loses the
+names, never the demo.
+==================
+*/
+static bool MVD_ReadDict( idFile *file, idDict &dict, idStr &error );
+
+static void MVD_ReadSummary( const idList<byte> &payload, idStr &players ) {
+	idFile_Memory file( "MVD summary", reinterpret_cast<const char *>( payload.Ptr() ), payload.Num() );
+	idDict summary;
+	idStr error;
+	if ( MVD_ReadDict( &file, summary, error ) && file.Tell() == file.Length() ) {
+		players = summary.GetString( "players" );
+	}
+}
+
 static bool MVD_IsClientRecord( unsigned short type ) {
 	return type == MVD_RECORD_CLIENT_SNAPSHOT || type == MVD_RECORD_CLIENT_APPLY ||
 		type == MVD_RECORD_CLIENT_RELIABLE || type == MVD_RECORD_CLIENT_USERCMD;
@@ -411,6 +431,7 @@ static bool MVD_RecordSchemaSupported( unsigned short type, unsigned short versi
 		case MVD_RECORD_CLIENT_RELIABLE:
 		case MVD_RECORD_CLIENT_USERCMD:
 		case MVD_RECORD_CLIENT_KEYFRAME:
+		case MVD_RECORD_SUMMARY:
 			return version == 1;
 		default:
 			return false;
@@ -863,6 +884,13 @@ void idMultiViewDemo::ClearState() {
 	timeDemoLastFrameTime = 0;
 	timeDemoSlowestFrame = 0;
 	markers.clear();
+	exporting = false;
+	exportStepMS = 0;
+	exportFrames = 0;
+	exportDirectory.Clear();
+	recordingPlayers.Clear();
+	thumbnailTaken = false;
+	pendingThumbnail.Clear();
 	keyframes.clear();
 	markersDropped = 0;
 	lastKeyframeGameTime = 0;
@@ -880,6 +908,7 @@ void idMultiViewDemo::Init() {
 	cmdSystem->AddCommand( "recordMVD", Record_f, CMD_FL_SYSTEM, "records a server-side multi-view demo" );
 	cmdSystem->AddCommand( "stopMVD", Stop_f, CMD_FL_SYSTEM, "stops MVD recording or playback" );
 	cmdSystem->AddCommand( "playMVD", Play_f, CMD_FL_SYSTEM, "plays a multi-view demo" );
+	cmdSystem->AddCommand( "demoExport", Export_f, CMD_FL_SYSTEM, "writes a multi-view demo as PNG frames: demoExport <demo>.mvd [fps] [quit]" );
 	cmdSystem->AddCommand( "mvdInfo", Info_f, CMD_FL_SYSTEM, "validates and describes a multi-view demo" );
 	cmdSystem->AddCommand( "mvdRecover", Recover_f, CMD_FL_SYSTEM, "salvages the complete part of an interrupted .mvd.part recording into a new demo" );
 	cmdSystem->AddCommand( "mvdStatus", Status_f, CMD_FL_SYSTEM, "reports multi-view playback time and camera state" );
@@ -1582,6 +1611,7 @@ bool idMultiViewDemo::RecordIsSupported( const record_t &record, bool duringPlay
 		case MVD_RECORD_CLIENT_RELIABLE:
 		case MVD_RECORD_CLIENT_USERCMD:
 		case MVD_RECORD_CLIENT_KEYFRAME:
+		case MVD_RECORD_SUMMARY:
 			known = true;
 			break;
 		default:
@@ -2288,7 +2318,7 @@ bool idMultiViewDemo::StartRecording( const idCmdArgs &args ) {
 		MVD_OPTIONAL_USERINFO | MVD_OPTIONAL_MARKERS | MVD_OPTIONAL_KEYFRAMES;
 	if ( asClient ) {
 		// openQ4 MP-22: a client-view recording has no index, markers or keyframes
-		header.optionalFeatures = MVD_OPTIONAL_CLEAN_END | MVD_OPTIONAL_USERINFO | MVD_OPTIONAL_KEYFRAMES;
+		header.optionalFeatures = MVD_OPTIONAL_CLEAN_END | MVD_OPTIONAL_USERINFO | MVD_OPTIONAL_KEYFRAMES | MVD_OPTIONAL_MARKERS;
 	}
 	header.protocolMajor = ASYNC_PROTOCOL_MAJOR;
 	header.protocolMinor = ASYNC_PROTOCOL_MINOR;
@@ -2330,6 +2360,9 @@ bool idMultiViewDemo::StartRecording( const idCmdArgs &args ) {
 		return false;
 	}
 
+	for ( int i = 0; i < MAX_ASYNC_CLIENTS; i++ ) {
+		NoteRecordingPlayer( sessLocal.mapSpawnData.userInfo[i] );
+	}
 	if ( asClient ) {
 		common->Printf( "Recording your view to '%s'\n", fileName.c_str() );
 	} else {
@@ -2371,6 +2404,93 @@ bool idMultiViewDemo::WriteClientRecord( unsigned short type, const void *body, 
 	return true;
 }
 
+/*
+==================
+idMultiViewDemo::NoteRecordingPlayer
+
+openQ4 MP-22: every name seen while recording goes in the summary the library
+shows and searches.
+==================
+*/
+void idMultiViewDemo::NoteRecordingPlayer( const idDict &info ) {
+	idStr name = info.GetString( "ui_name" );
+	name.RemoveColors();
+	name.StripLeading( ' ' );
+	name.StripTrailing( ' ' );
+	if ( name.IsEmpty() || recordingPlayers.Num() >= 64 ) {
+		return;
+	}
+	for ( int i = 0; i < recordingPlayers.Num(); i++ ) {
+		if ( recordingPlayers[i].Icmp( name ) == 0 ) {
+			return;
+		}
+	}
+	recordingPlayers.Append( name );
+}
+
+/*
+==================
+idMultiViewDemo::TakeRecordingThumbnail
+
+openQ4 MP-22: three seconds into a recording made where there is a view, a
+320x240 picture of it goes beside the demo as demos/<name>_thumb.png, which
+the library shows in place of the map's levelshot. A dedicated server has no
+view and takes none.
+==================
+*/
+void idMultiViewDemo::TakeRecordingThumbnail() {
+	if ( thumbnailTaken || state != MVD_RECORDING || finalizing || Sys_Milliseconds() - recordingStartRealTime < 3000 ) {
+		return;
+	}
+	thumbnailTaken = true;
+	if ( idAsyncNetwork::serverDedicated.GetInteger() != 0 || renderSystem == NULL ) {
+		return;
+	}
+	pendingThumbnail = fileName;
+	pendingThumbnail.StripFileExtension();
+	pendingThumbnail += "_thumb.png";
+}
+
+/*
+==================
+idMultiViewDemo::ServiceThumbnail
+
+Called at the start of the network frame, the point where console commands
+run: a command appended to the buffer could wait behind a script's waitMsec
+until the recording was over.
+==================
+*/
+void idMultiViewDemo::ServiceThumbnail() {
+	if ( pendingThumbnail.IsEmpty() ) {
+		return;
+	}
+	const idStr thumbnail = pendingThumbnail;
+	pendingThumbnail.Clear();
+	if ( state == MVD_RECORDING && !finalizing ) {
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "screenshot \"%s\" 320 240\n", thumbnail.c_str() ) );
+	}
+}
+
+/*
+==================
+idMultiViewDemo::WriteSummaryRecord
+
+openQ4 MP-22: the names seen while recording, before the end record.
+==================
+*/
+bool idMultiViewDemo::WriteSummaryRecord() {
+	idDict summary;
+	idStr names;
+	for ( int i = 0; i < recordingPlayers.Num(); i++ ) {
+		names += i > 0 ? ", " : "";
+		names += recordingPlayers[i];
+	}
+	summary.Set( "players", names );
+	idFile_Memory payload( "MVD summary" );
+	summary.WriteToFileHandle( &payload );
+	return WriteRecord( MVD_RECORD_SUMMARY, 1, 0, payload.GetDataPtr(), payload.Length(), false );
+}
+
 bool idMultiViewDemo::IsClientRecording() const {
 	return state == MVD_RECORDING && clientView && !finalizing;
 }
@@ -2396,6 +2516,7 @@ void idMultiViewDemo::CaptureClientSnapshot( const idBitMsg &msg, int messageSta
 		return;
 	}
 	snapshotCount++;
+	TakeRecordingThumbnail();
 	// a keyframe follows a snapshot, when the game holds it as its latest state
 	const int interval = mvd_keyframeInterval.GetInteger();
 	int frame = 0;
@@ -2437,6 +2558,7 @@ void idMultiViewDemo::CaptureClientUserInfo( int clientNum, const idDict &info )
 	if ( !IsClientRecording() || clientNum < 0 || clientNum >= MAX_ASYNC_CLIENTS ) {
 		return;
 	}
+	NoteRecordingPlayer( info );
 	idFile_Memory body( "MVD client user info" );
 	body.WriteUnsignedChar( static_cast<unsigned char>( clientNum ) );
 	info.WriteToFileHandle( &body );
@@ -2500,6 +2622,8 @@ bool idMultiViewDemo::StopRecording( const char *reason, bool finalize,
 		SERVER_MVD_REASON_NONE : failureReason;
 	if ( finalize && file != NULL ) {
 		clean = WriteIndexRecord() && WriteNavigationRecords();
+		// openQ4 MP-22: who was seen, for the library to show and search
+		clean = clean && WriteSummaryRecord();
 		idFile_Memory payload( "MVD end" );
 		int endFrame = idAsyncNetwork::server.GetGameFrame();
 		int endTime = idAsyncNetwork::server.GetGameTime();
@@ -2606,6 +2730,7 @@ void idMultiViewDemo::CaptureServerFrame( int gameFrame, int gameTime ) {
 	if ( state != MVD_RECORDING || finalizing ) {
 		return;
 	}
+	TakeRecordingThumbnail();
 
 	const int maxMinutes = mvd_maxDurationMinutes.GetInteger();
 	if ( maxMinutes > 0 && Sys_Milliseconds() - recordingStartRealTime >= maxMinutes * 60 * 1000 ) {
@@ -2749,6 +2874,7 @@ void idMultiViewDemo::CaptureUserInfo( int clientNum, const idDict &info ) {
 	if ( state != MVD_RECORDING || finalizing || clientNum < 0 || clientNum >= MAX_ASYNC_CLIENTS ) {
 		return;
 	}
+	NoteRecordingPlayer( info );
 	idFile_Memory payload( "MVD user info" );
 	payload.WriteInt( idAsyncNetwork::server.GetGameFrame() );
 	payload.WriteInt( idAsyncNetwork::server.GetGameTime() );
@@ -2774,7 +2900,12 @@ bool idMultiViewDemo::RecordMarker( const serverMVDMarker_t &input ) {
 		return false;
 	}
 	openq4_mvd::Marker marker;
+	int markerFrame = idAsyncNetwork::server.GetGameFrame();
 	marker.gameTime = idAsyncNetwork::server.GetGameTime();
+	if ( clientView ) {
+		// openQ4 MP-22: a client-view recording's own clock
+		ClientStamp( markerFrame, marker.gameTime );
+	}
 	marker.kind = input.kind;
 	marker.client = input.client;
 	marker.instance = input.instance;
@@ -2797,7 +2928,7 @@ bool idMultiViewDemo::RecordMarker( const serverMVDMarker_t &input ) {
 	}
 
 	std::vector<std::uint8_t> payload;
-	openq4_mvd::AppendU32( payload, static_cast<std::uint32_t>( idAsyncNetwork::server.GetGameFrame() ) );
+	openq4_mvd::AppendU32( payload, static_cast<std::uint32_t>( markerFrame ) );
 	openq4_mvd::AppendMarkerBody( payload, marker );
 	if ( !WriteRecord( MVD_RECORD_MARKER, 1, 0, payload.data(), static_cast<int>( payload.size() ) ) ) {
 		const idStr failure = lastError;
@@ -3457,7 +3588,49 @@ bool idMultiViewDemo::StartTimeDemo( const char *name, bool quitAfter ) {
 }
 
 bool idMultiViewDemo::IsTimeDemo() const {
-	return state == MVD_PLAYING && timeDemo;
+	// an export also runs uncapped
+	return state == MVD_PLAYING && ( timeDemo || exporting );
+}
+
+/*
+==================
+idMultiViewDemo::StartExport
+
+openQ4 MP-22: writes a multi-view demo, or a recording of one player's view,
+as a PNG sequence, exports/<demo>/frame00000.png on: every frame moves the
+match on by 1000/fps milliseconds, whatever the time it took, and the next
+frame's command buffer takes the screenshot of the state it shows. Sound is
+not written yet.
+==================
+*/
+bool idMultiViewDemo::StartExport( const char *name, int fps, bool quitAfter ) {
+	idCmdArgs args;
+	args.AppendArg( "demoExport" );
+	args.AppendArg( name );
+	if ( !StartPlayback( args ) ) {
+		return false;
+	}
+	idStr base = fileName;
+	base.StripPath();
+	base.StripFileExtension();
+	exporting = true;
+	timeDemoQuit = quitAfter;
+	exportStepMS = Max( 1, 1000 / idMath::ClampInt( 1, 120, fps ) );
+	exportFrames = 0;
+	exportDirectory = va( "exports/%s", base.c_str() );
+	common->Printf( "Exporting '%s' to %s/ at %d frames a second\n", fileName.c_str(), exportDirectory.c_str(),
+		1000 / exportStepMS );
+	return true;
+}
+
+void idMultiViewDemo::Export_f( const idCmdArgs &args ) {
+	if ( args.Argc() < 2 ) {
+		common->Printf( "usage: demoExport <demo>.mvd [fps] [quit]\n" );
+		return;
+	}
+	const int fps = args.Argc() > 2 ? atoi( args.Argv( 2 ) ) : 30;
+	const bool quitAfter = args.Argc() > 3 && !idStr::Icmp( args.Argv( 3 ), "quit" );
+	idAsyncNetwork::multiViewDemo.StartExport( args.Argv( 1 ), fps, quitAfter );
 }
 
 int idMultiViewDemo::GetPlaybackLocalClient() const {
@@ -4051,7 +4224,8 @@ void idMultiViewDemo::StepFrames( int frames ) {
 		return;
 	}
 	SetPaused( true );
-	const int step = Max( 1, frames ) * Max( 1, common->GetUserCmdMSec() );
+	// openQ4 MP-22: a negative count steps back, from the keyframe before it
+	const int step = ( frames == 0 ? 1 : frames ) * Max( 1, common->GetUserCmdMSec() );
 	forcePresentationFrame = true;
 	if ( !SeekByMS( step ) ) {
 		forcePresentationFrame = false;
@@ -4156,9 +4330,13 @@ void idMultiViewDemo::FinishPlayback( const char *reason, bool warning ) {
 	if ( warning ) {
 		common->Warning( "MVD playback stopped: %s", reason ? reason : "stream error" );
 	}
-	const bool timed = timeDemo;
+	const bool timed = timeDemo || exporting;
 	const bool quitAfter = timeDemoQuit;
-	if ( timed && timeDemoFrames > 0 ) {
+	if ( exporting ) {
+		common->Printf( "MVD_EXPORT frames=%d directory=%s fps=%d complete=%d\n", exportFrames,
+			exportDirectory.c_str(), 1000 / Max( 1, exportStepMS ), warning ? 0 : 1 );
+	}
+	if ( timeDemo && timeDemoFrames > 0 ) {
 		const float seconds = Max( 1, timeDemoLastFrameTime - timeDemoStartTime ) * 0.001f;
 		common->Printf( "MVD_TIMEDEMO frames=%d seconds=%.2f fps=%.1f slowest=%dms match=%.1fs complete=%d\n",
 			timeDemoFrames, seconds, timeDemoFrames / seconds, timeDemoSlowestFrame,
@@ -4467,7 +4645,15 @@ void idMultiViewDemo::RunPlaybackFrame() {
 	const int now = Sys_Milliseconds();
 	int elapsed = idMath::ClampInt( 0, 100, now - playbackLastRealTime );
 	playbackLastRealTime = now;
-	if ( timeDemo ) {
+	if ( exporting ) {
+		// openQ4 MP-22: an export frame is 1000/fps of the match; the screenshot of
+		// the frame shown runs first in the next frame's command buffer
+		elapsed = exportStepMS;
+		if ( playbackGameTime > header.startGameTime ) {
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND,
+				va( "screenshot \"%s/frame%05d.png\"\n", exportDirectory.c_str(), exportFrames++ ) );
+		}
+	} else if ( timeDemo ) {
 		// openQ4 MP-22: a benchmark frame is one simulation tic of the match
 		elapsed = Max( 1, common->GetUserCmdMSec() );
 		if ( timeDemoStartTime == 0 ) {
@@ -4479,7 +4665,7 @@ void idMultiViewDemo::RunPlaybackFrame() {
 		timeDemoLastFrameTime = now;
 	}
 	if ( !mvd_paused.GetBool() ) {
-		playbackGameTime += elapsed * ( timeDemo ? 1.0f : GetPlaybackScale() );
+		playbackGameTime += elapsed * ( timeDemo || exporting ? 1.0f : GetPlaybackScale() );
 	}
 
 	const int recordDeadline = Sys_Milliseconds() +
@@ -4728,6 +4914,8 @@ bool idMultiViewDemo::QueryFileInfo( const char *name, mvdFileInfo_t &info ) {
 				if ( record.type != MVD_RECORD_END ) {
 					if ( record.flags & MVD_RECORD_FLAG_REQUIRED ) {
 						summaryValid = false;
+					} else if ( record.version == 1 && record.type == MVD_RECORD_SUMMARY ) {
+						MVD_ReadSummary( record.payload, info.players );
 					} else if ( record.version == 1 && record.type == MVD_RECORD_MARKER_TABLE ) {
 						std::vector<openq4_mvd::Marker> tableMarkers;
 						if ( openq4_mvd::ParseMarkerTable( record.payload.Ptr(), record.payload.Num(), tableMarkers,
@@ -4935,6 +5123,8 @@ bool idMultiViewDemo::QueryFileInfo( const char *name, mvdFileInfo_t &info ) {
 			info.markerCount++;
 		} else if ( record.type == MVD_RECORD_KEYFRAME || record.type == MVD_RECORD_CLIENT_KEYFRAME ) {
 			info.keyframeCount++;
+		} else if ( record.type == MVD_RECORD_SUMMARY ) {
+			MVD_ReadSummary( record.payload, info.players );
 		} else if ( record.type == MVD_RECORD_END ) {
 			liveStreamStarted = true;
 			if ( record.version != 1 || record.payload.Num() != 20 ) {

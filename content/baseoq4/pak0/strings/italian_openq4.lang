@@ -1968,4 +1968,9 @@
 	"#str_232835"	"La tua identità è stata reimpostata: ogni server ora ti vede come un nuovo giocatore."
 	"#str_232836"	"Non invii alcuna identità: ui_identity è 0."
 	"#str_232837"	"Identità del giocatore"
+	"#str_232840"	"Giocatori"
+	"#str_232841"	"Segui un giocatore"
+	"#str_232842"	"Passo indietro"
+	"#str_232843"	"Giocatori: %s"
+	"#str_232844"	"Visuale di %s"
 }

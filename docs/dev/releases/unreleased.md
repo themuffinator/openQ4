@@ -509,6 +509,9 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Demo playback lists the players to follow by name, steps back a frame,
+  and `demoExport` writes a demo as pictures; the library shows who played and
+  a picture from each recording, and `demoFind` searches it.
 - `ui_autoAction "demo ss stats"` records every match you play, screenshots the
   result and writes its stats; servers can do the same with `si_autoAction`.
   `timeDemo name.mvd` benchmarks a multi-view demo. See

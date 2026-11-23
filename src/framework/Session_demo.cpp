@@ -462,6 +462,16 @@ static void DemoProbeEntry( demoLibraryEntry_t &entry ) {
 			entry.format = va( "OQ4MVD %u.%u / %u.%u",
 				info.formatMajor, info.formatMinor,
 				info.protocolMajor, info.protocolMinor );
+			// openQ4 MP-22: whose view or who played, and what demoFind searches
+			entry.serverName = DemoSanitizeText( info.serverName );
+			entry.players = DemoSanitizeText( info.players );
+			entry.recorder = DemoSanitizeText( info.viewName );
+			entry.clientView = info.clientView;
+			if ( info.compatible && info.clientView && !entry.recorder.IsEmpty() ) {
+				entry.details = va( DemoLocalized( "#str_232844" ), entry.recorder.c_str() );
+			} else if ( info.compatible && !entry.players.IsEmpty() ) {
+				entry.details = va( DemoLocalized( "#str_232843" ), entry.players.c_str() );
+			}
 			if ( info.compatible ) {
 				entry.capabilities =
 					DEMO_CAP_PLAY | DEMO_CAP_PAUSE | DEMO_CAP_RATE |
@@ -685,7 +695,53 @@ static void Session_DemoSkip_f( const idCmdArgs &args ) {
 }
 
 static void Session_DemoStep_f( const idCmdArgs &args ) {
-	sessLocal.StepDemo();
+	// openQ4 MP-22: demoStep [frames], negative to step back
+	sessLocal.StepDemo( args.Argc() > 1 ? atoi( args.Argv( 1 ) ) : 1 );
+}
+
+// openQ4 MP-22: demos whose name, map, mode, server, players or recorder contain the text
+static void Session_DemoFind_f( const idCmdArgs &args ) {
+	if ( args.Argc() < 2 ) {
+		common->Printf( "usage: demoFind <text>\n" );
+		return;
+	}
+	const idStr text = args.Args( 1, -1 );
+	sessLocal.RefreshDemoLibrary();
+	int found = 0;
+	for ( int i = 0; i < sessLocal.demoLibrary.Num(); i++ ) {
+		const demoLibraryEntry_t &entry = sessLocal.demoLibrary[i];
+		const char *fields[] = { entry.displayName.c_str(), entry.mapName.c_str(), entry.gameType.c_str(),
+			entry.serverName.c_str(), entry.players.c_str(), entry.recorder.c_str() };
+		bool match = false;
+		for ( int f = 0; f < static_cast<int>( sizeof( fields ) / sizeof( fields[0] ) ) && !match; f++ ) {
+			match = idStr::FindText( fields[f], text.c_str(), false ) >= 0;
+		}
+		if ( match ) {
+			common->Printf( "DEMO_FIND %s  %s  %s  %s%s%s\n", entry.path.c_str(), entry.mapName.c_str(),
+				entry.gameType.c_str(), entry.clientView ? "view of " : "", entry.clientView ? entry.recorder.c_str() : "",
+				entry.clientView ? "" : entry.players.c_str() );
+			found++;
+		}
+	}
+	common->Printf( "DEMO_FIND %d of %d demos match \"%s\"\n", found, sessLocal.demoLibrary.Num(), text.c_str() );
+}
+
+// openQ4 MP-22: the recorded players of the playing multi-view demo
+static void Session_DemoPlayers_f( const idCmdArgs &args ) {
+	if ( !idAsyncNetwork::multiViewDemo.IsPlaying() ) {
+		common->Printf( "No multi-view demo is playing\n" );
+		return;
+	}
+	const int followed = idAsyncNetwork::multiViewDemo.GetFollowClient();
+	int listed = 0;
+	for ( int slot = 0; slot < MAX_ASYNC_CLIENTS; slot++ ) {
+		idStr name;
+		if ( idAsyncNetwork::multiViewDemo.CopyFollowName( slot, name ) ) {
+			common->Printf( "%c %2d  %s\n", slot == followed ? '>' : ' ', slot, name.c_str() );
+			listed++;
+		}
+	}
+	common->Printf( "%d players; demoFollow <slot> or demoFollow <name> follows one\n", listed );
 }
 
 static void Session_DemoFollow_f( const idCmdArgs &args ) {
@@ -827,8 +883,10 @@ void idSessionLocal::InitDemoSystem() {
 	cmdSystem->AddCommand( "demoSpeed", Session_DemoSpeed_f, CMD_FL_SYSTEM, "sets unified demo playback speed" );
 	cmdSystem->AddCommand( "demoSeek", Session_DemoSeek_f, CMD_FL_SYSTEM, "seeks to a unified demo time in seconds" );
 	cmdSystem->AddCommand( "demoSkip", Session_DemoSkip_f, CMD_FL_SYSTEM, "moves relative to the current demo time in seconds" );
-	cmdSystem->AddCommand( "demoStep", Session_DemoStep_f, CMD_FL_SYSTEM, "steps a paused demo by one frame" );
+	cmdSystem->AddCommand( "demoStep", Session_DemoStep_f, CMD_FL_SYSTEM, "steps a paused demo: demoStep [frames], negative to step back" );
 	cmdSystem->AddCommand( "demoFollow", Session_DemoFollow_f, CMD_FL_SYSTEM, "follows an MVD player: demoFollow [next|prev|free|<slot>|<name>]" );
+	cmdSystem->AddCommand( "demoPlayers", Session_DemoPlayers_f, CMD_FL_SYSTEM, "lists a multi-view demo's recorded players, to follow with demoFollow" );
+	cmdSystem->AddCommand( "demoFind", Session_DemoFind_f, CMD_FL_SYSTEM, "lists the demos whose name, map, mode, server, players or recorder contain the text" );
 	cmdSystem->AddCommand( "demoFreeRoam", Session_DemoFreeRoam_f, CMD_FL_SYSTEM, "enters MVD free-roam mode" );
 	cmdSystem->AddCommand( "demoMarker", Session_DemoMarker_f, CMD_FL_SYSTEM, "seeks to an MVD marker: demoMarker next|prev [kind]" );
 	cmdSystem->AddCommand( "demoAutoTrack", Session_DemoAutoTrack_f, CMD_FL_SYSTEM, "sets or cycles MVD auto-tracking: demoAutoTrack [off|killer|action] [any|marine|strogg]" );
@@ -1089,6 +1147,26 @@ void idSessionLocal::UpdateDemoMenuGui() {
 			( mvdPlaying && idAsyncNetwork::multiViewDemo.GetMarkerCount() > 0 ) ||
 			( renderPlaying && renderDemoFrameClock && renderDemoPlaySegments.Num() > 1 &&
 			  ( capabilities & DEMO_CAP_SEEK ) != 0 ) );
+		// openQ4 MP-22: the recorded players, to follow one by name
+		demoPlayerRows = 0;
+		const int followed = mvdPlaying ? idAsyncNetwork::multiViewDemo.GetFollowClient() : -1;
+		for ( int slot = 0; slot < MAX_ASYNC_CLIENTS && demoPlayerRows < DEMO_PLAYER_ROWS; slot++ ) {
+			idStr name;
+			if ( mvdPlaying && ( capabilities & DEMO_CAP_FOLLOW ) != 0 &&
+				 idAsyncNetwork::multiViewDemo.CopyFollowName( slot, name ) ) {
+				guiDemoMenu->SetStateString( va( "demo_player%d_name", demoPlayerRows ), DemoSanitizeText( name ) );
+				guiDemoMenu->SetStateBool( va( "demo_player%d_on", demoPlayerRows ), slot == followed );
+				demoPlayerRowSlots[ demoPlayerRows++ ] = slot;
+			}
+		}
+		for ( int row = 0; row < DEMO_PLAYER_ROWS; row++ ) {
+			guiDemoMenu->SetStateBool( va( "demo_player%d_shown", row ), row < demoPlayerRows );
+		}
+		if ( demoPlayerRows == 0 ) {
+			demoPlayersOpen = false;
+		}
+		guiDemoMenu->SetStateBool( "demo_canPlayers", demoPlayerRows > 0 );
+		guiDemoMenu->SetStateBool( "demo_playersOpen", demoPlayersOpen );
 		const idCVar *autoTrack = cvarSystem->Find( "demo_autoTrack" );
 		static const char * const autoTrackLabels[] = { "#str_41573", "#str_41574", "#str_41575" };
 		guiDemoMenu->SetStateString( "demo_autoTrackLabel", DemoLocalized( autoTrackLabels[
@@ -1535,15 +1613,23 @@ bool idSessionLocal::SkipDemoMS( int deltaMS ) {
 	return false;
 }
 
-void idSessionLocal::StepDemo() {
+void idSessionLocal::StepDemo( int frames ) {
+	if ( frames == 0 ) {
+		frames = 1;
+	}
 	if ( idAsyncNetwork::multiViewDemo.IsPlaying() ) {
 		if ( !idAsyncNetwork::multiViewDemo.IsSeeking() ) {
-			idAsyncNetwork::multiViewDemo.StepFrames( 1 );
+			idAsyncNetwork::multiViewDemo.StepFrames( frames );
 		}
 	} else if ( readDemo != NULL && !renderDemoSeeking &&
 			   !timeDemo && !aviCaptureMode ) {
 		SetDemoPaused( true );
-		renderDemoStepPending = true;
+		if ( frames > 0 ) {
+			renderDemoStepPending = true;
+		} else {
+			// openQ4 MP-22: back to the frame before this one, from its keyframe
+			SeekDemoMS( Max( 0, DemoCurrentRenderTimeMS( *this ) - 1 ) );
+		}
 	}
 	UpdateDemoMenuGui();
 }
@@ -1626,6 +1712,13 @@ bool idSessionLocal::DeleteDemoLibraryFile( const demoLibraryEntry_t &entry ) {
 	if ( fileSystem->RemoveExplicitFile( explicitPath.c_str() ) != 0 ) {
 		common->Warning( "Could not delete demo '%s'", entry.path.c_str() );
 		return false;
+	}
+	// openQ4 MP-22: and its thumbnail
+	idStr thumbnail = entry.path;
+	thumbnail.StripFileExtension();
+	thumbnail += "_thumb.png";
+	if ( fileSystem->ReadFile( thumbnail.c_str(), NULL, NULL ) > 0 ) {
+		fileSystem->RemoveExplicitFile( fileSystem->RelativePathToOSPath( thumbnail.c_str(), "fs_savepath" ) );
 	}
 	return true;
 }
@@ -1764,7 +1857,7 @@ bool idSessionLocal::HandleDemoMenuCommand( const char *menuCommand ) {
 		return true;
 	}
 	if ( !idStr::Icmp( cmd, "demoStep" ) ) {
-		StepDemo();
+		StepDemo( icmd < args.Argc() ? atoi( args.Argv( icmd++ ) ) : 1 );
 		return true;
 	}
 	if ( !idStr::Icmp( cmd, "demoSpeed" ) ) {
@@ -1777,6 +1870,21 @@ bool idSessionLocal::HandleDemoMenuCommand( const char *menuCommand ) {
 		if ( idAsyncNetwork::multiViewDemo.IsPlaying() ) {
 			idAsyncNetwork::multiViewDemo.FollowNext();
 		}
+		return true;
+	}
+	// openQ4 MP-22: the deck's player list
+	if ( !idStr::Icmp( cmd, "demoPlayers" ) ) {
+		demoPlayersOpen = !demoPlayersOpen && demoPlayerRows > 0;
+		UpdateDemoMenuGui();
+		return true;
+	}
+	if ( !idStr::Icmp( cmd, "demoFollowRow" ) ) {
+		const int row = icmd < args.Argc() ? atoi( args.Argv( icmd++ ) ) : -1;
+		if ( row >= 0 && row < demoPlayerRows && idAsyncNetwork::multiViewDemo.IsPlaying() ) {
+			idAsyncNetwork::multiViewDemo.FollowClient( demoPlayerRowSlots[ row ] );
+		}
+		demoPlayersOpen = false;
+		UpdateDemoMenuGui();
 		return true;
 	}
 	if ( !idStr::Icmp( cmd, "demoFollowPrev" ) ) {

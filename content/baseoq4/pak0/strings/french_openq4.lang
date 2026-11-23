@@ -1968,4 +1968,9 @@
 	"#str_232835"	"Votre identité a été réinitialisée : chaque serveur vous voit désormais comme un nouveau joueur."
 	"#str_232836"	"Vous n'envoyez aucune identité : ui_identity vaut 0."
 	"#str_232837"	"Identité du joueur"
+	"#str_232840"	"Joueurs"
+	"#str_232841"	"Suivre un joueur"
+	"#str_232842"	"Image précédente"
+	"#str_232843"	"Joueurs : %s"
+	"#str_232844"	"Vue de %s"
 }

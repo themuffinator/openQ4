@@ -1959,4 +1959,9 @@
 	"#str_232835"	"Your identity was reset: every server now sees you as a new player."
 	"#str_232836"	"You send no identity: ui_identity is 0."
 	"#str_232837"	"Player Identity"
+	"#str_232840"	"Players"
+	"#str_232841"	"Follow a player"
+	"#str_232842"	"Step back"
+	"#str_232843"	"Players: %s"
+	"#str_232844"	"View of %s"
 }

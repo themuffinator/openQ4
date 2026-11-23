@@ -11593,6 +11593,13 @@ void idSessionLocal::PublishRetainedDemoSelection( idUserInterface *gui, const c
 		if ( !entry.mapName.IsEmpty() ) {
 			shot = RetainedPauseShot( entry.mapName.c_str() );
 		}
+		// openQ4 MP-22: the recording's own thumbnail, where one was taken
+		idStr thumbnail = entry.path;
+		thumbnail.StripFileExtension();
+		thumbnail += "_thumb";
+		if ( UI_RetainedImageSource( thumbnail.c_str() ) && fileSystem->ReadFile( va( "%s.png", thumbnail.c_str() ), NULL, NULL ) > 0 ) {
+			shot = thumbnail;
+		}
 		playable = entry.playable;
 		canPlay = ( entry.capabilities & DEMO_CAP_PLAY ) != 0;
 		canDelete = ( entry.capabilities & DEMO_CAP_DELETE ) != 0;

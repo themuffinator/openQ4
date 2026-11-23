@@ -3393,6 +3393,17 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			if ( IsServerDemoPlaying() ) {
 				demoAutoTrack.NoteKill( attackerEntityNumber, victimEntityNumber, GetDemoFollowClient(), time );
 			}
+			// openQ4 MP-22: a recording of this player's view marks each kill it hears of
+			if ( !isServer && victim != NULL && networkSystem->ServerIsMVDRecording() ) {
+				serverMVDMarker_t marker;
+				memset( &marker, 0, sizeof( marker ) );
+				marker.kind = SERVER_MVD_MARKER_KILL;
+				marker.client = attacker != NULL && attacker != victim ? attacker->entityNumber : -1;
+				marker.instance = victim->GetInstance();
+				marker.value0 = victim->entityNumber;
+				marker.value1 = methodOfDeath;
+				networkSystem->ServerRecordMVDMarker( marker );
+			}
 		
 			mpGame.ReceiveDeathMessage( attacker, attackerScore, victim, victimScore, methodOfDeath, quadKill );
 			break;

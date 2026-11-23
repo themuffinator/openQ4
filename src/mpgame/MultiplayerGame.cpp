@@ -15386,6 +15386,10 @@ void idMultiplayerGame::ClientRun( void ) {
 	}
 
 	CommonRun();
+	// openQ4 MP-22: a recording of this player's view marks what the match does
+	if ( !gameLocal.isServer ) {
+		PublishMVDMarkers();
+	}
 }
 
 

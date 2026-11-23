@@ -6625,10 +6625,14 @@ Completion substeps:
   `mp_autoaction_smoke.py` qualifies both sides on a cheats-off dedicated
   server; `mp_client_demo_smoke.py` adds a keyframe seek, a timedemo, a
   recovery and a refusal.
-  Open: markers for a client view, the named player list, reverse scrubbing,
-  frame-accurate stepping, export, thumbnails and library metadata, the two
-  retail readers, Vulkan, Linux and macOS runs, and a person watching a
-  recording.
+  Progress, 23 November (third round): the deck's player list (**Players**,
+  `demoPlayers`), frame steps back through keyframes (**Step back**,
+  `demoStep -1`) with exact tics both ways, `demoExport` as a PNG sequence,
+  markers in client recordings, a summary of names in every recording, the
+  library's player and recorder details with `demoFind`, and generated
+  thumbnails; both smokes check each.
+  Open: sound in exports, the two retail readers, Vulkan, Linux and macOS
+  runs, and a person watching a recording.
 - [ ] **MP-23 — P2, measured optimization: demo storage efficiency.** MVD is
   written uncompressed; the render container reaches 4.78:1 on its stream and
   the v12 joint predictor cut 24.5%. Budgets first: MVD bytes a minute for a

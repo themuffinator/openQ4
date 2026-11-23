@@ -1959,4 +1959,9 @@
 	"#str_232835"	"Deine Identität wurde zurückgesetzt: Jeder Server sieht dich jetzt als neuen Spieler."
 	"#str_232836"	"Du sendest keine Identität: ui_identity ist 0."
 	"#str_232837"	"Spieleridentität"
+	"#str_232840"	"Spieler"
+	"#str_232841"	"Einem Spieler folgen"
+	"#str_232842"	"Schritt zurück"
+	"#str_232843"	"Spieler: %s"
+	"#str_232844"	"Sicht von %s"
 }

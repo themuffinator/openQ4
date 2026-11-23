@@ -154,8 +154,46 @@ def check_navigation_and_tools() -> None:
             "a recording keeps its packs and a refusal for other game data names the pack that differs")
 
 
+def check_deck_and_library() -> None:
+    mvd = read("src/framework/async/MultiViewDemo.cpp")
+    session = read("src/framework/Session_demo.cpp")
+    menu = read("src/framework/Session_menu.cpp")
+    gui = read("content/baseoq4/pak0/guis/demo_menu.gui")
+    english = read("content/baseoq4/pak0/strings/english_openq4.lang")
+    require('set "cmd" "play main_menu_selection ; demoPlayers" ;' in gui and gui.count("demoFollowRow ") == 16 and
+            'text		"gui::demo_player15_name"' in gui, "the deck lists up to 16 recorded players to follow by name")
+    require('set "cmd" "play main_menu_selection ; demoStep -1" ;' in gui, "the deck steps back a frame")
+    for key in ("#str_232840", "#str_232841", "#str_232842", "#str_232843", "#str_232844"):
+        require(f'"{key}"' in english, f"{key} is in the language table")
+    require("demoPlayerRowSlots[ row ]" in session and "FollowClient(" in session, "a row follows its recorded slot")
+    require("const int step = ( frames == 0 ? 1 : frames ) * Max( 1, common->GetUserCmdMSec() );" in
+            body(mvd, "void idMultiViewDemo::StepFrames( int frames ) {"), "a step is whole tics, back as well as on")
+    export = body(mvd, "void idMultiViewDemo::RunPlaybackFrame() {")
+    require('screenshot \\"%s/frame%05d.png\\"' in export and "elapsed = exportStepMS;" in export,
+            "an export writes a PNG frame each 1000/fps of the match")
+    require('AddCommand( "demoExport", Export_f' in mvd, "demoExport is a command")
+    require("ClientStamp( markerFrame, marker.gameTime );" in body(mvd, "bool idMultiViewDemo::RecordMarker( const serverMVDMarker_t &input ) {"),
+            "a client recording stamps markers on its own clock")
+    require("idAsyncNetwork::multiViewDemo.IsClientRecording()" in read("src/framework/async/NetworkSystem.cpp"),
+            "the game's markers reach a client recording")
+    require("PublishMVDMarkers();" in body(read("src/mpgame/MultiplayerGame.cpp"), "void idMultiplayerGame::ClientRun( void ) {"),
+            "a client's game finds the match's changes for its recording")
+    require("SERVER_MVD_MARKER_KILL" in read("src/mpgame/Game_network.cpp").split("case GAME_RELIABLE_MESSAGE_DEATH")[1][:3000],
+            "a client recording marks each kill it hears of")
+    require("WriteSummaryRecord()" in body(mvd, "bool idMultiViewDemo::StopRecording( const char *reason, bool finalize,") and "MVD_RECORD_SUMMARY" in body(mvd, "bool idMultiViewDemo::WriteSummaryRecord() {"),
+            "a finished recording names everyone seen in its summary")
+    require('AddCommand( "demoFind", Session_DemoFind_f' in session and "#str_232844" in session and "#str_232843" in session,
+            "demoFind searches the library, which names the players or whose view a demo is")
+    require('"screenshot \\"%s\\" 320 240\\n"' in body(mvd, "void idMultiViewDemo::ServiceThumbnail() {"),
+            "a recording made where there is a view takes a 320x240 thumbnail")
+    require('thumbnail += "_thumb";' in menu, "the library shows a demo's own thumbnail")
+    require("!idStr::IsNumeric( args.Argv( 1 ) )" in read("src/renderer/RenderSystem_init.cpp"),
+            "screenshot takes a file name with a size")
+
+
 def main() -> int:
     try:
+        check_deck_and_library()
         check_container()
         check_recording()
         check_playback()

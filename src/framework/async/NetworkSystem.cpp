@@ -181,7 +181,8 @@ idNetworkSystem::ServerRecordMVDMarker
 ==================
 */
 bool idNetworkSystem::ServerRecordMVDMarker( const serverMVDMarker_t &marker ) {
-	return idAsyncNetwork::server.IsActive() &&
+	// openQ4 MP-22: a recording of a client's own view takes the markers its game finds too
+	return ( idAsyncNetwork::server.IsActive() || idAsyncNetwork::multiViewDemo.IsClientRecording() ) &&
 		idAsyncNetwork::multiViewDemo.RecordMarker( marker );
 }
 

@@ -26,6 +26,13 @@ Only the controls the selected demo supports are available. A demo file in
 your own `demos/` folder (in your save path) can be deleted after you confirm;
 demos inside packages are read-only.
 
+**After 0.15.0:** the details line names the players in a multi-view demo, or
+whose view a recording of one player's view shows, and a recording made where
+there was a view shows its own picture in place of the map's levelshot (a
+320x240 `demos/<name>_thumb.png` taken three seconds in). `demoFind <text>`
+lists the demos whose name, map, mode, server, players or recorder contain the
+text.
+
 ## Watch a demo
 
 Select a demo in **Demos** and choose **Play**, or enter `playMVD match_name` in
@@ -38,7 +45,9 @@ The controls include:
 - pause and resume, and step one frame;
 - skip back or forward 10 or 30 seconds;
 - speeds of 0.25x, 0.5x, 1x, 2x and 4x;
-- **Follow next** and **Free roam** in multi-view demos;
+- **Follow next** and **Free roam** in multi-view demos, and **Players**, a
+  list of everyone recorded to follow by name (**after 0.15.0**);
+- **Step back**, a frame at a time (**after 0.15.0**);
 - **Prev Marker** and **Next Marker**, when the demo has markers;
 - **Auto-Track**, which cycles Off, Killer and Action;
 - stop and close.
@@ -90,11 +99,12 @@ These work for any demo whose format supports the action:
 | `demoSpeed <0.05-16>` | Set a playback speed beyond the menu presets. |
 | `demoSeek <seconds>` | Go to a time, counted from the start. |
 | `demoSkip <seconds>` | Move back or forward, such as `demoSkip -10`. |
-| `demoStep` | Pause and advance one frame. |
+| `demoStep [frames]` | Pause and advance one frame, or that many; a negative number steps back (**after 0.15.0**). |
 | `demoFollow [next\|prev\|free\|<slot>\|<name>]` | In a multi-view demo, follow the next or previous player, a player slot or a player by name. |
 | `demoFreeRoam` | Leave follow mode and fly freely. |
 | `demoMarker next\|prev [kind]` | Jump to the next or previous marker. |
 | `demoAutoTrack [off\|killer\|action] [any\|marine\|strogg]` | Set auto-tracking, or cycle it with no arguments. |
+| `demoPlayers` | List a multi-view demo's recorded players, to follow with `demoFollow` (**after 0.15.0**). |
 | `demoStop` | Stop the demo. |
 
 A name matches whole names first, ignoring colours and case, then the one name
@@ -253,6 +263,14 @@ frames are not capped, so the same file always shows the same frames. The
 console reports the frames, seconds, frame rate and the slowest frame;
 `timeDemoQuit` quits afterwards. A hidden or minimized window may still be held
 to the display's rate.
+
+### Export a demo as pictures
+
+`demoExport match_name.mvd 30` writes a multi-view demo, or a recording of your
+own view, as one PNG picture every thirtieth of a second of the match, in
+`exports/match_name/` in your save path (`frame00000.png` on); add `quit` to
+quit afterwards. Any video editor or encoder turns the pictures into a video.
+Sound is not exported yet.
 
 ### Add markers and notes
 

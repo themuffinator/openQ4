@@ -153,6 +153,21 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   start and a menu start. The packaged fix is qualified on the next candidate,
   recorded in [release qualification](release-qualification.md).
 
+## Pick a player by name, step back, export pictures, find demos, 23 November 2026
+
+- **Players.** The playback controls list everyone in a multi-view demo; choose
+  one to follow. `demoPlayers` lists them at the console.
+- **Step back** a frame at a time, as well as forward.
+- **Export.** `demoExport name.mvd 30` writes a demo as PNG pictures for a
+  video editor. Sound is not exported yet.
+- **Find your demos.** The library names the players, or whose view a
+  recording shows, shows a picture from the recording itself, and
+  `demoFind <text>` searches them all.
+- **Markers in your own recordings**, for kills and the match's changes.
+- **Evidence.** `mp_client_demo_smoke.py` and `mp_autoaction_smoke.py` check
+  each on a cheats-off dedicated server (Windows, OpenGL). The new deck
+  buttons were not pressed by a person.
+
 ## Record every match automatically, time a demo, and seek recordings faster, 23 November 2026
 
 - **Autoaction.** `ui_autoAction "demo ss stats"` records every match you play,

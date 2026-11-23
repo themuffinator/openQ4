@@ -1959,4 +1959,9 @@
 	"#str_232835"	"Sua identidade foi redefinida: todos os servidores agora o veem como um novo jogador."
 	"#str_232836"	"Você não envia identidade: ui_identity é 0."
 	"#str_232837"	"Identidade do jogador"
+	"#str_232840"	"Jogadores"
+	"#str_232841"	"Seguir um jogador"
+	"#str_232842"	"Voltar quadro"
+	"#str_232843"	"Jogadores: %s"
+	"#str_232844"	"Visão de %s"
 }

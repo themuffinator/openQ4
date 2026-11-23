@@ -46,6 +46,7 @@ struct mvdFileInfo_t {
 	bool					clientView;
 	idStr					viewName;
 	idStr					packs;			// "<dir>/<pack>:<checksum>;..." the game data came from
+	idStr					players;		// openQ4 MP-22: every name seen while recording, ", " between
 };
 
 class idMultiViewDemo {
@@ -64,6 +65,9 @@ public:
 	// openQ4 MP-22: timeDemo for a .mvd: fixed match time a frame, uncapped, timed
 	bool					StartTimeDemo( const char *name, bool quitAfter );
 	bool					IsTimeDemo() const;
+	// openQ4 MP-22: a PNG frame a step, at a fixed frame rate (demoExport)
+	bool					StartExport( const char *name, int fps, bool quitAfter );
+	static void				Export_f( const idCmdArgs &args );
 	int						GetPlaybackLocalClient() const;
 	bool					StartNamedRecording( const char *name );
 	bool					StopRecordingCleanly( const char *reason );
@@ -109,6 +113,8 @@ public:
 	void					CaptureClientUserInfo( int clientNum, const idDict &info );
 	void					CaptureClientUsercmd( const usercmd_t &cmd );
 	void					OnClientGameEnded( const char *reason );
+	// openQ4 MP-22: a recording's thumbnail, taken where console commands run
+	void					ServiceThumbnail();
 
 	static void				Record_f( const idCmdArgs &args );
 	static void				Stop_f( const idCmdArgs &args );
@@ -231,6 +237,16 @@ private:
 	int						timeDemoStartTime;		// real time of the first timed frame
 	int						timeDemoLastFrameTime;
 	int						timeDemoSlowestFrame;
+	bool					exporting;
+	int						exportStepMS;
+	int						exportFrames;
+	idStrList				recordingPlayers;		// names seen while recording, for the summary
+	bool					thumbnailTaken;
+	idStr					pendingThumbnail;
+	void					TakeRecordingThumbnail();
+	void					NoteRecordingPlayer( const idDict &info );
+	bool					WriteSummaryRecord();
+	idStr					exportDirectory;
 	// Format 1.3 navigation. While recording these collect the directories
 	// written at finalization; during playback they hold what was read back.
 	std::vector<openq4_mvd::Marker>	markers;

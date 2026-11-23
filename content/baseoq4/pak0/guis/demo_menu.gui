@@ -1852,6 +1852,96 @@ windowDef Desktop
 			}
 		}
 
+		// openQ4 MP-22: a frame back, from the keyframe before it
+		windowDef demo_step_back_disabled
+		{
+			rect		334,131,104,30
+			visible		( "gui::demo_active" != 1 || "gui::demo_canStep" != 1 || "gui::demo_canSeek" != 1 )
+			backcolor	0.07,0.07,0.06,0.9
+			bordercolor	0.18,0.18,0.15,1
+			bordersize	1
+			forecolor	0.36,0.36,0.32,1
+			text		"#str_232842"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_step_back
+		{
+			rect		334,131,104,30
+			visible		( "gui::demo_active" == 1 && "gui::demo_canStep" == 1 && "gui::demo_canSeek" == 1 )
+			backcolor	0.14,0.16,0.1,0.95
+			bordercolor	0.36,0.4,0.24,1
+			bordersize	1
+			forecolor	0.9,0.91,0.84,1
+			text		"#str_232842"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_step_back::backcolor" "$demo_step_back::backcolor" "0.32,0.19,0.06,1" "120" ;
+				transition "demo_step_back::bordercolor" "$demo_step_back::bordercolor" "0.95,0.49,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_step_back::backcolor" "$demo_step_back::backcolor" "0.14,0.16,0.1,0.95" "180" ;
+				transition "demo_step_back::bordercolor" "$demo_step_back::bordercolor" "0.36,0.4,0.24,1" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoStep -1" ;
+			}
+		}
+
+		// openQ4 MP-22: the recorded players, to follow one by name
+		windowDef demo_players_disabled
+		{
+			rect		400,171,218,26
+			visible		( "gui::demo_active" != 1 || "gui::demo_canPlayers" != 1 )
+			backcolor	0.07,0.07,0.06,0.9
+			bordercolor	0.18,0.18,0.15,1
+			bordersize	1
+			forecolor	0.36,0.36,0.32,1
+			text		"#str_232840"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_players
+		{
+			rect		400,171,218,26
+			visible		( "gui::demo_active" == 1 && "gui::demo_canPlayers" == 1 )
+			backcolor	0.14,0.16,0.1,0.95
+			bordercolor	0.36,0.4,0.24,1
+			bordersize	1
+			forecolor	0.9,0.91,0.84,1
+			text		"#str_232840"
+			textscale	0.17
+			textalign	1
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_players::backcolor" "$demo_players::backcolor" "0.32,0.19,0.06,1" "120" ;
+				transition "demo_players::bordercolor" "$demo_players::bordercolor" "0.95,0.49,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_players::backcolor" "$demo_players::backcolor" "0.14,0.16,0.1,0.95" "180" ;
+				transition "demo_players::bordercolor" "$demo_players::bordercolor" "0.36,0.4,0.24,1" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoPlayers" ;
+			}
+		}
+
 		windowDef demo_playback_close
 		{
 			rect		522,131,96,30
@@ -1878,6 +1968,573 @@ windowDef Desktop
 			onAction {
 				set "cmd" "play main_menu_selection ; demoClose" ;
 			}
+		}
+	}
+
+	// openQ4 MP-22: the deck's player list, over the deck's PLAYERS button: an
+	// opaque black pop-up with the deck's thin frame (ui-visual-design.md 13.2)
+	windowDef demo_players_panel
+	{
+		rect		400,50,218,222
+		visible		( "gui::demo_browserMode" == 0 && "gui::demo_interactive" == 1 && "gui::demo_playersOpen" == 1 )
+		screenalignx	middle
+		screenaligny	bottom
+		backcolor	0,0,0,1
+		bordercolor	0.36,0.4,0.24,1
+		bordersize	1
+
+		windowDef demo_players_title
+		{
+			rect		6,3,206,16
+			forecolor	0.62,0.67,0.5,1
+			text		"#str_232841"
+			textscale	0.17
+			font		"fonts/lowpixel"
+			noevents	1
+		}
+
+		windowDef demo_player_row0
+		{
+			rect		6,22,206,11
+			visible		( "gui::demo_player0_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player0_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row0::backcolor" "$demo_player_row0::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row0::backcolor" "$demo_player_row0::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 0" ;
+			}
+		}
+
+		windowDef demo_player_followed0
+		{
+			rect		6,22,3,11
+			visible		( "gui::demo_player0_shown" == 1 && "gui::demo_player0_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row1
+		{
+			rect		6,34,206,11
+			visible		( "gui::demo_player1_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player1_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row1::backcolor" "$demo_player_row1::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row1::backcolor" "$demo_player_row1::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 1" ;
+			}
+		}
+
+		windowDef demo_player_followed1
+		{
+			rect		6,34,3,11
+			visible		( "gui::demo_player1_shown" == 1 && "gui::demo_player1_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row2
+		{
+			rect		6,46,206,11
+			visible		( "gui::demo_player2_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player2_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row2::backcolor" "$demo_player_row2::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row2::backcolor" "$demo_player_row2::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 2" ;
+			}
+		}
+
+		windowDef demo_player_followed2
+		{
+			rect		6,46,3,11
+			visible		( "gui::demo_player2_shown" == 1 && "gui::demo_player2_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row3
+		{
+			rect		6,58,206,11
+			visible		( "gui::demo_player3_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player3_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row3::backcolor" "$demo_player_row3::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row3::backcolor" "$demo_player_row3::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 3" ;
+			}
+		}
+
+		windowDef demo_player_followed3
+		{
+			rect		6,58,3,11
+			visible		( "gui::demo_player3_shown" == 1 && "gui::demo_player3_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row4
+		{
+			rect		6,70,206,11
+			visible		( "gui::demo_player4_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player4_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row4::backcolor" "$demo_player_row4::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row4::backcolor" "$demo_player_row4::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 4" ;
+			}
+		}
+
+		windowDef demo_player_followed4
+		{
+			rect		6,70,3,11
+			visible		( "gui::demo_player4_shown" == 1 && "gui::demo_player4_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row5
+		{
+			rect		6,82,206,11
+			visible		( "gui::demo_player5_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player5_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row5::backcolor" "$demo_player_row5::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row5::backcolor" "$demo_player_row5::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 5" ;
+			}
+		}
+
+		windowDef demo_player_followed5
+		{
+			rect		6,82,3,11
+			visible		( "gui::demo_player5_shown" == 1 && "gui::demo_player5_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row6
+		{
+			rect		6,94,206,11
+			visible		( "gui::demo_player6_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player6_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row6::backcolor" "$demo_player_row6::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row6::backcolor" "$demo_player_row6::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 6" ;
+			}
+		}
+
+		windowDef demo_player_followed6
+		{
+			rect		6,94,3,11
+			visible		( "gui::demo_player6_shown" == 1 && "gui::demo_player6_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row7
+		{
+			rect		6,106,206,11
+			visible		( "gui::demo_player7_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player7_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row7::backcolor" "$demo_player_row7::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row7::backcolor" "$demo_player_row7::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 7" ;
+			}
+		}
+
+		windowDef demo_player_followed7
+		{
+			rect		6,106,3,11
+			visible		( "gui::demo_player7_shown" == 1 && "gui::demo_player7_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row8
+		{
+			rect		6,118,206,11
+			visible		( "gui::demo_player8_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player8_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row8::backcolor" "$demo_player_row8::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row8::backcolor" "$demo_player_row8::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 8" ;
+			}
+		}
+
+		windowDef demo_player_followed8
+		{
+			rect		6,118,3,11
+			visible		( "gui::demo_player8_shown" == 1 && "gui::demo_player8_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row9
+		{
+			rect		6,130,206,11
+			visible		( "gui::demo_player9_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player9_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row9::backcolor" "$demo_player_row9::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row9::backcolor" "$demo_player_row9::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 9" ;
+			}
+		}
+
+		windowDef demo_player_followed9
+		{
+			rect		6,130,3,11
+			visible		( "gui::demo_player9_shown" == 1 && "gui::demo_player9_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row10
+		{
+			rect		6,142,206,11
+			visible		( "gui::demo_player10_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player10_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row10::backcolor" "$demo_player_row10::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row10::backcolor" "$demo_player_row10::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 10" ;
+			}
+		}
+
+		windowDef demo_player_followed10
+		{
+			rect		6,142,3,11
+			visible		( "gui::demo_player10_shown" == 1 && "gui::demo_player10_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row11
+		{
+			rect		6,154,206,11
+			visible		( "gui::demo_player11_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player11_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row11::backcolor" "$demo_player_row11::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row11::backcolor" "$demo_player_row11::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 11" ;
+			}
+		}
+
+		windowDef demo_player_followed11
+		{
+			rect		6,154,3,11
+			visible		( "gui::demo_player11_shown" == 1 && "gui::demo_player11_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row12
+		{
+			rect		6,166,206,11
+			visible		( "gui::demo_player12_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player12_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row12::backcolor" "$demo_player_row12::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row12::backcolor" "$demo_player_row12::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 12" ;
+			}
+		}
+
+		windowDef demo_player_followed12
+		{
+			rect		6,166,3,11
+			visible		( "gui::demo_player12_shown" == 1 && "gui::demo_player12_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row13
+		{
+			rect		6,178,206,11
+			visible		( "gui::demo_player13_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player13_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row13::backcolor" "$demo_player_row13::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row13::backcolor" "$demo_player_row13::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 13" ;
+			}
+		}
+
+		windowDef demo_player_followed13
+		{
+			rect		6,178,3,11
+			visible		( "gui::demo_player13_shown" == 1 && "gui::demo_player13_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row14
+		{
+			rect		6,190,206,11
+			visible		( "gui::demo_player14_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player14_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row14::backcolor" "$demo_player_row14::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row14::backcolor" "$demo_player_row14::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 14" ;
+			}
+		}
+
+		windowDef demo_player_followed14
+		{
+			rect		6,190,3,11
+			visible		( "gui::demo_player14_shown" == 1 && "gui::demo_player14_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
+		}
+
+		windowDef demo_player_row15
+		{
+			rect		6,202,206,11
+			visible		( "gui::demo_player15_shown" == 1 )
+			backcolor	0.14,0.16,0.1,0
+			forecolor	0.9,0.91,0.84,1
+			text		"gui::demo_player15_name"
+			textscale	0.16
+			textalign	0
+			textalignx	14
+			font		"fonts/lowpixel"
+
+			onMouseEnter {
+				transition "demo_player_row15::backcolor" "$demo_player_row15::backcolor" "0.32,0.19,0.06,1" "120" ;
+				set "cmd" "play main_menu_mouseover" ;
+			}
+
+			onMouseExit {
+				transition "demo_player_row15::backcolor" "$demo_player_row15::backcolor" "0.14,0.16,0.1,0" "180" ;
+			}
+
+			onAction {
+				set "cmd" "play main_menu_selection ; demoFollowRow 15" ;
+			}
+		}
+
+		windowDef demo_player_followed15
+		{
+			rect		6,202,3,11
+			visible		( "gui::demo_player15_shown" == 1 && "gui::demo_player15_on" == 1 )
+			backcolor	0.95,0.49,0.06,1
+			noevents	1
 		}
 	}
 

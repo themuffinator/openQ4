@@ -121,6 +121,8 @@ struct idMultiViewDemo {
     bool WriteIndexRecord() { ++indexWrites; return indexOK; }
     // The 1.3 directories follow the index; their writes are WriteRecord calls.
     bool WriteNavigationRecords() { return true; }
+    // MP-22: the summary of names follows the directories; its write is a WriteRecord call too
+    bool WriteSummaryRecord() { return true; }
     void Clear() {
         ++clears; state = MVD_IDLE; finalizing = false;
         fileName.clear(); tempFileName.clear(); lastError.clear();

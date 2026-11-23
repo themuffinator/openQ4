@@ -2015,4 +2015,9 @@
 	"#str_232835"	"Twoja tożsamość została zresetowana: każdy serwer widzi cię teraz jako nowego gracza."
 	"#str_232836"	"Nie wysyłasz tożsamości: ui_identity ma wartość 0."
 	"#str_232837"	"Tożsamość gracza"
+	"#str_232840"	"Gracze"
+	"#str_232841"	"Obserwuj gracza"
+	"#str_232842"	"Krok wstecz"
+	"#str_232843"	"Gracze: %s"
+	"#str_232844"	"Widok gracza %s"
 }

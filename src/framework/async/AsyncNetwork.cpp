@@ -312,6 +312,8 @@ void idAsyncNetwork::RunFrame( void ) {
 	// Dedicated-style paths can keep blocking until the next game frame because they are not
 	// trying to present repeated-state render frames in between async ticks.
 	const bool allowBlocking = ( idAsyncNetwork::serverDedicated.GetInteger() != 0 );
+	// openQ4 MP-22: a recording's thumbnail, at the point console commands run
+	multiViewDemo.ServiceThumbnail();
 	if ( multiViewDemo.IsPlaying() ) {
 		multiViewDemo.RunPlaybackFrame();
 		return;

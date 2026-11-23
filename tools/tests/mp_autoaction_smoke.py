@@ -180,6 +180,37 @@ def main() -> int:
                   data is not None and data.get("format") == "openq4-match-stats" and data.get("match") == name and
                   len(players) >= 3 and all("score" in p and "name" in p for p in players) and
                   any(p["name"] == "Auto Player" for p in players), json.dumps(data)[:500])
+
+        # The server's recording, watched: its players by name
+        for name in list(processes):
+            processes[name].kill()
+            processes.pop(name).wait()
+        server_demo = games["server"] / "demos" / f"{server_name[1]}.mvd"
+        (games["player"] / "demos" / server_demo.name).write_bytes(server_demo.read_bytes())
+        logs_of["viewer"] = games["player"] / "logs/openq4-viewer.log"
+        write_script(games["player"] / "mp22_viewer_boot.cfg", ["waitMsec 2000", f'playMVD "{server_name[1]}"'])
+        write_script(games["player"] / "mp22_viewer.cfg", [
+            "waitMsec 3000", "echo MP22_PLAYERS_BEGIN", "demoFind auto player", "demoPlayers", 'demoFollow "Auto Player"', "waitMsec 1000",
+            "mvdStatus", "echo MP22_PLAYERS_END", "waitMsec 1000", "quit"])
+        launch("viewer", paths["engine"],
+               dict(common, fs_savepath=str(games["player"].parent), fs_devpath=str(games["player"].parent),
+                    logFileName="logs/openq4-viewer.log", g_autoExecAfterMapLoad="mp22_viewer.cfg",
+                    net_port=str(args.client_port), r_renderApi="gl", r_fullscreen="0", r_fullscreenDesktop="0",
+                    r_borderless="0", r_borderlessDefaultMigrated="1", r_hiddenWindow="1", r_mode="-1",
+                    r_customWidth="640", r_customHeight="360", r_windowWidth="640", r_windowHeight="360",
+                    com_maxfps="60", r_swapInterval="0", ui_retained="0"),
+               ["+exec", "mp22_viewer_boot.cfg"])
+        watched = wait("the viewer lists the players", lambda t: "\nMP22_PLAYERS_END" in t["viewer"],
+                       args.startup_timeout)["viewer"]
+        listed = watched.rpartition("\nMP22_PLAYERS_END")[0].rpartition("\nMP22_PLAYERS_BEGIN")[2]
+        slot = re.search(r"^[ >]\s*(\d+)\s+Auto Player$", listed, re.MULTILINE)
+        followed = re.search(r"MVD_STATUS playing=1 [^\n]*follow=(\d+)", listed)
+        check("demoFind finds the server's recording by a player who was in it",
+              re.search(rf"DEMO_FIND demos/{re.escape(server_name[1])}\.mvd\s+mp/q4dm1\s+DM\s+[^\n]*Auto Player", listed)
+              is not None, listed[-600:])
+        check("demoPlayers lists the recorded players and demoFollow follows one by name",
+              slot is not None and re.search(r"(\d+) players; demoFollow", listed) is not None and
+              followed is not None and followed[1] == slot[1], listed[-600:])
     except Exception as error:  # noqa: BLE001 - the report records the failure
         report["failures"].append(f"exception: {error}")
         print(f"FAIL {error}", flush=True)
