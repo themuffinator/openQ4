@@ -16,9 +16,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The check list below runs in two interleaved halves on parallel runners:
+  # it is CPU-bound, and one 4-core runner took 28 minutes over it.
   script-smoke:
-    name: Validation Script Smoke
+    name: Validation Script Smoke (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
 
@@ -773,7 +779,7 @@ jobs:
           bash -n tools/validation/validate_pr.sh
           # Independent checks run concurrently; run_parallel_commands.py prints each
           # in this order and fails the step if any fails.
-          python tools/validation/run_parallel_commands.py <<'OPENQ4_CHECKS'
+          python tools/validation/run_parallel_commands.py --shard ${{ matrix.shard }}/2 <<'OPENQ4_CHECKS'
           python tools/validation/audit_source_provenance.py --check
           python tools/tests/aas_liquid_area_state.py
           python tools/tests/airdefense_performance_contract.py
@@ -1298,10 +1304,95 @@ jobs:
           set -euo pipefail
           bash tools/validation/validate_push.sh --dry-run
 
-  # Build jobs do not wait for script-smoke. It already runs the validator's
-  # Python checks on Linux, so each build job skips them except one Windows and
-  # one arm64 macOS job, which cover the MSVC STL, libc++ and arm64 floating
-  # point behavior those native harnesses depend on.
+  # script-smoke runs the validator's Python checks on Linux. These jobs repeat
+  # them on the two toolchains their native fixtures also depend on: Clang on
+  # the MSVC STL (Windows x64) and libc++ with arm64 floating point (macOS).
+  # They run beside the builds rather than before them, which put 29-40
+  # minutes in front of every Windows x64 and macOS OpenGL build. Windows takes
+  # two interleaved halves, about 22 minutes each; macOS takes one job.
+  windows-python-checks:
+    name: Windows x64 Python Checks (${{ matrix.shard }}/2)
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+      # The VS 2026 image pairs the MSVC 14.52 STL, which refuses Clang older
+      # than 22 (STL1000), with LLVM 20. The Python checks compile their
+      # fixtures with clang++ against that STL, so every one of them failed to
+      # build. The driver override adds the STL's own escape hatch to every
+      # clang invocation; the leading '#' keeps clang from echoing the edit.
+      # Remove it once the image ships Clang 22 or newer.
+      CCC_OVERRIDE_OPTIONS: "# +-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Native UI fixtures compile wrap sources that Meson provisions.
+      - name: Install Meson and Ninja
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install --upgrade pip
+          python -m pip install meson ninja
+
+      - name: Run Python checks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/validation/validate_push.ps1 --skip-build --fail-on-dirty --python-shard ${{ matrix.shard }}/2
+
+  macos-python-checks:
+    name: macOS ARM64 Python Checks
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Meson and Ninja
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install meson ninja
+
+      - name: Run Python checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/validation/validate_push.sh --skip-build --fail-on-dirty
+
+  # No build job waits for script-smoke or the Python check jobs, and none runs
+  # the Python checks itself. Only Linux x64 runs the SYSTEM page's non-English
+  # 'locales' test suite; the others skip it (see meson.build).
   posix-builds:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -1317,28 +1408,28 @@ jobs:
             os: ubuntu-24.04
             artifact_name: linux-x64
             runtime_smoke: true
-            python_tests: false
+            native_locales: true
             macos_graphics_bridge: ""
             macos_openal_provider: ""
           - name: Linux ARM64 Push Verification
             os: ubuntu-24.04-arm
             artifact_name: linux-arm64
             runtime_smoke: true
-            python_tests: false
+            native_locales: false
             macos_graphics_bridge: ""
             macos_openal_provider: ""
           - name: macOS OpenGL Push Verification
             os: macos-15
             artifact_name: macos-opengl
             runtime_smoke: true
-            python_tests: true
+            native_locales: false
             macos_graphics_bridge: opengl
             macos_openal_provider: system
           - name: macOS Metal Push Verification
             os: macos-15
             artifact_name: macos-metal
             runtime_smoke: true
-            python_tests: false
+            native_locales: false
             macos_graphics_bridge: metal
             macos_openal_provider: system
           # GitHub does not publish Intel Mac packages, so one bridge variant
@@ -1347,7 +1438,7 @@ jobs:
             os: macos-15-intel
             artifact_name: macos-x64-opengl
             runtime_smoke: true
-            python_tests: false
+            native_locales: false
             macos_graphics_bridge: opengl
             macos_openal_provider: system
             # The Intel image runs the UI matrices 2-4x slower than the
@@ -1457,9 +1548,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          validation_args=(--install --fail-on-dirty)
-          if [[ "${{ matrix.python_tests }}" != "true" ]]; then
-            validation_args+=(--skip-python-tests)
+          validation_args=(--install --fail-on-dirty --skip-python-tests)
+          if [[ "${{ matrix.native_locales }}" != "true" ]]; then
+            validation_args+=(--skip-test-suite locales)
           fi
           if [[ -n "${{ matrix.macos_graphics_bridge }}" ]]; then
             validation_args+=(
@@ -1565,12 +1656,8 @@ jobs:
     timeout-minutes: 150
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
-      # The VS 2026 image pairs the MSVC 14.52 STL, which refuses Clang older
-      # than 22 (STL1000), with LLVM 20. The Python checks compile their
-      # fixtures with clang++ against that STL, so every one of them failed to
-      # build. The driver override adds the STL's own escape hatch to every
-      # clang invocation; the leading '#' keeps clang from echoing the edit.
-      # Remove it once the image ships Clang 22 or newer.
+      # The text-store checks and clang-tidy run Clang against the MSVC 14.52
+      # STL, which refuses Clang older than 22; see windows-python-checks.
       CCC_OVERRIDE_OPTIONS: "# +-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
       # The x64 debug build runs the UI tests about twice as slowly as the
       # other lanes (scrollbar runtime 15 s against 6-12 s), and a loaded
@@ -1631,7 +1718,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools/validation/validate_push.ps1 --install --fail-on-dirty
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/validation/validate_push.ps1 --install --fail-on-dirty --skip-python-tests --skip-test-suite locales
 
       - name: Run Windows x64 dedicated server smoke
         shell: pwsh
@@ -1655,28 +1742,27 @@ jobs:
           $ErrorActionPreference = "Stop"
           python tools/analysis/clang_tidy_input_safety.py --build-dir builddir
 
+      # The nine checks build in their own scratch directories, so they run side
+      # by side (they took 7-13 minutes one after another). The SDL headers come
+      # from the subproject the build above unpacked.
       - name: Validate Windows text-store SDK boundary
         shell: cmd
         run: |
           call tools\build\openq4_devcmd.cmd
           if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_store.py
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --compiler cl --msvc-debug --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --unsupported --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --route-facts --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\native_input_facts.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\native_input_terminal.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
+          if not exist .tmp mkdir .tmp
+          (
+            echo python tools/tests/windows_text_store.py
+            echo python tools/tests/windows_text_collection_bridge.py --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_collection_bridge.py --compiler cl --msvc-debug --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_collection_bridge.py --unsupported --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_session.py --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_session.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_session.py --route-facts --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/native_input_facts.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/native_input_terminal.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
+          ) > .tmp\windows-text-store-checks.txt
+          python tools\validation\run_parallel_commands.py < .tmp\windows-text-store-checks.txt
 
       - name: Publish staged payload
         if: always()
@@ -1747,7 +1833,7 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          python tools/validation/openq4_validate.py push --install --fail-on-dirty --skip-python-tests "--extra-setup-arg=-Dopenal_root_override=$env:OPENQ4_OPENAL_ROOT"
+          python tools/validation/openq4_validate.py push --install --fail-on-dirty --skip-python-tests --skip-test-suite locales "--extra-setup-arg=-Dopenal_root_override=$env:OPENQ4_OPENAL_ROOT"
 
       - name: Run Windows ARM64 dedicated server smoke
         shell: pwsh

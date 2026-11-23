@@ -39,7 +39,7 @@ def validate_commit_workflow() -> None:
     require(source, "--no-install", "commit validation sanitizer build/install separation")
     require(source, "--build-dir .tmp/validation/linux-sanitizer-builddir", "commit validation sanitizer builddir")
     require(source, "--buildtype debugoptimized", "commit validation sanitizer buildtype")
-    require(source, "--jobs 2", "commit validation sanitizer parallelism")
+    require(source, "--jobs 4", "commit validation sanitizer parallelism")
     require(source, "--extra-setup-arg=-Duse_pch=false", "commit validation sanitizer PCH opt-out")
     require(source, "--extra-setup-arg=-Db_sanitize=address,undefined", "commit validation ASan+UBSan setup")
     require(source, "Stage sanitizer runtime", "commit validation sanitizer staging")

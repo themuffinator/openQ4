@@ -11,7 +11,8 @@ command failed, after listing every failure.
 The workflows' script-smoke steps feed their check lists through this. Every
 check runs in its own process and writes only to fresh temporary directories,
 which is what lets them overlap. The runner creates the repository's .tmp
-before starting any of them.
+before starting any of them. --shard K/N runs every Nth command from the Kth,
+so a long list can be split across parallel CI jobs that feed it the same input.
 """
 
 from __future__ import annotations
@@ -33,6 +34,16 @@ def positive_int(value: str) -> int:
     if parsed <= 0:
         raise argparse.ArgumentTypeError(f"expected a positive integer, got {value!r}")
     return parsed
+
+
+def shard_spec(value: str) -> tuple[int, int]:
+    index_text, separator, count_text = value.partition("/")
+    if not separator:
+        raise argparse.ArgumentTypeError(f"expected a K/N shard, got {value!r}")
+    index, count = positive_int(index_text), positive_int(count_text)
+    if index > count:
+        raise argparse.ArgumentTypeError(f"shard {index} of only {count}")
+    return index, count
 
 
 def default_jobs() -> int:
@@ -71,9 +82,15 @@ def run_captured(argv: list[str]) -> tuple[int, str, float]:
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--jobs", "-j", type=positive_int, default=None, help="Commands to run at once.")
+    parser.add_argument("--shard", type=shard_spec, default=None, metavar="K/N",
+                        help="Run only every Nth command, starting from the Kth.")
     args = parser.parse_args(argv)
     jobs = args.jobs or default_jobs()
     commands = parse_commands(sys.stdin.read())
+    if args.shard is not None:
+        index, count = args.shard
+        commands = commands[index - 1::count]
+        print(f"==> Shard {index}/{count}", flush=True)
     # Checks put their temporary directories under .tmp without creating it; run
     # in sequence an earlier check always had, but in parallel any can go first.
     (ROOT / ".tmp").mkdir(exist_ok=True)

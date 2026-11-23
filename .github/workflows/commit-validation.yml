@@ -12,9 +12,15 @@ permissions:
   contents: read
 
 jobs:
+  # The check list below runs in two interleaved halves on parallel runners:
+  # it is CPU-bound, and one 4-core runner took 26 minutes over it.
   script-smoke:
-    name: Validation Script Smoke
+    name: Validation Script Smoke (${{ matrix.shard }}/2)
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
 
@@ -769,7 +775,7 @@ jobs:
           bash -n tools/validation/validate_pr.sh
           # Independent checks run concurrently; run_parallel_commands.py prints each
           # in this order and fails the step if any fails.
-          python tools/validation/run_parallel_commands.py <<'OPENQ4_CHECKS'
+          python tools/validation/run_parallel_commands.py --shard ${{ matrix.shard }}/2 <<'OPENQ4_CHECKS'
           python tools/validation/audit_source_provenance.py --check
           python tools/tests/aas_liquid_area_state.py
           python tools/tests/airdefense_performance_contract.py
@@ -1295,14 +1301,21 @@ jobs:
           bash tools/validation/validate_push.sh --dry-run
           bash tools/validation/validate_pr.sh --dry-run
 
-  # Build jobs do not wait for script-smoke. It already runs the validator's
-  # Python checks on Linux, so each build job skips them except this one and the
-  # arm64 macOS OpenGL job, which cover the MSVC STL, libc++ and arm64 floating
-  # point behavior those native harnesses depend on.
-  windows-x64:
-    name: Windows x64 Commit Validation
+  # script-smoke runs the validator's Python checks on Linux. These jobs repeat
+  # them on the two toolchains their native fixtures also depend on: Clang on
+  # the MSVC STL (Windows x64) and libc++ with arm64 floating point (macOS),
+  # beside the builds rather than in front of them. No build job waits for
+  # script-smoke or these jobs, and none runs the Python checks itself. Only
+  # the Linux x64 Clang Wayland job runs the SYSTEM page's non-English
+  # 'locales' test suite; the others skip it (see meson.build).
+  windows-x64-python-checks:
+    name: Windows x64 Python Checks (${{ matrix.shard }}/2)
     runs-on: windows-2025
-    timeout-minutes: 150
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
       # The image now pairs the MSVC 14.52 STL, which refuses Clang older than
@@ -1310,6 +1323,78 @@ jobs:
       # failed to build. The driver override adds the STL's escape hatch to
       # every clang invocation; the leading '#' keeps clang from echoing it.
       # Remove it once the image ships Clang 22 or newer.
+      CCC_OVERRIDE_OPTIONS: "# +-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # Native UI fixtures compile wrap sources that Meson provisions.
+      - name: Install Meson and Ninja
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python -m pip install --upgrade pip
+          python -m pip install meson ninja
+
+      - name: Run Python checks
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/validation/validate_pr.ps1 --skip-build --no-install --fail-on-dirty --python-shard ${{ matrix.shard }}/2
+
+  macos-arm64-python-checks:
+    name: macOS ARM64 Python Checks
+    runs-on: macos-15
+    timeout-minutes: 90
+    env:
+      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Setup Java for Android host storage validation
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install Meson and Ninja
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install meson ninja
+
+      - name: Run Python checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/validation/validate_pr.sh --skip-build --no-install --fail-on-dirty
+
+  windows-x64:
+    name: Windows x64 Commit Validation
+    runs-on: windows-2025
+    timeout-minutes: 150
+    env:
+      OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
+      # The text-store checks and clang-tidy run Clang against the MSVC 14.52
+      # STL, which refuses Clang older than 22; see windows-x64-python-checks.
       CCC_OVERRIDE_OPTIONS: "# +-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
 
     steps:
@@ -1336,13 +1421,28 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson ninja
 
+      # The push and release workflows' cache; pull requests read main's entry.
+      - name: Restore prepared OpenAL Soft (x64)
+        id: openal_cache
+        uses: actions/cache@v6
+        with:
+          path: .tmp/openal-soft-x64
+          key: openal-soft-windows-x64-${{ hashFiles('tools/build/prepare_windows_openal.ps1') }}
+
       - name: Prepare OpenAL Soft (Windows)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $outputRoot = Join-Path $env:GITHUB_WORKSPACE ".tmp/openal-soft-x64"
-          $env:OPENQ4_VS_TARGET_ARCH = "x64"
-          powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "x64" -OutputRoot $outputRoot
+          $cached = "${{ steps.openal_cache.outputs.cache-hit }}" -eq "true" -and
+            (Test-Path (Join-Path $outputRoot "bin/OpenAL32.dll")) -and (Test-Path (Join-Path $outputRoot "lib/OpenAL32.lib"))
+          if ($cached) {
+            Write-Host "Using the cached OpenAL Soft install: $outputRoot"
+          } else {
+            $env:OPENQ4_VS_TARGET_ARCH = "x64"
+            powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "x64" -OutputRoot $outputRoot
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           "OPENQ4_OPENAL_ROOT=$outputRoot" >> $env:GITHUB_ENV
 
       - name: Run selected validation profile
@@ -1351,7 +1451,7 @@ jobs:
           $ErrorActionPreference = "Stop"
 
           Write-Host "Selected validation profile: pr"
-          powershell -NoProfile -ExecutionPolicy Bypass -File tools/validation/validate_pr.ps1 --fail-on-dirty
+          powershell -NoProfile -ExecutionPolicy Bypass -File tools/validation/validate_pr.ps1 --fail-on-dirty --skip-python-tests --skip-test-suite locales
 
       - name: Run Windows x64 dedicated server smoke
         shell: pwsh
@@ -1375,28 +1475,27 @@ jobs:
           $ErrorActionPreference = "Stop"
           python tools/analysis/clang_tidy_input_safety.py --build-dir .tmp/validation/pr-builddir
 
+      # The nine checks build in their own scratch directories, so they run side
+      # by side (they took 7-13 minutes one after another). The SDL headers come
+      # from the subproject the build above unpacked.
       - name: Validate Windows text-store SDK boundary
         shell: cmd
         run: |
           call tools\build\openq4_devcmd.cmd
           if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_store.py
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --compiler cl --msvc-debug --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_collection_bridge.py --unsupported --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\windows_text_session.py --route-facts --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\native_input_facts.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
-          if errorlevel 1 exit /b 1
-          python tools\tests\native_input_terminal.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
+          if not exist .tmp mkdir .tmp
+          (
+            echo python tools/tests/windows_text_store.py
+            echo python tools/tests/windows_text_collection_bridge.py --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_collection_bridge.py --compiler cl --msvc-debug --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_collection_bridge.py --unsupported --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_session.py --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_session.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/windows_text_session.py --route-facts --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/native_input_facts.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
+            echo python tools/tests/native_input_terminal.py --compiler cl --msvc-debug --no-mutations --sdl-include subprojects/SDL3-3.4.18/include
+          ) > .tmp\windows-text-store-checks.txt
+          python tools\validation\run_parallel_commands.py < .tmp\windows-text-store-checks.txt
 
   linux-arm64:
     name: Linux ARM64 Commit Validation
@@ -1496,6 +1595,7 @@ jobs:
           env LIBGL_ALWAYS_SOFTWARE=1 SDL_VIDEO_DRIVER=x11 SDL_VIDEODRIVER=x11 xvfb-run -a bash tools/validation/validate_pr.sh \
             --fail-on-dirty \
             --skip-python-tests \
+            --skip-test-suite locales \
             --runtime \
             --runtime-cases renderer-foundation-selftests,renderer-pbr-visible-selftest,renderer-cluster-grid-selftest,renderer-default-safety-selftest,renderer-shadow-planner-selftest,renderer-shadow-projected-diagnostic,sdl3-x11-display-diagnostics,renderer-vk-clear-startup,renderer-vk-probe-source-lifecycle,renderer-vk-hdr-selftest,renderer-vk-temporal-motion-selftest,renderer-vk-fallback-drill,renderer-vk-device-fallback-drill,renderer-vk-window-recovery,renderer-vk-surface-recovery,renderer-vk-swapchain-recovery,renderer-vk-resources-recovery \
             --runtime-tiers auto \
@@ -1562,12 +1662,27 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson ninja
 
+      # The push and release workflows' cache; pull requests read main's entry.
+      - name: Restore prepared OpenAL Soft (arm64)
+        id: openal_cache
+        uses: actions/cache@v6
+        with:
+          path: .tmp/openal-soft-arm64
+          key: openal-soft-windows-arm64-${{ hashFiles('tools/build/prepare_windows_openal.ps1') }}
+
       - name: Prepare OpenAL Soft (Windows ARM64)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $outputRoot = Join-Path $env:GITHUB_WORKSPACE ".tmp/openal-soft-arm64"
-          powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "arm64" -OutputRoot $outputRoot
+          $cached = "${{ steps.openal_cache.outputs.cache-hit }}" -eq "true" -and
+            (Test-Path (Join-Path $outputRoot "bin/OpenAL32.dll")) -and (Test-Path (Join-Path $outputRoot "lib/OpenAL32.lib"))
+          if ($cached) {
+            Write-Host "Using the cached OpenAL Soft install: $outputRoot"
+          } else {
+            powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "arm64" -OutputRoot $outputRoot
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           "OPENQ4_OPENAL_ROOT=$outputRoot" >> $env:GITHUB_ENV
 
       # See the Windows ARM64 push job: the arm64 link needs the OpenAL package
@@ -1579,7 +1694,7 @@ jobs:
           $ErrorActionPreference = "Stop"
 
           Write-Host "Selected validation profile: pr"
-          python tools/validation/openq4_validate.py pr --fail-on-dirty --skip-python-tests "--extra-setup-arg=-Dopenal_root_override=$env:OPENQ4_OPENAL_ROOT"
+          python tools/validation/openq4_validate.py pr --fail-on-dirty --skip-python-tests --skip-test-suite locales "--extra-setup-arg=-Dopenal_root_override=$env:OPENQ4_OPENAL_ROOT"
 
       - name: Run Windows ARM64 dedicated server smoke
         shell: pwsh
@@ -1612,8 +1727,9 @@ jobs:
   linux-sanitizer:
     name: Linux x64 ASan+UBSan Commit Validation
     runs-on: ubuntu-24.04
-    # The instrumented build alone can take over 80 minutes. Leave time for
-    # native tests, staging, the Wayland smoke and its evidence upload.
+    # The instrumented build took 73 minutes at two jobs; the runner's four
+    # cores and 16 GB hold four. Leave time for native tests, staging, the
+    # Wayland smoke and its evidence upload.
     timeout-minutes: 150
     env:
       OPENQ4_GAMELIBS_REPO: ${{ github.workspace }}
@@ -1703,7 +1819,8 @@ jobs:
             --no-install \
             --build-dir .tmp/validation/linux-sanitizer-builddir \
             --buildtype debugoptimized \
-            --jobs 2 \
+            --jobs 4 \
+            --skip-test-suite locales \
             --extra-setup-arg=-Duse_pch=false \
             --extra-setup-arg=-Db_sanitize=address,undefined
 
@@ -1824,6 +1941,8 @@ jobs:
             sync_window_ops_pass: "0"
             linux_x11: disabled
             artifact_suffix: x64-clang-no-libdecor-wayland-only
+            # The one pull-request lane that runs the 'locales' test suite.
+            native_locales: "1"
           - arch_label: ARM64
             runner: ubuntu-24.04-arm
             expected_uname: aarch64
@@ -1977,10 +2096,13 @@ jobs:
           export SDL_VIDEODRIVER=wayland
           export LIBGL_ALWAYS_SOFTWARE=1
 
+          validation_args=(--fail-on-dirty --skip-python-tests)
+          if [ "${{ matrix.native_locales }}" != "1" ]; then
+            validation_args+=(--skip-test-suite locales)
+          fi
           bash tools/validation/validate_pr.sh \
             --build-dir builddir \
-            --fail-on-dirty \
-            --skip-python-tests \
+            "${validation_args[@]}" \
             --extra-setup-arg=-Dlinux_x11=${{ matrix.linux_x11 }}
 
           sdl_config="$(find builddir -name SDL_build_config.h -print -quit)"
@@ -2092,12 +2214,10 @@ jobs:
           - bridge_label: OpenGL
             macos_graphics_bridge: opengl
             macos_openal_provider: system
-            python_tests: true
             artifact_suffix: opengl
           - bridge_label: Metal
             macos_graphics_bridge: metal
             macos_openal_provider: system
-            python_tests: false
             artifact_suffix: metal
 
     steps:
@@ -2140,10 +2260,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          validation_args=(--fail-on-dirty)
-          if [[ "${{ matrix.python_tests }}" != "true" ]]; then
-            validation_args+=(--skip-python-tests)
-          fi
+          validation_args=(--fail-on-dirty --skip-python-tests --skip-test-suite locales)
           bash tools/validation/validate_pr.sh \
             "${validation_args[@]}" \
             --platform-backend=sdl3 \

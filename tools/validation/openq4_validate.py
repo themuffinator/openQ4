@@ -214,6 +214,18 @@ def positive_int(value: str) -> int:
     return parsed
 
 
+def shard_spec(value: str) -> tuple[int, int]:
+    """Parse K/N: run the Kth of N interleaved slices of the Python checks."""
+    index_text, separator, count_text = value.partition("/")
+    if not separator:
+        raise argparse.ArgumentTypeError(f"{value!r} is not a K/N shard")
+    index = positive_int(index_text)
+    count = positive_int(count_text)
+    if index > count:
+        raise argparse.ArgumentTypeError(f"{value!r} names shard {index} of only {count}")
+    return index, count
+
+
 def repo_root_from_script() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -395,6 +407,15 @@ def test_args(build_dir: Path) -> list[str]:
             raise SystemExit("OPENQ4_MESON_TEST_TIMEOUT_MULTIPLIER must be greater than zero")
         args += ["--timeout-multiplier", multiplier]
     return args
+
+
+def suite_filter_args(args: argparse.Namespace) -> list[str]:
+    # A suite of repeats that one lane covers (the SYSTEM page's non-English
+    # 'locales') is left out of the others.
+    filtered: list[str] = []
+    for suite in getattr(args, "skip_test_suite", None) or []:
+        filtered += ["--no-suite", suite]
+    return filtered
 
 
 def validation_env(args: argparse.Namespace, root: Path) -> dict[str, str]:
@@ -952,7 +973,6 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'ui_capture_system_exit.py', []),
         (root / "tools" / "tests" / 'ui_capture_multiplayer_rosters.py', []),
         (root / "tools" / "tests" / 'ui_capture_system_refresh.py', []),
-        (root / "tools" / "tests" / 'ui_player_identity.py', []),
         (root / "tools" / "tests" / 'renderer_vid_restart_route.py', []),
         (root / "tools" / "tests" / 'renderer_image_recovery_owner.py', ['--mutations']),
         (root / "tools" / "tests" / 'renderer_image_recovery_module.py', ['--mutations']),
@@ -1008,6 +1028,14 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
             failures.append(f"{rel(test_script, root)}: test script was not found")
             continue
         checks.append((test_script, test_args))
+
+    # CI splits the checks across parallel jobs. Interleaving keeps the slow
+    # native-harness checks, which sit together in the list, spread out.
+    shard = getattr(args, "python_shard", None)
+    if shard is not None:
+        index, count = shard
+        checks = checks[index - 1::count]
+        print(f"\n==> Python check shard {index}/{count}: {len(checks)} check(s)", flush=True)
 
     jobs = python_test_jobs(args)
     if jobs <= 1 or args.dry_run:
@@ -2218,6 +2246,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=None,
         help="Python validation checks to run at once (default: OPENQ4_PYTHON_TEST_JOBS or the CPU count; 1 runs them in sequence).",
     )
+    parser.add_argument(
+        "--python-shard",
+        type=shard_spec,
+        default=None,
+        metavar="K/N",
+        help="Run only the Kth of N interleaved slices of the Python checks, so CI can split them across jobs.",
+    )
+    parser.add_argument(
+        "--skip-test-suite",
+        action="append",
+        default=[],
+        metavar="SUITE",
+        help="Leave a Meson test suite out of the native tests (repeatable), such as 'locales' on lanes another lane covers.",
+    )
     parser.add_argument("--skip-build", action="store_true", help="Skip Meson setup/compile/install steps.")
     parser.add_argument("--build-gamelibs", action="store_true", help="Deprecated: game modules now build with the engine.")
     parser.add_argument("--game-libs-repo", default="", help="Override the game-source root for validation fixtures; ordinary builds use this checkout.")
@@ -2263,6 +2305,10 @@ def main(argv: list[str]) -> int:
     print(f"Build dir: {build_dir}", flush=True)
     print(f"Build type: {args.buildtype}", flush=True)
     print(f"GameLibs repo: {env['OPENQ4_GAMELIBS_REPO']}", flush=True)
+    if args.python_shard is not None:
+        print(f"Python check shard: {args.python_shard[0]}/{args.python_shard[1]}", flush=True)
+    if args.skip_test_suite:
+        print(f"Skipped native test suites: {', '.join(args.skip_test_suite)}", flush=True)
 
     try:
         check_dirty_worktree(args, root, env)
@@ -2290,7 +2336,7 @@ def main(argv: list[str]) -> int:
                 dry_run=args.dry_run,
             )
             run_command(
-                wrapper + test_args(build_dir),
+                wrapper + test_args(build_dir) + suite_filter_args(args),
                 cwd=root,
                 env=env,
                 title="Meson native tests",

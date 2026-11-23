@@ -73,7 +73,7 @@ def validate_engine_corridor() -> None:
         "os: macos-15-intel",
         "artifact_name: macos-x64-opengl",
         "runtime_smoke: true",
-        "python_tests: false",
+        "native_locales: false",
         "macos_graphics_bridge: opengl",
     ):
         require(intel_entry, token, "push verification Intel matrix entry")

@@ -1,10 +1,32 @@
 name: Linux ARM64 Cross Build
 
+# Push Verification and Commit Validation build every change natively on ARM64
+# runners. This supplementary lane checks the x64-hosted multiarch cross
+# toolchain, which only the build description and toolchain inputs can break,
+# so it runs when those change, weekly for Ubuntu ports drift, and on demand.
 on:
   push:
     branches:
       - main
+    paths:
+      - "**/meson.build"
+      - "meson_options.txt"
+      - "subprojects/**"
+      - "tools/cross/**"
+      - "tools/build/meson_setup.sh"
+      - "tools/validation/openq4_validate.py"
+      - ".github/workflows/linux-arm64-cross.yml"
   pull_request:
+    paths:
+      - "**/meson.build"
+      - "meson_options.txt"
+      - "subprojects/**"
+      - "tools/cross/**"
+      - "tools/build/meson_setup.sh"
+      - "tools/validation/openq4_validate.py"
+      - ".github/workflows/linux-arm64-cross.yml"
+  schedule:
+    - cron: "17 4 * * 1"
   workflow_dispatch:
 
 concurrency:

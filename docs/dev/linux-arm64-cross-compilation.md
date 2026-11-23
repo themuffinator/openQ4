@@ -46,6 +46,8 @@ Expected outputs are:
 
 The reference workflow performs a real build of all four outputs rather than a configure-only check. It requires AArch64 ELF64 identity for every artifact, PIE for the client and dedicated server, RELRO plus BIND_NOW and a non-executable stack for all four, no X11 dependency in the Wayland-only client, and no direct OpenAL, OpenGL/GLX, SDL, PipeWire, Wayland, or X11/Xext dependency in the dedicated server. It also requires different SP/MP module bytes and exactly one defined `GLOBAL`/`DEFAULT` `GetGameAPI` export from each module. Use `readelf -h`, `readelf -lW`, `readelf -dW`, and `readelf --wide --dyn-syms` for the same local checks.
 
+Native ARM64 jobs in Push Verification and Commit Validation build every change. The cross build adds only the x64-hosted toolchain path, which depends on the build description far more than on the sources, so it runs when a `meson.build`, `meson_options.txt`, a subproject, `tools/cross/`, the Meson wrapper, the validator or the workflow itself changes, every Monday, and on manual dispatch.
+
 ## Build tools versus target tools
 
 Python source discovery, package generation, and `wayland-scanner` run on the x64 build machine. C, C++, archive, strip, compile checks, and dependency resolution target ARM64. Any new generator added to Meson must therefore be found with `native: true`; target utilities must come from the cross file.
