@@ -12,6 +12,28 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Music and ambience keep playing when the game runs slowly, 23 November 2026
+
+- **No more gaps in long tracks on slow frames.** Since 0.14.1, music, ambience
+  loops and long lines that play straight from the game's files were decoded in
+  the background a third of a second per frame. Below about three frames a
+  second, or during a long hitch just after one started, they ran dry, went
+  silent and started again. Each frame now refills the whole queue, up to about
+  a second of sound, as before 0.14.1, while decoding stays in the background.
+- **Back in full after headphones or speakers return.** A track restarted after
+  the audio output was lost now fills its whole buffer at once, instead of
+  playing a third of a second and dropping out again.
+- **What you need to do.** Nothing. Each playing stream keeps 96 KiB more
+  decoded audio, within the existing `s_streamMemoryMB` budget.
+- **Checks.** `audio_output_recovery_runtime.py` passes every stereo and
+  surround check; streams no longer underrun at two frames a second; native
+  stream and queue tests pin the per-frame refill. The release candidate's
+  failure came from a machine too busy to hold the hidden test client near
+  60 Hz and from two harness assumptions, which are fixed; 0.15.0 passes on a
+  quiet machine and fails the same way at two frames a second. The harness now
+  fails such a run as `frames_kept_pace`. Evidence:
+  [audio voice evidence](audio-voice-evidence.md#streams-across-long-frames-and-output-changes-23-november-2026).
+
 ## Sunlight and off-centre lamps cast the original shadows with shadow maps on, 23 November 2026
 
 - **Sunlit maps keep their shadows.** With shadow maps on (the Quality tier

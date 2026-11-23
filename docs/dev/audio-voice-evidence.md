@@ -1906,6 +1906,106 @@ OpenGL client, staged `.install`, private save path, no OS input:
 The phase runs only on stock `game/airdefense1`. The Awakening run has no
 matching scene, and the code path is shared.
 
+## Streams across long frames and output changes, 23 November 2026
+
+The release-qualification case `rel03.audio.recovery` failed on candidate C2
+(`8016bc922`, release build): in the stereo run `streams_resume_after_interruption`,
+`paused_line_resumes_in_place`, `rendered_gap_then_resume` and, through the
+streams, `dialogue_volume_kept_across_outage` and `trim_kept_active_samples`; in
+the surround run `layout_routing`. No `src/sound/` change landed between
+`v0.15.0` and C2.
+
+### What the failing run shows
+
+Every probe in that run was taken 282-631 ms (stereo) and up to 1,066 ms
+(surround) after the last mixed frame (`s_soundWorlds` `stamp` against `now`),
+and the map load filled 112 s of the 151 s mix: the machine was too busy to
+keep the hidden client near its 60 Hz cadence. Three things then failed together:
+
+- **Streams starved.** Since `8d3859db1` (5 November, shipped in 0.14.1) a job
+  decoded one block, and a voice queued it on a later update, so each frame
+  refilled one queue buffer, about a third of a second. Frames longer than that
+  ran the queue dry. The map's streamed ambience underran 11 times outside the
+  simulated outages, and the first-block wait averaged 509 ms. After an outage
+  `nogranule.ogg` restarted with one buffer and underran before the next frame;
+  `noeos.ogg` was still waiting for its first block at the probe.
+- **The harness compared clocks a frame apart.** Voice offsets are read when the
+  probe runs, but the reported world time was stamped at the last mixed frame. A
+  running world's clock has moved on by `now - stamp`, so the paused line seemed
+  to move 1,355 ms over 788 ms of scene time. Measured at the probe, the scene
+  moved 1,167 ms and the line is within tolerance.
+- **The harness measured loudness over the whole file.** OpenAL Soft's wave
+  writer records from the device's open, so 112 s of digital silence from the
+  load made up three quarters of the 250 ms windows. The "loud" reference became
+  0.0007 and no gap could be found, although the WAV holds the 440 Hz line, its
+  silence through each outage and its return.
+
+`layout_routing` failed because the frame after the last HRTF reset took over a
+second: the probe came before the voice had been handed back.
+
+### Changes
+
+- `idSoundOggStream` keeps three decoded blocks, one per queue buffer, and one
+  job decodes every free block. The voice queues every ready block in one update
+  and, once its queue is full, has the blocks it freed decoded again, so a frame
+  refills every buffer that played out, as the inline decode did before 5
+  November, without decoding on the main thread. A stream started or restarted
+  at the scene clock fills its whole queue on the first frame its decode lands.
+  With no accepting worker the block asked for still decodes inline, one at a
+  time. Each stream reserves 96 KiB more (`SOUND_STREAM_BYTES`).
+- `audio_output_recovery_runtime.py` (harness assumptions, not engine defects):
+  scene times are taken at the probe (`scene_time`), the loud reference spans
+  only the audible part of the WAV, and a new `frames_kept_pace` check fails a
+  run whose worst probe came 250 ms or more after the last mixed frame, so a
+  saturated machine reads as such instead of as a recovery defect. Results
+  record `probe_frame_lag_ms` and each phase's `scene_time`.
+
+### Results
+
+Hidden OpenGL client, `game/airdefense1`, OpenAL Soft wave writer, the harness's
+Ogg fixtures, no device or input. `com_maxfps 2` holds frames at 500 ms, the
+conditions of the failing run. Runs made before `frames_kept_pace` existed were
+re-read with the final checks from their logs and WAVs.
+
+| Runtime | Probe lag | Stereo | Surround | Underruns outside outages, stereo / surround |
+| --- | --- | --- | --- | --- |
+| C2, the REL evidence | 282-1,066 ms | `frames_kept_pace` and the three stream checks fail | `frames_kept_pace` and `layout_routing` fail | 11 / 2 |
+| 0.15.0 release (`.tmp/runtime/release-0150`) | 12-33 ms | 21 of 21 | 13 of 13 | 0 / 1 |
+| 0.15.0 release, `com_maxfps 2` | 470-500 ms | `frames_kept_pace`, `streams_playing` and the three stream checks fail | `frames_kept_pace` fails | 18 / 20 |
+| This change | 14-21 ms | 21 of 21, three runs | 13 of 13, three runs | 0 / 1 |
+| This change, `com_maxfps 2` | 469-505 ms | `frames_kept_pace`, `streams_resume_after_interruption` and `dialogue_volume_kept_across_outage` fail | `frames_kept_pace` fails; the HRTF probe fell between a hand-back and its restart | 0 / 0 |
+
+The surround runs at 60 Hz each record one underrun of a map voice-over line in
+the first frames after the load, on 0.15.0 and this change alike; the channel
+restarts it at the scene clock. At 2 fps this change keeps every stream playing
+between outages. A voice handed back after an output change is restarted on the
+next frame and its first blocks land a frame later, so at 2 fps the probes just
+after an outage still find the streams starting, and `frames_kept_pace` fails
+those runs. This change is a debugoptimized build; two of its runs used client
+`d40e26943252...` and overlapped a peer's multiplayer smoke client with probe
+lags unchanged, and one ran alone on the build before a description-only change.
+
+So 0.15.0 had the same behaviour: it passes on a quiet machine and fails the
+same stream checks at 2 fps. C2's failure was the busy machine plus the two
+harness assumptions; the stream starvation it exposed is fixed.
+
+### Tests
+
+`audio_stream_budget.py` runs the production stream on the deferring job stubs:
+three blocks from one job, a full set needing no job, a refill continuing the
+ready blocks without a seek while the ready block stays readable, another
+position discarding the old blocks with one seek, the short last block and
+nothing beyond it, and a decode cancelled between blocks keeping those it
+finished. The production queue test in `audio_streaming.py` now requires the
+first finished decode to fill every queue buffer, a full queue to keep a full set
+decoded ahead, and a long frame that played out two buffers to refill both in
+one update with the stream continuing sample-exactly. Built against C2's voice
+and stream code, it fails at "the first finished decode fills every queue
+buffer". `audio_decode_budget.py`, `audio_memory.py`, `audio_payload_restore.py`,
+`openal_device_pause.py`, `sound_recovery.py` (38,423 checks),
+`sound_settings.py`, `sound_retail_reverb_contract.py`,
+`stock_media_fallbacks.py` and `linux_arm64_source_portability.py` pass.
+
 ## Other verification and limitations
 
 ### PR #212 merge qualification, 4 November 2026

@@ -32,8 +32,10 @@ constexpr int AL_FALSE = 0;
 #define OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED 1
 static int sourceState = AL_PLAYING;
 static int sourceQueued = 0;
+static int sourceProcessed = 0;	// buffers a playing source has finished (a test sets it)
+static std::vector<unsigned> sourceQueueIds;	// queued buffer ids, oldest first
 // Detaching the buffer empties the queue; other source properties are not modelled.
-void alSourcei(ALuint,int property,int value) { if (property == AL_BUFFER && value == 0) sourceQueued = 0; }
+void alSourcei(ALuint,int property,int value) { if (property == AL_BUFFER && value == 0) { sourceQueued = sourceProcessed = 0; sourceQueueIds.clear(); } }
 struct idWaveFile { static const int FORMAT_PCM = 1; };
 constexpr int MAX_QUEUED_BUFFERS = 3;
 struct Debug { bool GetBool() const { return false; } } s_debugHardware;
@@ -43,10 +45,16 @@ int alIsSource(ALuint source) { return source != 0; }
 // every queued buffer as processed. Stopping keeps an idle source initial.
 void alGetSourcei(ALuint,int property,int* value) {
 	*value = property == AL_SOURCE_STATE ? sourceState : property == AL_BUFFERS_QUEUED ? sourceQueued :
-		property == AL_BUFFERS_PROCESSED ? ( sourceState == AL_STOPPED ? sourceQueued : 0 ) :
+		property == AL_BUFFERS_PROCESSED ? ( sourceState == AL_STOPPED ? sourceQueued : Min(sourceProcessed, sourceQueued) ) :
 		property == AL_SOURCE_TYPE ? ( sourceQueued ? AL_STREAMING : AL_UNDETERMINED ) : 0;
 }
-void alSourceUnqueueBuffers(ALuint,int count,ALuint*) { sourceQueued = Max(0, sourceQueued - count); }
+void alSourceUnqueueBuffers(ALuint,int count,ALuint* ids) {
+	for (int i = 0; i < count; ++i) {
+		ids[i] = sourceQueueIds.empty() ? 0 : sourceQueueIds.front();
+		if (!sourceQueueIds.empty()) sourceQueueIds.erase(sourceQueueIds.begin());
+	}
+	sourceQueued = Max(0, sourceQueued - count); sourceProcessed = Max(0, sourceProcessed - count);
+}
 void alSourcePlay(ALuint) { sourceState = AL_PLAYING; }
 void alSourceStop(ALuint) { if (sourceState != AL_INITIAL) sourceState = AL_STOPPED; }
 void alSourceRewind(ALuint) { sourceState = AL_INITIAL; }
@@ -143,7 +151,7 @@ void alBufferData(ALuint id, int, const void* data, int bytes, int) {
 	const short* samples = static_cast<const short*>(data);
 	buffers[id].assign(samples, samples + bytes / sizeof(short));
 }
-void alSourceQueueBuffers(ALuint, int, const ALuint* id) { queued.insert(queued.end(), buffers[*id].begin(), buffers[*id].end()); ++sourceQueued; }
+void alSourceQueueBuffers(ALuint, int, const ALuint* id) { queued.insert(queued.end(), buffers[*id].begin(), buffers[*id].end()); ++sourceQueued; sourceQueueIds.push_back(*id); }
 int CheckALErrors() { return failUpload ? 1 : 0; }
 class idSoundVoice_OpenAL {
 public:
@@ -167,7 +175,7 @@ public:
 	void ResetQueuedBufferState();
 	void AdvanceQueuedBuffer();
 	int StreamBlockFrames(idSoundSample_OpenAL* sample, int offset);
-	bool PrepareStreamBlock(idSoundSample_OpenAL* sample, int offset);
+	bool PrepareStreamBlock(idSoundSample_OpenAL* sample, int offset, bool decodeAhead);
 	bool StreamBlockPending() const;
 	bool SetNextQueuedSampleStart(idSoundSample_OpenAL* sample);
 	static bool GetPlayableBufferRange(const idSoundSample_OpenAL*,int,int&,int&,int&,int&);
@@ -365,8 +373,9 @@ int main(int argc, char** argv) {
 	}
 	Check(soundDeepRoutedQueueVoices == 0, "destroyed voices return every deep slot");
 	{
-		// A streamed voice starts without decoding on the caller: Update keeps it
-		// while its first block decodes, then queues and plays it, one block ahead.
+		// A streamed voice starts, or restarts at the scene clock after an output change
+		// or an underrun, without decoding on the caller: Update keeps it while its
+		// first blocks decode, then queues every buffer at once and plays.
 		stubJobsSynchronous = false;
 		lead.streamed = true; lead.openalBuffer = 0;
 		lead.buffers.clear(); lead.buffers.push_back({lead.playLength,lead.pcm.data(),lead.totalBufferSize});
@@ -374,17 +383,35 @@ int main(int argc, char** argv) {
 		start.leadinSample = &lead; start.loopingSample = &lead; start.paused = false;
 		start.FlushSourceBuffers(); start.paused = false;
 		Check(start.SetNextQueuedSampleStart(&lead), "start queue");
-		start.nextQueuedOffset = lead.playLength / 2;
+		const int startOffset = lead.playLength / 2;
+		start.nextQueuedOffset = startOffset;
 		queued.clear();
 		Check(start.Update() && start.StreamBlockPending() && sourceQueued == 0 && sourceState == AL_INITIAL, "a pending start is not a finished voice");
 		Check(start.Update() && start.StreamBlockPending() && stubPendingJobs.size() == 1, "polling a pending start submits nothing more");
-		Check(StubRunPendingJobs() == 1, "first block decodes on the worker");
-		Check(start.Update() && sourceQueued == 1 && sourceState == AL_PLAYING && start.StreamBlockPending(), "first block queued, played, next one decoding");
-		Check(std::equal(queued.begin(), queued.end(), lead.pcm.begin() + (lead.playLength / 2) * lead.channels), "a pending start begins at its exact offset");
+		Check(StubRunPendingJobs() == 1, "the first blocks decode on the worker");
+		// One block per finished job filled a single buffer per frame: a stream restarted
+		// after an output change played a third of a second and underran when the next
+		// frame came later than that.
+		Check(start.Update() && sourceQueued == MAX_QUEUED_BUFFERS && sourceState == AL_PLAYING, "the first finished decode fills every queue buffer");
+		Check(std::equal(queued.begin(), queued.end(), lead.pcm.begin() + startOffset * lead.channels), "a pending start begins at its exact offset");
+		Check(start.StreamBlockPending() && stubPendingJobs.size() == 1, "the blocks after the queue decode while it plays");
 		StubRunPendingJobs();
-		Check(start.Update() && sourceQueued == 2, "the queue fills a block per finished job");
+		Check(start.Update() && sourceQueued == MAX_QUEUED_BUFFERS && !start.StreamBlockPending() &&
+			start.oggStream->ReadyBlocks() == idSoundOggStream::AHEAD_BLOCKS, "a full queue keeps a full set of blocks decoded ahead");
+		// A long frame: two of the three buffers played out while the main thread was
+		// away. One update refills both from the blocks decoded ahead, with no wait for
+		// a worker, so the queue still rides out about a second, as the inline decode did.
+		sourceProcessed = 2;
+		Check(start.Update() && sourceQueued == MAX_QUEUED_BUFFERS && sourceState == AL_PLAYING, "a long frame refills every played buffer at once");
+		Check(queued.size() == static_cast<size_t>(5 * start.StreamBlockFrames(&lead, startOffset) * lead.channels) &&
+			std::equal(queued.begin(), queued.end(), lead.pcm.begin() + startOffset * lead.channels), "the refilled buffers continue the stream exactly");
+		StubRunPendingJobs();
+		sourceProcessed = 2;
+		Check(start.Update() && sourceQueued == MAX_QUEUED_BUFFERS, "so does every long frame after it");
+		Check(std::equal(queued.begin(), queued.end(), lead.pcm.begin() + startOffset * lead.channels), "every refill continues the stream exactly");
 		// Stopping while a block decodes neither waits nor leaks: the worker keeps the stream.
 		Check(start.StreamBlockPending(), "a refill is pending at stop");
+		sourceProcessed = 0;
 		const int jobsBefore = stubJobsRun;
 		start.FlushSourceBuffers();
 		Check(!start.oggStream && idSoundOggStream::ReleasedCount() == 1 && alive == 1, "a stopped voice hands its pending block to the release list");
@@ -408,5 +435,5 @@ int main(int argc, char** argv) {
 		sourceState = AL_PLAYING;
 		stubJobsSynchronous = true;
 	}
-	std::puts("PASS production queue: leadin/loop, mixed static/streamed, offset, three scratch buffers, one-second depth, recycled voices, cancellation and release, inline and worker-decoded blocks, pending starts and released refills");
+	std::puts("PASS production queue: leadin/loop, mixed static/streamed, offset, three scratch buffers, one-second depth, recycled voices, cancellation and release, inline and worker-decoded blocks, pending starts and restarts that fill the queue, long-frame refills from blocks decoded ahead and released refills");
 }

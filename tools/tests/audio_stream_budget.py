@@ -38,6 +38,7 @@ idCVar s_debugHardware("s_debugHardware","0",0,"");
 static int warnings=0;
 struct idLib { static void Printf(const char*,...){} static void Warning(const char*,...){++warnings;} };
 static bool noFile=false,badDecoder=false,badSeek=false;
+static int cancelAfterReads=-1;	// a worker's decode is cancelled once this many reads have run
 static SoundMemoryBudget aggregate;
 static uint64 aggregateLimit=64*1024*1024;
 static bool SoundMemoryAcquire(uint64 bytes) { return aggregate.Acquire(bytes,aggregateLimit); }
@@ -63,7 +64,8 @@ struct SoundVorbisStream {
     bool SetCountedLength(unsigned counted,const stb_vorbis_openq4_granule_page& page){
         if(!counted || page.page_end<=page.page_start) return false; frames=counted; return true; }
     // Mono: each sample is its frame number, so a block shows where it was decoded from.
-    int Read(short* out,int count){++reads; int n=std::min<int>(count,static_cast<int>(frames-cursor));
+    int Read(short* out,int count){++reads; if(cancelAfterReads>=0 && reads>=cancelAfterReads) stubCancelRequested=true;
+        int n=std::min<int>(count,static_cast<int>(frames-cursor));
         for(int i=0;i<n;++i) out[i]=static_cast<short>((cursor+i)&0x7fff); cursor+=n; return n;}
     int Channels(){return 1;} int Rate(){return 22050;} unsigned Frames(){return frames;}
 };
@@ -73,7 +75,8 @@ static idSoundOggStreamShape Shape(unsigned frames=22050){ idSoundOggStreamShape
 static bool Starts(const idSoundOggStream& stream, unsigned frame){ const short* b=stream.Block(); return b && b[0]==static_cast<short>(frame&0x7fff); }
 int main(){
     // Admission and the file open are main-thread work; the decoder opens with the first block.
-    idSoundOggStream a,b,c,d;
+    // Streams hold three decoded blocks: keep them off the stack, as the engine does.
+    static idSoundOggStream a,b,c,d;
     assert(a.Open("a",Shape()) && b.Open("b",Shape()) && c.Open("c",Shape()));
     assert(!d.Open("full",Shape()) && d.BlockState()==idSoundOggStream::BLOCK_FAILED);
     assert(files==3 && decoders==3 && soundStreamRejected==1 && decoderOpens==0);
@@ -89,7 +92,7 @@ int main(){
     assert(!a.Open("no shape",Shape(0)) && files==0);
     assert(files==0 && decoders==0 && soundStreamBytes==0);
     s_streamMemoryMB.SetInteger(32);
-    { idSoundOggStream more[8]; for(auto& stream:more) assert(stream.Open("live",Shape()));
+    { std::unique_ptr<idSoundOggStream[]> more(new idSoundOggStream[8]); for(int i=0;i<8;++i) assert(more[i].Open("live",Shape()));
       s_streamMemoryMB.SetInteger(8);
       assert(!a.Open("budget reduced",Shape())); }
     assert(a.Open("retry",Shape()) && files==1 && decoders==1);
@@ -97,22 +100,33 @@ int main(){
     a.Close(); a.Close();
     assert(files==0 && decoders==0 && soundStreamBytes==0);
 
-    // The first block opens, seeks and decodes on a worker; nothing runs on the caller.
+    // The first decode opens, seeks and decodes on a worker; nothing runs on the caller.
+    // One job decodes every free block ahead, so a frame refills every queue buffer.
     assert(a.Open("async",Shape()));
-    assert(a.RequestBlock(0,4096) && a.IsBlockPending() && decoderOpens==0 && reads==0);
+    assert(a.RequestBlock(0,4096) && a.IsBlockPending() && a.FreeBlocks()==0 && decoderOpens==0 && reads==0);
     assert(!a.RequestBlock(4096,4096) && a.PollBlock()==idSoundOggStream::BLOCK_PENDING && !a.Block());
     stubMilliseconds+=7;
     assert(StubRunPendingJobs()==1 && decoderOpens==1 && seeks==0);
-    assert(a.PollBlock()==idSoundOggStream::BLOCK_READY && a.BlockFrames()==4096 && Starts(a,0));
-    assert(soundStreamFirstBlocks==1 && soundStreamStartWaitMaxMs==7);
-    a.ConsumeBlock();
-    // Contiguous blocks keep the cursor; another position seeks exactly once.
-    assert(a.RequestBlock(4096,4096) && StubRunPendingJobs()==1 && a.PollBlock()==idSoundOggStream::BLOCK_READY && seeks==0 && Starts(a,4096));
-    a.ConsumeBlock();
+    assert(a.PollBlock()==idSoundOggStream::BLOCK_READY && a.ReadyBlocks()==idSoundOggStream::AHEAD_BLOCKS && a.BlockFrames()==4096 && Starts(a,0));
+    assert(soundStreamFirstBlocks==1 && soundStreamStartWaitMaxMs==7 && a.AheadFrame()==3*4096);
+    // Every block full: nothing more to decode.
+    assert(a.RequestBlock(a.AheadFrame(),4096) && !a.IsBlockPending() && stubPendingJobs.empty());
+    // The blocks are consecutive queue buffers.
+    a.ConsumeBlock(); assert(a.BlockFrame()==4096 && Starts(a,4096));
+    a.ConsumeBlock(); assert(a.BlockFrame()==8192 && Starts(a,8192) && a.FreeBlocks()==2);
+    // Refilling continues after the ready block without a seek, and the ready block
+    // stays readable while the refill decodes.
+    assert(a.RequestBlock(a.AheadFrame(),4096) && a.IsBlockPending() && a.BlockState()==idSoundOggStream::BLOCK_READY && Starts(a,8192));
+    assert(StubRunPendingJobs()==1 && a.PollBlock()==idSoundOggStream::BLOCK_READY && a.ReadyBlocks()==3 && seeks==0 && Starts(a,8192));
+    a.ConsumeBlock(); assert(Starts(a,12288) && a.AheadFrame()==20480);
+    // Another position discards the blocks decoded for the old one and seeks exactly once.
     assert(a.RequestBlock(11025,4096) && StubRunPendingJobs()==1 && a.PollBlock()==idSoundOggStream::BLOCK_READY && seeks==1 && Starts(a,11025));
-    a.ConsumeBlock();
-    // The end of the stream gives a short block, and nothing beyond it is requested.
-    assert(a.RequestBlock(20000,4096) && StubRunPendingJobs()==1 && a.PollBlock()==idSoundOggStream::BLOCK_READY && a.BlockFrames()==2050);
+    assert(a.ReadyBlocks()==3);
+    a.ConsumeBlock(); assert(Starts(a,15121) && a.BlockFrames()==4096);
+    // The end of the stream gives a short block, and nothing beyond it is decoded.
+    a.ConsumeBlock(); assert(Starts(a,19217) && a.BlockRequestFrames()==2833 && a.BlockFrames()==2833);
+    a.ConsumeBlock(); assert(a.ReadyBlocks()==0 && a.BlockState()==idSoundOggStream::BLOCK_IDLE);
+    assert(a.RequestBlock(20000,4096) && StubRunPendingJobs()==1 && a.PollBlock()==idSoundOggStream::BLOCK_READY && a.BlockFrames()==2050 && a.ReadyBlocks()==1);
     a.ConsumeBlock();
     assert(!a.RequestBlock(22050,1) && a.BlockState()==idSoundOggStream::BLOCK_FAILED);
     a.Close();
@@ -132,6 +146,14 @@ int main(){
     idSoundOggStream::ReapReleased(false);
     assert(idSoundOggStream::ReleasedCount()==0 && files==1 && soundStreamBytes==SOUND_STREAM_BYTES);
     assert(a.PollBlock()==idSoundOggStream::BLOCK_READY && Starts(a,0));
+    a.Close();
+    // A decode cancelled between blocks keeps those it finished, and an exact cursor.
+    assert(a.Open("cancelled midway",Shape()) && a.RequestBlock(0,4096));
+    cancelAfterReads=reads+1; assert(StubRunPendingJobs()==1); cancelAfterReads=-1; stubCancelRequested=false;
+    assert(a.PollBlock()==idSoundOggStream::BLOCK_READY && a.ReadyBlocks()==1 && Starts(a,0) && a.AheadFrame()==4096);
+    { const int before=seeks;
+      assert(a.RequestBlock(4096,4096) && StubRunPendingJobs()==1 && a.PollBlock()==idSoundOggStream::BLOCK_READY && a.ReadyBlocks()==3 && seeks==before); }
+    a.ConsumeBlock(); assert(Starts(a,4096));
     a.Close();
     // Shutdown joins a released block that never got a worker.
     released=new idSoundOggStream;
@@ -165,7 +187,7 @@ int main(){
     }
     stubJobsSynchronous=stubQueueFull=false; stubJobsInitialized=true; s_asyncStreamDecode.SetBool(true);
     assert(files==0 && decoders==0 && soundStreamBytes==0 && aggregate.Used()==0);
-    std::puts("PASS: stream byte budget, saturation, stop/retry, VFS/decoder failures, replacement, budget reduction, worker blocks, exact seeks, cancel/release/reap and inline fallback");
+    std::puts("PASS: stream byte budget, saturation, stop/retry, VFS/decoder failures, replacement, budget reduction, worker blocks decoded ahead, exact seeks, cancel/release/reap and inline fallback");
 }
 '''.replace('@DECLARATION@', declaration).replace('@PRODUCTION@', production)
     scratch = ROOT / '.tmp/audio/stream-budget'

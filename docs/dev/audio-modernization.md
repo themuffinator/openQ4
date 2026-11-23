@@ -332,13 +332,19 @@ Since 5 November each streamed block decodes on a job worker
 (`s_asyncStreamDecode`, default 1). The main thread admits the stream and opens
 its file, because the VFS open walks shared search paths and pak handles. The
 worker parses the Vorbis headers, checks them against the sample's load, seeks
-and decodes one queue buffer. The voice queues that buffer on a later update and
-requests the next one at once, so the decoder stays one block ahead. OpenAL
-calls stay on the main thread. A voice stopped while its block is decoding
+and decodes. Since 23 November a stream holds three blocks, one per queue
+buffer, and one job decodes every free block ahead of the voice. The voice
+queues every ready block in one update and, once its queue is full, has the
+blocks it freed decoded again, so each frame refills every buffer that played
+out, as the inline decode did. One block per job had refilled one buffer per
+frame: frames longer than a buffer, about a third of a second, ran the queue
+dry, and a stream restarted after an output change underran at once
+([evidence](audio-voice-evidence.md#streams-across-long-frames-and-output-changes-23-november-2026)).
+OpenAL calls stay on the main thread. A voice stopped while its block is decoding
 cancels the block and parks the stream until the worker lets go, without
-waiting. `s_restart` and shutdown join what is still parked. The first buffer
-arrives on the next frame instead of the same one. With no accepting worker the
-block decodes inline as before.
+waiting. `s_restart` and shutdown join what is still parked. The first buffers
+arrive on the next frame instead of the same one. With no accepting worker the
+block asked for decodes inline, one at a time, as before.
 
 The repository's MIT/public-domain stb_vorbis has a small read/seek/tell callback
 extension; both checked-in copies match, and Meson pins this bundled variant.

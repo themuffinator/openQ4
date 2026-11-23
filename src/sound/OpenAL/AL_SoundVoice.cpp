@@ -95,6 +95,8 @@ static int soundDeepRoutedQueueVoices = 0;
 #if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
 static short soundRoutedQueueScratch[SOUND_QUEUE_MAX_FRAMES * 6];
 #endif
+static_assert( idSoundOggStream::AHEAD_BLOCKS >= MAX_QUEUED_BUFFERS,
+	"a streamed voice refills every queue buffer in one frame from blocks decoded ahead" );
 
 #if OPENQ4_OPENAL_SOURCE_LATENCY_SUPPORTED
 static LPALGETSOURCEDVSOFT qalGetSourcedvSOFT = NULL;
@@ -1128,7 +1130,7 @@ int idSoundVoice_OpenAL::StreamBlockFrames( idSoundSample_OpenAL* sample, int of
 	return Min( Min( queueFrames, decodeCapacity ), sample->playLength - offset );
 }
 
-bool idSoundVoice_OpenAL::PrepareStreamBlock( idSoundSample_OpenAL* sample, int offset )
+bool idSoundVoice_OpenAL::PrepareStreamBlock( idSoundSample_OpenAL* sample, int offset, bool decodeAhead )
 {
 	const int frames = StreamBlockFrames( sample, offset );
 	if( frames <= 0 ) return false;
@@ -1147,19 +1149,31 @@ bool idSoundVoice_OpenAL::PrepareStreamBlock( idSoundSample_OpenAL* sample, int 
 		if( !oggStream->Open( sample->streamName, shape ) ) return false;
 	}
 	switch( oggStream->PollBlock() ) {
-		case idSoundOggStream::BLOCK_PENDING:
-			return true;
 		case idSoundOggStream::BLOCK_FAILED:
 			return false;
 		case idSoundOggStream::BLOCK_READY:
-			if( oggStream->BlockFrame() == static_cast<unsigned int>( offset ) && oggStream->BlockRequestFrames() == frames ) return true;
-			// A block for another position (the routing changed its size): decode again.
-			oggStream->ConsumeBlock();
+			if( oggStream->BlockFrame() != static_cast<unsigned int>( offset ) || oggStream->BlockRequestFrames() != frames ) {
+				// Blocks for another position (the routing changed their size): decode
+				// again, once a decode still writing after them has landed.
+				if( oggStream->IsBlockPending() ) return true;
+				oggStream->DiscardBlocks();
+			}
 			break;
 		default:
 			break;
 	}
-	return oggStream->RequestBlock( static_cast<unsigned int>( offset ), frames );
+	if( oggStream->IsBlockPending() ) return true;
+	// With none ready, decode from offset into every block. Decoding ahead keeps every
+	// free block decoding after the ready ones, so each frame refills every queue
+	// buffer that played out, however long the frame was.
+	const bool ahead = oggStream->ReadyBlocks() > 0;
+	if( ahead && !decodeAhead ) return true;
+	const unsigned int from = ahead ? oggStream->AheadFrame() : static_cast<unsigned int>( offset );
+	if( oggStream->FreeBlocks() > 0 && from < static_cast<unsigned int>( sample->playLength ) ) {
+		oggStream->RequestBlock( from, StreamBlockFrames( sample, static_cast<int>( from ) ) );
+	}
+	// A failure after ready blocks surfaces once they have been queued.
+	return oggStream->BlockState() != idSoundOggStream::BLOCK_FAILED;
 }
 
 bool idSoundVoice_OpenAL::StreamBlockPending() const
@@ -1181,7 +1195,7 @@ bool idSoundVoice_OpenAL::QueueNextBuffer( ALuint streamBuffer )
 		idSoundSample_OpenAL* sample = nextQueuedSample;
 		// Opening, seeking and decoding run on a job worker. Until the block is
 		// ready nothing is queued; Update keeps the voice and queues it then.
-		if( !PrepareStreamBlock( sample, nextQueuedOffset ) ) { ResetQueuedBufferState(); return false; }
+		if( !PrepareStreamBlock( sample, nextQueuedOffset, false ) ) { ResetQueuedBufferState(); return false; }
 		if( oggStream->BlockState() != idSoundOggStream::BLOCK_READY ) return false;
 		const short* pcm = oggStream->Block();
 		const int frames = oggStream->BlockFrames();
@@ -1205,9 +1219,10 @@ bool idSoundVoice_OpenAL::QueueNextBuffer( ALuint streamBuffer )
 		nextQueuedOffset += frames;
 		if( nextQueuedOffset >= sample->playLength ) AdvanceQueuedBuffer();
 		if( nextQueuedSample != NULL && nextQueuedSample->IsStreamed() ) {
-			// Decode the following block while this one plays. A failure here
-			// surfaces at the next queue attempt, after the queued audio.
-			PrepareStreamBlock( nextQueuedSample, nextQueuedOffset );
+			// With no block left ready, decode the next ones now. Update decodes ahead
+			// once its queue is full, so one decode covers every block this frame freed.
+			// A failure surfaces at the next queue attempt, after the queued audio.
+			PrepareStreamBlock( nextQueuedSample, nextQueuedOffset, false );
 		} else {
 			// Ended, or looping on a resident buffer: free the decoder now.
 			idSoundOggStream::Release( oggStream );
@@ -1373,6 +1388,13 @@ bool idSoundVoice_OpenAL::Update()
 				continue;
 			}
 			break;
+		}
+		if( nextQueuedSample != NULL && nextQueuedSample->IsStreamed() )
+		{
+			// Keep decoding ahead while the queue is full, so the next frame refills
+			// every buffer that plays out meanwhile, however long this frame is. A
+			// failure surfaces at the next queue attempt.
+			PrepareStreamBlock( nextQueuedSample, nextQueuedOffset, true );
 		}
 	}
 	else

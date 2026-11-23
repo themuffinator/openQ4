@@ -7067,6 +7067,16 @@ the non-verbal remainder is marked for players rather than counted as covered.
   the same streams in both modes. A start is now heard one to two frames late
   at the same position. Device and mobile qualification remain open.
   [Stream start evidence](presentation-owners.md#streamed-sound-starts-off-the-main-thread-5-november-2026).
+  November 23: one block per job refilled one queue buffer per frame, so frames
+  over a third of a second starved streams, and a stream restarted after an
+  output change underran at once; the C2 qualification run, on a saturated
+  machine, failed `audio_output_recovery_runtime.py` that way. A stream now
+  decodes three blocks ahead and a frame refills every played-out buffer; the
+  harness takes scene time at the probe, measures loudness over the audible span
+  and fails runs whose frames lag (`frames_kept_pace`). 0.15.0 and this change
+  pass every check on a quiet machine; at 2 fps only this change keeps streams
+  playing.
+  [Evidence](audio-voice-evidence.md#streams-across-long-frames-and-output-changes-23-november-2026).
 - [ ] **AUD-04 — P2, implementation and qualification: surround and mod reverb.**
   Resolve `SSF_CENTER`/VO placement on 5.1 with stereo/HRTF fallback and nonzero mod
   room-rolloff unit handling. Keep stock zero-rolloff behavior intact.

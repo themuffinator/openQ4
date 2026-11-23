@@ -53,10 +53,12 @@ inline const char* va( const char* format, ... ) {
 static int stubMilliseconds = 1000;
 inline int Sys_Milliseconds() { return stubMilliseconds; }
 
+// A test sets this to cancel the job that is running, between its codec reads.
+static bool stubCancelRequested = false;
 struct idJobContext {
 	void* data;
 	bool cancelled;
-	bool IsCancellationRequested() const { return cancelled; }
+	bool IsCancellationRequested() const { return cancelled || stubCancelRequested; }
 };
 typedef void ( *idJobFunction )( const idJobContext& context );
 enum class idJobPriority { LOW, NORMAL, HIGH };

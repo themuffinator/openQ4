@@ -195,9 +195,10 @@ private:
 	int						RoutedQueueFrames( int sampleRate );
 	void					AdvanceQueuedBuffer();
 	// A streamed sample's blocks decode on job workers (idSoundOggStream). The frames
-	// one queue buffer takes at offset; opening the stream and requesting that block.
+	// one queue buffer takes at offset; opening the stream and requesting that block,
+	// and with decodeAhead every free block after the ready ones too.
 	int						StreamBlockFrames( idSoundSample_OpenAL* sample, int offset );
-	bool					PrepareStreamBlock( idSoundSample_OpenAL* sample, int offset );
+	bool					PrepareStreamBlock( idSoundSample_OpenAL* sample, int offset, bool decodeAhead );
 	// The next queue buffer is still decoding: the voice is starting or refilling, not done.
 	bool					StreamBlockPending() const;
 	bool					SetNextQueuedSampleStart( idSoundSample_OpenAL* sample );
