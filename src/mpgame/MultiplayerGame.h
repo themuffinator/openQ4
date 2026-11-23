@@ -65,7 +65,9 @@ typedef enum {
 //             note that we have two mechanisms for dealing with vote data that
 //             should be consolidated:  this one that handles the interface and
 //             multi-field votes and the one that handles console commands and
-//             single line votes.  
+//             single line votes.
+// openQ4: a preset vote's name, nul included (MP_PRESET_NAME_MAX in mp/Presets.h)
+const int MP_VOTE_PRESET_BYTES = 32;
 struct voteStruct_t {
 	int				m_fieldFlags;	// flags for which fields are valid
 	int				m_kick;			// id of the player
@@ -82,6 +84,12 @@ struct voteStruct_t {
 	int				m_ruleset;
 	int				m_instagib;
 	int				m_overtime;
+	// openQ4 MP-12/MP-14/MP-16: the modifier, arena, preset and spectator chat votes
+	int				m_modifierMask;		// the modifiers the vote changes (MPModifierBit)
+	int				m_modifierValues;	// and what each becomes, under the same bits
+	int				m_weaponArena;		// rvMPModifiers' weapon arena index, -1 for none
+	int				m_spectatorChat;	// g_spectatorChat
+	char			m_preset[ MP_VOTE_PRESET_BYTES ];	// a preset name, nul-terminated
 	// restart is a flag only
 	// nextmap is a flag only but we don't technically support it (but doom had it so it's here)
 };
@@ -114,9 +122,28 @@ typedef enum {
 	// player and their identity are the kick field's, so every check on a kick
 	// target covers a mute target. Never valid without VOTEFLAG_KICK.
 	VOTEFLAG_MUTE			= 0x100000,
+	// openQ4 MP-14: turn modifiers on or off (m_modifierMask, m_modifierValues).
+	// Instagib may be named here or by VOTEFLAG_INSTAGIB, never by both.
+	VOTEFLAG_MODIFIER		= 0x200000,
+	// openQ4 MP-16: whether spectators reach players' all-chat (g_spectatorChat);
+	// bit 22 was reserved for it when MP-16 landed.
+	VOTEFLAG_SPECTATORCHAT	= 0x400000,
+	// openQ4 MP-14: apply a named preset. A preset sets the game type, ruleset,
+	// modifiers and limits together, so it is valid only on its own.
+	VOTEFLAG_PRESET			= 0x800000,
+	// openQ4 MP-14: a single-weapon arena, or none (m_weaponArena)
+	VOTEFLAG_ARENA			= 0x1000000,
 } voteFlag_t;
 
-#define NUM_VOTES			21	// VOTEFLAG_MUTE is bit 20 and must participate in vote masking
+// The flags a preset vote may not share a ballot with: the preset sets them.
+#define VOTEFLAG_PRESET_EXCLUSIVE	( VOTEFLAG_GAMETYPE | VOTEFLAG_RULESET | VOTEFLAG_INSTAGIB | VOTEFLAG_MODIFIER | VOTEFLAG_ARENA | \
+									  VOTEFLAG_TIMELIMIT | VOTEFLAG_FRAGLIMIT | VOTEFLAG_CAPTURELIMIT | VOTEFLAG_TOURNEYLIMIT | \
+									  VOTEFLAG_ROUNDLIMIT | VOTEFLAG_OVERTIME | VOTEFLAG_BUYING | VOTEFLAG_CONTROLTIME )
+// The flags whose payloads follow the MP-12 fields on every vote message, in
+// this order. A vote without them is laid out exactly as before.
+#define VOTEFLAG_MP14_FIELDS		( VOTEFLAG_MODIFIER | VOTEFLAG_SPECTATORCHAT | VOTEFLAG_PRESET | VOTEFLAG_ARENA )
+
+#define NUM_VOTES			25	// VOTEFLAG_ARENA is bit 24 and must participate in vote masking
 #define VOTEFLAG_ALL			( ( 1 << NUM_VOTES ) - 1 )
 #define MAX_PRINT_LEN 128
 
@@ -668,6 +695,13 @@ public:
 	void			ExecuteVote( void );
 // RAVEN BEGIN
 // shouchard:  multiline vote handlers
+	// openQ4 MP-14/MP-16: the payloads of VOTEFLAG_MP14_FIELDS, written after
+	// the MP-12 fields on every vote message. Read checks shape and range only.
+	static void		WriteVoteExtensionFields( idBitMsg &msg, const voteStruct_t &voteData );
+	static bool		ReadVoteExtensionFields( const idBitMsg &msg, voteStruct_t &voteData );
+	static void		EmptyVoteStruct( voteStruct_t &voteData );
+	bool			ValidateVoteExtensionFields( int clientNum, voteStruct_t &voteData );
+	void			ExecuteVoteExtensionFields( const voteStruct_t &voteData, bool &needRescanSI, bool &presetRestart );
 	void			ClientCallPackedVote( const voteStruct_t &voteData, int kickIdentity = 0 );
 	void			ServerCallPackedVote( int clientNum, const idBitMsg &msg );
 	void			ClientStartPackedVote( int clientNum, const voteStruct_t &voteData );
@@ -712,7 +746,9 @@ public:
 		bool		shuffleTeams;
 	} serverAdminData_t;
 
-	void			HandleServerAdminBanPlayer( int clientNum );
+	// openQ4 MP-18: for seconds (0 for good) and with a reason, by its row of
+	// RetainedAdminBanReasonText's table
+	void			HandleServerAdminBanPlayer( int clientNum, int seconds = 0, int reason = 0 );
 	void			HandleServerAdminRemoveBan( const char * info );
 	void			HandleServerAdminKickPlayer( int clientNum );
 	void			HandleServerAdminForceTeamSwitch( int clientNum );
@@ -1458,13 +1494,20 @@ private:
 	// document's rows follow this order. The casual callvote fields (MP-12)
 	// follow the kick, so the Admin page's fields stay the ones before it:
 	// skipping to the next map, a random map, the round limit, the overtime
-	// period, the ruleset, Instagib, readying everyone and a coin toss.
+	// period, the ruleset, Instagib, readying everyone and a coin toss. Then
+	// the moderation and modifier votes (MP-18, MP-14, MP-16): whether the
+	// chosen player is muted rather than kicked, Quad Hog, Vampiric Damage,
+	// Weapons Frenzy, a weapon arena (by row; -1 none), a preset (by row of
+	// the built-in table; -1 keeps the rules) and spectator chat.
 	enum retainedVoteField_t {
 		RVF_MAP, RVF_GAMETYPE, RVF_TIMELIMIT, RVF_FRAGLIMIT, RVF_CAPTURELIMIT, RVF_TOURNEYLIMIT, RVF_CONTROLTIME,
 		RVF_BALANCE, RVF_SHUFFLE, RVF_RESTART, RVF_BUYING, RVF_KICK,
-		RVF_NEXTMAP, RVF_RANDOMMAP, RVF_ROUNDLIMIT, RVF_OVERTIME, RVF_RULESET, RVF_INSTAGIB, RVF_READYALL, RVF_COINTOSS, RVF_COUNT
+		RVF_NEXTMAP, RVF_RANDOMMAP, RVF_ROUNDLIMIT, RVF_OVERTIME, RVF_RULESET, RVF_INSTAGIB, RVF_READYALL, RVF_COINTOSS,
+		RVF_MUTE, RVF_QUADHOG, RVF_VAMPIRIC, RVF_FRENZY, RVF_ARENA, RVF_PRESET, RVF_SPECTATORCHAT, RVF_COUNT
 	};
 	static const int RETAINED_VOTE_MAPS = 128;
+	static const int RETAINED_VOTE_ARENAS = 16;		// the weapon arena choice's rows
+	static const int RETAINED_VOTE_PRESETS = 16;	// the preset choice's rows (the built-in table)
 	static const int RETAINED_VOTE_LINES = 6;
 	int				retainedVoteDraft[ RVF_COUNT ];
 	idStr			retainedVoteMap;
@@ -1474,6 +1517,8 @@ private:
 	int				retainedVoteKickIdentity = 0;
 	bool			retainedVoteKickStale = false;
 	bool			SetRetainedVoteKick( int row, const char *catalog );
+	static int		RetainedVoteModifier( int field );
+	static int		RetainedVotePresetRow( const char *name );
 	bool			retainedVoteMapsRequested;
 	void			ResetRetainedVoteDraft( void );
 	void			RetainedVoteChoices( void );
@@ -1505,6 +1550,16 @@ private:
 	int				retainedAdminClient;		// the player chosen, by client number (-1: none)
 	idStr			retainedAdminIdentity;
 	int				retainedAdminBan;			// the ban chosen, by row (-1: none)
+	// openQ4 MP-18: the Players section's Ban is for the length and with the
+	// reason chosen here, by row of RetainedAdminBanLength/-Reason's tables.
+	int				retainedAdminBanLength = 0;
+	int				retainedAdminBanReason = 0;
+	static const int RETAINED_ADMIN_BAN_LENGTHS = 5;	// 10 minutes, an hour, a day, a week, for good
+	static const int RETAINED_ADMIN_BAN_REASONS = 6;	// none, then five
+	static int		RetainedAdminBanSeconds( int row );
+	static bool		RetainedAdminBanLengthKnown( int seconds );
+	static const char *RetainedAdminBanReasonText( int row );
+	static idStr	RetainedAdminBanDetail( const mpBanInfo_t &ban );
 	int				retainedAdminDraft[ RVF_COUNT ];
 	idStr			retainedAdminMap;
 	idList<int>		retainedAdminMaps;

@@ -222,9 +222,10 @@ def check_enforcement() -> None:
 
     mp = read("src/mpgame/MultiplayerGame.cpp")
     require('"kick %i ban"' not in mp, "the Admin page's Ban no longer runs a kick the engine reads as one word")
-    page = function_body(mp, "void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum )")
-    require("gameLocal.ServerBan( address, MPModPlayerPrefixBits( address ), 0," in page,
-            "the Admin page's Ban bans the range the player holds: their address, or their IPv6 /64")
+    page = function_body(mp, "void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum, int seconds, int reason )")
+    require("gameLocal.ServerBan( address, MPModPlayerPrefixBits( address ), static_cast<mpModTime_t>( Max( 0, seconds ) )," in page
+            and "RetainedAdminBanReasonText( reason )" in page,
+            "the Admin page's Ban bans the range the player holds (their address, or their IPv6 /64) for its length and reason")
     require(mp.count('gameLocal.ModerationLogClient( "kick", "vote",') == 2
             and 'gameLocal.ModerationLogClient( "kick", "admin", clientNum, "", 0 );' in mp, "vote and Admin page kicks reach the admin log")
 
@@ -350,7 +351,8 @@ def check_console_kick() -> None:
 def check_mute_vote() -> None:
     header = read("src/mpgame/MultiplayerGame.h")
     mp = read("src/mpgame/MultiplayerGame.cpp")
-    require("VOTEFLAG_MUTE\t\t\t= 0x100000," in header and re.search(r"#define\s+NUM_VOTES\s+21\b", header) is not None,
+    require("VOTEFLAG_MUTE\t\t\t= 0x100000," in header and re.search(r"#define\s+NUM_VOTES\s+(\d+)\b", header) is not None
+            and int(re.search(r"#define\s+NUM_VOTES\s+(\d+)\b", header).group(1)) > 20,
             "the mute vote is flag bit 20 and inside the vote mask")
     call = function_body(mp, "void idMultiplayerGame::CallVote_f( const idCmdArgs &args )")
     word = call.find('idStr::Icmp( szArg1, "mute" )')
@@ -369,7 +371,7 @@ def check_mute_vote() -> None:
     declared = re.search(r'^idCVar g_voteMuteMinutes\(.*$', cvars, re.M)
     require(declared is not None and '"10"' in declared.group(0) and ", 0, 1440 )" in declared.group(0)
             and "CVAR_GAME | CVAR_ARCHIVE" in declared.group(0), "a mute vote lasts ten minutes by default")
-    require('"bit 20 (+1048576) mute player"' in cvars, "si_voteFlags documents the mute bit")
+    require('"bit 20 (+1048576) mute player' in cvars, "si_voteFlags documents the mute bit")
 
 
 def check_shutdown() -> None:

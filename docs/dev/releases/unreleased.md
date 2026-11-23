@@ -506,6 +506,17 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Players can vote on more of the match. `callvote quadhog 1`, `vampiric`,
+  `frenzy` and `modifier <name> 0|1` turn a modifier on or off, `callvote arena
+  rocketlauncher` (or `none`) plays a single-weapon arena, `callvote preset
+  <name>` applies a preset, and `callvote spectatorchat 1` lets spectators talk
+  to the players. The in-match **Vote** page offers each of them, and **Mute
+  Instead of Kicking** turns its player vote into a mute. Each restarts the
+  match where the rules change, and a server can forbid each with
+  `si_voteFlags` (bits 21 to 24). See [Vote](../../user/multiplayer.md#vote).
+- The Admin page's **Ban** takes a length (10 minutes to permanent) and a
+  reason, and its ban list shows each ban's reason and time left. See
+  [The in-match Admin page](../../user/server-security.md#bans-mutes-and-chat-limits).
 - Vulkan spends less GPU time on scenes with smoke, heat haze or SSAO when MSAA is
   on: each copy of the scene depth those effects read costs about a quarter of
   what it did (about 1 ms a frame outdoors at 8x on the reference laptop, less at

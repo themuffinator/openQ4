@@ -3194,7 +3194,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 		}
 		case GAME_RELIABLE_MESSAGE_STARTPACKEDVOTE: {
 			voteStruct_t voteData;
-			memset( &voteData, 0, sizeof( voteData ) );
+			idMultiplayerGame::EmptyVoteStruct( voteData );
 			int clientNum = msg.ReadByte();
 			voteData.m_fieldFlags = msg.ReadLong();
 			if ( voteData.m_fieldFlags <= 0 || ( voteData.m_fieldFlags & ~VOTEFLAG_ALL ) != 0 ) {
@@ -3249,6 +3249,11 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_OVERTIME ) ) {
 				voteData.m_overtime = msg.ReadShort();
 			}
+			// openQ4 MP-14/MP-16: the modifier, spectator chat, preset and arena fields
+			if ( !idMultiplayerGame::ReadVoteExtensionFields( msg, voteData ) ) {
+				Warning( "Ignoring packed vote state with a malformed modifier, preset or arena field" );
+				break;
+			}
 			if ( msg.GetRemainingReadBits() != 0 ) {
 				Warning( "Ignoring packed vote state with %d trailing bits", msg.GetRemainingReadBits() );
 				break;
@@ -3269,7 +3274,7 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 			}
 			voteStruct_t voteData;
 			char mapNameBuffer[256] = { '\0' };
-			memset( &voteData, 0, sizeof( voteData ) );
+			idMultiplayerGame::EmptyVoteStruct( voteData );
 			if ( multiVote ) {
 				voteData.m_fieldFlags = msg.ReadLong();
 				if ( voteData.m_fieldFlags <= 0 || ( voteData.m_fieldFlags & ~VOTEFLAG_ALL ) != 0 ) {
@@ -3295,6 +3300,10 @@ void idGameLocal::ClientProcessReliableMessage( int clientNum, const idBitMsg &m
 				voteData.m_ruleset = msg.ReadByte();
 				voteData.m_instagib = msg.ReadByte();
 				voteData.m_overtime = msg.ReadShort();
+				if ( !idMultiplayerGame::ReadVoteExtensionFields( msg, voteData ) ) {
+					Warning( "Ignoring vote update with a malformed modifier, preset or arena field" );
+					break;
+				}
 				if ( ( voteData.m_ruleset != 0 && voteData.m_ruleset != 1 ) || ( voteData.m_instagib != 0 && voteData.m_instagib != 1 ) ) {
 					Warning( "Ignoring vote update with invalid casual vote values" );
 					break;

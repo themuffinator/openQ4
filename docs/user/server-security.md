@@ -79,8 +79,13 @@ nothing, unless that player has logged in as an [admin](#admins).
 | `kick <slot>`, `gameKick <slot\|name>` | Removes a player without banning them |
 | `serverShutdown <match\|now\|time\|cancel> [reason]` | Stops the server after telling the players; see [Stopping the server](#stopping-the-server) |
 
-The Admin page's **Ban** button now bans the chosen player's address for good,
-and the ban lists in the menus show addresses instead of IDs.
+The Admin page's **Ban** button now bans the chosen player's address, and the
+ban lists in the menus show addresses instead of IDs. Under **View Ban List**,
+**Ban Length** (10 minutes, an hour, a day, a week or permanent, the default)
+and **Ban Reason** (none, cheating, abusive chat, spam, team killing or
+griefing) set what the next **Ban** records. The Admin page's ban list shows
+each ban's reason and the time it has left. On a server running 0.15.0 the
+button still only kicks.
 
 **Naming the target.** `ban` reads its first word as a slot number if it is
 all digits, then as an address, then as a name. Banning a connected player by

@@ -874,7 +874,11 @@ idCVar si_voteFlags(				"si_voteFlags",				"0",			CVAR_GAME | CVAR_SERVERINFO | 
 																	"bit 17 (+131072) coin toss\n"
 																	"bit 18 (+262144) random map\n"
 																	"bit 19 (+524288) ready all\n"
-																	"bit 20 (+1048576) mute player" );
+																	"bit 20 (+1048576) mute player\n"
+																	"bit 21 (+2097152) modifiers\n"
+																	"bit 22 (+4194304) spectator chat\n"
+																	"bit 23 (+8388608) preset\n"
+																	"bit 24 (+16777216) weapon arena" );
 // openQ4 MP-12: casual vote policy. The defaults reproduce the inherited rule
 // (a strict majority of the frozen electorate, no per-map limit, players only).
 idCVar g_votePercent(				"g_votePercent",			"51",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "percentage of the players eligible when a vote starts that must vote yes for it to pass", 1, 100 );

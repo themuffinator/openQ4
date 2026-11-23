@@ -409,7 +409,7 @@ def ban_dialog_size() -> tuple[float, float]:
 
 
 def ban_list_modal(doc: Document, prefix: str = "create", pick_key: str | None = None, pick_verb: str = "createBanPick",
-                   remove_verb: str = "createBanRemove") -> dict:
+                   remove_verb: str = "createBanRemove", details: bool = False) -> dict:
     """PLAYER BAN LIST (section 6, the list dialog as MODS builds it): the
     game's ban list under NAME and GUID headings and an olive rule, on 20 u
     rows with the list's light and a scrollbar, or a line saying there is
@@ -419,7 +419,9 @@ def ban_list_modal(doc: Document, prefix: str = "create", pick_key: str | None =
     to REMOVE BAN, which removes its ban; CLOSE and Back return to VIEW LOCAL
     SERVER BAN LIST. The multiplayer card's Admin page shows the same dialog
     over its own list: `prefix` names the list's state, `pick_key` the row a
-    row's Accept names and the two verbs choose a ban and remove it."""
+    row's Accept names and the two verbs choose a ban and remove it; with
+    `details` a third column under DETAILS gives each ban's reason and the
+    time it has left (MP-18), and the name and range share the rest."""
     pick_key = pick_key or f"{prefix}.ban_pick"
     doc.state.update({f"{prefix}.ban_count": {"type": "number", "initial": 0}, f"{prefix}.ban_selected": {"type": "number", "initial": -1},
                       pick_key: {"type": "number", "initial": -1}})
@@ -428,12 +430,15 @@ def ban_list_modal(doc: Document, prefix: str = "create", pick_key: str | None =
     width_dp, action_w = ban_dialog_size()
     left, top, list_h = BAN_LIST_LEFT, BAN_LIST_TOP, BAN_LIST_H
     list_w = width_dp / U - 2 * left
-    guid_x = round(list_w / 2, 1)
+    guid_x = round(list_w * (0.34 if details else 0.5), 1)
+    detail_x = round(list_w * 0.62, 1) if details else list_w
     heading = {**typeface("lowpixel", 13, U * 12, [1, 1, 1, 0.4]), "white-space": keyword("nowrap"), "overflow": keyword("hidden")}
     parts = [
         label("ban-head-name", "#str_200242", {**absolute(left=U * left, top=U * 12, width=U * (guid_x - 4), height=U * 12), **heading}),
         label("ban-head-guid", "#str_200924", {**absolute(left=U * (left + guid_x), top=U * 12,
-              width=U * (list_w - guid_x), height=U * 12), **heading}),
+              width=U * (detail_x - guid_x - (4 if details else 0)), height=U * 12), **heading}),
+        *([label("ban-head-detail", "#str_232826", {**absolute(left=U * (left + detail_x), top=U * 12,
+                 width=U * (list_w - detail_x), height=U * 12), **heading})] if details else []),
         vector("ban-rule", absolute(left=U * left, top=U * top - 0.6, width=U * list_w, height=1.2), [
             path("rule", [(0, 0.6), ({"fraction": 1}, 0.6)], closed=False, stroke=stroke(solid(rgb(OLIVE, 0.26)), 1.2))]),
         label("ban-empty", "#str_231130", {**absolute(left=U * left, top=U * (top + 8), width=U * list_w, height=U * 16),
@@ -449,8 +454,12 @@ def ban_list_modal(doc: Document, prefix: str = "create", pick_key: str | None =
     for index in range(BAN_ROWS):
         ident, key = f"ban-row-{index}", f"{prefix}.ban{index}"
         cells = []
-        for column, left_u, column_w, tint in (("name", 4, guid_x - 8, tints[0]),
-                                               ("guid", guid_x, list_w - 16 - guid_x - 4, tints[1])):
+        columns = [("name", 4, guid_x - 8, tints[0])]
+        if details:
+            columns += [("guid", guid_x, detail_x - guid_x - 4, tints[1]), ("detail", detail_x, list_w - 16 - detail_x - 4, tints[1])]
+        else:
+            columns += [("guid", guid_x, list_w - 16 - guid_x - 4, tints[1])]
+        for column, left_u, column_w, tint in columns:
             doc.state[f"{key}.{column}"] = {"type": "string", "initial": ""}
             node = f"{ident}-{column}"
             cells.append(label(node, PLACEHOLDER, {**absolute(left=U * left_u, top=0, width=U * column_w, height=height),
@@ -463,7 +472,8 @@ def ban_list_modal(doc: Document, prefix: str = "create", pick_key: str | None =
         doc.events[event] = [{"op": "if", "condition": {"op": "==", "args": [{"state": f"{prefix}.ban_selected"}, index]},
                               "then": [{"op": "focus", "control": "banModal_yes"}],
                               "else": [{"op": "setState", "values": {pick_key: index}}, {"op": "action", "action": pick_verb}]}]
-        ids = row_states(doc, ident, (f"{ident}-name", f"{ident}-guid"), tints)
+        ids = row_states(doc, ident, (f"{ident}-name", f"{ident}-guid", *([f"{ident}-detail"] if details else [])),
+                         (*tints, *([tints[1]] if details else [])))
         rows.append(group(ident, {"position": keyword("relative"), "display": keyword("none"), "width": length(width), "height": length(height),
                                   "flex-shrink": number(0)}, [*row_plates(ident, width, height, selectable=True), *cells],
                           control={"role": "button", "label": PLACEHOLDER, "event": event, "states": ids}))

@@ -12,6 +12,38 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Votes for modifiers, arenas, presets and spectator chat; ban lengths and reasons, 23 November 2026
+
+- **Vote on how the match plays.** `callvote quadhog 1` (or `vampiric`,
+  `frenzy`, or `modifier <name> 0|1`) turns a modifier on or off,
+  `callvote arena rocketlauncher` plays a single-weapon arena and `arena none`
+  ends it, and `callvote preset <name>` applies one of the server's presets.
+  The match restarts with the new rules once the vote passes. A preset sets
+  the game type and limits itself, so it is a vote of its own.
+- **Vote whether spectators talk to the players.** `callvote spectatorchat 1`
+  lets spectators' all-chat reach players during live play.
+- **On the Vote page.** The in-match **Vote** page now offers Quad Hog (in
+  Deathmatch), Vampiric Damage, Weapons Frenzy, a weapon arena, a built-in
+  preset, Spectator Chat and **Mute Instead of Kicking** for the player
+  chosen.
+- **Bans with a length and a reason from the Admin page.** Under **View Ban
+  List**, **Ban Length** (10 minutes to permanent) and **Ban Reason** set
+  what the next **Ban** records, and the ban list shows each ban's reason
+  and time left.
+- **For server operators.** `si_voteFlags` forbids the new votes with bits 21
+  (modifiers), 22 (spectator chat), 23 (presets) and 24 (weapon arenas).
+- **Compatibility.** Players on 0.15.0 can join and vote as before; they do
+  not see the new votes called. A remote admin's Ban on a server running
+  0.15.0 still only kicks.
+- **Evidence.** `mp_vote_extensions_smoke.py` (hidden OpenGL listen server,
+  Deathmatch on `mp/q4dm1` with two paused bots): three refused calls start
+  no vote, then Quad Hog, a rocket arena, spectator chat and the standard
+  preset each pass and apply. `mp_casual_match_flow_contract.py`,
+  `mp_vote_security_contract.py`, `mp_moderation.py` and
+  `mp_match_vote_electorate_contract.py` pin the flags, payloads and Admin
+  page handling. Not run: Vulkan, a dedicated server, a remote client, and a
+  person using the new rows with real input.
+
 ## Sharper textures when upscaling, and on Vulkan with NVIDIA cards, 23 November 2026
 
 - **Lower resolution scales keep more texture detail.** When the 3D scene is

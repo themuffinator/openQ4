@@ -23,14 +23,14 @@
 static_assert( MP_MATCH_VIEW_MAX_MESSAGE_BYTES + 1 <= MAX_GAME_MESSAGE_SIZE,
 	"match view plus reliable message tag must fit the game transport buffer" );
 
-idCVar g_spectatorChat( "g_spectatorChat", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "let spectators talk to everyone during game" );
+idCVar g_spectatorChat( "g_spectatorChat", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_SERVERINFO | CVAR_BOOL, "let spectators talk to everyone during game; in the server info so the Vote page can offer the other value" );
 // openQ4: who may take the caster's view (both sides' health and armour) on a
 // server that is not running a managed match. The operator's matchBroadcaster
 // grant works either way; managed matches never accept a self-service request.
 idCVar g_casterAccess( "g_casterAccess", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "outside managed matches, let any spectator take the caster view for themselves with the caster command (0 = only the server operator grants it with matchBroadcaster)" );
 // Target-bearing requests are safe only when both ends understand the
 // connection identity. Older servers still use slots; never send them one.
-idCVar si_uiTargetProtocol( "si_uiTargetProtocol", "2", CVAR_GAME | CVAR_INTEGER | CVAR_ROM | CVAR_SERVERINFO, "identity-bound UI player requests" );
+idCVar si_uiTargetProtocol( "si_uiTargetProtocol", "3", CVAR_GAME | CVAR_INTEGER | CVAR_ROM | CVAR_SERVERINFO, "identity-bound UI player requests; 3 adds a ban's length and reason" );
 
 static const int ARENA_RESULT_REVIEW_MSEC = 6000;
 // The ordered ceremony that follows the exit condition: a frozen tableau the
@@ -1143,6 +1143,22 @@ static void ResolveAndApplyMPMenuModelSelection( idUserInterface *gui, const idS
 	bool selectedValid = selectedDecl.Length() &&
 		ExtractMPMenuModelInfo( selectedDecl.c_str(), modelName, headName, skinName, description, team ) &&
 		MPMenuModelAllowedForTeam( team, isTeamGame, menuModelTeam );
+
+	if ( !selectedValid && !forceModel && def ) {
+		// A stored name that names no player model, such as the retail
+		// default.cfg's "marine", takes the menu def's own default for the team.
+		// The first model in the list is Quake 4's Failed Transfer monster.
+		const char *defaultDecl = ( menuModelTeam >= 0 && menuModelTeam < TEAM_MAX ) ?
+			def->dict.GetString( va( "def_default_model_%s", mpMenuModelTeamSuffix[ menuModelTeam ] ) ) :
+			def->dict.GetString( "def_default_model" );
+		if ( defaultDecl[0] &&
+			ExtractMPMenuModelInfo( defaultDecl, modelName, headName, skinName, description, team ) &&
+			MPMenuModelAllowedForTeam( team, isTeamGame, menuModelTeam ) ) {
+			selectedDecl = defaultDecl;
+			selectedValid = true;
+			cvarSystem->SetCVarString( modelCVar.c_str(), selectedDecl.c_str() );
+		}
+	}
 
 	if ( !selectedValid ) {
 		idStr fallbackDecl;
@@ -13609,6 +13625,216 @@ static bool ReadVoteKickTarget( const idBitMsg &msg, int client ) {
 
 /*
 ================
+idMultiplayerGame::EmptyVoteStruct
+
+voteStruct_t holds an idStr, so it is cleared field by field.
+================
+*/
+void idMultiplayerGame::EmptyVoteStruct( voteStruct_t &voteData ) {
+	voteData.m_fieldFlags = 0;
+	voteData.m_kick = voteData.m_gameType = voteData.m_timeLimit = voteData.m_fragLimit = voteData.m_tourneyLimit = 0;
+	voteData.m_captureLimit = voteData.m_buying = voteData.m_teamBalance = voteData.m_controlTime = 0;
+	voteData.m_roundLimit = voteData.m_ruleset = voteData.m_instagib = voteData.m_overtime = 0;
+	voteData.m_map.Clear();
+	voteData.m_modifierMask = voteData.m_modifierValues = 0;
+	voteData.m_weaponArena = -1;
+	voteData.m_spectatorChat = 0;
+	voteData.m_preset[ 0 ] = '\0';
+}
+
+/*
+================
+idMultiplayerGame::WriteVoteExtensionFields
+
+openQ4 MP-14/MP-16: the modifier, spectator chat, preset and arena payloads,
+in that order, each only when its flag is set. A vote without these flags is
+byte for byte what it was before, so a 0.15.0 peer reads it unchanged.
+================
+*/
+void idMultiplayerGame::WriteVoteExtensionFields( idBitMsg &msg, const voteStruct_t &voteData ) {
+	if ( voteData.m_fieldFlags & VOTEFLAG_MODIFIER ) {
+		msg.WriteShort( voteData.m_modifierMask & ( ( 1 << MPMOD_COUNT ) - 1 ) );
+		msg.WriteShort( voteData.m_modifierValues & voteData.m_modifierMask & ( ( 1 << MPMOD_COUNT ) - 1 ) );
+	}
+	if ( voteData.m_fieldFlags & VOTEFLAG_SPECTATORCHAT ) {
+		msg.WriteByte( voteData.m_spectatorChat ? 1 : 0 );
+	}
+	if ( voteData.m_fieldFlags & VOTEFLAG_PRESET ) {
+		msg.WriteString( voteData.m_preset, MP_VOTE_PRESET_BYTES );
+	}
+	if ( voteData.m_fieldFlags & VOTEFLAG_ARENA ) {
+		msg.WriteByte( idMath::ClampInt( 0, 255, voteData.m_weaponArena + 1 ) );
+	}
+}
+
+/*
+================
+idMultiplayerGame::ReadVoteExtensionFields
+
+The shape and range of the payloads WriteVoteExtensionFields wrote: a
+modifier vote changes at least one known modifier and sets none it does not
+change, spectator chat is 0 or 1, a preset is a valid name, an arena is one
+of the table's or none. False leaves the message unusable.
+================
+*/
+bool idMultiplayerGame::ReadVoteExtensionFields( const idBitMsg &msg, voteStruct_t &voteData ) {
+	const int known = ( 1 << MPMOD_COUNT ) - 1;
+	if ( voteData.m_fieldFlags & VOTEFLAG_MODIFIER ) {
+		if ( msg.GetRemainingReadBits() < 32 ) {
+			return false;
+		}
+		voteData.m_modifierMask = msg.ReadShort();
+		voteData.m_modifierValues = msg.ReadShort();
+		if ( voteData.m_modifierMask <= 0 || ( voteData.m_modifierMask & ~known ) != 0 ||
+			( voteData.m_modifierValues & ~voteData.m_modifierMask ) != 0 ) {
+			return false;
+		}
+	}
+	if ( voteData.m_fieldFlags & VOTEFLAG_SPECTATORCHAT ) {
+		if ( msg.GetRemainingReadBits() < 8 ) {
+			return false;
+		}
+		voteData.m_spectatorChat = msg.ReadByte();
+		if ( voteData.m_spectatorChat != 0 && voteData.m_spectatorChat != 1 ) {
+			return false;
+		}
+	}
+	if ( voteData.m_fieldFlags & VOTEFLAG_PRESET ) {
+		if ( !HasBoundedMessageString( msg, MP_VOTE_PRESET_BYTES ) ) {
+			return false;
+		}
+		msg.ReadString( voteData.m_preset, MP_VOTE_PRESET_BYTES );
+		if ( !rvMPPresets::ValidName( voteData.m_preset ) ) {
+			return false;
+		}
+	}
+	if ( voteData.m_fieldFlags & VOTEFLAG_ARENA ) {
+		if ( msg.GetRemainingReadBits() < 8 ) {
+			return false;
+		}
+		voteData.m_weaponArena = msg.ReadByte() - 1;
+		if ( voteData.m_weaponArena < -1 || voteData.m_weaponArena >= rvMPModifiers::WeaponArenaCount() ) {
+			return false;
+		}
+	}
+	return true;
+}
+
+/*
+================
+idMultiplayerGame::ValidateVoteExtensionFields
+
+openQ4 MP-14/MP-16: whether the modifier, spectator chat, preset and arena
+fields of a called vote can pass, told to the caller as the other fields are:
+a field that changes nothing or cannot apply refuses the whole vote.
+================
+*/
+bool idMultiplayerGame::ValidateVoteExtensionFields( int clientNum, voteStruct_t &voteData ) {
+	bool valid = true;
+	const auto refuse = [&]( int flag, const char *reason ) {
+		if ( reason != NULL && ( voteData.m_fieldFlags & flag ) != 0 ) {
+			gameLocal.ServerSendChatMessage( clientNum, "server", reason );
+		}
+		voteData.m_fieldFlags &= ~flag;
+		valid = false;
+	};
+	const idDict &si = gameLocal.serverInfo;
+	if ( voteData.m_fieldFlags & VOTEFLAG_PRESET ) {
+		idStr reason;
+		idDict wanted;
+		if ( ( voteData.m_fieldFlags & VOTEFLAG_PRESET_EXCLUSIVE ) != 0 ) {
+			// a preset sets the game type, ruleset, modifiers and limits together
+			refuse( VOTEFLAG_PRESET, "#str_232809" );
+		} else if ( !rvMPPresets::Validate( voteData.m_preset, reason ) || !rvMPPresets::Settings( voteData.m_preset, wanted, reason ) ) {
+			common->DPrintf( "client %d: preset vote refused: %s\n", clientNum, reason.c_str() );
+			refuse( VOTEFLAG_PRESET, "#str_232807" );
+		} else if ( wanted.GetString( "si_gameType" )[ 0 ] != '\0' && !AnyMapPlaysGameType( wanted.GetString( "si_gameType" ) ) ) {
+			refuse( VOTEFLAG_PRESET, "#str_232808" );
+		} else if ( idStr::Icmp( si.GetString( "si_preset" ), voteData.m_preset ) == 0 && rvMPPresets::Matches( voteData.m_preset, si ) ) {
+			refuse( VOTEFLAG_PRESET, "#str_42752" );
+		}
+	}
+	if ( voteData.m_fieldFlags & VOTEFLAG_MODIFIER ) {
+		// Instagib has its own vote word; one ballot may not name it twice.
+		if ( ( voteData.m_fieldFlags & VOTEFLAG_INSTAGIB ) != 0 && ( voteData.m_modifierMask & MPModifierBit( MPMOD_INSTAGIB ) ) != 0 ) {
+			refuse( VOTEFLAG_MODIFIER, NULL );
+		}
+		// Quad Hog is Deathmatch's: the game type the ballot leaves decides.
+		const char *gameTypeName = ( voteData.m_fieldFlags & VOTEFLAG_GAMETYPE ) != 0 ?
+			VoteGameTypeToString( voteData.m_gameType ) : si.GetString( "si_gameType" );
+		const mpGameTypeInfo_t *gameTypeInfo = MPGameTypeByName( gameTypeName );
+		for ( int i = 0; i < rvMPModifiers::Count() && ( voteData.m_fieldFlags & VOTEFLAG_MODIFIER ) != 0; i++ ) {
+			const int bit = MPModifierBit( i );
+			if ( ( voteData.m_modifierMask & bit ) == 0 ) {
+				continue;
+			}
+			const mpModifierInfo_t *info = rvMPModifiers::Info( i );
+			const bool on = ( voteData.m_modifierValues & bit ) != 0;
+			if ( on && info->id == MPMOD_QUADHOG && ( gameTypeInfo == NULL || gameTypeInfo->type != GAME_DM ) ) {
+				refuse( VOTEFLAG_MODIFIER, "#str_232806" );
+			} else if ( si.GetBool( info->cvar ) == on ) {
+				refuse( VOTEFLAG_MODIFIER, "#str_42752" );
+			}
+		}
+	}
+	if ( ( voteData.m_fieldFlags & VOTEFLAG_SPECTATORCHAT ) != 0 && ( voteData.m_spectatorChat != 0 ) == g_spectatorChat.GetBool() ) {
+		refuse( VOTEFLAG_SPECTATORCHAT, "#str_42752" );
+	}
+	if ( ( voteData.m_fieldFlags & VOTEFLAG_ARENA ) != 0 &&
+		rvMPModifiers::WeaponArenaByName( si.GetString( "si_weaponArena" ) ) == voteData.m_weaponArena ) {
+		refuse( VOTEFLAG_ARENA, "#str_42752" );
+	}
+	return valid;
+}
+
+/*
+================
+idMultiplayerGame::ExecuteVoteExtensionFields
+
+openQ4 MP-14/MP-16: a passed vote's modifier, arena, spectator chat and
+preset fields. Modifiers and the arena are server-info switches: the caller's
+rescan publishes them and CheckModifierChange restarts the match on every peer
+at once. A preset writes its settings and, unless the ballot also moves to
+another map, restarts the match itself, as the preset command does.
+================
+*/
+void idMultiplayerGame::ExecuteVoteExtensionFields( const voteStruct_t &data, bool &needRescanSI, bool &presetRestart ) {
+	idStr reason;
+	if ( data.m_fieldFlags & VOTEFLAG_MODIFIER ) {
+		for ( int i = 0; i < rvMPModifiers::Count(); i++ ) {
+			const int bit = MPModifierBit( i );
+			if ( ( data.m_modifierMask & bit ) != 0 &&
+				!rvMPModifiers::SetModifier( rvMPModifiers::Info( i )->name, ( data.m_modifierValues & bit ) != 0 ? 1 : 0, reason ) ) {
+				gameLocal.Warning( "modifier vote passed but not applied: %s", reason.c_str() );
+			}
+		}
+		needRescanSI = true;
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_ARENA ) {
+		const mpWeaponArenaInfo_t *arena = rvMPModifiers::WeaponArena( data.m_weaponArena );
+		if ( !rvMPModifiers::SetWeaponArena( arena != NULL ? arena->name : "none", reason ) ) {
+			gameLocal.Warning( "weapon arena vote passed but not applied: %s", reason.c_str() );
+		}
+		needRescanSI = true;
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_SPECTATORCHAT ) {
+		// in the server info, so every Vote page offers the other value next
+		g_spectatorChat.SetBool( data.m_spectatorChat != 0 );
+		needRescanSI = true;
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_PRESET ) {
+		if ( rvMPPresets::Apply( data.m_preset, reason ) ) {
+			common->Printf( "preset '%s' applied by vote\n", data.m_preset );
+			needRescanSI = true;
+			presetRestart = true;
+		} else {
+			gameLocal.Warning( "preset vote passed but not applied: %s", reason.c_str() );
+		}
+	}
+}
+
+/*
+================
 idMultiplayerGame::ClientCallPackedVote
 
 The assumption is that the zero changes case has been handled above.
@@ -13669,6 +13895,7 @@ void idMultiplayerGame::ClientCallPackedVote( const voteStruct_t &voteData, int 
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_OVERTIME ) ) {
 		outMsg.WriteShort( idMath::ClampShort( voteData.m_overtime ) );
 	}
+	WriteVoteExtensionFields( outMsg, voteData );
 	if ( voteData.m_fieldFlags & VOTEFLAG_KICK ) outMsg.WriteLong( kickIdentity );
 	networkSystem->ClientSendReliableMessage( outMsg );
 }
@@ -13680,7 +13907,7 @@ idMultiplayerGame::ServerCallPackedVote
 */
 void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg ) {
 	voteStruct_t voteData;
-	memset( &voteData, 0, sizeof( voteData ) );
+	EmptyVoteStruct( voteData );
 
 	assert( -1 != clientNum );
 	if ( !IsEligibleVotePlayerSlot( clientNum ) ) {
@@ -14004,6 +14231,15 @@ void idMultiplayerGame::ServerCallPackedVote( int clientNum, const idBitMsg &msg
 			validVote = false;
 			voteData.m_fieldFlags &= ( ~VOTEFLAG_RANDOMMAP );
 		}
+	}
+
+	// openQ4 MP-14/MP-16: the modifier, spectator chat, preset and arena fields
+	if ( !ReadVoteExtensionFields( msg, voteData ) ) {
+		common->Warning( "Ignoring packed vote from client %d with a malformed modifier, preset or arena field", clientNum );
+		return;
+	}
+	if ( !ValidateVoteExtensionFields( clientNum, voteData ) ) {
+		validVote = false;
 	}
 
 	if ( wireFieldFlags & VOTEFLAG_KICK ) {
@@ -14403,6 +14639,7 @@ void idMultiplayerGame::ServerStartPackedVote( int clientNum, const voteStruct_t
 	if ( 0 != ( voteData.m_fieldFlags & VOTEFLAG_OVERTIME ) ) {
 		outMsg.WriteShort( idMath::ClampShort( voteData.m_overtime ) );
 	}
+	WriteVoteExtensionFields( outMsg, voteData );
 	networkSystem->ServerSendReliableMessage( -1, outMsg );
 }
 
@@ -14546,6 +14783,9 @@ void idMultiplayerGame::ExecutePackedVote( void ) {
 	if ( 0 != ( currentVoteData.m_fieldFlags & VOTEFLAG_NEXTMAP ) ) {
 		needServerNextMap = true;
 	}
+	// openQ4 MP-14/MP-16: modifiers, the arena, spectator chat and presets
+	bool presetRestart = false;
+	ExecuteVoteExtensionFields( currentVoteData, needRescanSI, presetRestart );
 
 	if ( needRescanSI ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "rescanSI" " " __FILE__ " " __LINESTR__ );
@@ -14557,6 +14797,10 @@ void idMultiplayerGame::ExecutePackedVote( void ) {
 	}
 	else if ( needNextMap ) {
 		gameLocal.sessionCommand = "nextMap";
+	}
+	else if ( presetRestart ) {
+		// a preset may name a game type this map does not play: this moves to one that does
+		QueueRulesRestart();
 	}
 	else if ( needRestart || gameLocal.NeedRestart() ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, "serverMapRestart" );	
@@ -18845,9 +19089,51 @@ void idMultiplayerGame::ResetRetainedVoteDraft( void ) {
 	retainedVoteDraft[ RVF_INSTAGIB ] = si.GetBool( "si_instagib" ) ? 1 : 0;
 	retainedVoteDraft[ RVF_READYALL ] = 0;
 	retainedVoteDraft[ RVF_COINTOSS ] = 0;
+	// The moderation and modifier fields (MP-18, MP-14, MP-16): a kick, not a
+	// mute, and the server's modifiers, arena, preset and spectator chat.
+	retainedVoteDraft[ RVF_MUTE ] = 0;
+	for ( int field = RVF_QUADHOG; field <= RVF_FRENZY; field++ ) {
+		retainedVoteDraft[ field ] = si.GetBool( rvMPModifiers::Info( RetainedVoteModifier( field ) )->cvar ) ? 1 : 0;
+	}
+	retainedVoteDraft[ RVF_ARENA ] = rvMPModifiers::WeaponArenaByName( si.GetString( "si_weaponArena" ) );
+	retainedVoteDraft[ RVF_PRESET ] = RetainedVotePresetRow( si.GetString( "si_preset" ) );
+	retainedVoteDraft[ RVF_SPECTATORCHAT ] = si.GetBool( "g_spectatorChat" ) ? 1 : 0;
 	retainedVoteKickIdentity = 0;
 	retainedVoteKickStale = false;
 	retainedVoteMapsRequested = false;
+}
+
+/*
+================
+idMultiplayerGame::RetainedVoteModifier
+
+The modifier a Vote page toggle turns on or off.
+================
+*/
+int idMultiplayerGame::RetainedVoteModifier( int field ) {
+	switch ( field ) {
+		case RVF_QUADHOG: return MPMOD_QUADHOG;
+		case RVF_VAMPIRIC: return MPMOD_VAMPIRIC;
+		case RVF_FRENZY: return MPMOD_FRENZY;
+		default: return -1;
+	}
+}
+
+/*
+================
+idMultiplayerGame::RetainedVotePresetRow
+
+A preset's row in the Vote page's choice, which offers the built-in presets;
+-1 for none of them (no preset, or one of the server's own files).
+================
+*/
+int idMultiplayerGame::RetainedVotePresetRow( const char *name ) {
+	for ( int row = 0; row < rvMPPresets::BuiltInCount() && row < RETAINED_VOTE_PRESETS; row++ ) {
+		if ( name != NULL && idStr::Icmp( rvMPPresets::BuiltIn( row )->name, name ) == 0 ) {
+			return row;
+		}
+	}
+	return -1;
 }
 
 /*
@@ -18915,7 +19201,8 @@ static const int retainedVoteFlags[] = {
 	VOTEFLAG_MAP, VOTEFLAG_GAMETYPE, VOTEFLAG_TIMELIMIT, VOTEFLAG_FRAGLIMIT, VOTEFLAG_CAPTURELIMIT, VOTEFLAG_TOURNEYLIMIT,
 	VOTEFLAG_CONTROLTIME, VOTEFLAG_TEAMBALANCE, VOTEFLAG_SHUFFLE, VOTEFLAG_RESTART, VOTEFLAG_BUYING, VOTEFLAG_KICK,
 	VOTEFLAG_NEXTMAP, VOTEFLAG_RANDOMMAP, VOTEFLAG_ROUNDLIMIT, VOTEFLAG_OVERTIME, VOTEFLAG_RULESET, VOTEFLAG_INSTAGIB,
-	VOTEFLAG_READYALL, VOTEFLAG_COINTOSS
+	VOTEFLAG_READYALL, VOTEFLAG_COINTOSS,
+	VOTEFLAG_MUTE, VOTEFLAG_MODIFIER, VOTEFLAG_MODIFIER, VOTEFLAG_MODIFIER, VOTEFLAG_ARENA, VOTEFLAG_PRESET, VOTEFLAG_SPECTATORCHAT
 };
 
 /*
@@ -18939,6 +19226,7 @@ bool idMultiplayerGame::RetainedDraftFieldShown( int voteGameType, int field ) {
 		case RVF_SHUFFLE: return MPGameTypeHasAny( type, GTF_TEAM );
 		case RVF_BUYING: return MPGameTypeHasAny( type, GTF_BUYING );
 		case RVF_ROUNDLIMIT: return MPGameTypeHasAny( type, GTF_ROUNDLIMIT );
+		case RVF_QUADHOG: return type == GAME_DM;
 		default: return field >= 0 && field < RVF_COUNT;
 	}
 }
@@ -18952,9 +19240,15 @@ bool idMultiplayerGame::RetainedVoteFieldShown( int field ) const {
 	return RetainedDraftFieldShown( retainedVoteDraft[ RVF_GAMETYPE ], field );
 }
 
-// A field the server's si_voteFlags forbids stays on the page, locked.
+// A field the server's si_voteFlags forbids stays on the page, locked. The
+// player choice answers to the mute bit alone while the call is a mute, as the
+// server's policy does.
 bool idMultiplayerGame::RetainedVoteFieldAllowed( int field ) const {
-	return field >= 0 && field < RVF_COUNT && ( gameLocal.serverInfo.GetInt( "si_voteFlags" ) & retainedVoteFlags[ field ] ) == 0;
+	if ( field < 0 || field >= RVF_COUNT ) {
+		return false;
+	}
+	const int flag = ( field == RVF_KICK && retainedVoteDraft[ RVF_MUTE ] ) ? VOTEFLAG_MUTE : retainedVoteFlags[ field ];
+	return ( gameLocal.serverInfo.GetInt( "si_voteFlags" ) & flag ) == 0;
 }
 
 /*
@@ -18968,11 +19262,7 @@ refuses a whole vote for one unchanged field, so nothing else is sent.
 */
 int idMultiplayerGame::RetainedVoteChanges( voteStruct_t &data ) {
 	static_assert( sizeof( retainedVoteFlags ) / sizeof( retainedVoteFlags[0] ) == RVF_COUNT, "every drafted vote field has its flag" );
-	data.m_fieldFlags = 0;
-	data.m_kick = data.m_gameType = data.m_timeLimit = data.m_fragLimit = data.m_tourneyLimit = 0;
-	data.m_captureLimit = data.m_buying = data.m_teamBalance = data.m_controlTime = 0;
-	data.m_roundLimit = data.m_ruleset = data.m_instagib = data.m_overtime = 0;
-	data.m_map.Clear();
+	EmptyVoteStruct( data );
 	RetainedVoteChoices();
 	if ( retainedVoteKickStale ) return 0;
 	const idDict &si = gameLocal.serverInfo;
@@ -19019,6 +19309,35 @@ int idMultiplayerGame::RetainedVoteChanges( voteStruct_t &data ) {
 	if ( changes( RVF_KICK ) && retainedVoteDraft[ RVF_KICK ] >= 0 ) {
 		data.m_kick = retainedVoteDraft[ RVF_KICK ];
 		data.m_fieldFlags |= VOTEFLAG_KICK;
+		// openQ4 MP-18: the same player, silenced instead of removed
+		if ( retainedVoteDraft[ RVF_MUTE ] && changes( RVF_MUTE ) ) {
+			data.m_fieldFlags |= VOTEFLAG_MUTE;
+		}
+	}
+	// openQ4 MP-14/MP-16: each modifier that differs from the server's, the
+	// arena, a preset chosen that is not the one in force, and spectator chat
+	for ( int field = RVF_QUADHOG; field <= RVF_FRENZY; field++ ) {
+		const int modifier = RetainedVoteModifier( field );
+		const int current = si.GetBool( rvMPModifiers::Info( modifier )->cvar ) ? 1 : 0;
+		if ( changes( field ) && retainedVoteDraft[ field ] != current ) {
+			data.m_modifierMask |= MPModifierBit( modifier );
+			data.m_modifierValues |= retainedVoteDraft[ field ] ? MPModifierBit( modifier ) : 0;
+			data.m_fieldFlags |= VOTEFLAG_MODIFIER;
+		}
+	}
+	if ( changes( RVF_ARENA ) && retainedVoteDraft[ RVF_ARENA ] != rvMPModifiers::WeaponArenaByName( si.GetString( "si_weaponArena" ) ) ) {
+		data.m_weaponArena = retainedVoteDraft[ RVF_ARENA ];
+		data.m_fieldFlags |= VOTEFLAG_ARENA;
+	}
+	const mpPresetInfo_t *preset = retainedVoteDraft[ RVF_PRESET ] >= 0 ? rvMPPresets::BuiltIn( retainedVoteDraft[ RVF_PRESET ] ) : NULL;
+	if ( changes( RVF_PRESET ) && preset != NULL &&
+		( idStr::Icmp( si.GetString( "si_preset" ), preset->name ) != 0 || !rvMPPresets::Matches( preset->name, si ) ) ) {
+		idStr::Copynz( data.m_preset, preset->name, sizeof( data.m_preset ) );
+		data.m_fieldFlags |= VOTEFLAG_PRESET;
+	}
+	if ( changes( RVF_SPECTATORCHAT ) && retainedVoteDraft[ RVF_SPECTATORCHAT ] != ( si.GetBool( "g_spectatorChat" ) ? 1 : 0 ) ) {
+		data.m_spectatorChat = retainedVoteDraft[ RVF_SPECTATORCHAT ];
+		data.m_fieldFlags |= VOTEFLAG_SPECTATORCHAT;
 	}
 	// The casual fields (MP-12): a value that differs from the server's, or a
 	// one-off action chosen, as the console's callvote words ask for them.
@@ -19074,6 +19393,10 @@ const char *idMultiplayerGame::RetainedVoteRefusal( void ) {
 	voteStruct_t data;
 	if ( RetainedVoteChanges( data ) == 0 ) {
 		return "#str_231051";
+	}
+	// openQ4 MP-14: a preset sets the rules itself, so the server takes it alone
+	if ( ( data.m_fieldFlags & VOTEFLAG_PRESET ) != 0 && ( data.m_fieldFlags & VOTEFLAG_PRESET_EXCLUSIVE ) != 0 ) {
+		return "#str_232809";
 	}
 	return NULL;
 }
@@ -19152,7 +19475,24 @@ bool idMultiplayerGame::SetRetainedVoteField( int field, int value ) {
 		case RVF_INSTAGIB:
 		case RVF_READYALL:
 		case RVF_COINTOSS:
+		case RVF_MUTE:
+		case RVF_QUADHOG:
+		case RVF_VAMPIRIC:
+		case RVF_FRENZY:
+		case RVF_SPECTATORCHAT:
 			if ( value != 0 && value != 1 ) {
+				return false;
+			}
+			retainedVoteDraft[ field ] = value;
+			return true;
+		case RVF_ARENA:
+			if ( value < -1 || value >= Min( rvMPModifiers::WeaponArenaCount(), RETAINED_VOTE_ARENAS ) ) {
+				return false;
+			}
+			retainedVoteDraft[ field ] = value;
+			return true;
+		case RVF_PRESET:
+			if ( value < -1 || value >= Min( rvMPPresets::BuiltInCount(), RETAINED_VOTE_PRESETS ) ) {
 				return false;
 			}
 			retainedVoteDraft[ field ] = value;
@@ -19256,6 +19596,31 @@ void idMultiplayerGame::CasualVoteLines( const voteStruct_t &data, idStrList &li
 	if ( data.m_fieldFlags & VOTEFLAG_READYALL ) {
 		lines.Append( common->GetLocalizedString( "#str_42767" ) );
 	}
+	// openQ4 MP-14/MP-16: one line a modifier, then the arena, the preset and spectator chat
+	if ( data.m_fieldFlags & VOTEFLAG_MODIFIER ) {
+		for ( int i = 0; i < rvMPModifiers::Count(); i++ ) {
+			if ( ( data.m_modifierMask & MPModifierBit( i ) ) != 0 ) {
+				lines.Append( va( common->GetLocalizedString( "#str_232801" ), common->GetLocalizedString( rvMPModifiers::Info( i )->label ),
+					( data.m_modifierValues & MPModifierBit( i ) ) != 0 ? yes : no ) );
+			}
+		}
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_ARENA ) {
+		const mpWeaponArenaInfo_t *arena = rvMPModifiers::WeaponArena( data.m_weaponArena );
+		if ( arena != NULL ) {
+			lines.Append( va( common->GetLocalizedString( "#str_232802" ), common->GetLocalizedString( arena->label ) ) );
+		} else {
+			lines.Append( common->GetLocalizedString( "#str_232803" ) );
+		}
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_PRESET ) {
+		const mpPresetInfo_t *preset = rvMPPresets::BuiltInByName( data.m_preset );
+		lines.Append( va( common->GetLocalizedString( "#str_232804" ),
+			preset != NULL ? common->GetLocalizedString( preset->label ) : data.m_preset ) );
+	}
+	if ( data.m_fieldFlags & VOTEFLAG_SPECTATORCHAT ) {
+		lines.Append( va( common->GetLocalizedString( "#str_232805" ), data.m_spectatorChat ? yes : no ) );
+	}
 }
 
 /*
@@ -19352,7 +19717,8 @@ void idMultiplayerGame::PublishRetainedVote( idUserInterface *card, bool &change
 	publish( "mp.vote.call.detail", "" );
 	static const char *const fields[ RVF_COUNT ] = { "map", "gametype", "timelimit", "fraglimit", "capturelimit", "tourneylimit",
 		"controltime", "balance", "shuffle", "restart", "buying", "kick",
-		"nextmap", "randommap", "roundlimit", "overtime", "ruleset", "instagib", "readyall", "cointoss" };
+		"nextmap", "randommap", "roundlimit", "overtime", "ruleset", "instagib", "readyall", "cointoss",
+		"mute", "quadhog", "vampiric", "frenzy", "arena", "preset", "spectatorchat" };
 	bool locked = false;
 	for ( int field = 0; field < RVF_COUNT; field++ ) {
 		const bool shown = RetainedVoteFieldShown( field ), allowed = RetainedVoteFieldAllowed( field );
@@ -19400,6 +19766,18 @@ void idMultiplayerGame::PublishRetainedVote( idUserInterface *card, bool &change
 	publish( "mp.vote.kick_catalog", retainedVoteKickCatalog.c_str() );
 	publish( "mp.vote.kick_count", va( "%d", 1 + retainedVoteKick.Num() ) );
 	publish( "mp.vote.kick", va( "%d", retainedVoteKick.FindIndex( retainedVoteDraft[ RVF_KICK ] ) ) );
+	// openQ4 MP-14: the weapon arena choice (none, then Quake 4's weapons) and
+	// the preset choice (none, then the built-in presets), each by row
+	const int arenas = Min( rvMPModifiers::WeaponArenaCount(), RETAINED_VOTE_ARENAS );
+	for ( int i = 0; i < RETAINED_VOTE_ARENAS; i++ ) {
+		publish( va( "mp.vote.arena%d", i ), i < arenas ? common->GetLocalizedString( rvMPModifiers::WeaponArena( i )->label ) : "" );
+	}
+	publish( "mp.vote.arena_count", va( "%d", 1 + arenas ) );
+	const int presets = Min( rvMPPresets::BuiltInCount(), RETAINED_VOTE_PRESETS );
+	for ( int i = 0; i < RETAINED_VOTE_PRESETS; i++ ) {
+		publish( va( "mp.vote.preset%d", i ), i < presets ? common->GetLocalizedString( rvMPPresets::BuiltIn( i )->label ) : "" );
+	}
+	publish( "mp.vote.preset_count", va( "%d", 1 + presets ) );
 }
 
 /*
@@ -19442,6 +19820,9 @@ void idMultiplayerGame::ResetRetainedAdminDraft( void ) {
 	retainedAdminClient = -1;
 	retainedAdminIdentity.Clear();
 	retainedAdminBan = -1;
+	// a ban for good with no reason, as the stock Ban was
+	retainedAdminBanLength = RETAINED_ADMIN_BAN_LENGTHS - 1;
+	retainedAdminBanReason = 0;
 	if ( retainedAdminState == RAS_REFUSED ) {
 		retainedAdminState = RAS_NONE;
 	}
@@ -19702,9 +20083,13 @@ void idMultiplayerGame::PublishRetainedAdmin( idUserInterface *card, bool &chang
 		const mpBanInfo_t *ban = row < bans ? gameLocal.GetBanListEntry( row ) : NULL;
 		publish( va( "mp.admin.ban%d.name", row ), ban != NULL ? MPRetainedPlainText( ban->name, 64, 1 ).c_str() : "" );
 		publish( va( "mp.admin.ban%d.guid", row ), ban != NULL ? MPRetainedPlainText( ban->guid, 64, 1 ).c_str() : "" );
+		// openQ4 MP-18: the reason and how long the ban has left
+		publish( va( "mp.admin.ban%d.detail", row ), ban != NULL ? RetainedAdminBanDetail( *ban ).c_str() : "" );
 	}
 	publish( "mp.admin.ban_count", va( "%d", bans ) );
 	publish( "mp.admin.ban_selected", va( "%d", retainedAdminBan ) );
+	publish( "mp.admin.ban_length", va( "%d", retainedAdminBanLength ) );
+	publish( "mp.admin.ban_reason", va( "%d", retainedAdminBanReason ) );
 	// The Server section's draft.
 	RetainedAdminChoices();
 	static const char *const fields[ RVF_COUNT ] = { "map", "gametype", "timelimit", "fraglimit", "capturelimit", "tourneylimit",
@@ -19868,13 +20253,22 @@ bool idMultiplayerGame::HandleRetainedAdminCommand( const idStr &sub, const idCm
 		if ( action == RAA_KICK ) {
 			HandleServerAdminKickPlayer( client );
 		} else if ( action == RAA_BAN ) {
-			HandleServerAdminBanPlayer( client );
+			HandleServerAdminBanPlayer( client, RetainedAdminBanSeconds( retainedAdminBanLength ), retainedAdminBanReason );
 		} else {
 			HandleServerAdminForceTeamSwitch( client );
 		}
 		if ( action != RAA_SWITCH ) {
 			retainedAdminClient = -1;
 			retainedAdminIdentity.Clear();
+		}
+		return false;
+	}
+	if ( !sub.Icmp( "adminBanLength" ) || !sub.Icmp( "adminBanReason" ) ) {
+		// openQ4 MP-18: the length and reason the next Ban uses, by row
+		const bool length = !sub.Icmp( "adminBanLength" );
+		int row = -1;
+		if ( smallNumber( row ) && row >= 0 && row < ( length ? RETAINED_ADMIN_BAN_LENGTHS : RETAINED_ADMIN_BAN_REASONS ) ) {
+			( length ? retainedAdminBanLength : retainedAdminBanReason ) = row;
 		}
 		return false;
 	}
@@ -21548,7 +21942,7 @@ const char* idMultiplayerGame::HandleGuiCommands( const char *_menuCommand ) {
 // RAVEN BEGIN
 // shouchard:  new functionality to match the new interface
 			voteStruct_t voteData;
-			memset( &voteData, 0, sizeof( voteData ) );
+			EmptyVoteStruct( voteData );
 			
 			// kick
 			int uiKickSelection = mainGui->State().GetInt( "playerList_sel_0" );
@@ -25282,7 +25676,7 @@ void idMultiplayerGame::CallVote_f( const idCmdArgs &args ) {
 	}
 
 	voteStruct_t voteData;
-	memset( &voteData, 0, sizeof( voteData ) );
+	EmptyVoteStruct( voteData );
 
 	if ( 0 == idStr::Icmp( szArg1, "restart" ) ) {
 		voteData.m_fieldFlags |= VOTEFLAG_RESTART;
@@ -25436,10 +25830,60 @@ void idMultiplayerGame::CallVote_f( const idCmdArgs &args ) {
 		voteData.m_fieldFlags |= VOTEFLAG_RANDOMMAP;
 	} else if ( 0 == idStr::Icmp( szArg1, "readyall" ) ) {
 		voteData.m_fieldFlags |= VOTEFLAG_READYALL;
+	// openQ4 MP-14: the modifier layer, by "modifier <name> <0|1>" or by the
+	// modifier's own name ("quadhog 1"); Instagib keeps its MP-12 vote
+	} else if ( 0 == idStr::Icmp( szArg1, "modifier" ) || rvMPModifiers::ByName( szArg1 ) != NULL ) {
+		const bool named = idStr::Icmp( szArg1, "modifier" ) != 0;
+		const mpModifierInfo_t *info = rvMPModifiers::ByName( named ? szArg1 : szArg2 );
+		if ( info == NULL || !ParseVoteIntegerRange( named ? szArg2 : args.Argv( 3 ), 0, 1, parsedValue ) ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232814" ) );
+			return;
+		}
+		if ( info->id == MPMOD_INSTAGIB ) {
+			voteData.m_fieldFlags |= VOTEFLAG_INSTAGIB;
+			voteData.m_instagib = parsedValue;
+		} else {
+			voteData.m_fieldFlags |= VOTEFLAG_MODIFIER;
+			voteData.m_modifierMask = MPModifierBit( info->id );
+			voteData.m_modifierValues = parsedValue ? MPModifierBit( info->id ) : 0;
+		}
+	} else if ( 0 == idStr::Icmp( szArg1, "arena" ) || 0 == idStr::Icmp( szArg1, "weaponarena" ) ) {
+		// a single-weapon arena, or none
+		int arena = -1;
+		if ( '\0' == *szArg2 ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232815" ) );
+			return;
+		}
+		if ( idStr::Icmp( szArg2, "none" ) != 0 && idStr::Icmp( szArg2, "off" ) != 0 ) {
+			arena = rvMPModifiers::WeaponArenaByName( szArg2 );
+			if ( arena < 0 ) {
+				common->Printf( "%s\n", common->GetLocalizedString( "#str_232815" ) );
+				return;
+			}
+		}
+		voteData.m_fieldFlags |= VOTEFLAG_ARENA;
+		voteData.m_weaponArena = arena;
+	} else if ( 0 == idStr::Icmp( szArg1, "preset" ) ) {
+		// the server knows its own presets/*.cfg; only the name's form is checked here
+		if ( !rvMPPresets::ValidName( szArg2 ) ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232816" ) );
+			return;
+		}
+		voteData.m_fieldFlags |= VOTEFLAG_PRESET;
+		idStr::Copynz( voteData.m_preset, szArg2, sizeof( voteData.m_preset ) );
+	} else if ( 0 == idStr::Icmp( szArg1, "spectatorchat" ) ) {
+		// openQ4 MP-16: whether spectators reach players' all-chat during play
+		if ( !ParseVoteIntegerRange( szArg2, 0, 1, parsedValue ) ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232813" ) );
+			return;
+		}
+		voteData.m_fieldFlags |= VOTEFLAG_SPECTATORCHAT;
+		voteData.m_spectatorChat = parsedValue;
 	} else {
 		common->Printf( "%s", common->GetLocalizedString( "#str_104404" ) );
 		common->Printf( "%s", common->GetLocalizedString( "#str_104405" ) );
 		common->Printf( "%s\n", common->GetLocalizedString( "#str_42751" ) );
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_232813" ) );
 		return;
 	}
 
@@ -25750,6 +26194,8 @@ void idMultiplayerGame::ClientUpdateVote( vote_result_t status, int yesCount, in
 			outMsg.WriteByte( idMath::ClampChar( voteData.m_ruleset ) );
 			outMsg.WriteByte( idMath::ClampChar( voteData.m_instagib ) );
 			outMsg.WriteShort( idMath::ClampShort( voteData.m_overtime ) );
+			// openQ4 MP-14/MP-16: only a vote that has them carries them
+			WriteVoteExtensionFields( outMsg, voteData );
 		}
 		networkSystem->ServerSendReliableMessage( -1, outMsg );
 	} else {
@@ -27355,9 +27801,13 @@ idMultiplayerGame::HandleServerAdminBanPlayer
 */	
 // Rcon still authenticates the request. Its command binds the selected
 // connection as well, because delivery can follow a disconnect/reconnect.
-static bool SendRemoteAdminPlayerTarget( const char *operation, int client ) {
+static bool SendRemoteAdminPlayerTarget( const char *operation, int client, int banSeconds = 0, int banReason = 0 ) {
 	if ( gameLocal.isServer || gameLocal.isListenServer ) return false;
-	if ( gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) >= 1 ) {
+	if ( gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) >= 3 && !idStr::Cmp( operation, "ban" ) ) {
+		// openQ4 MP-18: a server that takes a ban's length and reason
+		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon serverAdminTarget %s %d %u %d %d", operation, client,
+			static_cast<unsigned>( gameLocal.GetSpawnId( gameLocal.entities[ client ] ) ), banSeconds, banReason ) );
+	} else if ( gameLocal.serverInfo.GetInt( "si_uiTargetProtocol" ) >= 1 ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "rcon serverAdminTarget %s %d %u", operation, client,
 			static_cast<unsigned>( gameLocal.GetSpawnId( gameLocal.entities[ client ] ) ) ) );
 	} else {
@@ -27368,17 +27818,79 @@ static bool SendRemoteAdminPlayerTarget( const char *operation, int client ) {
 
 void idMultiplayerGame::ServerAdminTarget_f( const idCmdArgs &args ) {
 	int client = -1;
-	if ( !gameLocal.isServer || args.Argc() != 4 || !ParseVotePlayerSlot( args.Argv( 2 ), client ) ||
+	// openQ4 MP-18: a ban may add its length in seconds and its reason's row
+	const bool banDetail = args.Argc() == 6 && !idStr::Cmp( args.Argv( 1 ), "ban" );
+	if ( !gameLocal.isServer || ( args.Argc() != 4 && !banDetail ) || !ParseVotePlayerSlot( args.Argv( 2 ), client ) ||
 		gameLocal.mpGame.RetainedPlayerIdentity( client ) != args.Argv( 3 ) ||
 		gameLocal.mpGame.RejectManagedLegacyMutation( "server admin player action" ) ) return;
+	int banSeconds = 0, banReason = 0;
+	if ( banDetail ) {
+		banSeconds = atoi( args.Argv( 4 ) );
+		banReason = atoi( args.Argv( 5 ) );
+		if ( !RetainedAdminBanLengthKnown( banSeconds ) || banReason < 0 || banReason >= RETAINED_ADMIN_BAN_REASONS ) return;
+	}
 	if ( !idStr::Cmp( args.Argv( 1 ), "kick" ) ) gameLocal.mpGame.HandleServerAdminKickPlayer( client );
-	else if ( !idStr::Cmp( args.Argv( 1 ), "ban" ) ) gameLocal.mpGame.HandleServerAdminBanPlayer( client );
+	else if ( !idStr::Cmp( args.Argv( 1 ), "ban" ) ) gameLocal.mpGame.HandleServerAdminBanPlayer( client, banSeconds, banReason );
 	else if ( !idStr::Cmp( args.Argv( 1 ), "switch" ) ) gameLocal.mpGame.HandleServerAdminForceTeamSwitch( client );
 }
 
-void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum ) {
+/*
+================
+idMultiplayerGame::RetainedAdminBanSeconds and the other ban helpers
+
+openQ4 MP-18: the Admin page's ban lengths (#str_232819's order) and reasons
+(#str_232821's). A reason is recorded in the ban list and the admin log in
+these words, which only the server's operators read.
+================
+*/
+static const int retainedAdminBanLengths[] = {
+	10 * 60, 60 * 60, 24 * 60 * 60, 7 * 24 * 60 * 60, 0
+};
+static const char *const retainedAdminBanReasons[] = {
+	"", "cheating", "abusive chat", "spam", "team killing", "griefing"
+};
+
+int idMultiplayerGame::RetainedAdminBanSeconds( int row ) {
+	static_assert( sizeof( retainedAdminBanLengths ) / sizeof( retainedAdminBanLengths[0] ) == RETAINED_ADMIN_BAN_LENGTHS, "a length a row" );
+	static_assert( sizeof( retainedAdminBanReasons ) / sizeof( retainedAdminBanReasons[0] ) == RETAINED_ADMIN_BAN_REASONS, "a reason a row" );
+	return row >= 0 && row < RETAINED_ADMIN_BAN_LENGTHS ? retainedAdminBanLengths[ row ] : 0;
+}
+
+bool idMultiplayerGame::RetainedAdminBanLengthKnown( int seconds ) {
+	for ( int row = 0; row < RETAINED_ADMIN_BAN_LENGTHS; row++ ) {
+		if ( retainedAdminBanLengths[ row ] == seconds ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+const char *idMultiplayerGame::RetainedAdminBanReasonText( int row ) {
+	return row >= 0 && row < RETAINED_ADMIN_BAN_REASONS ? retainedAdminBanReasons[ row ] : "";
+}
+
+// A ban list row's detail: its reason, then how long it has left.
+idStr idMultiplayerGame::RetainedAdminBanDetail( const mpBanInfo_t &ban ) {
+	idStr left;
+	if ( ban.expires == 0 ) {
+		left = common->GetLocalizedString( "#str_232822" );
+	} else {
+		const long long remaining = Max( 0LL, static_cast<long long>( ban.expires ) - static_cast<long long>( ::time( NULL ) ) );
+		if ( remaining >= 2 * 24 * 60 * 60 ) {
+			left = va( common->GetLocalizedString( "#str_232823" ), static_cast<int>( ( remaining + 24 * 60 * 60 - 1 ) / ( 24 * 60 * 60 ) ) );
+		} else if ( remaining >= 2 * 60 * 60 ) {
+			left = va( common->GetLocalizedString( "#str_232824" ), static_cast<int>( ( remaining + 60 * 60 - 1 ) / ( 60 * 60 ) ) );
+		} else {
+			left = va( common->GetLocalizedString( "#str_232825" ), static_cast<int>( Max( 1LL, ( remaining + 59 ) / 60 ) ) );
+		}
+	}
+	const idStr reason = MPRetainedPlainText( ban.reason, 64, 1 );
+	return reason.IsEmpty() ? left : idStr( va( "%s, %s", reason.c_str(), left.c_str() ) );
+}
+
+void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum, int seconds, int reason ) {
 	if ( RejectManagedLegacyMutation( "server admin ban" ) || !IsValidVotePlayerSlot( clientNum ) ||
-		clientNum == gameLocal.localClientNum || SendRemoteAdminPlayerTarget( "ban", clientNum ) ) return;
+		clientNum == gameLocal.localClientNum || SendRemoteAdminPlayerTarget( "ban", clientNum, seconds, reason ) ) return;
 	// openQ4 MP-18: Quake 4 ran "kick <n> ban" here, and the engine's kick reads
 	// one word, so Ban only ever kicked. A bot has no address: it is removed.
 	const mpModAddress_t address = gameLocal.GetClientModAddress( clientNum );
@@ -27387,7 +27899,8 @@ void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum ) {
 		return;
 	}
 	const idStr name = gameLocal.userInfo[ clientNum ].GetString( "ui_name" );
-	gameLocal.ServerBan( address, MPModPlayerPrefixBits( address ), 0, name.c_str(), "", "admin" );
+	gameLocal.ServerBan( address, MPModPlayerPrefixBits( address ), static_cast<mpModTime_t>( Max( 0, seconds ) ), name.c_str(),
+		RetainedAdminBanReasonText( reason ), "admin" );
 }
 
 /*

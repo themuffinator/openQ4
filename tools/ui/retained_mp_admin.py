@@ -15,7 +15,9 @@ strip of three sections, as the Match page's:
   each saying why it cannot act (no player chosen, the player's own row, a
   mode without teams, a managed match); and View ban list, which asks the
   server for its list and opens PLAYER BAN LIST, the Create Server page's
-  dialog, where REMOVE BAN lifts the chosen ban.
+  dialog with a column for each ban's reason and time left, where REMOVE BAN
+  lifts the chosen ban. Under them, the length and the reason the next Ban
+  is given (MP-18): ten minutes to permanent, and none or one of five.
 - Server: the stock page's settings drafted as the Vote page drafts a call
   (the map and game type lists, the limits the drafted game type uses,
   balance, shuffle, restart and buying), and Apply changes, unavailable until
@@ -76,6 +78,13 @@ ROWS = (
     ("buying", "mpAdminBuying", "#str_231901", ("choice", 3)),
 )
 LEFT_ROWS = ("map", "gametype", "timelimit", "fraglimit", "capturelimit", "tourneylimit", "controltime")
+# The next Ban's length and reason (MP-18): the game's key, the session verb,
+# the label and the list (its options' key and count), as idMultiplayerGame's
+# RETAINED_ADMIN_BAN_LENGTHS and RETAINED_ADMIN_BAN_REASONS order them.
+BAN_CHOICES = (
+    ("ban_length", "mpAdminBanLength", "#str_232818", "#str_232819", 5),
+    ("ban_reason", "mpAdminBanReason", "#str_232820", "#str_232821", 6),
+)
 
 
 def section_tab(doc: Document, position: int, section: str, key: str) -> tuple[dict, str]:
@@ -346,9 +355,28 @@ def admin_page(doc: Document, index: int, ident: str, width: float, height: floa
     bans_row = group("admin-bans-row", {**b.absolute(left=right_x, top=len(ACTIONS) * SLOT_PITCH + 8, width=right_w, height=24),
                                         "display": keyword("flex"), "flex-direction": keyword("row"), "align-items": keyword("center")}, [bans])
     controls.append("admin-bans")
+    # The next Ban's length and reason, under the list's link.
+    ban_value_x = label_column([choice[2] for choice in BAN_CHOICES], right_w, wrap=True)
+    over = {(key, language): round(wrapped_width(text)) for _key, _verb, key, _options, _count in BAN_CHOICES
+            for language, text in any_text(key).items() if wrapped_width(text) > ban_value_x - 29}
+    if over:
+        raise SystemExit(f"Admin page ban labels past their room: {over}")
+    ban_rows = []
+    for key, verb, label_key, options_key, count in BAN_CHOICES:
+        state_key = f"mp.admin.{key}"
+        doc.state[state_key] = {"type": "number", "initial": 0}
+        doc.actions[verb] = {"operation": "session.menuValue", "input": "number",
+                             "arguments": {"command": verb, "value": {"input": "value"}}}
+        ident = f"admin-row-{key.replace('_', '')}"
+        ban_rows.append(value_row(doc, ident, label_key, "choice", right_w, ban_value_x, value={"state": state_key}, action=verb,
+                                  entries=[((options_key, option), option) for option in range(count)], wrap=True))
+        doc.bind(f"{ident}.enabled", ident, "enabled", {"op": "==", "args": [{"state": "card.tab"}, index]})
+    ban_choices = group("admin-ban-choices", {**b.absolute(left=right_x, top=len(ACTIONS) * SLOT_PITCH + 44, width=right_w,
+                                                           height=len(BAN_CHOICES) * VOTE_ROW_H), "display": keyword("flex"),
+                                              "flex-direction": keyword("column")}, ban_rows)
     players_section = section_group("players", 0, [player_list, group("admin-actions", b.absolute(left=right_x, top=0, width=right_w,
                                                                                                      height=section_height), actions),
-                                                   bans_row])
+                                                   bans_row, ban_choices])
 
     # Server: the drafted settings in two columns, Apply changes across the
     # foot.
@@ -479,5 +507,6 @@ def admin_modals(doc: Document) -> list:
     (mp.admin.ban*), its rows choosing through mpAdminBanPick and REMOVE BAN
     lifting the chosen ban through mpAdminUnban; and Kick's and Ban's
     confirmations."""
-    return [ban_list_modal(doc, prefix="mp.admin", pick_key="card.admin_ban_pick", pick_verb="mpAdminBanPick", remove_verb="mpAdminUnban"),
+    return [ban_list_modal(doc, prefix="mp.admin", pick_key="card.admin_ban_pick", pick_verb="mpAdminBanPick", remove_verb="mpAdminUnban",
+                           details=True),
             *confirm_modals(doc)]
