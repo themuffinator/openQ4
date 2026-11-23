@@ -4693,6 +4693,12 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "unmute",				idGameLocal::Mute_f,		CMD_FL_GAME | CMD_FL_RAWTEXT,	"lift a text mute: unmute <client slot|name>" );
 	cmdSystem->AddCommand( "status",				idGameLocal::Status_f,		CMD_FL_GAME,	"list the connected clients with their address, ping and mute state" );
 	cmdSystem->AddCommand( "admin",					idGameLocal::Admin_f,		CMD_FL_GAME,	"log in to the server as an admin with the password in net_clientAdminPassword; 'admin logout' gives the right up" );
+	// openQ4 MP-17: player identity, returning players, the ranking table and the match history
+	cmdSystem->AddCommand( "identity",				idMultiplayerGame::Identity_f,		CMD_FL_GAME,	"show your identity on the server you are connected to" );
+	cmdSystem->AddCommand( "identityReset",			idMultiplayerGame::IdentityReset_f,	CMD_FL_GAME,	"identityReset confirm: become a new player on every server" );
+	cmdSystem->AddCommand( "ghost",					idMultiplayerGame::Ghost_f,			CMD_FL_GAME,	"ghost <code>: back after losing your connection, claim your team and score with the code the server told you" );
+	cmdSystem->AddCommand( "rankings",				idMultiplayerGame::Rankings_f,		CMD_FL_GAME,	"rankings [game type]: the server's local ranking table (g_ranking)" );
+	cmdSystem->AddCommand( "history",				idMultiplayerGame::History_f,		CMD_FL_GAME,	"your last multiplayer matches, from profile/history.ndjson" );
 	cmdSystem->AddCommand( "serverShutdown",		idGameLocal::Shutdown_f,	CMD_FL_GAME | CMD_FL_RAWTEXT,	"stop the server once the players are told: serverShutdown <match|now|time|cancel> [reason]" );
 
 #ifndef _XBOX

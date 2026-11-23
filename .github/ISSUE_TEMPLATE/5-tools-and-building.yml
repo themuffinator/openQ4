@@ -1,0 +1,55 @@
+name: Building, mapping tools or modding
+description: A problem building openQ4 from source, with dmap, AAS or the level editor, or with mod and game-module support.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For problems with released packages, the **Bug report** form is the better fit. Only the first three questions are required.
+  - type: dropdown
+    id: area
+    attributes:
+      label: What is it about?
+      options:
+        - Building openQ4 from source
+        - dmap (compiling maps)
+        - AAS (bot and monster navigation)
+        - Level editor
+        - Mod support, game module or decl/script loading
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: openQ4 version or commit
+      description: A release, or the commit you built (`git rev-parse --short HEAD`).
+      placeholder: "0.15.0, or 174cb31a4"
+    validations:
+      required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: >-
+        The command you ran and its full output, as text. For a map, its name, and whether the original Quake
+        4 tools compile it. For a mod, whether it was written for the original game DLLs (openQ4 doesn't load
+        those) or built against openQ4's game module.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: System and compiler
+      placeholder: "Windows 11, Visual Studio 2022 17.14, Meson 1.8 / Ubuntu 24.04, GCC 14"
+    validations:
+      required: false
+  - type: textarea
+    id: attachments
+    attributes:
+      label: Logs and files
+      description: Optional. Build logs, `meson-logs/meson-log.txt`, a small map that shows the problem, or the mod's `mod.json`.
+    validations:
+      required: false

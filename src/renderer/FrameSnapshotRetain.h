@@ -18,6 +18,14 @@
 // frame (a 15-20 ms stall at 1440p Quality) and then re-copied every stream
 // the following frames. Streams that frame-temporary geometry uses once age
 // out at the tail, while streams reused every frame stay at the front.
+//
+// Leases. Acquire returns a shared owner from every acquisition. Lease returns
+// the bytes and appends an owner to the caller's holder only the first time a
+// version is leased under an epoch. A frame names its holder with an epoch
+// that changes whenever the holder is emptied, so the holder already owns any
+// version it leased under the current epoch. A replaced version starts
+// unleased. One owner per version per frame replaces one per acquisition: the
+// atomic count updates and holder growth were paid for every reused range.
 class idFrameSnapshotRetainedIndexes {
 public:
 	using block_t = std::vector<std::uint32_t>;
@@ -25,7 +33,7 @@ public:
 	struct result_t { lease_t lease; bool reused; };
 	static constexpr std::size_t maximumEntries = 32768;
 private:
-	struct entry_t { lease_t lease; std::list<const void *>::iterator recency; };
+	struct entry_t { lease_t lease; std::list<const void *>::iterator recency; std::uint64_t leaseEpoch; };
 	std::unordered_map<const void *, entry_t> entries;
 	std::list<const void *> recency;		// front: most recently acquired
 	std::size_t residentBytes = 0;
@@ -40,14 +48,17 @@ public:
 	void Clear() { entries.clear(); recency.clear(); residentBytes = 0; }
 	std::size_t Size() const { return entries.size(); }
 	std::size_t ResidentBytes() const { return residentBytes; }
-	result_t Acquire( const void *source, std::size_t bytes ) {
-		if ( source == nullptr || bytes == 0 || bytes > budget || bytes % sizeof( std::uint32_t ) != 0 ) return {};
+private:
+	entry_t *AcquireEntry( const void *source, std::size_t bytes, bool &reused ) {
+		reused = false;
+		if ( source == nullptr || bytes == 0 || bytes > budget || bytes % sizeof( std::uint32_t ) != 0 ) return nullptr;
 		auto found = entries.find( source );
 		if ( found != entries.end() ) {
 			const auto &old = found->second.lease;
 			if ( old->size() * sizeof( std::uint32_t ) == bytes && std::memcmp( old->data(), source, bytes ) == 0 ) {
 				recency.splice( recency.begin(), recency, found->second.recency );
-				return { old, true };
+				reused = true;
+				return &found->second;
 			}
 			Erase( found );
 		}
@@ -58,9 +69,25 @@ public:
 		auto copy = std::make_shared<block_t>( bytes / sizeof( std::uint32_t ) );
 		std::memcpy( copy->data(), source, bytes );
 		recency.push_front( source );
-		entries.emplace( source, entry_t{ copy, recency.begin() } );
 		residentBytes += bytes;
-		return { copy, false };
+		return &entries.emplace( source, entry_t{ std::move( copy ), recency.begin(), 0 } ).first->second;
+	}
+public:
+	result_t Acquire( const void *source, std::size_t bytes ) {
+		bool reused;
+		const entry_t *entry = AcquireEntry( source, bytes, reused );
+		return entry != nullptr ? result_t{ entry->lease, reused } : result_t{};
+	}
+	// The bytes stay valid while holder keeps the owners it was given. epoch
+	// is nonzero and changes whenever the holder is emptied.
+	template<class Holder> const std::uint32_t *Lease( const void *source, std::size_t bytes, std::uint64_t epoch, Holder &holder, bool &reused ) {
+		entry_t *entry = AcquireEntry( source, bytes, reused );
+		if ( entry == nullptr ) return nullptr;
+		if ( entry->leaseEpoch != epoch ) {
+			holder.push_back( entry->lease );
+			entry->leaseEpoch = epoch;
+		}
+		return entry->lease->data();
 	}
 };
 
@@ -80,7 +107,8 @@ public:
 // while one animated in place costs a comparison every 256 acquisitions rather
 // than a comparison, an allocation and a release on every view.
 //
-// Eviction is least-recently-used and incremental, as for the index cache.
+// Eviction is least-recently-used and incremental, and leasing works as for
+// the index cache.
 class idFrameSnapshotRetainedStreams {
 public:
 	// Vertex consumers may load 16-byte aligned vectors from these bytes.
@@ -118,6 +146,7 @@ private:
 		std::list<key_t>::iterator recency;
 		unsigned refusals;			// acquisitions still to refuse
 		unsigned nextRefusals;		// length of the next refusal run
+		std::uint64_t leaseEpoch;	// epoch this version was last leased under
 	};
 	using map_t = std::unordered_map<key_t, entry_t, hash_t>;
 	map_t entries;
@@ -139,8 +168,10 @@ public:
 	void Clear() { entries.clear(); recency.clear(); residentBytes = 0; }
 	std::size_t Size() const { return entries.size(); }
 	std::size_t ResidentBytes() const { return residentBytes; }
-	result_t Acquire( const void *source, std::size_t bytes ) {
-		if ( source == nullptr || bytes == 0 || bytes > budget ) return {};
+private:
+	entry_t *AcquireEntry( const void *source, std::size_t bytes, bool &reused ) {
+		reused = false;
+		if ( source == nullptr || bytes == 0 || bytes > budget ) return nullptr;
 		const key_t key{ source, bytes };
 		auto found = entries.find( key );
 		if ( found != entries.end() ) {
@@ -148,33 +179,52 @@ public:
 			recency.splice( recency.begin(), recency, entry.recency );
 			if ( entry.refusals > 0 ) {
 				--entry.refusals;
-				return {};
+				return nullptr;
 			}
 			if ( entry.lease ) {
-				if ( std::memcmp( entry.lease->data(), source, bytes ) == 0 ) return { entry.lease, true };
+				if ( std::memcmp( entry.lease->data(), source, bytes ) == 0 ) {
+					reused = true;
+					return &entry;
+				}
 				// Rewritten in place. The submitted version stays with its leases.
 				residentBytes -= bytes;
 				entry.lease.reset();
+				entry.leaseEpoch = 0;
 				entry.nextRefusals = entry.nextRefusals >= maximumRefusals / 2 ? maximumRefusals : entry.nextRefusals * 2;
 				entry.refusals = entry.nextRefusals - 1;	// this acquisition is the first
-				return {};
+				return nullptr;
 			}
 			// The refusal run ended: take a new version. This entry holds no
 			// bytes and is the most recent, so pressure never evicts it here.
 			while ( residentBytes + bytes > budget ) Erase( entries.find( recency.back() ) );
 			entry.lease = Own( source, bytes );
+			entry.leaseEpoch = 0;
 			residentBytes += bytes;
-			return { entry.lease, false };
+			return &entry;
 		}
 		// Bound both payload memory and bookkeeping for tiny ranges.
 		while ( !recency.empty() && ( residentBytes + bytes > budget || entries.size() >= maximumEntries ) ) {
 			Erase( entries.find( recency.back() ) );
 		}
 		recency.push_front( key );
-		const lease_t copy = Own( source, bytes );
-		entries.emplace( key, entry_t{ copy, recency.begin(), 0, 1 } );
 		residentBytes += bytes;
-		return { copy, false };
+		return &entries.emplace( key, entry_t{ Own( source, bytes ), recency.begin(), 0, 1, 0 } ).first->second;
+	}
+public:
+	result_t Acquire( const void *source, std::size_t bytes ) {
+		bool reused;
+		const entry_t *entry = AcquireEntry( source, bytes, reused );
+		return entry != nullptr ? result_t{ entry->lease, reused } : result_t{};
+	}
+	// As idFrameSnapshotRetainedIndexes::Lease.
+	template<class Holder> const void *Lease( const void *source, std::size_t bytes, std::uint64_t epoch, Holder &holder, bool &reused ) {
+		entry_t *entry = AcquireEntry( source, bytes, reused );
+		if ( entry == nullptr ) return nullptr;
+		if ( entry->leaseEpoch != epoch ) {
+			holder.push_back( entry->lease );
+			entry->leaseEpoch = epoch;
+		}
+		return entry->lease->data();
 	}
 };
 #endif

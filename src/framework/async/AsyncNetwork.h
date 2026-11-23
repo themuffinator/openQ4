@@ -72,6 +72,7 @@ const int GAME_INIT_ID_MAP_LOAD		= -2;
 #include "MsgChannel.h"
 #include "AsyncServer.h"
 #include "ServerScan.h"
+#include "ServerListFallback.h"
 #include "PredictionMargin.h"
 #include "AsyncClient.h"
 #include "MultiViewDemo.h"
@@ -242,6 +243,7 @@ private:
 	static void				Reconnect_f( const idCmdArgs &args );
 	static void				GetServerInfo_f( const idCmdArgs &args );
 	static void				GetLANServers_f( const idCmdArgs &args );
+	static void				GetNETServers_f( const idCmdArgs &args );	// openQ4 MP-19: the browser's Get New List, from the console
 	static void				ListServers_f( const idCmdArgs &args );
 	static void				RemoteConsole_f( const idCmdArgs &args );
 	static void				Heartbeat_f( const idCmdArgs &args );

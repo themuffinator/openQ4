@@ -74,13 +74,42 @@ nothing, unless that player has logged in as an [admin](#admins).
 | `ban <slot\|name\|address[/prefix]> [time] [reason]` | Bans an address or a range of addresses and removes every player in it |
 | `unban <row\|address[/prefix]>` | Lifts a ban, by its row in `banlist` or by its address |
 | `banlist` | Lists the bans with the time each has left; `banlist reload` reads the file again |
+| `ban id:<identity> [time] [reason]`, `unban id:<identity>` | Bans or lifts a player identity (after 0.15.0) |
 | `mute <slot\|name> [time]` | Stops a player's text chat and voice-menu lines reaching anyone |
 | `unmute <slot\|name>` | Lifts a mute |
 | `kick <slot>`, `gameKick <slot\|name>` | Removes a player without banning them |
 | `serverShutdown <match\|now\|time\|cancel> [reason]` | Stops the server after telling the players; see [Stopping the server](#stopping-the-server) |
 
-The Admin page's **Ban** button now bans the chosen player's address for good,
-and the ban lists in the menus show addresses instead of IDs.
+The Admin page's **Ban** button now bans the chosen player's address, and the
+ban lists in the menus show addresses instead of IDs.
+
+**Identity bans (after 0.15.0).** A player whose game proved an identity to
+your server (see [Your identity](multiplayer.md#your-identity-and-coming-back-after-a-dropped-connection))
+is banned by it as well: `ban`, the Admin page's **Ban** and an admin's ban all
+add a second row, `id:<identity>`, beside the address range, so neither a new
+address nor a fresh copy of the game on another network brings them back
+while they keep their identity. `status` shows each player's identity, and
+`ban id:3f9a0c1d22e4b781 1w cheating` bans one whether or not that player is
+connected. An identity ban is applied when the player proves the identity, a
+moment after they join. `unban id:<identity>` lifts one. A player can always
+make a new identity (`identityReset`), so an identity ban is a strong hint,
+not a lock; the address ban beside it still holds.
+
+**What identities tell a server, and what it keeps.** A server learns only the
+key a player's game made for that server. It cannot work out the player's key
+on any other server, nor anything about their computer. Your server keeps
+identities in four places, all in its save folder: `banlist.txt` (identity
+bans), `ranking.txt` with `g_ranking 1` (an identity, the last name seen with
+it and a rating; no addresses), the admin log (identity bans and their
+removal) and, for five minutes after a player leaves, its memory of their
+team and score. Nothing is sent anywhere else. A player who wants a fresh
+start runs `identityReset confirm`; their old rows then belong to nobody, and
+you can delete them. Under **View Ban List**,
+**Ban Length** (10 minutes, an hour, a day, a week or permanent, the default)
+and **Ban Reason** (none, cheating, abusive chat, spam, team killing or
+griefing) set what the next **Ban** records. The Admin page's ban list shows
+each ban's reason and the time it has left. On a server running 0.15.0 the
+button still only kicks.
 
 **Naming the target.** `ban` reads its first word as a slot number if it is
 all digits, then as an address, then as a name. Banning a connected player by

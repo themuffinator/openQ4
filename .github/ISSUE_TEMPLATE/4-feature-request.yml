@@ -1,0 +1,25 @@
+name: Idea or feature request
+description: Suggest something new, or a change to how something works.
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome, big or small. openQ4 plays the original Quake 4 files, so ideas that keep the original game working, or that can be switched off, are the easiest to take on.
+
+        You may find it's already planned in the [roadmap](https://github.com/themuffinator/openQ4/blob/main/docs/dev/roadmap.md) or in an [existing issue](https://github.com/themuffinator/openQ4/issues?q=is%3Aissue+label%3Aenhancement).
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: Describe the idea, and what it would make better for you.
+    validations:
+      required: true
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples
+      description: Optional. Another game or source port that does it well, a screenshot, a video, or a mock-up.
+    validations:
+      required: false

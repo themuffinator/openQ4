@@ -292,7 +292,10 @@ pass. Who can vote is fixed until the vote ends, even if players disconnect.
 offers every vote below but `scorelimit`: the map, **Skip to Next Map** and
 **Random Map**, the game type and its limits, the **Overtime Period**, the
 **Ruleset**, **Instagib**, buying, balance and shuffle, **Ready Everyone**,
-a **Coin Toss** and kicking a player. The old `clientCallVote` still works.
+a **Coin Toss** and kicking a player. After 0.15.0 the page also offers
+**Quad Hog** (in Deathmatch), **Vampiric Damage**, **Weapons Frenzy**, a
+**Weapon Arena**, a **Preset**, **Spectator Chat** and **Mute Instead of
+Kicking** for the player chosen. The old `clientCallVote` still works.
 The votes are:
 
 | Vote | What passes |
@@ -304,7 +307,11 @@ The votes are:
 | `readyall` | Mark everyone ready, during a warmup that waits for ready players |
 | `kick <name>`, `restart`, `buying 0\|1\|2`, `controlTime <sec>` | Kick a player, restart the map, change the buying rules, change DeadZone's control time |
 | `cointoss` | Nothing changes; the server announces heads or tails for everyone |
-| `mute <name>` | Stop that player's text chat reaching anyone, for ten minutes unless the server sets another time. **After 0.15.0**; typed at the console only, and players on 0.15.0 do not see the vote |
+| `mute <name>` | Stop that player's text chat reaching anyone, for ten minutes unless the server sets another time. **After 0.15.0**; players on 0.15.0 do not see the vote |
+| `modifier <name> 0\|1`, or the modifier's name: `quadhog 1`, `vampiric 1`, `frenzy 1` | Turn a [modifier](server-setup.md#modifiers-and-presets) on or off; Quad Hog only in Deathmatch. The match restarts. **After 0.15.0** |
+| `arena <weapon>`, `arena none` | Play a single-weapon arena (`rocketlauncher`, `railgun` and the rest), or none. The match restarts. **After 0.15.0** |
+| `preset <name>` | Apply a [preset](server-setup.md#modifiers-and-presets), built in or one of the server's own; it sets the game type, ruleset, modifiers and limits together, so it is a vote of its own. **After 0.15.0** |
+| `spectatorchat 0\|1` | Let spectators' all-chat reach the players during live play, or keep it to spectators. **After 0.15.0** |
 
 The operator chooses the rules of voting: `g_votePercent` (the share of the
 eligible players that must say yes, 51 by default, so a plain majority),
@@ -437,6 +444,37 @@ them on:
   server removed itself (a kick, an idle drop) does not pause the match. While
   the pause lasts, that side may take a player in even with `si_spectatorLock`
   on.
+
+### Your identity, and coming back after a dropped connection
+
+> **After 0.15.0.** This describes the development build; 0.15.0 has none of it.
+
+openQ4 lets each server recognise you when you come back, with no account and
+nothing sent anywhere else. The first time a server asks, your game makes a
+random key and keeps it in `identity.key` in your save folder. Each server sees
+a different key derived from it, so two servers cannot tell that they have
+seen the same player. Your identity is sixteen letters and digits, such as
+`3f9a0c1d22e4b781`; `identity` shows yours on the server you are on.
+
+- **A dropped connection costs you nothing.** If you leave a casual match and
+  come back within five minutes (the server's `g_reconnectRestore`), you get
+  your team and your score back. Tourney is the exception: its bracket keeps
+  its own places.
+- **No identity?** Set `ui_identity 0` and your game sends none. When the
+  server keeps places, it tells you a six-letter return code instead; type
+  `ghost <code>` after you reconnect.
+- **Starting again.** `identityReset confirm` gives you a new identity on every
+  server. Bans and rankings tied to the old one no longer apply to you, and
+  no server recognises you any more. Deleting `identity.key` does the same.
+- **Your match history.** When a match ends, your game adds a line to
+  `profile/history.ndjson` in your save folder: when, where, the map and mode,
+  your score, your place and the result. `history` lists your last ten
+  matches. Nothing is uploaded.
+- **Rankings.** A server can keep a local ranking table (see
+  [Rankings](server-setup.md#identities-returning-players-and-rankings)).
+  `rcon rankings`, where the server allows it, shows it.
+
+Servers older than this build never ask, and your game sends nothing to them.
 
 ## Your multiplayer settings
 

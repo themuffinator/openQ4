@@ -18,6 +18,7 @@ from retained_saves import table_text
 
 MODEL_ROWS = 128  # Bounded choice page, not a limit on the installed catalog.
 ROTATION_LABEL = "#str_231547"
+IDENTITY_LABEL = "#str_232837"     # "Player Identity" (MP-17)
 # The rows are 612 dp wide from 40 dp in: the tab strip's four labels and its
 # keycaps need 605 dp in the widest language (Brazilian Portuguese), and the
 # preview's bay starts 13 dp past them. At 540 dp from 87 dp in they held the
@@ -342,6 +343,12 @@ def player_setup(doc: Document) -> dict:
     # WEAPON ORDER opens over the page (multiplayer_document adds the dialog).
     rows.append(weapon_order_link(doc, "setup-weaponorder", WIDTH, ROW_H))
     own.append("setup-weaponorder")
+    # Whether the game proves the player's identity to each server (MP-17,
+    # ui_identity): on unless the player turns it off, as the user decided on
+    # 23 November 2026.
+    rows.append(value_row(doc, "setup-identity", IDENTITY_LABEL, "toggle", WIDTH, VALUE_X, value=cvar_state(doc, "ui_identity", "boolean"),
+                          action=setting_action(doc, "ui_identity", "boolean"), row_h=ROW_H, wrap=True))
+    own.append("setup-identity")
     sides = {1: [], 2: []}
     # OPPONENTS' first row forces a model on every other player outside team
     # modes (g_forceModel), from the same catalog page as the player's own
@@ -378,7 +385,7 @@ def player_setup(doc: Document) -> dict:
     hud = hud_rows(doc, WIDTH, VALUE_X, ROW_H, "setup")
     rows += hud
     hud_ids = [row["id"] for row in hud]
-    value_rows = [ident for ident in sides[1] + sides[2] if ident != "setup-team-note"] + ["setup-handicap", *hud_ids]
+    value_rows = [ident for ident in sides[1] + sides[2] if ident != "setup-team-note"] + ["setup-handicap", "setup-identity", *hud_ids]
     # Each row shows on its tab alone.
     doc.state["setup.tab"] = {"type": "number", "initial": 0}
     by_id = {row["id"]: row for row in rows}

@@ -370,6 +370,11 @@ enum {
 	// openQ4 (MP-18): a logged-in admin's request to kick, mute or ban a
 	// connected player, client to server (mp/Moderation.h).
 	GAME_RELIABLE_MESSAGE_MODERATION,
+	// openQ4 (MP-17): player identity (mp/Identity.h). Server to client, the
+	// challenge, sent only to a client whose userinfo has ui_identity 1, so an
+	// older client never sees it; client to server, the signed proof or a
+	// returning player's ghost code.
+	GAME_RELIABLE_MESSAGE_IDENTITY,
 	// Insert future wire messages before this sentinel; never serialize COUNT.
 	GAME_RELIABLE_MESSAGE_COUNT,
 };
@@ -419,6 +424,8 @@ typedef enum {
 	RELIABLE_FLOOD_MAPDB,
 	// an admin's request writes the admin log and can rewrite the ban list
 	RELIABLE_FLOOD_MODERATION,
+	// MP-17: a proof costs the server a signature check
+	RELIABLE_FLOOD_IDENTITY,
 
 	RELIABLE_FLOOD_NUM
 } reliableFloodClass_t;
@@ -432,6 +439,7 @@ const int RELIABLE_FLOOD_EVENT_DELAY	= 5000;
 const int RELIABLE_FLOOD_EMOTE_DELAY	= 500;
 const int RELIABLE_FLOOD_MAPDB_DELAY	= 1000;
 const int RELIABLE_FLOOD_MODERATION_DELAY	= 500;
+const int RELIABLE_FLOOD_IDENTITY_DELAY	= 250;
 
 // "has never sent one of these".  It cannot be 0: gameLocal.time starts at 0 on
 // every map load, so a zero stamp reads as "sent just now" and swallows each
@@ -1576,6 +1584,11 @@ public:
 	void					ModerationClientDisconnect( int clientNum );
 	bool					ModerationRefuseBanned( const char *endpoint );
 	int						ServerBan( const mpModAddress_t &address, int prefixBits, mpModTime_t durationSeconds, const char *name, const char *reason, const char *by );
+	// openQ4 MP-17: a ban on a player identity, which removes whoever holds it;
+	// and a connected player's ban, by the range they hold and their identity
+	int						ServerBanIdentity( const char *identity, mpModTime_t durationSeconds, const char *name, const char *reason, const char *by );
+	int						ServerBanClient( int clientNum, mpModTime_t durationSeconds, const char *reason, const char *by );
+	const mpModBan_t *		FindIdentityBan( const char *identity );
 	bool					IsClientTextMuted( int clientNum );
 	bool					SetClientTextMute( int clientNum, bool mute, mpModTime_t durationSeconds, const char *by );
 	bool					ModerationAllowChat( int clientNum, bool fromNetwork );

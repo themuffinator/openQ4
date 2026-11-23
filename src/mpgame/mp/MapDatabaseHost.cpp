@@ -626,6 +626,7 @@ void mpMapDatabaseHost::ServerMapStarted( const char *map ) {
 	Refresh();
 	mapChangePending = false;
 	advanceIssued.Clear();
+	intermissionAnnounced.Clear();
 	advanceAttempts = 0;
 	database.PickClose();
 	database.NotePlayed( database.Find( map ) );
@@ -747,7 +748,9 @@ mpMapAdvance_t mpMapDatabaseHost::ServerAdvance( void ) {
 	}
 	si_map.SetString( entry->token );
 	advanceIssued = entry->token;
-	gameLocal.ServerSendChatMessage( -1, "server", MAPDB_STR_NEXT_MAP, DisplayName( selection.index ) );
+	if ( intermissionAnnounced.Icmp( entry->token ) != 0 ) {
+		gameLocal.ServerSendChatMessage( -1, "server", MAPDB_STR_NEXT_MAP, DisplayName( selection.index ) );
+	}
 	return MP_MAP_ADVANCE_CHANGED;
 }
 
@@ -757,20 +760,55 @@ mpMapDatabaseHost::ServerMatchEnded
 ================
 */
 void mpMapDatabaseHost::ServerMatchEnded( void ) {
-	if ( !RotationActive() || !g_mapPick.GetBool() || gameLocal.gameType == GAME_TOURNEY ) {
+	if ( !ServerOfferPick() ) {
+		ServerAnnounceNext();
+	}
+}
+
+/*
+================
+mpMapDatabaseHost::ServerAnnounceNext
+
+openQ4 MP-12: the intermission names the map that follows, while the final
+scoreboard is up, with g_intermissionAnnounce. A pick, when one is offered,
+names its own candidates instead.
+================
+*/
+void mpMapDatabaseHost::ServerAnnounceNext( void ) {
+	if ( !gameLocal.mpGame.IntermissionAnnounces() || !RotationActive() || gameLocal.mpGame.IsArenaCampaignMatch() ) {
 		return;
+	}
+	mpMapSelection selection;
+	if ( ServerPredictNext( &selection ).Length() == 0 || selection.index < 0 ) {
+		return;
+	}
+	gameLocal.ServerSendChatMessage( -1, "server", MAPDB_STR_NEXT_MAP, DisplayName( selection.index ) );
+	intermissionAnnounced = database.Entry( selection.index )->token;
+	gameLocal.Printf( "map database: the intermission names %s\n", intermissionAnnounced.c_str() );
+}
+
+/*
+================
+mpMapDatabaseHost::ServerOfferPick
+
+The end-of-match pick, where the server offers one; true when it did.
+================
+*/
+bool mpMapDatabaseHost::ServerOfferPick( void ) {
+	if ( !RotationActive() || !g_mapPick.GetBool() || gameLocal.gameType == GAME_TOURNEY ) {
+		return false;
 	}
 	const int mode = g_mapRotation.GetInteger();
 	if ( mode != MP_MAP_ROTATION_ORDER && mode != MP_MAP_ROTATION_SHUFFLE ) {
-		return;
+		return false;
 	}
 	Refresh();
 	// a queued map is already the players' choice
 	if ( database.QueueNum() > 0 || database.Pick().open ) {
-		return;
+		return false;
 	}
 	if ( !database.PickOpen( CurrentEntry(), NextGameType(), PlayerCount(), mapSeed ) ) {
-		return;
+		return false;
 	}
 	idStr offer;
 	idStr offered;
@@ -782,6 +820,7 @@ void mpMapDatabaseHost::ServerMatchEnded( void ) {
 	gameLocal.Printf( "map database: pick offered:%s\n", offered.c_str() );
 	gameLocal.ServerSendChatMessage( -1, "server", MAPDB_STR_PICK_OFFER, offer.c_str() );
 	PublishServerInfo( true );
+	return true;
 }
 
 void mpMapDatabaseHost::ServerThink( void ) {

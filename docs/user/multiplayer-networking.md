@@ -38,6 +38,13 @@ your choice.
 - **Refresh List** asks the servers you already know for fresh details; **Get
   New List** searches for servers again. The bar under the list fills as
   servers answer.
+
+**Where the Internet list comes from.** **Get New List** asks the master server
+in `net_master0` (Quake 4's own, by default). After 0.15.0 it can also read an
+HTTPS server list, the kind an openQ4 master publishes: set
+`net_serverListUrl` to its `https://` address, and the browser lists the
+servers both name, each once. Nothing is read while the setting is empty, as
+it ships.
 - The bars beside each ping show connection quality: four bars up to 60 ms,
   three up to 120 ms, two up to 200 ms and one above that. Two bars turn amber
   and one turns red.
@@ -273,6 +280,7 @@ Type these into the console, or put them in your configuration file.
 | `net_clientMaxRate` | `128000` | Client | The most a server may send you each second, in bytes. Lower it below your real download speed if matches stutter on a slow or shared line. |
 | `net_serverMaxClientRate` | `128000` | Server | The most the server sends any one player each second, in bytes, whatever they ask for. |
 | `ui_browserView` | `0` | Client | Server browser layout in the new menus: `0` rows, `1` tiles. |
+| `net_serverListUrl` | *(empty)* | Client | After 0.15.0: an `https://` server list the browser reads beside the master at each **Get New List**. |
 
 ### Prediction and lag compensation
 

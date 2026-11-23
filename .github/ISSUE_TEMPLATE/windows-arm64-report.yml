@@ -1,10 +1,6 @@
 name: Windows ARM64 hardware report
 description: Report a Windows on ARM (arm64) result — a bug, or a successful run that can feed the ARM64 signoff evidence record.
 title: "[Windows ARM64]: "
-labels:
-  - windows
-  - arm64
-  - experimental-support
 body:
   - type: markdown
     attributes:
@@ -28,7 +24,7 @@ body:
     attributes:
       label: openQ4 version
       description: The version string printed at startup, or the release tag you downloaded.
-      placeholder: "0.8.1"
+      placeholder: "0.15.0"
     validations:
       required: true
   - type: input
@@ -36,7 +32,7 @@ body:
     attributes:
       label: Package artifact name
       description: Paste the exact downloaded file name, or say "built from source" and give the commit SHA.
-      placeholder: "openq4-0.8.1-windows-arm64.zip"
+      placeholder: "openq4-0.15.0-windows-arm64.zip"
     validations:
       required: true
   - type: dropdown

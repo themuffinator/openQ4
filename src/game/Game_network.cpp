@@ -2926,15 +2926,14 @@ Quake 4; it is the banned range now.
 ================
 */
 void idGameLocal::RemoveGuidFromBanList( const char *guid ) {
-	mpModAddress_t address;
-	int prefixBits = 0;
-	if ( guid == NULL || !MPModParseAddress( guid, address, prefixBits ) ) {
+	if ( guid == NULL ) {
 		return;
 	}
 	if ( !banListLoaded ) {
 		LoadBanList();
 	}
-	if ( MPModBanRemove( *modBans, MPModBanFindRange( *modBans, address, prefixBits ) ) ) {
+	// a range, or (MP-17) "id:" and an identity
+	if ( MPModBanRemove( *modBans, MPModBanFindTarget( *modBans, guid ) ) ) {
 		banListChanged = true;
 		SaveBanList();
 	}
@@ -2995,7 +2994,7 @@ const mpBanInfo_t* idGameLocal::GetBanListEntry( int entry ) {
 	}
 	const mpModBan_t &ban = modBans->bans[ entry ];
 	idStr::Copynz( info.name, ban.name, sizeof( info.name ) );
-	MPModFormatRange( ban.address, ban.prefixBits, info.guid, sizeof( info.guid ) );
+	MPModBanTarget( ban, info.guid, sizeof( info.guid ) );
 	idStr::Copynz( info.reason, ban.reason, sizeof( info.reason ) );
 	info.expires = ban.expires;
 	return &info;

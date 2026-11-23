@@ -39,6 +39,7 @@ constexpr int VOTEFLAG_RESTART=1,VOTEFLAG_BUYING=2,VOTEFLAG_TEAMBALANCE=4,VOTEFL
 struct {int GetInteger()const{return 51;}} g_votePercent;
 struct idMath {static int ClampChar(int n){return n;}static int ClampShort(int n){return n;}
     static int ClampInt(int lo,int hi,int n){return n<lo?lo:n>hi?hi:n;}};
+template<class T>T Max(T a,T b){return a>b?a:b;}
 // The buying vote carries the mode: off, Quake 4's rules or The Awakening's (mp/Buying.h).
 enum {BUYING_MODE_OFF,BUYING_MODE_QUAKE4,BUYING_MODE_AWAKENING,BUYING_MODE_COUNT};
 template<class T>struct idList:std::vector<T>{int Num()const{return int(this->size());}void Clear(){this->clear();}void Append(T v){this->push_back(v);}int FindIndex(T v)const{auto i=std::find(this->begin(),this->end(),v);return i==this->end()?-1:int(i-this->begin());}};
@@ -110,8 +111,13 @@ struct idMultiplayerGame {
     bool VoteKickTargetCurrent()const;void CheckVote();bool AbortInheritedVoteForManagedMatch(){return false;}
     void ClientUpdateVote(int v,int,int,const voteStruct_t&){updates.push_back(v);}
     void ExecuteVote(){++executed;}
-    void HandleServerAdminKickPlayer(int);void HandleServerAdminBanPlayer(int);void HandleServerAdminForceTeamSwitch(int);
+    void HandleServerAdminKickPlayer(int);void HandleServerAdminBanPlayer(int,int=0,int=0);void HandleServerAdminForceTeamSwitch(int);
     static void ServerAdminTarget_f(const idCmdArgs&);
+    // MP-18: the Admin page's ban length and reason; the vote payloads MP-14/16 added
+    int retainedAdminBanLength=4,retainedAdminBanReason=0;static const int RETAINED_ADMIN_BAN_REASONS=6;
+    static int RetainedAdminBanSeconds(int){return 0;}static bool RetainedAdminBanLengthKnown(int s){return s==0;}
+    static const char* RetainedAdminBanReasonText(int){return "";}
+    static void WriteVoteExtensionFields(idBitMsg&,const voteStruct_t&){}
     const char* RetainedAdminRefusal(int);
     bool Handle(const char* verb,std::vector<std::string> values){
         if(!admin)return false;idStr sub(verb);idCmdArgs args{values};int icmd=0;
@@ -137,6 +143,9 @@ struct Game {
     mpModAddress_t GetClientModAddress(int)const{mpModAddress_t a;a.family=addressed?4:0;return a;}
     int ServerBan(const mpModAddress_t&,int bits,mpModTime_t seconds,const char*,const char*,const char* by){
         commandsObject.commands.emplace_back("ServerBan /"+std::to_string(bits)+" "+std::to_string(seconds)+" "+by);return 0;}
+    // MP-17: a connected player's ban covers their range (and their identity); the range is what this test reads
+    int ServerBanClient(int client,mpModTime_t seconds,const char* reason,const char* by){
+        mpModAddress_t address=GetClientModAddress(client);return ServerBan(address,MPModPlayerPrefixBits(address),seconds,"",reason,by);}
 }gameLocal;
 @VALID@
 @CURRENT@

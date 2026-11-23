@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
+import io
 import json
+import lzma
 import os
 import plistlib
 import re
@@ -382,6 +385,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--extra-archive-format",
+        action="append",
+        choices=("tar.gz", "tar.xz"),
+        default=[],
+        help=(
+            "Also write the full package in this tar format, from the same tar stream "
+            "(Linux: tar.gz beside the default tar.xz). The update archive keeps the main format."
+        ),
+    )
+    parser.add_argument(
         "--package-suffix",
         default="",
         help=(
@@ -631,10 +644,15 @@ def get_required_game_module_binaries(platform: str, arch: str) -> tuple[str, st
     )
 
 
-def get_required_windows_root_symbols(arch: str) -> tuple[str, str]:
+def get_required_windows_root_symbols(arch: str) -> tuple[str, ...]:
+    # Every shipped openQ4 image beside the game modules: crash dumps from the
+    # renderer modules and the updater need their PDBs as much as the engine's.
     return (
         f"{PRODUCT_NAME}-client_{arch}.pdb",
         f"{PRODUCT_NAME}-ded_{arch}.pdb",
+        f"{PRODUCT_NAME}-updater_{arch}.pdb",
+        f"renderer-gl_{arch}.pdb",
+        f"renderer-vk_{arch}.pdb",
     )
 
 
@@ -1998,26 +2016,17 @@ def create_macos_symbol_tarball(symbol_root: Path, archive_path: Path) -> None:
         raise RuntimeError(f"macOS symbol archive paths could not be resolved safely: {exc}") from exc
     prepare_archive_output_path(archive_path, "macOS symbol archive output")
 
-    with tarfile.open(archive_path, "w:xz") as archive:
-        for path in sorted(symbol_root.rglob("*")):
-            if path.is_symlink():
-                raise RuntimeError(f"macOS symbol archive input contains a symlink: {path}")
-            if path.is_dir():
-                continue
-            if not path.is_file():
-                raise RuntimeError(f"macOS symbol archive input contains a non-regular file: {path}")
-
-            relative_path = path.relative_to(symbol_root)
-            arcname = (Path(symbol_root.name) / relative_path).as_posix()
-            info = archive.gettarinfo(path, arcname=arcname)
-            info.uid = 0
-            info.gid = 0
-            info.uname = ""
-            info.gname = ""
-            info.mtime = DETERMINISTIC_TAR_MTIME
-            info.mode = 0o644
-            with path.open("rb") as handle:
-                archive.addfile(info, handle)
+    entries: list[tuple[Path, str, int]] = []
+    for path in sorted(symbol_root.rglob("*")):
+        if path.is_symlink():
+            raise RuntimeError(f"macOS symbol archive input contains a symlink: {path}")
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise RuntimeError(f"macOS symbol archive input contains a non-regular file: {path}")
+        relative_path = path.relative_to(symbol_root)
+        entries.append((path, (Path(symbol_root.name) / relative_path).as_posix(), 0o644))
+    write_tar_archives(entries, {"tar.xz": archive_path})
 
 
 def validate_macos_symbol_archive_contents(
@@ -2562,6 +2571,122 @@ def create_macos_dmg(package_root: Path, archive_path: Path) -> None:
     )
 
 
+# xz settings for every tar.xz the packager writes. A fixed block size makes the
+# output the same whatever the thread count, and lets `xz -T0` use every core:
+# the content packs are already compressed, and single-threaded lzma spent most
+# of a Linux packaging job (7 to 10 minutes) on them for a 1.5% saving.
+XZ_PRESET = 6
+XZ_BLOCK_SIZE = "24MiB"
+GZIP_LEVEL = 6
+TAR_STREAM_BUFFER_BYTES = 1024 * 1024
+
+
+class _TarStreamTee(io.RawIOBase):
+    """One tar stream written to several compressors at once."""
+
+    def __init__(self, sinks: list) -> None:
+        super().__init__()
+        self._sinks = sinks
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, data) -> int:
+        view = memoryview(data)
+        for sink in self._sinks:
+            sink.write(view)
+        return len(view)
+
+
+def _open_tar_compressors(outputs: dict[str, Path]) -> list[tuple[str, object, object]]:
+    """A (kind, writer, file) per requested format: xz -T0 when available, else Python's codecs."""
+    opened: list[tuple[str, object, object]] = []
+    try:
+        for archive_format, path in outputs.items():
+            handle = path.open("wb")
+            if archive_format == "tar.xz":
+                xz = shutil.which("xz")
+                if xz:
+                    process = subprocess.Popen(
+                        [xz, "-T0", f"-{XZ_PRESET}", f"--block-size={XZ_BLOCK_SIZE}", "-c"],
+                        stdin=subprocess.PIPE,
+                        stdout=handle,
+                    )
+                    opened.append(("xz", process, handle))
+                else:
+                    opened.append(("codec", lzma.LZMAFile(handle, "wb", preset=XZ_PRESET), handle))
+            elif archive_format == "tar.gz":
+                # No file name and a zero timestamp in the gzip header keep it reproducible.
+                opened.append(
+                    ("codec", gzip.GzipFile(filename="", mode="wb", compresslevel=GZIP_LEVEL, fileobj=handle, mtime=0),
+                     handle)
+                )
+            else:
+                handle.close()
+                raise RuntimeError(f"unsupported tar archive format: {archive_format}")
+    except BaseException:
+        _abort_tar_compressors(opened)
+        raise
+    return opened
+
+
+def _abort_tar_compressors(opened: list[tuple[str, object, object]]) -> None:
+    for kind, writer, handle in opened:
+        try:
+            if kind == "xz":
+                writer.kill()
+                writer.wait()
+            else:
+                writer.close()
+        except (OSError, ValueError):
+            pass
+        handle.close()
+
+
+def _close_tar_compressors(opened: list[tuple[str, object, object]], outputs: dict[str, Path]) -> None:
+    failures = []
+    for (kind, writer, handle), path in zip(opened, outputs.values()):
+        if kind == "xz":
+            writer.stdin.close()
+            if writer.wait() != 0:
+                failures.append(f"xz exited with {writer.returncode} writing {path}")
+        else:
+            writer.close()
+        handle.close()
+    if failures:
+        raise RuntimeError("; ".join(failures))
+
+
+def write_tar_archives(entries: list[tuple[Path, str, int]], outputs: dict[str, Path]) -> None:
+    """Write (source, archive name, mode) entries as one tar stream into every output format.
+
+    Headers are normalized (root owner, fixed mtime) so each archive is
+    reproducible from the same package tree.
+    """
+    opened = _open_tar_compressors(outputs)
+    try:
+        tee = io.BufferedWriter(_TarStreamTee([item[1].stdin if item[0] == "xz" else item[1] for item in opened]),
+                                buffer_size=TAR_STREAM_BUFFER_BYTES)
+        with tarfile.open(fileobj=tee, mode="w|", bufsize=TAR_STREAM_BUFFER_BYTES) as archive:
+            for path, arcname, mode in entries:
+                info = archive.gettarinfo(path, arcname=arcname)
+                info.uid = 0
+                info.gid = 0
+                info.uname = ""
+                info.gname = ""
+                info.mtime = DETERMINISTIC_TAR_MTIME
+                info.mode = mode
+                with path.open("rb") as handle:
+                    archive.addfile(info, handle)
+        tee.flush()
+    except BaseException:
+        _abort_tar_compressors(opened)
+        for path in outputs.values():
+            path.unlink(missing_ok=True)
+        raise
+    _close_tar_compressors(opened, outputs)
+
+
 def create_release_archive(
     package_root: Path,
     archive_path: Path,
@@ -2570,12 +2695,23 @@ def create_release_archive(
     *,
     excluded_relative_paths: frozenset[str] = frozenset(),
     rootless: bool = False,
+    extra_archives: dict[str, Path] | None = None,
 ) -> None:
     """Archive package_root under its own folder name, or at the archive root when rootless.
 
     An update archive is rootless so it extracts straight into an existing
     openQ4 folder, replacing files, and leaves out the bulk content packs.
+    extra_archives writes the same tar in other tar formats in the same pass
+    (a Linux package's .tar.gz beside its .tar.xz).
     """
+    extra_archives = dict(extra_archives or {})
+    if extra_archives and archive_format not in ("tar.gz", "tar.xz"):
+        raise RuntimeError(f"extra archive formats need a tar package, not {archive_format}")
+    for extra_format, extra_path in extra_archives.items():
+        if extra_format == archive_format or extra_format not in ("tar.gz", "tar.xz"):
+            raise RuntimeError(f"unsupported extra archive format: {extra_format}")
+        validate_archive_output_outside_input_tree(package_root, extra_path, "release archive output")
+        prepare_archive_output_path(extra_path, "release archive output")
     validate_archive_output_outside_input_tree(package_root, archive_path, "release archive output")
     prepare_archive_output_path(archive_path, "release archive output")
 
@@ -2613,26 +2749,17 @@ def create_release_archive(
                     shutil.copyfileobj(source, target, length=1024 * 1024)
         return
 
-    mode = {"tar.gz": "w:gz", "tar.xz": "w:xz"}[archive_format]
-    with tarfile.open(archive_path, mode) as archive:
-        for path in sorted(package_root.rglob("*")):
-            if not path.is_file():
-                continue
-            relative_path = path.relative_to(package_root)
-            if relative_path.as_posix() in excluded_relative_paths:
-                continue
-            arcname = relative_path.as_posix() if rootless else (Path(package_root.name) / relative_path).as_posix()
-            info = archive.gettarinfo(path, arcname=arcname)
-            info.uid = 0
-            info.gid = 0
-            info.uname = ""
-            info.gname = ""
-            info.mtime = DETERMINISTIC_TAR_MTIME
-            info.mode = 0o644
-            if relative_path.as_posix() in executable_archive_paths:
-                info.mode = 0o755
-            with path.open("rb") as handle:
-                archive.addfile(info, handle)
+    entries: list[tuple[Path, str, int]] = []
+    for path in sorted(package_root.rglob("*")):
+        if not path.is_file():
+            continue
+        relative_path = path.relative_to(package_root)
+        if relative_path.as_posix() in excluded_relative_paths:
+            continue
+        arcname = relative_path.as_posix() if rootless else (Path(package_root.name) / relative_path).as_posix()
+        mode = 0o755 if relative_path.as_posix() in executable_archive_paths else 0o644
+        entries.append((path, arcname, mode))
+    write_tar_archives(entries, {archive_format: archive_path, **extra_archives})
 
 
 UPDATE_ARCHIVE_SUFFIX = "-update"
@@ -4021,6 +4148,13 @@ def main(argv: list[str]) -> int:
     if archive_format == "dmg" and args.platform != "macos":
         print("error: archive format 'dmg' is only supported for macOS packages", file=sys.stderr)
         return 1
+    extra_archive_formats = list(dict.fromkeys(args.extra_archive_format))
+    if extra_archive_formats and (archive_format not in ("tar.gz", "tar.xz") or archive_format in extra_archive_formats):
+        print(
+            f"error: --extra-archive-format needs a tar package in another format (package format: {archive_format})",
+            file=sys.stderr,
+        )
+        return 1
 
     raw_source_root = Path(args.source_root)
     raw_install_dir = Path(args.install_dir) if args.install_dir is not None else raw_source_root / ".install"
@@ -4266,12 +4400,16 @@ def main(argv: list[str]) -> int:
             return 1
 
     update_archive_path: Path | None = None
+    extra_archive_paths = {
+        extra_format: output_dir / f"{package_stem}{ARCHIVE_SUFFIX[extra_format]}" for extra_format in extra_archive_formats
+    }
     try:
         create_release_archive(
             package_root,
             archive_path,
             archive_format,
             archive_executable_paths,
+            extra_archives=extra_archive_paths,
         )
         if args.platform in ("windows", "linux") and archive_format in ("zip", "tar.gz", "tar.xz"):
             update_archive_path = output_dir / f"{package_stem}{UPDATE_ARCHIVE_SUFFIX}{archive_suffix}"
@@ -4319,6 +4457,8 @@ def main(argv: list[str]) -> int:
     print(f"Packaged openQ4 release {version} for {args.platform}")
     print(f"Package directory: {package_root}")
     print(f"Release archive: {archive_path}")
+    for extra_path in extra_archive_paths.values():
+        print(f"Release archive: {extra_path}")
     if update_archive_path is not None:
         print(f"Update archive (no {', '.join(OPENQ4_BULK_PACK_NAMES)}): {update_archive_path}")
     if windows_symbol_archive_path is not None:

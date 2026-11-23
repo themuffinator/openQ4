@@ -329,6 +329,7 @@ it, for example `connect [2001:db8::1]:28004`. Every address form is under
 | `g_mapRotation` | What follows a match: `0` the same map, `1` the rotation (default), `2` a shuffled rotation, `3` the `g_mapCycle` script (**New in 0.15.0**) |
 | `g_mapQueue` | `1` lets players queue maps with `mymap` (default); `0` turns the queue off (**New in 0.15.0**) |
 | `g_mapPick` | `1` offers three maps to pick from when a match ends (**New in 0.15.0**) |
+| `g_intermissionAnnounce` | `1` names the next map while the final scoreboard is up and reads out each player's end-of-match awards; see [Picking the next map](#picking-the-next-map). Off by default. **After 0.15.0** |
 | `g_mapDatabase` | The file that adjusts the map database, `mapdb.txt` by default (**New in 0.15.0**) |
 | `g_mapCycle` | Map cycle script. In 0.14.1 it runs whenever `si_mapCycle` is empty; from 0.15.0 only with `g_mapRotation 3` |
 | `si_allowVoting`, `si_voteFlags` | `si_allowVoting 1` lets players call votes; `si_voteFlags` is a bit mask of the votes you forbid (type `si_voteFlags` for the bits) |
@@ -351,6 +352,65 @@ Bot settings are listed under [Bots](#bots).
 On **Create Server → Rules** they are **Item Timers**, **Highlight Limit** (Off, Low, Medium or High, which is
 no limit) and **Allow Forced Models**.
 See [Multiplayer Client Options](multiplayer-client-options.md#for-server-operators).
+
+## Identities, returning players and rankings
+
+> **After 0.15.0.** This describes the development build.
+
+Players' games prove an identity to your server when they join (see
+[Your identity](multiplayer.md#your-identity-and-coming-back-after-a-dropped-connection)).
+Your server keeps its own random id in `identity_server.txt` in its save
+folder; keep that file to keep your players' identities across restarts and
+moves.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `g_identity` | `1` | Ask each player whose game offers one for their identity. `status` shows it and `ban id:<identity>` bans it |
+| `g_reconnectRestore` | `300` | Seconds a player who leaves a casual match keeps their team and score for their return, by identity or by the six-letter ghost code the server told them. `0` forgets them at once |
+| `g_ranking` | `0` | Keep a local ranking table in `ranking.txt`: an Elo rating for each identity and game type, updated when a casual match ends |
+
+**Rankings.** With `g_ranking 1`, the end of every casual match rates the
+players who proved an identity: in team modes each against the other team's
+average, in free-for-all modes every player against every other by score. A
+player's first twenty rated matches count more (K 48, then 32). Tourney and
+matches with fewer than two rated players (one a side in team modes) are not
+rated. `rankings [game type]` lists the table, best first. The file is written
+whole each time; a file this build cannot read is left as it is and not
+updated.
+
+## Run a master server
+
+> **After 0.15.0.** The program is in the source tree; openQ4 does not run one
+> for you yet.
+
+A master server is how players' browsers find Internet servers. openQ4
+servers announce themselves to the masters in `net_master0` to `net_master4`
+when a map starts and every five minutes, unless `net_LANServer 1`.
+`tools/master/openq4_master.py` is a master you can run yourself, with nothing
+but Python 3.10 or later:
+
+```
+python openq4_master.py --port 27650 --json /var/www/openq4/servers.json
+```
+
+- It lists a server only once the server answers the master's own challenge,
+  so nobody can list an address that is not theirs, and drops one that has not
+  announced itself for fifteen minutes.
+- It answers both the old list request and the newer one, so players on IPv6
+  find IPv6 servers.
+- With `--json` it writes the list to a file every minute. Publish that file
+  over HTTPS and players can set `net_serverListUrl` to it: their browser then
+  lists your servers even when no master answers.
+- `--allow-private` lists servers on private and loopback addresses, for a LAN
+  or a test. By default only public addresses are listed.
+
+Point your servers at it with `net_master1 <host>:27650` (they announce to
+every master set), and players at it with `net_master0 <host>:27650` (the
+browser asks only the first).
+
+To check it from a game, set `net_master0` to it and type `NETScan` in the
+console (the browser's **Get New List** on the Internet source), then
+`listServers` a few seconds later: your server should be in the list.
 
 ## Maps, rotation and the map queue
 
@@ -484,11 +544,23 @@ map, which is the rotation's own, is played. Give players time with
 The pick is not offered when a map is queued, in Tourney, or when fewer than
 two maps can be offered.
 
+**After 0.15.0:** with `g_intermissionAnnounce 1`, the scoreboard that ends a
+casual match also names the next map in chat, so players know where they are
+going before the map changes, and then reads out each player's awards from the
+match (the stats screen's Perfect, Rail Master and the rest), one every two
+seconds. A pick, when one is offered, names its own maps instead. Managed
+matches and the Arena campaign keep their own flow.
+
 Managed matches and series choose their maps and set their own rules; see
 the [competitive matches guide](competitive-matches.md). While one runs, the
 queue and the pick are off and a map's `set` lines are not applied.
 
 ## Console commands
+
+The identity commands (after 0.15.0): `identity` (your identity on this
+server), `identityReset confirm`, `ghost <code>`, `history` (on a player's
+game) and `rankings [game type]` (on the server).
+
 
 | Command | What it does |
 |---|---|

@@ -737,6 +737,22 @@ static void ResolveAndApplyMPMenuModelSelection( idUserInterface *gui, const idS
 		ExtractMPMenuModelInfo( selectedDecl.c_str(), modelName, headName, skinName, description, team ) &&
 		MPMenuModelAllowedForTeam( team, isTeamGame, menuModelTeam );
 
+	if ( !selectedValid && !forceModel && def ) {
+		// A stored name that names no player model, such as the retail
+		// default.cfg's "marine", takes the menu def's own default for the team.
+		// The first model in the list is Quake 4's Failed Transfer monster.
+		const char *defaultDecl = ( menuModelTeam >= 0 && menuModelTeam < TEAM_MAX ) ?
+			def->dict.GetString( va( "def_default_model_%s", mpMenuModelTeamSuffix[ menuModelTeam ] ) ) :
+			def->dict.GetString( "def_default_model" );
+		if ( defaultDecl[0] &&
+			ExtractMPMenuModelInfo( defaultDecl, modelName, headName, skinName, description, team ) &&
+			MPMenuModelAllowedForTeam( team, isTeamGame, menuModelTeam ) ) {
+			selectedDecl = defaultDecl;
+			selectedValid = true;
+			cvarSystem->SetCVarString( modelCVar.c_str(), selectedDecl.c_str() );
+		}
+	}
+
 	if ( !selectedValid ) {
 		idStr fallbackDecl;
 		if ( FirstMPMenuModelFromList( buildValues, fallbackDecl ) &&

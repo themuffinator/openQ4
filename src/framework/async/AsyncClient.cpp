@@ -818,6 +818,9 @@ void idAsyncClient::GetNETServers( void ) {
 	msg.WriteBits( 0, 2 );
 	msg.WriteBits( 0, 2 );
 
+	// openQ4 MP-19: the HTTPS list as well, where the player has one; the two merge
+	serverListFallback.Start( cvarSystem->GetCVarString( "net_serverListUrl" ) );
+
 	netadr_t adr;
 	if ( idAsyncNetwork::GetMasterAddress( 0, adr ) ) {
 		clientPort.SendPacket( adr, msg.GetData(), msg.GetSize() );
@@ -3047,6 +3050,21 @@ void idAsyncClient::RunFrame( bool allowBlocking ) {
 
 	// update server list
 	serverList.RunFrame();
+	// openQ4 MP-19: what the HTTPS server list named, once it has arrived
+	{
+		std::vector<std::string> listed;
+		std::string listUrl, listError;
+		if ( serverListFallback.Poll( listed, listUrl, listError ) ) {
+			if ( !listError.empty() ) {
+				common->Printf( "server list: %s: %s\n", listUrl.c_str(), listError.c_str() );
+			} else {
+				for ( size_t i = 0; i < listed.size(); i++ ) {
+					serverList.AddServer( serverList.Num(), listed[ i ].c_str() );
+				}
+				common->Printf( "server list: %d server(s) from %s\n", static_cast<int>( listed.size() ), listUrl.c_str() );
+			}
+		}
+	}
 
 	if ( clientState == CS_DISCONNECTED ) {
 		usercmdGen->GetDirectUsercmd();

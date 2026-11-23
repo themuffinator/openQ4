@@ -444,6 +444,9 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Upgrade Notes
 
+- Multiplayer-only settings that earlier versions lost (field of view, HUD
+  options such as item timers or damage numbers, Create Server options) do not
+  come back by themselves: set them once more and they now stay set.
 - Servers and players must run the same build for buying: the player state now
   carries weapon mods, and the buying vote names Off, Quake 4 or The Awakening.
   Replace the engine and both game modules together.
@@ -506,6 +509,44 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Server hosts can have the end-of-match scoreboard name the next map and
+  read out each player's awards (`g_intermissionAnnounce 1`; off by default).
+  See [Picking the next map](../../user/server-setup.md#picking-the-next-map).
+- Linux packages are also offered as `.tar.gz`, with exactly the same files as
+  the `.tar.xz`, for sites that do not take xz archives such as ModDB.
+- Server hosts can run their own master server (`tools/master/openq4_master.py`),
+  and the server browser can also read an HTTPS server list such a master
+  publishes (`net_serverListUrl`). Both are off until you set them up. See
+  [Run a master server](../../user/server-setup.md#run-a-master-server).
+- The Windows symbols download now includes the OpenGL and Vulkan renderer
+  modules and the updater, so crash reports from them can be read.
+- Servers recognise a returning player. Your game proves to each server that
+  you are the same player as before, with a key kept only on your computer and
+  different for every server; leave a casual match and return within five
+  minutes and your team and score come back (`ghost <code>` does it without an
+  identity). Bans also cover the player's identity, `status` shows it, a
+  server may keep a local ranking table (`g_ranking 1`, `rankings`), and your
+  game keeps your match history (`history`). Turn it off with Player Setup's
+  **Player Identity**. See
+  [Your identity](../../user/multiplayer.md#your-identity-and-coming-back-after-a-dropped-connection).
+- Multiplayer-only settings are kept between sessions. Field of view, the
+  HUD's damage numbers, speedometer, input display, item timers, hit sound and
+  other multiplayer options, and the Create Server bot and server options, were
+  dropped from the config whenever it was saved before a match had loaded the
+  multiplayer module, and came back at their defaults. A new profile's
+  multiplayer character is the default marine instead of the Failed Transfer
+  monster.
+- Players can vote on more of the match. `callvote quadhog 1`, `vampiric`,
+  `frenzy` and `modifier <name> 0|1` turn a modifier on or off, `callvote arena
+  rocketlauncher` (or `none`) plays a single-weapon arena, `callvote preset
+  <name>` applies a preset, and `callvote spectatorchat 1` lets spectators talk
+  to the players. The in-match **Vote** page offers each of them, and **Mute
+  Instead of Kicking** turns its player vote into a mute. Each restarts the
+  match where the rules change, and a server can forbid each with
+  `si_voteFlags` (bits 21 to 24). See [Vote](../../user/multiplayer.md#vote).
+- The Admin page's **Ban** takes a length (10 minutes to permanent) and a
+  reason, and its ban list shows each ban's reason and time left. See
+  [The in-match Admin page](../../user/server-security.md#bans-mutes-and-chat-limits).
 - Vulkan spends less GPU time on scenes with smoke, heat haze or SSAO when MSAA is
   on: each copy of the scene depth those effects read costs about a quarter of
   what it did (about 1 ms a frame outdoors at 8x on the reference laptop, less at

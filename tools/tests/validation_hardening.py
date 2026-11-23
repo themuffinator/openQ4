@@ -552,10 +552,26 @@ def validate_windows_pdb_architecture_match() -> None:
     for path in (
         install_root / "openQ4-client_x64.pdb",
         install_root / "openQ4-ded_x64.pdb",
+        install_root / "openQ4-updater_x64.pdb",
+        install_root / "renderer-gl_x64.pdb",
         game_dir / "game-sp_x64.pdb",
         game_dir / "game-mp_x64.pdb",
     ):
         write_file(path)
+
+    # The renderer modules' and the updater's symbols are required too: a crash
+    # in a renderer module is symbolized from the release's symbols archive.
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_windows_symbols(root, install_root, game_dir, {"x64"}),
+            "renderer-vk_x64.pdb",
+            "missing renderer module PDB",
+        ),
+    )
+    write_file(install_root / "renderer-vk_x64.pdb")
 
     with_host_flags(
         True,
@@ -734,6 +750,17 @@ def validate_validation_wiring() -> None:
         # Bans, mutes, the chat flood window and the per-address limit on a staged
         # dedicated server with a bot and two clients; mp_moderation.py is wired.
         "mp_moderation_smoke.py",
+        # Identities, a returning player by identity and by ghost code, rankings,
+        # history and identity bans on a staged dedicated server with three
+        # clients; mp_identity.py is wired.
+        "mp_identity_smoke.py",
+        # Internet discovery through tools/master/openq4_master.py on loopback: a
+        # staged dedicated server and a hidden client; master_protocol.py and
+        # mp_server_discovery.py are wired.
+        "mp_master_smoke.py",
+        # The modifier, arena, preset and spectator chat votes on a staged hidden
+        # listen server; mp_casual_match_flow_contract.py pins their wiring.
+        "mp_vote_extensions_smoke.py",
         # A 12-player match over a simulated small path MTU.
         "mp_path_mtu_soak.py",
         "mp_mod_admission_smoke.py",

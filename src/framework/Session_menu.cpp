@@ -204,7 +204,9 @@ static const char *const RETAINED_MP_VOTE_FIELDS[] = {
 	"mpVoteControlTime", "mpVoteBalance", "mpVoteShuffle", "mpVoteRestart", "mpVoteBuying", "mpVoteKick",
 	// The casual callvote fields (MP-12), after the kick as the game orders them.
 	"mpVoteNextMap", "mpVoteRandomMap", "mpVoteRoundLimit", "mpVoteOvertime", "mpVoteRuleset", "mpVoteInstagib",
-	"mpVoteReadyAll", "mpVoteCoinToss"
+	"mpVoteReadyAll", "mpVoteCoinToss",
+	// The moderation and modifier votes (MP-18, MP-14, MP-16).
+	"mpVoteMute", "mpVoteQuadHog", "mpVoteVampiric", "mpVoteFrenzy", "mpVoteArena", "mpVotePreset", "mpVoteSpectatorChat"
 };
 // The Admin page's drafted server settings, whose controls request "<verb>
 // <value>", in the order of the game's retainedVoteField_t without the kick;
@@ -213,6 +215,9 @@ static const char *const RETAINED_MP_ADMIN_FIELDS[] = {
 	"mpAdminMap", "mpAdminGameType", "mpAdminTimeLimit", "mpAdminFragLimit", "mpAdminCaptureLimit", "mpAdminTourneyLimit",
 	"mpAdminControlTime", "mpAdminBalance", "mpAdminShuffle", "mpAdminRestart", "mpAdminBuying"
 };
+// The Admin page's Ban length and reason choices (MP-18), by row; the game
+// checks each row against its tables.
+static const char *const RETAINED_MP_ADMIN_BAN_CHOICES[] = { "mpAdminBanLength", "mpAdminBanReason" };
 // The card's text fields' longest entries in bytes: the remote console
 // password, a console command, the Match page's referee credential, and the
 // player's name and clan as the stock fields took them.
@@ -1917,10 +1922,27 @@ static void SetMainMenuMPModelVars( idUserInterface *gui ) {
 	idStr selectedSkinName;
 	idStr selectedDescription;
 	idStr selectedTeam;
-	const bool selectedValid = selectedDecl.Length() &&
+	bool selectedValid = selectedDecl.Length() &&
 		MainMenuExtractPlayerModelInfo( selectedDecl.c_str(), selectedModelName, selectedHeadName, selectedSkinName, selectedDescription, selectedTeam ) &&
 		MainMenuModelAllowedForTeam( selectedTeam, isTeamGame, menuModelTeam );
 
+	if ( !selectedValid && def ) {
+		// A stored name that names no player model, such as the retail
+		// default.cfg's "marine", takes the menu def's own default for the team.
+		// The first model in the list is Quake 4's Failed Transfer monster, which
+		// every fresh profile became the first time this menu was built.
+		const char *defaultDecl = ( menuModelTeam >= 0 && menuModelTeam < 2 ) ?
+			def->dict.GetString( va( "def_default_model_%s", mainMenuMPTeamNames[ menuModelTeam ] ) ) :
+			def->dict.GetString( "def_default_model" );
+		idStr defaultTeam;
+		if ( defaultDecl[0] &&
+			MainMenuExtractPlayerModelInfo( defaultDecl, selectedModelName, selectedHeadName, selectedSkinName, selectedDescription, defaultTeam ) &&
+			MainMenuModelAllowedForTeam( defaultTeam, isTeamGame, menuModelTeam ) ) {
+			selectedDecl = defaultDecl;
+			selectedValid = true;
+			cvarSystem->SetCVarString( modelCVar.c_str(), selectedDecl.c_str() );
+		}
+	}
 	if ( !selectedValid ) {
 		if ( MainMenuFirstModelFromList( buildValues, isTeamGame, menuModelTeam, selectedDecl, selectedModelName, selectedHeadName, selectedSkinName ) ) {
 			cvarSystem->SetCVarString( modelCVar.c_str(), selectedDecl.c_str() );
@@ -12850,6 +12872,12 @@ void idSessionLocal::HandleRetainedMultiplayerRequest( idUserInterface *gui, con
 		static_cast<int>( sizeof( RETAINED_MP_ADMIN_FIELDS ) / sizeof( RETAINED_MP_ADMIN_FIELDS[0] ) ), voteField, voteValue ) ) {
 		// A drafted server setting changes, and the menu stays open.
 		gameCommand = va( "retained adminSet %d %d", voteField, voteValue );
+		command = gameCommand.c_str();
+	} else if ( Session_RetainedValueRequest( request, RETAINED_MP_ADMIN_BAN_CHOICES,
+		static_cast<int>( sizeof( RETAINED_MP_ADMIN_BAN_CHOICES ) / sizeof( RETAINED_MP_ADMIN_BAN_CHOICES[0] ) ), voteField, voteValue ) &&
+		voteValue >= 0 ) {
+		// The next Ban's length or reason, by row, and the menu stays open.
+		gameCommand = va( "retained %s %d", voteField == 0 ? "adminBanLength" : "adminBanReason", voteValue );
 		command = gameCommand.c_str();
 	} else if ( !idStr::Icmp( request, "mpSettingsControls" ) ) {
 		command = "mainMenu fromMp_toControls";

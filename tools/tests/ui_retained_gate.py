@@ -5436,8 +5436,13 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     appearance = re.findall(r'"(mp[A-Za-z]+)"', re.search(r'RETAINED_MP_APPEARANCE_VALUES\[\] = \{([^}]*)\};', menu).group(1))
     choices = re.findall(r'"(mp[A-Za-z]+)"', re.search(r'RETAINED_MP_MATCH_CHOICES\[\] = \{([^}]*)\};', menu).group(1))
     admin_fields = re.findall(r'"(mpAdmin[A-Za-z]+)"', re.search(r'RETAINED_MP_ADMIN_FIELDS\[\] = \{([^}]*)\};', menu).group(1))
-    assert set(fields) | set(appearance) | set(choices) | set(admin_fields) | {'mpMatchRuleValue'} == value_verbs and \
-        len(fields) + len(appearance) + len(choices) + len(admin_fields) + 1 == len(value_verbs), (fields, appearance, choices, value_verbs)
+    # The Admin page's next Ban length and reason (MP-18), each a list by row.
+    ban_choices = re.findall(r'"(mpAdmin[A-Za-z]+)"', re.search(r'RETAINED_MP_ADMIN_BAN_CHOICES\[\] = \{([^}]*)\};', menu).group(1))
+    import retained_mp_admin
+    assert ban_choices == [verb for _key, verb, _label, _options, _count in retained_mp_admin.BAN_CHOICES]
+    assert set(fields) | set(appearance) | set(choices) | set(admin_fields) | set(ban_choices) | {'mpMatchRuleValue'} == value_verbs and \
+        len(fields) + len(appearance) + len(choices) + len(admin_fields) + len(ban_choices) + 1 == len(value_verbs), \
+        (fields, appearance, choices, value_verbs)
     assert appearance == [*retained_mp_menus.MODEL_VERBS, 'mpCrosshair'] and choices == ['mpMatchRole', 'mpMatchScope', 'mpMatchSeriesProfile']
     enum = [name.strip() for name in re.search(r'enum retainedVoteField_t \{([^}]*)\};', header).group(1).split(',') if name.strip()]
     assert enum[-1] == 'RVF_COUNT'

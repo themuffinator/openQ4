@@ -5,9 +5,10 @@
 Casual servers get the votes Quake players type (callvote/cv with the new
 fields), a pass percentage, a per-map vote limit and a spectator-vote policy;
 team timeouts and a technical pause from the console (si_timeouts); a spectator
-lock; an inactivity policy; and a pause when a playing human disconnects. Every
-piece keeps its default off or at the inherited value, and the managed match
-keeps its own typed authority path.
+lock; an inactivity policy; a pause when a playing human disconnects; and an
+intermission that names the next map and reads out the awards. Every piece
+keeps its default off or at the inherited value, and the managed match keeps
+its own typed authority path.
 """
 from __future__ import annotations
 
@@ -59,8 +60,24 @@ def check_votes() -> None:
                         ("OVERTIME", 0x10000), ("COINTOSS", 0x20000), ("RANDOMMAP", 0x40000), ("READYALL", 0x80000)):
         require(re.search(rf"VOTEFLAG_{name}\s*=\s*0x{value:X},", header, re.IGNORECASE) is not None,
                 f"VOTEFLAG_{name} keeps bit value 0x{value:X}")
-    # MP-18 added VOTEFLAG_MUTE at bit 20 (tools/tests/mp_moderation.py pins it)
-    require(re.search(r"#define\s+NUM_VOTES\s+21\b", header) is not None, "NUM_VOTES covers the new flags")
+    # MP-18 added VOTEFLAG_MUTE at bit 20 (tools/tests/mp_moderation.py pins it); the
+    # modifier, spectator chat, preset and arena votes (MP-14, MP-16) take bits 21 to 24
+    for name, value in (("MODIFIER", 0x200000), ("SPECTATORCHAT", 0x400000), ("PRESET", 0x800000), ("ARENA", 0x1000000)):
+        require(re.search(rf"VOTEFLAG_{name}\s*=\s*0x{value:X},", header, re.IGNORECASE) is not None,
+                f"VOTEFLAG_{name} keeps bit value 0x{value:X}")
+    require(re.search(r"#define\s+NUM_VOTES\s+25\b", header) is not None, "NUM_VOTES covers the new flags")
+    # their payloads follow the MP-12 fields on every message, only when their flags are set
+    require(game.count("WriteVoteExtensionFields( outMsg, voteData );") == 3, "the three vote writers send the extension fields")
+    require(network.count("idMultiplayerGame::ReadVoteExtensionFields( msg, voteData )") == 2, "both client vote readers read them")
+    require("ReadVoteExtensionFields( msg, voteData )" in function_body(game, "void idMultiplayerGame::ServerCallPackedVote"),
+            "the packed vote call reads them before the kick identity")
+    before(function_body(game, "void idMultiplayerGame::ServerCallPackedVote"), "ReadVoteExtensionFields( msg, voteData )",
+           "ReadVoteKickTarget( msg, voteData.m_kick )", "the extension fields come before the kick identity")
+    writer = function_body(game, "void idMultiplayerGame::WriteVoteExtensionFields")
+    for flag in ("VOTEFLAG_MODIFIER", "VOTEFLAG_SPECTATORCHAT", "VOTEFLAG_PRESET", "VOTEFLAG_ARENA"):
+        require(flag in writer, f"{flag} has a payload only when set")
+    for word in ('"modifier"', '"arena"', '"preset"', '"spectatorchat"'):
+        require(word in function_body(game, "void idMultiplayerGame::CallVote_f"), f"callvote takes {word}")
     for field in ("m_roundLimit", "m_ruleset", "m_instagib", "m_overtime"):
         require(field in function_body(header, "struct voteStruct_t"), f"voteStruct_t carries {field}")
 
@@ -300,12 +317,49 @@ def check_strings() -> None:
         require(string_id in referenced, f"{string_id} is used")
 
 
+def check_intermission() -> None:
+    game = read("src/mpgame/MultiplayerGame.cpp")
+    host = read("src/mpgame/mp/MapDatabaseHost.cpp")
+    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+
+    require(re.search(r'"g_intermissionAnnounce",\s*"0",\s*CVAR_GAME \| CVAR_ARCHIVE \| CVAR_BOOL,', cvars) is not None,
+            "g_intermissionAnnounce defaults off: a casual server keeps Quake 4's quiet scoreboard")
+    gate = function_body(game, "bool idMultiplayerGame::IntermissionAnnounces( void ) const")
+    require("gameLocal.isServer && g_intermissionAnnounce.GetBool() && !IsManagedMatch() && !IsArenaCampaignMatch()" in gate,
+            "only a casual server that turned it on announces; a managed match and the Arena campaign keep their own flow")
+    require("RunIntermissionAwards();" in function_body(game, "void idMultiplayerGame::Run( void ) {"), "the reel runs every frame")
+    reel = function_body(game, "void idMultiplayerGame::RunIntermissionAwards( void ) {")
+    for token, label in (
+        ("gameState->GetMPGameState() != GAMEREVIEW", "the reel plays during the review only"),
+        ("intermissionAwardsMatch != identityMatchStamp", "the reel is built once a match"),
+        ("statManager->GetPlayerStat( i )", "it reads the stat manager's own end-of-match awards"),
+        ("stat->endGameAwards[ round ]", "one award a player a round"),
+        ('gameLocal.ServerSendChatMessage( -1, "server", endGameAwardInfo[ award ].name, va( ": %s", name ) );',
+         "each award is read to everyone, localized by each client"),
+        ("INTERMISSION_AWARD_GAP_MS", "one line every two seconds"),
+    ):
+        require(token in reel, label)
+    ended = function_body(host, "void mpMapDatabaseHost::ServerMatchEnded( void ) {")
+    require("if ( !ServerOfferPick() ) {" in ended and "ServerAnnounceNext();" in ended,
+            "a pick names its own candidates; otherwise the intermission names the next map")
+    announce = function_body(host, "void mpMapDatabaseHost::ServerAnnounceNext( void ) {")
+    require("gameLocal.mpGame.IntermissionAnnounces()" in announce and "ServerPredictNext( &selection )" in announce and
+            "intermissionAnnounced = database.Entry( selection.index )->token;" in announce,
+            "the intermission names the map the rotation will load")
+    advance = function_body(host, "mpMapAdvance_t mpMapDatabaseHost::ServerAdvance( void ) {")
+    require("if ( intermissionAnnounced.Icmp( entry->token ) != 0 ) {" in advance,
+            "the change does not name again the map the intermission named")
+    require("intermissionAnnounced.Clear();" in function_body(host, "void mpMapDatabaseHost::ServerMapStarted( const char *map ) {"),
+            "a new map forgets the last intermission")
+
+
 def main() -> int:
     try:
         check_votes()
         check_timeouts()
         check_policies()
         check_strings()
+        check_intermission()
     except (AssertionError, ValueError) as error:
         print(f"mp_casual_match_flow_contract: FAIL: {error}")
         return 1

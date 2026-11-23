@@ -63,7 +63,9 @@ struct ScreenHost final : Host {
 		// The multiplayer HUD's options and spectating at their defaults
 		// (Player Setup's HUD tab, the card's Settings page).
 		{"hud_hitSound",1.0},{"hud_crosshairNames",1.0},{"hud_crosshairAmmo",false},{"hud_itemTimers",true},{"hud_teamLocations",true},
-		{"hud_localClock",0.0},{"ui_spectatorSpeed",100.0},{"g_spectatorFollowView",0.0}};
+		{"hud_localClock",0.0},{"ui_spectatorSpeed",100.0},{"g_spectatorFollowView",0.0},
+		// Player Setup's Player Identity (MP-17), on by default.
+		{"ui_identity",true}};
 	bool ReadCVar(const std::string& name, size_t type, StateValue& value) override {
 		if (type == 2 && name == "sys_lang") { value = language; return true; }
 		if (const auto found = cvars.find(name); found != cvars.end()) {
@@ -305,7 +307,7 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 // The player settings the multiplayer card's Settings and Voice pages and the
 // GAME OPTIONS page change.
-static const std::set<std::string> PlayerSettings = {"ui_handicap","hud_hitSound","hud_crosshairNames","hud_crosshairAmmo","hud_itemTimers",
+static const std::set<std::string> PlayerSettings = {"ui_handicap","ui_identity","hud_hitSound","hud_crosshairNames","hud_crosshairAmmo","hud_itemTimers",
 	"hud_teamLocations","hud_localClock","ui_spectatorSpeed","g_spectatorFollowView","cl_player_outline_enemy","cl_player_outline_team",
 	"cl_player_rimlight_enemy","cl_player_rimlight_team","cl_player_visibility_enemy_color","cl_player_visibility_team_color",
 	"cl_player_brightskin_enemy","cl_player_brightskin_team","cl_player_brightskin_enemy_color","cl_player_brightskin_team_color",

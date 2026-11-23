@@ -13,6 +13,7 @@ import re
 import stat
 import sys
 import tarfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from zipfile import BadZipFile, ZipFile
 
@@ -95,22 +96,22 @@ def verify_archive_integrity(path: Path) -> None:
                     raise RuntimeError(f"release archive has a corrupt member: {path.name}: {bad_member}")
         elif path.name.endswith((".tar.gz", ".tar.xz")):
             opener = gzip.open if path.name.endswith(".tar.gz") else lzma.open
-            # Tar readers can stop at the end-of-archive blocks without checking
-            # the gzip/xz footer. Explicitly drain the compressed stream first.
-            expanded = 0
+            # One decompression pass: read every member, then drain the rest of
+            # the stream, because tar readers can stop at the end-of-archive
+            # blocks without checking the gzip/xz footer.
             with opener(path, "rb") as stream:
-                while chunk := stream.read(1024 * 1024):
-                    expanded += len(chunk)
-                    if expanded > MAX_ARCHIVE_EXPANDED_BYTES:
+                with tarfile.open(fileobj=stream, mode="r|") as archive:
+                    for index, member in enumerate(archive):
+                        if index >= MAX_ARCHIVE_MEMBERS:
+                            raise RuntimeError(f"release archive has too many members: {path.name}")
+                        if member.isfile():
+                            with archive.extractfile(member) as member_stream:
+                                while member_stream.read(1024 * 1024):
+                                    if stream.tell() > MAX_ARCHIVE_EXPANDED_BYTES:
+                                        raise RuntimeError(f"release archive exceeds validation limits: {path.name}")
+                while stream.read(1024 * 1024):
+                    if stream.tell() > MAX_ARCHIVE_EXPANDED_BYTES:
                         raise RuntimeError(f"release archive exceeds validation limits: {path.name}")
-            with tarfile.open(path, "r|*") as archive:
-                for index, member in enumerate(archive):
-                    if index >= MAX_ARCHIVE_MEMBERS:
-                        raise RuntimeError(f"release archive has too many members: {path.name}")
-                    if member.isfile():
-                        with archive.extractfile(member) as stream:
-                            while stream.read(1024 * 1024):
-                                pass
     except (OSError, EOFError, tarfile.TarError, BadZipFile, lzma.LZMAError) as exc:
         raise RuntimeError(f"release archive is truncated or corrupt: {path.name}: {exc}") from exc
 
@@ -181,7 +182,11 @@ def verify_asset_set(artifact_dir: Path, expected_names: list[str]) -> tuple[str
 
     for name in expected:
         require_regular_file(artifact_dir / name, f"approved release artifact {name}")
-        verify_archive_integrity(artifact_dir / name)
+    # The codecs and zip CRC checks release the GIL, so the archives verify in
+    # parallel; the first failure in name order is the one reported.
+    with ThreadPoolExecutor(max_workers=max(1, min(len(expected), os.cpu_count() or 1))) as pool:
+        for future in [pool.submit(verify_archive_integrity, artifact_dir / name) for name in expected]:
+            future.result()
     return expected
 
 

@@ -43,6 +43,181 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **Developer detail:** [what the stock volumes hold](shadowmapping-audit-2026-11-09.md#what-the-stock-volumes-hold)
   and REN-03 in the [roadmap](roadmap.md).
 
+## Linux downloads as .tar.gz, and a faster, rehearsable release workflow, 23 November 2026
+
+- **Linux packages also as `.tar.gz`.** Each Linux release now offers the
+  same archive as `.tar.gz` beside the `.tar.xz`, for sites that do not take
+  xz archives, such as ModDB. Both hold exactly the same files; the AppImage,
+  update archive and debug symbols are unchanged.
+- **Releases publish sooner.** Publishing 0.15.0 took two dispatches (the
+  first failed after 18 minutes in a Linux check that only releases run) and
+  50 minutes for the run that worked: Linux ARM64 took 30 minutes, 10 of them
+  compressing already-compressed content packs with single-threaded lzma
+  (about 1 to 2 MB/s, for a 1.5% saving). Linux and macOS archives now come
+  from one tar stream through `xz -T0` (fixed block size, so reproducible) and
+  gzip at once; Linux debug symbols use every core; the prepared OpenAL Soft is
+  cached on Windows (3 to 5 minutes per job); compressed archives upload as
+  artifacts without recompression; the publish job checks archives in one pass
+  on parallel threads and runs both update proofs at once; and the Discord job
+  checks out one folder instead of the 3 GB tree.
+- **Rehearse before release day.** `rehearsal: true` runs the whole release
+  from `main` or any branch, every build, package and publication check, and
+  stops before tagging, publishing or announcing.
+- **Evidence.** `release_archive_formats.py` checks that the `.tar.xz` and
+  `.tar.gz` hold exactly the tar the previous writer made, that the gzip
+  header carries no name or time, that reruns are byte-identical, that Python's
+  lzma is the fallback without `xz`, that a truncated stream still fails
+  verification, and pins the workflow's archive, upload, cache and rehearsal
+  wiring. The release, packaging, Linux, macOS and Windows workflow contracts
+  pass. The changes have not run on GitHub yet: the first rehearsal measures
+  them.
+
+## Windows crash reports from the renderers and the updater can be read, 23 November 2026
+
+- **For crash reports.** The Windows symbols download that accompanies each
+  release (`openq4-<version>-windows-<arch>-symbols.zip`) now carries the
+  debug symbols of both renderer modules and the updater, not only the
+  engine, the dedicated server and the game modules. Crashes inside the
+  OpenGL or Vulkan renderer, where many of them happen, can be symbolized from
+  a release again. The game package itself is unchanged.
+- **Evidence.** The REL-04 symbols check of the 0.16.0 candidates found the
+  three PDBs missing. `package_nightly.py` and the stage validator in
+  `openq4_validate.py` now require them. Packaging candidate C2's staged
+  install with the fixed packager gives a byte-identical runtime archive and a
+  symbols archive whose seven PDBs each carry their image's GUID
+  (`release_qualification.py check-symbols`).
+
+## Multiplayer settings and field of view are kept between sessions, 23 November 2026
+
+- **Your multiplayer settings stay set.** openQ4 starts on its single-player
+  game module and loads the multiplayer one only when a match starts. Until
+  then, the multiplayer-only settings in your config (field of view, the HUD's
+  damage numbers, speedometer, input display, item timers, hit sound,
+  crosshair names, team locations and local clock, and the bot and server
+  options of Create Server) were not marked to be saved, so the next time
+  anything changed the config they were dropped and came back at their
+  defaults. They are now kept. 0.15.0 and earlier releases had the same
+  problem.
+- **The multiplayer Player Setup rows always work.** The Create Server and
+  Player Setup settings the engine declares for the menu used to lose their
+  type when a saved config set them, and the menu then could not show or
+  change them on every launch after the first.
+- **A new profile's multiplayer character is a marine.** The shipped
+  configuration names a character the game does not have, and the menu
+  replaced it with the first one in its list, the Failed Transfer monster. It
+  now uses the game's own default marine (Strogg in a team game's Strogg
+  team). A character you picked yourself is unchanged.
+- **What to do.** Nothing. Settings you lose to the old problem return only if
+  you set them again.
+- **Evidence.** Found by the REL-01 release qualification of the 0.16.0
+  candidate `174cb31a4` (`release_profile_runtime.py clean-install`, then
+  reproduced by hand on the official 0.15.0 package): a level start dropped
+  all 21 menu settings, a menu start re-declared them at their defaults, and
+  `g_fov`, `hud_damageNumbers` and `hud_showSpeed` set in a config were gone
+  after one menu start. `archived_settings_across_modules.py` pins the three
+  source changes and fails on the earlier source; the clean-install run now
+  also seeds multiplayer-only settings and requires them to survive a level
+  start and a menu start. The packaged fix is qualified on the next candidate,
+  recorded in [release qualification](release-qualification.md).
+
+## The scoreboard names the next map and reads out the awards, 23 November 2026
+
+- **Know where you are going.** With `g_intermissionAnnounce 1`, the
+  scoreboard that ends a casual match names the next map in chat, before the
+  map changes.
+- **An awards reel.** The same scoreboard then reads out each player's
+  end-of-match awards, one every two seconds.
+- **Off unless you turn it on.** Servers keep Quake 4's quiet scoreboard by
+  default; managed matches and the Arena campaign are unchanged.
+- **Evidence.** `mp_casual_match_flow_contract.py` and
+  `mp_map_database_contract.py` pin it; `mp_map_rotation_smoke.py` plays it on
+  a dedicated server with two bots and a hidden client (Windows). Not run:
+  Vulkan, Linux, macOS and a person watching it.
+
+## A master server you can run, and an HTTPS server list, 23 November 2026
+
+- **Run your own master.** `tools/master/openq4_master.py` lists the openQ4
+  servers that announce themselves to it, for IPv4 and IPv6 players, and lists
+  a server only once it has answered the master's own challenge. It needs
+  nothing but Python.
+- **A server list over HTTPS.** The master can write its list to a file for a
+  web server to publish. Set `net_serverListUrl` to that `https://` address and
+  the browser reads it beside the master, listing each server once, so your
+  players still find servers when no master answers.
+- **Nothing changes until you choose to.** The game still asks Quake 4's master
+  first, and reads no HTTPS list until you set one.
+- **Check it from the console.** `NETScan` runs the browser's Internet search,
+  and `listServers` shows what it found.
+- **Evidence.** `master_protocol.py` plays both sides of the protocol against
+  the program over loopback; `mp_server_discovery.py` runs the list reader's
+  native test and pins the browser's wiring; `mp_master_smoke.py` runs the
+  program, a staged dedicated server and a hidden client on loopback (Windows):
+  the server's heartbeat, the master's challenge, the JSON list, and the
+  client's `NETScan` listing the server once with its name and ping. Not run:
+  a deployed master, the HTTPS list against a real certificate, Linux and
+  macOS.
+
+## Servers recognise returning players; identity bans, rankings and your match history, 23 November 2026
+
+- **A dropped connection costs you nothing.** Leave a casual match and come
+  back within five minutes, and you get your team and score back. Your game
+  proves to each server that you are the same player as before, with a key
+  that never leaves your computer and is different for every server, so no
+  two servers can tell they have seen the same player. Nothing is uploaded and
+  there is no account.
+- **No identity?** Turn **Player Identity** off in Player Setup (or set
+  `ui_identity 0`) and your game sends none. The server then tells you a
+  six-letter code; type `ghost <code>` when you come back.
+- **Bans that follow the player.** Banning a player now also bans their
+  identity, so a new address alone does not bring them back. `status` shows
+  identities, and `ban id:<identity>` and `unban id:<identity>` take one.
+- **Rankings, if the server wants them.** `g_ranking 1` keeps a local Elo
+  table by game type, updated when each casual match ends; `rankings` lists it.
+- **Your history.** Your game keeps a line for every match you finish in
+  `profile/history.ndjson`; `history` shows the last ten.
+- **Starting over.** `identityReset confirm` makes you a new player on every
+  server.
+- **Compatibility.** Players and servers on 0.15.0 neither send nor ask for
+  identities and play as before.
+- **Evidence.** `mp_identity.py` runs Ed25519 signing against RFC 8032's
+  vectors and the identity core's native test, and pins the wiring;
+  `mp_identity_smoke.py` qualifies identities, a returning player on both
+  paths, rankings, history, identity bans and `identityReset` on a pure
+  dedicated server with three hidden clients (Windows). Not run: Linux,
+  macOS, IPv6 and a person playing.
+
+## Votes for modifiers, arenas, presets and spectator chat; ban lengths and reasons, 23 November 2026
+
+- **Vote on how the match plays.** `callvote quadhog 1` (or `vampiric`,
+  `frenzy`, or `modifier <name> 0|1`) turns a modifier on or off,
+  `callvote arena rocketlauncher` plays a single-weapon arena and `arena none`
+  ends it, and `callvote preset <name>` applies one of the server's presets.
+  The match restarts with the new rules once the vote passes. A preset sets
+  the game type and limits itself, so it is a vote of its own.
+- **Vote whether spectators talk to the players.** `callvote spectatorchat 1`
+  lets spectators' all-chat reach players during live play.
+- **On the Vote page.** The in-match **Vote** page now offers Quad Hog (in
+  Deathmatch), Vampiric Damage, Weapons Frenzy, a weapon arena, a built-in
+  preset, Spectator Chat and **Mute Instead of Kicking** for the player
+  chosen.
+- **Bans with a length and a reason from the Admin page.** Under **View Ban
+  List**, **Ban Length** (10 minutes to permanent) and **Ban Reason** set
+  what the next **Ban** records, and the ban list shows each ban's reason
+  and time left.
+- **For server operators.** `si_voteFlags` forbids the new votes with bits 21
+  (modifiers), 22 (spectator chat), 23 (presets) and 24 (weapon arenas).
+- **Compatibility.** Players on 0.15.0 can join and vote as before; they do
+  not see the new votes called. A remote admin's Ban on a server running
+  0.15.0 still only kicks.
+- **Evidence.** `mp_vote_extensions_smoke.py` (hidden OpenGL listen server,
+  Deathmatch on `mp/q4dm1` with two paused bots): three refused calls start
+  no vote, then Quad Hog, a rocket arena, spectator chat and the standard
+  preset each pass and apply. `mp_casual_match_flow_contract.py`,
+  `mp_vote_security_contract.py`, `mp_moderation.py` and
+  `mp_match_vote_electorate_contract.py` pin the flags, payloads and Admin
+  page handling. Not run: Vulkan, a dedicated server, a remote client, and a
+  person using the new rows with real input.
+
 ## Sharper textures when upscaling, and on Vulkan with NVIDIA cards, 23 November 2026
 
 - **Lower resolution scales keep more texture detail.** When the 3D scene is

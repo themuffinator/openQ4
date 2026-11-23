@@ -1402,7 +1402,16 @@ def server_page(doc: Document, index: int, ident: str, width: float, height: flo
 # casual votes (MP-12: skipping to the next map, a random map, the round
 # limit, the overtime period, the ruleset, Instagib, readying everyone and a
 # coin toss) were the console's alone. The column scrolls when the drafted
-# game type shows more rows than it holds.
+# game type shows more rows than it holds. The modifier votes (MP-14: Quad
+# Hog, which shows only for Deathmatch, Vampiric Damage, Weapons Frenzy, a
+# weapon arena and a built-in preset) follow Instagib; spectator chat (MP-16)
+# the teams; and the mute (MP-18) the kick, whose player it silences instead.
+# The arena and preset lists lead with none, which keeps the server's rules.
+ARENA_ROWS = int(re.search(r"static const int RETAINED_VOTE_ARENAS = (\d+);",
+                           (ROOT / "src" / "mpgame" / "MultiplayerGame.h").read_text(encoding="utf-8")).group(1))
+PRESET_ROWS = int(re.search(r"static const int RETAINED_VOTE_PRESETS = (\d+);",
+                            (ROOT / "src" / "mpgame" / "MultiplayerGame.h").read_text(encoding="utf-8")).group(1))
+VOTE_NONE = "#str_232812"
 VOTE_ROWS = (
     ("map", "mpVoteMap", "#str_200209", ("choice", MAP_CATALOG)),
     ("nextmap", "mpVoteNextMap", "#str_232622", ("toggle",)),
@@ -1418,12 +1427,19 @@ VOTE_ROWS = (
     ("overtime", "mpVoteOvertime", "#str_41642", ("slider", 0, 600, 30)),
     ("ruleset", "mpVoteRuleset", "#str_42220", ("list", "#str_42221", 2)),
     ("instagib", "mpVoteInstagib", "#str_231960", ("toggle",)),
+    ("quadhog", "mpVoteQuadHog", "#str_231962", ("toggle",)),
+    ("vampiric", "mpVoteVampiric", "#str_231964", ("toggle",)),
+    ("frenzy", "mpVoteFrenzy", "#str_231966", ("toggle",)),
+    ("arena", "mpVoteArena", "#str_231968", ("choice", ARENA_ROWS)),
+    ("preset", "mpVotePreset", "#str_231976", ("choice", PRESET_ROWS)),
     ("buying", "mpVoteBuying", "#str_231901", ("choice", 3)),
     ("balance", "mpVoteBalance", "#str_200212", ("toggle",)),
     ("shuffle", "mpVoteShuffle", "#str_201044", ("toggle",)),
+    ("spectatorchat", "mpVoteSpectatorChat", "#str_232810", ("toggle",)),
     ("readyall", "mpVoteReadyAll", "#str_232625", ("toggle",)),
     ("cointoss", "mpVoteCoinToss", "#str_232624", ("toggle",)),
     ("kick", "mpVoteKick", "#str_200207", ("choice", PLAYER_ROWS)),
+    ("mute", "mpVoteMute", "#str_232800", ("toggle",)),
 )
 VOTE_RUNNING, VOTE_CALL, VOTE_NONE_RUNNING = "#str_231043", "#str_231044", "#str_231047"
 VOTE_LOCKED, VOTE_NO_ONE = "#str_231052", "#str_231053"
@@ -1793,7 +1809,7 @@ def vote_row(doc: Document, key: str, verb: str, label_key: str, control: tuple,
         for row in range(slots):
             doc.state[f"{state_key}{row}"] = {"type": "string", "initial": ""}
         doc.state[f"{state_key}_count"] = {"type": "number", "initial": 0}
-        leading = [(VOTE_NO_ONE, -1)] if key == "kick" else []
+        leading = [(VOTE_NO_ONE, -1)] if key == "kick" else [(VOTE_NONE, -1)] if key in ("arena", "preset") else []
         entries = leading + [({"state": f"{state_key}{row}"}, row) for row in range(slots)]
         count = {"state": f"{state_key}_count"}
     elif kind == "slider":

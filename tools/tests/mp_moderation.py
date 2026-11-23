@@ -222,9 +222,13 @@ def check_enforcement() -> None:
 
     mp = read("src/mpgame/MultiplayerGame.cpp")
     require('"kick %i ban"' not in mp, "the Admin page's Ban no longer runs a kick the engine reads as one word")
-    page = function_body(mp, "void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum )")
-    require("gameLocal.ServerBan( address, MPModPlayerPrefixBits( address ), 0," in page,
-            "the Admin page's Ban bans the range the player holds: their address, or their IPv6 /64")
+    page = function_body(mp, "void idMultiplayerGame::HandleServerAdminBanPlayer( int clientNum, int seconds, int reason )")
+    require("gameLocal.ServerBanClient( clientNum, static_cast<mpModTime_t>( Max( 0, seconds ) ), RetainedAdminBanReasonText( reason )," in page,
+            "the Admin page's Ban bans the player for its length and reason: by the range they hold (their address, or "
+            "their IPv6 /64) and, since MP-17, their identity")
+    client_ban = function_body(read("src/mpgame/Game_network.cpp"), "int idGameLocal::ServerBanClient(")
+    require("ServerBan( address, MPModPlayerPrefixBits( address ), durationSeconds," in client_ban,
+            "a connected player's ban covers the range they hold")
     require(mp.count('gameLocal.ModerationLogClient( "kick", "vote",') == 2
             and 'gameLocal.ModerationLogClient( "kick", "admin", clientNum, "", 0 );' in mp, "vote and Admin page kicks reach the admin log")
 
@@ -350,7 +354,8 @@ def check_console_kick() -> None:
 def check_mute_vote() -> None:
     header = read("src/mpgame/MultiplayerGame.h")
     mp = read("src/mpgame/MultiplayerGame.cpp")
-    require("VOTEFLAG_MUTE\t\t\t= 0x100000," in header and re.search(r"#define\s+NUM_VOTES\s+21\b", header) is not None,
+    require("VOTEFLAG_MUTE\t\t\t= 0x100000," in header and re.search(r"#define\s+NUM_VOTES\s+(\d+)\b", header) is not None
+            and int(re.search(r"#define\s+NUM_VOTES\s+(\d+)\b", header).group(1)) > 20,
             "the mute vote is flag bit 20 and inside the vote mask")
     call = function_body(mp, "void idMultiplayerGame::CallVote_f( const idCmdArgs &args )")
     word = call.find('idStr::Icmp( szArg1, "mute" )')
@@ -369,7 +374,7 @@ def check_mute_vote() -> None:
     declared = re.search(r'^idCVar g_voteMuteMinutes\(.*$', cvars, re.M)
     require(declared is not None and '"10"' in declared.group(0) and ", 0, 1440 )" in declared.group(0)
             and "CVAR_GAME | CVAR_ARCHIVE" in declared.group(0), "a mute vote lasts ten minutes by default")
-    require('"bit 20 (+1048576) mute player"' in cvars, "si_voteFlags documents the mute bit")
+    require('"bit 20 (+1048576) mute player' in cvars, "si_voteFlags documents the mute bit")
 
 
 def check_shutdown() -> None:
@@ -591,9 +596,8 @@ def check_admins() -> None:
             and "MPModSamePlayer( clientModAddress[ i ], clientModAddress[ targetSlot ] )" in request[gate:check]
             and "target.coversAdmin = true;" in request[gate:check],
             "the target is the player the admin chose; the host, another admin, a bot and a range that holds an admin are refused")
-    require("MPModAdminBanSeconds( seconds, maxBanMinutes ), targetName.c_str(), reason, \"admin\" ) >= 0;" in request[act:]
-            and "ServerBan( address, MPModPlayerPrefixBits( address )," in request[act:],
-            "an admin's ban is of the player's own range, for no longer than the host allows")
+    require("ServerBanClient( targetSlot, MPModAdminBanSeconds( seconds, maxBanMinutes ), reason, \"admin\" ) >= 0;" in request[act:],
+            "an admin's ban is of the player's own range (and, since MP-17, their identity), for no longer than the host allows")
     for forbidden in ("MPModParseAddress", "RemoveBan", "ScheduleServerShutdown", "MPModFormatAddress", "BufferCommandText( CMD_EXEC_NOW, reason",
                       "GetBanListCount"):
         require(forbidden not in request, f"an admin's request never reaches {forbidden}: no addresses, no unban, no shutdown")

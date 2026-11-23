@@ -127,6 +127,11 @@ def summarize(windows):
             "median_of_windows": {key: statistics.median(w[key] for w in selected)
                                   for key in ("mean_ms", "p50_ms", "p95_ms", "p99_ms")},
             "snapshot_us_per_frame": sum(s.get("cpuUs", 0) for s in stats) / frames if frames else 0,
+            # Work on the snapshotting thread (cycles on Windows, ns on POSIX):
+            # unlike cpuUs it excludes time preempted by other processes.
+            "snapshot_thread_work_per_frame": sum(s.get("threadWork", 0) for s in stats) / frames if frames else 0,
+            "snapshot_omitted_bytes_per_frame": sum(s.get("omittedBytes", 0) for s in stats) / frames if frames else 0,
+            "snapshot_temporary_index_bytes_per_frame": sum(s.get("temporaryIndexBytes", 0) for s in stats) / frames if frames else 0,
             "snapshot_bytes_per_frame": sum(s.get("bytes", 0) for s in stats) / frames if frames else 0,
             "snapshot_reused_bytes_per_frame": sum(s.get("reusedBytes", 0) for s in stats) / frames if frames else 0,
             "snapshot_retained_vertex_bytes_per_frame": sum(s.get("retainedVertexBytes", 0) for s in stats) / frames if frames else 0,

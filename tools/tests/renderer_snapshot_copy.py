@@ -232,6 +232,65 @@ int main() {
  assert(cappedStreams.Size()==streams_t::maximumEntries && cappedStreams.ResidentBytes()==streams_t::maximumEntries*16);
  assert(cappedStreams.Acquire(oneShotStreams.back().data(),16).reused && !cappedStreams.Acquire(oneShotStreams.front().data(),16).reused);
  }
+
+ // Leases: one owner per version per holder epoch, and the holder alone keeps
+ // a replaced or evicted version readable.
+ {
+ using holder_t=std::vector<std::shared_ptr<const void>>;
+ idFrameSnapshotRetainedIndexes leasedIndexes(64);
+ std::uint32_t li[4]={5,6,7,8};
+ holder_t frameA,frameB;bool reused=false;
+ const std::uint32_t* v1=leasedIndexes.Lease(li,sizeof(li),3,frameA,reused);
+ assert(v1 && !reused && frameA.size()==1 && v1!=li && v1[2]==7);
+ assert(leasedIndexes.Lease(li,sizeof(li),3,frameA,reused)==v1 && reused && frameA.size()==1);
+ // Another holder (the other frame slot, or this one after it emptied) owns it too.
+ assert(leasedIndexes.Lease(li,sizeof(li),4,frameB,reused)==v1 && reused && frameB.size()==1);
+ li[2]=70;
+ const std::uint32_t* v2=leasedIndexes.Lease(li,sizeof(li),3,frameA,reused);
+ assert(v2 && v2!=v1 && !reused && v2[2]==70 && frameA.size()==2);
+ leasedIndexes.Clear();frameB.clear();
+ assert(v1[2]==7 && v2[2]==70);
+ std::weak_ptr<const void> held=frameA.front();frameA.clear();assert(held.expired());
+ // Acquire keeps returning owners of its own.
+ auto owned=leasedIndexes.Acquire(li,sizeof(li));
+ assert(owned.lease && !owned.reused && leasedIndexes.Lease(li,sizeof(li),5,frameA,reused)==owned.lease->data() && reused);
+
+ idFrameSnapshotRetainedStreams leasedStreams(256);
+ unsigned char lv[48];for(std::size_t i=0;i<sizeof(lv);++i)lv[i]=static_cast<unsigned char>(i+1);
+ holder_t slot0,slot1;
+ const void* s1=leasedStreams.Lease(lv,sizeof(lv),7,slot0,reused);
+ assert(s1 && !reused && slot0.size()==1 && reinterpret_cast<std::uintptr_t>(s1)%16==0);
+ assert(leasedStreams.Lease(lv,sizeof(lv),7,slot0,reused)==s1 && reused && slot0.size()==1);
+ assert(leasedStreams.Lease(lv,sizeof(lv),8,slot1,reused)==s1 && slot1.size()==1);
+ // A rewrite drops the version from the cache; the refused range holds nothing.
+ lv[3]=0xee;
+ assert(!leasedStreams.Lease(lv,sizeof(lv),7,slot0,reused) && !leasedStreams.Lease(lv,sizeof(lv),7,slot0,reused));
+ const void* s2=leasedStreams.Lease(lv,sizeof(lv),7,slot0,reused);
+ assert(s2 && s2!=s1 && slot0.size()==2 && static_cast<const unsigned char*>(s2)[3]==0xee);
+ leasedStreams.Clear();slot1.clear();
+ assert(static_cast<const unsigned char*>(s1)[3]==4);
+ }
+
+ // Per-view identities: insertion marks, values, growth, and a fresh view
+ // that remembers nothing of the previous one.
+ {
+ idFrameSnapshotIdentities ids;
+ ids.Begin();
+ int keys[3000];int values[3000];
+ assert(ids.Find(&keys[0])==nullptr && !ids.Contains(&keys[0]));
+ bool inserted=false;
+ ids.Insert(&keys[0],&inserted);assert(inserted && ids.Contains(&keys[0]) && ids.Find(&keys[0])==nullptr);
+ ids.Insert(&keys[0],&inserted);assert(!inserted);
+ for(int i=0;i<3000;++i)ids.Insert(&keys[i])=&values[i];
+ assert(ids.Size()==3000 && ids.Capacity()>=6000);
+ for(int i=0;i<3000;++i)assert(ids.Find(&keys[i])==&values[i]);
+ ids.Begin();
+ assert(ids.Size()==0 && ids.Find(&keys[0])==nullptr && !ids.Contains(&keys[1234]));
+ ids.Insert(&keys[1234],&inserted);assert(inserted && ids.Find(&keys[1234])==nullptr);
+ ids.Insert(&keys[1234])=&values[1];assert(ids.Find(&keys[1234])==&values[1] && ids.Find(&keys[1235])==nullptr);
+ ids.Release();assert(ids.Capacity()==0 && ids.Find(&keys[1234])==nullptr);
+ ids.Begin();ids.Insert(&keys[9])=&values[9];assert(ids.Find(&keys[9])==&values[9]);
+ }
 }
 '''
 
@@ -261,7 +320,9 @@ def main():
                                    ("remember-overwrites", mutate(header, " || Find( source, bytes ) != nullptr", ""), False),
                                    ("late-preparation", header, False), ("stale-retention", header, False),
                                    ("whole-clear", header, False), ("stale-stream", header, False),
-                                   ("stream-whole-clear", header, False), ("stream-eager-retry", header, False)):
+                                   ("stream-whole-clear", header, False), ("stream-eager-retry", header, False),
+                                   ("lease-unheld", header, False), ("lease-epoch-blind", header, False),
+                                   ("identity-stale-view", mutate(header, "if ( ++generation == 0 ) {", "if ( generation == 0 ) {"), False)):
             index_code, stream_code = indexes, streams
             if name == "stale-retention":
                 index_code = mutate(indexes, "std::memcmp( old->data(), source, bytes ) == 0", "true")
@@ -273,6 +334,10 @@ def main():
                 stream_code = mutate(streams, "Erase( entries.find( recency.back() ) );", "Clear();")
             if name == "stream-eager-retry":
                 stream_code = mutate(streams, "entry.refusals = entry.nextRefusals - 1;", "entry.refusals = 0;")
+            if name == "lease-unheld":
+                index_code = mutate(indexes, "holder.push_back( entry->lease );", "")
+            if name == "lease-epoch-blind":
+                stream_code = mutate(streams, "if ( entry->leaseEpoch != epoch ) {", "if ( entry->leaseEpoch == 0 ) {")
             (temp / "FrameSnapshotRetain.h").write_text(index_code + marker + stream_code, encoding="utf-8")
             body = preparation.replace("snapshot.Surface( view->drawSurfs[i], true, true )", "snapshot.Surface( view->drawSurfs[i], true, false )") if name == "late-preparation" else preparation
             (temp / "copy.cpp").write_text(PREPARATION + body + PREPARATION_CASE + CASES, encoding="utf-8")
@@ -284,7 +349,8 @@ def main():
                 raise AssertionError(f"{name}: unexpected exit {result.returncode}")
     print("Snapshot copies: complete-view preparation, alias reuse, distinct ranges, later-view isolation, "
           "least-recently-used index retention, retained static vertex streams (replacement, lifetime, "
-          "eviction, refusal of rewritten ranges) and nine negative controls passed")
+          "eviction, refusal of rewritten ranges), one lease per version per frame, per-view identity "
+          "tables and twelve negative controls passed")
 
 
 if __name__ == "__main__":

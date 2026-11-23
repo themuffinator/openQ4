@@ -1236,10 +1236,17 @@ void idCVarSystemLocal::SetA_f( const idCmdArgs &args ) {
 		return;
 	}
 
-	// FIXME: enable this for ship, so mods can store extra data
-	// but during development we don't want obsolete cvars to continue
-	// to be saved
-//	cvar->flags |= CVAR_ARCHIVE;
+	// id left the archive flag off "during development" so obsolete cvars would
+	// stop being saved ("enable this for ship, so mods can store extra data").
+	// openQ4 ships two game modules, and only one is loaded at a time: a
+	// config's settings for the other one (the multiplayer HUD, field of view,
+	// bot and server options while game_sp runs) exist only as these console
+	// cvars until that module registers them. Without the flag the next config
+	// write dropped every one of them. Keep a cvar that no code has declared
+	// archived; a module's static declaration merges its own flags on top.
+	if ( !( cvar->GetFlags() & CVAR_STATIC ) ) {
+		cvar->flags |= CVAR_ARCHIVE;
+	}
 }
 
 /*

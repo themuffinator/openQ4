@@ -1199,7 +1199,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-04 — Closed | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed; the picture is still at rest (#216). A temporally upscaled scene samples sharper texture mips (16-18% more detail at 50% scale, stability unchanged), and Vulkan corrects the NVIDIA driver's softer anisotropic filter, so its frames hold OpenGL's detail. | Human review of ghosting and disocclusion on the reference display and physical Linux/macOS/Android belong to platform qualification. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. lavapipe's one-byte difference is traced to its texel decode and bounded to lavapipe. The showcase map qualifies skins, a mixed PBR/classic model, cutout coverage and shadows on both renderers (67/67 each, procedural stand-ins). | The Mesa SSAO controls that fail since 21 November (not investigated); real textures.com materials (the owner's downloads); physical Linux/Apple fallback (PLAT). |
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; SSR and SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan in seven stock scenes; a map's own baked probe, a probe captured in a stock scene and authored decals pass on both renderers; a scratch re-bake of one bundled grid is measured. | Re-bake of the cropped bundled grids (owner decision, evidence recorded); quiet-machine cost of the leaves beyond the first scene; other GPUs/platforms and appearance review (PLAT). |
-| REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and the opt-in Vulkan render thread exist: stage 1 (tic overlap) and stage 2 (front-end overlap) with retained index and static vertex streams. 23 November, Windows x64 Vulkan: the per-frame join that had removed all overlap since 6 November is fixed; frozen Quality captures are bit-identical between modes 0, 1 and 2 on four single-player views and within the mode 0 floor in multiplayer; 100 resize/scale cycles and a restart per mode stay within the memory, handle, cache and Vulkan-allocation bounds with validation clean. | Matched benefit without tail regression: five quiet paired mode 0/1/2 runs and the every-frame Quality floor (shared-machine runs show mode 1 ahead of mode 0 and mode 2 behind it); snapshot cost reduction beyond copying; physical display/input qualification; Wayland/macOS runtime coverage. |
+| REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and the opt-in Vulkan render thread exist: stage 1 (tic overlap) and stage 2 (front-end overlap) with retained index and static vertex streams. 23 November, Windows x64 Vulkan: the per-frame join that had removed all overlap since 6 November is fixed; frozen Quality captures are bit-identical between modes 0, 1 and 2 on four single-player views and within the mode 0 floor in multiplayer; 100 resize/scale cycles and a restart per mode stay within the memory, handle, cache and Vulkan-allocation bounds with validation clean. Snapshot work per mode 2 frame then fell 46% in a same-binary A/B (17.0 M to 9.2 M thread cycles): front-end-only streams are no longer frozen, frame-temporary indexes no longer thrash the retained index cache (under 1,000 entries, not 32,768), one lease per version per frame, reused per-view tables; parity unchanged. | Matched benefit without tail regression: five quiet paired mode 0/1/2 runs and the every-frame Quality floor (shared-machine runs show mode 1 ahead of mode 0; mode 2 moved from above mode 0 to mostly below it); vertex streams validated twice per static surface (`verts` beside the ambient cache); physical display/input qualification; Wayland/macOS runtime coverage. |
 | REN-08 — Closed | Motion blur coexists with TAA, owns exact skinned/weapon vectors, is frame-rate independent and reports requested/effective state; 41 GL/Vulkan combination cases pass. | Physical Linux/macOS/Android and appearance review belong to platform qualification. |
 | REN-09 — Partial | Per-light shadowed scattering replaces the REN-06 leaf on GL and Vulkan: falloff/projection images, point, projected and cascaded-sun maps, stencil-light policy (none by default), composite before fog and translucents, status reporting, exact rollback; frozen outdoor/indoor captures pass under TAA and 4x MSAA. 23 November 2026: moving casters and a moving flashlight, temporal history, resolution scale and dynamic resolution, mirrors and remote cameras, a backend decline and VR stereo pass on GL and Vulkan; scratch targets are pooled by view size. Evidence: [volumetric lighting](volumetric-lighting.md). | Per-tier cost against FPS-01 on a quiet reference machine (a shared-machine ladder is recorded), the owner's visual review of the defaults (contact sheets captured, no default changed; 12 whites out the Tram 1 opening), and physical Linux/macOS/Android runs with the Apple GL 2.1 and GLES declines (PLAT). |
 | REN-10 — Closed | HBAO (`r_ssaoMethod 1`), GTAO (`2`) and a brute-force reference (`3`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. GTAO closer to the reference than SSAO with fewer halos, HBAO as close as SSAO; backend parity, exact rollback, cost at or near SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
@@ -2011,16 +2011,41 @@ diagnostics establish whole-frame ownership or production performance.
         frame. Neither is budget evidence; `r_vkRenderThread` stays 0 and the
         Quality floor is not claimed.
 
-      See [vertex retention](presentation-owners.md#retained-vertex-streams-23-november-2026)
-      and [qualification evidence](presentation-owners.md#overlap-repair-and-mode-qualification-23-november-2026).
+      Snapshot cost beyond copying, same day. Every retained stream is still
+      compared in full; the cut is in work the snapshot did not need:
+      - Silhouette, face-plane, dominant-triangle, shadow-vertex and
+        mirror/duplicate tables are not frozen. Only the front end and three
+        null-checked debug views read them, and a snapshot taken while one of
+        those views is on keeps them (about 2.0 MB a frame).
+      - Frame-temporary index streams take the per-view copy instead of
+        thrashing the retained index cache, which now holds under 1,000
+        entries instead of sitting at its 32,768 cap. Index ranges also join
+        the per-view lookup.
+      - A frame holds one lease per retained version, not one per
+        acquisition, and the four per-view hash containers are replaced by
+        reused open-addressing tables.
+      - `rendererFrameSnapshotStats` reports `threadWork`, work on the
+        snapshotting thread that excludes preemption.
+
+      A same-binary A/B (only the Vulkan DLL differs, nine mode 2 windows
+      each, interleaved) cut thread work from a median 17.0 M to 9.2 M cycles
+      per frame (-46%), and elapsed snapshot time from 7.7 to 4.0 ms. Parity
+      is unchanged (bit-identical HUD-hidden captures on the four
+      single-player views), and the 100-cycle bounds check passes, with the
+      retained caches under 6 MiB. On the shared host (79-99% CPU), the candidate's
+      mode 2 windows fell below the same run's mode 0 in six of nine; the
+      baseline's never did. That is not budget evidence.
+
+      See [vertex retention](presentation-owners.md#retained-vertex-streams-23-november-2026),
+      [qualification evidence](presentation-owners.md#overlap-repair-and-mode-qualification-23-november-2026)
+      and [snapshot cost](presentation-owners.md#snapshot-cost-beyond-copying-23-november-2026).
 
       **Still open:** quiet paired mode 0/1/2 measurements (five matched runs)
-      and the every-frame Quality floor; snapshot cost reduction beyond
-      copying (a sound version identity so unchanged streams are not re-read,
-      arena-backed per-view containers, frame-temporary index streams
-      churning the index cache at its entry cap); physical display/input
-      qualification and Wayland/macOS runtime coverage. Do not promote the
-      default from shared-machine measurements.
+      and the every-frame Quality floor; static vertex bytes validated twice
+      per view (`verts` beside the ambient cache, pending an audit of readers
+      in the shared domain code); physical display/input qualification and
+      Wayland/macOS runtime coverage. Do not promote the default from
+      shared-machine measurements.
 - [x] **REN-08 — P1, qualification and targeted implementation: complete post-
   processing combinations.** Qualify motion blur independently of TAA: it has its
   own history, limited rigid-opaque object vectors and subview/time-gap resets;
@@ -4952,14 +4977,14 @@ prediction/rewind defaults.
 | MP-09 — Partial | Aim/turn/trigger fixes and five-level combat ladder measured over a round robin. | People verify skill 1 accessibility and skill 5 difficulty/fairness ([checklist](mp-human-qualification.md#mp-09-bot-difficulty-against-people)); retune from that evidence. |
 | MP-10 — Partial | Buying offers Quake 4's or The Awakening's rules as one server option; the catalog, prices, awards, mods (networked and carried over a death) and the retained buy card pass contract, native and gate checks and OpenGL and Vulkan gameplay captures, including a remote client; CTF buying matches start again. | Play with real keys and a controller and judge the four mods in play by eye; UI register acceptance for FLOW-010 and a visual-spec record of the card. |
 | MP-11 — Partial | Classic ruleset (`si_ruleset 1`): definition overlay, blaster start, tiered armour, Quake 2 health and mega health, Quake 2 weapon/ammo numbers, stair double jump, Threewave CTF scoring and the grappling hook, with Create Server and Controls rows; host, bot and predicted remote-client runs pass. Bots use the hook as a route shortcut; the hook rides movers and lets go on teleport. | Real-input play (hook feel, double jump on stairs, weapon balance on the stock maps), Classic pickup names. |
-| MP-12 — Partial | `callvote`/`cv`/`vote` with eleven new vote words, `g_votePercent`, `g_voteLimit` and `si_spectatorVote`; casual team timeouts (`si_timeouts`, `timeout`/`timein`) and a console `pause`; `si_spectatorLock`, `g_inactivity` and `g_pauseOnDisconnect`; contract, electorate harness and a hidden listen-server smoke pass on OpenGL. 20 November: the in-match Vote page offers the casual votes (next map, random map, round limit, overtime, ruleset, Instagib, ready all, coin toss) and Create Server sets the timeouts, the spectator lock and the idle timeout. | Casual team locks, a console forfeit, the intermission awards reel and next-map announcement, `mute`/`modifier`/`preset` votes once MP-18 and MP-14 land, Duel casual timeouts; Vulkan, dedicated, remote-client and real-input runs. |
+| MP-12 — Partial | `callvote`/`cv`/`vote` with eleven new vote words, `g_votePercent`, `g_voteLimit` and `si_spectatorVote`; casual team timeouts (`si_timeouts`, `timeout`/`timein`) and a console `pause`; `si_spectatorLock`, `g_inactivity` and `g_pauseOnDisconnect`; contract, electorate harness and a hidden listen-server smoke pass on OpenGL. 20 November: the in-match Vote page offers the casual votes (next map, random map, round limit, overtime, ruleset, Instagib, ready all, coin toss) and Create Server sets the timeouts, the spectator lock and the idle timeout. | Casual team locks, a console forfeit, Duel casual timeouts; Vulkan, dedicated (beyond the intermission), remote-client and real-input runs. The `mute`, `modifier`, `preset`, `arena` and `spectatorchat` votes and their Vote page rows landed 23 November, and the intermission's next-map announcement and awards reel (`g_intermissionAnnounce`, off by default) the same day. |
 | MP-13 — Partial | One map database in the game module (`mapdb.txt` over discovered mapDefs): player bounds, modes, per-map settings applied at load and reverted after; the rotation, the player queue (`mymap`), the end-of-match pick (`mappick`), `si_nextMap`; votes, the Vote and Admin pages, the series pool, `PickMap` and the server card read it. Contract, core harness and a dedicated-server smoke with bots pass. | Create Server's catalogue and levelshot list (engine side, still its own mapDef filter) and its map-cycle field; a retained page for the queue and the pick (Create Server sets `g_mapRotation` and `g_mapQueue` since 20 November); a browser map filter; play by people; other platforms. |
-| MP-14 — Partial | One modifier layer latched with the game type on every peer: Instagib, Quad Hog, Vampiric Damage, Weapons Frenzy, ten single-weapon arenas, a powerup switch, self-damage, knockback and fall-damage percentages and a weapon respawn time; eleven built-in presets and server-authored `presets/<name>.cfg` behind an allow list; Create Server's Modifiers tab, the match title, the loading card and the browser's rows and details card show them; contract and scripted bot and remote-client runs pass. | Votes through MP-12's `callvote`; match-rules fields so a managed match's digest records them; Last Man Standing; a hog marker; Vulkan, dedicated-server and real-input passes for each modifier, and the percentages in play; the UI register's record of the Modifiers tab and its caption size. |
+| MP-14 — Partial | One modifier layer latched with the game type on every peer: Instagib, Quad Hog, Vampiric Damage, Weapons Frenzy, ten single-weapon arenas, a powerup switch, self-damage, knockback and fall-damage percentages and a weapon respawn time; eleven built-in presets and server-authored `presets/<name>.cfg` behind an allow list; Create Server's Modifiers tab, the match title, the loading card and the browser's rows and details card show them; contract and scripted bot and remote-client runs pass. | Match-rules fields so a managed match's digest records them (the `modifier`, `arena` and `preset` votes landed 23 November); Last Man Standing; a hog marker; Vulkan, dedicated-server and real-input passes for each modifier, and the percentages in play; the UI register's record of the Modifiers tab and its caption size. |
 | MP-15 — Partial | Crosshair options, hit marker and damage numbers, brightskins/outlines/rimlights, forced models, lagometer, speed and input displays, four layouts, awards. Landed 15 November: chat tokens (`#h #a #w #l #n`) expanded on the sender, with place names taken from the map's own landmarks; hit sounds by damage (`hud_hitSound`, two tone sets made from Quake 4's own hit sounds, armour variant kept); a weapon preference order (`ui_weaponOrder`) for pickups and the empty-weapon fallback; ammunition beside the crosshair and a crosshair-name option; team info sent to team mates, so the Competitive team list is right across the map and names where each player is; a server item-timer policy (`si_itemTimers`: nobody, spectators, everyone) enforced where the list is sent, with the timer list and the time of day in all four layouts; `si_maxBrightskin` and `si_forcedModels`. The cores have a native test, the wiring is pinned, and a two-client smoke passes on OpenGL and Vulkan. Landed 17 November: smart weapon switching after WORR's (`ui_autoSwitch` 0 never, 1 always, 2 smart and the default, with a one-time move of profiles on the old default `1`; core `MPSmartSwitchAllows` in `mp/WeaponOrder.h`, natively tested), a three-way Auto Weapon Switch row in both interfaces, a Last Weapon Controls row (`_impulse51`, now live in single player too) and Quake Live-informed default keys (`G` last weapon, `Mouse4` grappling hook). | A person judging smart switching in a live match; A person judging hit tones and tokens in play; (menu rows landed 20 November: the HUD options on Player Setup's HUD tab and the in-match Settings page's HUD section, Weapon Order's dialog on both PLAYER pages, and Item Timers, Highlight Limit and Allow Forced Models on Create Server); UI-11 register rows and visual-spec text for the timer list, crosshair ammunition and team locations; 4:3 captures; a team list outside the Competitive layout and in the stock interface; the empty-weapon fallback in a live match; team info and held-timer states in demo playback; cosmetic limits beyond the player's own game module; editor placement (UI-06). The frag line and match clock were already Quake 4's. |
-| MP-16 — Partial | Follow by slot or name with a named list; live auto-follow in five modes (killer, action, leader, powerup, flag) with manual override; first-person, third-person and chase follow views and a death camera; a free-camera speed setting; a casual caster view (`g_casterAccess`, `caster on`) with both sides' vitals; a typed live event stream on servers and clients (`g_matchEventStream`) with a sample overlay; a notice when spectator chat is kept from players. Casual spectators are neutral, a broadcaster who joins the game loses the role, and follow requests are no longer lost between frames. Three contracts and a two-client live smoke pass on OpenGL and Vulkan. | The `spectatorchat` vote (waits for MP-12's vote set, bit 22 reserved); a caster HUD panel of its own and the named list as a menu page (UI-11; Spectator Speed and Follow View are menu rows since 20 November); the three new camera modes in MVD playback; play by people with real input; other platforms; multi-POV and delay stay OPT-04. |
-| MP-17 — Not started | The managed roster restores team and score to a reconnecting player; per-weapon stats and awards within a match; schema-v2 reports in managed matches. | Identity decision and key-based implementation, reconnect restoration everywhere, profile and history, per-gametype rating, awards reel, casual exports; nothing uploaded. |
-| MP-18 — Partial | rcon2, the Admin page's kick/ban/switch, PBKDF2 referee, voice mute, `si_motd`. 22 November: bans by address and range with an expiry and a reason (`ban`, `unban`, `banlist`, a text `banlist.txt` that takes over Quake 4's binary one; the Admin page's Ban now bans), a text mute that follows the address (`mute`, `unmute`), the chat flood window (`g_chatFlood*`), the name policy (`g_reservedNames`), `net_serverMaxClientsPerAddress`, `status` with addresses and the NDJSON admin log; then the `mute` vote (`callvote mute`, `g_voteMuteMinutes`), graceful shutdown (`serverShutdown match|now|time|cancel`) and the engine's own `kick` in the log; then the match log (`g_matchLog`, the live event stream's events appended to `logs/match.ndjson`) and an atomic write of `banlist.txt`; then the admin role (`net_serverAdminPassword`, `admin`: the referee's challenge and response with a second password, then kick, mute and capped bans of connected players from the admin's own console, `g_adminMaxBanMinutes`); then an audit that fixed what two independent reviews found (commands read their line as typed, an unreadable ban list is never written over, IPv6 `/64` for bans, mutes and the limit, engine-accurate name rules, the host's `admin list|revoke|off`). The core and the ban file reader have native tests, the commands and call sites are pinned, and a dedicated-server smoke passes on Windows over loopback ([record](mp-moderation.md)). | Bans by identity and an identity in `status` (MP-17); a ban's reason and expiry on the Admin page, a mute row on the Vote page and a menu for admins; Linux, macOS, IPv6 and a real remote address. |
-| MP-19 — Not started | Browser with favourites, filters, find player and tiles; LAN scan; the default master is id's host. | A discovery service the project controls with a list fallback, recent servers, region sorting; a fresh install on each platform finds a server. |
+| MP-16 — Partial | Follow by slot or name with a named list; live auto-follow in five modes (killer, action, leader, powerup, flag) with manual override; first-person, third-person and chase follow views and a death camera; a free-camera speed setting; a casual caster view (`g_casterAccess`, `caster on`) with both sides' vitals; a typed live event stream on servers and clients (`g_matchEventStream`) with a sample overlay; a notice when spectator chat is kept from players. Casual spectators are neutral, a broadcaster who joins the game loses the role, and follow requests are no longer lost between frames. Three contracts and a two-client live smoke pass on OpenGL and Vulkan. | A caster HUD panel of its own and the named list as a menu page (UI-11; Spectator Speed and Follow View are menu rows since 20 November); the three new camera modes in MVD playback; play by people with real input; other platforms; multi-POV and delay stay OPT-04. |
+| MP-17 — Partial | Decision (user, 23 November): an identity on by default, one Ed25519 key per server derived from a seed kept on the player's computer. A one-time challenge bound to the server's id, the slot and the connection; `status` shows it; identity bans beside address bans (`ban id:`), applied on proof; a casual leaver's team and score kept for `g_reconnectRestore` seconds and given back by identity or by `ghost <code>`; a local ranking table (`g_ranking`, Elo K 48 then 32); the player's own history (`history`); `identityReset`; Player Setup's Player Identity. RFC 8032 vectors, a native core test, a contract and a dedicated-server smoke pass on Windows. | The awards reel and a `stats` command with accuracy; casual exports in the managed schema-v2 JSON with a summary and a catalogue; Duel queue places and round inventories on return; Tourney ratings; a reviewer's pass over the key protocol; Steam identity (STEAM-02); other platforms; nothing uploaded. |
+| MP-18 — Partial | rcon2, the Admin page's kick/ban/switch, PBKDF2 referee, voice mute, `si_motd`. 22 November: bans by address and range with an expiry and a reason (`ban`, `unban`, `banlist`, a text `banlist.txt` that takes over Quake 4's binary one; the Admin page's Ban now bans), a text mute that follows the address (`mute`, `unmute`), the chat flood window (`g_chatFlood*`), the name policy (`g_reservedNames`), `net_serverMaxClientsPerAddress`, `status` with addresses and the NDJSON admin log; then the `mute` vote (`callvote mute`, `g_voteMuteMinutes`), graceful shutdown (`serverShutdown match|now|time|cancel`) and the engine's own `kick` in the log; then the match log (`g_matchLog`, the live event stream's events appended to `logs/match.ndjson`) and an atomic write of `banlist.txt`; then the admin role (`net_serverAdminPassword`, `admin`: the referee's challenge and response with a second password, then kick, mute and capped bans of connected players from the admin's own console, `g_adminMaxBanMinutes`); then an audit that fixed what two independent reviews found (commands read their line as typed, an unreadable ban list is never written over, IPv6 `/64` for bans, mutes and the limit, engine-accurate name rules, the host's `admin list|revoke|off`). The core and the ban file reader have native tests, the commands and call sites are pinned, and a dedicated-server smoke passes on Windows over loopback ([record](mp-moderation.md)). | A menu for admins who log in with `admin`; Linux, macOS, IPv6 and a real remote address. A ban's length and reason on the Admin page and the Vote page's mute row landed 23 November. |
+| MP-19 — Partial | Browser with favourites, filters, find player and tiles; LAN scan. 23 November: an openQ4 master program (`tools/master/openq4_master.py`: challenge-verified heartbeats, the legacy and the extended list, a JSON list for HTTPS) and the browser's HTTPS fallback (`net_serverListUrl`, merged with the master's list); the user chose to keep id's master as the default and the list address empty until the project's hosts are chosen. | A discovery service the project controls with a list fallback, recent servers, region sorting; a fresh install on each platform finds a server. |
 | MP-20 — Not started | Stock Quake 4 physics; Classic double jump and hook; `pm_jumpheight`, `pm_slidevelocity` and `pm_powerslide` synced. | Retail 1.4.2 movement parity evidence on the stock maps at 30, 60 and 90 tics; an optional ProMode-style movement ruleset the bots use. |
 | MP-21 — Partial | Render v14 block container with keyframes, 64-bit files and `compressDemo`; MVD 1.3 records with CRCs and readers for 1.0 to 1.2; the update policy. | One container for every stream, `demoConvert`, the format registry, per-version golden fixtures, byte-identical cross-platform reads in CI. |
 | MP-22 — Not started | Server MVDs with markers, keyframes and auto-tracking; render demos record the local view; a deck with pause, speed, step, seek and follow. | Client-side recording on any server, autoaction, named list, reverse scrub, `timeDemo` for MVD, video and image export, thumbnails and metadata; the retail-demo decision. |
@@ -6073,6 +6098,18 @@ Completion substeps:
   `modifier`/`preset`/`arena` votes (MP-14's layer) and MP-16's
   `spectatorchat` vote (`si_voteFlags` bits from 20 are reserved for them), Duel
   casual timeouts, and Vulkan, dedicated, remote-client and real-input runs.
+  Progress, 23 November: the intermission. With `g_intermissionAnnounce 1` (off
+  by default) a casual server's final scoreboard names the next map in chat,
+  the map the rotation will load (`ServerPredictNext`), and the change does
+  not name it again; a pick, when offered, names its own maps instead. The
+  awards reel then reads out the stat manager's end-of-match awards, one
+  award a player a round, one line every two seconds, each localized by the
+  client; managed matches and the Arena campaign are left alone.
+  `mp_casual_match_flow_contract.py` and `mp_map_database_contract.py` pin it,
+  and `mp_map_rotation_smoke.py` plays it on a pure dedicated server with two
+  bots and a hidden client: quiet until turned on, the next map named once
+  during the scoreboard and loaded, each award read out reaching the client.
+  The scoreboard itself stays Quake 4's; a reel on the scoreboard GUI is open.
   Progress, 17 November ([audit](mp-audit-2026-11-17.md#match-flow-votes-and-pauses)):
   nine defects fixed. The idle drop no longer deletes a player inside its own
   think; a casual server keeps a limit changed by a vote, at the console or
@@ -6085,6 +6122,7 @@ Completion substeps:
   the next-map switch. The idle drop, the kept limit and the client's
   settings were [run](mp-audit-2026-11-17.md#checked); the electorate, the
   lock and the disconnect pause are covered by their contracts only.
+  Progress, 23 November: the votes MP-14 and MP-16 waited for. `callvote modifier <name> 0|1` (or the modifier's own name: `quadhog 1`), `arena <weapon|none>`, `preset <name>` and `spectatorchat 0|1` are bits 21 to 24 (`VOTEFLAG_MODIFIER`, `_SPECTATORCHAT`, `_PRESET`, `_ARENA`, `NUM_VOTES` 25), each with its payload after the MP-12 fields only when its flag is set, so a vote without them is laid out as before. The server checks each through the layer's own rules (Quad Hog only where the ballot leaves Deathmatch; a preset the server has whose game type a map plays, alone in its ballot) and refuses one that changes nothing; a passed modifier or arena restarts the match through `CheckModifierChange`, a preset as the `preset` command does. `g_spectatorChat` is in the server info so every Vote page knows its value. The retained Vote page offers Quad Hog (in Deathmatch), Vampiric Damage, Weapons Frenzy, a weapon arena, a built-in preset, spectator chat and **Mute Instead of Kicking** for the player chosen (the mute vote's row). `mp_vote_extensions_smoke.py` passes on a hidden OpenGL listen server: three refused calls start no vote, then Quad Hog, a rocket arena, spectator chat and the standard preset each pass and apply.
 - [ ] **MP-13 — P2, implementation: map pools, rotation and the player queue.**
   Replace the `si_mapCycle` string and `mapcycle.scriptcfg` with one structured
   map database (Muff Mode `mapdb.json`, CPMA `map_cfgdir`): for each stock or
@@ -6232,6 +6270,11 @@ Completion substeps:
   classic`) hung the server in a restart loop; it now loads the map again
   once, which was run. A preset whose game type the map cannot play moves to
   a map that can, or is refused when none is installed.
+  Progress, 23 November: votes through MP-12's `callvote`: `modifier <name> 0|1`
+  (or the modifier's name), `arena <weapon|none>` and `preset <name>`, checked by
+  this layer's validators and restarting the match as the console commands do,
+  with Vote page rows for the three modifiers, the arena and the built-in
+  presets (MP-12 has the round's record).
 - [ ] **MP-15 — P2, implementation: competitive HUD and client options.** CPMA's
   SuperHUD, Q4MAX's HUD scripts and Muff Mode's client commands set the
   expectation. openQ4 already has crosshair size, colour, custom art, animation
@@ -6345,6 +6388,9 @@ Completion substeps:
   Second round, 17 November ([second round](mp-audit-2026-11-17.md#second-round)): the chase and death
   cameras clip their raised focus before pulling back, so a low ceiling no
   longer holds the camera inside it. Not yet looked at by eye.
+  Progress, 23 November: the `spectatorchat` vote, on bit 22 as reserved, with a
+  Spectator Chat row on the Vote page; `g_spectatorChat` is now in the server
+  info so clients know its value (MP-12 has the round's record).
 - [ ] **MP-17 — P1, decision and implementation: player identity, persistence
   and ranking.** `com_guid` is read-only and never written, so GUID bans do
   nothing and no feature can recognise a returning player; the archived plan
@@ -6364,6 +6410,33 @@ Completion substeps:
   slot-reuse (the MP-01 identity guards), rating fixtures against a known
   sequence, reconnect smokes across every mode, privacy notes in the
   [server security guide](../user/server-security.md).
+  Progress, 23 November: the decision and the first round. The user chose an
+  identity that is on unless the player turns it off (Player Setup's Player
+  Identity, `ui_identity`, which travels in userinfo), in place of this item's
+  "opt-in": each player's game keeps a random seed in `identity.key` and
+  derives a separate Ed25519 key for each server from it and the server's own
+  id (`identity_server.txt`), so servers cannot link a player across them.
+  Signing joins the updater's verifier in `src/idlib/Ed25519.*` (RFC 8032's
+  vectors in `tools/tests/native/Ed25519SignTest.cpp`). The server sends a
+  challenge (its id and a fresh nonce) only to a game whose userinfo offers an
+  identity, so a 0.15.0 client never sees the message; the proof signs the
+  domain, the server's id, the nonce, the slot and the connection's number,
+  and one answer spends the challenge whatever it says. The fingerprint
+  (sixteen hex digits) is in `status`. Bans by identity share `banlist.txt`
+  (`ban identity <fingerprint> ...` lines, which an older build keeps
+  untouched), `ban id:`/`unban id:` take them, and banning a connected player
+  bans their range and their identity. A casual leaver's team and score are
+  kept for `g_reconnectRestore` seconds (300) and given back by identity, or
+  by the ghost code the server tells a player without one; Tourney keeps no
+  places. `g_ranking 1` keeps `ranking.txt`: Elo by game type, team modes
+  against the other team's average, free-for-all pairwise by score, K 48 for
+  the first 20 rated matches then 32. Each player's game appends its matches
+  to `profile/history.ndjson` (`history`). `mp_identity.py` runs both native
+  tests and pins the wiring; `mp_identity_smoke.py` qualifies it on a pure
+  dedicated server with three hidden clients. Open: the awards reel and
+  `stats`, casual exports, Duel queue places and round inventories, Tourney
+  ratings, an independent review of the protocol, Steam identity and other
+  platforms.
 - [ ] **MP-18 — P1, implementation: server administration and moderation.**
   openQ4 has rcon2, the Admin page's kick, ban and team switch, the PBKDF2
   referee, voice mute and `si_motd`; its bans are keyed to a GUID that is never
@@ -6421,6 +6494,16 @@ Completion substeps:
   beyond the engine's existing reliable-message budget, the menu rows for a
   ban's reason and for the mute vote, a menu for admins, and other platforms
   (IPv6 included).
+  Progress, 23 November: the Admin page's Ban has a **Ban Length** (10 minutes,
+  an hour, a day, a week or permanent, the default) and a **Ban Reason** (none
+  or one of five, recorded in the ban list and the admin log in plain words),
+  and its ban list a details column with each ban's reason and time left. A
+  remote rcon admin's Ban carries them to a server that advertises
+  `si_uiTargetProtocol` 3 (`serverAdminTarget ban <slot> <identity> <seconds>
+  <reason>`); an older server gets the old form. The Vote page's **Mute Instead
+  of Kicking** is the mute vote's row (MP-12). Still open: a menu for admins who
+  log in with `admin`, identity bans (MP-17) and other platforms.
+  Progress, 23 November (MP-17): bans by identity and an identity in `status`.
 - [ ] **MP-19 — P1, decision and implementation: server discovery.** `net_master0`
   defaults to id's `q4master.idsoftware.com:27650`; the name resolves today,
   but no openQ4 evidence shows it listing openQ4 servers and the project does
@@ -6432,6 +6515,27 @@ Completion substeps:
   remain STEAM/OPT-09. Gates: a fresh install on Windows, Linux and macOS lists
   a test server from the Internet source; a master outage falls back and says
   so; `server-setup.md` and `multiplayer-networking.md` updated.
+  Progress, 23 November: the decision and the program. The user chose to
+  keep `net_master0` at id's master and ship `net_serverListUrl` empty until
+  the project's hosts are chosen. `tools/master/openq4_master.py` is a
+  standard-library master: a heartbeat is answered by `getInfo` with a
+  random challenge and listed only when the `infoResponse` echoes it;
+  `getServers` gets six-byte IPv4 records and `getServersExt` dpmaster-style
+  IPv4 and IPv6 records, each filtered by protocol and game; per-address
+  rate limits; `--json` writes the list a web server publishes. The browser
+  reads such a list over HTTPS on a worker thread at each Internet refresh
+  (`src/framework/async/ServerListFallback.*`, the reader in
+  `ServerListParse.h`) and merges it with the master's. `master_protocol.py`
+  plays both sides of the protocol against the program and
+  `mp_server_discovery.py` runs the reader's native test and pins the wiring.
+  `NETScan` runs the browser's Internet search from the console, and
+  `mp_master_smoke.py` qualifies the whole path on loopback on Windows: the
+  program, a staged dedicated server's heartbeat and challenge answer, the
+  JSON list, and a hidden client's `NETScan` listing the server once with its
+  name and ping. Open: the hosts and their deployment, the HTTPS list against
+  a real certificate, recent servers and region/ping sorting in the browser,
+  the master's outage notice in the browser, and a fresh install on each
+  platform finding a server from the Internet source.
 - [ ] **MP-20 — P1, qualification and implementation: movement parity and a
   ProMode-style option.** Qualify openQ4's player movement against retail 1.4.2
   on the stock multiplayer maps (strafe jumps, crouch slides, ramp and jump-pad

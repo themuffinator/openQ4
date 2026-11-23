@@ -54,6 +54,11 @@ on:
         required: false
         default: false
         type: boolean
+      rehearsal:
+        description: Rehearse the release from any branch - build, package and verify every asset, but create no tag or release and announce nothing
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: openq4-manual-releases
@@ -108,10 +113,16 @@ jobs:
         env:
           INPUT_ARM64_EVIDENCE_CANDIDATE: ${{ inputs.generate_linux_arm64_evidence_candidate }}
           INPUT_ARM64_SUPPORT_TIER: ${{ inputs.linux_arm64_support_tier }}
+          INPUT_REHEARSAL: ${{ inputs.rehearsal }}
         shell: bash
         run: |
           set -euo pipefail
 
+          rehearsal="${INPUT_REHEARSAL}"
+          if [ "${rehearsal}" != "true" ] && [ "${rehearsal}" != "false" ]; then
+            echo "Invalid rehearsal selector: ${rehearsal}"
+            exit 1
+          fi
           candidate_only="${INPUT_ARM64_EVIDENCE_CANDIDATE}"
           if [ "${candidate_only}" != "true" ] && [ "${candidate_only}" != "false" ]; then
             echo "Invalid ARM64 evidence-candidate selector: ${candidate_only}"
@@ -121,8 +132,12 @@ jobs:
             echo "Linux ARM64 evidence candidates are non-publishing preview-tier builds; got ${INPUT_ARM64_SUPPORT_TIER}."
             exit 1
           fi
-          if [ "${candidate_only}" = "false" ] && [ "${GITHUB_REF}" != "refs/heads/main" ]; then
+          if [ "${candidate_only}" = "false" ] && [ "${rehearsal}" = "false" ] && [ "${GITHUB_REF}" != "refs/heads/main" ]; then
             echo "Publishing manual releases must be dispatched from refs/heads/main; got ${GITHUB_REF}."
+            exit 1
+          fi
+          if [ "${rehearsal}" = "true" ] && [[ "${GITHUB_REF}" != refs/heads/* ]]; then
+            echo "Release rehearsals must be dispatched from a pushed branch; got ${GITHUB_REF}."
             exit 1
           fi
           if [ "${candidate_only}" = "true" ] && [[ "${GITHUB_REF}" != refs/heads/* ]]; then
@@ -148,7 +163,7 @@ jobs:
               echo "ARM64 evidence candidate ${openq4_source_sha} must descend from the current origin/main."
               exit 1
             fi
-          elif ! git merge-base --is-ancestor "${openq4_source_sha}" refs/remotes/origin/main; then
+          elif [ "${rehearsal}" = "false" ] && ! git merge-base --is-ancestor "${openq4_source_sha}" refs/remotes/origin/main; then
             echo "Triggering openQ4 commit ${openq4_source_sha} is not a release candidate reachable from origin/main."
             exit 1
           fi
@@ -845,14 +860,32 @@ jobs:
           echo "OPENQ4_MACOS_OPENAL_ROOT=${prepared_root}" >> "${GITHUB_ENV}"
           echo "PKG_CONFIG_PATH=${prepared_root}/lib/pkgconfig" >> "${GITHUB_ENV}"
 
+      # Building OpenAL Soft from source took 3 to 5 minutes of every Windows job.
+      # The prepared install is cached under the prepare script's hash, which
+      # pins the OpenAL version, so a changed script or version builds afresh.
+      - name: Restore prepared OpenAL Soft (Windows)
+        if: matrix.platform == 'windows'
+        id: openal_cache
+        uses: actions/cache@v6
+        with:
+          path: .tmp/openal-soft-${{ matrix.binary_arch }}
+          key: openal-soft-windows-${{ matrix.binary_arch }}-${{ hashFiles('tools/build/prepare_windows_openal.ps1') }}
+
       - name: Prepare OpenAL Soft (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $outputRoot = Join-Path $env:GITHUB_WORKSPACE ".tmp/openal-soft-${{ matrix.binary_arch }}"
-          $env:OPENQ4_VS_TARGET_ARCH = "${{ matrix.binary_arch }}"
-          powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "${{ matrix.binary_arch }}" -OutputRoot $outputRoot
+          $cached = "${{ steps.openal_cache.outputs.cache-hit }}" -eq "true" -and
+            (Test-Path (Join-Path $outputRoot "bin/OpenAL32.dll")) -and (Test-Path (Join-Path $outputRoot "lib/OpenAL32.lib"))
+          if ($cached) {
+            Write-Host "Using the cached OpenAL Soft install: $outputRoot"
+          } else {
+            $env:OPENQ4_VS_TARGET_ARCH = "${{ matrix.binary_arch }}"
+            powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "${{ matrix.binary_arch }}" -OutputRoot $outputRoot
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           "OPENQ4_OPENAL_ROOT=$outputRoot" >> $env:GITHUB_ENV
 
       - name: Build and install (Windows)
@@ -1112,7 +1145,8 @@ jobs:
             )
           done
 
-          tar -C "${symbols_dir}" -cJf "${symbols_archive}" .
+          # xz -T0 uses every core; a fixed block size keeps the archive reproducible.
+          XZ_OPT="-T0 --block-size=24MiB" tar -C "${symbols_dir}" -cJf "${symbols_archive}" .
           echo "debug_symbols_dir=${symbols_dir}" >> "$GITHUB_OUTPUT"
           echo "debug_symbols_path=${symbols_archive}" >> "$GITHUB_OUTPUT"
 
@@ -1344,6 +1378,12 @@ jobs:
             fi
           fi
 
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            # The same tar as .tar.gz beside the .tar.xz, for sites that do not
+            # take xz archives (ModDB).
+            package_args+=(--extra-archive-format tar.gz)
+          fi
+
           python tools/build/package_release.py "${package_args[@]}"
 
           archive_path="${RUNNER_TEMP}/openq4-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}-${{ matrix.binary_arch }}${{ matrix.package_suffix }}${{ matrix.archive_ext }}"
@@ -1386,6 +1426,14 @@ jobs:
             fi
             echo "windows_symbols_path=${windows_symbols_path}" >> "$GITHUB_OUTPUT"
           fi
+          if [ "${{ matrix.platform }}" = "linux" ]; then
+            gz_archive_path="${RUNNER_TEMP}/openq4-${{ needs.metadata.outputs.version_tag }}-linux-${{ matrix.binary_arch }}${{ matrix.package_suffix }}.tar.gz"
+            if [ ! -f "${gz_archive_path}" ]; then
+              echo "Expected Linux .tar.gz package not found: ${gz_archive_path}"
+              exit 1
+            fi
+            echo "gz_archive_path=${gz_archive_path}" >> "$GITHUB_OUTPUT"
+          fi
           echo "archive_path=${archive_path}" >> "$GITHUB_OUTPUT"
           echo "package_dir=${package_dir}" >> "$GITHUB_OUTPUT"
 
@@ -1394,11 +1442,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python tools/build/verify_linux_release_artifacts.py archive \
-            --archive "${{ steps.package.outputs.archive_path }}" \
-            --arch "${{ matrix.binary_arch }}" \
-            --symbols-root "${{ steps.linux_symbols.outputs.debug_symbols_dir }}" \
-            --work-root "${RUNNER_TEMP}"
+          for archive in "${{ steps.package.outputs.archive_path }}" "${{ steps.package.outputs.gz_archive_path }}"; do
+            python tools/build/verify_linux_release_artifacts.py archive \
+              --archive "${archive}" \
+              --arch "${{ matrix.binary_arch }}" \
+              --symbols-root "${{ steps.linux_symbols.outputs.debug_symbols_dir }}" \
+              --work-root "${RUNNER_TEMP}"
+          done
 
       - name: Build and validate Linux AppImage
         if: matrix.platform == 'linux' && inputs.generate_linux_arm64_evidence_candidate == false
@@ -2149,6 +2199,16 @@ jobs:
           name: openq4-release-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}-${{ matrix.binary_arch }}${{ matrix.package_suffix }}
           path: ${{ steps.package.outputs.archive_path }}
           if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload Linux .tar.gz package
+        if: matrix.platform == 'linux' && inputs.generate_linux_arm64_evidence_candidate == false
+        uses: actions/upload-artifact@v7
+        with:
+          name: openq4-release-${{ needs.metadata.outputs.version_tag }}-linux-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-targz
+          path: ${{ steps.package.outputs.gz_archive_path }}
+          if-no-files-found: error
+          compression-level: 0
 
       - name: Upload update archive
         if: (matrix.platform == 'windows' || matrix.platform == 'linux') && inputs.generate_linux_arm64_evidence_candidate == false
@@ -2157,6 +2217,7 @@ jobs:
           name: openq4-release-${{ needs.metadata.outputs.version_tag }}-${{ matrix.platform }}-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-update
           path: ${{ steps.package.outputs.update_archive_path }}
           if-no-files-found: error
+          compression-level: 0
 
       - name: Upload Windows symbols
         if: matrix.platform == 'windows'
@@ -2165,6 +2226,7 @@ jobs:
           name: openq4-release-${{ needs.metadata.outputs.version_tag }}-windows-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-symbols
           path: ${{ steps.package.outputs.windows_symbols_path }}
           if-no-files-found: error
+          compression-level: 0
 
       - name: Upload macOS dSYM symbols
         if: matrix.platform == 'macos'
@@ -2173,6 +2235,7 @@ jobs:
           name: openq4-release-${{ needs.metadata.outputs.version_tag }}-macos-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-symbols
           path: ${{ steps.package.outputs.symbols_archive_path }}
           if-no-files-found: error
+          compression-level: 0
 
       - name: Upload Linux debug symbols
         if: matrix.platform == 'linux' && inputs.generate_linux_arm64_evidence_candidate == false
@@ -2181,6 +2244,7 @@ jobs:
           name: openq4-release-${{ needs.metadata.outputs.version_tag }}-linux-${{ matrix.binary_arch }}${{ matrix.package_suffix }}-debugsymbols
           path: ${{ steps.linux_symbols.outputs.debug_symbols_path }}
           if-no-files-found: error
+          compression-level: 0
 
       - name: Upload Linux AppImage
         if: matrix.platform == 'linux' && inputs.generate_linux_arm64_evidence_candidate == false
@@ -2191,6 +2255,7 @@ jobs:
             ${{ steps.appimage.outputs.appimage_path }}
             ${{ steps.appimage.outputs.appimage_zsync_path }}
           if-no-files-found: error
+          compression-level: 0
 
       - name: Upload Windows installer
         if: matrix.platform == 'windows'
@@ -2199,6 +2264,7 @@ jobs:
           name: openq4-release-${{ needs.metadata.outputs.version_tag }}-windows-${{ matrix.binary_arch }}-installer
           path: ${{ steps.windows_installer.outputs.installer_path }}
           if-no-files-found: error
+          compression-level: 0
 
   android:
     name: Android APK
@@ -2232,6 +2298,7 @@ jobs:
           git fetch --force --tags origin
 
       - name: Validate release candidate source and tag target
+        if: inputs.rehearsal == false
         env:
           OPENQ4_SOURCE_SHA: ${{ needs.metadata.outputs.openq4_source_sha }}
           RELEASE_TAG: ${{ needs.metadata.outputs.release_tag }}
@@ -2297,6 +2364,7 @@ jobs:
             "openq4-${{ needs.metadata.outputs.version_tag }}-windows-arm64-symbols.zip"
             "openq4-${{ needs.metadata.outputs.version_tag }}-windows-arm64-setup.exe"
             "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64.tar.xz"
+            "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64.tar.gz"
             "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64-update.tar.xz"
             "openq4-${{ needs.metadata.outputs.version_tag }}-linux-x64-debugsymbols.tar.xz"
             "openq4-${{ needs.metadata.outputs.version_tag }}-x86_64.AppImage"
@@ -2312,6 +2380,7 @@ jobs:
           if [ "${{ needs.metadata.outputs.linux_arm64_support_tier }}" = "preview" ]; then
             expected+=(
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview.tar.xz"
+              "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview.tar.gz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-update.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-debugsymbols.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-preview-aarch64.AppImage"
@@ -2320,6 +2389,7 @@ jobs:
           else
             expected+=(
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64.tar.xz"
+              "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64.tar.gz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-update.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-debugsymbols.tar.xz"
               "openq4-${{ needs.metadata.outputs.version_tag }}-aarch64.AppImage"
@@ -2398,17 +2468,22 @@ jobs:
           previous_manifests=("${previous_dir}"/openq4-*-content-packs.json)
           shopt -u nullglob
           mv "${previous_manifests[0]}" "${previous_dir}/content-packs.json"
-          for platform in windows-x64.zip linux-x64.tar.xz; do
-            gh release download "${PREVIOUS_TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "openq4-*-${platform}" --dir "${previous_dir}"
+          # Both platforms' proofs run at once; each downloads and reads its own
+          # previous full package, and a failure in either fails the step.
+          verify_update_proof() {
+            local platform="$1"
+            local platform_dir="${previous_dir}/${platform}"
+            mkdir -p "${platform_dir}"
+            gh release download "${PREVIOUS_TAG}" --repo "${GITHUB_REPOSITORY}" --pattern "openq4-*-${platform}" --dir "${platform_dir}"
             shopt -s nullglob
-            previous_full=("${previous_dir}"/openq4-*-"${platform}")
+            local previous_full=("${platform_dir}"/openq4-*-"${platform}")
             shopt -u nullglob
             if [ "${#previous_full[@]}" -ne 1 ]; then
               echo "Expected one previous ${platform} package, found ${#previous_full[@]}."
-              exit 1
+              return 1
             fi
-            stem="${platform%%.*}"
-            extension="${platform#*.}"
+            local stem="${platform%%.*}"
+            local extension="${platform#*.}"
             python tools/build/content_pack_release.py verify-update \
               --previous-full "${previous_full[0]}" \
               --update "${artifact_dir}/openq4-${tag}-${stem}-update.${extension}" \
@@ -2416,7 +2491,20 @@ jobs:
               "${standalone_args[@]}" \
               --report "${RUNNER_TEMP}/update-proof-${stem}.json"
             rm -f "${previous_full[0]}"
+          }
+          proof_pids=()
+          for platform in windows-x64.zip linux-x64.tar.xz; do
+            verify_update_proof "${platform}" &
+            proof_pids+=("$!")
           done
+          proof_failed=0
+          for pid in "${proof_pids[@]}"; do
+            wait "${pid}" || proof_failed=1
+          done
+          if [ "${proof_failed}" -ne 0 ]; then
+            echo "An update proof failed; see its output above."
+            exit 1
+          fi
 
       - name: Build and sign the in-game update manifest
         env:
@@ -2564,7 +2652,22 @@ jobs:
             "Windows ARM64 packages are experimental. They are built natively for Arm64 and automated tests start the dedicated server, but nothing has started the game client automatically yet, and no real-hardware report has confirmed that the packages run. If the renderer does not start, launch with +set r_renderApi vulkan, and please report the result with the Windows ARM64 issue template." \
             >> "${RUNNER_TEMP}/release-changelog.md"
 
+      - name: Report release rehearsal
+        if: inputs.rehearsal == true
+        env:
+          RELEASE_ASSET_MANIFEST: ${{ steps.release_assets.outputs.asset_manifest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "### Release rehearsal: nothing was published"
+            echo "Every asset below was built, packaged and verified for \`${{ needs.metadata.outputs.release_tag }}\`."
+            echo
+            sed 's/^/- /' "${RELEASE_ASSET_MANIFEST}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Create or update release
+        if: inputs.rehearsal == false
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           LINUX_ARM64_SUPPORT_TIER: ${{ needs.metadata.outputs.linux_arm64_support_tier }}
@@ -2632,6 +2735,7 @@ jobs:
             if [ "${LINUX_ARM64_SUPPORT_TIER}" = "preview" ]; then
               stale_linux_arm64_assets=(
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64.tar.xz"
+                "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64.tar.gz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-update.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-debugsymbols.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-aarch64.AppImage"
@@ -2640,6 +2744,7 @@ jobs:
             else
               stale_linux_arm64_assets=(
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview.tar.xz"
+                "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview.tar.gz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-update.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-linux-arm64-preview-debugsymbols.tar.xz"
                 "openq4-${{ needs.metadata.outputs.version_tag }}-preview-aarch64.AppImage"
@@ -2815,14 +2920,18 @@ jobs:
   discord:
     name: Announce On Discord
     needs: [metadata, release]
-    if: ${{ needs.release.result == 'success' && inputs.draft == false }}
+    if: ${{ needs.release.result == 'success' && inputs.draft == false && inputs.rehearsal == false }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
 
     steps:
+      # The announcer is one script that reads the release through the API;
+      # the full tree (about 3 GB of content sources) is not needed.
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github/scripts
 
       - name: Setup Node.js
         uses: actions/setup-node@v7

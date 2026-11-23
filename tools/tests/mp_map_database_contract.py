@@ -205,8 +205,12 @@ def validate_rotation_and_settings() -> None:
     active = body(host, "bool mpMapDatabaseHost::RotationActive( void ) const {")
     for token in ("IsManagedMatch()", "IsArenaCampaignMatch()"):
         require(active, token, "mpMapDatabaseHost::RotationActive")
-    for signature in ("void mpMapDatabaseHost::ServerQueueSet(", "void mpMapDatabaseHost::ServerMatchEnded( void ) {"):
+    # MP-12: the match's end offers the pick (ServerOfferPick) or names the next map (ServerAnnounceNext)
+    for signature in ("void mpMapDatabaseHost::ServerQueueSet(", "bool mpMapDatabaseHost::ServerOfferPick( void ) {",
+                      "void mpMapDatabaseHost::ServerAnnounceNext( void ) {"):
         require(body(host, signature), "RotationActive()", signature)
+    require(body(host, "void mpMapDatabaseHost::ServerMatchEnded( void ) {"), "if ( !ServerOfferPick() ) {",
+            "void mpMapDatabaseHost::ServerMatchEnded( void ) {")
 
     state = read(MP / "mp/GameState.cpp")
     require(state, "mpMapHost.ServerMatchEnded();", "rvGameState::NewState GAMEREVIEW")

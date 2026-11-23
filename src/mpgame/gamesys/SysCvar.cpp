@@ -874,7 +874,11 @@ idCVar si_voteFlags(				"si_voteFlags",				"0",			CVAR_GAME | CVAR_SERVERINFO | 
 																	"bit 17 (+131072) coin toss\n"
 																	"bit 18 (+262144) random map\n"
 																	"bit 19 (+524288) ready all\n"
-																	"bit 20 (+1048576) mute player" );
+																	"bit 20 (+1048576) mute player\n"
+																	"bit 21 (+2097152) modifiers\n"
+																	"bit 22 (+4194304) spectator chat\n"
+																	"bit 23 (+8388608) preset\n"
+																	"bit 24 (+16777216) weapon arena" );
 // openQ4 MP-12: casual vote policy. The defaults reproduce the inherited rule
 // (a strict majority of the frozen electorate, no per-map limit, players only).
 idCVar g_votePercent(				"g_votePercent",			"51",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "percentage of the players eligible when a vote starts that must vote yes for it to pass", 1, 100 );
@@ -896,6 +900,16 @@ idCVar g_chatFloodSeconds(			"g_chatFloodSeconds",		"4",			CVAR_GAME | CVAR_ARCH
 idCVar g_chatFloodWait(				"g_chatFloodWait",			"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a player who passed the chat flood window stays silenced", 0, 600 );
 idCVar g_adminLog(					"g_adminLog",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "write kicks, bans, mutes, chat floods and refused connections to logs/admin.ndjson in the save folder" );
 idCVar g_voteMuteMinutes(			"g_voteMuteMinutes",		"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "minutes a player stays silenced after a mute vote passes; 0 until unmute or a server restart", 0, 1440 );
+// openQ4 MP-17: player identity. ui_identity travels in the player's userinfo,
+// so a server challenges only a game that answers; the user chose on
+// 23 November 2026 to have it on unless the player turns it off.
+idCVar ui_identity(					"ui_identity",				"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "prove to each server that you are the same player as before, with a key kept only on this computer and different for every server; 0 sends no identity" );
+idCVar g_identity(					"g_identity",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "ask each player whose game offers one for their identity on this server; status shows it, ban id:<identity> bans it, and returning players and the ranking table use it" );
+idCVar g_reconnectRestore(			"g_reconnectRestore",		"300",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a player who leaves a casual match keeps their team and score for when they return, by identity or by the ghost code they were told; 0 forgets them at once", 0, 3600 );
+// openQ4 MP-12: the intermission. Off by default: a casual server keeps Quake 4's
+// quiet scoreboard until its operator turns this on.
+idCVar g_intermissionAnnounce(		"g_intermissionAnnounce",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "while the final scoreboard is up, name the next map and read out each player's awards" );
+idCVar g_ranking(					"g_ranking",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "keep a local ranking table (ranking.txt): an Elo rating for each identity and game type, updated when a casual match ends; rankings lists it" );
 idCVar g_adminMaxBanMinutes(		"g_adminMaxBanMinutes",		"1440",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "the longest ban, in minutes, a logged-in admin may give a connected player; 0 lets admins ban nobody", 0, 525600 );
 idCVar g_reservedNames(				"g_reservedNames",			"admin;console;referee",	CVAR_GAME | CVAR_ARCHIVE, "player names nobody may take, separated by ';', whatever their case or colours; a player who asks for one gets it with '_' added" );
 

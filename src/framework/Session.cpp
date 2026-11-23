@@ -11165,9 +11165,15 @@ Declare them here instead, with the same defaults game_mp uses so its later
 static registration matches. That registration keeps the current value and only
 adopts the reset value and range, so whatever the player picked in the menu is
 what the match starts with.
+
+Common::Init declares them before it executes the configs, so a saved value
+lands on this declaration. Declared afterwards, the config's seta created a bare
+console cvar first, this function skipped the name, and the setting lost its
+kind: the retained menu could not read it (23 November 2026, REL-01 clean-install
+run). Session::Init still calls it for any path that skipped that step.
 ===============
 */
-static void Session_DeclareMultiplayerMenuGameCVars( void ) {
+void Session_DeclareMultiplayerMenuGameCVars( void ) {
 	struct menuGameCVar_t {
 		const char *name;
 		const char *value;
@@ -11190,6 +11196,8 @@ static void Session_DeclareMultiplayerMenuGameCVars( void ) {
 		{ "si_maxBrightskin",		"1",	CVAR_FLOAT | CVAR_SERVERINFO },
 		{ "si_forcedModels",		"1",	CVAR_BOOL | CVAR_SERVERINFO },
 		{ "ui_weaponOrder",			"",		CVAR_USERINFO },
+		// MP-17: Player Setup's Player Identity, on unless the player turns it off
+		{ "ui_identity",			"1",	CVAR_BOOL | CVAR_USERINFO },
 		{ "g_inactivity",			"0",	CVAR_INTEGER },
 		{ "hud_hitSound",			"1",	CVAR_INTEGER },
 		{ "hud_crosshairAmmo",		"0",	CVAR_BOOL },
@@ -11202,11 +11210,19 @@ static void Session_DeclareMultiplayerMenuGameCVars( void ) {
 	};
 
 	for ( int i = 0; i < (int)( sizeof( menuGameCVars ) / sizeof( menuGameCVars[0] ) ); i++ ) {
-		if ( cvarSystem->Find( menuGameCVars[i].name ) != NULL ) {
+		const int flags = CVAR_GAME | CVAR_ARCHIVE | menuGameCVars[i].flags;
+		const idCVar *existing = cvarSystem->Find( menuGameCVars[i].name );
+		if ( existing == NULL ) {
+			cvarSystem->SetCVarString( menuGameCVars[i].name, menuGameCVars[i].value, flags );
 			continue;
 		}
-		cvarSystem->SetCVarString( menuGameCVars[i].name, menuGameCVars[i].value,
-			CVAR_GAME | CVAR_ARCHIVE | menuGameCVars[i].flags );
+		// A launch option's +set made a console cvar first. Give it this
+		// declaration's kind and archive flag and keep its value; without the
+		// kind the retained menu cannot read it.
+		if ( ( existing->GetFlags() & flags ) != flags ) {
+			const idStr value = existing->GetString();
+			cvarSystem->SetCVarString( menuGameCVars[i].name, value.c_str(), flags );
+		}
 	}
 }
 #endif
