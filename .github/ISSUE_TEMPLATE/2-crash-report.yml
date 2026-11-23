@@ -1,0 +1,96 @@
+name: Crash or won't start
+description: openQ4 closes, freezes, shows an error, or never reaches the menu.
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Sorry it crashed. Only the first three questions are required.
+
+        **To get playing again in the meantime:** if it broke after you changed a setting, start once with `+set r_renderApi gl` (back to OpenGL). On a Mac, please use the **macOS crash report** form instead; it asks for the files macOS keeps.
+
+        **Files that help.** Your save folder is `%LOCALAPPDATA%\openQ4` on Windows, `~/.local/share/openq4` on Linux and Steam Deck.
+        - `baseoq4/logs/fatal.log` in the save folder: written by itself when openQ4 stops with an error window on Windows. The window shows its path.
+        - The `crashes` folder next to `openQ4-client_x64.exe`: written by itself after a Windows crash.
+        - `baseoq4/logs/openq4.log` in the save folder: only written when you start with `+set logFile 2 +set logFileName logs/openq4.log`. If you can make it crash again, please add that and attach the log.
+  - type: input
+    id: version
+    attributes:
+      label: openQ4 version
+      description: The first line of `openq4.log` or `fatal.log` is the most reliable, for example `openQ4 0.15.0`. Otherwise, the release you downloaded.
+      placeholder: "0.15.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: System
+      options:
+        - Windows
+        - Windows ARM64
+        - Linux
+        - Linux ARM64
+        - Steam Deck
+        - Android
+        - macOS (please use the macOS crash report form)
+    validations:
+      required: true
+  - type: dropdown
+    id: when
+    attributes:
+      label: When does it happen?
+      options:
+        - It never starts, or stops before the menu
+        - In the menus
+        - Loading a level or a save
+        - While playing
+        - Joining or hosting multiplayer
+        - When quitting
+        - After changing a setting
+    validations:
+      required: true
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What you were doing, the error message if there was one (as text if you can), and whether it happens every time.
+    validations:
+      required: false
+  - type: input
+    id: system_details
+    attributes:
+      label: Graphics card, driver, and desktop on Linux
+      placeholder: "RX 7800 XT, Mesa 25.2, KDE Plasma on Wayland"
+    validations:
+      required: false
+  - type: dropdown
+    id: renderer
+    attributes:
+      label: Renderer
+      description: Settings → Display, or `r_renderApi`. Whether the other one also crashes helps a lot.
+      options:
+        - OpenGL
+        - Vulkan
+        - Both crash
+        - Not sure
+    validations:
+      required: false
+  - type: dropdown
+    id: mods
+    attributes:
+      label: Mods or texture packs
+      options:
+        - No mods, just Quake 4 and openQ4
+        - Yes, and it also crashes without them
+        - Yes, and I haven't tried without them
+        - Yes, and it only crashes with them
+    validations:
+      required: false
+  - type: textarea
+    id: files
+    attributes:
+      label: fatal.log, openq4.log and crash files
+      description: Drag the files in here. Zip the `crashes` folder if there are several.
+    validations:
+      required: false

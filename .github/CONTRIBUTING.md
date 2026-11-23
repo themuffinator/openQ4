@@ -47,22 +47,36 @@ to the maintainers.
 Before opening a new issue, please search [existing
 issues](https://github.com/themuffinator/openQ4/issues) to avoid duplicates.
 
-When filing a bug report, include as much of the following as possible:
+[Open an issue](https://github.com/themuffinator/openQ4/issues/new/choose) with
+the form that fits. Each asks for only a few required answers and says where to
+find the rest:
 
-- The openQ4 version or commit SHA you are running.
-- Your operating system, CPU architecture, GPU, and driver version.
-- Whether you are using a release package or a local build.
-- Clear steps to reproduce the problem.
-- The expected behavior and what actually happened.
-- Relevant excerpts from `openq4.log` (located under
-  `fs_savepath/<gameDir>/logs/openq4.log`; the default path is usually
-  `.home/baseoq4/logs/openq4.log` when launching from the repo).
-- For crashes, include the crash log, minidump, or stack trace if available.
+- **Bug report**: something looks, sounds or behaves wrong in the game.
+- **Crash or won't start**: openQ4 closes, freezes or never reaches the menu.
+- **Low frame rate or stutter**: performance and loading times.
+- **Idea or feature request**.
+- **Building, mapping tools or modding**: source builds, dmap, AAS, the level
+  editor and mod support.
+- **VR headset**, **macOS crash**, **Linux ARM64** and **Windows ARM64**
+  reports. Linux ARM64 and macOS are previews and Windows ARM64 is
+  experimental; a report that everything worked is useful evidence for them,
+  not only bug reports.
 
-If your report is for a preview or experimental platform (Linux ARM64 and macOS
-are previews; Windows ARM64 is experimental), please use the corresponding issue
-template so the right context is captured up front. A report that everything
-worked is useful evidence for those platforms, not only bug reports.
+What helps most, whichever form you use:
+
+- **The version from the log.** The first line of `openq4.log` names the exact
+  build, which isn't always the one you think you installed.
+- **A log.** openQ4 writes one only when asked: start with
+  `+set logFile 2 +set logFileName logs/openq4.log`. It lands in
+  `baseoq4/logs/` inside your save folder (`%LOCALAPPDATA%\openQ4` on Windows,
+  `~/.local/share/openq4` on Linux and Steam Deck,
+  `~/Library/Application Support/openQ4` on macOS). When launching from the
+  repository, that is usually `.home/baseoq4/logs/openq4.log`.
+- **Where it happens.** The level, the spot, and a screenshot or short video.
+- **Mods and texture packs.** Whether the problem also happens without them.
+- **For crashes**, `fatal.log` and the files in the `crashes` folder next to the
+  executable on Windows. For a save that won't load, a zip of its `.save`, `.txt`
+  and `.tga` files.
 
 ### When an Issue Waits for Your Reply
 
@@ -95,8 +109,8 @@ game modules. When reporting a compatibility problem:
 
 ### Suggesting Features or Improvements
 
-Feature suggestions are best opened as issues with the `[Request]` or
-`[Enhancement]` prefix. To help discussion:
+Feature suggestions are best opened with the **Idea or feature request** form.
+To help discussion:
 
 - Explain the player or developer benefit.
 - Describe how it relates to stock-asset compatibility or project goals.
