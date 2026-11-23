@@ -31,7 +31,7 @@ UI toolkit/editor/corpus remain major completion gates.
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
 | Ultra frame rate at 2560x1440 | **91-188 fps on GL, 96-188 fps on Vulkan, on the reference laptop; every tier meets its refresh class** | FPS-02 re-tiered the presets to refresh classes (Enhanced 144/90, Quality 100/60, Ultra 75/45 average/1% low) and all three meet them in every scene on both backends; the previous everything-on Ultra (19-58 fps on GL) is now the Maximum preset with no frame-rate target. Budgets are in [`performance-budgets.json`](performance-budgets.json). See the FPS category and the [performance report](performance-report.md). |
-| Release acceptance | **0 / 4 REL tasks closed** | 0.15.0 (November 2026) is the available release. It shipped ahead of these gates, which stay open for final-package acceptance; later source progress is unreleased. Since 23 November one frozen package per candidate runs a [release qualification](release-qualification.md) matrix: the Windows x64 0.16.0 candidate C2 passes it except audio output recovery, after C1 exposed lost player settings and missing renderer symbols; that defect, other platforms, the human reviews and promotion remain. |
+| Release acceptance | **0 / 4 REL tasks closed** | 0.15.0 (November 2026) is the available release. It shipped ahead of these gates, which stay open for final-package acceptance; later source progress is unreleased. Since 23 November one frozen package per candidate runs a [release qualification](release-qualification.md) matrix: the Windows x64 0.16.0 candidate C3 passes it, after C1 and C2 exposed lost player settings, missing renderer symbols and starving audio streams, all fixed; other platforms, the human reviews and promotion remain. |
 
 ### Category completion estimates
 
@@ -72,7 +72,7 @@ exact; the estimate column is deliberately approximate.
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
 | [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **100%** | 6 / 6 | None; macOS evidence stays with the platform gate. |
 | [Developer map tools](#tool-completion-checkpoints) — TOOL | **100%** | 4 / 4 | None; macOS evidence stays with the platform gate. |
-| [Release qualification](#release-qualification-and-completion-rules) — REL | **50%** | 0 / 4 | Packages and runs for the platforms other than Windows x64, human/device reviews, hardware lifecycle cases, signing and the promotion decision. |
+| [Release qualification](#release-qualification-and-completion-rules) — REL | **55%** | 0 / 4 | Packages and runs for the platforms other than Windows x64, human/device reviews, hardware lifecycle cases, signing and the promotion decision. |
 | [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
 
 ### Reading and maintaining completion checkpoints
@@ -8215,21 +8215,22 @@ do not establish an accepted delivery scope for these ambitions. To advance one:
 
 ### REL completion checkpoints
 
-**Estimate: 50%; 0/4 tasks closed.** Since 23 November 2026 one frozen package per
+**Estimate: 55%; 0/4 tasks closed.** Since 23 November 2026 one frozen package per
 candidate runs the matrix in [release qualification](release-qualification.md):
 `release_qualification.py` hashes every file, proves the runtime is exactly the
 release archive's, binds it to its commit and re-checks it around every case,
 keeping every attempt. Candidate C1 (`174cb31a4`) was rejected for losing
-players' multiplayer settings; C2 (`8016bc922`) passes the Windows x64 matrix
-except audio output recovery, where Ogg streams do not resume after an outage.
+players' multiplayer settings; C2 (`8016bc922`) failed audio output recovery,
+which exposed streams starving under slow frames (fixed in `5b8f32617`); C3
+(`7fc884a87`) passes the Windows x64 matrix.
 Tests on different revisions still do not combine into an accepted package, and
 this update promotes no release or support tier.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| REL-01 — Partial | Release-configuration Windows x64 candidates built from a frozen commit, packaged and frozen. On C2: package layout, dedicated server, dedicated and listen-server multiplayer on all 20 stock MP maps (GL and Vulkan), all 29 stock SP maps on both renderers (in each Vulkan sweep one renderer's `mcc_2` capture fell in the map's scripted opening fades), the 31-stage campaign chain, campaign saves, Quake 4/Awakening switching, SP save/load and demo, pack reports, localization, a clean install and an upgrade over a 0.15.0 profile and save. C1's upgrade run found three settings defects, also in 0.15.0, fixed in `8016bc922`. | The same matrix on Linux x64/Steam Deck, macOS, Linux and Windows ARM64 and Android packages; multiplayer demos (MVD) in the matrix. |
-| REL-02 — Partial | Engine-capture and diagnostic infrastructure, scoped visual/audio evidence and human-review procedures exist. C2 wrote 49 contact sheets of every stock map's opening view on Vulkan beside OpenGL at the same viewpoint; the runner lists each review and records the reviewer's verdict (`record-human`). | The reviews themselves: matched visual acceptance from those sheets, actual motion/latency, audible sound, accessibility and VR comfort on physical devices with required permissions. |
-| REL-03 — Partial | On C2: cold and warm starts, start after generated-cache damage, resize and renderer restarts, a Vulkan relaunch, pause, slow motion, map change and clean shutdown; GL and Vulkan soaks of 16 stops with a `vid_restart` (process memory within 1.14 times); network loss and reconnect, IPv6; Vulkan startup recovery; effects across map changes and restores. C2 fails audio output recovery: after a software output interruption its Ogg streams never resume and a paused line resumes 0.5 s out of place (being fixed). | That audio defect fixed and requalified; device and surface loss, an unplugged audio device, background/suspend and high-DPI on real hardware, and every other platform. |
+| REL-01 — Partial | Release-configuration Windows x64 candidates built from a frozen commit, packaged and frozen. On C3 (and C2): package layout, dedicated server, dedicated and listen-server multiplayer on all 20 stock MP maps (GL and Vulkan), all 29 stock SP maps on both renderers (in each Vulkan sweep one renderer's `mcc_2` capture fell in the map's scripted opening fades), the 31-stage campaign chain, campaign saves, Quake 4/Awakening switching, SP save/load and demo, pack reports, localization, a clean install and an upgrade over a 0.15.0 profile and save. C1's upgrade run found three settings defects, also in 0.15.0, fixed in `8016bc922`. | The same matrix on Linux x64/Steam Deck, macOS, Linux and Windows ARM64 and Android packages; multiplayer demos (MVD) in the matrix. |
+| REL-02 — Partial | Engine-capture and diagnostic infrastructure, scoped visual/audio evidence and human-review procedures exist. C2 and C3 each wrote 49 contact sheets of every stock map's opening view on Vulkan beside OpenGL at the same viewpoint; the runner lists each review and records the reviewer's verdict (`record-human`). | The reviews themselves: matched visual acceptance from those sheets, actual motion/latency, audible sound, accessibility and VR comfort on physical devices with required permissions. |
+| REL-03 — Partial | On C3 (and C2): cold and warm starts, start after generated-cache damage, resize and renderer restarts, a Vulkan relaunch, pause, slow motion, map change and clean shutdown; GL and Vulkan soaks of 16 stops with a `vid_restart` (process memory within 1.14 times); network loss and reconnect, IPv6; Vulkan startup recovery; effects across map changes and restores; audio output interruption, layout changes and the low-memory trim (C2 failed it: streams decoded on job workers refilled one buffer a frame and underran under slow frames, since 0.14.1; fixed in `5b8f32617`, C3 passes all 34 checks). C3's first OpenGL soak was ended by two machine-wide GPU resets (Windows LiveKernelEvent 141) from another process: the OpenGL client has no context-reset handling and exits without a message. | OpenGL recovery from a GPU reset (no `ARB_robustness` handling); device and surface loss, an unplugged audio device, background/suspend and high-DPI on real hardware, and every other platform. |
 | REL-04 — Partial | Withdrawal policy, release-status page, curated unreleased material and support/promotion validators exist. Package checks run per candidate: provenance, exact archive, layout, symbols (C1 found the renderer and updater PDBs missing from the Windows symbols archive, fixed in `be420c1ad`) and signing (every Windows image unsigned). Upgrade notes cover the settings fix. | A signed Windows package or a stated decision against one; the promotion decision for the proven subset, with the support and capability matrices updated with it. |
 
 Completion order for the selected release:
@@ -8260,25 +8261,27 @@ Completion order for the selected release:
   Windows x64 candidate C1 lost players' settings (multiplayer-only settings
   dropped by `seta`'s missing archive flag, the multiplayer menu's 21 settings
   declared after the configs, the Failed Transfer default model; fixed in
-  `8016bc922`); C2 passes. Other platforms are not run.
+  `8016bc922`); C2 and C3 pass. Other platforms are not run.
 - [ ] **REL-02 — P1, qualification: visual and human evidence.** Use engine
   `screenshot` render-target captures and matched viewpoints/time. Perform actual
   motion, input latency, audible sound, accessibility and VR comfort checks on
   appropriate devices. Default to windowed tests. Fullscreen and input control
   require the project's specific prior user permission; never substitute OS
   screen capture or silently infer permission from a historical test plan.
-  Progress, 23 November: C2's sweeps wrote matched Vulkan/OpenGL contact sheets
-  of every stock map; the human reviews are listed in the matrix and not done.
+  Progress, 23 November: C2's and C3's sweeps wrote matched Vulkan/OpenGL
+  contact sheets of every stock map; the human reviews are listed in the matrix
+  and not done.
 - [ ] **REL-03 — P1, qualification: lifecycle and failure matrix.** Cover cold/warm
   starts, assets/cache failures, long sessions, map/campaign/mode changes, network
   loss/reconnect, saves/demos, device/surface/audio loss, resize/high DPI, pause/
   slow motion, background/suspend, shutdown and renderer/module recovery. Verify
   bounded resources, fallback and user-visible error behavior without lowering
   gates to turn historical failures green.
-  Progress, 23 November: C2 passes the software lifecycle, soak, network
-  and renderer-recovery cases on Windows x64. It fails audio output recovery:
-  Ogg streams do not resume after an outage (being fixed). Real-hardware loss,
-  suspend and high-DPI remain.
+  Progress, 23 November: C3 passes the software lifecycle, soak, network,
+  audio and renderer-recovery cases on Windows x64 (C2's audio failure exposed
+  stream starvation, fixed in `5b8f32617`). A machine-wide GPU reset ended the
+  OpenGL client without a message: GL has no context-reset recovery.
+  Real-hardware loss, suspend and high-DPI remain.
 - [ ] **REL-04 — P1, documentation and promotion: close only proven scope.** Keep
   published downloads distinct from current-source features. Record withdrawals
   in the shared release-status policy, player status page and historical notes;
@@ -8293,8 +8296,9 @@ Completion order for the selected release:
   local implementation pass, synthetic device or archived branch is not product
   acceptance. Record a deliberate exclusion when a feature will remain deferred.
   Progress, 23 November: candidates carry provenance, exact-archive, layout,
-  symbols and signing checks; the symbols gap is fixed (`be420c1ad`). Windows
-  packages are unsigned. Promotion is the project owner's decision.
+  symbols and signing checks; the symbols gap is fixed (`be420c1ad`) and C3's
+  seven PDBs match their images. Windows packages are unsigned. Promotion is the
+  project owner's decision.
 
 ## Plan archive and traceability
 

@@ -263,7 +263,7 @@ release the official 0.15.0 archive.
 | `rel03.soak-vk` | pass | All 16 stops and the `vid_restart`; process memory 1.14 times, Vulkan allocations 1.08 times. |
 | `rel03.network.reconnect-impaired`, `rel03.network.ipv6` | pass | |
 | `rel03.renderer.vk-recovery` | fail, pass | Attempt 1 refused its runtime path (the harness accepts only `.install` or `.tmp/stock-runtime/`); attempt 2 ran on the runner's hard-linked view and passed. |
-| `rel03.audio.recovery` | fail | **A product defect.** After a software output interruption the two Ogg stream fixtures never resume (one stays `initial` with a block queued, one `stopped`), so the dialogue-volume and trim checks that need them fail too; a dialogue line paused across an outage resumes 1355 ms on over 788 ms; the surround run fails `layout_routing`. No sound code changed between 0.15.0 and C2; the harness last passed on 25 October, before stream decoding moved to job workers (`8d3859db1`, `39aa329a9`). Being fixed separately; the next candidate reruns it. |
+| `rel03.audio.recovery` | fail | **A product defect.** After a software output interruption the two Ogg stream fixtures never resume (one stays `initial` with a block queued, one `stopped`), so the dialogue-volume and trim checks that need them fail too; a dialogue line paused across an outage resumes 1355 ms on over 788 ms; the surround run fails `layout_routing`. The cause, found afterwards: since 0.14.1 (`8d3859db1`) a stream decoded on job workers refilled one queue buffer per frame, so under slow frames a stream restarted after an output change underran at once; this run's probes lagged the mixer by 282-1,066 ms. 0.15.0 behaves the same. Fixed in `5b8f32617`, which also corrects three harness assumptions and adds `frames_kept_pace`, so an overloaded machine now reads as such. |
 | `rel03.effects.lifecycle` | pass | |
 | `rel02.captures.generated-images` | pass | |
 | `rel04.package.symbols` | fail | C2's own symbols archive predates `be420c1ad`: no PDBs for the renderer modules or the updater. The fixed packager, run on C2's staged install, gives the same runtime archive byte for byte and a symbols archive whose seven PDBs match their images. |
@@ -275,6 +275,43 @@ OpenGL, for the matched visual review.
 
 **Not proven by C2:** audio output recovery (above); any platform but Windows x64; multiplayer demos; device,
 surface and audio-device loss on real hardware, suspend and high-DPI; every
-REL-02 human review; a signed package. **Found in passing, not a REL defect:**
-`tram1b` loads `tram1b.aas32` yet some AI report no `aas32` loaded and cannot
-path, on both renderers (Q4-02 follow-up).
+REL-02 human review; a signed package. **Found in passing:** some AI in
+`tram1b` and `mcc_1` report no `aas32` and cannot path on both renderers. The
+retail `aas32` files are empty and Quake 4 1.4.2 refuses them too, so it is
+retail content; `ad456ddad` makes the warnings say so (Q4-02).
+
+### C3: 0.16.0 candidate from `7fc884a87`, 23 November 2026
+
+**Passes the Windows x64 automated matrix; not promoted.** C3 is C2's source plus
+the symbols fix (`be420c1ad`), the audio stream fix (`5b8f32617`), the Q4-02
+warnings (`ad456ddad`) and other sessions' MP-22, REN and CI commits, built and
+packaged the same way. Provenance verified; the extracted runtime holds exactly
+the 440 files of `openq4-0.16.0-windows-x64.zip` (SHA-256 `397376841c54f3f4…`,
+manifest `e07f205033c29deda871f576bfec05982d502114e2d15cda426f55e1bac0d2b3`);
+version resource build 2691. Same machine, driver and retail view as C2.
+
+| Case | Attempts | Result |
+| --- | --- | --- |
+| `rel01.package.layout`, `rel04.package.symbols`, `rel04.package.signing` | pass | Seven PDBs, each carrying its image's GUID; every image `NotSigned`. |
+| `rel01.ded.startup`, `rel01.mp.dedicated-client` | pass | |
+| `rel01.install.clean` | pass | The seven seeded multiplayer-only settings survive a level and a menu start; no archived value changes between starts. |
+| `rel01.install.upgrade` | pass | 0.15.0's profile and save (build 2636) carry over: no player choice lost, save restored and resaved (build 2691). Migrations as in C2. |
+| `rel01.sp.save-load`, `rel01.sp.demo`, `rel01.sp.campaign-saves` | pass | |
+| `rel01.sp.campaign-transitions` | pass | All 31 stages in order. |
+| `rel01.campaign.switch`, `rel01.content-packs`, `rel01.localization` | pass | |
+| `rel01.mp.listen-gl`, `rel01.mp.listen-vk` | pass | 20 of 20 maps; 40 of 40 runs, no VUIDs. |
+| `rel01.sp.stock-maps-gl` | pass | 29 of 29. |
+| `rel01.sp.stock-maps-vk` | fail | 57 of 58, no VUIDs; the one miss is `mcc_2` on Vulkan, black in its scripted opening fades as in both C2 attempts. |
+| `rel03.lifecycle` | pass | Cold start to the map 9.9 s, warm 5.3 s; every exit code 0, quit to exit 0.6-1.7 s. |
+| `rel03.soak-vk` | pass | 16 stops and the `vid_restart`; process memory 1.13 times, Vulkan allocations 1.08 times. |
+| `rel03.soak-gl` | fail, pass | Attempt 1 reached 15 of 16 stops before Windows reset the GPU twice (LiveKernelEvent 141 at 18:48, while another session's development client was crashing in its game module); the OpenGL client has no context-reset handling and exited with code 1 and no message. Attempt 2: 16 stops and the `vid_restart`, process memory 1.13 times. |
+| `rel03.network.reconnect-impaired`, `rel03.network.ipv6` | pass | |
+| `rel03.renderer.vk-recovery`, `rel03.effects.lifecycle` | pass | |
+| `rel03.audio.recovery` | pass | All 34 checks, run when one other client was using the machine; probes lagged the mixer by 21-35 ms. |
+| `rel02.captures.generated-images` | pass | |
+
+**Not proven by C3:** any platform but Windows x64; multiplayer demos;
+device, surface and audio-device loss on real hardware, suspend and high-DPI;
+every REL-02 human review; a signed package. The OpenGL client exits without a
+message when the GPU is reset; Vulkan has its own recovery path, which
+`rel03.renderer.vk-recovery` exercises for startup.
