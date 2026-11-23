@@ -1168,8 +1168,15 @@ def validate_ci_job_scope() -> None:
                 raise AssertionError(f"{workflow} job {name} must run {shards} shard(s) of the Python checks")
 
         smoke = jobs["script-smoke"]
-        if "shard: [1, 2]" not in smoke or "run_parallel_commands.py --shard ${{ matrix.shard }}/2 <<'OPENQ4_CHECKS'" not in smoke:
+        if ("shard: [1, 2]" not in smoke or "OPENQ4_SMOKE_SHARD: ${{ matrix.shard }}/2" not in smoke
+                or "run_parallel_commands.py --shard \"${OPENQ4_SMOKE_SHARD}\" <<'OPENQ4_CHECKS'" not in smoke):
             raise AssertionError(f"{workflow} script-smoke must split its checks into two halves")
+        # GitHub evaluates a run block that holds an expression as one
+        # expression, and refuses the workflow past 21000 characters.
+        for job_name, job_body in jobs.items():
+            for block in re.findall(r"run: \|\n((?:          .*\n|\n)+)", job_body + "\n"):
+                if len(block) > 20000 and "${{" in block:
+                    raise AssertionError(f"{workflow} job {job_name} has an expression in a run block over 20000 characters")
         commands = [line.strip() for line in smoke.splitlines() if line.strip().startswith("python tools/")]
         repeated = sorted({command for command in commands if commands.count(command) > 1})
         if repeated:

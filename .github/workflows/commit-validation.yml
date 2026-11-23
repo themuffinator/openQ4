@@ -50,8 +50,13 @@ jobs:
       - name: Install Meson for wrap-sourced test harnesses
         run: python -m pip install meson
 
+      # The shard reaches the script through the environment: an expression
+      # inside this run block would make GitHub evaluate the whole block as one
+      # expression, which is capped at 21000 characters.
       - name: Check validation script syntax
         shell: bash
+        env:
+          OPENQ4_SMOKE_SHARD: ${{ matrix.shard }}/2
         run: |
           set -euo pipefail
           python -m py_compile \
@@ -775,7 +780,7 @@ jobs:
           bash -n tools/validation/validate_pr.sh
           # Independent checks run concurrently; run_parallel_commands.py prints each
           # in this order and fails the step if any fails.
-          python tools/validation/run_parallel_commands.py --shard ${{ matrix.shard }}/2 <<'OPENQ4_CHECKS'
+          python tools/validation/run_parallel_commands.py --shard "${OPENQ4_SMOKE_SHARD}" <<'OPENQ4_CHECKS'
           python tools/validation/audit_source_provenance.py --check
           python tools/tests/aas_liquid_area_state.py
           python tools/tests/airdefense_performance_contract.py
