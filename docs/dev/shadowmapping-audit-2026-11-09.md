@@ -1818,6 +1818,17 @@ files.
 
 What remains after it, in the order it shows:
 
+- **`outdoor_Main` moves away from stencil with the caster.** mcc_landing's
+  main outdoor light, a cube light whose source lies 280 units outside its
+  box, was measured again when REN-02 and REN-03 were merged (23 November,
+  same scan and machine, under load). With the caster its worst view differs
+  from stencil by 9.57% map-only and 9.86% stencil-only on OpenGL (8.79% and
+  8.87% on Vulkan, both in view 0 or 1); with `r_shadowMapPrelightCasters 0`
+  its worst view is 0.60% and 1.00% (OpenGL, view 4). In the worst view the
+  map leaves lit a stretch of terrain behind the rocks that stencil shadows,
+  and darkens ground that stencil leaves lit. The caster was kept on by
+  default because the lights above improve by far more; the cause for this
+  light is not established.
 - **A far shell leaks behind itself.** The caps are the faces turned away
   from the light, and a receiver that stands closer behind one than the
   map's bias is lit: `light_9083`'s stencil-only share rises from 0.22% to
