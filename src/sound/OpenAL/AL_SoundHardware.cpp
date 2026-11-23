@@ -220,6 +220,52 @@ static bool openQ4_LoadReopenDeviceProc( ALCdevice* device )
 }
 #endif
 
+#if defined( ALC_SOFT_loopback ) && defined( ALC_FORMAT_CHANNELS_SOFT ) && defined( ALC_SHORT_SOFT )
+	#define OPENQ4_OPENAL_LOOPBACK_SUPPORTED 1
+#else
+	#define OPENQ4_OPENAL_LOOPBACK_SUPPORTED 0
+#endif
+
+#if OPENQ4_OPENAL_LOOPBACK_SUPPORTED
+// openQ4 MP-22: a demo export mixes its sound track into memory (SoundCapture.h)
+typedef ALCdevice* ( ALC_APIENTRY *openq4_alcLoopbackOpenDeviceSOFT_t )( const ALCchar* deviceName );
+typedef ALCboolean ( ALC_APIENTRY *openq4_alcIsRenderFormatSupportedSOFT_t )( ALCdevice* device, ALCsizei freq, ALCenum channels, ALCenum type );
+typedef void ( ALC_APIENTRY *openq4_alcRenderSamplesSOFT_t )( ALCdevice* device, ALCvoid* buffer, ALCsizei samples );
+
+static openq4_alcLoopbackOpenDeviceSOFT_t qalcLoopbackOpenDeviceSOFT = NULL;
+static openq4_alcIsRenderFormatSupportedSOFT_t qalcIsRenderFormatSupportedSOFT = NULL;
+static openq4_alcRenderSamplesSOFT_t qalcRenderSamplesSOFT = NULL;
+
+static bool openQ4_LoadLoopbackProcs()
+{
+	if( qalcLoopbackOpenDeviceSOFT != NULL && qalcIsRenderFormatSupportedSOFT != NULL && qalcRenderSamplesSOFT != NULL )
+	{
+		return true;
+	}
+	if( alcIsExtensionPresent( NULL, "ALC_SOFT_loopback" ) != ALC_TRUE )
+	{
+		return false;
+	}
+	qalcLoopbackOpenDeviceSOFT = reinterpret_cast<openq4_alcLoopbackOpenDeviceSOFT_t>( alcGetProcAddress( NULL, "alcLoopbackOpenDeviceSOFT" ) );
+	qalcIsRenderFormatSupportedSOFT = reinterpret_cast<openq4_alcIsRenderFormatSupportedSOFT_t>( alcGetProcAddress( NULL, "alcIsRenderFormatSupportedSOFT" ) );
+	qalcRenderSamplesSOFT = reinterpret_cast<openq4_alcRenderSamplesSOFT_t>( alcGetProcAddress( NULL, "alcRenderSamplesSOFT" ) );
+	return qalcLoopbackOpenDeviceSOFT != NULL && qalcIsRenderFormatSupportedSOFT != NULL && qalcRenderSamplesSOFT != NULL;
+}
+
+static ALCenum openQ4_LoopbackChannels( const int channels )
+{
+	switch( channels )
+	{
+		case 1: return ALC_MONO_SOFT;
+		case 4: return ALC_QUAD_SOFT;
+		case 6: return ALC_5POINT1_SOFT;
+		case 7: return ALC_6POINT1_SOFT;
+		case 8: return ALC_7POINT1_SOFT;
+		default: return ALC_STEREO_SOFT;
+	}
+}
+#endif
+
 #if defined( AL_DEFERRED_UPDATES_SOFT )
 	#define OPENQ4_OPENAL_DEFERRED_UPDATES_SUPPORTED 1
 #else
@@ -1221,6 +1267,9 @@ void idSoundHardware_OpenAL::EndDeferredUpdates() {
 bool idSoundHardware_OpenAL::UpdateDeviceMonitoring() {
 	// The owned settings lease queries drift and keeps recovery authority.
 	if (SoundSettings_BlockAutomaticRestart()) return false;
+	// A demo export's loopback mixer: the playback device's preferences apply
+	// when it opens again, after the export.
+	if( loopbackOpen ) return false;
 	UpdateOutputState();
 	const int nowTime = Sys_Milliseconds();
 	const int pendingDeviceEventFlags = openQ4_ConsumePendingDeviceEventFlags();
@@ -1708,7 +1757,20 @@ void idSoundHardware_OpenAL::Init()
 	}
 
 	const idStr requestedDeviceName = NormalizeRequestedDeviceName( s_deviceName.GetString() );
-	if( requestedDeviceName.Length() > 0 )
+	if( loopbackRequested )
+	{
+		openalDevice = OpenLoopbackDevice( openalContext );
+		if( openalDevice == NULL )
+		{
+			common->Warning( "OpenAL loopback mixer unavailable; opening the playback device instead." );
+		}
+		else
+		{
+			common->Printf( "Done.\n" );
+			common->Printf( "OpenAL loopback mixer: %d Hz, %d channels%s\n", loopbackRate, loopbackChannels, loopbackHrtf ? ", HRTF" : "" );
+		}
+	}
+	if( openalDevice == NULL && requestedDeviceName.Length() > 0 )
 	{
 		openalDevice = alcOpenDevice( requestedDeviceName.c_str() );
 		if( openalDevice == NULL )
@@ -1734,16 +1796,19 @@ void idSoundHardware_OpenAL::Init()
 		return;
 	}
 
-	openQ4_ReportHrtfPreference( openalDevice );
-
-	ALCint openalContextAttributes[ OPENQ4_OPENAL_DEVICE_ATTRIBUTE_CAPACITY ];
-	const ALCint* requestedContextAttributes = openQ4_BuildDeviceAttributes( openalDevice, openalContextAttributes, true );
-	openalContext = alcCreateContext( openalDevice, requestedContextAttributes );
-	if( openalContext == NULL && requestedContextAttributes != NULL )
+	if( !loopbackOpen )
 	{
-		CheckALCErrors( openalDevice );
-		common->Warning( "idSoundHardware_OpenAL::Init: alcCreateContext() rejected the requested OpenAL device attributes; retrying with runtime default." );
-		openalContext = alcCreateContext( openalDevice, NULL );
+		openQ4_ReportHrtfPreference( openalDevice );
+
+		ALCint openalContextAttributes[ OPENQ4_OPENAL_DEVICE_ATTRIBUTE_CAPACITY ];
+		const ALCint* requestedContextAttributes = openQ4_BuildDeviceAttributes( openalDevice, openalContextAttributes, true );
+		openalContext = alcCreateContext( openalDevice, requestedContextAttributes );
+		if( openalContext == NULL && requestedContextAttributes != NULL )
+		{
+			CheckALCErrors( openalDevice );
+			common->Warning( "idSoundHardware_OpenAL::Init: alcCreateContext() rejected the requested OpenAL device attributes; retrying with runtime default." );
+			openalContext = alcCreateContext( openalDevice, NULL );
+		}
 	}
 	if( openalContext == NULL )
 	{
@@ -1771,6 +1836,7 @@ void idSoundHardware_OpenAL::Init()
 		openalContext = NULL;
 		alcCloseDevice( openalDevice );
 		openalDevice = NULL;
+		loopbackOpen = false;
 		initFailed = true;
 		s_noSound.SetBool( true );
 		s_noSound.ClearModified();
@@ -1779,7 +1845,7 @@ void idSoundHardware_OpenAL::Init()
 
 	// A restart or a device retry must retain an outstanding app suspension.
 	SetDevicePaused( devicePauseRequested );
-	if( !quietRetry )
+	if( !quietRetry && !loopbackOpen )
 	{
 		common->Printf( "Done.\n" );
 	}
@@ -1872,12 +1938,16 @@ void idSoundHardware_OpenAL::Init()
 	NoteOutputChanged( "device opened" );
 
 	CaptureOpenedDeviceState( requestedDeviceName.c_str() );
-	reopenDeviceAvailable = alcIsExtensionPresent( openalDevice, "ALC_SOFT_reopen_device" ) == ALC_TRUE && openQ4_LoadReopenDeviceProc( openalDevice );
+	// A loopback mixer has no endpoint to lose, reopen or follow.
+	reopenDeviceAvailable = !loopbackOpen && alcIsExtensionPresent( openalDevice, "ALC_SOFT_reopen_device" ) == ALC_TRUE && openQ4_LoadReopenDeviceProc( openalDevice );
 	if( reopenDeviceAvailable )
 	{
 		common->Printf( "OpenAL in-place device reopen available.\n" );
 	}
-	EnableDeviceEventMonitoring();
+	if( !loopbackOpen )
+	{
+		EnableDeviceEventMonitoring();
+	}
 	if( openedRequestedDeviceName.Length() == 0 ) {
 		common->Printf( "OpenAL requested device: system default\n" );
 	} else {
@@ -2057,6 +2127,163 @@ void idSoundHardware_OpenAL::Init()
 	}
 }
 
+/*
+========================
+idSoundHardware_OpenAL loopback
+
+openQ4 MP-22: a demo export's sound track (SoundCapture.h). The export asks for
+the format the playback device mixes in, the sound system restarts onto a
+loopback mixer in that format, and every export step renders exactly its share
+of samples into the track. Nothing reaches the speakers meanwhile.
+========================
+*/
+void idSoundHardware_OpenAL::GetOutputFormat( int& rate, int& channels, bool& hrtf ) const
+{
+	rate = 48000;
+	channels = 2;
+	hrtf = false;
+	if( loopbackOpen )
+	{
+		// what the mixer renders, after any fallback to stereo
+		rate = loopbackRate;
+		channels = loopbackChannels;
+		hrtf = loopbackHrtf;
+		return;
+	}
+	if( openalDevice == NULL )
+	{
+		return;
+	}
+	ALCint frequency = 0;
+	alcGetIntegerv( openalDevice, ALC_FREQUENCY, 1, &frequency );
+	if( CheckALCErrors( openalDevice ) == ALC_NO_ERROR && frequency >= 8000 && frequency <= 384000 )
+	{
+		rate = frequency;
+	}
+#if OPENQ4_OPENAL_OUTPUT_MODE_SUPPORTED
+	if( alcIsExtensionPresent( openalDevice, "ALC_SOFT_output_mode" ) == ALC_TRUE )
+	{
+		ALCint outputMode = ALC_ANY_SOFT;
+		alcGetIntegerv( openalDevice, ALC_OUTPUT_MODE_SOFT, 1, &outputMode );
+		if( CheckALCErrors( openalDevice ) == ALC_NO_ERROR )
+		{
+			switch( outputMode )
+			{
+				case ALC_MONO_SOFT: channels = 1; break;
+				case ALC_QUAD_SOFT: channels = 4; break;
+				case ALC_SURROUND_5_1_SOFT: channels = 6; break;
+				case ALC_SURROUND_6_1_SOFT: channels = 7; break;
+				case ALC_SURROUND_7_1_SOFT: channels = 8; break;
+#if defined( ALC_STEREO_HRTF_SOFT )
+				case ALC_STEREO_HRTF_SOFT: hrtf = true; break;
+#endif
+				default: break;
+			}
+		}
+	}
+#endif
+}
+
+bool idSoundHardware_OpenAL::LoopbackAvailable()
+{
+#if OPENQ4_OPENAL_LOOPBACK_SUPPORTED
+	return openQ4_LoadLoopbackProcs();
+#else
+	return false;
+#endif
+}
+
+void idSoundHardware_OpenAL::RequestLoopback( int rate, int channels, bool hrtf )
+{
+	loopbackRequested = true;
+	loopbackRate = rate;
+	loopbackChannels = channels;
+	loopbackHrtf = hrtf && channels == 2;
+}
+
+ALCdevice* idSoundHardware_OpenAL::OpenLoopbackDevice( ALCcontext*& context )
+{
+	context = NULL;
+	loopbackOpen = false;
+#if OPENQ4_OPENAL_LOOPBACK_SUPPORTED
+	if( !openQ4_LoadLoopbackProcs() )
+	{
+		return NULL;
+	}
+	ALCdevice* device = qalcLoopbackOpenDeviceSOFT( NULL );
+	if( device == NULL )
+	{
+		return NULL;
+	}
+	// The playback device's layout when the mixer can render it, else stereo.
+	if( qalcIsRenderFormatSupportedSOFT( device, loopbackRate, openQ4_LoopbackChannels( loopbackChannels ), ALC_SHORT_SOFT ) != ALC_TRUE )
+	{
+		common->Printf( "OpenAL loopback mixer cannot render %d channels at %d Hz; recording stereo.\n", loopbackChannels, loopbackRate );
+		loopbackChannels = 2;
+		loopbackHrtf = false;
+		if( qalcIsRenderFormatSupportedSOFT( device, loopbackRate, ALC_STEREO_SOFT, ALC_SHORT_SOFT ) != ALC_TRUE )
+		{
+			loopbackRate = 48000;
+		}
+	}
+	ALCint attributes[16];
+	int count = 0;
+	attributes[count++] = ALC_FORMAT_CHANNELS_SOFT;
+	attributes[count++] = openQ4_LoopbackChannels( loopbackChannels );
+	attributes[count++] = ALC_FORMAT_TYPE_SOFT;
+	attributes[count++] = ALC_SHORT_SOFT;
+	attributes[count++] = ALC_FREQUENCY;
+	attributes[count++] = loopbackRate;
+#if OPENQ4_OPENAL_HRTF_SUPPORTED
+	if( alcIsExtensionPresent( device, "ALC_SOFT_HRTF" ) == ALC_TRUE )
+	{
+		attributes[count++] = ALC_HRTF_SOFT;
+		attributes[count++] = loopbackHrtf ? ALC_TRUE : ALC_FALSE;
+	}
+#endif
+#if defined( ALC_OUTPUT_LIMITER_SOFT )
+	if( alcIsExtensionPresent( device, "ALC_SOFT_output_limiter" ) == ALC_TRUE )
+	{
+		attributes[count++] = ALC_OUTPUT_LIMITER_SOFT;
+		attributes[count++] = s_outputLimiter.GetBool() ? ALC_TRUE : ALC_FALSE;
+	}
+#endif
+	attributes[count] = 0;
+	context = alcCreateContext( device, attributes );
+	if( context == NULL )
+	{
+		CheckALCErrors( device );
+		alcCloseDevice( device );
+		return NULL;
+	}
+	loopbackOpen = true;
+	return device;
+#else
+	return NULL;
+#endif
+}
+
+bool idSoundHardware_OpenAL::RenderLoopback( void* out, int frames )
+{
+#if OPENQ4_OPENAL_LOOPBACK_SUPPORTED
+	if( !loopbackOpen || openalDevice == NULL || qalcRenderSamplesSOFT == NULL || out == NULL || frames < 0 )
+	{
+		return false;
+	}
+	// what this frame changed reaches the mixer before it renders
+	EndDeferredUpdates();
+	if( frames > 0 )
+	{
+		qalcRenderSamplesSOFT( openalDevice, out, frames );
+	}
+	return CheckALCErrors( openalDevice ) == ALC_NO_ERROR;
+#else
+	( void )out;
+	( void )frames;
+	return false;
+#endif
+}
+
 // SDL can park the engine loop while OpenAL keeps mixing. Silence the owned
 // context immediately and, when both extension functions exist, stop the device.
 // Keep the resume function for this exact device so partial extension support
@@ -2069,7 +2296,7 @@ void idSoundHardware_OpenAL::SetDevicePaused( bool paused )
 		alListenerf( AL_GAIN, ( paused || soundSystem->IsMuted() ) ? 0.0f : 1.0f );
 		EndDeferredUpdates();
 	}
-	if( openalDevice == NULL )
+	if( openalDevice == NULL || loopbackOpen )
 	{
 		return;
 	}
@@ -2180,6 +2407,7 @@ void idSoundHardware_OpenAL::Shutdown()
 
 	alcCloseDevice( openalDevice );
 	openalDevice = NULL;
+	loopbackOpen = false;
 	lastDeviceCheckTime = 0;
 	lastPerfPrintTime = 0;
 	reopenDeviceAvailable = false;
@@ -2590,7 +2818,7 @@ void idSoundHardware_OpenAL::Update()
 		return;
 	}
 
-	if( devicePauseRequested || soundSystem->IsMuted() )
+	if( ( devicePauseRequested && !loopbackOpen ) || soundSystem->IsMuted() )
 	{
 		alListenerf( AL_GAIN, 0.0f );
 	}
@@ -3135,7 +3363,8 @@ void idSoundHardware_OpenAL::NoteReverbSend( ALuint slotHandle )
 void idSoundHardware_OpenAL::UpdateIdleReverbSlots( int numSlots )
 {
 #if OPENQ4_OPENAL_EFX_SUPPORTED
-	reverbClock = Sys_Milliseconds();
+	// a demo export's mixer runs on the export's steps, not real time
+	reverbClock = loopbackOpen ? soundSystemLocal.SoundTime() : Sys_Milliseconds();
 	const bool idleAllowed = s_reverbIdleSlots.GetBool();
 	for( int slot = 0; slot < numSlots && slot < SOUND_REVERB_SLOTS; slot++ )
 	{

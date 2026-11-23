@@ -58,6 +58,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../ui/SettingsService.h"
 #include "../ui/UserInterfaceManaged.h"
 #include "../ui/UserInterfaceRetained.h"
+#include "../sound/SoundCapture.h"
 #include <functional>
 #include <memory>
 #include <chrono>
@@ -11471,7 +11472,8 @@ void idSessionLocal::UpdateSoundWorldFocus() {
 
 	idSoundWorld *targetSoundWorld = requestedSoundWorld;
 
-	if ( targetSoundWorld != NULL && Session_ShouldSilenceAudioWhenUnfocused() ) {
+	// openQ4 MP-22: a demo export records its sound track whatever has focus
+	if ( targetSoundWorld != NULL && !Sound_CaptureActive() && Session_ShouldSilenceAudioWhenUnfocused() ) {
 		targetSoundWorld = NULL;
 	}
 

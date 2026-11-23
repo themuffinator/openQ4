@@ -159,14 +159,18 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   one to follow. `demoPlayers` lists them at the console.
 - **Step back** a frame at a time, as well as forward.
 - **Export.** `demoExport name.mvd 30` writes a demo as PNG pictures for a
-  video editor. Sound is not exported yet.
+  video editor, with its sound as a WAV file exactly as long as the pictures.
+  Nothing plays through your speakers while it runs, and your sound device
+  comes back afterwards. The demos guide has the `ffmpeg` line that joins
+  them into a video.
 - **Find your demos.** The library names the players, or whose view a
   recording shows, shows a picture from the recording itself, and
   `demoFind <text>` searches them all.
 - **Markers in your own recordings**, for kills and the match's changes.
 - **Evidence.** `mp_client_demo_smoke.py` and `mp_autoaction_smoke.py` check
-  each on a cheats-off dedicated server (Windows, OpenGL). The new deck
-  buttons were not pressed by a person.
+  each on a cheats-off dedicated server (Windows, OpenGL); the export's WAV is
+  read back for its format, length and level. The new deck buttons were not
+  pressed by a person, and nobody has listened to an export yet.
 
 ## Record every match automatically, time a demo, and seek recordings faster, 23 November 2026
 

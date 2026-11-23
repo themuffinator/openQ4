@@ -863,8 +863,7 @@ one tic back through the keyframe before it. `demoExport <demo>.mvd [fps]
 [quit]` plays like a timedemo with 1000/fps of the match a frame and buffers a
 `screenshot "exports/<demo>/frame%05d.png"` each frame, which runs at the head
 of the next frame's command buffer before playback moves on, so each picture is
-the frame shown; sound is not written (the sound world's AVI hooks are empty
-and the OpenAL backend has no loopback renderer). A client recording now has
+the frame shown; sound came in the fourth round (below). A client recording now has
 markers: the client's game runs `PublishMVDMarkers` (phase, round, pause,
 score, flag and powerup changes it can see) and marks each kill from the death
 message, and the recorder stamps them on its own clock. Every finished
@@ -875,7 +874,54 @@ made where there is a view takes a 320x240 `demos/<name>_thumb.png` three
 seconds in (`screenshot <file> <width> <height>`), which the library shows and
 deletes with the demo.
 
-**Open.** Recording across a map change, sound in exports, and the prediction's
+**Sound in exports (fourth round, same day).** `demoExport` writes
+`exports/<demo>/<demo>.wav` beside the pictures (`src/sound/SoundCapture.h`).
+Before `StartPlayback` loads the map, `Sound_BeginCapture` reads the open
+device's `ALC_FREQUENCY` and `ALC_OUTPUT_MODE_SOFT` (mono, stereo, HRTF
+stereo, quad, 5.1, 6.1, 7.1), opens the file and restarts the sound system
+onto an `ALC_SOFT_loopback` device in that format: 16-bit, at the device's
+rate, HRTF and the output limiter as the device had them; a layout the mixer
+cannot render falls back to stereo. The map's samples then load straight onto
+the loopback context, and nothing reaches the speakers. Each picture the
+export buffers calls `Sound_CaptureAdvance` with its step, and that frame's
+`idSoundSystemLocal::Render` mixes it after the world and the hardware update
+(`MixCapture`): `alcRenderSamplesSOFT` renders `msec * rate / 1000` minus the
+frames already written, in slices of at most 100 ms with the playing world and
+the voices updated between them so a stream's ~1 s queue refills as in a live
+frame, and the sound clock moves on by exactly the slice instead of reading
+`Sys_Milliseconds`. `RefreshSoundTime`, the reverb slots' idle clock and the
+listener gain (no device pause) follow the export, endpoint monitoring and
+device events stay off, and the session does not silence the playing world for
+lost focus. The steps themselves are now whole milliseconds that add up to
+`n * 1000 / fps` (`DemoExportStepMsec`: 33, 33, 34 at 30 a second): the old
+fixed `1000 / fps` step made 30 and 60 a second pictures 1% and 4% shorter
+than the match, which a track at the match's own rate would have shown.
+`FinishPlayback` and `StopPlayback` call `Sound_EndCapture`, which mixes the
+last step no sound frame reached, rewrites the RIFF header (PCM for one or two
+channels, `WAVE_FORMAT_EXTENSIBLE` with OpenAL Soft's speaker mask above that),
+reports `MVD_EXPORT_SOUND written=1 file=... rate channels frames msec peak rms
+complete` and restarts onto the playback device; the sound clock keeps any lead
+the export built over the wall clock (`soundClockOffset`), so it never runs
+backwards. A track that cannot be made (sound off, no loopback in the runtime,
+for example Apple's OpenAL framework, a settings change holding the device, an
+unwritable file) leaves the device alone and reports `MVD_EXPORT_SOUND
+written=0 reason="..."`; a mixer lost mid-export writes silence for the rest
+so the track keeps its length. Stream blocks still decode on job workers, so a
+stream that starts in an export starts a frame late, as it does live.
+`SoundCaptureTest` checks the step and frame arithmetic, the headers and the
+levels; `mp_client_demo.py` pins the wiring, and `mp_client_demo_smoke.py`
+exports the client recording with sound on and reads the WAV back: format,
+rate and channels as reported, exactly `pictures * 100 ms` at 10 a second, not
+silent, and the device opened again. On 23 November it passed on Windows
+(OpenGL, a headphone endpoint with automatic HRTF): 330 pictures and a
+33.000 s, 48 kHz HRTF stereo track (1,584,000 frames, peak 27,684, every
+second audible). The same export with `s_numberOfSpeakers 6` wrote a 5.1
+`WAVE_FORMAT_EXTENSIBLE` track (mask 0x60F) of the same length, with sound in
+the front, centre and side channels. The render-demo `aviDemo` path writes no
+pictures (its `TakeScreenshot` calls are commented out), so it has nothing for
+a track to line up with and was left as it is.
+
+**Open.** Recording across a map change, and the prediction's
 lead: playback predicts to the recorder's frame as the clock reconstructs it,
 which matches the recorded view to within the frame-time jitter of the
 original client.

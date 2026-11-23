@@ -182,6 +182,28 @@ public:
 	// the slot holds the null effect until a voice feeds it again
 	bool			IsReverbSlotIdle( int slot ) const;
 
+	// openQ4 MP-22: a demo export's sound track (SoundCapture.h). The format the
+	// open device mixes in, which the capture records at; on the loopback
+	// mixer, the format it renders.
+	void			GetOutputFormat( int& rate, int& channels, bool& hrtf ) const;
+	// The runtime offers ALC_SOFT_loopback.
+	static bool		LoopbackAvailable();
+	// The next Init opens a loopback mixer in this format instead of a playback
+	// device; EndLoopback makes the next Init open the playback device again.
+	// Init falls back to the playback device when the loopback one will not open.
+	void			RequestLoopback( int rate, int channels, bool hrtf );
+	void			EndLoopback()
+	{
+		loopbackRequested = false;
+	}
+	bool			IsLoopback() const
+	{
+		return loopbackOpen;
+	}
+	// Mixes the next frames sample frames of the loopback device into out
+	// (16-bit, interleaved in its layout). False when no loopback device is open.
+	bool			RenderLoopback( void* out, int frames );
+
 	// OpenAL info
 	static void		PrintDeviceList( const char* list );
 	static void		PrintALCInfo( ALCdevice* device );
@@ -206,6 +228,12 @@ private:
 
 	ALCdevice*			openalDevice;
 	ALCcontext*			openalContext;
+	bool				loopbackRequested = false;
+	bool				loopbackOpen = false;
+	int					loopbackRate = 0;
+	int					loopbackChannels = 0;
+	bool				loopbackHrtf = false;
+	ALCdevice*			OpenLoopbackDevice( ALCcontext*& context );
 	typedef void ( ALC_APIENTRY *devicePauseFunction_t )( ALCdevice* device );
 	bool				devicePauseRequested = false;
 	devicePauseFunction_t deviceResume = NULL;

@@ -18,6 +18,9 @@ instead of the step pump the other smokes use. The run must show:
   the camera refusing to follow anyone else, a rewind that replays from the
   start, and the playback running to its clean end with no warning;
 * a screenshot during playback that is not one flat colour.
+* `demoExport` writing a PNG picture every tenth of a second and a 16-bit WAV
+  sound track exactly as long as them, mixed by a loopback mixer that replaces
+  the sound device for the export, audible, with the device opened again after.
 
 Peers bind 127.0.0.1 only, so a runtime at a new path raises no firewall
 prompt.
@@ -26,10 +29,13 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import array
 import json
+import math
 import os
 import re
 import subprocess
+import sys
 import time
 import zlib
 from pathlib import Path
@@ -59,6 +65,38 @@ def flat_image(path: Path) -> bool | None:
         return len(set(pixels[i:i + 3] for i in range(0, min(len(pixels), 3 * 200000), 3 * 97))) <= 1
     # compressed formats: a flat image compresses to almost nothing
     return len(set(data[len(data) // 4:])) <= 2
+
+
+def read_wav(path: Path) -> dict | None:
+    """The format and the 16-bit samples of a PCM or WAVE_FORMAT_EXTENSIBLE file."""
+    if not path.is_file():
+        return None
+    data = path.read_bytes()
+    if data[:4] != b"RIFF" or data[8:12] != b"WAVE" or int.from_bytes(data[4:8], "little") != len(data) - 8:
+        return None
+    at, fmt, samples = 12, None, None
+    while at + 8 <= len(data):
+        name, size = data[at:at + 4], int.from_bytes(data[at + 4:at + 8], "little")
+        chunk = data[at + 8:at + 8 + size]
+        if name == b"fmt ":
+            fmt = {"tag": int.from_bytes(chunk[0:2], "little"), "channels": int.from_bytes(chunk[2:4], "little"),
+                   "rate": int.from_bytes(chunk[4:8], "little"), "block": int.from_bytes(chunk[12:14], "little"),
+                   "bits": int.from_bytes(chunk[14:16], "little")}
+        elif name == b"data":
+            samples = array.array("h")
+            samples.frombytes(chunk[: len(chunk) // 2 * 2])
+            if sys.byteorder != "little":
+                samples.byteswap()
+        at += 8 + size + (size & 1)
+    if fmt is None or samples is None or fmt["channels"] <= 0:
+        return None
+    frames = len(samples) // fmt["channels"]
+    second = fmt["rate"] * fmt["channels"]
+    windows = [max((abs(value) for value in samples[start:start + second]), default=0)
+               for start in range(0, len(samples), second)]
+    return dict(fmt, frames=frames, peak=max((abs(value) for value in samples), default=0),
+                rms=math.sqrt(sum(value * value for value in samples) / len(samples)) if samples else 0.0,
+                audible_seconds=sum(1 for peak in windows if peak >= 64), seconds=len(windows))
 
 
 def main() -> int:
@@ -290,14 +328,17 @@ def main() -> int:
               timed[-500:])
         finish("timer", 60)
 
-        # demoExport: a PNG frame each tenth of a second of the match, then quit
+        # demoExport: a PNG frame each tenth of a second of the match and its sound track, then quit.
+        # Only this game has sound on: it opens the sound device, records the track from a loopback
+        # mixer and opens the device again at the end.
         logs_of["exporter"] = games["player"] / "logs/openq4-exporter.log"
         write_script(games["player"] / "mp22_exporter.cfg", ["waitMsec 2000", f"demoExport {DEMO}.mvd 10 quit"])
-        launch("exporter", paths["engine"], dict(common | window, logFileName="logs/openq4-exporter.log"),
+        launch("exporter", paths["engine"], dict(common | window, logFileName="logs/openq4-exporter.log", s_noSound="0"),
                ["+exec", "mp22_exporter.cfg"])
-        exported = wait("the export", lambda t: "MVD_EXPORT" in t["exporter"], args.startup_timeout + args.record_seconds * 3,
-                        may_end=("exporter",))["exporter"]
+        wait("the export", lambda t: "MVD_EXPORT frames=" in t["exporter"], args.startup_timeout + args.record_seconds * 3,
+             may_end=("exporter",))
         finish("exporter", 120)
+        exported = read_log(logs_of["exporter"])
         result = re.search(r"MVD_EXPORT frames=(\d+) directory=(\S+) fps=(\d+) complete=(\d)", exported)
         frames = sorted((games["player"] / "exports" / DEMO).glob("frame*.png"))
         report["export"] = {"line": result.groups() if result else None, "files": len(frames)}
@@ -305,6 +346,26 @@ def main() -> int:
               result is not None and result[4] == "1" and result[3] == "10" and len(frames) == int(result[1]) and
               len(frames) >= args.record_seconds * 9 and frames[0].read_bytes()[:8] == b"\x89PNG\r\n\x1a\n",
               json.dumps(report["export"]))
+        track = re.search(r"MVD_EXPORT_SOUND written=1 file=(\S+) rate=(\d+) channels=(\d+) frames=(\d+) msec=(\d+) "
+                          r"peak=(\d+) rms=([\d.]+) complete=(\d)", exported)
+        wav = read_wav(games["player"] / "exports" / DEMO / f"{DEMO}.wav")
+        report["export"]["sound"] = {"line": track.groups() if track else None,
+                                     "file": {k: v for k, v in wav.items()} if wav else None}
+        msec = len(frames) * 1000 // 10
+        check("demoExport writes a 16-bit WAV at the mixer's rate, exactly as long as the pictures",
+              track is not None and wav is not None and track[1] == f"exports/{DEMO}/{DEMO}.wav" and track[8] == "1" and
+              wav["tag"] in (1, 0xFFFE) and wav["bits"] == 16 and wav["rate"] == int(track[2]) >= 22050 and
+              wav["channels"] == int(track[3]) >= 1 and wav["block"] == wav["channels"] * 2 and
+              int(track[5]) == msec and wav["frames"] == int(track[4]) == msec * wav["rate"] // 1000,
+              json.dumps(report["export"]["sound"]) + exported[-400:])
+        check("the sound track is the match's sound, not silence",
+              wav is not None and track is not None and wav["peak"] == int(track[6]) and wav["peak"] >= 1000 and
+              wav["rms"] >= 30 and wav["audible_seconds"] * 2 >= wav["seconds"],
+              json.dumps(report["export"]["sound"]))
+        check("the loopback mixer replaces the sound device for the export, which opens again after it",
+              "OpenAL loopback mixer:" in exported and
+              "The sound track is finished; the playback device is open again" in exported and
+              exported.count("Setup OpenAL device and context") >= 3, exported[-600:])
 
         # A recording cut short, and one whose game data differs from this game's
         demo = (games["player"] / "demos" / f"{DEMO}.mvd").read_bytes()
