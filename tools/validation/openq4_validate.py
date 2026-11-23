@@ -992,6 +992,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'savegame_cross_load.py', ['--self-test']),
         (root / "tools" / "tests" / 'release_profile_runtime.py', ['self-test']),
         (root / "tools" / "tests" / 'archived_settings_across_modules.py', []),
+        (root / "tools" / "tests" / 'release_archive_formats.py', []),
         (root / "tools" / "validation" / 'release_qualification.py', ['self-test']),
         (root / "tools" / "tests" / 'bse_lifecycle_runtime.py', ['--self-test']),
         (root / "tools" / "tests" / 'turbo_lift_runtime.py', ['--self-test']),

@@ -30,9 +30,10 @@ import argparse
 import fnmatch
 import hashlib
 import json
-
+import os
 import sys
 import tarfile
+from concurrent.futures import ThreadPoolExecutor
 
 import zipfile
 from dataclasses import dataclass
@@ -408,10 +409,16 @@ def command_verify_identity(args: argparse.Namespace) -> int:
     def wanted(relative: str) -> bool:
         return any(relative == name or relative.endswith("/" + name) for name in wanted_names)
 
-    for raw in args.archive:
-        path = Path(raw)
-        is_update = UPDATE_ARCHIVE_MARKER in path.name and not path.name.endswith(".apk")
-        members = read_archive(path, wanted, rootless=is_update)
+    def is_update_archive(path: Path) -> bool:
+        return UPDATE_ARCHIVE_MARKER in path.name and not path.name.endswith(".apk")
+
+    # Each archive is read and its packs hashed on its own thread (the codecs and
+    # hashlib release the GIL); the comparisons below keep the argument order.
+    paths = [Path(raw) for raw in args.archive]
+    with ThreadPoolExecutor(max_workers=max(1, min(len(paths), os.cpu_count() or 1))) as pool:
+        archive_members = list(pool.map(lambda path: read_archive(path, wanted, rootless=is_update_archive(path)), paths))
+    for path, members in zip(paths, archive_members):
+        is_update = is_update_archive(path)
         found: dict[str, str] = {}
         for name, record in manifest.items():
             paths = pack_member_paths(members, name)

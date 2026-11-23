@@ -107,7 +107,7 @@ The Windows installer and the Linux AppImage always update as whole downloads. W
 
 - **The easiest way to play** is the AppImage, a single file that runs without installing: `openq4-<version>-x86_64.AppImage` on most PCs, or the clearly marked `openq4-<version>-preview-aarch64.AppImage` on ARM64. Make it executable with `chmod +x openq4-*.AppImage` and run it.
 - The AppImage contains openQ4 and the libraries it needs, but **not** the Quake 4 assets. It finds your Steam or GOG installation the same way the other packages do; if it doesn't, add `+set fs_basepath "/path/to/Quake 4"` when you launch it.
-- The `.tar.xz` archive has the same game as loose files, plus the dedicated server, the Steam Deck launcher and offline documentation. Extract it anywhere.
+- The `.tar.xz` archive has the same game as loose files, plus the dedicated server, the Steam Deck launcher and offline documentation. Extract it anywhere. Releases after 0.15.0 also offer the same archive as `.tar.gz`, for sites and tools that don't take `.tar.xz`.
 - openQ4 targets a 64-bit desktop comparable to Ubuntu 24.04, with working OpenGL graphics drivers. It runs on both Wayland and X11 desktops.
 - **Linux ARM64 packages are preview builds** until they have been fully tested on real ARM64 hardware. They need a 64-bit ARM computer with full desktop OpenGL drivers; boards that only offer OpenGL ES aren't supported.
 

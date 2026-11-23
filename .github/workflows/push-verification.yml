@@ -755,6 +755,7 @@ jobs:
             tools/tests/savegame_cross_load.py \
             tools/tests/release_profile_runtime.py \
             tools/tests/archived_settings_across_modules.py \
+            tools/tests/release_archive_formats.py \
             tools/tests/bse_lifecycle_runtime.py \
             tools/tests/turbo_lift_runtime.py \
             tools/tests/awakening_vehicle_runtime.py \
@@ -1274,6 +1275,7 @@ jobs:
           python tools/tests/savegame_cross_load.py --self-test
           python tools/tests/release_profile_runtime.py self-test
           python tools/tests/archived_settings_across_modules.py
+          python tools/tests/release_archive_formats.py
           python tools/validation/release_qualification.py self-test
           python tools/tests/bse_lifecycle_runtime.py --self-test
           python tools/tests/turbo_lift_runtime.py --self-test
@@ -1593,13 +1595,28 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson ninja
 
+      # The same cache as the release workflow's, so pushes keep it warm for releases.
+      - name: Restore prepared OpenAL Soft (x64)
+        id: openal_cache
+        uses: actions/cache@v6
+        with:
+          path: .tmp/openal-soft-x64
+          key: openal-soft-windows-x64-${{ hashFiles('tools/build/prepare_windows_openal.ps1') }}
+
       - name: Prepare OpenAL Soft (Windows)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $outputRoot = Join-Path $env:GITHUB_WORKSPACE ".tmp/openal-soft-x64"
-          $env:OPENQ4_VS_TARGET_ARCH = "x64"
-          powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "x64" -OutputRoot $outputRoot
+          $cached = "${{ steps.openal_cache.outputs.cache-hit }}" -eq "true" -and
+            (Test-Path (Join-Path $outputRoot "bin/OpenAL32.dll")) -and (Test-Path (Join-Path $outputRoot "lib/OpenAL32.lib"))
+          if ($cached) {
+            Write-Host "Using the cached OpenAL Soft install: $outputRoot"
+          } else {
+            $env:OPENQ4_VS_TARGET_ARCH = "x64"
+            powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "x64" -OutputRoot $outputRoot
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           "OPENQ4_OPENAL_ROOT=$outputRoot" >> $env:GITHUB_ENV
 
       - name: Run push verification
@@ -1691,12 +1708,27 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install meson ninja
 
+      # The same cache as the release workflow's, so pushes keep it warm for releases.
+      - name: Restore prepared OpenAL Soft (arm64)
+        id: openal_cache
+        uses: actions/cache@v6
+        with:
+          path: .tmp/openal-soft-arm64
+          key: openal-soft-windows-arm64-${{ hashFiles('tools/build/prepare_windows_openal.ps1') }}
+
       - name: Prepare OpenAL Soft (Windows ARM64)
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $outputRoot = Join-Path $env:GITHUB_WORKSPACE ".tmp/openal-soft-arm64"
-          powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "arm64" -OutputRoot $outputRoot
+          $cached = "${{ steps.openal_cache.outputs.cache-hit }}" -eq "true" -and
+            (Test-Path (Join-Path $outputRoot "bin/OpenAL32.dll")) -and (Test-Path (Join-Path $outputRoot "lib/OpenAL32.lib"))
+          if ($cached) {
+            Write-Host "Using the cached OpenAL Soft install: $outputRoot"
+          } else {
+            powershell -ExecutionPolicy Bypass -File tools/build/prepare_windows_openal.ps1 -Architecture "arm64" -OutputRoot $outputRoot
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
           "OPENQ4_OPENAL_ROOT=$outputRoot" >> $env:GITHUB_ENV
 
       # The bundled OpenAL import library is x64-only, so the arm64 build links
