@@ -456,6 +456,10 @@ static int Common_GetRequestedPresentationCap( void ) {
 	if ( vrSystem != NULL && vrSystem->IsPacing() ) {
 		return 0;
 	}
+	// openQ4 MP-22: a multi-view timedemo measures frames as fast as they come
+	if ( idAsyncNetwork::multiViewDemo.IsTimeDemo() ) {
+		return 0;
+	}
 
 	// A window that shows nothing never presents faster than 60 Hz, uncapped
 	// included, so a hidden or minimized client does not spin (HF-07).

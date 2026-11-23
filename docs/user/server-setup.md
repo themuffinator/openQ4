@@ -329,6 +329,7 @@ it, for example `connect [2001:db8::1]:28004`. Every address form is under
 | `g_mapRotation` | What follows a match: `0` the same map, `1` the rotation (default), `2` a shuffled rotation, `3` the `g_mapCycle` script (**New in 0.15.0**) |
 | `g_mapQueue` | `1` lets players queue maps with `mymap` (default); `0` turns the queue off (**New in 0.15.0**) |
 | `g_mapPick` | `1` offers three maps to pick from when a match ends (**New in 0.15.0**) |
+| `si_autoAction` | What the server does for every match it runs: `demo` records a multi-view demo, `stats` writes `stats/<match>.json`, e.g. `si_autoAction "demo stats"`. Players see it in the server information. A managed match records itself. **After 0.15.0** |
 | `g_intermissionAnnounce` | `1` names the next map while the final scoreboard is up and reads out each player's end-of-match awards; see [Picking the next map](#picking-the-next-map). Off by default. **After 0.15.0** |
 | `g_mapDatabase` | The file that adjusts the map database, `mapdb.txt` by default (**New in 0.15.0**) |
 | `g_mapCycle` | Map cycle script. In 0.14.1 it runs whenever `si_mapCycle` is empty; from 0.15.0 only with `g_mapRotation 3` |

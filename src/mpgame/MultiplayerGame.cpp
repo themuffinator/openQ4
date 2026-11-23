@@ -15116,6 +15116,8 @@ void idMultiplayerGame::CommonRun( void ) {
 
 	// openQ4: servers and clients both publish the match they are in
 	liveEvents.Update();
+	// openQ4 MP-22: the result's screenshot, stats and the end of an autoaction demo
+	AutoActionFrame();
 	// ...and a server that keeps a match log appends the same events to it
 	matchLog.Update();
 

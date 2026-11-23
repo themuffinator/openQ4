@@ -31,6 +31,7 @@ import os
 import re
 import subprocess
 import time
+import zlib
 from pathlib import Path
 
 from mp_map_rotation_smoke import Role
@@ -67,7 +68,7 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--port", type=int, default=28201)
     parser.add_argument("--client-port", type=int, default=28202)
-    parser.add_argument("--record-seconds", type=int, default=20)
+    parser.add_argument("--record-seconds", type=int, default=32)
     parser.add_argument("--timeout", type=int, default=120, help="maximum seconds for any one step")
     parser.add_argument("--startup-timeout", type=int, default=300)
     args = parser.parse_args()
@@ -93,7 +94,8 @@ def main() -> int:
         game.mkdir(parents=True, exist_ok=True)
     server = Role("server", games["server"])
     logs_of = {"server": server.log, "rec": games["player"] / "logs/openq4.log",
-               "viewer": games["player"] / "logs/openq4-viewer.log"}
+               "viewer": games["player"] / "logs/openq4-viewer.log",
+               "timer": games["player"] / "logs/openq4-timer.log"}
     write_script(games["server"] / "rot_server_start.cfg", [
         "set bot_minPlayers 0", "set bot_skill 2", "addbot", "addbot", "echo ROT_SERVER_READY", *server.start_lines()])
 
@@ -116,6 +118,9 @@ def main() -> int:
         *section("FOLLOW", ["demoFollow next", "demoFreeRoam"]),
         *section("SHOT", ["screenshot", "waitMsec 1500"]),
         *section("SEEK", ["demoSeek 1", "waitMsec 6000", "mvdStatus"]),
+        # well past the keyframe at ten seconds, then back to it
+        "waitMsec 15000",
+        *section("KEYFRAME", ["demoSeek 15", "waitMsec 3000", "mvdStatus"]),
         # the rest plays out; then the game is closed
         f"waitMsec {( args.record_seconds + 30 ) * 1000}", "quit"])
     common = {
@@ -239,12 +244,54 @@ def main() -> int:
         rewound = part("viewer", "SEEK")
         after = re.search(r"MVD_STATUS playing=1 paused=0 seeking=0 time=(\d+)", rewound)
         check("a rewind replays from the start and plays on", after is not None and int(after[1]) >= 1000, rewound)
+        keyed = part("viewer", "KEYFRAME", args.timeout)
+        restored = re.search(r"MVD_KEYFRAME restored time=(\d+)", keyed)
+        landed = re.search(r"MVD_STATUS playing=1 paused=0 seeking=0 time=(\d+)", keyed)
+        check("a rewind past a keyframe restores it instead of replaying from the start",
+              restored is not None and 8000 <= int(restored[1]) <= 15000 and landed is not None and int(landed[1]) >= 15000,
+              keyed)
         ended = wait("playback ends", lambda t: f"Stopped MVD playback of 'demos/{DEMO}.mvd'" in t["viewer"],
                      args.record_seconds * 2 + args.timeout, may_end=("viewer",))["viewer"]
         check("playback runs to its clean end with no warning",
               f"Stopped MVD playback of 'demos/{DEMO}.mvd' (complete)" in ended and "MVD playback stopped:" not in ended,
               ended[-800:])
         finish("viewer", args.record_seconds + 60)
+
+        # timeDemo: one simulation tic a frame, uncapped, then quit
+        write_script(games["player"] / "mp22_timer.cfg", ["waitMsec 2000", f"timeDemoQuit {DEMO}.mvd"])
+        launch("timer", paths["engine"], dict(common | window, logFileName="logs/openq4-timer.log"), ["+exec", "mp22_timer.cfg"])
+        timed = wait("the timedemo", lambda t: "MVD_TIMEDEMO" in t["timer"], args.startup_timeout + args.record_seconds,
+                     may_end=("timer",))["timer"]
+        result = re.search(r"MVD_TIMEDEMO frames=(\d+) seconds=([\d.]+) fps=([\d.]+) slowest=(\d+)ms match=([\d.]+)s complete=(\d)",
+                           timed)
+        report["timedemo"] = result.groups() if result else None
+        check("timeDemo plays the recording one tic a frame to its end and reports the frame rate",
+              result is not None and result[6] == "1" and int(result[1]) >= float(result[5]) * 50 and float(result[3]) > 0,
+              timed[-500:])
+        finish("timer", 60)
+
+        # A recording cut short, and one whose game data differs from this game's
+        demo = (games["player"] / "demos" / f"{DEMO}.mvd").read_bytes()
+        (games["player"] / "demos" / "cut.mvd.part").write_bytes(demo[: len(demo) * 6 // 10])
+        header_bytes = int.from_bytes(demo[8:12], "little")
+        changed = bytearray(demo)
+        content = int.from_bytes(changed[52:56], "little")
+        changed[52:56] = ((content + 1) & 0xffffffff).to_bytes(4, "little")
+        changed[header_bytes - 4:header_bytes] = zlib.crc32(bytes(changed[:header_bytes - 4])).to_bytes(4, "little")
+        (games["player"] / "demos" / "mismatch.mvd").write_bytes(bytes(changed))
+        logs_of["checker"] = games["player"] / "logs/openq4-checker.log"
+        write_script(games["player"] / "mp22_checker.cfg", [
+            "waitMsec 2000", *section("RECOVER", ["mvdRecover cut.mvd.part", "mvdInfo cut_recovered.mvd"]),
+            *section("MISMATCH", ["playMVD mismatch", "waitMsec 1000"]), "quit"])
+        launch("checker", paths["engine"], dict(common | window, logFileName="logs/openq4-checker.log"),
+               ["+exec", "mp22_checker.cfg"])
+        recovered = part("checker", "RECOVER", args.startup_timeout, may_end=("checker",))
+        check("mvdRecover saves the complete part of a client-view recording cut short",
+              "clean end: yes" in recovered and "view: one player's" in recovered, recovered[-600:])
+        refused = part("checker", "MISMATCH", args.timeout, may_end=("checker",))
+        check("a recording with other game data is refused and the packs are compared",
+              "MVD content checksum" in refused and "Every pack matches the recording's" in refused, refused[-600:])
+        finish("checker", 60)
     except Exception as error:  # noqa: BLE001 - the report records the failure
         report["failures"].append(f"exception: {error}")
         print(f"FAIL {error}", flush=True)

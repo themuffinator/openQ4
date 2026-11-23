@@ -216,12 +216,43 @@ The recording holds what your game received from the server and your own
 moves, so it plays back exactly what you saw: your view, the players and
 effects around you, your HUD and the scoreboard. It cannot follow another
 player or fly free, and the **Follow** and **Free roam** controls are not
-offered. Pause, speed, stepping and skipping work; seeking backwards replays
-from the start, so it takes a moment on a long recording.
+offered. Pause, speed, stepping and skipping work, and seeking takes about a
+second: the recording keeps a keyframe every ten seconds (`mvd_keyframeInterval`).
 
 A recording ends by itself when the map changes or you leave the server.
 `mvdStatus` shows a recording in progress (`view=client`); `mvdInfo` describes
-a finished one, including whose view it is.
+a finished one, including whose view it is. `mvdRecover` saves the complete
+part of one that was cut short, as for a server's recording.
+
+### Record every match automatically
+
+> **After 0.15.0.**
+
+Set `ui_autoAction` to the things to do for every match you play:
+
+```text
+ui_autoAction "demo ss stats"
+```
+
+- `demo` records each match from the moment it goes live until the result.
+- `ss` takes a screenshot of the final scoreboard.
+- `stats` writes the result to `stats/<match>.json`: the map, mode, team
+  scores and each player's score, kills, deaths and damage.
+
+The files share one name made of the date and time, the mode, the map and your
+name, such as `20261123-161522_dm_q4dm1_player`. A recording you started
+yourself is left alone. A server can do the same for every match it runs with
+`si_autoAction "demo stats"`, which players see in its server information; see
+the [server setup guide](server-setup.md).
+
+### Time a demo
+
+`timeDemo match_name.mvd` plays a multi-view demo, or a recording of your own
+view, as a benchmark: each frame moves the match on by one simulation tic and
+frames are not capped, so the same file always shows the same frames. The
+console reports the frames, seconds, frame rate and the slowest frame;
+`timeDemoQuit` quits afterwards. A hidden or minimized window may still be held
+to the display's rate.
 
 ### Add markers and notes
 
@@ -353,6 +384,11 @@ The overlay shows **Seeking...** while it works.
 
 openQ4 also limits how much of a demo it reads at once, so a long match plays
 smoothly and a damaged file cannot freeze the game.
+
+When the game data checksum differs, the console names the packs that differ
+from the ones the demo was recorded with, or says that every pack matches and
+loose files or a mod changed the game data (**after 0.15.0**; older demos do
+not record their packs).
 
 `mvd_enforceContent 0` skips only the game data checksum, for troubleshooting.
 It cannot make demos recorded with different game files play correctly.

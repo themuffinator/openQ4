@@ -509,6 +509,10 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- `ui_autoAction "demo ss stats"` records every match you play, screenshots the
+  result and writes its stats; servers can do the same with `si_autoAction`.
+  `timeDemo name.mvd` benchmarks a multi-view demo. See
+  [Record every match automatically](../../user/multiview-demos.md#record-every-match-automatically).
 - You can record your own view of a match on any server you join: `record
   match_name`, then `stopRecord`. The recording appears in **Demos** and plays
   back from your point of view. See

@@ -356,6 +356,10 @@ void rvGameState::GameStateChanged( void ) {
 			if( gameLocal.isClient ) {
 				statManager->Init();
 			}
+			// openQ4 MP-22: this player's autoaction starts with live play
+			if ( previousGameState->currentState != SUDDENDEATH ) {
+				gameLocal.mpGame.AutoActionMatchStarted( true );
+			}
  		} else if( currentState == SUDDENDEATH ) {
 			soundSystem->SetActiveSoundWorld( true );
 			gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_SUDDEN_DEATH, gameLocal.time );
@@ -368,6 +372,8 @@ void rvGameState::GameStateChanged( void ) {
 			// openQ4 MP-17: the match goes in the player's own history
 			if ( previousGameState->currentState == GAMEON || previousGameState->currentState == SUDDENDEATH ) {
 				gameLocal.mpGame.IdentityRecordHistory();
+				// openQ4 MP-22: and this player's autoaction takes the result
+				gameLocal.mpGame.AutoActionMatchEnded( true );
 			}
 		}
 
@@ -820,6 +826,8 @@ bool rvGameState::NewState( mpGameState_t newState ) {
 
 			gameLocal.mpGame.ClearTeamScores();
 			gameLocal.mpGame.OnMatchStarted();
+			// openQ4 MP-22: the server's autoaction starts with live play
+			gameLocal.mpGame.AutoActionMatchStarted( false );
 
 			cvarSystem->SetCVarString( "ui_ready", "Not Ready" );
 			gameLocal.mpGame.switchThrottle[ 1 ] = 0;	// passby the throttle
@@ -831,6 +839,8 @@ bool rvGameState::NewState( mpGameState_t newState ) {
 			// that happen outside idMultiplayerGame::Run.
 			if ( currentState == GAMEON || currentState == SUDDENDEATH ) {
 				gameLocal.mpGame.OnMatchEnded();
+				// openQ4 MP-22: the server's autoaction takes the result
+				gameLocal.mpGame.AutoActionMatchEnded( false );
 			}
 			statManager->EndGame();
 			// openQ4: the map database offers the end-of-match pick, if the

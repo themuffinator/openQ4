@@ -131,6 +131,22 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   start and a menu start. The packaged fix is qualified on the next candidate,
   recorded in [release qualification](release-qualification.md).
 
+## Record every match automatically, time a demo, and seek recordings faster, 23 November 2026
+
+- **Autoaction.** `ui_autoAction "demo ss stats"` records every match you play,
+  takes a screenshot of the result and writes the result to `stats/`. A server
+  can record and write the stats of every match it runs with `si_autoAction`,
+  which its players can see.
+- **Time a demo.** `timeDemo name.mvd` plays a multi-view demo or your own
+  recording as a benchmark and reports the frame rate.
+- **Faster seeking in your own recordings.** They keep a keyframe every ten
+  seconds, and `mvdRecover` saves one that was cut short.
+- **A clearer refusal.** When a demo's game data differs from yours, the
+  console names the pack that differs.
+- **Evidence.** `mp_autoaction.py`, `mp_client_demo.py`; `mp_autoaction_smoke.py`
+  and `mp_client_demo_smoke.py` on a cheats-off pure dedicated server with
+  bots (Windows, OpenGL). Not run: Vulkan, Linux, macOS and a person watching.
+
 ## Record your own view on any server, 23 November 2026
 
 - **Record without hosting.** On a server you joined, `record match_name`

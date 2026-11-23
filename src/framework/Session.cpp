@@ -5435,6 +5435,11 @@ Session_TimeDemo_f
 */
 static void Session_TimeDemo_f( const idCmdArgs &args ) {
 	if ( args.Argc() >= 2 ) {
+		// openQ4 MP-22: a multi-view demo, or a recording of one player's view, times as well
+		if ( idStr( args.Argv( 1 ) ).CheckExtension( ".mvd" ) ) {
+			idAsyncNetwork::multiViewDemo.StartTimeDemo( args.Argv( 1 ), false );
+			return;
+		}
 		sessLocal.TimeRenderDemo( va( "demos/%s", args.Argv(1) ), ( args.Argc() > 2 ) );
 	}
 }
@@ -5445,6 +5450,10 @@ Session_TimeDemoQuit_f
 ================
 */
 static void Session_TimeDemoQuit_f( const idCmdArgs &args ) {
+	if ( args.Argc() >= 2 && idStr( args.Argv( 1 ) ).CheckExtension( ".mvd" ) ) {
+		idAsyncNetwork::multiViewDemo.StartTimeDemo( args.Argv( 1 ), true );
+		return;
+	}
 	sessLocal.TimeRenderDemo( va( "demos/%s", args.Argv(1) ) );
 	if ( sessLocal.timeDemo == TD_YES ) {
 		// this allows hardware vendors to automate some testing

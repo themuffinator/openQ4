@@ -6615,11 +6615,20 @@ Completion substeps:
   that apply ([format](multiview-demos.md#client-view-recordings-mp-22-23-november-2026)).
   `mp_client_demo.py` pins the wiring and `mp_client_demo_smoke.py` records on
   a cheats-off pure dedicated server with bots and plays the file back.
-  Open: autoaction and `si_autoAction`, `MPBuildMatchBasename` naming,
-  keyframes and markers for a client view, the named player list, reverse
-  scrubbing, frame-accurate stepping, `timeDemo` for MVDs, export, thumbnails
-  and library metadata, the pak-naming mismatch message, the retail-demo
-  decision, Vulkan, Linux and macOS runs, and a person watching a recording.
+  Progress, 23 November (second round): autoaction (`ui_autoAction`,
+  `si_autoAction`: demo, ss, stats, named by `MPBuildMatchBasename`), keyframes
+  and `mvdRecover` for client recordings, `timeDemo` for any MVD (one tic a
+  frame, uncapped, `MVD_TIMEDEMO` report), and a content refusal that names
+  the pack that differs from the recording's. The retail-demo decision (user,
+  23 November): build readers for both retail `.demo` and `.netdemo`.
+  `mp_autoaction.py` runs the basename's native test and pins the wiring;
+  `mp_autoaction_smoke.py` qualifies both sides on a cheats-off dedicated
+  server; `mp_client_demo_smoke.py` adds a keyframe seek, a timedemo, a
+  recovery and a refusal.
+  Open: markers for a client view, the named player list, reverse scrubbing,
+  frame-accurate stepping, export, thumbnails and library metadata, the two
+  retail readers, Vulkan, Linux and macOS runs, and a person watching a
+  recording.
 - [ ] **MP-23 — P2, measured optimization: demo storage efficiency.** MVD is
   written uncompressed; the render container reaches 4.78:1 on its stream and
   the v12 joint predictor cut 24.5%. Budgets first: MVD bytes a minute for a

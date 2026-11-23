@@ -1568,6 +1568,7 @@ public:
 	virtual bool			TakePureImageCacheEviction( void );
 	virtual fsFileOrigin_t	GetFileOrigin( const char *relativePath );
 	bool					IsShippedPack( const pack_t *pak ) const;
+	void					ListLoadedPacks( idStrList &entries ) const;	// FS_ListLoadedPacks
 	virtual idFile *		GetNewFileMemory( void );
 	virtual idFile *		GetNewFilePermanent( void );
 	virtual idFile *		OpenFileReadFlags( const char *relativePath, int searchFlags, pack_t **foundInPak = NULL, bool allowCopyFiles = true, const char* gamedir = NULL );
@@ -6308,6 +6309,29 @@ pack failure found by filesystem startup; from here on, a filesystem restart
 reports one at once.
 ================
 */
+void idFileSystemLocal::ListLoadedPacks( idStrList &entries ) const {
+	entries.Clear();
+	for ( const searchpath_t *search = searchPaths; search != NULL; search = search->next ) {
+		if ( search->pack == NULL ) {
+			continue;
+		}
+		idStr path = search->pack->pakFilename;
+		path.BackSlashesToSlashes();
+		idStr file;
+		path.ExtractFileName( file );
+		idStr directory;
+		path.ExtractFilePath( directory );
+		directory.StripTrailing( '/' );
+		idStr gameDir;
+		directory.ExtractFileName( gameDir );
+		entries.Append( va( "%s/%s:%08x", gameDir.c_str(), file.c_str(), static_cast<unsigned int>( search->pack->checksum ) ) );
+	}
+}
+
+void FS_ListLoadedPacks( idStrList &entries ) {
+	fileSystemLocal.ListLoadedPacks( entries );
+}
+
 void FS_RaiseDeferredContentPackFailure( void ) {
 	fs_openQ4PackProblemsMayRaise = true;
 	if ( fs_openQ4PackProblems.Num() == 0 ) {

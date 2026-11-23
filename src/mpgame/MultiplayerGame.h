@@ -1060,6 +1060,10 @@ public:
 	// openQ4 MP-12: the intermission names the next map and reads out the
 	// match's awards, one every two seconds, with g_intermissionAnnounce.
 	bool			IntermissionAnnounces( void ) const;
+	// openQ4 MP-22: autoaction (ui_autoAction for this player, si_autoAction for the server)
+	void			AutoActionMatchStarted( bool local );
+	void			AutoActionMatchEnded( bool local );
+	void			AutoActionFrame( void );
 	static void		IdentityReset_f( const idCmdArgs &args );
 	static void		Identity_f( const idCmdArgs &args );
 	static void		Ghost_f( const idCmdArgs &args );
@@ -1086,6 +1090,14 @@ private:
 	idList<int>		intermissionAwards;
 	int				intermissionAwardsMatch = 0;	// the identityMatchStamp the reel was built for
 	int				intermissionAwardNext = 0;		// game time of the next line
+	// MP-22's autoaction: [0] this player's (ui_autoAction), [1] the server's (si_autoAction)
+	idStr			autoActionName[ 2 ];				// the match's file name, MPBuildMatchBasename
+	int				autoActionActions[ 2 ] = { 0, 0 };	// MP_AUTOACTION_* for this match
+	int				autoActionPending[ 2 ] = { 0, 0 };	// what the result still owes
+	int				autoActionResultTime[ 2 ] = { 0, 0 };
+	bool			autoActionDemo[ 2 ] = { false, false };	// autoaction started the recording
+	int				AutoActionActions( bool local ) const;
+	void			WriteAutoActionStats( const char *name );
 	void			RunIntermissionAwards( void );
 	void			IdentityProved( int clientNum, const char *fingerprint );
 	void			IdentityTellGhost( int clientNum );

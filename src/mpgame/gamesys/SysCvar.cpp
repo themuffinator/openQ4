@@ -908,6 +908,11 @@ idCVar g_identity(					"g_identity",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_B
 idCVar g_reconnectRestore(			"g_reconnectRestore",		"300",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a player who leaves a casual match keeps their team and score for when they return, by identity or by the ghost code they were told; 0 forgets them at once", 0, 3600 );
 // openQ4 MP-12: the intermission. Off by default: a casual server keeps Quake 4's
 // quiet scoreboard until its operator turns this on.
+// openQ4 MP-22: what is done for every match. Words: demo (record it), ss (a
+// screenshot of the result), stats (stats/<match>.json). The server's is in its
+// server info, so players can see that their matches are recorded.
+idCVar ui_autoAction(				"ui_autoAction",			"",				CVAR_GAME | CVAR_ARCHIVE | CVAR_NOCHEAT, "for every match you play: demo records it, ss takes a screenshot of the result, stats writes stats/<match>.json; e.g. \"demo ss stats\"" );
+idCVar si_autoAction(				"si_autoAction",			"",				CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NOCHEAT, "for every match the server runs: demo records a multi-view demo, stats writes stats/<match>.json" );
 idCVar g_intermissionAnnounce(		"g_intermissionAnnounce",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "while the final scoreboard is up, name the next map and read out each player's awards" );
 idCVar g_ranking(					"g_ranking",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "keep a local ranking table (ranking.txt): an Elo rating for each identity and game type, updated when a casual match ends; rankings lists it" );
 idCVar g_adminMaxBanMinutes(		"g_adminMaxBanMinutes",		"1440",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "the longest ban, in minutes, a logged-in admin may give a connected player; 0 lets admins ban nobody", 0, 525600 );

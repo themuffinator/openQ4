@@ -45,6 +45,7 @@ struct mvdFileInfo_t {
 	// player's view only (no free camera, follow or auto-tracking)
 	bool					clientView;
 	idStr					viewName;
+	idStr					packs;			// "<dir>/<pack>:<checksum>;..." the game data came from
 };
 
 class idMultiViewDemo {
@@ -60,6 +61,9 @@ public:
 	bool					IsClientRecording() const;
 	// playback of such a recording: the game runs as its recorder's client slot
 	bool					IsClientViewPlayback() const;
+	// openQ4 MP-22: timeDemo for a .mvd: fixed match time a frame, uncapped, timed
+	bool					StartTimeDemo( const char *name, bool quitAfter );
+	bool					IsTimeDemo() const;
 	int						GetPlaybackLocalClient() const;
 	bool					StartNamedRecording( const char *name );
 	bool					StopRecordingCleanly( const char *reason );
@@ -221,6 +225,12 @@ private:
 	int						clientStartSnapshotFrame;
 	int						clientStartSnapshotTime;
 	int						clientStartGameFrame;
+	bool					timeDemo;				// playing as a benchmark
+	bool					timeDemoQuit;
+	int						timeDemoFrames;
+	int						timeDemoStartTime;		// real time of the first timed frame
+	int						timeDemoLastFrameTime;
+	int						timeDemoSlowestFrame;
 	// Format 1.3 navigation. While recording these collect the directories
 	// written at finalization; during playback they hold what was read back.
 	std::vector<openq4_mvd::Marker>	markers;
@@ -237,6 +247,9 @@ private:
 	void					ClearState();
 	bool					StartRecording( const idCmdArgs &args );
 	bool					WriteClientNetworkStateRecord();
+	bool					BuildClientNetworkState( idFile_Memory &payload );
+	bool					WriteClientKeyframe( int gameFrame, int gameTime );
+	bool					JumpToClientKeyframe( int index, bool &worldReset );
 	bool					ValidateClientNetworkState( const byte *bytes, int length, idStr &error ) const;
 	bool					ApplyPlaybackNetworkState( const record_t &networkState, const char *context );
 	bool					ProcessClientPlaybackRecord( const record_t &record, bool &handled );

@@ -823,11 +823,42 @@ plus the time since its stamp), duplicating missing commands as
 start; follow, free roam and auto-tracking are refused, and the library and
 deck offer neither.
 
-**Open.** Keyframes and markers for a client view (the start state is a
-keyframe in all but name), `mvdRecover` for an interrupted client view,
-recording across a map change, and the prediction's lead: playback predicts to
-the recorder's frame as the clock reconstructs it, which matches the recorded
-view to within the frame-time jitter of the original client.
+**Keyframes (second round, same day).** A client recording writes a keyframe
+after a snapshot every `mvd_keyframeInterval` seconds, in its own optional
+record type 34 with a server keyframe's layout: counts, then the map state, the
+client network state (as the start record's), and a four-byte version word as
+the third block, which a keyframe block may not leave empty. The playback index
+notes them; a seek restores the nearest one through the same
+`ApplyPlaybackNetworkState` path as the start, which now takes the game clock
+from the restored state's client time, and replays the rest.
+
+**Recovery, timedemo and packs.** `mvdRecover` counts a client recording's
+snapshots and reliables and copies its keyframes without a directory.
+`timeDemo <name>.mvd` (and `timeDemoQuit`) plays any MVD with one simulation
+tic a frame, uncapped (`Common_GetRequestedPresentationCap`), and prints
+`MVD_TIMEDEMO frames= seconds= fps= slowest= match= complete=`; it times the
+same frames every run, so FPS work can compare builds on a recording. Every
+recording's metadata now lists its packs (`FS_ListLoadedPacks`:
+`<dir>/<pack>:<checksum>`); a content refusal compares them with the loaded
+ones and names a changed, missing or extra pack, or says that every pack
+matches.
+
+**Autoaction.** `ui_autoAction` (a player) and `si_autoAction` (a server, in
+its server info) take the words `demo`, `ss` and `stats`
+(`src/mpgame/mp/AutoAction.h`, with `MPBuildMatchBasename`:
+`YYYYMMDD-HHMMSS_<mode>_<map>[_<player>]`). The player's side starts on the
+local game's live edge (`rvGameState::GameStateChanged`, never during demo
+playback) by buffering `record "<name>"`, quoted because the tokenizer splits
+the name at its dash; the server's starts in `NewState(GAMEON)` with
+`ServerStartMVDRecording` unless the match is managed. Both leave a recording
+someone else started alone, a host whose server records records once, and two
+seconds into the review take the screenshot, write `stats/<name>.json` and stop
+the demo.
+
+**Open.** Markers for a client view, recording across a map change, and the
+prediction's lead: playback predicts to the recorder's frame as the clock
+reconstructs it, which matches the recorded view to within the frame-time
+jitter of the original client.
 
 ## Campaign render demos (v11), 7 November 2026
 

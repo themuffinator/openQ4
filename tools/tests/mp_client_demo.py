@@ -71,7 +71,7 @@ def check_recording() -> None:
     require("asClient ? WriteClientNetworkStateRecord() : WriteNetworkStateRecord()" in start and
             "if ( !asClient ) {\n\t\tgame->SetDemoState( DEMO_RECORDING, true, false );" in start,
             "the client writes its own start state and leaves the game's demo state alone")
-    network = body(mvd, "bool idMultiViewDemo::WriteClientNetworkStateRecord() {")
+    network = body(mvd, "bool idMultiViewDemo::BuildClientNetworkState( idFile_Memory &payload ) {")
     require("game->WriteNetworkInfo( &payload, viewClient );" in network and "ValidateClientNetworkState(" in network,
             "the client's start state is the game's client network info, checked before it is written")
     stamp = body(mvd, "void idMultiViewDemo::ClientStamp( int &frame, int &time ) const {")
@@ -126,11 +126,40 @@ def check_playback() -> None:
             "the library and the deck offer a client-view recording no camera controls")
 
 
+def check_navigation_and_tools() -> None:
+    mvd = read("src/framework/async/MultiViewDemo.cpp")
+    session = read("src/framework/Session.cpp")
+    common = read("src/framework/Common.cpp")
+    snapshot = body(mvd, "void idMultiViewDemo::CaptureClientSnapshot( const idBitMsg &msg, int messageStart, int clientGameFrame ) {")
+    require("WriteClientKeyframe( frame, time );" in snapshot and "mvd_keyframeInterval.GetInteger()" in snapshot,
+            "a client recording writes a keyframe after a snapshot every mvd_keyframeInterval seconds")
+    keyframe = body(mvd, "bool idMultiViewDemo::WriteClientKeyframe( int gameFrame, int gameTime ) {")
+    require("BuildClientNetworkState( networkState )" in keyframe and "MVD_RECORD_CLIENT_KEYFRAME" in keyframe,
+            "a client keyframe holds the client network state in a record of its own type")
+    jump = body(mvd, "bool idMultiViewDemo::JumpToClientKeyframe( int index, bool &worldReset ) {")
+    require(jump.index("ValidateClientNetworkState(") < jump.index("session->Stop();") and
+            'ApplyPlaybackNetworkState( networkState, "keyframe" )' in jump,
+            "a client keyframe is validated before the world is reset and restored as the start state is")
+    require("return JumpToClientKeyframe( index, worldReset );" in body(mvd, "bool idMultiViewDemo::JumpToKeyframe( int index, bool &worldReset ) {"),
+            "seeking a client recording uses its keyframes")
+    recover = body(mvd, "bool idMultiViewDemo::Recover( const idCmdArgs &args ) {")
+    require("record.type == MVD_RECORD_CLIENT_SNAPSHOT" in recover, "mvdRecover counts a client recording's snapshots")
+    frame = body(mvd, "void idMultiViewDemo::RunPlaybackFrame() {")
+    require("elapsed = Max( 1, common->GetUserCmdMSec() );" in frame, "a timedemo frame is one simulation tic")
+    require("StartTimeDemo( args.Argv( 1 ), false )" in session and "StartTimeDemo( args.Argv( 1 ), true )" in session,
+            "timeDemo and timeDemoQuit take a .mvd")
+    require("idAsyncNetwork::multiViewDemo.IsTimeDemo()" in body(common, "static int Common_GetRequestedPresentationCap( void ) {"),
+            "a timedemo is not frame-capped")
+    require('metadata.Set( "packs", packList );' in mvd and "MVD_PackDifference(" in body(mvd, "bool idMultiViewDemo::StartPlayback( const idCmdArgs &args ) {"),
+            "a recording keeps its packs and a refusal for other game data names the pack that differs")
+
+
 def main() -> int:
     try:
         check_container()
         check_recording()
         check_playback()
+        check_navigation_and_tools()
     except (AssertionError, ValueError) as error:
         print(f"mp_client_demo: FAIL: {error}")
         return 1

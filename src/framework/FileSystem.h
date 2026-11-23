@@ -518,6 +518,10 @@ ID_INLINE bool FS_AwakeningActive( void ) {
 // a failure at once.
 void						FS_RaiseDeferredContentPackFailure( void );
 
+// openQ4 MP-22: every pack on the search path as "<game dir>/<pack>:<checksum>",
+// in search order, for a demo to record what its game data came from.
+void						FS_ListLoadedPacks( idStrList &entries );
+
 /*
 ================================================
 idFileLocal is a FileStream wrapper that automatically closes a file when the
