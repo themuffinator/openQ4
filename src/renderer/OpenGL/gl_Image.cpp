@@ -154,6 +154,13 @@ bool idImage::ReadLevelBytes( int level, idList<byte> &bytes, bool decodeRGBA8 )
 #define GL_SRGB8_ALPHA8 0x8C43
 #endif
 
+// Desktop GL 1.4 texture-object state; OpenGL ES has none, and the GLES
+// headers do not declare it. The sampler LOD-bias path checks for ES at
+// runtime, so on GLES the call is never made and only the name is needed.
+#ifndef GL_TEXTURE_LOD_BIAS
+#define GL_TEXTURE_LOD_BIAS 0x8501
+#endif
+
 #ifndef GL_COMPRESSED_RGBA_BPTC_UNORM
 #define GL_COMPRESSED_RGBA_BPTC_UNORM 0x8E8C
 #endif
