@@ -57,10 +57,13 @@ struct PerformancePreset {
 	// sunlight and distant sources are cascaded (Quality, Ultra); 1 lets
 	// spotlights cascade too (Maximum). Matters only with shadowMapCSM 1.
 	int shadowMapProjectedCSM;
+	// 1 lets the game's depth of field draw (the weapon wheel's focus and
+	// map scripts' cinematic focus): Enhanced and up.
+	int depthOfField;
 };
 inline constexpr const char* PerformancePresetDefaultName = "balanced";
 inline constexpr int PerformancePresetCount = 9;
-inline constexpr int PerformancePresetTargetCount = 54;
+inline constexpr int PerformancePresetTargetCount = 55;
 const std::array<PerformancePreset,PerformancePresetCount>& PerformancePresets() noexcept;
 const std::array<const char*,PerformancePresetTargetCount>& PerformancePresetTargets() noexcept;
 const PerformancePreset* FindPerformancePreset(std::string_view name) noexcept;

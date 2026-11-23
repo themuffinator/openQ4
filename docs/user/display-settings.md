@@ -17,7 +17,7 @@ The Display page has four tabs (in 0.14.1, three: MSAA was on **Screen**, and th
 | **Graphics** | Performance Preset, Auto-Detect, Rendering Backend, Rendering Device, Restart Renderer, UI Scale, Text Size, UI Aspect |
 | **Screen** | Display Device, Expand Across Displays, Fullscreen, Borderless Window, Fullscreen Policy, V-Sync, Frame Rate Cap, window size, Display Resolution, custom fullscreen size, Refresh Rate |
 | **Image Quality** | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering, specular, bump maps, detailed sky, ambient light |
-| **Effects** | Lighting: shadows, Shadow Maps, character self-shadows, Irradiance Volumes, Preload Light Grids. Post-processing: Bloom, Ambient Occlusion, HDR Tonemap, Motion Blur, CRT Emulation |
+| **Effects** | Lighting: shadows, Shadow Maps, character self-shadows, Irradiance Volumes, Preload Light Grids. Post-processing: Bloom, Ambient Occlusion, HDR Tonemap, Motion Blur, Depth of Field, CRT Emulation |
 
 **Frame Rate Cap**, **Anisotropic Filtering**, **Shadow Maps** and **Motion Blur** are not in 0.14.1, where only the presets and the console set them. Choosing a preset still sets all four; change one afterwards and the rest of the preset stays as it was.
 
@@ -43,6 +43,7 @@ What the effects are:
 
 - **Shadow maps** give soft, detailed shadows; see [Shadow mapping](shadow-mapping.md). Low, Performance and Balanced keep the original game's sharp-edged shadows. Minimum and Low Power draw no shadows at all, which on integrated graphics saves about as much as halving the number of pixels drawn.
 - **Light grids** add openQ4's bounced light to maps that ship one. **New in 0.15.0:** Minimum and Low Power turn them off and use the original game's lighting. If you lower **Resolution Scale** yourself, their 30 FPS cap stretches the smaller scene instead of rebuilding it with [temporal upscaling](temporal-presentation.md#automatic-upscaling-default).
+- **Depth of Field** lets the game focus like a camera: the weapon wheel keeps your weapon and everything close by sharp while the distance softens, and cutscenes that use it pull focus between characters. Enhanced and the presets above turn it on; see [Depth of field](#depth-of-field).
 - **Bloom** adds a glow around bright lights. **SSAO** (ambient occlusion) adds soft shading in corners and creases. **Tone mapping** balances very bright and dark areas. Presets below Enhanced leave these off.
 - Ultra and Maximum draw SSAO at full resolution. Enhanced and Quality draw it at half resolution, which is cheaper and looks the same in play. On OpenGL, half resolution is not in 0.14.1: there, 0.14.1 draws it at full resolution on every preset.
 - **New in 0.15.0:** SSAO's shading is smooth instead of grainy on every preset. **Settings → Display → Effects → Ambient Occlusion** picks **Off**, **SSAO**, **HBAO** or **GTAO** (the console's `r_ssao` and `r_ssaoMethod`). HBAO (`r_ssaoMethod 1`) is horizon-based ambient occlusion, the familiar look of many games, about as accurate as SSAO with a different character. GTAO (`r_ssaoMethod 2`) is ground-truth ambient occlusion, the most physically accurate: corners shade more like real light does, edges around objects stay clean, and PBR surfaces get coloured bounce light and reflections that dim in creases. Both cost about the same as SSAO, or less on the higher presets. The presets turn ambient occlusion on or off and keep the kind you picked.
@@ -329,6 +330,16 @@ Motion blur (**Settings → Display → Effects → Motion Blur**, not in 0.14.1
 - **Below 10 FPS it switches off**, so very slow frames stay sharp rather than smeared.
 - `r_motionBlurStrength` (0.45), `r_motionBlurMaxPixels` (10) and `r_motionBlurSamples` (8, or 16 on Maximum) set the length, the longest smear and the quality.
 - On a Mac using OpenGL's older 2.1 mode, motion blur turns MSAA off for the 3D scene.
+
+## Depth of field
+
+Depth of field (**Settings → Display → Effects → Depth of Field**; `r_depthOfField`, on in Enhanced, Quality, Ultra and Maximum) lets the game focus the picture like a camera lens where it asks for it:
+
+- **The weapon wheel** keeps your weapon and the world within about three metres sharp and softens the distance with round bokeh. With the setting off, the wheel blurs the whole scene behind it instead, as before.
+- **Cutscenes and map scripts** can focus on a character or a distance and pull focus as the scene plays. Quake 4's own levels do not use it yet; openQ4's enhanced cinematics will.
+- It works on OpenGL and Vulkan. The OpenGL ES renderer (Android) and VR headsets don't draw it.
+
+The full depth-of-field camera for screenshots and videos is a separate, console-only tool; see [Depth of Field for Screenshots and Video](depth-of-field.md).
 
 ## Interface size and text
 

@@ -21,7 +21,9 @@ the [development roadmap](../roadmap.md) for current scope.
 - **The weapon wheel focuses like a camera.** While the wheel is open, your
   weapon stays raised and it and everything close by stay sharp while the
   distance falls softly out of focus, instead of the whole screen blurring,
-  and the crosshair gets out of the way. For screenshots and videos there is a full depth-of-field camera
+  and the crosshair gets out of the way. **Depth of Field** in Settings >
+  Display > Effects turns it on or off (on from the Enhanced preset up), and
+  map scripts can now use it to pull focus in cutscenes. For screenshots and videos there is a full depth-of-field camera
   too, with autofocus, aperture, bokeh shape and more, kept to the console as
   a cheat. See [Depth of Field for Screenshots and Video](../../user/depth-of-field.md).
 
@@ -578,6 +580,16 @@ the [development roadmap](../roadmap.md) for current scope.
   camera with autofocus, f-stop, focal length, focus range, round or bladed
   bokeh and a focus view, on OpenGL and Vulkan. See
   [Depth of Field for Screenshots and Video](../../user/depth-of-field.md).
+- **Depth of Field** (Settings > Display > Effects, `r_depthOfField`) turns
+  the game's own depth of field on or off: the weapon wheel's focus and
+  scripted cutscene focus. Enhanced, Quality, Ultra and Maximum turn it on.
+  Because the presets changed, the game offers its graphics system check once
+  more on the next start.
+- Map and mod scripts can drive depth of field with `sys.setDepthOfField`,
+  `sys.setDepthOfFieldFocus` (follows a character), `sys.setDepthOfFieldLens`
+  and `sys.clearDepthOfField`, with smooth focus pulls, kept in saved games;
+  Quake 4's own scripts and existing saves are unaffected. See
+  [scripted depth of field](../../user/depth-of-field.md#for-map-and-mod-authors-scripted-depth-of-field).
 - Classic multiplayer ruleset corrections: quad damage is four times, seeking
   nails lose Quake 4's splash, the expansion maps' napalm launcher respawns in
   30 seconds, Scout carriers take no armour, health from Regeneration drains

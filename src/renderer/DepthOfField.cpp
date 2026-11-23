@@ -8,10 +8,17 @@
 // The r_dof camera is a capture tool for promotional shots and has no menu
 // entry: every cvar is a cheat, so it works in single player and on a
 // multiplayer server only with cheats on (and is reset when they are not).
+//
+// r_depthOfField is the player's Depth of Field setting (Settings > System,
+// owned by the performance presets): it lets the game's requests draw, the
+// weapon wheel's focus and map scripts' cinematic lens. It does not touch the
+// r_dof camera.
 
 #include "tr_local.h"
 #include "DepthOfFieldCore.h"
 
+idCVar r_depthOfField( "r_depthOfField", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
+	"depth of field where the game asks for it: the weapon wheel's focus on your weapon and cinematic focus from map scripts" );
 idCVar r_dof( "r_dof", "0", CVAR_RENDERER | CVAR_CHEAT | CVAR_BOOL,
 	"cinematic depth of field for promotional captures: a thin-lens camera focused by r_dofFocusDistance (or the depth under r_dofFocusX/Y)" );
 idCVar r_dofFocusDistance( "r_dofFocusDistance", "0", CVAR_RENDERER | CVAR_CHEAT | CVAR_FLOAT,
@@ -56,15 +63,14 @@ idCVar r_dofDebug( "r_dofDebug", "0", CVAR_RENDERER | CVAR_CHEAT | CVAR_BOOL,
 idRenderSystemLocal::SetViewDepthOfField
 ====================
 */
-bool idRenderSystemLocal::SetViewDepthOfField( float amount, int flags ) {
-	const float clamped = idMath::ClampFloat( 0.0f, 1.0f, amount );
-	depthOfFieldRequestAmount = clamped;
-	depthOfFieldRequestFlags = flags;
+bool idRenderSystemLocal::SetViewDepthOfField( const renderViewDepthOfField_t &dof ) {
+	depthOfFieldRequest = dof;
+	depthOfFieldRequest.amount = idMath::ClampFloat( 0.0f, 1.0f, dof.amount );
 	depthOfFieldRequestFrame = frameCount;
-	if ( clamped <= 0.001f ) {
+	if ( depthOfFieldRequest.amount <= 0.001f ) {
 		return true;
 	}
-	return RB_DepthOfFieldAvailable();
+	return r_depthOfField.GetBool() && RB_DepthOfFieldAvailable();
 }
 
 /*
@@ -79,9 +85,8 @@ void R_DepthOfField_LatchRequest( viewDef_t *viewDef ) {
 	if ( viewDef == NULL ) {
 		return;
 	}
-	const bool current = tr.depthOfFieldRequestFrame == tr.frameCount;
-	viewDef->depthOfFieldRequest = current ? tr.depthOfFieldRequestAmount : 0.0f;
-	viewDef->depthOfFieldRequestFlags = current ? tr.depthOfFieldRequestFlags : 0;
+	const bool current = tr.depthOfFieldRequestFrame == tr.frameCount && r_depthOfField.GetBool();
+	viewDef->depthOfFieldRequest = current ? tr.depthOfFieldRequest : renderViewDepthOfField_t();
 }
 
 /*
@@ -99,14 +104,19 @@ bool R_DepthOfField_ResolveView( const viewDef_t *viewDef, int viewWidth, int vi
 	if ( viewDef == NULL || viewDef->renderView.asymmetricFov || r_skipPostProcess.GetBool() ) {
 		return false;
 	}
-	if ( !r_dof.GetBool() && viewDef->depthOfFieldRequest <= 0.001f ) {
+	const renderViewDepthOfField_t &request = viewDef->depthOfFieldRequest;
+	if ( !r_dof.GetBool() && request.amount <= 0.001f ) {
 		return false;
 	}
 	depthOfFieldInputs_t in;
 	in.enabled = r_dof.GetBool();
-	in.requestAmount = viewDef->depthOfFieldRequest;
-	in.requestFlags = ( viewDef->depthOfFieldRequestFlags & VIEW_DOF_FOCUS_VIEW_WEAPON ) != 0
-		? DOF_REQUEST_FOCUS_VIEW_WEAPON : 0;
+	in.requestAmount = request.amount;
+	in.requestFlags = ( request.flags & VIEW_DOF_FOCUS_VIEW_WEAPON ) != 0 ? DOF_REQUEST_FOCUS_VIEW_WEAPON : 0;
+	in.requestFocusDistance = request.focusDistance;
+	in.requestFStop = request.fStop;
+	in.requestFocalLength = request.focalLength;
+	in.requestFocusRange = request.focusRange;
+	in.requestMaxBlur = request.maxBlur;
 	in.focusDistance = r_dofFocusDistance.GetFloat();
 	in.focusX = r_dofFocusX.GetFloat();
 	in.focusY = r_dofFocusY.GetFloat();

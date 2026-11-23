@@ -202,6 +202,11 @@ private:
 	void						Event_BeginManualStreaming( void );
 	void						Event_EndManualStreaming( void );
 	void						Event_SetMatSort( const char *name, const char *val ) const;
+	// openQ4: map-scripted depth of field (gamesys/ScriptedDepthOfField.h)
+	void						Event_SetDepthOfField( float focusDistance, float fStop, float blendTime );
+	void						Event_SetDepthOfFieldFocus( idEntity *focus, float fStop, float blendTime );
+	void						Event_SetDepthOfFieldLens( float focalLength, float focusRange, float maxBlur );
+	void						Event_ClearDepthOfField( float blendTime );
 // RAVEN END
 
 public:							

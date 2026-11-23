@@ -499,6 +499,23 @@ typedef struct renderVRFrameResult_s {
 class idRenderWorld;
 
 
+// SetViewDepthOfField flags (DepthOfFieldCore.h DOF_REQUEST_*)
+static const int VIEW_DOF_FOCUS_VIEW_WEAPON = 1 << 0;	// the weapon wheel: the view weapon and the world near it stay sharp
+
+// A depth of field asked for by the game: the weapon wheel, or a map script
+// (sys.setDepthOfField and friends). With VIEW_DOF_FOCUS_VIEW_WEAPON only
+// amount counts. Otherwise it is the thin lens of the r_dof camera: amount
+// scales its blur, so fading amount in and out fades the effect.
+typedef struct renderViewDepthOfField_s {
+	float	amount = 0.0f;			// 0..1
+	int		flags = 0;
+	float	focusDistance = 0.0f;	// world units along the view axis; 0 = autofocus at the centre
+	float	fStop = 2.8f;
+	float	focalLength = 0.0f;		// millimetres; 0 = from the view's field of view
+	float	focusRange = 0.0f;		// world units kept fully sharp each side of the focus
+	float	maxBlur = 0.0f;			// pixels at 1080 lines; 0 = the default
+} renderViewDepthOfField_t;
+
 class idRenderSystem {
 public:
 
@@ -909,17 +926,14 @@ public:
 	virtual void EndVideoCapture() {}
 
 	// Appended slot, render API 38. A depth of field the game asks for on
-	// this frame's main view; call it before RenderScene, every frame it is
-	// wanted. amount (0..1) fades it in; flags take VIEW_DOF_FOCUS_VIEW_WEAPON,
-	// which keeps the view weapon sharp and defocuses the world behind it (the
-	// weapon wheel). It replaces the r_dof camera for the frame. Returns true
-	// when the renderer will draw it (amount 0 asks for nothing and returns
-	// true), false when the caller should fall back to its own treatment.
-	virtual bool SetViewDepthOfField( float amount, int flags ) { (void)amount; (void)flags; return false; }
+	// this frame's main view (renderViewDepthOfField_t above); call it before
+	// RenderScene, every frame it is wanted. Returns true when the renderer
+	// will draw it (amount 0 asks for nothing and returns true), false when the
+	// caller should fall back to its own treatment: the player's Depth of Field
+	// setting (r_depthOfField) is off, or the backend cannot draw it.
+	virtual bool SetViewDepthOfField( const renderViewDepthOfField_t &dof ) { (void)dof; return false; }
 };
 
-// SetViewDepthOfField flags (DepthOfFieldCore.h DOF_REQUEST_*)
-static const int VIEW_DOF_FOCUS_VIEW_WEAPON = 1 << 0;
 
 extern idRenderSystem *		renderSystem;
 

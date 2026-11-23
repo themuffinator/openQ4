@@ -16,20 +16,20 @@ int main(){
  Seed();SystemSettingsHost host;std::string error;StateValues original;
  Check(host.Read(original,error),"complete host baseline");
  const std::set<std::string> keys(openq4::PerformancePresetTargets().begin(),openq4::PerformancePresetTargets().end());
- Check(keys.size()==54&&original.size()==78&&!keys.contains("r_screenFraction"),"catalog union; presets never own the render scale");
+ Check(keys.size()==55&&original.size()==79&&!keys.contains("r_screenFraction"),"catalog union; presets never own the render scale");
  for(const auto& preset:openq4::PerformancePresets()){
   SettingsTransaction tx(host);Check(tx.Begin(7).code==SettingsCode::Ok,"begin real host");
   Check(tx.Edit(7,{{"r_brightness",1.375},{"r_forceAmbient",0.1375}}).code==SettingsCode::Ok,"custom outside draft");
   const auto previous=tx.Draft();
-  StateValues patch;Check(host.BuildPreset(preset.name,patch,error)&&patch.size()==54,"real typed expansion");
+  StateValues patch;Check(host.BuildPreset(preset.name,patch,error)&&patch.size()==55,"real typed expansion");
   Check(tx.EditGenerated(7,[&](StateValues& out,std::string& why){return host.BuildPreset(preset.name,out,why);}).code==SettingsCode::Ok,"whole preset atomically drafted");
   int untouched=0;for(const auto& [key,value]:previous){
-   Check(SettingsValueEqual(tx.Draft().at(key),keys.contains(key)?patch.at(key):value),"54 replacements and exact outside preservation");
+   Check(SettingsValueEqual(tx.Draft().at(key),keys.contains(key)?patch.at(key):value),"55 replacements and exact outside preservation");
    if(!keys.contains(key))++untouched;
   }
   Check(untouched==24&&SettingsValuesEqual(tx.Baseline(),original),"24 outside keys and baseline preserved");
   Check(writes==0,"draft preset never invokes setter");
-  StateValues readback;Check(host.Read(readback,error)&&SettingsValuesEqual(original,readback),"all 78 live unchanged");
+  StateValues readback;Check(host.Read(readback,error)&&SettingsValuesEqual(original,readback),"all 79 live unchanged");
   Check((SystemSettingsHost::ChangedEffects(tx.Baseline(),tx.Draft())&(SystemSettingPresetExpansion|SystemSettingImageReload|SystemSettingAudioRestart|SystemSettingRendererResources))!=0,"profile remains real unsupported effect footprint");
  }
  SettingsTransaction tx(host);Check(tx.Begin(1).code==SettingsCode::Ok,"detection owner");
@@ -128,7 +128,7 @@ int main(){
   Seed();openq4::PerformancePresetAssignments expected;std::string error;
   Check(openq4::ExpandPerformancePreset(preset,expected,error),"shared expansion");
   Check(Common_ApplyPerformancePreset(preset),"actual Common apply");
-  Check(cvars.calls.size()==54&&instance.warnings==0&&instance.prints==1,"exact successful call count");
+  Check(cvars.calls.size()==55&&instance.warnings==0&&instance.prints==1,"exact successful call count");
   for(size_t i=0;i<expected.size();++i){Check(cvars.calls[i]==expected[i].key,"old setter ordering and marker last");
    const auto& value=expected[i].value;Check(cvars.vars.at(expected[i].key).value==(value.index()==0?std::to_string(std::get<int>(value)):std::get<std::string>(value)),"real accepted readback");
    Check(cvars.vars.at(expected[i].key).flags==17,"archive flags preserved on success");}
@@ -140,9 +140,9 @@ int main(){
  for(bool marker:{false,true}){
   Seed();cvars.refuse=marker?"com_performancePreset":"r_postAA";
   Check(!Common_ApplyPerformancePreset(openq4::PerformancePresets()[3]),"setter refusal rejected");
-  Check(cvars.calls.size()==(marker?108:107)&&instance.warnings==1&&cvars.modified==64,"rollback and global flags");
+  Check(cvars.calls.size()==(marker?110:109)&&instance.warnings==1&&cvars.modified==64,"rollback and global flags");
   for(const auto& [key,value]:cvars.vars)Check(value.value=="sentinel"&&value.flags==16,"all target values and flags restored");
-  if(!marker)Check(cvars.calls[53]=="com_performancePreset","first marker setter belongs only to rollback");
+  if(!marker)Check(cvars.calls[54]=="com_performancePreset","first marker setter belongs only to rollback");
  }
  Seed();auto invalid=openq4::PerformancePresets()[2];invalid.anisotropy=17;
  Check(!Common_ApplyPerformancePreset(invalid,true)&&instance.warnings==0&&instance.prints==0,"normalization rejected quietly");
@@ -156,7 +156,7 @@ int main(){
  for(int spec=0;spec<4;++spec){
   Seed();com_machineSpec.value=std::to_string(spec);Com_ExecMachineSpec_f({{"execMachineSpec"}});
   const char* names[]={"low","performance","balanced","ultra"};
-  Check(cvars.calls.size()==54&&cvars.vars.at("com_performancePreset").value==names[spec],"actual compatibility command uses complete canonical expansion only");
+  Check(cvars.calls.size()==55&&cvars.vars.at("com_performancePreset").value==names[spec],"actual compatibility command uses complete canonical expansion only");
   Check(cvars.vars.at("r_shadows").value=="1","every stock quality choice keeps the original shadows");
  }
  for(const char* spec:{"-1","4","2147483647"}){

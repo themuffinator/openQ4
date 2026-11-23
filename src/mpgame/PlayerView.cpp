@@ -7,6 +7,7 @@
 #pragma hdrstop
 
 #include "Game_local.h"
+#include "../game/gamesys/ScriptedDepthOfField.h"
 #include "../game/gamesys/RetainedViewEffects.inl"
 #include "../game/gamesys/Subtitles.inl"
 
@@ -682,7 +683,7 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view, i
 		// The wheel's scene focus is part of how this view renders. The scene
 		// pass is often RF_NO_GUI, with the wheel drawn by a later GUI-only pass.
 		RequestRetainedWheelFocus( !pm_thirdPerson.GetBool() && !g_skipViewEffects.GetBool(),
-			view->asymmetricFov );
+			view->asymmetricFov, ScriptedDepthOfField::Evaluate( view->vieworg, view->viewaxis ) );
 		// jscott: portal sky rendering with KRABS
 		idCamera *portalSky = gameLocal.GetPortalSky();
 		if ( portalSky ) {

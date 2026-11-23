@@ -3,6 +3,7 @@
 
 
 #include "../Game_local.h"
+#include "../gamesys/ScriptedDepthOfField.h"
 #include "../awakening/ScriptEvents.h"
 
 const idEventDef EV_Thread_Execute( "<execute>", NULL );
@@ -119,6 +120,12 @@ const idEventDef EV_Thread_EndManualStreaming( "endManualStreaming" );
 
 // nrausch: change material sort order on the fly
 const idEventDef EV_Thread_SetMatSort( "setMatSort", "ss", 0 );
+// openQ4: map-scripted depth of field. The script compiler declares these
+// itself on first use (idCompiler::DeclareImplicitEvent).
+const idEventDef EV_Thread_SetDepthOfField( "setDepthOfField", "fff" );
+const idEventDef EV_Thread_SetDepthOfFieldFocus( "setDepthOfFieldFocus", "Eff" );
+const idEventDef EV_Thread_SetDepthOfFieldLens( "setDepthOfFieldLens", "fff" );
+const idEventDef EV_Thread_ClearDepthOfField( "clearDepthOfField", "f" );
 // RAVEN END
 
 CLASS_DECLARATION( idClass, idThread )
@@ -233,6 +240,10 @@ CLASS_DECLARATION( idClass, idThread )
 	EVENT( EV_Thread_BeginManualStreaming,	idThread::Event_BeginManualStreaming )
 	EVENT( EV_Thread_EndManualStreaming,	idThread::Event_EndManualStreaming )	
 	EVENT( EV_Thread_SetMatSort,				idThread::Event_SetMatSort )
+	EVENT( EV_Thread_SetDepthOfField,			idThread::Event_SetDepthOfField )
+	EVENT( EV_Thread_SetDepthOfFieldFocus,		idThread::Event_SetDepthOfFieldFocus )
+	EVENT( EV_Thread_SetDepthOfFieldLens,		idThread::Event_SetDepthOfFieldLens )
+	EVENT( EV_Thread_ClearDepthOfField,			idThread::Event_ClearDepthOfField )
 // RAVEN END
 END_CLASS
 
@@ -2357,3 +2368,28 @@ void idThread::Event_EndManualStreaming()
 {
 }
 // RAVEN END
+
+/*
+================
+idThread::Event_SetDepthOfField and friends
+
+openQ4: map-scripted depth of field; gamesys/ScriptedDepthOfField.h.
+================
+*/
+#include "../gamesys/ScriptedDepthOfField.inl"
+
+void idThread::Event_SetDepthOfField( float focusDistance, float fStop, float blendTime ) {
+	ScriptedDepthOfField::Set( focusDistance, "", fStop, blendTime );
+}
+
+void idThread::Event_SetDepthOfFieldFocus( idEntity *focus, float fStop, float blendTime ) {
+	ScriptedDepthOfField::Set( 0.0f, focus != NULL ? focus->GetName() : "", fStop, blendTime );
+}
+
+void idThread::Event_SetDepthOfFieldLens( float focalLength, float focusRange, float maxBlur ) {
+	ScriptedDepthOfField::SetLens( focalLength, focusRange, maxBlur );
+}
+
+void idThread::Event_ClearDepthOfField( float blendTime ) {
+	ScriptedDepthOfField::Clear( blendTime );
+}

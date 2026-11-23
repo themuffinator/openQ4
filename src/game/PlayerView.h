@@ -92,7 +92,7 @@ private:
 	void ResetRetainedViewEffects();
 	void RetainedRecoveryFade( const idVec4 &color, int duration );
 	void DrawRetainedViewEffects( bool wheelOnly = false );
-	void RequestRetainedWheelFocus( bool allowed, bool headset );
+	void RequestRetainedWheelFocus( bool allowed, bool headset, const renderViewDepthOfField_t &scene );
 	idUserInterface *presentationFx = NULL;
 	// The renderer draws the wheel's scene focus as depth of field this frame.
 	bool wheelSceneFocus = false;

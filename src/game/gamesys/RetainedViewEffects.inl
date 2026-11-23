@@ -62,17 +62,27 @@ void idPlayerView::RetainedRecoveryFade( const idVec4 &color, int duration ) {
 }
 
 /*
-The weapon wheel's scene focus, asked for before the view renders. The
-renderer's depth of field keeps the view weapon sharp and defocuses the world
-behind it. Where it cannot draw that (no post-processing, a headset's eye),
-the view-effects document blurs the whole scene instead, as it always did.
+The view's depth of field, asked for before it renders. While the weapon
+wheel is open the renderer keeps the view weapon and the world near it sharp
+and defocuses the rest; where it cannot (the Depth of Field setting is off,
+no post-processing, a headset's eye) the view-effects document blurs the
+whole scene instead, as it always did. Otherwise the scene's own request
+(a map script's lens, ScriptedDepthOfField) goes through.
 */
-void idPlayerView::RequestRetainedWheelFocus( bool allowed, bool headset ) {
+void idPlayerView::RequestRetainedWheelFocus( bool allowed, bool headset, const renderViewDepthOfField_t &scene ) {
 	float wheel = 0;
 	if ( allowed && !headset && player && !player->spectating && cvarSystem->GetCVarBool( "ui_retained" ) ) {
 		wheel = RetainedViewEase( player->GetWeaponWheelBlend() );
 	}
-	wheelSceneFocus = renderSystem->SetViewDepthOfField( wheel, VIEW_DOF_FOCUS_VIEW_WEAPON ) && wheel > 0;
+	renderViewDepthOfField_t dof = scene;
+	if ( wheel > 0 ) {
+		dof = renderViewDepthOfField_t();
+		dof.amount = wheel;
+		dof.flags = VIEW_DOF_FOCUS_VIEW_WEAPON;
+	} else if ( headset ) {
+		dof.amount = 0;
+	}
+	wheelSceneFocus = renderSystem->SetViewDepthOfField( dof ) && wheel > 0;
 }
 
 void idPlayerView::DrawRetainedViewEffects( bool wheelOnly ) {

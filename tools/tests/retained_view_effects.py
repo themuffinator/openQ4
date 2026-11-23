@@ -54,9 +54,10 @@ struct Manager {
 } manager;
 auto* uiManager=&manager;
 const int VIEW_DOF_FOCUS_VIEW_WEAPON=1;
+struct renderViewDepthOfField_t {float amount=0;int flags=0;float focusDistance=0,fStop=2.8f,focalLength=0,focusRange=0,maxBlur=0;};
 struct RenderSystem {
- bool available=true;float amount=-1;int flags=0;
- bool SetViewDepthOfField(float a,int f){amount=a;flags=f;return a<=.001f||available;}
+ bool available=true;float amount=-1;int flags=0;float focus=0;
+ bool SetViewDepthOfField(const renderViewDepthOfField_t& d){amount=d.amount;flags=d.flags;focus=d.focusDistance;return d.amount<=.001f||available;}
 } renderer;
 auto* renderSystem=&renderer;
 struct idPlayerView {
@@ -66,7 +67,7 @@ struct idPlayerView {
  ~idPlayerView();void ResetRetainedViewEffects();void RetainedRecoveryFade(const idVec4&,int);
  void ResetSubtitles(){} // subtitle state is covered by audio_subtitles.py
  void DrawRetainedViewEffects(bool wheelOnly=false);
- void RequestRetainedWheelFocus(bool allowed,bool headset);
+ void RequestRetainedWheelFocus(bool allowed,bool headset,const renderViewDepthOfField_t& scene);
  float value(const char*k){return presentationFx?presentationFx->state[k]:0;}
 };
 '''
@@ -83,15 +84,20 @@ int main(){
  assert(v.value("wheel_amount")==1 && v.value("death_amount")==0 && v.value("death_tunnel")==0);
  assert(v.value("wheel_blur")==1);
  // The renderer's depth of field focuses the view weapon in place of the blur.
- v.RequestRetainedWheelFocus(true,false);v.DrawRetainedViewEffects(true);
+ const renderViewDepthOfField_t none{};renderViewDepthOfField_t lens{};lens.amount=.5f;lens.focusDistance=200;
+ v.RequestRetainedWheelFocus(true,false,lens);v.DrawRetainedViewEffects(true);
  assert(renderer.amount==1 && renderer.flags==VIEW_DOF_FOCUS_VIEW_WEAPON && v.wheelSceneFocus);
  assert(v.value("wheel_amount")==1 && v.value("wheel_blur")==0);
  // A headset eye, a declined pass or a hidden view keeps the blur and asks for nothing.
- v.RequestRetainedWheelFocus(true,true);v.DrawRetainedViewEffects(true);
+ v.RequestRetainedWheelFocus(true,true,lens);v.DrawRetainedViewEffects(true);
  assert(renderer.amount==0 && !v.wheelSceneFocus && v.value("wheel_blur")==1);
- renderer.available=false;v.RequestRetainedWheelFocus(true,false);v.DrawRetainedViewEffects(true);
+ renderer.available=false;v.RequestRetainedWheelFocus(true,false,none);v.DrawRetainedViewEffects(true);
  assert(renderer.amount==1 && !v.wheelSceneFocus && v.value("wheel_blur")==1);
- renderer.available=true;v.RequestRetainedWheelFocus(false,false);assert(renderer.amount==0 && !v.wheelSceneFocus);
+ renderer.available=true;v.RequestRetainedWheelFocus(false,false,none);assert(renderer.amount==0 && !v.wheelSceneFocus);
+ // With the wheel closed a map script's lens goes through untouched.
+ p.wheel=0;v.RequestRetainedWheelFocus(true,false,lens);
+ assert(renderer.amount==.5f && renderer.flags==0 && renderer.focus==200 && !v.wheelSceneFocus);
+ p.wheel=1;
  p.wheel=0;p.health=100;v.DrawRetainedViewEffects();assert(v.deathFxStart==-1);
  for(const char* setting:{"ui_retainedReducedMotion","ui_reducedFlashing"}){
   cv.values[setting]=true;p.health=0;v.DrawRetainedViewEffects();gameLocal.time+=320;v.DrawRetainedViewEffects();

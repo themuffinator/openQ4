@@ -116,8 +116,8 @@
 //      ReleaseVideoFrame and EndVideoCapture: the continuous readback of
 //      presented frames that video capture records.
 // 38 - idRenderSystem appends SetViewDepthOfField: the game's depth-of-field
-//      request for the frame's main view (the weapon wheel's focus on the
-//      view weapon).
+//      request for the frame's main view (renderViewDepthOfField_t: the weapon
+//      wheel's focus on the view weapon, or a map script's lens).
 #define RENDER_API_VERSION			38
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 

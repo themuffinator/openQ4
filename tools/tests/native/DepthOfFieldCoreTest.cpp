@@ -124,6 +124,37 @@ static void TestWeaponRequest() {
 	Check( Near( s.fixedScale, DOF_WEAPON_MAX_BLUR * 2.0f ), "the blur keeps its share of a taller view" );
 }
 
+static void TestScriptedLens() {
+	depthOfFieldInputs_t in = Camera();
+	in.enabled = false;
+	in.requestAmount = 0.5f;
+	in.requestFocusDistance = 200.0f;
+	in.requestFStop = 2.8f;
+	in.requestFocalLength = 50.0f;
+	depthOfFieldSettings_t s;
+	Check( DepthOfFieldCore_Resolve( in, s ), "a script's lens resolves without the cheat" );
+	Check( !s.weaponFocus && !s.autoFocus && Near( s.focusDistance, 200.0f ), "a script focuses where it says" );
+	depthOfFieldSettings_t full;
+	in.requestAmount = 1.0f;
+	DepthOfFieldCore_Resolve( in, full );
+	Check( Near( DepthOfFieldCore_CocScale( s, 200.0f ), DepthOfFieldCore_CocScale( full, 200.0f ) * 0.5f, 0.01f ),
+		"a script's amount scales the blur, so a blend fades it" );
+	Check( Near( s.maxRadius, DOF_SCRIPTED_MAX_BLUR ) && s.samples == DepthOfFieldCore_SampleCount( DOF_SCRIPTED_QUALITY ),
+		"a script gets the default blur limit and quality" );
+	in.requestFocusDistance = 0.0f;
+	in.requestFocalLength = 0.0f;
+	in.requestMaxBlur = 40.0f;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( s.autoFocus && Near( s.focalMm, 18.0f, 0.01f ) && Near( s.maxRadius, 40.0f ),
+		"distance 0 autofocuses, focal length 0 follows the field of view" );
+	in.enabled = true;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( Near( s.focusDistance, 200.0f ) && Near( s.focalMm, 50.0f ), "the r_dof camera wins over a script" );
+	in.requestFlags = DOF_REQUEST_FOCUS_VIEW_WEAPON;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( s.weaponFocus, "the weapon wheel wins over both" );
+}
+
 static void TestPlan() {
 	depthOfFieldSettings_t s;
 	depthOfFieldInputs_t in = Camera();
@@ -173,6 +204,7 @@ int main() {
 	TestLens();
 	TestShaping();
 	TestWeaponRequest();
+	TestScriptedLens();
 	TestPlan();
 	if ( failures != 0 ) {
 		std::fprintf( stderr, "DepthOfFieldCoreTest: %d failure(s)\n", failures );

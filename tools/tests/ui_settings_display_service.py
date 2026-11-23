@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise production engine display-service methods with counted platform I/O.
 
-Uses the real 78-key SYSTEM host, display request/recovery helpers, journal codec
+Uses the real 79-key SYSTEM host, display request/recovery helpers, journal codec
 and strict JSON/value parser. Native persistence, renderer and placement lease
 are counted doubles: this tests ordering/ownership, not devices or power loss.
 """

@@ -6659,8 +6659,7 @@ idRenderSystemLocal::Clear
 void idRenderSystemLocal::Clear( void ) {
 	registered = false;
 	frameCount = 0;
-	depthOfFieldRequestAmount = 0.0f;
-	depthOfFieldRequestFlags = 0;
+	depthOfFieldRequest = renderViewDepthOfField_t();
 	depthOfFieldRequestFrame = -1;
 	viewCount = 0;
 	videoRestartCount = 0;
@@ -6902,7 +6901,7 @@ void idRenderSystemLocal::BeginLevelLoad( void ) {
 	// of the new map, costing a full-screen copy per loading-screen present.
 	underwaterAmount = 0.0f;
 	underwaterTint.Zero();
-	depthOfFieldRequestAmount = 0.0f;
+	depthOfFieldRequest = renderViewDepthOfField_t();
 	depthOfFieldRequestFrame = -1;
 
 	// The caller runs declManager->BeginLevelLoad() immediately before this, and

@@ -163,8 +163,8 @@ static void Seed() {
 MAIN = r'''
 int main() {
     Seed();SystemSettingsHost host;std::string error;StateValues original;
-    assert(SystemSettingsHost::Schema().size()==78 && host.Read(original,error));
-    assert(original.size()==78 && writes==0);
+    assert(SystemSettingsHost::Schema().size()==79 && host.Read(original,error));
+    assert(original.size()==79 && writes==0);
     assert(std::get<double>(original.at("r_brightness"))==1.2345678901234567);
     assert(original.at("r_screenFraction")==StateValue(90.0));
     assert(original.at("image_usePrecompressedTextures")==StateValue(2.0));
@@ -179,7 +179,7 @@ int main() {
     StateValues failed={{"sentinel",true}};
     assert(!host.Read(failed,error) && failed==StateValues({{"sentinel",true}}));
     brightness.flags&=~CVAR_PRIVATE;
-    StateValues defaults;assert(host.Defaults(defaults,error) && defaults.size()==78 && writes==0);
+    StateValues defaults;assert(host.Defaults(defaults,error) && defaults.size()==79 && writes==0);
     assert(defaults.at("r_brightness")==StateValue(1.0));
     assert(defaults.at("ui_retainedScale")==StateValue(1.0) && defaults.at("ui_retainedTextScale")==StateValue(1.0));
     for(const auto* key:{"ui_retainedScale","ui_retainedTextScale"}) {
@@ -379,7 +379,7 @@ int main() {
     Seed();
     localCVarSystem.variables.at("r_brightness").value="1.2junk";failed={{"sentinel",true}};
     assert(!host.Read(failed,error) && failed==StateValues({{"sentinel",true}}));
-    std::puts("SYSTEM settings host: 78-key catalog, defaults, exact decimals, validation/rollback, patch refusal and display classification passed");
+    std::puts("SYSTEM settings host: 79-key catalog, defaults, exact decimals, validation/rollback, patch refusal and display classification passed");
 }
 '''
 
@@ -402,7 +402,7 @@ def source_checks(host_source):
     page |= {'r_ssao', 'r_ssaoMethod'}
     catalog = set(re.findall(r'(?:Number|Boolean|String)\("(\w+)"', host_source))
     assert {key.lower() for key in page | preset_keys} == {key.lower() for key in catalog}
-    assert len(preset_keys) == 54 and len(catalog) == 78
+    assert len(preset_keys) == 55 and len(catalog) == 79
     renderer = (ROOT / 'src/renderer/RenderSystem_init.cpp').read_text(encoding='utf-8')
     modes = renderer.split('vidmode_t r_vidModes[] = {', 1)[1].split('};', 1)[0]
     expected = {int(mode): (int(width), int(height)) for mode, width, height in re.findall(r'\{\s*(\d+),\s*(\d+),\s*(\d+)\s*\}', modes)}

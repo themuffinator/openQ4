@@ -75,6 +75,8 @@
   "settings.baseline.s_useEAXReverb": {"type": "boolean", "initial": false},
   "settings.draft.r_shadowMapCharacterSelfShadow": {"type": "boolean", "initial": false},
   "settings.baseline.r_shadowMapCharacterSelfShadow": {"type": "boolean", "initial": false},
+  "settings.draft.r_depthOfField": {"type": "boolean", "initial": false},
+  "settings.baseline.r_depthOfField": {"type": "boolean", "initial": false},
   "settings.draft.r_shadowMapPointLights": {"type": "boolean", "initial": true},
   "settings.baseline.r_shadowMapPointLights": {"type": "boolean", "initial": true},
   "settings.draft.r_hdrSceneTarget": {"type": "boolean", "initial": true},
@@ -502,6 +504,7 @@
    "operation": "settings.system.edit",
    "arguments": {"r_shadowMapCharacterSelfShadow": {"input": "value"}}
   },
+  "edit.r_depthOfField": {"input": "boolean", "operation": "settings.system.edit", "arguments": {"r_depthOfField": {"input": "value"}}},
   "begin": {"operation": "settings.system.begin", "arguments": {}},
   "apply": {"operation": "settings.system.apply", "arguments": {}},
   "cancel": {"operation": "settings.system.cancel", "arguments": {}},
@@ -3740,6 +3743,43 @@
   {
    "id": "settings_motionblur.opacity",
    "node": "settings_motionblur",
+   "property": "opacity",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
+       {"op": "!", "args": [{"state": "settings.busy"}]}
+      ]
+     },
+     1,
+     0.4
+    ]
+   }
+  },
+  {
+   "id": "settings_depthoffield.enabled",
+   "node": "settings_depthoffield",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [
+     {"op": "==", "args": [{"state": "page.tab"}, 3]},
+     {
+      "op": "&&",
+      "args": [
+       {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
+       {"op": "!", "args": [{"state": "settings.busy"}]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "settings_depthoffield.opacity",
+   "node": "settings_depthoffield",
    "property": "opacity",
    "value": {
     "op": "select",
@@ -26565,6 +26605,227 @@
    }
   },
   {
+   "id": "tall.settings_depthoffield.width",
+   "node": "settings_depthoffield",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield.height",
+   "node": "settings_depthoffield",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-focus.width",
+   "node": "settings_depthoffield-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-focus.height",
+   "node": "settings_depthoffield-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-head.left",
+   "node": "settings_depthoffield-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-head.width",
+   "node": "settings_depthoffield-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     310.9075,
+     {"op": "*", "args": [152.011, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-head.height",
+   "node": "settings_depthoffield-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-label.font-size",
+   "node": "settings_depthoffield-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-label.line-height",
+   "node": "settings_depthoffield-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-box.left",
+   "node": "settings_depthoffield-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     370.2211,
+     {"op": "*", "args": [181.011, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-box.top",
+   "node": "settings_depthoffield-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-box.width",
+   "node": "settings_depthoffield-box",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-box.height",
+   "node": "settings_depthoffield-box",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-checked.left",
+   "node": "settings_depthoffield-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     370.2211,
+     {"op": "*", "args": [181.011, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-checked.top",
+   "node": "settings_depthoffield-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-checked.width",
+   "node": "settings_depthoffield-checked",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_depthoffield-checked.height",
+   "node": "settings_depthoffield-checked",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
    "id": "tall.settings_crt.width",
    "node": "settings_crt",
    "property": "width",
@@ -32529,6 +32790,150 @@
     },
     {
      "node": "settings_motionblur-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_depthoffield.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "settings_depthoffield-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "settings_depthoffield-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "settings_depthoffield-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_depthoffield.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "settings_depthoffield-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_depthoffield-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "settings_depthoffield-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_depthoffield.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "settings_depthoffield-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_depthoffield-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_depthoffield-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_depthoffield.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "settings_depthoffield-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_depthoffield-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "settings_depthoffield-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "settings_depthoffield.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "settings_depthoffield-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_depthoffield-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "settings_depthoffield-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -111183,7 +111588,7 @@
                    "navigation": {
                     "down": "settings_bloom",
                     "up": "settings_irradiance",
-                    "right": "settings_crt",
+                    "right": "settings_depthoffield",
                     "left": "settings_lightgrid_preload"
                    }
                   }
@@ -112679,10 +113084,236 @@
                    },
                    "parts": {"checked": "settings_motionblur-checked"},
                    "navigation": {
-                    "down": "settings_crt",
+                    "down": "settings_depthoffield",
                     "up": "settings_tonemap",
                     "left": "settings_irradiance",
                     "right": "settings_motionblur"
+                   }
+                  }
+                 },
+                 {
+                  "id": "settings_depthoffield",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 1},
+                   "flex-shrink": {"type": "number", "value": 0}
+                  },
+                  "children": [
+                   {
+                    "id": "settings_depthoffield-plate",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "plate",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                       {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.12]}},
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.32]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_depthoffield-wash",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"},
+                     "opacity": {"type": "number", "value": 0}
+                    },
+                    "paths": [
+                     {
+                      "id": "wash",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                       {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {
+                       "type": "linear",
+                       "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                       "to": [{"fraction": 1}, {"fraction": 0.0}],
+                       "stops": [
+                        {"at": 0, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.45]}},
+                        {"at": 1, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.1]}}
+                       ]
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_depthoffield-focus",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 4, "unit": "dp"},
+                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                     "opacity": {"type": "number", "value": 0}
+                    },
+                    "paths": [
+                     {
+                      "id": "rail",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_depthoffield-head",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 21, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 152.011, "unit": "dp"},
+                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                     "display": {"type": "keyword", "value": "flex"},
+                     "flex-direction": {"type": "keyword", "value": "row"},
+                     "align-items": {"type": "keyword", "value": "center"}
+                    },
+                    "children": [
+                     {
+                      "id": "settings_depthoffield-label",
+                      "type": "text",
+                      "properties": {
+                       "text": {"type": "text", "value": "#str_232914"},
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "flex-shrink": {"type": "number", "value": 1},
+                       "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                       "font-family": {"type": "font", "value": "lowpixel"},
+                       "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                       "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                       "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]},
+                       "white-space": {"type": "keyword", "value": "normal"},
+                       "overflow": {"type": "keyword", "value": "hidden"}
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_depthoffield-box",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
+                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                     "width": {"type": "length", "value": 14, "unit": "dp"},
+                     "height": {"type": "length", "value": 14, "unit": "dp"}
+                    },
+                    "paths": [
+                     {
+                      "id": "box",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]}},
+                       "widthDp": 1.5,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "settings_depthoffield-checked",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
+                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                     "width": {"type": "length", "value": 14, "unit": "dp"},
+                     "height": {"type": "length", "value": 14, "unit": "dp"},
+                     "display": {"type": "keyword", "value": "none"}
+                    },
+                    "children": [
+                     {
+                      "id": "settings_depthoffield-mark",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "mark",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]}}
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ],
+                  "control": {
+                   "role": "toggle",
+                   "label": "#str_232914",
+                   "action": "edit.r_depthOfField",
+                   "value": {"state": "settings.draft.r_depthOfField"},
+                   "states": {
+                    "default": "settings_depthoffield.default",
+                    "hover": "settings_depthoffield.hover",
+                    "focus": "settings_depthoffield.focus",
+                    "pressed": "settings_depthoffield.pressed",
+                    "disabled": "settings_depthoffield.disabled"
+                   },
+                   "parts": {"checked": "settings_depthoffield-checked"},
+                   "navigation": {
+                    "down": "settings_crt",
+                    "up": "settings_motionblur",
+                    "left": "settings_lightgrid_preload",
+                    "right": "settings_depthoffield"
                    }
                   }
                  },
@@ -112906,7 +113537,7 @@
                    "parts": {"checked": "settings_crt-checked"},
                    "navigation": {
                     "down": "settings_shadows",
-                    "up": "settings_motionblur",
+                    "up": "settings_depthoffield",
                     "left": "settings_lightgrid_preload",
                     "right": "settings_crt"
                    }

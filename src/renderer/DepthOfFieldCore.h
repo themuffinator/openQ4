@@ -12,7 +12,10 @@
 //     sensor unless r_dofFocalLength sets one, so zooming in narrows the
 //     depth of field the way a real lens does.
 //   - the game (idRenderSystem::SetViewDepthOfField): the weapon wheel keeps
-//     the view weapon sharp and defocuses the world behind it.
+//     the view weapon sharp and defocuses the world behind it, and map
+//     scripts (sys.setDepthOfField and friends) drive the same thin lens for
+//     cinematics. The player's Depth of Field setting gates both.
+// The weapon wheel wins over everything, then the r_dof camera, then a script.
 //
 // The circle of confusion is measured in view pixels and signed: negative in
 // front of the focus plane, positive behind it.
@@ -51,6 +54,8 @@ static const float DOF_REFERENCE_HEIGHT = 1080.0f;	// r_dofMaxBlur is in pixels 
 static const float DOF_WEAPON_FOCUS_DISTANCE = 48.0f;
 static const float DOF_WEAPON_FOCUS_RANGE = 80.0f;
 static const float DOF_WEAPON_MAX_BLUR = 14.0f;			// pixels at the reference height
+static const float DOF_SCRIPTED_MAX_BLUR = 24.0f;		// a script's default largest blur
+static const int DOF_SCRIPTED_QUALITY = 2;
 
 // The game's request (idRenderSystem::SetViewDepthOfField flags).
 static const int DOF_REQUEST_FOCUS_VIEW_WEAPON = 1 << 0;
@@ -61,6 +66,11 @@ struct depthOfFieldInputs_t {
 	bool	enabled;				// r_dof
 	float	requestAmount;			// the game's request, 0..1; 0 = none
 	int		requestFlags;
+	float	requestFocusDistance;	// a script's lens (renderViewDepthOfField_t); 0 = autofocus
+	float	requestFStop;
+	float	requestFocalLength;		// 0 = from the field of view
+	float	requestFocusRange;
+	float	requestMaxBlur;			// 0 = DOF_SCRIPTED_MAX_BLUR
 	float	focusDistance;			// r_dofFocusDistance, world units; 0 = autofocus
 	float	focusX;					// r_dofFocusX, 0 left .. 1 right
 	float	focusY;					// r_dofFocusY, 0 top .. 1 bottom
@@ -192,8 +202,9 @@ inline bool DepthOfFieldCore_Resolve( const depthOfFieldInputs_t &in, depthOfFie
 	}
 	const float heightScale = static_cast<float>( in.viewHeight ) / DOF_REFERENCE_HEIGHT;
 	const float request = DepthOfFieldCore_Clamp( in.requestAmount, 0.0f, 1.0f );
-	if ( request > 0.001f ) {
-		out.weaponFocus = ( in.requestFlags & DOF_REQUEST_FOCUS_VIEW_WEAPON ) != 0;
+	const bool weaponRequest = request > 0.001f && ( in.requestFlags & DOF_REQUEST_FOCUS_VIEW_WEAPON ) != 0;
+	if ( weaponRequest ) {
+		out.weaponFocus = true;
 		out.autoFocus = false;
 		out.focusDistance = DOF_WEAPON_FOCUS_DISTANCE;
 		out.focusRange = DOF_WEAPON_FOCUS_RANGE;
@@ -229,6 +240,23 @@ inline bool DepthOfFieldCore_Resolve( const depthOfFieldInputs_t &in, depthOfFie
 				return false;
 			}
 		}
+	} else if ( request > 0.001f ) {
+		// A script's lens: the r_dof camera's model with the script's values,
+		// its blur scaled by the request so a blend fades it in and out.
+		out.autoFocus = in.requestFocusDistance <= 0.0f;
+		out.focusDistance = out.autoFocus ? 0.0f : DepthOfFieldCore_Clamp( in.requestFocusDistance, 1.0f, 65536.0f );
+		out.focalMm = in.requestFocalLength > 0.0f ? DepthOfFieldCore_Clamp( in.requestFocalLength, 4.0f, 1200.0f )
+			: DepthOfFieldCore_FocalLengthForFov( in.fovX );
+		out.lensScale = DepthOfFieldCore_LensScale( out.focalMm, in.requestFStop, in.viewWidth, request );
+		out.focusRange = DepthOfFieldCore_Clamp( in.requestFocusRange, 0.0f, 65536.0f );
+		out.nearScale = 1.0f;
+		out.farScale = 1.0f;
+		out.maxRadius = DepthOfFieldCore_Clamp( in.requestMaxBlur > 0.0f ? in.requestMaxBlur : DOF_SCRIPTED_MAX_BLUR,
+			1.0f, 64.0f ) * heightScale;
+		out.samples = DepthOfFieldCore_SampleCount( DOF_SCRIPTED_QUALITY );
+		out.bladeRoundness = 1.0f;
+		out.highlightBoost = 1.0f;
+		out.highlightThreshold = 0.7f;
 	} else {
 		return false;
 	}

@@ -68,6 +68,17 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   airdefense2; `openq4-depth-of-field-core`, `retained_view_effects.py` and
   the retained-screens wheel checks pass. Not yet run: Linux, macOS, the
   Android emulator (GLES declines by design) and a cost measurement.
+- **Scripted depth of field and a Depth of Field setting** (second round).
+  Map scripts call `sys.setDepthOfField`, `setDepthOfFieldFocus`,
+  `setDepthOfFieldLens` and `clearDepthOfField` (eased focus pulls, entity
+  tracking), declared by the script compiler on first use so stock programs
+  and save checksums are unchanged; the state rides in the worldspawn's spawn
+  args. `r_depthOfField` (Settings > Display > Effects, SYSTEM catalog V8,
+  12 languages, `#str_232914`) gates the wheel and scripts and is a preset
+  target on from Enhanced up; the preset system version moves (players see the
+  system check again). Evidence: airdefense2 `script` calls draw and clear on
+  OpenGL; the setting off returns the reference frame. Cinematics across the
+  campaign are REN-13.
 
 ## Texture packs' converted normal maps light correctly; a clearer settings failure, 23 November 2026
 

@@ -30,6 +30,8 @@ const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV5();
 const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV6();
 // V7 adds the ambient occlusion method (r_ssaoMethod), an immediate renderer setting.
 const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV7();
+// V8 adds the Depth of Field switch, an immediate renderer setting.
+const std::map<std::string,SettingsEffectField>& SettingsEffectCatalogV8();
 
 enum class SettingsEffectCompletion { DisplayConfirmed, Automatic };
 enum class SettingsRendererStrategy { None, CoalescedDevice };
