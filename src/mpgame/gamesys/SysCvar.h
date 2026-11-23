@@ -487,6 +487,7 @@ extern idCVar	ui_identity;
 extern idCVar	g_identity;
 extern idCVar	g_reconnectRestore;
 extern idCVar	g_ranking;
+extern idCVar	g_intermissionAnnounce;
 extern idCVar	g_reservedNames;
 extern idCVar	g_mapCycle;
 // RAVEN BEGIN

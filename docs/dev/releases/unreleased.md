@@ -509,6 +509,9 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Server hosts can have the end-of-match scoreboard name the next map and
+  read out each player's awards (`g_intermissionAnnounce 1`; off by default).
+  See [Picking the next map](../../user/server-setup.md#picking-the-next-map).
 - Linux packages are also offered as `.tar.gz`, with exactly the same files as
   the `.tar.xz`, for sites that do not take xz archives such as ModDB.
 - Server hosts can run their own master server (`tools/master/openq4_master.py`),

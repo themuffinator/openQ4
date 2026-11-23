@@ -81,6 +81,8 @@ public:
 	void				ServerThink( void );
 	// The match ended: offer the pick if the server wants one.
 	void				ServerMatchEnded( void );
+	bool				ServerOfferPick( void );		// the end-of-match pick; true when one was offered
+	void				ServerAnnounceNext( void );	// MP-12: the next map, at the intermission
 	// Chooses the next map, consuming a queued map or the pick, and writes
 	// si_map.
 	mpMapAdvance_t		ServerAdvance( void );
@@ -137,6 +139,7 @@ private:
 	bool				hostingNext;			// ServerPrepareMap ran for a map this process will serve
 
 	idStr				advanceIssued;			// the map ServerAdvance last wrote to si_map
+	idStr				intermissionAnnounced;	// MP-12: the map the intermission named; the change does not name it again
 	int					advanceAttempts;
 
 	uint32_t			mapSeed;				// one draw a map: shuffle and tie breaks

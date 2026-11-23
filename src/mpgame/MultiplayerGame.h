@@ -1057,6 +1057,9 @@ public:
 	const char *	ClientIdentity( int clientNum ) const;	// sixteen hex digits, or "" when none was proved
 	bool			IdentityRankingEnabled( void ) const;
 	void			IdentityRecordHistory( void );		// the client's side: this match in its own history
+	// openQ4 MP-12: the intermission names the next map and reads out the
+	// match's awards, one every two seconds, with g_intermissionAnnounce.
+	bool			IntermissionAnnounces( void ) const;
 	static void		IdentityReset_f( const idCmdArgs &args );
 	static void		Identity_f( const idCmdArgs &args );
 	static void		Ghost_f( const idCmdArgs &args );
@@ -1079,6 +1082,11 @@ private:
 	mpIdReturnStore_t identityReturns;
 	int				identityMatchStamp = 1;
 	bool			identityMatchRated = false;
+	// MP-12's awards reel: (award << 8) | client, read out in this order
+	idList<int>		intermissionAwards;
+	int				intermissionAwardsMatch = 0;	// the identityMatchStamp the reel was built for
+	int				intermissionAwardNext = 0;		// game time of the next line
+	void			RunIntermissionAwards( void );
 	void			IdentityProved( int clientNum, const char *fingerprint );
 	void			IdentityTellGhost( int clientNum );
 	void			IdentitySendChallenge( int clientNum );

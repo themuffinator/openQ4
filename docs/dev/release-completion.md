@@ -89,6 +89,20 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   start and a menu start. The packaged fix is qualified on the next candidate,
   recorded in [release qualification](release-qualification.md).
 
+## The scoreboard names the next map and reads out the awards, 23 November 2026
+
+- **Know where you are going.** With `g_intermissionAnnounce 1`, the
+  scoreboard that ends a casual match names the next map in chat, before the
+  map changes.
+- **An awards reel.** The same scoreboard then reads out each player's
+  end-of-match awards, one every two seconds.
+- **Off unless you turn it on.** Servers keep Quake 4's quiet scoreboard by
+  default; managed matches and the Arena campaign are unchanged.
+- **Evidence.** `mp_casual_match_flow_contract.py` and
+  `mp_map_database_contract.py` pin it; `mp_map_rotation_smoke.py` plays it on
+  a dedicated server with two bots and a hidden client (Windows). Not run:
+  Vulkan, Linux, macOS and a person watching it.
+
 ## A master server you can run, and an HTTPS server list, 23 November 2026
 
 - **Run your own master.** `tools/master/openq4_master.py` lists the openQ4

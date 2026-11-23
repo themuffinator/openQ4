@@ -17701,6 +17701,8 @@ void idMultiplayerGame::Run( void ) {
 	mpMapHost.ServerThink();
 	// openQ4 MP-17: the server's id, and a ghost code for players with no identity
 	IdentityServerFrame();
+	// openQ4 MP-12: the intermission's awards reel
+	RunIntermissionAwards();
 	// openQ4: a casual session has no roster transactions, so it mirrors every
 	// join, spectate and leave in every phase.  Syncing only in warmup and
 	// countdown left anyone who entered or changed sides during live play with
@@ -29054,6 +29056,67 @@ void idMultiplayerGame::CheckModifierChange( void ) {
 	rvMPModifiers::Tokens( wanted, tokens );
 	common->Printf( "The match modifiers changed to '%s': restarting the match\n", tokens.c_str() );
 	QueueRulesRestart();
+}
+
+/*
+================
+idMultiplayerGame::IntermissionAnnounces
+================
+*/
+bool idMultiplayerGame::IntermissionAnnounces( void ) const {
+	return gameLocal.isServer && g_intermissionAnnounce.GetBool() && !IsManagedMatch() && !IsArenaCampaignMatch();
+}
+
+/*
+================
+idMultiplayerGame::RunIntermissionAwards
+
+openQ4 MP-12: during the review that ends a casual match, each player's
+end-of-match awards (the stats screen's: Rail Master, Leading Slayer and the
+rest) are read out to everyone, one every two seconds, most players first so
+that everyone hears their name early. The awards are the stat manager's,
+counted when review began.
+================
+*/
+void idMultiplayerGame::RunIntermissionAwards( void ) {
+	static const int INTERMISSION_AWARD_FIRST_MS = 2500;
+	static const int INTERMISSION_AWARD_GAP_MS = 2000;
+	if ( !IntermissionAnnounces() || gameState == NULL || gameState->GetMPGameState() != GAMEREVIEW ) {
+		return;
+	}
+	if ( intermissionAwardsMatch != identityMatchStamp ) {
+		intermissionAwardsMatch = identityMatchStamp;
+		intermissionAwards.Clear();
+		// one award a player a round, then the next, so nobody waits behind one player's list
+		for ( int round = 0; round < EGA_NUM_AWARDS; round++ ) {
+			for ( int i = 0; i < gameLocal.numClients && i < MAX_CLIENTS; i++ ) {
+				const idEntity *ent = gameLocal.entities[ i ];
+				const rvPlayerStat *stat = statManager->GetPlayerStat( i );
+				if ( ent == NULL || !ent->IsType( idPlayer::GetClassType() ) || stat == NULL || round >= stat->endGameAwards.Num() ) {
+					continue;
+				}
+				const int award = stat->endGameAwards[ round ];
+				if ( award > EGA_INVALID && award < EGA_NUM_AWARDS && endGameAwardInfo[ award ].name != NULL ) {
+					intermissionAwards.Append( ( award << 8 ) | i );
+				}
+			}
+		}
+		intermissionAwardNext = gameLocal.time + INTERMISSION_AWARD_FIRST_MS;
+		return;
+	}
+	if ( intermissionAwards.Num() == 0 || gameLocal.time < intermissionAwardNext ) {
+		return;
+	}
+	const int entry = intermissionAwards[ 0 ];
+	intermissionAwards.RemoveIndex( 0 );
+	intermissionAwardNext = gameLocal.time + INTERMISSION_AWARD_GAP_MS;
+	const int award = entry >> 8, client = entry & 0xff;
+	if ( client < MAX_CLIENTS && gameLocal.entities[ client ] != NULL ) {
+		const char *name = gameLocal.userInfo[ client ].GetString( "ui_name" );
+		gameLocal.ServerSendChatMessage( -1, "server", endGameAwardInfo[ award ].name, va( ": %s", name ) );
+		// a dedicated server's console shows no chat
+		gameLocal.Printf( "intermission: %s: %s\n", common->GetLocalizedString( endGameAwardInfo[ award ].name ), name );
+	}
 }
 
 /*

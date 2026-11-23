@@ -16,7 +16,10 @@ The run must show:
 * the queue (`mymap`) refusing what it must, keeping one entry a player,
   and being played before the rotation continues;
 * the end-of-match pick (`mappick`) offered when a match ends, and the
-  client's pick loaded.
+  client's pick loaded;
+* the intermission quiet until `g_intermissionAnnounce 1`, then naming the
+  next map once during the scoreboard (not again at the change), the map it
+  named loading, and each award its reel read out reaching the client (MP-12).
 
 Peers bind 127.0.0.1 only, so a runtime at a new path raises no firewall prompt.
 """
@@ -348,6 +351,39 @@ def main() -> int:
               f"map database: next map {candidates[1]} (picked with 1 votes, 3 players)" in written, written)
         check("the server is on the picked map", current_map("map after the pick") == candidates[1])
         check("the next map is announced to players", TEXT_NEXT in read_log(client.log))
+
+        # --- the intermission names the next map and reads the awards (MP-12) ---
+        check("the intermission is quiet until the server turns it on",
+              "map database: the intermission names" not in read_log(server.log))
+        before_next = read_log(client.log).count(TEXT_NEXT)
+        mark = len(read_log(server.log))
+        # As with the pick: the map-load hook is armed once the match has ended, since an
+        # armed hook also runs on the map being played and would take the limit back.
+        # A fresh match ended by its first frag gives that player the Perfect award (a
+        # kill and no death), so the reel has something to read.
+        step(server, "enable the intermission",
+             ["set g_intermissionAnnounce 1", "set si_fragLimit 1", "rescanSI", "serverMapRestart"])
+        wait("the match ends and the intermission names the next map",
+             lambda t: "map database: the intermission names " in t["server"][mark:], 240)
+        # The hook runs as soon as it is armed, during the review: it takes the frag limit
+        # back but leaves the reel running; the reel is turned off once the map changed.
+        change_map("intermission", None, ("set si_fragLimit 0", "rescanSI"), 120)
+        step(server, "intermission off", ["set g_intermissionAnnounce 0"])
+        written = read_log(server.log)[mark:]
+        named = re.findall(r"map database: the intermission names (\S+)", written)
+        chosen = re.findall(r"map database: next map (\S+) \(", written)
+        report["intermission"] = {"named": named, "chosen": chosen,
+                                  "awards": re.findall(r"^intermission: ([^\n]+)$", written, re.MULTILINE)}
+        check("the intermission names the next map once, and it is the map that loads",
+              len(named) == 1 and chosen[-1:] == named, json.dumps(report["intermission"]))
+        heard = read_log(client.log)
+        check("players hear the next map during the scoreboard, and not again at the change",
+              heard.count(TEXT_NEXT) == before_next + 1 and heard.rfind(TEXT_NEXT) < heard.rfind(MAP_OPENED), heard[-600:])
+        # Every player without a kill has Critical Failure, and the first frag's player a
+        # Perfect; others depend on how the match went.
+        awards = report["intermission"]["awards"]
+        check(f"the reel reads out the match's awards and each reaches the players ({len(awards)} this match)",
+              len(awards) >= 1 and all(f"server^0: {award}" in heard for award in awards), "\n".join(awards))
 
         client.inject(["quit"])
         report["exit_codes"]["client"] = processes["client"].wait(timeout=30)

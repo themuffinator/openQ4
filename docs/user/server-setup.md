@@ -329,6 +329,7 @@ it, for example `connect [2001:db8::1]:28004`. Every address form is under
 | `g_mapRotation` | What follows a match: `0` the same map, `1` the rotation (default), `2` a shuffled rotation, `3` the `g_mapCycle` script (**New in 0.15.0**) |
 | `g_mapQueue` | `1` lets players queue maps with `mymap` (default); `0` turns the queue off (**New in 0.15.0**) |
 | `g_mapPick` | `1` offers three maps to pick from when a match ends (**New in 0.15.0**) |
+| `g_intermissionAnnounce` | `1` names the next map while the final scoreboard is up and reads out each player's end-of-match awards; see [Picking the next map](#picking-the-next-map). Off by default. **After 0.15.0** |
 | `g_mapDatabase` | The file that adjusts the map database, `mapdb.txt` by default (**New in 0.15.0**) |
 | `g_mapCycle` | Map cycle script. In 0.14.1 it runs whenever `si_mapCycle` is empty; from 0.15.0 only with `g_mapRotation 3` |
 | `si_allowVoting`, `si_voteFlags` | `si_allowVoting 1` lets players call votes; `si_voteFlags` is a bit mask of the votes you forbid (type `si_voteFlags` for the bits) |
@@ -542,6 +543,13 @@ map, which is the rotation's own, is played. Give players time with
 
 The pick is not offered when a map is queued, in Tourney, or when fewer than
 two maps can be offered.
+
+**After 0.15.0:** with `g_intermissionAnnounce 1`, the scoreboard that ends a
+casual match also names the next map in chat, so players know where they are
+going before the map changes, and then reads out each player's awards from the
+match (the stats screen's Perfect, Rail Master and the rest), one every two
+seconds. A pick, when one is offered, names its own maps instead. Managed
+matches and the Arena campaign keep their own flow.
 
 Managed matches and series choose their maps and set their own rules; see
 the [competitive matches guide](competitive-matches.md). While one runs, the
