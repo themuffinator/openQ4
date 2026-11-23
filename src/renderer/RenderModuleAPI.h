@@ -115,7 +115,10 @@
 // 37 - idRenderSystem appends RequestVideoFrame, PollVideoFrame,
 //      ReleaseVideoFrame and EndVideoCapture: the continuous readback of
 //      presented frames that video capture records.
-#define RENDER_API_VERSION			37
+// 38 - idRenderSystem appends SetViewDepthOfField: the game's depth-of-field
+//      request for the frame's main view (the weapon wheel's focus on the
+//      view weapon).
+#define RENDER_API_VERSION			38
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;

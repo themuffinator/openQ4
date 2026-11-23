@@ -287,6 +287,12 @@ bool RB_UnderwaterViewAvailable( void ) {
 	return false;
 }
 
+// The depth of field pass lives in the excluded draw_common.cpp: the weapon
+// wheel keeps its own soft focus and r_dof draws nothing here.
+bool RB_DepthOfFieldAvailable( void ) {
+	return false;
+}
+
 // Ownership query for the modern light-grid pipeline, whose real answer lives
 // in the excluded draw_common.cpp with a subtree of helpers behind it.
 // Answering "not representable" keeps such surfaces on the per-surface

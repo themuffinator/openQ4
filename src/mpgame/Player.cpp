@@ -5158,7 +5158,7 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 	if ( vehicleController.IsDriving( ) ) {
 		if ( !gameDebug.IsHudActive( DBGHUD_ANY ) ) {
 			vehicleController.DrawHUD( );
-			if ( cursor && health > 0 ) {			
+			if ( cursor && health > 0 && weaponWheelBlend <= 0.01f ) {			
 				// mekberg: adjustable crosshair size.
 				int crossSize = cvarSystem->GetCVarInteger( "g_crosshairSize" );
 				crossSize = crossSize - crossSize % 8;
@@ -5220,8 +5220,9 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 			if ( weapon && weapon->GetZoomGui() && zoomed && !IsVRHandAiming() ) {
 				weapon->GetZoomGui()->Redraw( gameLocal.time );
 			}
-			// openQ4 VR: the weapon hand aims, so a screen-centre crosshair would lie
-			if ( cursor && health > 0 && !IsVRHandAiming() ) {
+			// openQ4 VR: the weapon hand aims, so a screen-centre crosshair would lie.
+			// The weapon wheel hides it, as it does over a vehicle's.
+			if ( cursor && health > 0 && !IsVRHandAiming() && weaponWheelBlend <= 0.01f ) {
 				// Pass the current weapon to the cursor gui for custom crosshairs
 				int crossSize = cvarSystem->GetCVarInteger( "g_crosshairSize" );
 				crossSize = crossSize - crossSize % 8;

@@ -1100,6 +1100,18 @@ if get_option('build_native_tests')
     timeout: 30,
   )
 
+  openq4_depth_of_field_core_test = executable(
+    'openq4-depth-of-field-core-test',
+    files('tools/tests/native/DepthOfFieldCoreTest.cpp'),
+    include_directories: root_include_dir,
+    install: false,
+  )
+  test(
+    'openq4-depth-of-field-core',
+    openq4_depth_of_field_core_test,
+    timeout: 30,
+  )
+
   openq4_renderer_contracts_test = executable(
     'openq4-renderer-contracts-test',
     files(

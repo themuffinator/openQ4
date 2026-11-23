@@ -429,6 +429,10 @@ typedef struct viewDef_s {
 	bool				temporalJitterEnabled;
 	bool				temporalHistoryValid;
 	bool				temporalCaptureFrame;
+	// The game's depth-of-field request for this frame (SetViewDepthOfField),
+	// latched when the view was built so the back end reads it on any thread.
+	float				depthOfFieldRequest;
+	int					depthOfFieldRequestFlags;
 	bool				temporalPreviousProjectionValid;
 
 	idRenderWorldLocal *renderWorld;
@@ -1080,6 +1084,7 @@ public:
 	virtual int				GetImageMSAASamples(idImage* image);
 	virtual const glconfig_t &	GetGLConfig( void ) const;
 	virtual bool			SetUnderwaterView( float amount, const idVec3 &tint, float fogDistance );
+	virtual bool			SetViewDepthOfField( float amount, int flags );
 	virtual void			GetGpuFrameTiming( renderGpuFrameTiming_t &timing ) const;
 	virtual void			ResetGpuFrameTiming( const char *reason );
 	virtual void			GetPresentationState( renderPresentationState_t &state ) const;
@@ -1234,6 +1239,11 @@ public:
 	float					underwaterAmount;
 	idVec3					underwaterTint;
 	float					underwaterFogDistance;
+	// openQ4: the game's depth-of-field request (SetViewDepthOfField), valid for
+	// the frame it was made in; RenderScene latches it into the view.
+	float					depthOfFieldRequestAmount;
+	int						depthOfFieldRequestFlags;
+	int						depthOfFieldRequestFrame;
 	idRenderTexture *		activeRenderTexture;
 	renderPortalSkyCaptureViewCallback_t portalSkyCaptureViewCallback;
 	bool					suppressLevelshotViewModels;
@@ -2361,6 +2371,18 @@ void RB_ApplyCRTToBackBuffer( void );
 // openQ4 VR desktop mirror (draw_common.cpp)
 void RB_VR_DrawImageRect( idImage *image, int x, int y, int width, int height, float s0, float t0, float s1, float t1 );
 bool RB_UnderwaterViewAvailable( void );
+// Depth of field (DepthOfField.cpp; the pass in draw_common.cpp and
+// Vulkan/vk_PostProcess.cpp). RB_DepthOfFieldAvailable: whether this back end
+// can draw it at all.
+struct depthOfFieldSettings_t;
+bool RB_DepthOfFieldAvailable( void );
+bool R_DepthOfField_ResolveView( const viewDef_t *viewDef, int viewWidth, int viewHeight,
+	depthOfFieldSettings_t &settings );
+void R_DepthOfField_LatchRequest( viewDef_t *viewDef );
+// Seconds since the previous autofocus frame on this clock (wall time, so a
+// paused game still settles its focus); resets and returns 0 when stale.
+float R_DepthOfField_FocusElapsed( int &lastMsec );
+float R_DepthOfField_FocusSpeed( void );
 
 void RB_DetermineLightScale( void );
 void RB_STD_LightScale( void );

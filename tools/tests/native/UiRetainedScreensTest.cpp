@@ -2124,15 +2124,18 @@ static void CheckContinuity(ScreenHost& host, char** paths, const char* campaign
 			Check(host.softened.empty(),"no inactive game-effect backdrop passes");
 			for (const auto size : {std::pair{1280,720},std::pair{2560,720},std::pair{540,960}}) {
 				viewport.width = size.first; viewport.height = size.second;
-				Check(runtime.SetState({{"wheel_amount",.5}},error,4),"wheel focus fades independently of death and recovery");
+				Check(runtime.SetState({{"wheel_amount",.5},{"wheel_blur",.5}},error,4),"wheel focus fades independently of death and recovery");
 				host.softened.clear(); runtime.Frame(viewport,4);
 				Check(host.softened.size() == 1 && Near(host.softened[0].sigma,4*viewport.DpRatio(),.01f) &&
 					Near(host.softened[0].saturation,.97f,.001f),"one gentle Gaussian scene pass at partial wheel blend");
 				Bounds bounds; Check(runtime.GetBounds("wheel-focus",bounds) && Near(bounds.width,float(size.first)) &&
 					Near(bounds.height,float(size.second)),"wheel focus covers the entire wide or tall viewport");
-				Check(runtime.SetState({{"wheel_amount",1.0}},error,5),"wheel reaches full focus");
+				Check(runtime.SetState({{"wheel_amount",1.0},{"wheel_blur",1.0}},error,5),"wheel reaches full focus");
 				host.softened.clear(); runtime.Frame(viewport,5);
 				Check(host.softened.size() == 1 && Near(host.softened[0].sigma,8*viewport.DpRatio(),.01f),"full wheel uses an eight dp Gaussian sigma");
+				Check(runtime.SetState({{"wheel_blur",0.0}},error,6),"the renderer's depth of field takes over the blur");
+				host.softened.clear(); runtime.Frame(viewport,6);
+				Check(host.softened.size() <= 1 && ( host.softened.empty() || Near(host.softened[0].sigma,0.f,.01f) ),"no Gaussian blur under the depth of field");
 				Check(runtime.SetState({{"wheel_amount",0.0}},error,6),"wheel release clears focus");
 				host.softened.clear(); runtime.Frame(viewport,6);
 				Check(host.softened.empty(),"closed wheel costs no scene filter pass");

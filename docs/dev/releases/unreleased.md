@@ -18,6 +18,13 @@ the [development roadmap](../roadmap.md) for current scope.
   timers show each powerup and armour with where it lies and how close it is
   to returning, and kill feed lines slide in with a quick glint.
 
+- **The weapon wheel focuses like a camera.** While the wheel is open, your
+  weapon and everything close by stay sharp and the distance falls softly out
+  of focus, instead of the whole screen blurring, and the crosshair gets out
+  of the way. For screenshots and videos there is a full depth-of-field camera
+  too, with autofocus, aperture, bokeh shape and more, kept to the console as
+  a cheat. See [Depth of Field for Screenshots and Video](../../user/depth-of-field.md).
+
 - **Native resolution, always.** The game starts at your display's native
   resolution with the 3D scene at full size, and no graphics preset or
   Auto-Detect ever changes your resolution or resolution scale again. The
@@ -558,6 +565,13 @@ the [development roadmap](../roadmap.md) for current scope.
   for its format, quality, frame rate, resolution, sound and timing, and
   Settings > Controls > Other has a Record Video key. See
   [Record Video](../../user/video-capture.md).
+- The weapon wheel uses a depth of field focused on your weapon and the
+  world within about three metres, and hides the crosshair while it is open;
+  where post-processing is off it keeps the old soft blur. For promotional
+  shots, `r_dof` and its settings (cheats, no menu entry) add a thin-lens
+  camera with autofocus, f-stop, focal length, focus range, round or bladed
+  bokeh and a focus view, on OpenGL and Vulkan. See
+  [Depth of Field for Screenshots and Video](../../user/depth-of-field.md).
 - Classic multiplayer ruleset corrections: quad damage is four times, seeking
   nails lose Quake 4's splash, the expansion maps' napalm launcher respawns in
   30 seconds, Scout carriers take no armour, health from Regeneration drains

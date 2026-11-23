@@ -12,6 +12,24 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Depth of field for captures and the weapon wheel, 23 November 2026
+
+- **The weapon wheel focuses on your weapon.** The renderer's depth of field
+  keeps the view weapon and the world within 128 units sharp and blurs the
+  distance with round bokeh, in place of the whole-screen Gaussian, which
+  stays as the fallback where the renderer declines. The crosshair hides
+  while the wheel is open. Visual spec 1.50, register revision 30
+  (`WID-039` supersedes `WID-037`, pending).
+- **`r_dof` camera for promotional shots** (REN-12, partial): a thin-lens
+  model following the field of view, autofocus with an eased pull, focus
+  range, near/far scales, bladed bokeh with highlight weighting, quality up
+  to 192 samples at full resolution, and a focus view. Every cvar is a cheat
+  with no menu entry. Render API 38 appends `SetViewDepthOfField`.
+- Evidence: Windows x64 captures on OpenGL and Vulkan at 2560x1440 on
+  airdefense2; `openq4-depth-of-field-core`, `retained_view_effects.py` and
+  the retained-screens wheel checks pass. Not yet run: Linux, macOS, the
+  Android emulator (GLES declines by design) and a cost measurement.
+
 ## Texture packs' converted normal maps light correctly; a clearer settings failure, 23 November 2026
 
 - **BC7 normal maps that keep X in alpha are read correctly** (#255). A pack

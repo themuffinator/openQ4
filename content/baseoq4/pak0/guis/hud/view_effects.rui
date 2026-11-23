@@ -14,7 +14,8 @@
   "death_tunnel": {"type": "number", "initial": 0},
   "crash_focus": {"type": "number", "initial": 0},
   "crash_lids": {"type": "number", "initial": 0},
-  "wheel_amount": {"type": "number", "initial": 0}
+  "wheel_amount": {"type": "number", "initial": 0},
+  "wheel_blur": {"type": "number", "initial": 0}
  },
  "bindings": [
   {
@@ -27,7 +28,7 @@
    "id": "wheel-focus.blur",
    "node": "wheel-focus",
    "property": "backdrop-blur",
-   "value": {"op": "*", "args": [{"state": "wheel_amount"}, 8]}
+   "value": {"op": "*", "args": [{"state": "wheel_blur"}, 8]}
   },
   {
    "id": "wheel-focus.saturation",

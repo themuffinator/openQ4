@@ -53,13 +53,20 @@ struct Manager {
  void DeAlloc(idUserInterface*g){++frees;delete g;}
 } manager;
 auto* uiManager=&manager;
+const int VIEW_DOF_FOCUS_VIEW_WEAPON=1;
+struct RenderSystem {
+ bool available=true;float amount=-1;int flags=0;
+ bool SetViewDepthOfField(float a,int f){amount=a;flags=f;return a<=.001f||available;}
+} renderer;
+auto* renderSystem=&renderer;
 struct idPlayerView {
  Player* player=nullptr;idUserInterface* presentationFx=nullptr;
  int deathFxStart=-1,recoveryFxUntil=0,crashFxStart=-1,crashFxDuration=0;
- bool recoverySequence=false,crashFxClosing=false;
+ bool recoverySequence=false,crashFxClosing=false,wheelSceneFocus=false;
  ~idPlayerView();void ResetRetainedViewEffects();void RetainedRecoveryFade(const idVec4&,int);
  void ResetSubtitles(){} // subtitle state is covered by audio_subtitles.py
  void DrawRetainedViewEffects(bool wheelOnly=false);
+ void RequestRetainedWheelFocus(bool allowed,bool headset);
  float value(const char*k){return presentationFx?presentationFx->state[k]:0;}
 };
 '''
@@ -74,6 +81,17 @@ int main(){
  // Wheel submission clears the scene-specific states in the shared document.
  p.wheel=1;v.DrawRetainedViewEffects(true);
  assert(v.value("wheel_amount")==1 && v.value("death_amount")==0 && v.value("death_tunnel")==0);
+ assert(v.value("wheel_blur")==1);
+ // The renderer's depth of field focuses the view weapon in place of the blur.
+ v.RequestRetainedWheelFocus(true,false);v.DrawRetainedViewEffects(true);
+ assert(renderer.amount==1 && renderer.flags==VIEW_DOF_FOCUS_VIEW_WEAPON && v.wheelSceneFocus);
+ assert(v.value("wheel_amount")==1 && v.value("wheel_blur")==0);
+ // A headset eye, a declined pass or a hidden view keeps the blur and asks for nothing.
+ v.RequestRetainedWheelFocus(true,true);v.DrawRetainedViewEffects(true);
+ assert(renderer.amount==0 && !v.wheelSceneFocus && v.value("wheel_blur")==1);
+ renderer.available=false;v.RequestRetainedWheelFocus(true,false);v.DrawRetainedViewEffects(true);
+ assert(renderer.amount==1 && !v.wheelSceneFocus && v.value("wheel_blur")==1);
+ renderer.available=true;v.RequestRetainedWheelFocus(false,false);assert(renderer.amount==0 && !v.wheelSceneFocus);
  p.wheel=0;p.health=100;v.DrawRetainedViewEffects();assert(v.deathFxStart==-1);
  for(const char* setting:{"ui_retainedReducedMotion","ui_reducedFlashing"}){
   cv.values[setting]=true;p.health=0;v.DrawRetainedViewEffects();gameLocal.time+=320;v.DrawRetainedViewEffects();
@@ -109,7 +127,7 @@ int main(){
  gameLocal.camera=nullptr;gameLocal.map="game/mcc_2";p.inBed=true;v.RetainedRecoveryFade(white,2000);
  v.DrawRetainedViewEffects();assert(v.value("recovery_amount")==1 && v.value("crash_focus")==0);
  p.inBed=false;v.RetainedRecoveryFade(white,2000);assert(!v.recoverySequence);
- std::puts("retained view effects: death, accessibility, crash sequence, cleanup and treatment passed");
+ std::puts("retained view effects: death, wheel focus, accessibility, crash sequence, cleanup and treatment passed");
 }
 '''
 

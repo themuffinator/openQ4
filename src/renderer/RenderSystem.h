@@ -907,7 +907,19 @@ public:
 	virtual int PollVideoFrame( renderVideoFrame_t &frame, bool wait ) { (void)frame; (void)wait; return -1; }
 	virtual void ReleaseVideoFrame() {}
 	virtual void EndVideoCapture() {}
+
+	// Appended slot, render API 38. A depth of field the game asks for on
+	// this frame's main view; call it before RenderScene, every frame it is
+	// wanted. amount (0..1) fades it in; flags take VIEW_DOF_FOCUS_VIEW_WEAPON,
+	// which keeps the view weapon sharp and defocuses the world behind it (the
+	// weapon wheel). It replaces the r_dof camera for the frame. Returns true
+	// when the renderer will draw it (amount 0 asks for nothing and returns
+	// true), false when the caller should fall back to its own treatment.
+	virtual bool SetViewDepthOfField( float amount, int flags ) { (void)amount; (void)flags; return false; }
 };
+
+// SetViewDepthOfField flags (DepthOfFieldCore.h DOF_REQUEST_*)
+static const int VIEW_DOF_FOCUS_VIEW_WEAPON = 1 << 0;
 
 extern idRenderSystem *		renderSystem;
 

@@ -1,10 +1,10 @@
 {
-  "schema_version": 29,
+  "schema_version": 30,
   "id_namespace": "openq4.ui.product",
   "date": "2026-11-23",
   "status": "Implementation incomplete; this register preserves full product scope and does not accept any production GUI.",
   "baseline": {
-    "engine_revision": "e152c7f1336380422528dfea574416884bdda6c2",
+    "engine_revision": "6c81ea99186c2e54c660c8af5aa5460c474decfc",
     "companion_revision": "18f000a7ff3b99f1da25a73282a0eca1dc1244f0",
     "effective_gui_count": 358,
     "translated_or_accepted_resources": 0,
@@ -14,7 +14,7 @@
     "visual": {
       "path": "docs/dev/ui-visual-design.md",
       "authority": "normative visual, interaction and editor contract",
-      "sha256": "4f2b0f32b6ab066f8be244db13ac35a10470430bb7bcffc398d2a5d762c944f3"
+      "sha256": "979b9a91a3021abf84c8c2bb6cf586f8807715b4d4b61cd7224253a416ca7e8f"
     },
     "product": {
       "path": "docs/dev/archive/2026-10-18/plans/ui-product-completion.md",
@@ -2393,6 +2393,18 @@
       "source_refs": [
         "visual:14",
         "visual:Version 1.49"
+      ],
+      "carried_evidence": []
+    },
+    {
+      "superseded": "WID-037",
+      "successors": [
+        "WID-039"
+      ],
+      "normative_change": "Visual 1.50 replaces the wheel's Gaussian scene focus with the renderer's depth of field focused on the view weapon and the world within 128 units, at the product owner's request, keeps the Gaussian as the fallback where the renderer declines, and hides the crosshair while the wheel is open; the wash, artwork, timing, saturation and closed-wheel rules are carried unchanged.",
+      "source_refs": [
+        "visual:14",
+        "visual:Version 1.50"
       ],
       "carried_evidence": []
     }
@@ -15956,6 +15968,44 @@
           "place_cut_u": 66,
           "drop_under_flags_u": 15
         }
+      }
+    },
+    {
+      "id": "WID-039",
+      "title": "Weapon-wheel depth of field on the view weapon",
+      "milestone_owner": "M5",
+      "implementation_owner": "UI components and application bindings",
+      "source_refs": [
+        "visual:7",
+        "product:2 UI-03",
+        "product:3 Text, controls and accessibility",
+        "product:4 M3",
+        "visual:14",
+        "visual:9",
+        "visual:Version 1.50"
+      ],
+      "requirement": "The native Marine, Strogg and multiplayer weapon wheels ask the renderer for a depth of field focused on the view weapon: the view weapon and the world within 128 units stay sharp, and beyond them a round-bokeh blur grows with distance to 14 px at 1080 lines, scaled with the view's height, with subtle 0.94 saturation. Ease it with the wheel blend, filter only the 3D view so damage indicators, HUD and wheel artwork stay sharp, and where the renderer declines (no post-processing, a headset's eye) apply the high-quality separable Gaussian with eight dp sigma to the entire wide/tall view instead. Hide the crosshair and hit marker while the wheel is open or fading, respect the opaque-backing fallback and submit no focus pass once the wheel closes. Multiplayer simulation continues at normal speed.",
+      "dependencies": [
+        "WID-036"
+      ],
+      "acceptance_evidence_needed": [
+        "Engine captures on OpenGL and Vulkan with the wheel open, closed and partially faded, and with the renderer declining, at landscape, ultrawide and portrait sizes. Verify a sharp view weapon and nearby world, a defocused distance, sharp HUD/wheel artwork, a hidden crosshair, the Gaussian fallback, reduced motion, cancellation, no lingering pass, and unchanged multiplayer simulation speed."
+      ],
+      "status": "pending",
+      "current_evidence": [],
+      "acceptance_evidence": [],
+      "remaining": "Windows OpenGL and Vulkan captures of the open wheel exist (docs/user/depth-of-field.md describes the effect); the aspect matrix, the declined-renderer fallback in a live session, devices, VR and product acceptance remain open.",
+      "constraints": {
+        "weapon_focus": true,
+        "clear_world_units": 128,
+        "max_blur_px_at_1080": 14,
+        "scene_saturation": 0.94,
+        "fallback_sigma_dp": 8,
+        "before_hud": true,
+        "covers_full_view": true,
+        "fades_with_wheel": true,
+        "hides_crosshair": true,
+        "no_closed_filter_pass": true
       }
     }
   ],

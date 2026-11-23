@@ -56,7 +56,7 @@ exact; the estimate column is deliberately approximate.
 | [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **60%** | 1 / 8 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks; HDR display output (VK-08, not started). |
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
-| [Modern rendering engine](#modern-rendering-engine) — REN | **65%** | 5 / 11 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, partial). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026; temporal AA and dynamic resolution (REN-04) closed 23 November 2026. |
+| [Modern rendering engine](#modern-rendering-engine) — REN | **65%** | 5 / 12 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, partial). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026; temporal AA and dynamic resolution (REN-04) closed 23 November 2026; depth of field (REN-12, partial) 23 November. |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **40%** | 4 / 9 | Shadow-map cost, equal-settings regressions (the retained HUD's composition and most of the Vulkan depth capture removed 22 November, unmeasured in fullscreen), hitches, front-end cost and the release gate. |
 | [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05). |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **70%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest on a headset. |
@@ -1186,7 +1186,7 @@ Sources: [modernization history](archive/2026-10-18/idtech5-modernization-roadma
 
 ### REN completion checkpoints
 
-**Estimate: 65%; 5/11 tasks closed.** PBR, temporal features and qualified shared
+**Estimate: 65%; 5/12 tasks closed.** PBR, temporal features and qualified shared
 rendering domains exist (REN-01). Aggregate modern lighting still has
 `MODERN_LIGHTING_PARITY_PROVEN_DOMAINS=0`; neither feature presence nor domain
 diagnostics establish whole-frame ownership or production performance.
@@ -1204,6 +1204,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-09 — Partial | Per-light shadowed scattering replaces the REN-06 leaf on GL and Vulkan: falloff/projection images, point, projected and cascaded-sun maps, stencil-light policy (none by default), composite before fog and translucents, status reporting, exact rollback; frozen outdoor/indoor captures pass under TAA and 4x MSAA. 23 November 2026: moving casters and a moving flashlight, temporal history, resolution scale and dynamic resolution, mirrors and remote cameras, a backend decline and VR stereo pass on GL and Vulkan; scratch targets are pooled by view size. Evidence: [volumetric lighting](volumetric-lighting.md). | Per-tier cost against FPS-01 on a quiet reference machine (a shared-machine ladder is recorded), the owner's visual review of the defaults (contact sheets captured, no default changed; 12 whites out the Tram 1 opening), and physical Linux/macOS/Android runs with the Apple GL 2.1 and GLES declines (PLAT). |
 | REN-10 — Closed | HBAO (`r_ssaoMethod 1`), GTAO (`2`) and a brute-force reference (`3`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. GTAO closer to the reference than SSAO with fewer halos, HBAO as close as SSAO; backend parity, exact rollback, cost at or near SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
 | REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | Linux (Mesa GL and Vulkan) and the Android emulator (GLES declines cleanly) pass. VR headset confirmation and physical Linux GPUs, macOS and Android devices belong to platform qualification; a preset decision waits for authored content. |
+| REN-12 — Partial | Depth of field on GL and Vulkan from one lens model (`DepthOfFieldCore.h`): thin-lens CoC from the view's field of view on a 36 mm sensor, autofocus with an eased pull, tile-dilated scatter-as-gather bokeh (round or bladed, highlight weighting) at half or full resolution, before motion blur and bloom. The `r_dof*` promotional camera is cheat-only with no menu entry; the weapon wheel asks for a view-weapon focus through `SetViewDepthOfField` (render API 38) with the Gaussian as its fallback. Windows captures on both backends; `DepthOfFieldCore` native test. | Cost not priced against FPS-01; Linux, macOS and Android (GLES declines) not run; capture-tool review of the bokeh on authored character shots. |
 
 ### REN task evidence and acceptance
 
@@ -2226,6 +2227,37 @@ diagnostics establish whole-frame ownership or production performance.
   parallax draws, no warnings). VR stereo was not run on a headset, and physical
   Linux GPUs, macOS and Android devices belong to platform qualification
   (PLAT/AND); a preset decision waits for authored content.
+- [ ] **REN-12 — P2, implementation: depth of field.** Partial, 23 November
+  2026. A camera-quality depth of field for promotional captures and the
+  weapon wheel ([player guide](../user/depth-of-field.md)).
+  `src/renderer/DepthOfFieldCore.h` holds the lens model and the pass plan
+  both backends draw from: the signed circle of confusion of a thin lens,
+  K * (1 - S / d), with the focal length following the view's field of view on
+  a 36 mm sensor unless `r_dofFocalLength` sets one; an in-focus band
+  (`r_dofFocusRange`); separate near and far scales; blur sizes in pixels of
+  a 1080-line view. Seven passes in one program per backend
+  (`glprogs/dof.fs`, `shaders/post_dof.frag`): a 1x1 autofocus target eased
+  toward the median depth of five taps around `r_dofFocusX/Y`; a prefilter to
+  colour plus CoC at half resolution (full at `r_dofQuality 3`); 8x8 tile
+  maxima of the near CoC, dilated by its reach; a golden-angle scatter-as-gather
+  where a sample counts when its own disc covers the pixel, a farther sample
+  may not spill over a sharper nearer one and foreground blur bleeds over the
+  focus plane, shaped by `r_dofBlades`/`r_dofBladeRoundness` and weighted by
+  `r_dofHighlights`; a tent; and a composite blending by the full-resolution
+  CoC and the near coverage. It runs on the main scene view before motion blur
+  and bloom, never on a headset's eye, and leaves the HUD sharp. Every
+  `r_dof*` cvar is a cheat with no menu entry (reset on a server without
+  cheats). The game asks through `idRenderSystem::SetViewDepthOfField`
+  (render API 38): the weapon wheel keeps the view weapon (its depth range)
+  and the world within 128 units sharp and blurs beyond (visual spec 1.50,
+  register revision 30, `WID-039`); where the renderer declines, the view
+  effects document's Gaussian takes over. Evidence: Windows x64 captures on
+  OpenGL and Vulkan at 2560x1440 on airdefense2 (autofocus, telephoto with
+  six blades, the CoC debug view, the open wheel), the
+  `openq4-depth-of-field-core` native test, `retained_view_effects.py` and the
+  retained-screens wheel checks. Remaining: price the cost against FPS-01's
+  budgets, run Linux, macOS and the Android emulator (GLES declines by
+  design), and review the bokeh on authored character shots.
 
 ## Frame-rate recovery and performance budgets
 

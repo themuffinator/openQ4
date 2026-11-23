@@ -61,6 +61,20 @@ void idPlayerView::RetainedRecoveryFade( const idVec4 &color, int duration ) {
 	}
 }
 
+/*
+The weapon wheel's scene focus, asked for before the view renders. The
+renderer's depth of field keeps the view weapon sharp and defocuses the world
+behind it. Where it cannot draw that (no post-processing, a headset's eye),
+the view-effects document blurs the whole scene instead, as it always did.
+*/
+void idPlayerView::RequestRetainedWheelFocus( bool allowed, bool headset ) {
+	float wheel = 0;
+	if ( allowed && !headset && player && !player->spectating && cvarSystem->GetCVarBool( "ui_retained" ) ) {
+		wheel = RetainedViewEase( player->GetWeaponWheelBlend() );
+	}
+	wheelSceneFocus = renderSystem->SetViewDepthOfField( wheel, VIEW_DOF_FOCUS_VIEW_WEAPON ) && wheel > 0;
+}
+
 void idPlayerView::DrawRetainedViewEffects( bool wheelOnly ) {
 	if ( !player || player->spectating || !cvarSystem->GetCVarBool( "ui_retained" ) ) {
 		ResetRetainedViewEffects(); return;
@@ -116,6 +130,7 @@ void idPlayerView::DrawRetainedViewEffects( bool wheelOnly ) {
 	// Separate submissions share a document but never blur the HUD or apply
 	// recovery/death twice when InfluenceVision has already drawn its GUI.
 	presentationFx->SetStateFloat( "wheel_amount", wheel );
+	presentationFx->SetStateFloat( "wheel_blur", wheelSceneFocus ? 0 : wheel );
 	presentationFx->StateChanged( gameLocal.time );
 	presentationFx->Redraw( gameLocal.time );
 }

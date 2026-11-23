@@ -9,13 +9,13 @@ def state(name): return {'state':name}
 def document():
     doc=ui.Document('openq4.view-effects')
     for name in ('recovery_amount','death_amount','death_shock','death_focus','death_tunnel',
-                 'crash_focus','crash_lids','wheel_amount'):
+                 'crash_focus','crash_lids','wheel_amount','wheel_blur'):
         doc.state[name]={'type':'number','initial':0}
-    def filter(ident,source,blur,saturation,boost=None):
+    def filter(ident,source,blur,saturation,boost=None,blur_source=None):
         node=ui.group(ident,{**ui.FULL,'display':ui.keyword('none'),
                       'backdrop-blur':ui.length(0),'backdrop-saturate':ui.number(1)})
         doc.bind(ident+'.display',ident,'display',{'op':'select','args':[{'op':'>','args':[state(source),.001]},'block','none']})
-        sigma=product(state(source),blur)
+        sigma=product(state(blur_source or source),blur)
         if boost:
             sigma={'op':'+','args':[sigma,product(state(boost),4.5)]}
         doc.bind(ident+'.blur',ident,'backdrop-blur',sigma)
@@ -35,7 +35,9 @@ def document():
         return node
     # Isotropic dp sigma, two-pass Gaussian filtering on the live scene. The
     # wheel pass is submitted before the HUD; wheel artwork stays unfiltered.
-    nodes=[filter('wheel-focus','wheel_amount',8,.06),
+    # The wheel's blur follows wheel_blur: zero while the renderer's depth of
+    # field focuses the view weapon, the wheel's blend when it cannot.
+    nodes=[filter('wheel-focus','wheel_amount',8,.06,blur_source='wheel_blur'),
            filter('recovery-focus','recovery_amount',20,.30),
            veil('recovery-periphery','#33271E','recovery_amount'),
            # Warm, heavy eyes distinguish the crash from the colder death

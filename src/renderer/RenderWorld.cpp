@@ -1196,6 +1196,7 @@ void idRenderWorldLocal::RenderScene( const renderView_t *renderView, int render
 	viewDef_t		*parms = (viewDef_t *)R_ClearedFrameAlloc( sizeof( *parms ) );
 	parms->renderView = *renderView;
 	parms->renderFlags = renderFlags;
+	R_DepthOfField_LatchRequest( parms );
 
 	// an off-axis eye frustum must enclose its axis with finite, ordered
 	// tangents; anything else renders through the symmetric fov_x/fov_y

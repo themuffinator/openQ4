@@ -56,6 +56,7 @@
 #include "../ModernGLExecutor.h"
 #include "../TemporalPresentation.h"
 #include "../MotionBlurCore.h"
+#include "../DepthOfFieldCore.h"
 
 #undef snprintf
 #undef vsnprintf
@@ -158,7 +159,8 @@ enum vkPostPassKind_t {
 	VK_POST_MOTION_VECTORS_REACTIVE,
 	VK_POST_SKY_MASK,
 	VK_POST_VOLUMETRIC_INJECT,
-	VK_POST_VOLUMETRIC_COMPOSITE
+	VK_POST_VOLUMETRIC_COMPOSITE,
+	VK_POST_DOF
 };
 
 // scene shader modules, created the first time a pass needs one
@@ -179,6 +181,7 @@ enum vkPostSceneModule_t {
 	VK_POST_MODULE_MOTION_VECTORS_REACTIVE_VERT,
 	VK_POST_MODULE_MOTION_VECTORS_REACTIVE_FRAG,
 	VK_POST_MODULE_SKY_MASK,
+	VK_POST_MODULE_DOF,
 	VK_POST_SCENE_MODULE_COUNT
 };
 
@@ -204,7 +207,8 @@ static const vkPostModuleSource_t vkPostSceneModuleSources[ VK_POST_SCENE_MODULE
 	{ vk_post_motionvectors_previous_vert_spv, vk_post_motionvectors_previous_vert_spv_size, "post posed motion vector vertex" },
 	{ vk_post_motionvectors_reactive_vert_spv, vk_post_motionvectors_reactive_vert_spv_size, "post reactive coverage vertex" },
 	{ vk_post_motionvectors_reactive_frag_spv, vk_post_motionvectors_reactive_frag_spv_size, "post reactive coverage fragment" },
-	{ vk_post_skymask_frag_spv, vk_post_skymask_frag_spv_size, "post portal-sky mask fragment" }
+	{ vk_post_skymask_frag_spv, vk_post_skymask_frag_spv_size, "post portal-sky mask fragment" },
+	{ vk_post_dof_frag_spv, vk_post_dof_frag_spv_size, "post depth of field fragment" }
 };
 
 // RB_BLOOM_MAX_LEVELS and RB_BLOOM_BASE_WEIGHTS (draw_common.cpp)
@@ -578,6 +582,7 @@ image manager, which frees them on its own; the render textures are ours.
 ====================
 */
 static void VK_Post_ShutdownVolumetrics( void );
+static void VK_Post_ShutdownDepthOfField( void );
 
 void VK_PostProcess_Shutdown( void ) {
 	memset( &vkLinearCapture, 0, sizeof( vkLinearCapture ) );
@@ -606,6 +611,7 @@ void VK_PostProcess_Shutdown( void ) {
 			delete vkPostScene.bloomTargets[ level ][ pingPong ];
 		}
 	}
+	VK_Post_ShutdownDepthOfField();
 	delete vkPostScene.motionVectorTarget;
 	delete vkPostScene.ssaoFieldTarget;
 	delete vkPostScene.ssaoOcclusionTarget;
@@ -2554,6 +2560,200 @@ static bool VK_Post_MotionBlur( const viewDef_t *viewDef, idRenderTexture *scene
 	return drew;
 }
 
+// ---- depth of field (RB_STD_DepthOfField) ----
+
+// draw_common.cpp rbDofTarget_t
+enum vkPostDofTarget_t {
+	VK_POST_DOF_FOCUS0 = 0,
+	VK_POST_DOF_FOCUS1,
+	VK_POST_DOF_PREFILTER,
+	VK_POST_DOF_TILES,
+	VK_POST_DOF_TILES_DILATED,
+	VK_POST_DOF_GATHER,
+	VK_POST_DOF_POSTFILTER,
+	VK_POST_DOF_TARGET_COUNT
+};
+
+static const char *const vkPostDofTargetNames[ VK_POST_DOF_TARGET_COUNT ] = {
+	"_vkDofFocus0", "_vkDofFocus1", "_vkDofPrefilter", "_vkDofTiles", "_vkDofTilesDilated",
+	"_vkDofGather", "_vkDofPostfilter"
+};
+
+struct vkPostDofState_t {
+	idImage *			images[ VK_POST_DOF_TARGET_COUNT ];
+	idRenderTexture *	targets[ VK_POST_DOF_TARGET_COUNT ];
+	int					focusCurrent;
+	bool				focusValid;
+	int					focusMsec;
+	const idRenderWorldLocal *focusWorld;
+	int					focusVideoRestart;
+};
+static vkPostDofState_t vkPostDof;
+
+/*
+====================
+RB_DepthOfFieldAvailable
+
+The game asks from its own thread, so this creates nothing: the module is
+built the first time the pass draws, which warns once if it cannot.
+====================
+*/
+bool RB_DepthOfFieldAvailable( void ) {
+	return !r_skipPostProcess.GetBool() && vkCtx.device != VK_NULL_HANDLE
+		&& !vkPostScene.moduleFailed[ VK_POST_MODULE_DOF ];
+}
+
+static void VK_Post_ForgetDofFocus( void ) {
+	vkPostDof.focusValid = false;
+	vkPostDof.focusMsec = 0;
+}
+
+static void VK_Post_ShutdownDepthOfField( void ) {
+	for ( int i = 0; i < VK_POST_DOF_TARGET_COUNT; i++ ) {
+		delete vkPostDof.targets[ i ];
+	}
+	memset( &vkPostDof, 0, sizeof( vkPostDof ) );
+	vkPostDof.focusVideoRestart = -1;
+}
+
+// One intermediate pass: the whole target, its four inputs bound to sets 0-3.
+static bool VK_Post_DofStep( int targetIndex, VkShaderModule fragModule, const depthOfFieldBlock_t &block,
+		idImage *primary, idImage *depth, idImage *auxA, idImage *auxB ) {
+	if ( !VK_Exec_SetRenderTarget( vkPostDof.targets[ targetIndex ], 0, r_vkPostDepthTransitionReference.GetBool() ) ) {
+		return false;
+	}
+	idImage *const inputs[ 4 ] = { primary, depth, auxA, auxB };
+	VkDescriptorSet sets[ 4 ];
+	for ( int i = 0; i < 4; i++ ) {
+		sets[ i ] = VK_Post_Descriptor( inputs[ i ] != NULL ? inputs[ i ] : globalImages->blackImage );
+	}
+	const int uniformOffset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
+	const VkPipeline pipeline = VK_Exec_PostPipeline( VK_POST_DOF, vkPost.fullscreenVert, fragModule,
+			GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	return VK_Post_DrawTarget( pipeline, sets, 4, uniformOffset );
+}
+
+// Returns true when it drew into the scene. Leaves the scene target active.
+static bool VK_Post_DepthOfField( const viewDef_t *viewDef, idRenderTexture *sceneTarget, int sceneCubeFace ) {
+	if ( !VK_Post_IsMainSceneView( viewDef ) ) {
+		return false;
+	}
+	const int width = VK_Post_ViewWidth( viewDef );
+	const int height = VK_Post_ViewHeight( viewDef );
+	depthOfFieldSettings_t settings;
+	if ( !R_DepthOfField_ResolveView( viewDef, width, height, settings ) ) {
+		VK_Post_ForgetDofFocus();
+		return false;
+	}
+	const VkShaderModule fragModule = VK_Post_SceneModule( VK_POST_MODULE_DOF );
+	if ( fragModule == VK_NULL_HANDLE ) {
+		vkPostFailReason = "depth of field program unavailable";
+		return false;
+	}
+	static const char *const label = "Vulkan depth of field";
+	const int sizes[ VK_POST_DOF_TARGET_COUNT ][ 2 ] = {
+		{ 1, 1 }, { 1, 1 },
+		{ settings.gatherWidth, settings.gatherHeight },
+		{ settings.tileWidth, settings.tileHeight },
+		{ settings.tileWidth, settings.tileHeight },
+		{ settings.gatherWidth, settings.gatherHeight },
+		{ settings.gatherWidth, settings.gatherHeight }
+	};
+	for ( int i = 0; i < VK_POST_DOF_TARGET_COUNT; i++ ) {
+		if ( !VK_Post_EnsureColorTarget( vkPostDof.images[ i ], vkPostDof.targets[ i ], vkPostDofTargetNames[ i ],
+				sizes[ i ][ 0 ], sizes[ i ][ 1 ], TF_LINEAR, label ) ) {
+			vkPostFailReason = "depth of field targets unavailable";
+			return false;
+		}
+	}
+	// Both captures come from the scene target, before any pass moves off it.
+	idImage *depthImage = VK_Post_FinalDepth( viewDef );
+	idImage *scene = VK_Post_CaptureScene( viewDef );
+	if ( depthImage == NULL || scene == NULL ) {
+		vkPostFailReason = "scene or depth capture unavailable";
+		return false;
+	}
+	const float unitScale[ 2 ] = { 1.0f, 1.0f };
+	const float depthProjection[ 2 ] = { viewDef->projectionMatrix[ 10 ], viewDef->projectionMatrix[ 14 ] };
+
+	// The autofocus history belongs to one world and one device.
+	if ( vkPostDof.focusWorld != viewDef->renderWorld || vkPostDof.focusVideoRestart != tr.GetVideoRestartCount() ) {
+		VK_Post_ForgetDofFocus();
+		vkPostDof.focusWorld = viewDef->renderWorld;
+		vkPostDof.focusVideoRestart = tr.GetVideoRestartCount();
+	}
+
+	depthOfFieldBlock_t block;
+	idImage *focusImage = NULL;
+	if ( settings.autoFocus ) {
+		const float elapsed = R_DepthOfField_FocusElapsed( vkPostDof.focusMsec );
+		const float blend = DepthOfFieldCore_FocusBlend( R_DepthOfField_FocusSpeed(), elapsed );
+		const int next = vkPostDof.focusCurrent == VK_POST_DOF_FOCUS0 ? VK_POST_DOF_FOCUS1 : VK_POST_DOF_FOCUS0;
+		DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_FOCUS, width, height, depthProjection,
+			unitScale, unitScale, blend, vkPostDof.focusValid );
+		if ( !VK_Post_DofStep( next, fragModule, block, NULL, depthImage,
+				vkPostDof.images[ vkPostDof.focusCurrent ], NULL ) ) {
+			VK_Post_ForgetDofFocus();
+			return false;
+		}
+		vkPostDof.focusCurrent = next;
+		vkPostDof.focusValid = true;
+		focusImage = vkPostDof.images[ vkPostDof.focusCurrent ];
+	} else {
+		VK_Post_ForgetDofFocus();
+	}
+
+	struct dofStep_t {
+		depthOfFieldPass_t pass;
+		int target;
+		idImage *primary;
+		idImage *depth;
+		idImage *auxA;
+	};
+	const dofStep_t steps[] = {
+		{ DOF_PASS_PREFILTER, VK_POST_DOF_PREFILTER, scene, depthImage, focusImage },
+		{ DOF_PASS_TILE_MAX, VK_POST_DOF_TILES, vkPostDof.images[ VK_POST_DOF_PREFILTER ], NULL, NULL },
+		{ DOF_PASS_TILE_DILATE, VK_POST_DOF_TILES_DILATED, vkPostDof.images[ VK_POST_DOF_TILES ], NULL, NULL },
+		{ DOF_PASS_GATHER, VK_POST_DOF_GATHER, vkPostDof.images[ VK_POST_DOF_PREFILTER ], NULL,
+			vkPostDof.images[ VK_POST_DOF_TILES_DILATED ] },
+		{ DOF_PASS_POSTFILTER, VK_POST_DOF_POSTFILTER, vkPostDof.images[ VK_POST_DOF_GATHER ], NULL, NULL }
+	};
+	for ( int i = 0; i < int( sizeof( steps ) / sizeof( steps[ 0 ] ) ); i++ ) {
+		DepthOfFieldCore_FillBlock( block, settings, steps[ i ].pass, width, height, depthProjection,
+			unitScale, unitScale, 1.0f, false );
+		if ( !VK_Post_DofStep( steps[ i ].target, fragModule, block, steps[ i ].primary, steps[ i ].depth,
+				steps[ i ].auxA, NULL ) ) {
+			vkPostFailReason = "depth of field pass refused";
+			VK_Exec_SetRenderTarget( sceneTarget, sceneCubeFace );
+			return false;
+		}
+	}
+
+	if ( !VK_Exec_SetRenderTarget( sceneTarget, sceneCubeFace ) ) {
+		return false;
+	}
+	DepthOfFieldCore_FillBlock( block, settings, DOF_PASS_COMPOSITE, width, height, depthProjection,
+		unitScale, unitScale, 1.0f, false );
+	const VkDescriptorSet sets[ 4 ] = {
+		VK_Post_Descriptor( scene ),
+		VK_Post_Descriptor( depthImage ),
+		VK_Post_Descriptor( focusImage != NULL ? focusImage : globalImages->blackImage ),
+		VK_Post_Descriptor( vkPostDof.images[ VK_POST_DOF_POSTFILTER ] )
+	};
+	const int uniformOffset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
+	const VkPipeline pipeline = VK_Exec_PostPipeline( VK_POST_DOF, vkPost.fullscreenVert, fragModule,
+			GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	const bool drew = VK_Post_DrawSceneRect( viewDef, pipeline, sets, 4, uniformOffset );
+	static bool logged = false;
+	if ( drew && !logged ) {
+		logged = true;
+		common->Printf( "Vulkan: first depth of field pass drew (%s, %d samples, %dx%d gather)\n",
+			settings.weaponFocus ? "view weapon focus" : ( settings.autoFocus ? "autofocus" : "manual focus" ),
+			settings.samples, settings.gatherWidth, settings.gatherHeight );
+	}
+	return drew;
+}
+
 // ---- bloom, tone map and grade (RB_STD_Bloom) ----
 
 typedef struct vkPostBloomBlurBlock_s {
@@ -3687,6 +3887,17 @@ static bool VK_Post_DrawSceneEffectsInView( const viewDef_t *viewDef ) {
 		} else {
 			VK_Post_WarnOnce( ssaoWarned, "r_ssao" );
 		}
+	}
+	// Depth of field before motion blur and bloom, as a camera would.
+	static bool dofWarned = false;
+	vkPostFailReason = NULL;
+	if ( VK_Post_DepthOfField( viewDef, sceneTarget, sceneCubeFace ) ) {
+		drew = true;
+	} else if ( vkPostFailReason != NULL ) {
+		VK_Post_WarnOnce( dofWarned, "r_dof" );
+	}
+	if ( VK_Exec_ActiveRenderTexture() != sceneTarget && !VK_Exec_SetRenderTarget( sceneTarget, sceneCubeFace ) ) {
+		return drew;
 	}
 	// Only the main camera advances the motion-blur history.
 	if ( VK_Post_MotionBlur( viewDef, sceneTarget ) ) {
