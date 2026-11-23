@@ -18,6 +18,7 @@ from remastered_hud_base import (AND, BOUND_TEXT, NOT, OR, S, U, HudDocument, an
                                  gameplay_root,
                                  layout_state, num, op, play, pts_path, rgb, rounded_rect, sel, stroke, svg_path, tr, transform_value,
                                  u, vec, when)
+from remastered_hud_groups import flash_cap
 from remastered_hud_status import MP_ROSTER, full
 
 NOTE, MAR, STR, MAR_T, STR_T = "#FFFF8D", "#6AA42B", "#FF7B04", "#AAE355", "#FF8E00"
@@ -392,6 +393,8 @@ FEED_FIELDS = {"attacker": "", "victim": "", "weapon": -1, "kind": 0, "quad": Fa
 # the scoreline's network readout (about 16:10 and narrower at any HUD scale),
 # the top-trailing groups step down under the bar by this much.
 UNDER_BAR_DROP = 38
+# The kill feed's arrival and glide: hard deceleration, no overshoot.
+FEED_EASE = [0.16, 1.0, 0.3, 1.0]
 
 
 def scoreline_shown() -> dict:
@@ -416,7 +419,16 @@ def kill_feed(doc: HudDocument) -> dict:
     world, the teal telefrag mark), a TEAM tag on a team kill, the victim;
     names cut with an ellipsis at 84 u, white for you, the team's text color
     in team modes, #FFFF8D otherwise. The game times the lines (2000 ms hold,
-    1000 ms fade, one leaves every 3.1 s)."""
+    1000 ms fade, one leaves every 3.1 s).
+
+    Motion (openQ4): a line arrives from 22 u toward the trailing edge,
+    decelerating into place over 240 ms on cubic (0.16, 1, 0.3, 1) as it fades
+    in over 140 ms; its weapon mark settles from 155% over 260 ms, and a white
+    glint over its plate peaks at 0.45 at 60 ms and is gone by 280 ms (capped
+    at 0.40 under reduced flashing). When the top line leaves, the lines below
+    glide up into its place over 200 ms instead of jumping. The game names
+    each change (oq4_feedIn<slot>, oq4_feedShift); reduced motion seats the
+    lines at once."""
     tourney = op("==", S("gametype"), 2)
     rows = []
     for slot in range(4):
@@ -447,7 +459,8 @@ def kill_feed(doc: HudDocument) -> dict:
             doc.show(holder["id"], op("==", S(f("kind")), kind))
             marks.append(holder)
         mark = ui.group(lid + "-mark", {"position": ui.keyword("relative"), "display": ui.keyword("block"), "width": ui.length(u(11)),
-                                        "height": ui.length(u(11)), "margin-right": ui.length(u(5))}, marks)
+                                        "height": ui.length(u(11)), "margin-right": ui.length(u(5)), "transform": transform_value()},
+                        marks)
         team_tag = tag_node(doc, lid + "-tag", "#str_231001", [("m", rgb(MAR_T), op("!=", S(f("victimTeam")), 1)),
                                                                ("s", rgb(STR_T), op("==", S(f("victimTeam")), 1))],
                             **{"margin-right": ui.length(u(4)), "display": ui.keyword("none")})
@@ -461,11 +474,20 @@ def kill_feed(doc: HudDocument) -> dict:
         doc.show(plate["id"], NOT(S(f("you"))))
         doc.show(band["id"], S(f("you")))
         doc.show(mark_you["id"], S(f("you")))
-        content = flex_row(lid + "-c", [plate, band, mark_you, attacker, quad, mark, team_tag, victim],
-                           **{"height": ui.length(u(15)), "padding-left": ui.length(u(6)), "padding-right": ui.length(u(4))})
+        # The arrival glint: a white plate the timeline flashes (its leaf holds
+        # the reduced-flashing cap).
+        glint_path = fitted_plate_path("g", u(15), r=u(1), fill=ui.solid([1, 1, 1, 1]))
+        glint_path["blend"] = "additive"
+        glint_leaf = vec(lid + "-glint-v", [glint_path], {"opacity": num(1)})
+        glint = full(lid + "-glint", [glint_leaf], opacity=num(0))
+        flash_cap(doc, [glint_leaf["id"]], 0.45)
+        content = flex_row(lid + "-c", [plate, band, glint, mark_you, attacker, quad, mark, team_tag, victim],
+                           **{"height": ui.length(u(15)), "padding-left": ui.length(u(6)), "padding-right": ui.length(u(4)),
+                              "opacity": num(1), "transform": transform_value()})
         top = 24 - 11.5 + slot * 15
         row = ui.group(lid, {**ui.absolute(left=0, top=u(top), width=u(637), height=u(15)), "display": ui.keyword("none"),
-                             "flex-direction": ui.keyword("row"), "justify-content": ui.keyword("flex-end"), "opacity": num(1)},
+                             "flex-direction": ui.keyword("row"), "justify-content": ui.keyword("flex-end"), "opacity": num(1),
+                             "transform": transform_value()},
                        [content])
         doc.bind(lid + ".display", lid, "display", sel(S(f("live")), "flex", "none"))
         # The Tourney strip pushes the feed down; Competitive takes the strip
@@ -474,7 +496,16 @@ def kill_feed(doc: HudDocument) -> dict:
         doc.bind(lid + ".top", lid, "top", sel(under_match_bar(), u(top + UNDER_BAR_DROP),
                                                  sel(AND(tourney, NOT(competitive)), u(top + 46), u(top))))
         doc.bind(lid + ".opacity", lid, "opacity", S(f("alpha")))
+        rest = transform_value()
+        doc.timeline(lid + "-in", 280, [
+            tr(lid + "-c", "opacity", [(0, num(0)), (140, num(1))]),
+            tr(lid + "-c", "transform", [(0, transform_value(tx=u(22)), FEED_EASE), (240, rest)]),
+            tr(lid + "-mark", "transform", [(0, transform_value(sx=1.55, sy=1.55), FEED_EASE), (260, rest)]),
+            tr(lid + "-glint", "opacity", [(0, num(0)), (60, num(0.45)), (280, num(0))])])
+        doc.timeline(lid + "-shift", 200, [tr(lid, "transform", [(0, transform_value(ty=u(15)), FEED_EASE), (200, rest)])])
+        doc.on(f"oq4_feedIn{slot}", cancel(lid + "-shift"), play(lid + "-in"))
         rows.append(row)
+    doc.on("oq4_feedShift", *[play(f"feed{slot}-shift") for slot in range(4)])
     return full("feed", rows)
 
 
@@ -1041,8 +1072,8 @@ def vote(doc: HudDocument) -> dict:
                        plate, [head, *lines, tallies, ramp_row])
     doc.bind("vote.display", "vote", "display", sel(op("!=", S("voteNotice"), 0), "block", "none"))
     # Competitive: the top-leading corner the panels left (36 u from the top
-    # inset, the card's cl anchor rebased onto tl's), clear of the team status;
-    # deathmatch keeps its standing there, and the vote its place.
+    # inset, the card's cl anchor rebased onto tl's); deathmatch keeps its
+    # standing there, and the vote its place.
     rebased = op("+", op("/", op("-", S("hud.top"), op("/", S("hud.height"), 2)), S("hud.scale")), u(240) + u(36))
     doc.bind("vote.top", "vote", "top", sel(scoreline_shown(), rebased, u(150)))
     return card
@@ -1125,26 +1156,20 @@ def chat_geometry() -> tuple:
 
 def chat_history_room() -> tuple:
     """The room for history above the open input (14.9: up to eight
-    messages, as many as the space above allows), up to 6 u under the leading
-    group above the box: Competitive's team status (its rows end 16.5 u apart
-    from y 150 of the center-leading canvas) or the vote card (45 u and 12 u
-    a field from its top). The center-leading canvas centers on the view; the
-    bottom-leading one stands on the bottom inset; both scale by the HUD scale.
-    Returns the room's height (dp) and the messages of one line it holds."""
-    from remastered_hud_competitive import competitive, team_mode
+    messages, as many as the space above allows), up to 6 u under the vote
+    card above the box (45 u and 12 u a field from its top). The center-leading
+    canvas centers on the view; the bottom-leading one stands on the bottom
+    inset; both scale by the HUD scale. Returns the room's height (dp) and the
+    messages of one line it holds."""
     half = op("/", op("-", op("/", S("hud.height"), 2), S("hud.bottom")), S("hud.scale"))
     far = u(10000)
-    spectating, mine = S("oq4_spectating"), S("oq4_my_team")
-    rows = sel(OR(spectating, op("==", mine, 0)), S("oq4_ts0_count"), S("oq4_ts1_count"))
-    team_shown = AND(competitive(), team_mode(), op(">", rows, 0))
-    team_top = op("-", op("+", half, u(92)), op("*", rows, u(16.5)))
     fields = u(0)
     for k in range(1, 7):
         fields = op("+", fields, sel(op("!=", S(f"voteInfo_{k}"), ""), u(12), 0))
     rebased = op("+", op("/", op("-", S("hud.top"), op("/", S("hud.height"), 2)), S("hud.scale")), u(240) + u(36))
     vote_top = sel(scoreline_shown(), rebased, u(150))
     vote_bottom = op("-", half, op("-", op("+", op("+", vote_top, u(45)), fields), u(240)))
-    limit = op("min", sel(team_shown, team_top, far), sel(op("!=", S("voteNotice"), 0), vote_bottom, far))
+    limit = sel(op("!=", S("voteNotice"), 0), vote_bottom, far)
     bottom, _ = chat_geometry()
     prompts = op("+", u(CHAT_INPUT - 9), op("/", S("oq4.chatPrompts"), S("hud.scale")))
     space = op("max", 0, op("-", op("-", op("-", limit, bottom), prompts), u(6)))
@@ -1164,7 +1189,7 @@ def chat_lines(doc: HudDocument) -> list:
     column from its bottom (the newest first, reversed) that the room clips,
     so wrapped history never reaches the group above."""
     declare(doc, {"oq4_chatting": False, "oq4_chat_count": 0, "oq4_spectating": False, "oq4_my_team": 0, "voteNotice": 0,
-                  "oq4_ts0_count": 0, "oq4_ts1_count": 0, "oq4_team_game": False, "oq4.chatPrompts": u(9), "oq4.chatFirst": 0})
+                  "oq4_team_game": False, "oq4.chatPrompts": u(9), "oq4.chatFirst": 0})
     for k in range(1, 7):
         doc.string(f"voteInfo_{k}")
     room, fitting = chat_history_room()
@@ -1251,11 +1276,10 @@ def chat_box(doc: HudDocument, children: list) -> dict:
     otherwise it is 200 u wide and rises to 150 u above the bottom edge,
     clear of the weapon strip. The voice plates sit directly above it.
 
-    Competitive grows the status bar, the strip and the pickups by 15% and
-    puts the team status at the leading edge from y 150, where a risen box
-    would meet them: the box keeps its bottom 8 u above the enlarged status
-    bar and, where it is not wide, is 200 u wide or as wide as the space
-    beside the widest strip (eleven weapons), down to 120 u."""
+    Competitive grows the status bar, the strip and the pickups by 15%: the
+    box keeps its bottom 8 u above the enlarged status bar and, where it is
+    not wide, is 200 u wide or as wide as the space beside the widest strip
+    (eleven weapons), down to 120 u."""
     # Anchor-local dp (the bl anchor is scaled by hud.scale about its corner).
     bottom, width = chat_geometry()
     box = ui.group("chatbox", {**ui.absolute(left=u(8), width=u(300), height=u(400)), "bottom": ui.length(u(59)), "display": ui.keyword("flex"),
@@ -2131,17 +2155,16 @@ def mp_document() -> dict:
     lag = connection_notice(doc)
     arena = arena_presentation(doc)
     tags = name_tags(doc)
-    from remastered_hud_competitive import competitive, crosshair_ammo, item_timers, match_bar, team_status
+    from remastered_hud_competitive import competitive, crosshair_ammo, item_timers, match_bar
     matchbar = match_bar(doc)
-    leading, trailing = team_status(doc)
     # The client options (MP-15) show in every layout: each has its own setting.
     ammo = crosshair_ammo(doc)
     timers = item_timers(doc)
     doc.on("hudJoin", *doc.joins)
     doc.on("onInit", *doc.joins)
     # Competitive (ui_hudLayout 3) trades the team panels, the timer and the
-    # Tourney strip for the scoreline and the team status; deathmatch keeps
-    # the standing and the timer.
+    # Tourney strip for the scoreline; deathmatch keeps the standing and the
+    # timer.
     remastered_top = full("tl-rem", [stand, teams, clock])
     doc.show("tl-rem", NOT(scoreline_shown()))
     strip_slot = full("tc-strip", [strip, bar])
@@ -2161,9 +2184,9 @@ def mp_document() -> dict:
                                                             chrome("banners-shot", [banners])]),
                              chrome("matchbar-shot", [matchbar])]),
         anchor(doc, "tr", [chrome("tr-shot", [beyond_minimal(doc, "tr-full", [feed, ctx, lag])])]),
-        anchor(doc, "cr", [chrome("cr-shot", [trailing, stats, timers])]),
+        anchor(doc, "cr", [chrome("cr-shot", [stats, timers])]),
         anchor(doc, "cc", [chrome("cc-shot", [beyond_minimal(doc, "cc-full", [aim]), ammo])]),
-        anchor(doc, "cl", [chrome("cl-shot", [leading, ballot])]),
+        anchor(doc, "cl", [chrome("cl-shot", [ballot])]),
         anchor(doc, "bl", [chrome("bl-shot", [chat_box(doc, talkers + lines + [chat_input(doc)])])]),
         anchor(doc, "bc", [chrome("bc-shot", [follow, respawn])], scale="hud.centerScale"),
         arena,

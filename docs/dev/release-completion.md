@@ -12,6 +12,36 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Initials and ammunition on the scoreline, no side lists, and a moving kill feed, 23 November 2026
+
+- **Players by initials, ammunition at a glance.** On the user's review the
+  scoreline's tiles name each player by the first two letters of their name
+  instead of showing their weapon (Quake 4 ships no portraits), and a thin bar
+  over each tile fills to the ammunition for the weapon in hand, in that
+  weapon's colour. The dead keep their initials, dimmed, under the skull.
+- **Less clutter.** Competitive's team lists at the screen's edges are gone;
+  the rosters carry the players. Team Locations (`hud_teamLocations`) has
+  nothing to show on the new interface's HUD for now.
+- **A kill feed that moves.** A new line slides in from the right as it fades
+  in, its weapon mark settles and its plate glints, all within 280 ms; when the
+  top line leaves, the rest glide up instead of jumping. Reduced motion seats
+  lines at once and reduced flashing caps the glint.
+- **Ammunition on the wire.** Ammunition is private player state, so team info
+  now carries it: each record gains a byte after the entries, which 0.15.0
+  clients do not read, so mixed versions still play together. On a casual
+  server someone who chose to watch is sent every player's record (a managed
+  match keeps its own rules); that also keeps a spectator's vitals current for
+  players across the map.
+- **What you need to do.** Nothing.
+- **Checks.** Native core tests pin the ammunition packing; the native HUD
+  checks cover initials, the ammunition bar, the dead, the missing side lists,
+  the chat room under the vote card and the feed's arrival and glide; the
+  two-client smoke adds a team mate's ammunition and a spectator receiving
+  every player's record with ammunition. Captures show Team DM spectating, the
+  feed mid-arrival and Duel as player and spectator. Visual specification 1.48
+  and register revision 28 (`FLOW-075` supersedes `FLOW-073`; `FLOW-076` for
+  the feed's motion; both pending).
+
 ## A Competitive scoreline with rosters, and item timers with symbols, 23 November 2026
 
 - **Duel, Tourney and team games read like a broadcast.** With the Competitive

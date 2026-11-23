@@ -1059,8 +1059,8 @@ static void Cmd_OpenQ4ReportClientOptions_f( const idCmdArgs &args ) {
 		}
 		mpTeamInfoEntry_t info;
 		mp.teamInfo.Resolve( other, info );
-		gameLocal.Printf( "CLIENTOPT mate slot=%d team=%d source=%s health=%d armor=%d weapon=%d origin=%d,%d,%d location=\"%s\"\n",
-			i, other->team, mp.teamInfo.UsesRecord( other ) ? "record" : "entity", info.health, info.armor, info.weapon,
+		gameLocal.Printf( "CLIENTOPT mate slot=%d team=%d source=%s health=%d armor=%d weapon=%d ammo=%d origin=%d,%d,%d location=\"%s\"\n",
+			i, other->team, mp.teamInfo.UsesRecord( other ) ? "record" : "entity", info.health, info.armor, info.weapon, info.ammo,
 			info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ],
 			mp.locations.NameForPoint( idVec3( info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ] ) ) );
 	}

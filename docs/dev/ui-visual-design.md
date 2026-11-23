@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.47, 23 November 2026 (1.46 on 17 November, 1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.48, 23 November 2026 (1.47 earlier that day, 1.46 on 17 November, 1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -71,6 +71,13 @@ further out, each side's players as tiles with their weapon, health and armor
 bars where the viewer may see them and a skull for the dead. Deathmatch keeps
 the Remastered standing and timer top-leading. The item timers gain symbols,
 places and progress lines, and the spectators' trailing list steps under them
+(section 14.9).
+
+Version 1.48 names the scoreline's players by their initials, with a bar over
+each tile showing the ammunition for the weapon in hand in the weapon's color
+code instead of the weapon's symbol, and drops Competitive's side team lists,
+which the rosters make redundant. Kill feed lines now arrive with a quick
+slide, fade and glint, and the lines below glide up when the top line leaves
 (section 14.9).
 
 Version 1.1 added measured references from a survey of the effective retail
@@ -2326,7 +2333,7 @@ and parallax off.
 | Classic | The stock layout, shear and palette |
 | Remastered | The stock elements anchored to the safe area, scalable, with vector symbols |
 | Minimal | Health, armor, ammunition and crosshair only |
-| Competitive | Multiplayer: the scoreline at the top center in Duel, Tourney and the team modes (each side's score and roster, the timer between), the standing and timer top-leading in deathmatch, team status at the leading edge, readouts enlarged by 15% and network quality at all times (section 14.9) |
+| Competitive | Multiplayer: the scoreline at the top center in Duel, Tourney and the team modes (each side's score and roster, the timer between), the standing and timer top-leading in deathmatch, readouts enlarged by 15% and network quality at all times (section 14.9) |
 | Touch | Readouts moved clear of the touch controls and enlarged |
 
 HUD settings cover an independent HUD scale, the safe inset, the HUD width
@@ -2566,8 +2573,8 @@ centered status bar.
 | Top center | Boss bar, timed notices, multiplayer notices and warm-up text, and in Classic the stock spectator lines; the Competitive match bar |
 | Top leading | New-objective notice; the multiplayer standing, team panels and timer, or in Competitive the vote |
 | Top trailing | Radio chatter on every HUD, vehicles included, with the objective-complete notice or a vehicle's panel below it; the kill feed |
-| Leading edge | Objectives display, vote; Competitive team status |
-| Trailing edge | Statistics; a Competitive spectator's second team list |
+| Leading edge | Objectives display, vote |
+| Trailing edge | Statistics; item timers |
 | Bottom leading | Chat and chat input |
 | Bottom trailing | Powerups and the carried flag; HUD prompts |
 
@@ -2961,7 +2968,7 @@ their content. The table records what each group shows.
 | Timer | Top leading, under the standing or panels | A 70x16 u plate: the stopwatch in #FFFF8D and the time in Chain 19 dp, tabular. One readout per state: M:SS counting down; elapsed time beside ∞ when the match is untimed; WARM-UP with the ready count; STARTS IN and the countdown, stated only here; #FFBE23 in the last minute and #E46D56 with a 1 Hz pulse in the last ten seconds; SUDDEN DEATH with ∞; OVERTIME with the time added |
 | Tourney | Top center, within the center screen | The bracket strip on plates at 0.55: names cut with an ellipsis before the score, scores in Chain, your row aqua #5EB987 at 0.40 with the marker, the winner of a finished arena checked and the loser at 0.50 (the blue settle stays, no longer the only cue). The message bar keeps its 45-degree end and names the round with one word throughout; the timer and a ROUND and ARENA plate sit under it |
 | Center column | Top center | Frag notice, main notice, warm-up lines and awards stack in that order from y 81 and move down for each other with `page.enter` easing instead of overlapping; spectators get the follow card instead of the stock lines. Each line sits on its own plate at 0.35; rank ordinals take #FFBE23 instead of pure blue, red and yellow. The countdown is not repeated here |
-| Kill feed | Top trailing | Trailing-aligned lines on their own plates at 0.35. Names longer than 84 u end in an ellipsis, so the victim is never lost. Your lines use the header-band plate at 0.30 with the marker, and a team kill carries a TEAM tag. The Tourney feed sits under the strip and fades like the rest; spectators see the feed |
+| Kill feed | Top trailing | Trailing-aligned lines on their own plates at 0.35. Names longer than 84 u end in an ellipsis, so the victim is never lost. Your lines use the header-band plate at 0.30 with the marker, and a team kill carries a TEAM tag. The Tourney feed sits under the strip and fades like the rest; spectators see the feed. A line arrives from 22 u toward the trailing edge, decelerating into place over 240 ms on cubic (0.16, 1, 0.3, 1) as it fades in over 140 ms; its weapon mark settles from 155% over 260 ms and a white glint over its plate peaks at 0.45 at 60 ms and is gone by 280 ms (0.40 under reduced flashing). When the top line leaves, the lines below glide up into its place over 200 ms. Reduced motion seats lines at once |
 | Match context | Top trailing, under the kill feed | openQ4's managed-match lines in the card construction: the phase heading, then series, timeouts, readiness and proposals. It collapses to its phase line and one summary while play is live, and the scoreboard holds the full record |
 
 Positions never depend on which elements are visible: a group keeps its slot,
@@ -2991,16 +2998,21 @@ places.
   plate at 0.55 with a 1.6 u lip in the team's color (the header band's in
   Duel and Tourney), on the header-band plate for you, lit in the team's text
   color at 0.28 (white at 0.22 in Duel and Tourney) for the player you follow.
-  - **Weapon.** The weapon in hand in the weapon color code where the viewer
-    may see it: your own side, or every side for someone who chose to watch.
-    Otherwise the faction mark at 0.55, or in Duel and Tourney the Quake mark
-    at 0.45.
+  - **Name.** The first two letters or digits of the player's name, the first
+    a capital, in Lowpixel 10 dp: the team's text color (#E4EBD2 in Duel and
+    Tourney), white for you and the player you follow. Quake 4 ships no player
+    portraits, so initials tell the tiles apart.
+  - **Ammunition.** Over the tile, in the 4 u above the scoreline, a 1.8 u bar
+    as wide as the plate on a white track at 0.15, filling to the ammunition
+    for the weapon in hand as a share of what it holds, in the weapon color
+    code; a weapon that uses none reads full. It shows where the viewer may
+    see it: your own side, or every side for someone who chose to watch.
   - **Vitals.** Under the plate, on the same terms, health and armor bars as
     wide as the plate, 2.4 u tall on a 3.4 u pitch, on a white track at 0.18,
     filling to 100: health white (#E46D56 at 25 and below, #FFBE23 above 100),
     armor #B5C784. They end level with the slabs.
-  - **Dead.** A skull in #E46D56 over a plate at 0.30, on every side, as the
-    round modes' alive pips already show.
+  - **Dead.** The initials drop to 0.35 under a skull in #E46D56 over a plate
+    at 0.30, on every side, as the round modes' alive pips already show.
 - **Timer.** The time in Chain 17 dp with the Remastered timer's states, and
   under it, in Lowpixel 700 at 0.55, the limit (TO 30), the round (ROUND 3) or
   the arena (ARENA 2).
@@ -3011,20 +3023,15 @@ places.
 - **Network.** Network quality (section 13.13), the ping beside four bars,
   follows the scoreline's trailing end, where the fourth tile would end, at all
   times.
-- **Team status.** In team modes your team's list sits at the leading edge from
-  y 150, under the team name in its text color: one 138x14.5 u plate per player
-  on a 16.5 u pitch with the weapon icon, the name cut with an ellipsis, health
-  in Chain (#E46D56 at 25 and below, #FFBE23 above 100) and armor at 0.60. Your
-  row uses the header-band plate and the marker; the dead keep their row at 0.40
-  under an ✕.
+- **No side lists.** The rosters carry the players: Competitive shows no team
+  status lists at the view's edges.
 - **Readouts.** The status bar grows by 15% about the bottom edge, with the
   weapon strip and pickups above it, and the chat box keeps its 8 u clearance
-  above it. The box never rises toward the team status: where it cannot span
+  above it. The box stays low: where it cannot span
   the space beside the status bar it is 200 u wide, or as wide as the space
   beside the widest strip allows, down to 120 u (4:3).
 - **Vote.** With the scoreline, the vote takes the top-leading corner that the
-  panels left, clear of the team status; in deathmatch it keeps its Remastered
-  place under the standing.
+  panels left; in deathmatch it keeps its Remastered place under the standing.
 - **Tourney.** The bracket strip leaves the top; the scoreboard's bracket tree
   (section 14.14) holds it.
 - **Narrow views.** Below about 16:9 at the HUD scale in use, the kill feed's
@@ -3047,14 +3054,10 @@ of the stock's breathing lines in the center column.
   toward the bottom edge, reading SPECTATING over Free camera with Follow a
   player and Scores prompts. Players in view carry name tags: a small plate at
   0.50 with a 4 u team-color block and the name, pointing down at the player.
-- **Competitive.** Both teams' status lists flank the view, the Marines at the
-  leading edge and the Strogg at the trailing edge, trailing-aligned. The
-  followed player's row is lit in the team's text color at 0.22 with the marker,
-  and held statistics take the trailing list's place. The trailing list steps
-  down to clear the item timers' last row by 6 u under its team name. Both
-  rosters show every player's weapon, health and armor, and the followed
-  player's tile is lit. In Duel and Tourney the scoreline's leading side is the
-  followed player. Name tags add a health line.
+- **Competitive.** Both rosters show every player's ammunition, health and
+  armor, and the followed player's tile is lit; the Marines lead. In Duel and
+  Tourney the scoreline's leading side is the followed player. Name tags add a
+  health line.
 - **Classic** keeps the stock lines: SPECTATING - FOLLOWING with the name, then
   the cycle and exit keys, in #FFFF8C at 123 and 141 u, breathing over 900 ms.
 
@@ -3115,7 +3118,7 @@ then heavy and light armor, in map order within each.
   - **Keyboards.** Controller and touch players get the platform or on-screen
     keyboard (section 13.5).
   - **Room.** The history stands from the input's prompt row up to 6 u under
-    the leading group above the box (Competitive's team status, or the vote),
+    the leading group above the box (the vote),
     and shows only whole messages: a message the room would cut fades out.
     Where the box is too narrow for the three prompts they wrap onto a
     second row.

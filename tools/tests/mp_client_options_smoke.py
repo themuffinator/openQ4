@@ -258,6 +258,8 @@ def main() -> int:
                 dispatch("client", ["set hud_hitSound 2", "set in_presentationViewProbeAttack 1", "waitMsec 1500",
                                     "echo OPT_CLIENT_AIM", report,
                                     "set in_presentationViewProbeAttack 0", "waitMsec 600", "echo OPT_CLIENT_HITS", report,
+                                    # a spectator hears about every player, ammunition included
+                                    "set ui_spectate Spectate", "waitMsec 2500", "echo OPT_CLIENT_SPECTATE", report,
                                     "waitMsec 300", "quit"], "OPT_DONE_CLIENT_4")
                 stage = 8
             if stage == 8 and done(client, "OPT_CLIENT_HITS") and processes["client"].poll() is not None:
@@ -321,12 +323,18 @@ def main() -> int:
         check("landmark place names", int(place.get("landmarks", "0")) > 0 and place.get("name", "") != "", place)
 
         # team info over the wire, and the HUD state
-        state = after(client, "OPT_CLIENT_STATE")
+        state = after(client, "OPT_CLIENT_STATE").split("OPT_CLIENT_TIMERS")[0]
         mates = [m for m in facts(state, "mate") if m.get("slot") == "0"]
         check("team info record for the team mate", bool(mates) and mates[0].get("source") == "record"
               and int(mates[0].get("health", "0")) > 0 and mates[0].get("location", "") != "", mates)
         foes = [m for m in facts(state, "mate") if m.get("team") != (fact(state, "player") or {}).get("team")]
         check("no team info record for an opponent", all(m.get("source") == "entity" for m in foes), foes)
+        check("the team mate's record carries the ammunition for the weapon in hand",
+              bool(mates) and 0 <= int(mates[0].get("ammo", "255")) <= 250, mates)
+        watching = facts(after(client, "OPT_CLIENT_SPECTATE"), "mate")
+        check("a spectator holds every player's record with ammunition",
+              len(watching) >= 2 and all(m.get("source") == "record" and 0 <= int(m.get("ammo", "255")) <= 250 for m in watching)
+              and len({m.get("team") for m in watching}) >= 2, watching)
         hud = fact(state, "hud") or {}
         check("crosshair ammunition in the HUD state", hud.get("xhair_ammo", "").isdigit(), hud)
         check("time of day in the HUD state", re.fullmatch(r"\d\d:\d\d", hud.get("local_clock", "")) is not None, hud)

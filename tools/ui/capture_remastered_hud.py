@@ -504,7 +504,10 @@ SCENARIOS = {
     # dead, the item timers counting as the bots take the armor and mega
     # health, and the trailing list stepping under them.
     'mp-competitive-tdm-spec': ('mp:mp/q4dm1', [
-        'set g_autoExecAfterMapLoad ""', 'waitMsec 2500', *['addbot'] * 8, 'waitMsec 4000', 'set ui_spectate Spectate',
+        'set g_autoExecAfterMapLoad ""', 'waitMsec 2500', *['addbot'] * 8, 'waitMsec 4000',
+        # a kill feed line arriving (about 80 ms in) and seated
+        'kill 2', 'waitMsec 80', shot('comp-tdm-feed-arrive'), 'waitMsec 500', shot('comp-tdm-feed-seated'),
+        'set ui_spectate Spectate',
         'waitMsec 20000', 'follownext', 'waitMsec 2500', shot('comp-tdm-spec'), 'waitMsec 15000', shot('comp-tdm-spec-later'),
         'followfree', 'waitMsec 15000', shot('comp-tdm-spec-free'),
         'set ui_hudLayout 1', 'waitMsec 400', shot('comp-tdm-spec-remastered'), 'set ui_hudLayout 3', 'set ui_spectate Play',

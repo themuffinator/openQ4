@@ -12,10 +12,11 @@ the [development roadmap](../roadmap.md) for current scope.
 
 - **A scoreline worth watching.** The Competitive HUD layout now puts the
   score across the top in Duel, Tourney and team games: big scores either side
-  of the clock, and each side's players beside them with their weapon, health
-  and armour bars, and a skull while they are down. Spectators see both sides
-  at a glance, and the item timers show each powerup and armour with where it
-  lies and how close it is to returning.
+  of the clock, and each side's players beside them by their initials, with
+  ammunition, health and armour bars, and a skull while they are down.
+  Spectators see both sides at a glance without the old side lists, the item
+  timers show each powerup and armour with where it lies and how close it is
+  to returning, and kill feed lines slide in with a quick glint.
 
 - **Native resolution, always.** The game starts at your display's native
   resolution with the 3D scene at full size, and no graphics preset or
@@ -537,11 +538,14 @@ the [development roadmap](../roadmap.md) for current scope.
 
 - The Competitive HUD layout has a scoreline across the top in Duel, Tourney
   and team games: large scores either side of the timer and, further out, up
-  to four players a side with their weapon, health and armour where you may
-  see them (your own side, or both sides when you spectate) and a skull while
-  they are dead. Deathmatch keeps the leader, the runner-up and the timer at
-  the top left. Item timers in every layout now show each item's symbol, where
-  it lies and a line filling as it respawns. See
+  to four players a side named by their initials, with a bar for the
+  ammunition of the weapon in hand (in its colour) and health and armour bars
+  where you may see them (your own side, or both sides when you spectate), and
+  a skull while they are dead. It replaces the team lists at the screen's
+  edges. Deathmatch keeps the leader, the runner-up and the timer at the top
+  left. Item timers in every layout now show each item's symbol, where it lies
+  and a line filling as it respawns, and kill feed lines arrive with a quick
+  slide and glint and glide up as older lines leave. See
   [Spectate](../../user/multiplayer.md#spectate) and
   [Item timers](../../user/multiplayer-client-options.md#item-timers).
 - `recordVideo` records what you play, with its sound, to a video file:

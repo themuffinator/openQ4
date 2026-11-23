@@ -23183,6 +23183,46 @@ static idStr OQ4_HudPlain( const char *text ) {
 	return plain;
 }
 
+/*
+================
+OQ4_HudInitials
+
+openQ4: a player's tile on the Competitive scoreline names them by the first
+two letters or digits of their name, the first in capitals ("Bi" for
+Bidwell). Quake 4 ships no portraits to show instead. UTF-8 letters are kept
+whole.
+================
+*/
+static idStr OQ4_HudInitials( const char *plain ) {
+	idStr initials;
+	int taken = 0;
+	for ( const char *c = plain ? plain : ""; *c != '\0' && taken < 2; ) {
+		const unsigned char lead = (unsigned char)*c;
+		int length = 1;
+		if ( lead >= 0xF0 ) {
+			length = 4;
+		} else if ( lead >= 0xE0 ) {
+			length = 3;
+		} else if ( lead >= 0xC0 ) {
+			length = 2;
+		}
+		if ( lead < 0x80 && !idStr::CharIsAlpha( lead ) && !idStr::CharIsNumeric( lead ) ) {
+			c++;
+			continue;
+		}
+		for ( int i = 0; i < length && c[ i ] != '\0'; i++ ) {
+			char ch = c[ i ];
+			if ( length == 1 ) {
+				ch = taken == 0 ? idStr::ToUpper( ch ) : idStr::ToLower( ch );
+			}
+			initials.Append( ch );
+		}
+		c += length;
+		taken++;
+	}
+	return initials;
+}
+
 static idStr OQ4_HudOrdinal( int place ) {
 	if ( place < 1 ) {
 		return "";
@@ -23316,7 +23356,8 @@ the leader and 2nd); in Tourney your arena's two players.  Under the timer it
 names the limit, the round or the arena.  The team status lists each team's
 players, best score first: the weapon, health, armor and whether they are
 dead, you or followed.  The scoreline's rosters (team modes, Duel and Tourney)
-put up to four players beside each side's score.
+put up to four players beside each side's score, each by initials, with the
+ammunition for the weapon in hand where this viewer may see it.
 ================
 */
 void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, idPlayer *localPlayer, idPlayer *followed, int limit ) {
@@ -23463,8 +23504,14 @@ void idMultiplayerGame::PublishRemasteredCompetitive( idUserInterface *_mphud, i
 				open = neutralView || ( !localPlayer->wantSpectate && mine );
 				dead = info.health <= 0 || ( player == localPlayer && player->pfl.dead );
 			}
+			const idStr name = player ? OQ4_HudPlain( player->GetUserInfo()->GetString( "ui_name" ) ) : idStr();
+			// the ammunition for the weapon in hand, as a percentage, -1 when not known
+			const int ammo = open && !dead && info.ammo != MP_TEAMINFO_AMMO_UNKNOWN
+				? ( info.ammo * 100 + MP_TEAMINFO_AMMO_FULL / 2 ) / MP_TEAMINFO_AMMO_FULL : -1;
 			const char *prefix = va( "oq4_sl%d_%d", side, i );
-			_mphud->SetStateString( va( "%s_name", prefix ), player ? OQ4_HudPlain( player->GetUserInfo()->GetString( "ui_name" ) ).c_str() : "" );
+			_mphud->SetStateString( va( "%s_name", prefix ), name.c_str() );
+			_mphud->SetStateString( va( "%s_initials", prefix ), OQ4_HudInitials( name.c_str() ).c_str() );
+			_mphud->SetStateInt( va( "%s_ammo", prefix ), ammo );
 			_mphud->SetStateBool( va( "%s_open", prefix ), open );
 			_mphud->SetStateInt( va( "%s_weapon", prefix ), open && !dead ? info.weapon : -1 );
 			_mphud->SetStateInt( va( "%s_health", prefix ), open && !dead ? Max( 0, info.health ) : 0 );
@@ -23653,7 +23700,7 @@ void idMultiplayerGame::PublishRemasteredHud( idUserInterface *_mphud, idPlayer 
 	const bool teamGame = gameLocal.IsTeamGame();
 	const mpGameState_t state = gameState->GetMPGameState();
 
-	remasteredKills.Publish( _mphud, "oq4_feed", now, 2000, 1000, 3100, tourney ? 2 : 4 );
+	remasteredKills.Publish( _mphud, "oq4_feed", now, 2000, 1000, 3100, tourney ? 2 : 4, "oq4_feed" );
 	PublishRemasteredChat( _mphud, now );
 
 	_mphud->SetStateBool( "oq4_team_game", teamGame );

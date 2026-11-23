@@ -10,8 +10,7 @@ under the timer. Competitive lists your team's players at the leading edge and
 enlarges the status bar by 15% about the bottom edge. The kill feed, the center
 column, the powerups and the managed-match card keep their places; the vote
 takes the top-leading corner the panels left and the Tourney strip leaves the
-top. Spectators see both teams' lists flanking the view and the item timers
-above the trailing list. Constructions are the design atlas's (multiplayer
+top. The rosters replace the side team lists, which were clutter beside them. Constructions are the design atlas's (multiplayer
 sheet); coordinates are the 640x480 u anchor canvases. The game publishes the
 sides (oq4_mb*), the rosters (oq4_sl*), the line under the timer, the team
 status rows (oq4_ts*) and the item timers (oq4_it_*).
@@ -35,16 +34,14 @@ BAR_Y, BAR_H, TIMER_W, SCORE_W = 4.0, 30.0, 64.0, 56.0
 SCORE_X = (320 - TIMER_W / 2 - 2 - SCORE_W, 320 + TIMER_W / 2 + 2)
 TILE_W, TILE_H, TILE_PITCH, ROSTER_GAP, ROSTER = 20.0, 20.0, 22.0, 3.0, 4
 VITAL_Y, VITAL_H, VITAL_PITCH = BAR_Y + TILE_H + 2.2, 2.4, 3.4
+# The ammunition bar over each tile, in the 4 u above the scoreline.
+AMMO_Y, AMMO_H = 1.0, 1.8
 BAR_END = SCORE_X[1] + SCORE_W + ROSTER_GAP + ROSTER * TILE_PITCH - (TILE_PITCH - TILE_W)
 UNDER_Y = BAR_Y + BAR_H + 2
-# Team status (atlas teamList): 138x14.5 u plates on a 16.5 u pitch from y 150.
-LIST_W, LIST_ROW, LIST_PITCH, LIST_Y, LIST_ROWS = 138.0, 14.5, 16.5, 150.0, 8
 TEAM_NAMES = ("#str_200197", "#str_200199")
-# A team mate's location beside their row, and the client options every layout
-# shows (MP-15): item timers on 13 u plates trailing at 633 u from y 96 on a
-# 15 u pitch, the time of day above them, and the ammunition 13 u right of the
-# crosshair.
-LOCATION_W = 78.0
+# The client options every layout shows (MP-15): item timers on 13 u plates
+# trailing at 633 u from y 96 on a 15 u pitch, the time of day above them, and
+# the ammunition 13 u right of the crosshair.
 ITEM_ROWS, ITEM_W, ITEM_ROW, ITEM_PITCH, ITEM_Y, ITEM_RIGHT = 6, 118.0, 13.0, 15.0, 96.0, 633.0
 AT_BASE, TAKEN, DROPPED = "#str_231251", "#str_231252", "#str_231253"
 # The item timers' kinds (rvItemTimers: quad, haste, regeneration,
@@ -168,19 +165,22 @@ def roster(doc: HudDocument, side: int) -> list:
     """One side's roster, best score first from the slab outward: each tile a
     20 u plate at 0.55 with a 1.6 u lip in the team's color (the header band's
     in Duel and Tourney), lit in the team's text color at 0.28 for the player
-    you follow and on the header-band plate for you. It holds the weapon in
-    hand in the weapon color code where this viewer may see it, the faction
-    mark otherwise, or for the dead a skull in #E46D56 over a plate at 0.30.
-    Under it health and armor bars fill to 100: health white (#E46D56 at 25 and
-    below, #FFBE23 above 100), armor #B5C784."""
+    you follow and on the header-band plate for you. It names the player by
+    the first two letters of their name in Lowpixel 10 u, in the team's text
+    color (#E4EBD2 in Duel and Tourney), white for you and the player you
+    follow; Quake 4 ships no portraits. Over the tile, where this viewer may
+    see it, a 1.8 u bar fills to the ammunition for the weapon in hand in the
+    weapon color code. Under it health and armor bars fill to 100: health white
+    (#E46D56 at 25 and below, #FFBE23 above 100), armor #B5C784. The dead keep
+    their initials at 0.35 under a skull in #E46D56 over a plate at 0.30."""
     declare(doc, {f"oq4_sl{side}_count": 0})
     team = side_team(side)
     teams = team_mode()
     nodes = []
     for i in range(ROSTER):
         p = f"oq4_sl{side}_{i}"
-        declare(doc, {p + "_name": "", p + "_open": False, p + "_weapon": -1, p + "_health": 0, p + "_armor": 0, p + "_dead": False,
-                      p + "_you": False, p + "_followed": False})
+        declare(doc, {p + "_name": "", p + "_initials": "", p + "_open": False, p + "_weapon": -1, p + "_ammo": -1, p + "_health": 0,
+                      p + "_armor": 0, p + "_dead": False, p + "_you": False, p + "_followed": False})
         rid = f"sl{side}t{i}"
         dead, opened, you, followed = S(p + "_dead"), S(p + "_open"), S(p + "_you"), S(p + "_followed")
         alive_plate = plate_at(rid + "-plate", 0, 0, TILE_W, TILE_H, 0.55)
@@ -201,30 +201,27 @@ def roster(doc: HudDocument, side: int) -> list:
                       {**ui.absolute(left=u(1), top=0, width=u(TILE_W - 2), height=u(TILE_H)), "display": ui.keyword("none")})
             doc.show(lit["id"], AND(followed, AND(teams, op("==", team, t)) if t < 2 else NOT(teams)))
             lits.append(lit)
-        marks = []
-        for t in (0, 1):
-            mark = ui.group(f"{rid}-mark{t}", {**ui.absolute(left=u(TILE_W / 2 - 6), top=u(4), width=u(12), height=u(12)),
-                                               "display": ui.keyword("none"), "opacity": num(0.55)},
-                            hud_svg.icon_nodes("marinelogo" if t == 0 else "strogglogo", f"{rid}-mark{t}-g", 0, 0, u(12), tint=WHITE))
-            doc.show(mark["id"], AND(teams, op("==", team, t), NOT(dead), op("<", S(p + "_weapon"), 0)))
-            marks.append(mark)
-        # Duel and Tourney: someone you may not look over shows only as there.
-        unseen = ui.group(rid + "-unseen", {**ui.absolute(left=u(TILE_W / 2 - 6), top=u(4), width=u(12), height=u(12)),
-                                            "display": ui.keyword("none"), "opacity": num(0.45)},
-                          hud_svg.icon_nodes("quakelogo", rid + "-unseen-g", 0, 0, u(12), tint=WHITE))
-        doc.show(unseen["id"], AND(NOT(teams), NOT(dead), op("<", S(p + "_weapon"), 0)))
-        weapons = []
-        for index, glyph in enumerate(MP_ROSTER):
-            holder = ui.group(f"{rid}-w{index}", {**ui.absolute(left=u(1.5), top=u(5), width=u(TILE_W - 3), height=u(10)),
-                                                  "display": ui.keyword("none"), "justify-content": ui.keyword("center")},
-                              hud_svg.icon_nodes(glyph, f"{rid}-w{index}-g", u((TILE_W - 3) / 2), 0, u(10), anchor="middle",
-                                                 tint=rgb(FEED_COLOURS[index])))
-            doc.show(holder["id"], AND(NOT(dead), op("==", S(p + "_weapon"), index)))
-            weapons.append(holder)
-        skull = ui.group(rid + "-skull", {**ui.absolute(left=u(TILE_W / 2 - 7), top=u(3), width=u(14), height=u(14)),
+        initials = text_at(doc, rid + "-ini", S(p + "_initials"), 10, rgb(MAR_T), center=TILE_W / 2, baseline=13.8, width=TILE_W,
+                           extra={"letter-spacing": ui.length(u(0.3)), "opacity": num(1)})
+        doc.bind(rid + "-ini.color", rid + "-ini", "color",
+                 colour_of([(OR(you, followed), WHITE), (AND(teams, op("==", team, 0)), rgb(MAR_T)), (teams, rgb(STR_T))], rgb(NAME)))
+        doc.bind(rid + "-ini.opacity", rid + "-ini", "opacity", sel(dead, 0.35, 1))
+        skull = ui.group(rid + "-skull", {**ui.absolute(left=u(TILE_W / 2 - 6), top=u(4), width=u(12), height=u(12)),
                                           "display": ui.keyword("none")},
-                         hud_svg.icon_nodes("skull", rid + "-skull-g", 0, 0, u(14), tint=rgb(ERR, 0.95)))
+                         hud_svg.icon_nodes("skull", rid + "-skull-g", 0, 0, u(12), tint=rgb(ERR, 0.95)))
         doc.show(skull["id"], dead)
+        # The ammunition for the weapon in hand, over the tile in the weapon's color.
+        ammo = S(p + "_ammo")
+        weapon = S(p + "_weapon")
+        fill = ui.group(rid + "-ammo-fill", {"position": ui.keyword("absolute"), "left": ui.length(0), "top": ui.length(0),
+                                             "width": ui.length(0, "%"), "height": ui.length(100, "%"), "display": ui.keyword("block"),
+                                             "background-color": ui.colour([1, 1, 1, 0.9])})
+        doc.bind(rid + "-ammo-fill.width", fill["id"], "width", op("clamp", ammo, 0, 100))
+        doc.bind(rid + "-ammo-fill.bg", fill["id"], "background-color",
+                 colour_of([(op("==", weapon, index), rgb(colour, 0.95)) for index, colour in enumerate(FEED_COLOURS)], [1, 1, 1, 0.9]))
+        ammo_bar = ui.group(rid + "-ammo", {**ui.absolute(left=u(1), top=u(AMMO_Y - BAR_Y), width=u(TILE_W - 2), height=u(AMMO_H)),
+                                            "display": ui.keyword("none"), "background-color": ui.colour([1, 1, 1, 0.15])}, [fill])
+        doc.show(ammo_bar["id"], AND(opened, NOT(dead), op(">=", ammo, 0)))
         health = S(p + "_health")
         hp = vital_bar(doc, rid + "-hp", VITAL_Y - BAR_Y, health,
                        [(op("<=", health, 25), rgb(ERR, 0.9)), (op(">", health, 100), rgb(VALUE, 0.9))], [1, 1, 1, 0.9])
@@ -233,7 +230,7 @@ def roster(doc: HudDocument, side: int) -> list:
         doc.show(vitals["id"], AND(opened, NOT(dead)))
         tile = ui.group(rid, {**ui.absolute(left=u(tile_x(side, i)), top=u(BAR_Y), width=u(TILE_W), height=u(BAR_H)),
                               "display": ui.keyword("none")},
-                        [alive_plate, dead_plate, band, lip, *lits, *marks, unseen, *weapons, skull, vitals])
+                        [alive_plate, dead_plate, band, lip, *lits, initials, skull, ammo_bar, vitals])
         doc.show(rid, op(">", S(f"oq4_sl{side}_count"), i))
         nodes.append(tile)
     return nodes
@@ -427,108 +424,6 @@ def deathmatch_net(doc: HudDocument) -> dict:
                                    "margin-left": ui.length(u(4)), "display": ui.keyword("none")})
     doc.bind("ffn.display", "ffn", "display", sel(AND(competitive(), NOT(scoreline_shown())), "flex", "none"))
     return row
-
-
-# ------------------------------------------------------------------ team status
-
-def team_list(doc: HudDocument, ident: str, team, *, trailing: bool) -> dict:
-    """One team's status (atlas teamList): the team name above, then one
-    138x14.5 u plate per player on a 16.5 u pitch with the weapon (an x for
-    the dead, whose rows drop to 0.40), the name cut at 46 u, health in Chain
-    (#E46D56 at 25 and below, #FFBE23 above 100) and armor at 0.60. Your row
-    uses the header-band plate and the marker; a followed player's row is lit
-    in the team's text color at 0.22 with the marker."""
-    x = 494.0 if trailing else 8.0
-    is_marine = op("==", team, 0)
-    text_colour = colour_of([(is_marine, rgb(MAR_T))], rgb(STR_T))
-    head_kw = {"right": x + LIST_W} if trailing else {"x": x}
-    head = text_at(doc, ident + "-head", sel(is_marine, TEAM_NAMES[0], TEAM_NAMES[1]), 6.8, rgb(MAR_T), baseline=LIST_Y - 3,
-                   extra={"letter-spacing": ui.length(u(0.7))}, **head_kw)
-    doc.bind(ident + "-head.color", ident + "-head", "color", text_colour)
-    rows = [head]
-    count = sel(is_marine, S("oq4_ts0_count"), S("oq4_ts1_count"))
-    for i in range(LIST_ROWS):
-        def f(name, i=i):
-            return sel(is_marine, S(f"oq4_ts0_{i}_{name}"), S(f"oq4_ts1_{i}_{name}"))
-        rid = f"{ident}{i}"
-        y = LIST_Y + i * LIST_PITCH
-        you, dead, followed = f("you"), f("dead"), f("followed")
-        plate = plate_at(rid + "-plate", 0, 0, LIST_W, LIST_ROW, 0.45)
-        doc.show(plate["id"], NOT(you))
-        band = plate_at(rid + "-band", 0, 0, LIST_W, LIST_ROW, 0.3, BAND, display=ui.keyword("none"))
-        doc.show(band["id"], you)
-        lit = []
-        for t, colour in enumerate((MAR_T, STR_T)):
-            node = vec(f"{rid}-lit{t}", [fitted_plate_path("l", u(11.5), r=u(1), fill=ui.solid(rgb(colour, 0.22)), pad=0, top=u(1.5))],
-                       {**ui.absolute(left=u(1.5), top=0, width=u(LIST_W - 3), height=u(LIST_ROW)), "display": ui.keyword("none")})
-            doc.show(node["id"], AND(followed, op("==", team, t)))
-            lit.append(node)
-        mark = marker_vec(rid + "-marker", LIST_W + 1 if trailing else -6, 4.5)
-        mark["properties"]["display"] = ui.keyword("none")
-        doc.show(mark["id"], OR(you, followed))
-        icon_x = LIST_W - 21 if trailing else 4
-        weapons = []
-        for index, glyph in enumerate(MP_ROSTER):
-            holder = ui.group(f"{rid}-w{index}", {**ui.absolute(left=u(icon_x), top=u(2.5), width=u(17), height=u(9.5)),
-                                                  "display": ui.keyword("none")},
-                              hud_svg.icon_nodes(glyph, f"{rid}-w{index}-g", 0, 0, u(9.5), tint=rgb(FEED_COLOURS[index])))
-            doc.show(holder["id"], AND(NOT(dead), op("==", f("weapon"), index)))
-            weapons.append(holder)
-        cross = vec(rid + "-dead", [pts_path("a", [(u(icon_x + 5), u(4)), (u(icon_x + 11), u(10.5))], closed=False,
-                                             stroke=stroke([1, 1, 1, 0.4], u(1.4), cap="round")),
-                                    pts_path("b", [(u(icon_x + 11), u(4)), (u(icon_x + 5), u(10.5))], closed=False,
-                                             stroke=stroke([1, 1, 1, 0.4], u(1.4), cap="round"))], {"display": ui.keyword("none")})
-        doc.show(cross["id"], dead)
-        name_kw = {"right": LIST_W - 26} if trailing else {"x": 26}
-        name = text_at(doc, rid + "-name", f("name"), 9, rgb(MAR_T), baseline=10.6, extra={**ellipsis(46), "opacity": num(1)}, **name_kw)
-        doc.bind(rid + "-name.color", rid + "-name", "color", colour_of([(OR(you, followed), WHITE), (is_marine, rgb(MAR_T))], rgb(STR_T)))
-        doc.bind(rid + "-name.opacity", rid + "-name", "opacity", sel(dead, 0.4, 1))
-        health = text_at(doc, rid + "-hp", op("numberText", f("health")), 10.6, WHITE, baseline=11, face="chain",
-                         right=34 if trailing else LIST_W - 34, extra={"display": ui.keyword("none")})
-        doc.bind(rid + "-hp.color", rid + "-hp", "color",
-                 colour_of([(op("<=", f("health"), 25), rgb(ERR)), (op(">", f("health"), 100), rgb(VALUE))], WHITE))
-        doc.show(health["id"], NOT(dead))
-        armor = text_at(doc, rid + "-ar", op("numberText", f("armor")), 9, [1, 1, 1, 0.6], baseline=11, face="chain",
-                        right=10 if trailing else LIST_W - 10, extra={"display": ui.keyword("none")})
-        doc.bind(rid + "-ar.color", rid + "-ar", "color", colour_of([(op(">", f("armor"), 0), [1, 1, 1, 0.6])], [1, 1, 1, 0.25]))
-        doc.show(armor["id"], NOT(dead))
-        # Where the player is (MP-15): beside the row on the view's side, cut at 78 u.
-        place_kw = {"right": -4} if trailing else {"x": LIST_W + 4}
-        place = text_at(doc, rid + "-loc", f("location"), 7.4, [1, 1, 1, 0.72], baseline=10.2,
-                        extra={**ellipsis(LOCATION_W), "display": ui.keyword("none")}, **place_kw)
-        doc.show(place["id"], AND(NOT(dead), op("!=", f("location"), "")))
-        row = ui.group(rid, {**ui.absolute(left=u(x), top=u(y), width=u(LIST_W), height=u(LIST_ROW)), "display": ui.keyword("none")},
-                       [plate, band, *lit, mark, *weapons, cross, name, health, armor, place])
-        doc.show(rid, op(">", count, i))
-        rows.append(row)
-    return full(ident, rows, display=ui.keyword("none"))
-
-
-def team_status(doc: HudDocument) -> tuple:
-    """Team modes: your team's list at the leading edge; spectators see the
-    Marines there and the Strogg at the trailing edge, under the item timers,
-    where held statistics take the trailing list's place. Returns (leading,
-    trailing)."""
-    declare(doc, {"oq4_spectating": False, "oq4_my_team": 0, "stat_visible": 0})
-    for team in range(2):
-        declare(doc, {f"oq4_ts{team}_count": 0})
-        for i in range(LIST_ROWS):
-            declare(doc, {f"oq4_ts{team}_{i}_name": "", f"oq4_ts{team}_{i}_weapon": -1, f"oq4_ts{team}_{i}_health": 0,
-                          f"oq4_ts{team}_{i}_armor": 0, f"oq4_ts{team}_{i}_dead": False, f"oq4_ts{team}_{i}_you": False,
-                          f"oq4_ts{team}_{i}_followed": False, f"oq4_ts{team}_{i}_location": ""})
-    spectating = S("oq4_spectating")
-    leading = team_list(doc, "tsl", sel(spectating, 0, S("oq4_my_team")), trailing=False)
-    doc.show("tsl", AND(competitive(), team_mode()))
-    trailing = team_list(doc, "tst", 1, trailing=True)
-    doc.show("tst", AND(competitive(), team_mode(), spectating, op("==", S("stat_visible"), 0)))
-    # The item timers above it (from y 96 on a 15 u pitch, stepped down with
-    # the kill feed on narrow views) push it down to clear their last row by
-    # 6 u under its team name.
-    declare(doc, {"oq4_it_count": 0})
-    clear = op("max", 0, op("-", op("+", op("*", op("clamp", S("oq4_it_count"), 0, ITEM_ROWS), u(ITEM_PITCH)), item_timers_drop()),
-                                u(LIST_Y - 9 - ITEM_Y + 2 - 6)))
-    doc.bind("tst.top", "tst", "top", clear)
-    return leading, trailing
 
 
 # ---------------------------------------------------------------- client options

@@ -7,9 +7,15 @@
 // they have: health, armour, the weapon in hand and a position the client turns
 // into a location name.
 //
-// The message goes to the team member alone. It is not forwarded to whoever
-// spectates them and it is not recorded: a spectator and a demo already hold
-// every player's state.
+// The message goes to the team member alone, holding their own team. Someone
+// who chose to watch gets every player's record on a casual server, for the
+// one thing no snapshot carries for players they do not follow: how much
+// ammunition each has for the weapon in hand (the Competitive scoreline's
+// bars). It is not recorded.
+//
+// The ammunition travels as a trailer of one byte an entry after the entries,
+// so a 0.15.0 client, which stops reading after the entries, takes the message
+// as before, and a record from an older server has no ammunition.
 //
 // The packing core below owns no engine types, so tools/tests/native can
 // compile it alone.
@@ -22,6 +28,9 @@ static const int MP_TEAMINFO_SEND_MSEC = 500;
 // a record older than this is no better than the stale entity it replaces
 static const int MP_TEAMINFO_FRESH_MSEC = 2500;
 static const int MP_TEAMINFO_NO_WEAPON = 0xff;
+// ammunition for the weapon in hand as a share of what it can hold, 0..250
+static const int MP_TEAMINFO_AMMO_FULL = 250;
+static const int MP_TEAMINFO_AMMO_UNKNOWN = 0xff;
 
 struct mpTeamInfoEntry_t {
 	int		clientNum;
@@ -29,6 +38,7 @@ struct mpTeamInfoEntry_t {
 	int		armor;
 	int		weapon;			// slot, -1 for none
 	int		origin[ 3 ];	// whole world units
+	int		ammo;			// 0..MP_TEAMINFO_AMMO_FULL, or MP_TEAMINFO_AMMO_UNKNOWN
 };
 
 // Health and armour travel as unsigned bytes and positions as signed 16 bit
@@ -50,6 +60,29 @@ inline int MPTeamInfoPackCoord( float value ) {
 
 inline int MPTeamInfoPackWeapon( int weapon, int maxWeapons ) {
 	return ( weapon >= 0 && weapon < maxWeapons && weapon < MP_TEAMINFO_NO_WEAPON ) ? weapon : MP_TEAMINFO_NO_WEAPON;
+}
+
+// A weapon that uses none, or holds unlimited ammunition, reads full.
+inline int MPTeamInfoPackAmmo( int ammo, int maxAmmo, bool unlimited ) {
+	if ( unlimited ) {
+		return MP_TEAMINFO_AMMO_FULL;
+	}
+	if ( maxAmmo <= 0 ) {
+		return MP_TEAMINFO_AMMO_UNKNOWN;
+	}
+	if ( ammo <= 0 ) {
+		return 0;
+	}
+	if ( ammo >= maxAmmo ) {
+		return MP_TEAMINFO_AMMO_FULL;
+	}
+	const int share = ( ammo * MP_TEAMINFO_AMMO_FULL + maxAmmo / 2 ) / maxAmmo;
+	// a weapon with a shot left never reads empty
+	return share < 1 ? 1 : share;
+}
+
+inline int MPTeamInfoUnpackAmmo( int packed ) {
+	return ( packed >= 0 && packed <= MP_TEAMINFO_AMMO_FULL ) ? packed : MP_TEAMINFO_AMMO_UNKNOWN;
 }
 
 inline int MPTeamInfoUnpackWeapon( int packed, int maxWeapons ) {

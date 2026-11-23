@@ -877,8 +877,8 @@ landscape phone shapes, binding no evidence record. The stock GUIs (Classic
 included), multiplayer objective markers, swipe controls' 24 dp edge margin,
 fold and multi-window resizes and device acceptance remain.
 
-There are **126 partial, 233 pending and 0 verified requirements**, counting the
-43 superseded rows at their recorded states. `BEH-002`
+There are **126 partial, 235 pending and 0 verified requirements**, counting the
+44 superseded rows at their recorded states. `BEH-002`
 remains partial for the implemented settings transaction/service boundary.
 `BEH-005` remains partial for committed action delivery and cancellation; stock
 sounds and the complete device/modal/widget behavior still require implementation
@@ -1367,3 +1367,18 @@ evidence and performance preset notes that later commits had changed without
 re-binding; no evidence scope or result changes. There are 359
 rows, 316 active requirements and 43 historical superseded rows; the 358
 migration variants and seven final gates remain unaccepted.
+
+## Revision 28: initials, ammunition and a moving kill feed
+
+Visual specification 1.48 follows the product owner's review of revision 27:
+the scoreline's tiles name players by their initials, since Quake 4 ships no
+portraits, with a bar over each tile for the ammunition of the weapon in hand
+in the weapon's color instead of the weapon's symbol, and Competitive's side
+team lists go as clutter beside the rosters. Kill feed lines arrive with a
+quick slide, fade and glint and glide up as the top line leaves, after
+openPR06's obituary feed. `FLOW-075` supersedes `FLOW-073`, carrying no
+evidence, and `FLOW-076` appends the feed's motion. Both are pending. The
+revision re-binds the visual specification and the Remastered HUD notes; no
+evidence scope or result changes. There are 361 rows, 317 active requirements
+and 44 historical superseded rows; the 358 migration variants and seven final
+gates remain unaccepted.

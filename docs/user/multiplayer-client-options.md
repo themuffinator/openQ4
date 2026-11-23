@@ -110,13 +110,17 @@ this version on. Buying always switches to what you bought.
 | `hud_crosshairAmmo` | `0` | `1` shows the ammunition of the weapon in hand just right of the crosshair. It turns red when the weapon is low. |
 | `hud_crosshairNames` | `1` | Names the player under your crosshair: `0` nobody, `1` everyone, `2` team mates only. A team mate also shows health and armour. |
 
-## Team list locations
+## Team info
 
-In team modes the Competitive layout lists your team with each player's weapon,
-health and armour. Each row now also names where that player is, and the list
-stays accurate for team mates on the far side of the map: the server sends
-your own team's positions and vitals to you twice a second. Opponents are
-never sent. `hud_teamLocations 0` hides the names.
+The server sends you your own team's positions, health, armour and ammunition
+twice a second, so the Competitive scoreline stays accurate for team mates on
+the far side of the map. Opponents are never sent to players. On a casual
+server someone who chose to spectate is sent every player, so both sides'
+ammunition bars and vitals stay current; a managed match keeps its own rules.
+
+The Competitive layout no longer lists team mates at the screen's edge with
+the place each one stands; the scoreline's player tiles replaced it. For now
+`hud_teamLocations` has nothing to show on the new interface's HUD.
 
 ## Item timers
 
