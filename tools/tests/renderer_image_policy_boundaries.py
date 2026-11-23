@@ -66,16 +66,18 @@ struct renderImageOperation_t {
  bool Allowed()const{return permit;}void Succeeded(uint64_t=0){done=true;}
 };
 struct idImage {idImageOpts opts;int usage=0;bool allowDownSize=true;textureFilter_t filter=TF_DEFAULT;textureRepeat_t repeat=TR_REPEAT;unsigned texnum=99;uint64_t storageGeneration=0;
- const char* GetName()const{return "image";}bool IsFileBacked()const{return true;}void PurgeImage(){++native;texnum=99;}void AllocImage();void SubImageUpload(int,int,int,int,int,int,const void*,int)const;};
+ const char* GetName()const{return "image";}bool IsFileBacked()const{return true;}void PurgeImage(){++native;texnum=99;}int SamplerLodBiasStep()const{return 0;}void AllocImage();void SubImageUpload(int,int,int,int,int,int,const void*,int)const;};
 struct VmaAllocation_T{};using VmaAllocation=VmaAllocation_T*;
 struct VmaAllocationCreateInfo{int usage=0,flags=0;};
 struct VmaAllocationInfo{void* pMappedData=nullptr;};
 enum{VMA_MEMORY_USAGE_AUTO=1,VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT=1,VMA_ALLOCATION_CREATE_MAPPED_BIT=2};
-struct {bool initialized=true,presentationBlocked=false;VkPhysicalDevice physicalDevice{};VkDevice device{};int allocator=0;VkSampleCountFlags sampleLocationCounts=0;struct{struct{float maxSamplerAnisotropy=16;}limits;}deviceProperties;}vkCtx;
+struct {bool initialized=true,presentationBlocked=false;VkPhysicalDevice physicalDevice{};VkDevice device{};int allocator=0;VkSampleCountFlags sampleLocationCounts=0;struct{struct{float maxSamplerAnisotropy=16,maxSamplerLodBias=15;}limits;}deviceProperties;int driverID=0;}vkCtx;
 struct{int GetInteger()const{return 1;}}image_anisotropy;
 struct imageFilterState_t {int mode=0;bool usesMipmaps=true,minLinear=true,magLinear=true,mipLinear=true;};
 imageFilterState_t R_GetDefaultImageFilterState(){return {};}
-struct vkSamplerKey_t{textureFilter_t filter;textureRepeat_t repeat;bool mips;int anisotropy,defaultFilterMode;bool explicitMipChain;};
+struct vkSamplerKey_t{textureFilter_t filter;textureRepeat_t repeat;bool mips;int anisotropy,defaultFilterMode;bool explicitMipChain;int lodBiasStep,driverBiasMillis;};
+static const int TEMPORAL_LOD_BIAS_STEPS_PER_MIP=4;struct idMath{static float ClampFloat(float a,float b,float v){return std::min(std::max(v,a),b);}};
+static int VK_Image_AnisotropicDriverBiasMillis(int){return 0;}
 static constexpr int VK_MAX_SAMPLERS=4;
 static vkSamplerKey_t vkSamplerKeys[VK_MAX_SAMPLERS]{};
 static VkSampler vkSamplers[VK_MAX_SAMPLERS]{};static int vkNumSamplers=0;

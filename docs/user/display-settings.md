@@ -154,7 +154,7 @@ openQ4 follows whatever shape your window or screen is, so there is no aspect-ra
 
 **Settings → Display → Image Quality → Resolution Scale** renders the 3D world at a percentage of your screen's resolution: 10%, 25%, 50%, 75%, 85%, 100%, 125%, 150% or 200%. Below 100% is faster and softer; above 100% renders more pixels than your screen has and scales them down, which is sharper and slower. The HUD and menus always stay at full resolution.
 
-Below 100%, [temporal anti-aliasing](temporal-presentation.md) upscales the scene by default, which keeps edges smooth and recovers detail a plain stretch loses.
+Below 100%, [temporal anti-aliasing](temporal-presentation.md) upscales the scene by default, which keeps edges smooth and recovers detail a plain stretch loses. **After 0.15.0:** while it upscales, the world's textures are also drawn from sharper detail levels, so they keep more of their detail at a lower scale.
 
 The console setting `r_resolutionScaleMode` chooses how a scene below 100% is stretched to your screen, on OpenGL and Vulkan, in single-player and multiplayer:
 
@@ -312,6 +312,10 @@ seta image_filter GL_NEAREST_MIPMAP_NEAREST
 ```
 
 The pixelated modes skip anisotropic filtering so that `image_anisotropy` can't blur the pixel edges.
+
+**After 0.15.0: texture sharpness.** `image_lodbias` makes the world's textures sharper or softer by choosing a different detail level: negative values are sharper and can shimmer in motion, positive values are softer. It runs from `-2` to `2` in steps of a quarter level, the default `0` changes nothing, and it takes effect at once. Menus, the HUD and text are not affected, and OpenGL ES devices ignore it.
+
+On NVIDIA graphics cards the Vulkan renderer used to draw textures seen at an angle slightly softer than OpenGL did. It now corrects for that by itself, so both renderers look the same; `r_vkAnisotropicLodBias 0` turns the correction off. Other graphics cards did not have the difference and get no correction.
 
 ## Motion blur
 

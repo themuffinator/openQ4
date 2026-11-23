@@ -46,6 +46,7 @@ For a fixed scale instead, leave `r_rendererDynamicResolution 0` and lower **Res
 |---|---:|---|
 | `r_temporalAA` | `2` | `0` off, `1` always on (full resolution too), `2` automatic: on below full resolution, unless the frame cap is 30 or lower. |
 | `r_temporalAASharpness` | `0.5` | Sharpening applied to the image you see (`0` to `1`). The frames TAA collects stay unsharpened. |
+| `r_temporalAALodBias` | `1` | **After 0.15.0.** Texture detail while upscaling (`0` to `1.5`). At `1` the world's textures are drawn as sharp as they would be at full resolution, which the upscale turns into real detail; `0` turns this off. It has no effect at 100% scale. |
 | `r_temporalAAFeedback` | `0.9` | How much of earlier frames is kept (`0` to `0.98`). Higher is smoother but slower to react. Still parts of the picture keep a little more. |
 | `r_temporalAAReactiveEffects` | `0.85` | How strongly particles, effects and moving glass ignore earlier frames (`0` to `1`), which stops them smearing. |
 | `r_temporalAAReactiveScale` | `1.0` | Multiplies that rejection for everything (`0` to `2`). |

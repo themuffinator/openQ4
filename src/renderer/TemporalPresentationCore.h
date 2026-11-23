@@ -4,6 +4,7 @@
 #ifndef __TEMPORAL_PRESENTATION_CORE_H__
 #define __TEMPORAL_PRESENTATION_CORE_H__
 
+#include <cmath>
 #include <cstdint>
 
 // Device-independent dynamic-resolution policy.  The renderer feeds this only
@@ -347,6 +348,42 @@ inline temporalResolutionOutput_t TemporalResolutionCore_Update(
 	output.height = TemporalResolutionCore_AlignedDimension(
 		nativeHeight, output.scalePercent, config.dimensionAlignment );
 	return output;
+}
+
+// Texture LOD bias for a temporally upscaled scene (REN-04).  A scene drawn at
+// a fraction of the output resolution selects its texture mips for that
+// smaller target, so the upscaled picture carries about a mip less detail per
+// halving.  Temporal upscaling accumulates jittered samples and can resolve
+// the detail a sharper mip adds, so material textures are biased by
+// strength * log2( scale ) while it presents.  Samplers hold the bias in
+// quarter-mip steps; the step moves only once the exact value has left the
+// applied step by three quarters of a step, so a dynamic resolution that
+// hovers between two scales does not rebuild samplers every few frames.
+const int TEMPORAL_LOD_BIAS_STEPS_PER_MIP = 4;
+const int TEMPORAL_LOD_BIAS_MIN_STEP = -2 * TEMPORAL_LOD_BIAS_STEPS_PER_MIP;
+
+inline float TemporalResolutionCore_UpscaleLodBias( int scalePercent,
+		bool temporalUpscale, float strength ) {
+	if ( !temporalUpscale || scalePercent <= 0 || scalePercent >= 100
+			|| !( strength > 0.0f ) ) {
+		return 0.0f;
+	}
+	return strength * std::log2( static_cast<float>( scalePercent ) / 100.0f );
+}
+
+inline int TemporalResolutionCore_LodBiasStep( float exactBias, int appliedStep ) {
+	if ( !( exactBias < 0.0f ) ) {
+		// native resolution, or no temporal resolve: exactly unbiased
+		return 0;
+	}
+	const float exactSteps = exactBias * TEMPORAL_LOD_BIAS_STEPS_PER_MIP;
+	appliedStep = TemporalResolutionCore_ClampInt(
+		TEMPORAL_LOD_BIAS_MIN_STEP, 0, appliedStep );
+	if ( std::fabs( exactSteps - static_cast<float>( appliedStep ) ) < 0.75f ) {
+		return appliedStep;
+	}
+	return TemporalResolutionCore_ClampInt( TEMPORAL_LOD_BIAS_MIN_STEP, 0,
+		static_cast<int>( std::floor( exactSteps + 0.5f ) ) );
 }
 
 #endif /* !__TEMPORAL_PRESENTATION_CORE_H__ */

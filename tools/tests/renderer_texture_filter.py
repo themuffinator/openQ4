@@ -61,6 +61,21 @@ def main() -> None:
     require(vk_image, "defaultFilter.mipLinear ? VK_SAMPLER_MIPMAP_MODE_LINEAR", "Vulkan mip blending")
     require(vk_image, "void idImage::RefreshSamplerState()", "Vulkan live refresh")
 
+    # Texture LOD bias: image_lodbias, the temporal-upscaling bias and the
+    # Vulkan driver correction all reach default samplers through one refresh.
+    require(manager, 'idCVar image_lodbias(', "image_lodbias registration")
+    require(manager, 'idCVar r_vkAnisotropicLodBias(', "Vulkan anisotropic correction registration")
+    require(manager, "&image_anisotropy, &r_vkAnisotropicLodBias", "live correction tracking")
+    require(manager, "WantedLodBiasStep() != appliedLodBiasStep", "live LOD bias refresh")
+    require(manager, "int idImage::SamplerLodBiasStep() const", "material-texture LOD bias scope")
+    require(gl_image, "glTexParameterf( target, GL_TEXTURE_LOD_BIAS", "OpenGL LOD bias")
+    require(gl_image, "glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES", "OpenGL ES has no LOD bias parameter")
+    require(vk_image, "vkSamplerKeys[ i ].lodBiasStep == lodBiasStep", "Vulkan LOD bias cache key")
+    require(vk_image, "vkSamplerKeys[ i ].driverBiasMillis == driverBiasMillis", "Vulkan correction cache key")
+    require(vk_image, "VK_DRIVER_ID_NVIDIA_PROPRIETARY", "correction limited to the measured driver")
+    require(docs, "`image_lodbias`", "LOD bias documentation")
+    require(docs, "`r_vkAnisotropicLodBias 0`", "Vulkan correction documentation")
+
     require(docs, "seta image_filter GL_NEAREST_MIPMAP_NEAREST", "pixelated-texture example")
     require(
         validator,

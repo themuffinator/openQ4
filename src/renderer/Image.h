@@ -206,6 +206,10 @@ public:
 	// Should be called at least once
 	void		SetSamplerState(textureFilter_t tf, textureRepeat_t tr);
 	void		RefreshSamplerState();
+	// Quarter-mip LOD bias steps this image's sampler carries: image_lodbias
+	// plus the bias of a temporally upscaled scene (REN-04). Mipmapped material
+	// textures only, never the interface, fonts or render targets.
+	int			SamplerLodBiasStep() const;
 
 	// used by callback functions to specify the actual data
 	// data goes from the bottom to the top line of the image, as OpenGL expects it
@@ -605,6 +609,17 @@ public:
 	// swallows the born-modified state of those cvars during startup
 	void				PrimeCvars();
 
+	// Texture LOD bias while the scene is temporally upscaled (REN-04), in
+	// quarter-mip steps (zero or negative). The front end requests a step each
+	// frame; CheckCvars adds image_lodbias and reapplies the default samplers
+	// when the sum changes, under the same level-load and image-policy
+	// deferral as a sampling cvar.
+	void				RequestUpscaleLodBiasStep( int step ) { requestedLodBiasStep = step; }
+	int					RequestedUpscaleLodBiasStep() const { return requestedLodBiasStep; }
+	// the step default samplers carry now: image_lodbias plus the upscaling bias
+	int					AppliedLodBiasStep() const { return appliedLodBiasStep; }
+	int					LodBiasChanges() const { return lodBiasChanges; }
+
 	// unbind all textures from all texture units
 	void				UnbindAll();
 
@@ -689,6 +704,10 @@ public:
 	reductionReloadStats_t reductionReloadStats;
 	void				ClearReductionReloads();
 	void				ApplyPendingImageCvars( bool finishReloads );
+	int					requestedLodBiasStep = 0;
+	int					appliedLodBiasStep = 0;
+	int					lodBiasChanges = 0;
+	int					WantedLodBiasStep() const;
 	bool				preloadingMapImages;		// unless this is set
 };
 

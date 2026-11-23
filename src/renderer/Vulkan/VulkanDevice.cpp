@@ -1876,6 +1876,7 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 		vkGetPhysicalDeviceProperties2( vkCtx.physicalDevice, &query );
 		driver.driverName[ VK_MAX_DRIVER_NAME_SIZE - 1 ] = '\0';
 		driver.driverInfo[ VK_MAX_DRIVER_INFO_SIZE - 1 ] = '\0';
+		vkCtx.driverID = (int)driver.driverID;
 		common->Printf( "Vulkan: driver '%s' '%s' (driverID %d, driverVersion 0x%08x, vendorID 0x%04x, deviceID 0x%04x, deviceType %d, api %u.%u.%u)\n",
 				driver.driverName, driver.driverInfo, (int)driver.driverID,
 				(unsigned int)vkCtx.deviceProperties.driverVersion,

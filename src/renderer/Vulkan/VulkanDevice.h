@@ -112,6 +112,8 @@ typedef struct vkDeviceContext_s {
 	uint32_t			physicalDeviceIndex;
 	char				physicalDeviceId[33];
 	VkPhysicalDeviceProperties deviceProperties;
+	// VkDriverId of the selected device (0 until its driver properties are read)
+	int					driverID;
 	// Fixed for the device lifetime. Zero retains the driver's native pattern.
 	// All multisample pipelines and depth-image transitions use the same pattern.
 	VkSampleCountFlags sampleLocationCounts;

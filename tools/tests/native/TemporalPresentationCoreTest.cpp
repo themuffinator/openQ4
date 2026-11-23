@@ -3,6 +3,7 @@
 
 #include "src/renderer/TemporalPresentationCore.h"
 
+#include <cmath>
 #include <cstdio>
 
 static int failures = 0;
@@ -149,6 +150,31 @@ int main() {
 	Check( TemporalResolutionCore_AlignedDimension( 1366, 100, 8 ) == 1366
 			&& TemporalResolutionCore_AlignedDimension( 767, 100, 8 ) == 767,
 		"100 percent scale must preserve the exact native extent" );
+
+	// Texture LOD bias while temporally upscaling (REN-04).
+	Check( TemporalResolutionCore_UpscaleLodBias( 100, true, 1.0f ) == 0.0f
+			&& TemporalResolutionCore_UpscaleLodBias( 150, true, 1.0f ) == 0.0f
+			&& TemporalResolutionCore_UpscaleLodBias( 50, false, 1.0f ) == 0.0f
+			&& TemporalResolutionCore_UpscaleLodBias( 50, true, 0.0f ) == 0.0f,
+		"native, supersampled, non-temporal and disabled frames must stay unbiased" );
+	Check( std::fabs( TemporalResolutionCore_UpscaleLodBias( 50, true, 1.0f ) + 1.0f ) < 1.0e-5f
+			&& std::fabs( TemporalResolutionCore_UpscaleLodBias( 25, true, 0.5f ) + 1.0f ) < 1.0e-5f,
+		"the bias must be strength * log2( scale )" );
+	Check( TemporalResolutionCore_LodBiasStep( 0.0f, -4 ) == 0,
+		"an unbiased frame must return to exactly zero whatever was applied" );
+	Check( TemporalResolutionCore_LodBiasStep( -1.0f, 0 ) == -4
+			&& TemporalResolutionCore_LodBiasStep( -0.415f, 0 ) == -2
+			&& TemporalResolutionCore_LodBiasStep( -5.0f, 0 ) == TEMPORAL_LOD_BIAS_MIN_STEP,
+		"a new bias must round to the nearest quarter mip inside the two-mip bound" );
+	Check( TemporalResolutionCore_LodBiasStep( -0.415f, -2 ) == -2
+			&& TemporalResolutionCore_LodBiasStep( -0.60f, -2 ) == -2
+			&& TemporalResolutionCore_LodBiasStep( -0.33f, -2 ) == -2
+			&& TemporalResolutionCore_LodBiasStep( -0.70f, -2 ) == -3
+			&& TemporalResolutionCore_LodBiasStep( -0.60f, -3 ) == -3,
+		"a scale hovering between two steps must keep the applied one" );
+	Check( TemporalResolutionCore_LodBiasStep( -0.10f, 0 ) == 0
+			&& TemporalResolutionCore_LodBiasStep( -0.20f, 0 ) == -1,
+		"a slight upscale must not bias until it reaches most of a step" );
 
 	if ( failures != 0 ) {
 		return 1;

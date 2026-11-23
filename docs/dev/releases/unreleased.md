@@ -10,6 +10,12 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Highlights
 
+- **Sharper textures at lower resolution scales, and on Vulkan with NVIDIA
+  cards.** When the game draws the 3D scene below your screen's resolution
+  and upscales it, the world's textures now keep more of their detail: 16-18%
+  more at 50% scale. On NVIDIA graphics cards the Vulkan renderer used to
+  draw angled textures a little softer than OpenGL did; it now matches.
+  `image_lodbias` is a new sharpness setting of your own, off by default.
 - **Controllers, reworked.** Every connected controller is ready, and the one
   you pick up takes over. Stick aim is set in degrees per second with a dead
   zone for each stick, an optional turn boost and three response presets;

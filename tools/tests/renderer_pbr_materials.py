@@ -1178,7 +1178,7 @@ def test_vulkan_environment_mip_chain_sampler() -> None:
                   "if ( !explicitMipChain && ( filter != TF_DEFAULT || !defaultFilter.usesMipmaps ) )",
                   "vkSamplerKeys[ i ].explicitMipChain == explicitMipChain",
                   "explicitMipChain ? VK_SAMPLER_MIPMAP_MODE_LINEAR : VK_SAMPLER_MIPMAP_MODE_NEAREST",
-                  "VK_Image_GetSampler( filter, repeat, entry->numMips > 1, entry->explicitMipChain )",
+                  "VK_Image_GetSampler( filter, repeat, entry->numMips > 1, entry->explicitMipChain,",
                   "bool VK_Image_UseExplicitMipChain( unsigned int texnum )"):
         require(image, token, "explicit mip-chain sampler")
     probes = read(ROOT / "src/renderer/Vulkan/vk_PBRProbes.cpp")

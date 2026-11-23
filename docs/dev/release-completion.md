@@ -12,6 +12,37 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Sharper textures when upscaling, and on Vulkan with NVIDIA cards, 23 November 2026
+
+- **Lower resolution scales keep more texture detail.** When the 3D scene is
+  drawn below your screen's resolution and temporal AA upscales it (the
+  default below 100%, and with dynamic resolution), the world's textures are
+  now drawn from sharper detail levels, which the upscale turns into real
+  detail. At 50% scale the picture holds 16-18% more texture detail and at
+  75% about 5% more, with no added shimmer at rest. `r_temporalAALodBias 0`
+  turns it off. Menus, the HUD and text are untouched, and so is a scene at
+  100%.
+- **Vulkan is as sharp as OpenGL on NVIDIA cards.** Textures seen at an angle
+  were slightly softer under Vulkan than under OpenGL on NVIDIA graphics
+  cards: about 6% less detail in a typical outdoor view and up to 25% on
+  ground seen from above. The cause is how NVIDIA's Vulkan driver filters
+  angled textures, not openQ4's settings: the same code on an Intel GPU does
+  not show it. The Vulkan renderer now corrects for it on that driver, and
+  the two renderers measure the same. `r_vkAnisotropicLodBias 0` turns the
+  correction off. Other graphics cards get no correction.
+- **A sharpness setting of your own.** `image_lodbias` makes the world's
+  textures sharper (negative) or softer (positive), from `-2` to `2` in
+  quarter steps. The default `0` changes nothing.
+- **What is not shown.** One NVIDIA card and driver version were measured; a
+  different driver may need a different amount. Nobody has yet reviewed the
+  sharper upscaled picture in motion by eye, and Linux, macOS and Android were
+  not run. OpenGL ES devices have no such texture setting and are unchanged.
+- **Checks.** The temporal stability gate (14 single-player runs, OpenGL and
+  Vulkan) requires the extra detail and the unchanged stability limits; the
+  temporal qualification, the texture-filter contract and the native
+  resolution-policy test pass.
+- **Developer detail:** [texture detail](temporal-presentation.md#texture-detail-while-upscaling-and-under-vulkan-23-november-2026)
+  and REN-04 in the [roadmap](roadmap.md).
 ## Controllers: the one in your hands, aim in degrees, gyro, layouts and haptics, 22 November 2026
 
 - **The controller in your hands is the one in charge.** Every connected

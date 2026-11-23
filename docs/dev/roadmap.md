@@ -1196,7 +1196,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-01 — Closed | All nine shared classic domains own stock (and, for subview forms stock content never authors, validation-room) views on a fresh GL/Vulkan package under the default preset, with 4x MSAA and with the post chain off: byte-identical to classic, visible content controls, named zero-commit rollback. They now draw into the scene target the classic walker uses. Defaults stay off. | Human appearance review of the retained captures and physical Linux/macOS/Android runs belong to platform qualification; default promotion is a separate owner decision. |
 | REN-02 — Partial | Shared material/light contracts and corridors provide foundations; the remaining decline reasons are inventoried. | Inventory remaining semantics; finish coherent lit-frame composition, visible ownership, full fallback and measured benefit before parity promotion. |
 | REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). The opt-in modern OpenGL receivers filter projected shadows with the classic kernel and PCSS-lite blocker search since 17 November; a widened PCSS radius now softens the same pixels as the classic receivers (84% overlap), where before it changed none. The 9 November [stencil-parity audit](shadowmapping-audit-2026-11-09.md) fixed prelight-only (`noDynamicShadows`) lights losing their shadows, `noSelfShadow` world geometry no longer shadowing `noSelfShadow` receivers under prelit lights, the one-sided five-tap kernel and the packed-depth wrap at the far envelope. | Physical platforms; the audit's open parity items (casters outside an off-centre light's box, images for the two fixed rules). The cascade range end is closed (19 November, whole-light last cascade). |
-| REN-04 — Partial | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed. | Human review of visual stability; physical Linux/macOS/Android. |
+| REN-04 — Closed | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed; the picture is still at rest (#216). A temporally upscaled scene samples sharper texture mips (16-18% more detail at 50% scale, stability unchanged), and Vulkan corrects the NVIDIA driver's softer anisotropic filter, so its frames hold OpenGL's detail. | Human review of ghosting and disocclusion on the reference display and physical Linux/macOS/Android belong to platform qualification. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. | lavapipe residual, mods authored outside the laboratory, physical Linux/Apple fallback. |
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; froxel/SSR/SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan. | Re-bake of the cropped bundled grids (owner decision); broader authored scenes. |
 | REN-07 — Partial | Device-aware presets, measured culling/HUD improvements and opt-in Vulkan render-thread stage 1 exist. | Stage-2 ownership work; matched benefit without tail regression; quality parity, 100 resize/scale cycles and sustained resource bounds. |
@@ -1365,7 +1365,7 @@ diagnostics establish whole-frame ownership or production performance.
   [depth-sized offset](shadowmapping-outdoor-terrain.md#normal-offset-sized-at-each-receivers-depth-for-distant-lights-19-november-2026).
   Remaining: re-measure the FPS-02 Quality/Ultra budgets with cascades on, on
   a quiet reference machine.
-- [ ] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
+- [x] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple
   views and retained UI. Test delayed/stale GPU timing and resolution recovery.
@@ -1390,13 +1390,28 @@ diagnostics establish whole-frame ownership or production performance.
   sky sampled in place), posed surfaces that were not re-posed keep exact
   motion, and `renderer_temporal_stability.py` measures the picture at rest.
   See [stability qualification](temporal-presentation.md#stability-qualification-11-november-2026-issue-216).
-  Remaining: human review of ghosting and disocclusion on the reference
-  display, and physical Linux/macOS/Android; a negative texture LOD bias while
-  upscaling (at 50% scale the image holds about half the native texture
-  detail, and neither backend has LOD-bias plumbing); and the 8% lower texture
-  sharpness of plain Vulkan frames against OpenGL, which temporal AA only
-  preserves. Native UI separation stays covered natively; capture frames
-  cannot show it.
+  Completed 23 November 2026 on Windows x64 OpenGL and Vulkan, with the two
+  open findings closed. While temporal AA upscales, material textures are
+  sampled log2( scale ) mips sharper (`r_temporalAALodBias`, default 1, in
+  quarter-mip steps with hysteresis so dynamic resolution does not rebuild
+  samplers every few frames; OpenGL ES has no such sampler state and declines).
+  The settled history holds 5% more detail at 75% scale and 16-18% more at
+  50% on both backends, inside the unchanged stability limits; the stability
+  gate gained control cases and passes all 14 single-player runs.
+  The softer Vulkan frames were NVIDIA's Vulkan driver: with identical sampler
+  state, top mip and trilinear results, it loses detail once anisotropy
+  passes 1, where OpenGL and Intel's Vulkan driver gain it. The Vulkan sampler
+  cache now biases anisotropic samplers on that driver by the measured 0.15
+  to 0.25 of a mip (`r_vkAnisotropicLodBias`, 0 off), and native-resolution
+  detail reads 30.7 against OpenGL's 30.4 where it read 27.5 against 31.0.
+  `image_lodbias` (the retail cvar) is restored as the user's control. See
+  [texture detail](temporal-presentation.md#texture-detail-while-upscaling-and-under-vulkan-23-november-2026).
+  Human review of ghosting and disocclusion on the reference display and
+  physical Linux/macOS/Android runs belong to platform qualification (PLAT),
+  as for REN-08. Native UI separation stays covered natively; capture frames
+  cannot show it. Not rerun for this change: the multiplayer stability case.
+  Found and left open: a 10240 x 5760 tiled Vulkan `screenshot` fills only
+  part of the image.
 - [ ] **REN-05 — P1, qualification: remaining PBR quality and portability.**
   Reproduce strict residual Intel SSAO and lavapipe scalar/texture differences and
   recorded cutout/normal diagnostic mismatches; fix or explicitly bound exceptions.

@@ -477,18 +477,107 @@ unchanged on both backends (13 cases, 23 runs, no unexpected fallback).
 
 Findings left open:
 
-- **Upscaled texture detail.** At 50% scale the image holds about half the
-  native detail. Most of the gap is texture mip selection: the scene is
-  rendered, and its mips chosen, at the lower resolution. Temporal upscaling
-  needs a negative texture LOD bias (log2 of the scale) on both backends to
-  recover it; no LOD-bias plumbing exists yet.
+- **Upscaled texture detail.** At 50% scale the image held about half the
+  native detail, most of it lost to texture mip selection at the lower
+  resolution. Closed on 23 November 2026: see
+  [texture detail](#texture-detail-while-upscaling-and-under-vulkan-23-november-2026).
 - **Vulkan texture sharpness.** In plain frames without temporal AA, the same
-  crop has 92% of OpenGL's gradient energy under Vulkan. The resolve preserves
-  that difference; it is not a temporal AA effect.
+  crop had 92% of OpenGL's gradient energy under Vulkan. Closed on 23 November
+  2026: it is the NVIDIA Vulkan driver's anisotropic filter, and the Vulkan
+  backend now corrects for it (same section).
 - **Reactive surfaces.** A surface that rejects history shows the recentered
   current frame: it does not move, but its edges are not anti-aliased and their
   aliasing changes with the jitter phase. Multiplayer cannot stop game time,
   so its case holds only the global translation to a limit.
+
+### Texture detail while upscaling and under Vulkan, 23 November 2026
+
+Both findings above concerned texture mip selection, and both are closed
+(REN-04).
+
+**A temporally upscaled scene samples sharper mips.** A scene drawn at a
+fraction of the output resolution chooses its texture mips for the smaller
+target, so the upscaled picture loses about a mip of detail per halving. The
+front end now requests a texture LOD bias of `r_temporalAALodBias` (default 1)
+times log2( scale ) each frame, and the image manager reapplies the default
+samplers when it changes:
+
+- It applies only while the last presented scene went through the temporal
+  resolve (a spatial present or a fallback cannot resolve the aliasing a
+  sharper mip adds), never in VR, and never at or above 100% scale. Captures
+  keep the samplers of the frames around them.
+- Samplers hold it in quarter-mip steps, bounded at two mips. A step changes
+  only once the exact value has left the applied step by three quarters of a
+  step, so a dynamic resolution hovering between two scales does not rebuild
+  samplers every few frames (`TemporalPresentationCore.h`, native test).
+- It reaches mipmapped material textures only: not the interface, fonts or
+  render targets, which are not minified by the scene scale.
+- OpenGL sets `GL_TEXTURE_LOD_BIAS` on the texture object; OpenGL ES has no
+  such parameter and stays unbiased. Vulkan carries the step in its sampler
+  cache key.
+- `rendererTemporalPresentationStatus` reports the strength, the exact value
+  and the requested and applied bias. `image_lodbias` (default 0, the retail
+  cvar's name) adds a user bias through the same path.
+
+`renderer_temporal_stability.py` gained control cases with
+`r_temporalAALodBias 0` and requires the status line's applied bias, more
+detail than the control (gradient energy of the settled history, median of a
+4 x 3 grid of screen cells, which ignores the walker frozen at a different
+phase in each launch) and the unchanged stability limits. Windows x64, GeForce
+RTX 4060 Laptop GPU, 1280 x 720 hidden window, shared machine; all 14
+single-player runs pass:
+
+| Case | Backend | Applied bias | Detail, bias off | Detail, bias on | Median cell gain | Largest step | Pixels changing | Ripple |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| Upscaled from 75% | OpenGL | -0.50 | 18.39 | 19.90 | 1.05 | 0.001 px | 0.03% | 0.03 |
+| Upscaled from 75% | Vulkan | -0.50 | 18.59 | 19.99 | 1.05 | 0.001 px | 0.04% | 0.03 |
+| Upscaled from 50% | OpenGL | -1.00 | 10.61 | 12.54 | 1.18 | 0.002 px | 0.06% | 0.04 |
+| Upscaled from 50% | Vulkan | -1.00 | 11.08 | 12.79 | 1.16 | 0.003 px | 0.08% | 0.04 |
+
+Native resolution measures 30.41 (OpenGL) and 30.70 (Vulkan). The limits
+(0.02 px, 0.5% and 0.15) are unchanged, and the 67% sharpened case and the 4x
+MSAA case pass with them. The multiplayer case was not rerun for this change.
+
+**Vulkan was softer under anisotropic filtering on NVIDIA.** Plain frames
+(`r_temporalAA 0`, engine screenshots, frozen game time) from the two backends
+were compared by gradient energy at the skyline pose and looking straight down
+onto the ground from 1,400 units, where the texture footprint has almost no
+anisotropy:
+
+| Straight-down view | OpenGL (NVIDIA) | Vulkan (NVIDIA), uncorrected | Vulkan (NVIDIA), corrected | Vulkan (Intel Iris Xe) |
+|---|---:|---:|---:|---:|
+| No mipmaps (`image_filter GL_LINEAR`) | 83.1 | 83.1 | | |
+| Anisotropy 1 | 51.9 | 52.3 | | 52.7 |
+| Anisotropy 2 | 56.5 | 48.6 | 55.6 | 54.1 |
+| Anisotropy 4 | 57.3 | 46.8 | 57.3 | |
+| Anisotropy 8 | 58.4 | 43.8 | 58.5 | |
+| Anisotropy 16 | 58.1 | 43.8 | 58.6 | 54.0 |
+
+The top mip and trilinear filtering match exactly, so the mip chains and the
+sampler state are the same. The difference appears only once `maxAnisotropy`
+passes 1: OpenGL gains detail, as an anisotropic filter should, and so does
+the same Vulkan code on the Intel GPU, while NVIDIA's Vulkan driver loses it,
+ending below its own trilinear result. That driver selects blurrier mips for
+anisotropic samplers. A negative mip bias on those samplers restores the
+OpenGL result: 0.15 of a mip at 2x, 0.21 at 4x and 0.25 at 8x and 16x, fitted
+on the straight-down view. At the skyline pose the corrected Vulkan frame
+holds 39.9 against OpenGL's 39.9 at 2x, 42.1 against 41.8 at 4x and 42.9
+against 42.8 at 16x (uncorrected: 37.8, 39.3 and 40.0); the 8x cell was
+disturbed by scene state that differed between launches (43.0 against 40.7).
+
+The Vulkan sampler cache applies that bias when the device's driver is
+`VK_DRIVER_ID_NVIDIA_PROPRIETARY` and anisotropy is above 1
+(`VK_Image_AnisotropicDriverBiasMillis`); `r_vkAnisotropicLodBias` scales it
+(default 1, 0 off). No other driver is corrected. Limits: one GPU and one
+driver version were measured, and a different NVIDIA driver may not need the
+same amount; a 64-sample supersampled reference could not rank the two
+filters against ground truth, because launch-to-launch scene differences were
+larger than the difference between them.
+
+Found on the way and left open: a 10240 x 5760 tiled `screenshot` on Vulkan
+fills only part of the image (OpenGL writes it whole), and an OpenGL client
+twice stalled in renderer startup after `R_ARB2_Init` while several other
+clients were starting on the same GPU.
 
 `rendererVulkanTemporalMotionSelfTest` numerically reads GPU velocity and resolve
 attachments for positive/negative translation, rotation, perspective interpolation, camera plus jitter,

@@ -60,10 +60,15 @@ idCVar r_temporalAADebug( "r_temporalAADebug", "0",
 	CVAR_RENDERER | CVAR_INTEGER,
 	"temporal presentation diagnostic view: 0 = final, 1 = velocity, 2 = reactive, 3 = history weight", 0, 3 );
 static bool R_TemporalPresentation_TemporalAAWanted( void );
+static void R_TemporalPresentation_UpdateLodBias( int scalePercent,
+	bool temporalAARequested, bool captureFrame );
 
 idCVar r_temporalAAReactiveEffects( "r_temporalAAReactiveEffects", "0.85",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
 	"temporal AA history rejection where particles, effects and translucent moving surfaces cover a pixel", 0.0f, 1.0f );
+idCVar r_temporalAALodBias( "r_temporalAALodBias", "1",
+	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
+	"texture detail while temporal AA upscales a scene drawn below native resolution: material textures are sampled this share of log2( scale ) mips sharper, which the upscale resolves (1 = the full scale, 0 = off)", 0.0f, 1.5f );
 idCVar r_temporalAASharpness( "r_temporalAASharpness", "0.5",
 	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
 	"contrast-adaptive sharpening applied when temporal AA presents its history (0 = off); the history itself stays unsharpened", 0.0f, 1.0f );
@@ -855,6 +860,8 @@ void R_TemporalPresentation_BeginFrame( int nativeWidth, int nativeHeight,
 
 	R_TemporalPresentation_RecordFrameScale( tr.frameCount,
 		gpuTiming.generation, output.scalePercent, !captureFrame );
+	R_TemporalPresentation_UpdateLodBias( output.scalePercent,
+		temporalAARequested, captureFrame );
 
 	const int debug = r_dynamicResolutionDebug.GetInteger();
 	if ( debug >= 2 || ( debug >= 1
@@ -963,6 +970,40 @@ float R_TemporalPresentation_PresentSharpness( void ) {
 
 static temporalOwnershipStats_t rg_temporalOwnershipStats = { -1, 0, 0, 0, 0, 0, false };
 
+// Whether the last presented scene went through the temporal resolve. A
+// spatial present or a fallback cannot resolve the aliasing a sharper mip
+// adds, so the upscaling LOD bias waits for a resolve that kept history.
+// Captures present spatially for one frame and leave it as it was. Written by
+// the backend when it records a resolve, read by the next front end.
+static volatile int rg_temporalResolveLive = 0;
+static float rg_temporalLodBiasExact = 0.0f;
+
+/*
+====================
+R_TemporalPresentation_UpdateLodBias
+
+Requests the texture LOD bias for the frame being built (REN-04). The image
+manager applies a changed step from R_CheckCvars, after this, so the frame's
+samplers match the scale it renders at.
+====================
+*/
+static void R_TemporalPresentation_UpdateLodBias( int scalePercent,
+		bool temporalAARequested, bool captureFrame ) {
+	if ( globalImages == NULL ) {
+		return;
+	}
+	if ( captureFrame ) {
+		// a screenshot or save preview keeps the samplers of the frames around it
+		return;
+	}
+	const bool temporalUpscale = temporalAARequested && rg_temporalResolveLive != 0
+		&& !R_TemporalPresentation_VRFrame();
+	rg_temporalLodBiasExact = TemporalResolutionCore_UpscaleLodBias(
+		scalePercent, temporalUpscale, r_temporalAALodBias.GetFloat() );
+	globalImages->RequestUpscaleLodBiasStep( TemporalResolutionCore_LodBiasStep(
+		rg_temporalLodBiasExact, globalImages->RequestedUpscaleLodBiasStep() ) );
+}
+
 void R_TemporalPresentation_RecordOwnership( const temporalOwnershipStats_t &stats ) {
 	rg_temporalOwnershipStats = stats;
 }
@@ -973,6 +1014,11 @@ void R_TemporalPresentation_RecordResolve( temporalResolveOutcome_t outcome,
 		return;
 	}
 	rg_temporalResolveStats.outcomes[outcome]++;
+	if ( outcome == TEMPORAL_RESOLVE_HISTORY || outcome == TEMPORAL_RESOLVE_SEEDED ) {
+		rg_temporalResolveLive = 1;
+	} else if ( outcome != TEMPORAL_RESOLVE_CAPTURE ) {
+		rg_temporalResolveLive = 0;
+	}
 	rg_temporalResolveStats.velocity[idMath::ClampInt( -1, 2, velocity ) + 1]++;
 	if ( outcome == TEMPORAL_RESOLVE_FALLBACK ) {
 		R_TemporalPresentation_CountReason( rg_temporalResolveStats.fallbacks, fallbackReason );
@@ -1201,6 +1247,14 @@ void R_TemporalPresentation_PrintStatus_f( const idCmdArgs &args ) {
 		rg_temporalResolutionState.droppedScaleChanges,
 		rg_temporalResolutionState.raisedScaleChanges,
 		rg_temporalResolutionState.discontinuityResets );
+	common->Printf(
+		"Temporal texture LOD bias: strength=%.2f exact=%.3f requested=%.2f applied=%.2f resolveLive=%d changes=%d\n",
+		r_temporalAALodBias.GetFloat(), rg_temporalLodBiasExact,
+		globalImages != NULL ? static_cast<float>( globalImages->RequestedUpscaleLodBiasStep() )
+			/ TEMPORAL_LOD_BIAS_STEPS_PER_MIP : 0.0f,
+		globalImages != NULL ? static_cast<float>( globalImages->AppliedLodBiasStep() )
+			/ TEMPORAL_LOD_BIAS_STEPS_PER_MIP : 0.0f,
+		rg_temporalResolveLive, globalImages != NULL ? globalImages->LodBiasChanges() : 0 );
 	common->Printf(
 		"Temporal ownership: frame=%d rigid=%d posed=%d weapon=%d reactive=%d missed=%d complete=%d\n",
 		rg_temporalOwnershipStats.frameNumber,

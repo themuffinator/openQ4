@@ -101,6 +101,22 @@ idCVar image_anisotropy(
 	1,
 	16 );
 
+idCVar image_lodbias(
+	"image_lodbias",
+	"0",
+	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
+	"mip level bias for mipmapped material textures, in mips (applied in quarter-mip steps): negative samples sharper mips, positive blurrier ones; OpenGL ES ignores it",
+	-2.0f,
+	2.0f );
+
+idCVar r_vkAnisotropicLodBias(
+	"r_vkAnisotropicLodBias",
+	"1",
+	CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
+	"Vulkan: scale of the mip bias that corrects a driver whose anisotropic filter samples blurrier mips than OpenGL's on the same GPU (NVIDIA's Vulkan driver; no other driver is corrected): 1 = the measured correction, 0 = off",
+	0.0f,
+	2.0f );
+
 imageFilterState_t R_GetDefaultImageFilterState() {
 	static const imageFilterState_t states[ IMAGE_FILTER_MODE_COUNT ] = {
 		{ IMAGE_FILTER_LINEAR_MIPMAP_LINEAR, true, true, true, true },
@@ -367,7 +383,7 @@ static bool R_ImageReductionCvarsChanged( bool clear ) {
 }
 
 static bool R_ImageSamplerCvarsChanged( bool clear ) {
-	idCVar *const samplerCvars[] = { &image_filter, &image_anisotropy };
+	idCVar *const samplerCvars[] = { &image_filter, &image_anisotropy, &r_vkAnisotropicLodBias };
 	bool changed = false;
 	for ( int i = 0; i < static_cast<int>( sizeof( samplerCvars ) / sizeof( samplerCvars[0] ) ); i++ ) {
 		if ( samplerCvars[i]->IsModified() ) {
@@ -419,7 +435,8 @@ next vid_restart.
 ===============
 */
 void idImageManager::CheckCvars() {
-	const bool changed = R_ImageReductionCvarsChanged( false ) || R_ImageSamplerCvarsChanged( false );
+	const bool changed = R_ImageReductionCvarsChanged( false ) || R_ImageSamplerCvarsChanged( false )
+		|| WantedLodBiasStep() != appliedLodBiasStep;
 	if ( !changed && PendingReductionReloads() <= 0 ) {
 		return;
 	}
@@ -447,8 +464,19 @@ void idImageManager::ApplyPendingImageCvars( bool finishReloads ) {
 		ReloadReductionChangedImages();
 	}
 
+	// The upscaling LOD bias follows the scene scale, which dynamic resolution
+	// moves during play, so it changes samplers without a console line.
+	const int wantedLodBiasStep = WantedLodBiasStep();
+	const bool lodBiasChanged = wantedLodBiasStep != appliedLodBiasStep;
+	if ( lodBiasChanged ) {
+		appliedLodBiasStep = wantedLodBiasStep;
+		lodBiasChanges++;
+	}
+
 	if ( samplerChanged ) {
 		common->Printf( "Texture sampling changed, updating samplers...\n" );
+	}
+	if ( samplerChanged || lodBiasChanged ) {
 		for ( int i = 0; i < images.Num(); i++ ) {
 			idImage *image = images[i];
 			if ( image != NULL && image->IsLoaded() && image->GetFilter() == TF_DEFAULT ) {
@@ -505,6 +533,45 @@ static bool R_IsQ4PresentationImageNamespace( const char *name ) {
 		&& ( idStr::Icmpn( name, "gfx/guis/", 9 ) == 0
 			|| idStr::Icmpn( name, "fonts", 5 ) == 0
 			|| idStr::Icmpn( name, "newfonts", 8 ) == 0 );
+}
+
+/*
+===============
+idImageManager::WantedLodBiasStep
+
+image_lodbias plus the temporal-upscaling bias, in quarter mips.
+===============
+*/
+int idImageManager::WantedLodBiasStep() const {
+	const float userSteps = image_lodbias.GetFloat() * TEMPORAL_LOD_BIAS_STEPS_PER_MIP;
+	const int userStep = static_cast<int>( userSteps < 0.0f ? userSteps - 0.5f : userSteps + 0.5f );
+	return idMath::ClampInt( -3 * TEMPORAL_LOD_BIAS_STEPS_PER_MIP, 2 * TEMPORAL_LOD_BIAS_STEPS_PER_MIP,
+		userStep + requestedLodBiasStep );
+}
+
+/*
+===============
+idImage::SamplerLodBiasStep
+
+The LOD bias reaches mipmapped material textures drawn in the 3D scene. The
+interface and fonts are drawn at the output resolution, and render targets
+(names starting with an underscore) are never minified by the scene scale, so
+they keep an unbiased sampler.
+===============
+*/
+int idImage::SamplerLodBiasStep() const {
+	if ( filter != TF_DEFAULT || usage == TD_FONT || globalImages == NULL ) {
+		return 0;
+	}
+	const int step = globalImages->AppliedLodBiasStep();
+	if ( step == 0 ) {
+		return 0;
+	}
+	const char *name = imgName.c_str();
+	if ( name[0] == '_' || R_IsQ4PresentationImageNamespace( name ) ) {
+		return 0;
+	}
+	return step;
 }
 
 static bool R_AllowImageDownSizeForName( const char *name, bool allowDownSize ) {

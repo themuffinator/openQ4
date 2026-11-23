@@ -495,10 +495,14 @@ void idImage::SetTexParameters() {
 			glTexParameterf(target, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1 );
 		}
 	}
-	//if ( glConfig.textureLODBiasAvailable && ( usage != TD_FONT ) ) {
-	//	// use a blurring LOD bias in combination with high anisotropy to fix our aliasing grate textures...
-	//	glTexParameterf(target, GL_TEXTURE_LOD_BIAS_EXT, r_lodBias.GetFloat() );
-	//}
+	// A temporally upscaled scene selects its mips for the smaller scene
+	// target; a negative bias gives the resolve the detail back (REN-04).
+	// GL 1.4 texture-object state: OpenGL ES has no such parameter.
+	if ( glConfig.textureLODBiasAvailable && glConfig.backendCaps.profile != RENDERER_CONTEXT_PROFILE_ES ) {
+		const bool biased = filter == TF_DEFAULT && hasMipChain && defaultFilter.usesMipmaps;
+		glTexParameterf( target, GL_TEXTURE_LOD_BIAS, biased
+			? static_cast<float>( SamplerLodBiasStep() ) / TEMPORAL_LOD_BIAS_STEPS_PER_MIP : 0.0f );
+	}
 
 	// Border clamp is optional on ES 3.0. When absent, use the authored
 	// texture edge instead of leaving the driver's default repeat mode active.

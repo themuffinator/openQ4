@@ -93,6 +93,10 @@ def main() -> int:
         "R_TemporalPresentation_PreviousPositionCache(",
         "R_TemporalPresentation_RecordOwnership(",
         'idCVar r_temporalAASharpness( "r_temporalAASharpness", "0.5"',
+        # REN-04: a temporally upscaled scene samples sharper texture mips
+        'idCVar r_temporalAALodBias( "r_temporalAALodBias", "1"',
+        "R_TemporalPresentation_UpdateLodBias( output.scalePercent,",
+        "TemporalResolutionCore_UpscaleLodBias(",
         'idCVar r_dynamicResolutionCaptureNative( "r_dynamicResolutionCaptureNative", "0"',
         "R_TemporalPresentation_FindSampleScale(",
         "eligibleForFeedback",

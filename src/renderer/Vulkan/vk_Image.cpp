@@ -70,6 +70,7 @@ bool idImage::ReadPixelsRGBA8( idList<byte> &pixels ) {
 }
 
 extern idCVar image_anisotropy;
+extern idCVar r_vkAnisotropicLodBias;
 
 /*
 ====================
@@ -276,15 +277,44 @@ typedef struct vkSamplerKey_s {
 	int				anisotropy;
 	int				defaultFilterMode;
 	bool			explicitMipChain;
+	int				lodBiasStep;	// quarter mips: image_lodbias plus the temporal-upscaling bias
+	int				driverBiasMillis;	// thousandths of a mip: the anisotropic driver correction
 } vkSamplerKey_t;
 
-static const int VK_MAX_SAMPLERS = 64;
+/*
+====================
+VK_Image_AnisotropicDriverBiasMillis
+
+NVIDIA's Vulkan driver filters an anisotropic sampler from blurrier mips than
+its OpenGL driver does on the same GPU, and than its own trilinear filter
+does for a footprint with no anisotropy at all: with identical sampler state
+the frame loses detail as soon as maxAnisotropy passes 1, where OpenGL and
+Intel's Vulkan driver gain it (REN-04; docs/dev/temporal-presentation.md).
+The top mip and trilinear filtering match OpenGL exactly, so the difference is
+the driver's level selection under anisotropy. A negative mip bias on those
+samplers restores the OpenGL result; r_vkAnisotropicLodBias scales it, 0 off.
+====================
+*/
+static int VK_Image_AnisotropicDriverBiasMillis( int anisotropy ) {
+	if ( anisotropy <= 1 || vkCtx.driverID != (int)VK_DRIVER_ID_NVIDIA_PROPRIETARY ) {
+		return 0;
+	}
+	// Thousandths of a mip at 2x, 4x, 8x and 16x: the bias at which a view
+	// straight down onto textured ground holds the detail OpenGL's holds
+	// (GeForce RTX 4060 Laptop GPU, 23 November 2026).
+	static const int measured[] = { -150, -210, -250, -250 };
+	const int level = anisotropy >= 16 ? 3 : anisotropy >= 8 ? 2 : anisotropy >= 4 ? 1 : 0;
+	return static_cast<int>( measured[ level ] * idMath::ClampFloat( 0.0f, 2.0f, r_vkAnisotropicLodBias.GetFloat() ) );
+}
+
+// Each upscaling LOD-bias step adds a sampler per default-filter address mode.
+static const int VK_MAX_SAMPLERS = 160;
 static vkSamplerKey_t vkSamplerKeys[ VK_MAX_SAMPLERS ];
 static VkSampler vkSamplers[ VK_MAX_SAMPLERS ];
 static int vkNumSamplers = 0;
 
 static VkSampler VK_Image_GetSampler( textureFilter_t filter, textureRepeat_t repeat, bool mips,
-		bool explicitMipChain = false ) {
+		bool explicitMipChain = false, int lodBiasStep = 0 ) {
 	const imageFilterState_t defaultFilter = R_GetDefaultImageFilterState();
 	const int defaultFilterMode = filter == TF_DEFAULT ? static_cast<int>( defaultFilter.mode ) : -1;
 	// Explicit linear/nearest filters select the base level even if the image
@@ -295,6 +325,9 @@ static VkSampler VK_Image_GetSampler( textureFilter_t filter, textureRepeat_t re
 	explicitMipChain = explicitMipChain && mips && filter == TF_LINEAR;
 	if ( !explicitMipChain && ( filter != TF_DEFAULT || !defaultFilter.usesMipmaps ) ) {
 		mips = false;
+	}
+	if ( filter != TF_DEFAULT || !mips ) {
+		lodBiasStep = 0;
 	}
 	int anisotropy = 0;
 	if ( filter == TF_DEFAULT && mips && defaultFilter.minLinear ) {
@@ -307,11 +340,15 @@ static VkSampler VK_Image_GetSampler( textureFilter_t filter, textureRepeat_t re
 		}
 	}
 
+	const int driverBiasMillis = VK_Image_AnisotropicDriverBiasMillis( anisotropy );
+
 	for ( int i = 0; i < vkNumSamplers; i++ ) {
 		if ( vkSamplerKeys[ i ].filter == filter && vkSamplerKeys[ i ].repeat == repeat
 				&& vkSamplerKeys[ i ].mips == mips && vkSamplerKeys[ i ].anisotropy == anisotropy
 				&& vkSamplerKeys[ i ].defaultFilterMode == defaultFilterMode
-				&& vkSamplerKeys[ i ].explicitMipChain == explicitMipChain ) {
+				&& vkSamplerKeys[ i ].explicitMipChain == explicitMipChain
+				&& vkSamplerKeys[ i ].lodBiasStep == lodBiasStep
+				&& vkSamplerKeys[ i ].driverBiasMillis == driverBiasMillis ) {
 			return vkSamplers[ i ];
 		}
 	}
@@ -342,6 +379,12 @@ static VkSampler VK_Image_GetSampler( textureFilter_t filter, textureRepeat_t re
 			break;
 	}
 	sci.maxLod = mips ? VK_LOD_CLAMP_NONE : 0.25f;
+	if ( lodBiasStep != 0 || driverBiasMillis != 0 ) {
+		const float maxBias = vkCtx.deviceProperties.limits.maxSamplerLodBias;
+		sci.mipLodBias = idMath::ClampFloat( -maxBias, maxBias,
+			static_cast<float>( lodBiasStep ) / TEMPORAL_LOD_BIAS_STEPS_PER_MIP
+			+ static_cast<float>( driverBiasMillis ) * 0.001f );
+	}
 
 	VkSamplerAddressMode addressMode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 	switch ( repeat ) {
@@ -386,6 +429,8 @@ static VkSampler VK_Image_GetSampler( textureFilter_t filter, textureRepeat_t re
 	vkSamplerKeys[ vkNumSamplers ].anisotropy = anisotropy;
 	vkSamplerKeys[ vkNumSamplers ].defaultFilterMode = defaultFilterMode;
 	vkSamplerKeys[ vkNumSamplers ].explicitMipChain = explicitMipChain;
+	vkSamplerKeys[ vkNumSamplers ].lodBiasStep = lodBiasStep;
+	vkSamplerKeys[ vkNumSamplers ].driverBiasMillis = driverBiasMillis;
 	vkSamplers[ vkNumSamplers ] = sampler;
 	vkNumSamplers++;
 	return sampler;
@@ -1221,7 +1266,7 @@ void idImage::AllocImage( void ) {
 	entry.depth = isVolume ? layeredDepth : 1;
 	entry.everUploaded = false;
 	entry.generation = vkImageGenerationCounter++;
-	entry.sampler = VK_Image_GetSampler( filter, repeat, entry.numMips > 1 );
+	entry.sampler = VK_Image_GetSampler( filter, repeat, entry.numMips > 1, false, SamplerLodBiasStep() );
 	if ( entry.sampler == VK_NULL_HANDLE ) R_ImagePolicyObserveError( "Vulkan image sampler creation failed" );
 	if ( droppedLevels > 0 ) {
 		VK_Image_NoteBudgetReduction( info, opts.width, opts.height, numMips, numLayers, droppedLevels );
@@ -1630,7 +1675,8 @@ void idImage::SetTexParameters( void ) {
 	if ( entry == NULL ) {
 		return;
 	}
-	entry->sampler = VK_Image_GetSampler( filter, repeat, entry->numMips > 1, entry->explicitMipChain );
+	entry->sampler = VK_Image_GetSampler( filter, repeat, entry->numMips > 1, entry->explicitMipChain,
+		SamplerLodBiasStep() );
 	entry->generation = vkImageGenerationCounter++;
 }
 

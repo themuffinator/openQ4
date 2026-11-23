@@ -18,6 +18,12 @@ supersampled image. The gate measures, between consecutive frames,
 and, across the jitter cycle, how far the history sits from the mean of the
 cycle (the residual ripple of the accumulation). A JSON report and a Markdown
 summary go to --output-dir.
+
+Upscaled cases also check the texture LOD bias (REN-04): the status line must
+report the step log2( scale ) asks for, the control cases with
+r_temporalAALodBias 0 must report none, and the biased history must hold more
+detail (gradient energy of the cycle mean) than its control without giving up
+the stability limits above.
 """
 
 from __future__ import annotations
@@ -66,6 +72,9 @@ class Case:
     max_shift: float = 0.06			# pixels, any consecutive pair
     max_changed: float = 0.005		# share of pixels moving more than 4/255 between frames
     max_ripple: float = 0.15		# mean absolute distance from the cycle mean, 8-bit levels
+    lod_bias: float = 0.0			# the applied texture LOD bias the status line must report
+    control: str = ""				# the same case without the LOD bias
+    min_detail_gain: float = 0.0	# detail relative to the control, at least
 
 
 # Native resolution integrates raw jittered samples, so each frame still moves
@@ -73,14 +82,23 @@ class Case:
 # sampled recentered and has no such term.
 CASES: list[Case] = [
     Case("native", "temporal AA at native resolution", {"r_temporalAA": "1"}),
+    Case("taau-75-nobias", "temporal upscaling from 75% with the texture LOD bias off",
+         {"r_temporalAA": "2", "r_screenFraction": "75", "r_resolutionScaleMode": "1",
+          "r_temporalAALodBias": "0"}, max_shift=0.02),
     Case("taau-75", "automatic temporal upscaling from 75%",
-         {"r_temporalAA": "2", "r_screenFraction": "75", "r_resolutionScaleMode": "1"}, max_shift=0.02),
+         {"r_temporalAA": "2", "r_screenFraction": "75", "r_resolutionScaleMode": "1"}, max_shift=0.02,
+         lod_bias=-0.5, control="taau-75-nobias", min_detail_gain=1.04),
+    Case("taau-50-nobias", "temporal upscaling from 50% with the texture LOD bias off",
+         {"r_temporalAA": "2", "r_screenFraction": "50", "r_resolutionScaleMode": "1",
+          "r_temporalAALodBias": "0"}, max_shift=0.02),
     Case("taau-50", "automatic temporal upscaling from 50%",
-         {"r_temporalAA": "2", "r_screenFraction": "50", "r_resolutionScaleMode": "1"}, max_shift=0.02),
+         {"r_temporalAA": "2", "r_screenFraction": "50", "r_resolutionScaleMode": "1"}, max_shift=0.02,
+         lod_bias=-1.0, control="taau-50-nobias", min_detail_gain=1.08),
     Case("native-msaa4", "temporal AA over a 4x MSAA scene", {"r_temporalAA": "1"},
          launch={"r_multiSamples": "4"}),
     Case("taau-67-sharpen", "temporal upscaling from 67% under the sharpened scale mode",
-         {"r_temporalAA": "2", "r_screenFraction": "67", "r_resolutionScaleMode": "2"}, max_shift=0.02),
+         {"r_temporalAA": "2", "r_screenFraction": "67", "r_resolutionScaleMode": "2"}, max_shift=0.02,
+         lod_bias=-0.5),
     # g_stopTime is single-player only and the spawn point is random: pickups
     # turn, lights pulse and the view differs from run to run. Its median cell
     # measured 0.05-0.13 px; the unfixed single-player resolve measured 1.0 px
@@ -166,6 +184,15 @@ def analyse(shots: Path) -> dict:
         mean_step.append(float(np.mean(delta)))
     cycle = np.stack(frames[-8:])
     ripple = float(np.mean(np.abs(cycle - cycle.mean(axis=0))))
+    # Detail the history holds: gradient energy of the cycle mean, whole frame
+    # and per cell of the 4x3 grid (the sky cells hold almost none).
+    settled = cycle.mean(axis=0)
+    energy = np.zeros_like(settled)
+    energy[1:-1, 1:-1] = (0.25 * np.square(settled[1:-1, 2:] - settled[1:-1, :-2])
+                          + 0.25 * np.square(settled[2:, 1:-1] - settled[:-2, 1:-1]))
+    cell_detail = [float(np.mean(energy[row * height // 3:(row + 1) * height // 3,
+                                        column * width // 4:(column + 1) * width // 4]))
+                   for row in range(3) for column in range(4)]
     magnitudes = [float(np.hypot(dx, dy)) for dx, dy in shifts]
     return {
         "image": prefix, "frames": len(frames), "size": [int(frames[0].shape[1]), int(frames[0].shape[0])],
@@ -174,6 +201,7 @@ def analyse(shots: Path) -> dict:
         "shifts": [[round(dx, 4), round(dy, 4)] for dx, dy in shifts],
         "maxChangedShare": max(changed_share), "meanStep": float(np.mean(mean_step)),
         "ripple": ripple,
+        "detail": float(np.mean(energy)), "cellDetail": cell_detail,
     }
 
 
@@ -250,10 +278,12 @@ def launch_case(runtime: Path, output: Path, backend: str, case: Case, width: in
     log_path = game_dir / "logs" / "stability.log"
     log_text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
     resolve = re.findall(r"Temporal resolve: (.*)", log_text)
+    lod_bias = re.findall(r"Temporal texture LOD bias: .*\bapplied=(-?[0-9.]+)", log_text)
     result = {
         "backend": backend, "case": case.name, "description": case.description,
         "exitCode": exit_code, "seconds": round(time.time() - started, 1), "log": str(log_path),
         "resolve": resolve[-1].strip() if resolve else "",
+        "lodBias": float(lod_bias[-1]) if lod_bias else None,
         "failures": [line for line in log_text.splitlines()
                      if any(pattern.search(line) for pattern in FAILURE_PATTERNS)],
     }
@@ -261,8 +291,25 @@ def launch_case(runtime: Path, output: Path, backend: str, case: Case, width: in
     return result
 
 
-def evaluate(case: Case, result: dict) -> list[str]:
+def evaluate(case: Case, result: dict, control: dict | None = None) -> list[str]:
     problems: list[str] = []
+    if result.get("lodBias") is None:
+        problems.append("no texture LOD bias status line")
+    elif abs(result["lodBias"] - case.lod_bias) > 0.01:
+        problems.append(f"texture LOD bias {result['lodBias']:.2f} applied (expected {case.lod_bias:.2f})")
+    if case.control and "detail" in result:
+        if control is None or "detail" not in control:
+            problems.append(f"control case {case.control} did not run")
+        else:
+            # The walker in view is frozen at whatever phase game time stopped
+            # on, which differs between launches: the median screen cell
+            # ignores the cells it and its shadow cross.
+            ratios = [cell / reference for cell, reference in zip(result["cellDetail"], control["cellDetail"])
+                      if reference > 1.0]
+            gain = float(np.median(ratios)) if ratios else 0.0
+            result["detailGain"] = gain
+            if gain < case.min_detail_gain:
+                problems.append(f"detail is {gain:.3f} of the unbiased control (at least {case.min_detail_gain})")
     if result["exitCode"] != 0:
         problems.append(f"exit code {result['exitCode']}")
     problems += [f"log: {line.strip()}" for line in result["failures"][:5]]
@@ -319,7 +366,9 @@ def main() -> int:
                 continue
             result = launch_case(runtime, output, backend, case, args.width, args.height,
                                  not args.visible, args.timeout)
-            result["problems"] = evaluate(case, result)
+            control = next((earlier for earlier in report["cases"]
+                            if earlier["backend"] == backend and earlier["case"] == case.control), None)
+            result["problems"] = evaluate(case, result, control)
             result["pass"] = not result["problems"]
             failed |= not result["pass"]
             report["cases"].append(result)
@@ -328,16 +377,18 @@ def main() -> int:
                   f"cell={result.get('maxCellShift', float('nan')):.4f}px "
                   f"changed={100.0 * result.get('maxChangedShare', float('nan')):.2f}% "
                   f"ripple={result.get('ripple', float('nan')):.3f} "
+                  f"detail={result.get('detail', float('nan')):.2f} lodBias={result.get('lodBias')} "
                   + ("; ".join(result["problems"]) if result["problems"] else ""), flush=True)
     (output / "report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     lines = ["# Temporal AA stability", "", f"Map `{MAP}`, pose `{POSE}`, runtime `{runtime}`.", "",
-             "| Backend | Case | Result | Max shift (px) | RMS shift (px) | Changed | Ripple | Notes |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- |"]
+             "| Backend | Case | Result | Max shift (px) | RMS shift (px) | Changed | Ripple | Detail | LOD bias | Notes |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for result in report["cases"]:
         lines.append(f"| {result['backend']} | {result['case']} | {'pass' if result['pass'] else 'FAIL'} | "
                      f"{result.get('maxShift', float('nan')):.4f} | {result.get('rmsShift', float('nan')):.4f} | "
                      f"{100.0 * result.get('maxChangedShare', float('nan')):.2f}% | "
-                     f"{result.get('ripple', float('nan')):.3f} | {'; '.join(result['problems'])} |")
+                     f"{result.get('ripple', float('nan')):.3f} | {result.get('detail', float('nan')):.2f} | "
+                     f"{result.get('lodBias')} | {'; '.join(result['problems'])} |")
     (output / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"report: {output / 'report.md'}")
     return 1 if failed else 0
