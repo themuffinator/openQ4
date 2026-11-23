@@ -389,6 +389,52 @@ lighting parity there; under MD5R its stencil shadow has no vertex buffer),
 and the native PBR owner still admits the PBR part; the control requires both.
 Vulkan keeps native ownership.
 
+### lavapipe material-layout difference, 23 November 2026 (REN-05)
+
+On 5 October one pixel of 1,024,000 differed by one byte between the
+laboratory's scalar material and its packed and separate texture forms on
+Mesa's software Vulkan driver, where the ambient check demands equality. Rerun
+at `d30280aa2` on Mesa 25.2.8 (LLVM 20.1.2, WSL2 Ubuntu 24.04 under Xvfb,
+device `llvmpipe (LLVM 20.1.2, 256 bits)`, driverID 13):
+`renderer_vulkan_pbr_ambient.py --backend vk --production --samples 0`
+followed by `renderer_pbr_ambient_parity.py`, three times, and the OpenGL
+owner on llvmpipe once.
+
+| Run | Controls | Scalar against packed, separate, restored |
+| --- | --- | --- |
+| lavapipe, three runs | 41/41 each | 0 bytes each; all 41 captures identical across runs |
+| llvmpipe OpenGL | 40/40 | 0 bytes |
+| OpenGL against lavapipe | parity passes | largest interior error 2 bytes |
+
+The difference does not occur at this revision, and its cause is lavapipe's
+texel decode: it turns an 8-bit texel k into `float(k) * float(1/255)`, one
+float step above the correctly rounded k/255 for the laboratory's metallic
+byte 102 and AO byte 192 (128 is unaffected). The scalar material and its
+texture forms are therefore different float inputs on that driver, and a pixel
+on a rounding boundary can land one byte apart. A diagnostic fixture confirms
+it: with the scalars set to the reciprocal products the float captures of all
+744,843 lit pixels are bit-identical to the packed form; with exactly rounded
+quotients the production ambient frame differs on one pixel by one byte
+(689,434: blue 37 against 36), the October signature. llvmpipe OpenGL is exact
+in every variant.
+
+`renderer_pbr_ambient_parity.py` now allows, on lavapipe only, at most 4
+one-byte pixels between the scalar form and the packed or separate form
+(`LAVAPIPE_LAYOUT_*`). The driver is read from the run's own engine logs, not
+from an option; every other pair on lavapipe, every other device and OpenGL
+stay exact. Synthetic copies of the real runs confirm the gate: one and four
+pixels pass; five pixels, a two-byte pixel, a pixel in the restored pair, and
+one pixel under any other driver line fail.
+
+Not closed by this run: the ten current SSAO controls on Mesa. October
+recorded 8/8 on each backend; since the filtered-occlusion change of
+21 November `ssao-on` fails on llvmpipe OpenGL and on lavapipe (7 classic
+pixels changed, the debug view differs on 21 pixels, and on OpenGL one
+directly lit PBR pixel), and OpenGL/Vulkan parity fails on
+`ssao-classic-half` (station mean 1.53 against 1.0). The captures repeat
+exactly between runs. It is the same class as the bounded Intel residual and
+has not been investigated or bounded.
+
 ## PBR Showcase Map
 
 The laboratory proves exact responses on calibrated, flat test data. The
@@ -437,6 +483,94 @@ as PBR, and the engine log must stay free of diagnostics. `--synthetic` on the
 generator replaces the downloads with procedural stand-ins, so the pipeline can
 be checked without an account; on 17 November 2026 both renderers passed all
 26 captures that way.
+
+### Authoring, cutout, decal and probe proofs, 23 November 2026 (REN-05, REN-06)
+
+The runner now qualifies what a mod authors beyond a material on a sphere.
+After the station cameras it runs, on each backend:
+
+- **Authoring bay.** One specimen at a time is spawned at a fixed place. A
+  skin swapping the PBR base (`polished_brass`) for another PBR material must
+  change the specimen and stay PBR-owned; a skin swapping it for a classic
+  material built from the same textures (no `pbr` block) must be drawn
+  classically; one skinned model carrying the PBR material above its equator
+  and the classic one below must keep each half's owner. A second launch
+  converts that model to packed MD5R (`r_convertMD5toMD5R 1`), which must draw
+  it like CPU skinning.
+- **Cutout.** A close view of the alpha-tested fence, in the albedo view with
+  and without the fence, measures how much of the view it covers: it must
+  show both fence and holes and no less fence than its alpha map has (the
+  view minifies the texture, and alpha-tested coverage grows with each mip).
+  Four floor captures (fence present or removed, projector on or off) measure
+  how much of the projector's light passes the fence: neither none (an opaque
+  caster) nor all of it (no shadow).
+- **Decals.** Two authored decal quads (`blend filter` on a wall, `blend
+  blend` on the floor, `polygonOffset`, `sort decal`) must mark the PBR
+  receiver under them and only a decal-sized part of the view. They are
+  classic unlit blend stages on both renderers: neither needs clustered
+  decals.
+- **Room probe** (third launch, `r_rendererReflectionProbes 1`). A
+  box-projected probe the size of the room is captured in the engine
+  (`bakeReflectionProbes 128`). It must change the stations against the
+  probes-off launch; `reloadImages all` must restore the frame; a second
+  capture taken with the two key lights off must change the reflections (a
+  new source generation reaching the atlas), and a third with them on must
+  restore the first frame. `gfxInfo`'s probe resource line is kept for each.
+- **Stock scene** (fourth launch). The specimen and a sphere probe are
+  spawned in `game/airdefense1` at the opening pose and the probe is captured
+  from the stock scene. It must light the specimen, and, since a probe light
+  is metadata and never a classic light, turning probes on must leave every
+  stock pixel away from the specimen alone.
+
+`--reference <report.json>` compares one backend with the other: fence
+coverage within 0.02, transmission within 0.1, and the median pixel difference
+of every captured cube face within 6 levels (a flipped or swapped face moves
+most pixels; the stock scene's live battle effects move a minority).
+
+Results on the synthetic stand-ins (`--synthetic --resolution 512`, RTX 4060
+Laptop GPU, NVIDIA 591.74, debugoptimized build of `d30280aa2`, shared
+machine):
+
+| | Vulkan | OpenGL |
+| --- | --- | --- |
+| Checks passed | 67/67 | 67/67, and the comparison with the Vulkan report |
+| Skin to PBR / to classic: specimen change, owned share | 2.0 / 6.3 levels; 100% / 0% | 2.2 / 6.3 levels; 100% / 0% |
+| Mixed model, PBR share of upper / lower half | 100% / 0% | 100% / 0% |
+| Packed MD5R against CPU skinning | 0.0 levels | 0.002 levels |
+| Fence coverage of the close view (alpha map 66.8%) | 68.1% | 67.8% |
+| Projector light passing the fence | 76.9% of 33.1 levels | 76.9% of 33.4 levels |
+| Decals: share of view, strength (wall filter / floor blend) | 3.3% at 35 / 4.4% at 130 levels | 3.3% at 35 / 4.4% at 129 levels |
+| Probe on against off, stations | 23-52 levels | 23-52 levels |
+| After reload / dark capture / third capture | 0.0 / 5.7 / 0.0 levels | 0.0 / 5.7 / 0.0 levels |
+| Background prefilters published after the first / dark / third capture | 2, 4, 5 | 2, 4, 5 |
+| Stock scene: specimen change, stock pixels changed | 13.0 levels; 0 | 11.6 levels; 0 |
+| Captured faces against the other backend, room / stock (median) | reference | at most 1 / at most 5 levels |
+
+Two findings came from the new checks:
+
+- **The fence never cast a shadow.** Its material was `twoSided`, and the
+  engine keeps the stock rule that `twoSided` implies `noShadows`; the
+  17 November captures could not show it, because nothing measured the
+  shadow. The fence is a thin brush with a face on each side, so the
+  generator no longer marks it `twoSided`: the projector's light now passes
+  it at 77%, with the cutout pattern, on both renderers. The
+  [PBR guide](../user/pbr-materials.md) states the rule.
+- **OpenGL compiles the PBR mapped-shadow receiver slowly.** The first frame
+  that draws a PBR surface under a mapped projected light compiles the PBR
+  variant of `glprogs/shadow_interaction.fs`; cold, on this NVIDIA driver, the
+  launch takes about two minutes instead of 25-45 s and the client's private
+  memory peaks at 9.3 GB instead of 3.2 GB (stack:
+  `RB_ShadowMapLoadPBRVariant`). Keeping the classic body out of the PBR
+  variant did not change it (119 s and 9.3 GB against 128 s and 9.3 GB), so
+  the cost is the shadow filter itself and belongs to the shadow items; the
+  shaders are unchanged here. The runner waits for free commit before each
+  launch and stops a client above `--max-private-gb`.
+
+Not covered: the textures.com materials themselves. The drop folder is empty
+(`--check`: 82 maps still to download), so every number above is from
+procedural stand-ins; the first import of real downloads also has to confirm
+the normal-map convention detection. Other GPUs and platforms are not covered
+either.
 ## Automated Safe Matrix
 
 The modern-visible and low-overhead GL self-tests explicitly request a hidden
@@ -663,6 +797,101 @@ without depth. Capture frames now use the current frame's depth proof
 (`VK_TemporalPresentation_DepthCurrentForCapture`); gameplay frames were not
 affected. Not covered: other poses and maps, other GPUs and platforms, and
 review of the leaves' appearance.
+
+#### More stock scenes, 23 November 2026 (REN-06)
+
+The harness now takes `--scenes` from a table of stock poses (`all` runs
+them), `--hidden-window` and `--size`, and waits for free commit before each
+launch. It checks that the baseline shows a scene at all, records the frozen
+view position, and requires: identical baselines; a master-off capture
+byte-identical to the baseline; a visible change from all three leaves
+together in every scene; and a visible change from SSR and from SSGI in at
+least one scene on each backend. A pose with nothing bright to reflect leaves
+SSR nothing to add, which is recorded rather than failed.
+
+The third leaf, `r_rendererFroxelVolumetrics`, has been REN-09's shadowed
+volumetric lighting since 21 November: it scatters light from shadow-mapped
+lights only, so whether it changes a pose is REN-09's evidence. It stays in
+the matrix because the combination and the rollback must hold with it
+enabled; its own effect is recorded and required only with
+`--require-volumetric`.
+
+Seven scenes, 1280 x 720 hidden window, one launch per scene and backend
+(`--scenes all --hidden-window --size 1280x720`, RTX 4060 Laptop GPU, shared
+machine). Changed channel bytes against the baseline, of 2.76 million:
+
+| Scene | Backend | Volumetric | SSR | SSGI | All | Master off | Baselines |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `game/airdefense1` opening | Vulkan | 2.47 M | 0.026 M | 0.78 M | 2.57 M | identical | identical |
+| | OpenGL | 2.46 M | 0.027 M | 0.79 M | 2.57 M | identical | identical |
+| `game/airdefense1` wreckage | Vulkan | 1.01 M | 291 bytes | 0.04 M | 1.02 M | identical | identical |
+| | OpenGL | 1.02 M | 292 bytes | 0.04 M | 1.02 M | identical | identical |
+| `game/airdefense1` tank | Vulkan | 2.72 M | 0.081 M | 1.52 M | 2.76 M | identical | identical |
+| | OpenGL | 2.74 M | 0.079 M | 1.53 M | 2.76 M | identical | identical |
+| `game/medlabs` start | Vulkan | 0.39 M | 0.041 M | 0.67 M | 0.77 M | identical | identical |
+| | OpenGL | 0.45 M | 0.040 M | 0.77 M | 0.83 M | identical | identical |
+| `game/tram1` start | Vulkan | 2.76 M | 0.043 M | 1.89 M | 2.76 M | identical | identical |
+| | OpenGL | 2.76 M | 0.043 M | 1.89 M | 2.76 M | identical | identical |
+| `game/hangar1` start | Vulkan | 1.20 M | 0.049 M | 1.66 M | 1.81 M | identical | identical |
+| | OpenGL | 1.19 M | 0.051 M | 1.69 M | 1.79 M | identical | identical |
+| `game/building_b` start | Vulkan | 0.88 M | 0.064 M | 1.16 M | 1.28 M | identical | identical |
+| | OpenGL | 0.88 M | 0.065 M | 1.16 M | 1.30 M | identical | identical |
+
+All fourteen launches pass. Master-off rollback is byte-exact in every scene
+on both backends, and every scene is frozen (no pixel differs between its two
+baselines, on Vulkan too at this size). SSR visibly changes six of the seven
+scenes; at the wreckage pose it has almost nothing to reflect. The two
+backends agree on each leaf's reach within a few percent.
+
+Stated limits, unchanged: these are bounded scene-colour and depth effects.
+SSR reflects only what is on screen and is not roughness-aware; SSGI gathers
+only on-screen light; neither is world-space, and both stay default off.
+
+Two start poses were tried and dropped, and the harness now rejects their
+kind: `game/storage1` opens on a scripted camera that game time does not
+freeze (47% of pixels moved between baselines, so master-off could not be
+compared), and `game/mcc_landing` opens on a black screen. On the black
+screen the volumetric leaf still changed every pixel (5 levels mean), and at
+the tram1 start it changes the frame by 151 levels mean on Vulkan: both are
+passed to REN-09 as observations, not judged here.
+
+Delayed whole-frame GPU times ranged from 0.7 to 13 ms per configuration
+with other sessions' clients on the same GPU, and every configuration stayed
+inside the harness's bound (twice the baseline plus 6 ms). They are
+shared-machine numbers, not budget evidence: the quiet-machine cost of the
+leaves is still the 6 November measurement above.
+
+#### Light-grid re-bake evidence, 23 November 2026 (REN-06)
+
+The bundled grids are cropped June bakes and the owner chose on 5 October to
+keep them. To inform that decision, one map was baked in scratch and compared
+with its bundled grid; nothing in `pak1` changed, and the bake was not kept.
+
+- **Bake.** `bakeLightGrids game/airdefense2 force bounce3 size128 samples128
+  blends1 limit16384 grid 64 64 128 -quit` (the bundled grid's own options;
+  same settings hash `0x4df1ec63`; 14,041 valid probes of 16,595, as
+  bundled), OpenGL, hidden 1280 x 720 window, debugoptimized build: 6.7
+  minutes, peak private memory 3.3 GB, on the shared machine.
+- **Comparison.** 24 fixed views (four headings at the valid probe nearest
+  the centre of each of the six areas with the most probes), frozen, with
+  `r_useLightGrid` 0 and 1, on the bundled runtime and on a copy carrying the
+  bake as loose files.
+
+| 24 views of `game/airdefense2` | Bundled grid | Scratch re-bake |
+| --- | --- | --- |
+| Light the grid adds to the frame, mean | 0.00 levels (at most 0.005 a view) | 0.58 levels (up to 1.7 a view) |
+| Pixels the grid changes, in the four views checked | 4 to 11,254, by at most 15 levels | 313,000 to 586,000 of 921,600, by up to 55 levels |
+| Grid-on frames, bundled against re-bake | | 0.61 levels mean; 2.4% of pixels differ by more than 8 levels |
+| Grid-off frames, bundled against re-bake | | at most 0.12 levels (the control) |
+
+At these views the bundled airdefense2 grid adds almost nothing: Irradiance
+Volumes on and off look the same. In four of the six areas the re-bake puts
+bounced light on a third to two thirds of the frame; at the probes chosen in
+the other two, neither grid adds anything (not examined further). This matches
+the provenance finding that most of this map's bundled probes are black. One
+map and one bake are not a survey: the multiplayer grids were cropped less
+severely, and their difference was not measured here. Re-baking and replacing
+`pak1` data remains the owner's decision.
 
 The same foundation case requires `rendererContractsSelfTest` and
 `rendererGpuSkinningSelfTest` to pass without a skip. The Vulkan startup case
