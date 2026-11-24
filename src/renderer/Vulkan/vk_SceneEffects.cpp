@@ -720,7 +720,7 @@ static bool VK_LightGrid_Draw( const vkLightGridPassState_t &pass, const drawSur
 	VK_Scene_BindUniform( pass.cmd, uniformOffset );
 	vkCmdPushConstants( pass.cmd, layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			0, sizeof( push ), &push );
-	vkCmdDrawIndexed( pass.cmd, (uint32_t)surf->geo->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( pass.cmd, VK_Device_DrawIndexCount( surf->geo->numIndexes ), 1, 0, 0, 0 );
 	return true;
 }
 
@@ -1188,7 +1188,7 @@ static void VK_Scene_DrawOutlinePush( const vkSceneOverlayPass_t &pass, const dr
 	push.outlineParams[ 3 ] = 0.0f;
 	vkCmdPushConstants( pass.cmd, VK_Exec_InteractionPipelineLayout(),
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
-	vkCmdDrawIndexed( pass.cmd, (uint32_t)surf->geo->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( pass.cmd, VK_Device_DrawIndexCount( surf->geo->numIndexes ), 1, 0, 0, 0 );
 }
 
 // Clears the stencil over the view scissor, leaving the outline bit clear.
@@ -1469,7 +1469,7 @@ static bool VK_SceneEffects_DrawPlayerVisibility( const viewDef_t *viewDef, draw
 				VK_Scene_SetCull( pass.cmd, viewDef, surf->material->GetCullType() );
 				vkCmdPushConstants( pass.cmd, layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 						0, sizeof( float ) * 16, mvp );
-				vkCmdDrawIndexed( pass.cmd, (uint32_t)surf->geo->numIndexes, 1, 0, 0, 0 );
+				vkCmdDrawIndexed( pass.cmd, VK_Device_DrawIndexCount( surf->geo->numIndexes ), 1, 0, 0, 0 );
 				submitted = true;
 			}
 		}
@@ -1568,13 +1568,17 @@ static bool VK_SceneEffects_DrawCelOutlines( const viewDef_t *viewDef, drawSurf_
 VK_SceneEffects_DrawPreFog
 
 RB_STD_DrawView's steps between the pre-fog material passes and the fog, in
-its order: light grid, player visibility effects, cel outline shells, over
+its order: light grid, the r_forceAmbient floor, player visibility effects,
+cel outline shells, over
 drawSurfs[0..processed), the surfaces sorted before SS_POST_PROCESS. Returns
 true when anything drew; the caller then restores its viewport and space
 tracking and treats _currentRender as stale.
 ====================
 */
 const char *VK_SceneEffects_HDRRejection( const viewDef_t *viewDef ) {
+	// The floor is a display-referred blend against the finished frame, like
+	// the overlays below: a view that draws it keeps the display-referred scene.
+	if ( r_forceAmbient.GetFloat() > 0.0f ) { return "ambient-floor"; }
 	if ( r_useLightGrid.GetBool() && !r_skipDiffuse.GetBool() && viewDef->renderWorld != NULL
 			&& viewDef->renderWorld->AnyLightGridAvailable()
 			&& !VK_PBR_BakedViewReady( viewDef ) ) { return "baked-lighting"; }
@@ -1602,6 +1606,12 @@ bool VK_SceneEffects_DrawPreFog( const viewDef_t *viewDef, int processed ) {
 	drawSurf_t **drawSurfs = (drawSurf_t **)viewDef->drawSurfs;
 	bool drew = false;
 	if ( VK_SceneEffects_DrawLightGrid( viewDef ) ) {
+		drew = true;
+	}
+	// The brightness floor follows the ambient and light-grid passes and comes
+	// before the readability overlays, which it would otherwise wash out by
+	// exactly the amount the player turned it up.
+	if ( VK_Exec_DrawAmbientFloor( viewDef ) ) {
 		drew = true;
 	}
 	if ( VK_SceneEffects_DrawPlayerVisibility( viewDef, drawSurfs, processed ) ) {

@@ -725,6 +725,12 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	if ( !glConfig.isInitialized ) {
 		return;
 	}
+	// The command counts and back-end time the OpenGL loop reports
+	// (tr_backend.cpp): com_speeds, the renderer metrics and
+	// r_debugRenderToTexture read them on either renderer.
+	const int backEndStartMsec = Sys_Milliseconds();
+	int c_draw3d = 0, c_draw2d = 0, c_setBuffers = 0, c_swapBuffers = 0, c_copyRenders = 0,
+		c_specialEffects = 0, c_renderTargetOps = 0;
 	// a VR frame moves onto its targets with RC_VR_TARGET (vk_VRPresentation.cpp)
 	RB_VR_BeginBackEnd();
 
@@ -813,19 +819,15 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			case RC_SET_BUFFER: {
 				const setBufferCommand_t *cmd = (const setBufferCommand_t *)cmds;
 				backEnd.frameCount = cmd->frameCount;
+				c_setBuffers++;
 				VK_PostProcess_ResetLinearCapture();
-				// clear-color policy mirrors the GL RB_SetBuffer; black
-				// otherwise (the swapchain load op always clears)
-				float c[ 3 ];
-				if ( sscanf( r_clear.GetString(), "%f %f %f", &c[ 0 ], &c[ 1 ], &c[ 2 ] ) == 3 ) {
-					vkClearColor[ 0 ] = c[ 0 ];
-					vkClearColor[ 1 ] = c[ 1 ];
-					vkClearColor[ 2 ] = c[ 2 ];
-				} else if ( r_clear.GetInteger() == 1 ) {
-					vkClearColor[ 0 ] = 0.4f;
-					vkClearColor[ 1 ] = 0.0f;
-					vkClearColor[ 2 ] = 0.25f;
-				} else {
+				// The clear color is the one RB_SetBuffer uses on OpenGL
+				// (RB_FrameClearColor, shared), including the colors the
+				// debug tools pick by themselves: white under r_showOverDraw
+				// and purple under r_lockSurfaces and r_singleArea. Where
+				// OpenGL keeps the old frame (r_clear 0), the frame starts
+				// black: the swapchain load op always clears.
+				if ( !RB_FrameClearColor( vkClearColor ) ) {
 					vkClearColor[ 0 ] = vkClearColor[ 1 ] = vkClearColor[ 2 ] = 0.0f;
 				}
 				vkClearColor[ 3 ] = 1.0f;
@@ -846,19 +848,27 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 						? sharedSubview : NULL;
 					if ( cmd->viewDef->viewEntitys == NULL ) {
 						// 2D view (GUI/console/cinematics)
+						c_draw2d++;
 						VK_GuiExecutor_Draw2DView( cmd->viewDef );
 					} else if ( sharedSubview != NULL
 							&& R_ClassicSubviewDomain_IsDirect( *sharedSubview ) ) {
+						c_draw3d++;
 						VK_DrawSharedDirectSubview( *sharedSubview );
 					} else {
-						// world view: depth prepass + ambient walks (Phase E)
-						VK_GuiExecutor_Draw3DView( cmd->viewDef );
+						c_draw3d++;
+						// r_skipRender bypasses every view that has models and
+						// leaves 2D rendering visible, as RB_DrawView does
+						if ( !r_skipRender.GetBool() ) {
+							// world view: depth prepass + ambient walks (Phase E)
+							VK_GuiExecutor_Draw3DView( cmd->viewDef );
+						}
 					}
 				}
 				break;
 			}
 			case RC_SET_RENDERTEXTURE: {
 				const setRenderTargetCommand_t *cmd = (const setRenderTargetCommand_t *)cmds;
+				c_renderTargetOps++;
 				if ( cmd->renderTexture != NULL ) {
 					if ( cmd->renderTexture->MakeCurrent() ) {
 						backEnd.renderTexture = cmd->renderTexture;
@@ -872,17 +882,20 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			}
 			case RC_DRAW_SPECIAL_EFFECTS: {
 				const drawSpecialEffectsCommand_t *cmd = (const drawSpecialEffectsCommand_t *)cmds;
+				c_specialEffects++;
 				VK_GuiExecutor_PrepareSpecialEffects( cmd );
 				break;
 			}
 			case RC_CLEAR_RENDERTARGET: {
 				const renderClearBufferCommand_t *cmd = (const renderClearBufferCommand_t *)cmds;
+				c_renderTargetOps++;
 				VK_Exec_ClearRenderTarget( cmd->clearColor, cmd->clearDepth,
 						cmd->clearDepthValue, cmd->clearColorValue.ToFloatPtr() );
 				break;
 			}
 			case RC_RESOLVE_MSAA: {
 				const resolveRenderTargetCommand_t *cmd = (const resolveRenderTargetCommand_t *)cmds;
+				c_renderTargetOps++;
 				const bool specialEffectsAwaitResolve =
 						VK_GuiExecutor_SpecialEffectsAwaitResolve(
 								cmd->msaaRenderTexture );
@@ -898,6 +911,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			case RC_RESOLVE_TEMPORAL_PRESENTATION: {
 				resolveTemporalPresentationCommand_t executionCommand =
 					*reinterpret_cast<const resolveTemporalPresentationCommand_t *>( cmds );
+				c_renderTargetOps++;
 				// Save previews can enter their capture scope after the front end
 				// queued this command. Never let that late flush read or advance
 				// gameplay history.
@@ -910,6 +924,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 				break;
 			}
 			case RC_PRESENT_SCALED_SCENE:
+				c_renderTargetOps++;
 				(void)VK_GuiExecutor_PresentScaledScene(
 					*reinterpret_cast<const presentScaledSceneCommand_t *>( cmds ) );
 				break;
@@ -926,10 +941,12 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 						((const setPostProcessSMAAQualityCommand_t *)cmds)->quality;
 				break;
 			case RC_VR_TARGET:
+				c_renderTargetOps++;
 				RB_VR_SetTarget( cmds );
 				break;
 			case RC_COPY_RENDER: {
 				const copyRenderCommand_t *cmd = (const copyRenderCommand_t *)cmds;
+				c_copyRenders++;
 				const bool sharedCaptureMatches = pendingSharedSubview != NULL
 					&& pendingSharedSubview->backendOutcome[
 						CLASSIC_SUBVIEW_DOMAIN_BACKEND_VULKAN]
@@ -984,6 +1001,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 			}
 			case RC_SWAP_BUFFERS: {
 				const bool timingEnabled = r_rendererMetrics.GetInteger() > 0;
+				c_swapBuffers++;
 				const int presentBegin = timingEnabled ? Sys_Milliseconds() : 0;
 				const unsigned long long postBegin = timingEnabled ? R_RendererMetrics_CpuClock() : 0;
 				// RB_SwapBuffers runs the back-buffer passes (CRT, then
@@ -1026,6 +1044,15 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	}
 	R_ClassicSpecialFrameDomain_FinalizeBackendFrame(
 		CLASSIC_SPECIAL_FRAME_BACKEND_VULKAN );
+
+	backEnd.pc.msec = Sys_Milliseconds() - backEndStartMsec;
+	R_RendererMetrics_RecordBackendCommands( c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers,
+		c_copyRenders, c_specialEffects, c_renderTargetOps );
+	if ( r_debugRenderToTexture.GetInteger() == 1 ) {
+		common->Printf( "3d: %i, 2d: %i, SetBuf: %i, SwpBuf: %i, CpyRenders: %i, CpyFrameBuf: %i\n",
+			c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, backEnd.c_copyFrameBuffer );
+		backEnd.c_copyFrameBuffer = 0;
+	}
 }
 
 

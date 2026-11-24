@@ -1624,6 +1624,68 @@ bool R_ShadowMapLightSourceOutsideVolume( const renderLight_t &parms ) {
 
 /*
 =================
+R_ShadowMapPrelightVolumeFoldsCaps
+
+dmap leaves the cap ranges out of a volume when a perforated or translucent
+surface casts into it (BuildLightShadows: "can't ever remove front faces"),
+so stencil always draws it with its caps. The caps are still in the index
+list.
+=================
+*/
+bool R_ShadowMapPrelightVolumeFoldsCaps( const srfTriangles_t *shadowTri ) {
+	return shadowTri != NULL && shadowTri->numIndexes > 0
+		&& shadowTri->numShadowIndexesNoFrontCaps >= shadowTri->numIndexes;
+}
+
+/*
+=================
+R_ShadowMapPrelightCapOnCutout
+
+Whether a front cap lies on one of the light's perforated world triangles:
+a cap is a piece of the casting triangle, so its centre lies in that
+triangle's plane and inside it.
+=================
+*/
+static bool R_ShadowMapPrelightCapOnCutout( const idVec3 &a, const idVec3 &b, const idVec3 &c,
+		const idList<shadowMapPrelightCutout_t> *cutouts ) {
+	if ( cutouts == NULL || cutouts->Num() == 0 ) {
+		return false;
+	}
+	const idVec3 centre = ( a + b + c ) * ( 1.0f / 3.0f );
+	for ( int i = 0; i < cutouts->Num(); ++i ) {
+		const shadowMapPrelightCutout_t &cutout = ( *cutouts )[i];
+		if ( !cutout.bounds.ContainsPoint( centre ) ) {
+			continue;
+		}
+		if ( idMath::Fabs( cutout.plane.Distance( centre ) ) > 0.5f ) {
+			continue;
+		}
+		// on the same side of all three edges, with a small margin (the
+		// plane's normal may point either way round the winding)
+		bool inward = true;
+		bool outward = true;
+		for ( int edge = 0; edge < 3; ++edge ) {
+			const idVec3 &from = cutout.v[edge];
+			const idVec3 &to = cutout.v[( edge + 1 ) % 3];
+			const idVec3 across = cutout.plane.Normal().Cross( to - from );
+			const float length = across.Length();
+			if ( length <= idMath::FLOAT_EPSILON ) {
+				inward = outward = false;
+				break;
+			}
+			const float side = ( centre - from ) * across / length;
+			inward = inward && side >= -0.25f;
+			outward = outward && side <= 0.25f;
+		}
+		if ( inward || outward ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+=================
 R_ShadowMapBuildPrelightCaster
 
 The front caps of a prelight shadow volume as ordinary caster geometry. dmap
@@ -1639,19 +1701,51 @@ discards one copy is drawn: the set is already the one the stencil rule
 selects, and it must not be selected again by a rule or a projection
 handedness that could disagree.
 
-NULL when the volume carries no separate front caps. dmap folds them away
-when a perforated surface casts into the volume, and such a light keeps its
-per-surface casters, which hold the cutouts.
+A volume whose caps dmap folded away (a perforated surface casts into it)
+still holds them: its vertexes come in pairs, a point on the casting geometry
+and then its projection, and a front cap is a triangle on three of the first
+kind. Those caps are taken, less the ones that lie on a perforated world
+triangle (cutouts): those surfaces keep casting into the map surface by
+surface, through their holes, where stencil casts them solid.
+
+NULL when the volume gives no caps.
 =================
 */
-srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri ) {
+srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri,
+		const idList<shadowMapPrelightCutout_t> *cutouts ) {
 	if ( shadowTri == NULL || shadowTri->shadowVertexes == NULL || shadowTri->indexes == NULL
 			|| shadowTri->numVerts <= 0 ) {
 		return NULL;
 	}
-	const int first = shadowTri->numShadowIndexesNoFrontCaps;
-	const int count = shadowTri->numIndexes - first;
-	if ( first < 0 || count < 3 || count % 3 != 0 ) {
+	const bool folded = R_ShadowMapPrelightVolumeFoldsCaps( shadowTri );
+	const int first = folded ? 0 : shadowTri->numShadowIndexesNoFrontCaps;
+	const int range = shadowTri->numIndexes - first;
+	if ( first < 0 || range < 3 || range % 3 != 0 || ( folded && ( shadowTri->numVerts & 1 ) != 0 ) ) {
+		return NULL;
+	}
+
+	// the cap triangles, as offsets into the index list
+	idList<int> caps;
+	caps.SetGranularity( 1024 );
+	for ( int i = 0; i < range; i += 3 ) {
+		const glIndex_t *tri = shadowTri->indexes + first + i;
+		if ( folded ) {
+			if ( ( tri[0] & 1 ) != 0 || ( tri[1] & 1 ) != 0 || ( tri[2] & 1 ) != 0 ) {
+				continue;	// a silhouette quad or a rear cap
+			}
+			if ( tri[0] >= shadowTri->numVerts || tri[1] >= shadowTri->numVerts || tri[2] >= shadowTri->numVerts ) {
+				return NULL;
+			}
+			if ( R_ShadowMapPrelightCapOnCutout( shadowTri->shadowVertexes[ tri[0] ].xyz.ToVec3(),
+					shadowTri->shadowVertexes[ tri[1] ].xyz.ToVec3(),
+					shadowTri->shadowVertexes[ tri[2] ].xyz.ToVec3(), cutouts ) ) {
+				continue;
+			}
+		}
+		caps.Append( first + i );
+	}
+	const int count = caps.Num() * 3;
+	if ( count < 3 ) {
 		return NULL;
 	}
 
@@ -1662,7 +1756,7 @@ srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri 
 	int numVerts = 0;
 	bool valid = true;
 	for ( int i = 0; i < count && valid; ++i ) {
-		const int source = shadowTri->indexes[first + i];
+		const int source = shadowTri->indexes[ caps[i / 3] + i % 3 ];
 		// a front cap lies on the casting geometry: the unprojected vertexes
 		if ( source < 0 || source >= shadowTri->numVerts
 				|| shadowTri->shadowVertexes[source].xyz.w != 1.0f ) {
@@ -1689,9 +1783,10 @@ srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri 
 		}
 	}
 	for ( int i = 0; i < count; i += 3 ) {
-		const glIndex_t a = remap[ shadowTri->indexes[first + i + 0] ];
-		const glIndex_t b = remap[ shadowTri->indexes[first + i + 1] ];
-		const glIndex_t c = remap[ shadowTri->indexes[first + i + 2] ];
+		const glIndex_t *source = shadowTri->indexes + caps[i / 3];
+		const glIndex_t a = remap[ source[0] ];
+		const glIndex_t b = remap[ source[1] ];
+		const glIndex_t c = remap[ source[2] ];
 		tri->indexes[i + 0] = a;
 		tri->indexes[i + 1] = b;
 		tri->indexes[i + 2] = c;
@@ -1702,6 +1797,87 @@ srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri 
 	Mem_Free( remap );
 	R_BoundTriSurf( tri );
 	return tri;
+}
+
+/*
+=================
+R_ShadowMapPrelightKeepsCutout
+
+Whether a world surface of a light that casts the static world from its
+prelight caps keeps a caster of its own: a perforated, shadow-casting surface
+that lies inside the light's box, which then casts through its holes. A
+perforated surface that reaches outside the box casts solid from the caps, as
+stencil does, since a surface caster is drawn whole and would shadow from
+where the volume holds nothing (network1's tube lights).
+=================
+*/
+idCVar r_shadowMapPrelightCutouts( "r_shadowMapPrelightCutouts", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
+	"with r_shadowMapPrelightCasters, a perforated world surface (a grate) that lies inside the light's box keeps its own caster and shadows through its holes; 0 casts it solid from the prelight caps, as stencil shadows do" );
+
+bool R_ShadowMapPrelightKeepsCutout( const idRenderLightLocal *light, const idMaterial *shader, const srfTriangles_t *geo ) {
+	if ( !r_shadowMapPrelightCutouts.GetBool() ) {
+		return false;
+	}
+	if ( light == NULL || shader == NULL || geo == NULL || light->frustumTris == NULL
+			|| shader->Coverage() != MC_PERFORATED || !shader->SurfaceCastsShadow() ) {
+		return false;
+	}
+	idBounds lightBounds = light->frustumTris->bounds;
+	lightBounds.ExpandSelf( 1.0f );
+	return lightBounds.ContainsPoint( geo->bounds[0] ) && lightBounds.ContainsPoint( geo->bounds[1] );
+}
+
+/*
+=================
+R_ShadowMapCollectPrelightCutouts
+
+The perforated world triangles whose caps a light's prelight caster leaves
+out: those of every world area surface that keeps a caster of its own
+(R_ShadowMapPrelightKeepsCutout).
+=================
+*/
+static void R_ShadowMapCollectPrelightCutouts( const idRenderLightLocal *light,
+		idList<shadowMapPrelightCutout_t> &cutouts ) {
+	cutouts.Clear();
+	if ( light == NULL || light->world == NULL || light->frustumTris == NULL ) {
+		return;
+	}
+	const idBounds &lightBounds = light->frustumTris->bounds;
+	const int numAreas = light->world->NumAreas();
+	for ( int area = 0; area < numAreas; ++area ) {
+		idRenderModel *model = renderModelManager->CheckModel( va( "_area%i", area ) );
+		if ( model == NULL || !model->IsStaticWorldModel() || !model->Bounds().IntersectsBounds( lightBounds ) ) {
+			continue;
+		}
+		for ( int s = 0; s < model->NumSurfaces(); ++s ) {
+			const modelSurface_t *surface = model->Surface( s );
+			const srfTriangles_t *geo = surface != NULL ? surface->geometry : NULL;
+			const idMaterial *shader = surface != NULL ? surface->shader : NULL;
+			if ( geo == NULL || geo->verts == NULL || geo->indexes == NULL
+					|| !R_ShadowMapPrelightKeepsCutout( light, shader, geo ) ) {
+				continue;
+			}
+			for ( int i = 0; i + 2 < geo->numIndexes; i += 3 ) {
+				shadowMapPrelightCutout_t cutout;
+				for ( int corner = 0; corner < 3; ++corner ) {
+					cutout.v[corner] = geo->verts[ geo->indexes[i + corner] ].xyz;
+				}
+				cutout.bounds.Clear();
+				for ( int corner = 0; corner < 3; ++corner ) {
+					cutout.bounds.AddPoint( cutout.v[corner] );
+				}
+				if ( !cutout.bounds.IntersectsBounds( lightBounds ) ) {
+					continue;
+				}
+				cutout.bounds.ExpandSelf( 1.0f );
+				cutout.plane.FromPoints( cutout.v[0], cutout.v[1], cutout.v[2] );
+				if ( cutout.plane.Normal().LengthSqr() < 0.5f ) {
+					continue;	// degenerate
+				}
+				cutouts.Append( cutout );
+			}
+		}
+	}
 }
 
 /*
@@ -1739,14 +1915,20 @@ srfTriangles_t *R_ShadowMapPrelightCaster( idRenderLightLocal *light ) {
 		return NULL;
 	}
 #endif
+	// keyed on the volume and on whether cutouts keep their own casters
+	const int sourceKey = shadowTri->numIndexes * 2 + ( r_shadowMapPrelightCutouts.GetBool() ? 1 : 0 );
 	if ( light->shadowMapPrelightCasterSource != shadowTri
-			|| light->shadowMapPrelightCasterSourceIndexes != shadowTri->numIndexes ) {
+			|| light->shadowMapPrelightCasterSourceIndexes != sourceKey ) {
 		if ( light->shadowMapPrelightCaster != NULL ) {
 			R_FreeStaticTriSurf( light->shadowMapPrelightCaster );
 		}
-		light->shadowMapPrelightCaster = R_ShadowMapBuildPrelightCaster( shadowTri );
+		idList<shadowMapPrelightCutout_t> cutouts;
+		if ( R_ShadowMapPrelightVolumeFoldsCaps( shadowTri ) ) {
+			R_ShadowMapCollectPrelightCutouts( light, cutouts );
+		}
+		light->shadowMapPrelightCaster = R_ShadowMapBuildPrelightCaster( shadowTri, &cutouts );
 		light->shadowMapPrelightCasterSource = shadowTri;
-		light->shadowMapPrelightCasterSourceIndexes = shadowTri->numIndexes;
+		light->shadowMapPrelightCasterSourceIndexes = sourceKey;
 	}
 	return light->shadowMapPrelightCaster;
 }
@@ -1796,18 +1978,45 @@ bool R_ShadowMapPrelightCasterSelfTest( void ) {
 	if ( caster != NULL ) {
 		R_FreeStaticTriSurf( caster );
 	}
-	// a volume whose caps were folded into the silhouette gives none, and
-	// neither does one whose cap reaches a projected vertex
+	// a volume whose caps dmap folded into one range still gives its front
+	// cap (the triangle on three even vertexes), unless the cap lies on a
+	// cutout; and one whose cap reaches a projected vertex gives none
+	volume.numShadowIndexesNoCaps = 24;
 	volume.numShadowIndexesNoFrontCaps = 24;
-	srfTriangles_t *none = R_ShadowMapBuildPrelightCaster( &volume );
+	srfTriangles_t *folded = R_ShadowMapBuildPrelightCaster( &volume );
+	passed = passed && folded != NULL && folded->numVerts == 3 && folded->numIndexes == 6
+		&& folded->bounds[0].Compare( idVec3( 0.0f, 0.0f, 64.0f ), 0.01f )
+		&& folded->bounds[1].Compare( idVec3( 32.0f, 32.0f, 64.0f ), 0.01f );
+	if ( folded != NULL ) {
+		R_FreeStaticTriSurf( folded );
+	}
+	idList<shadowMapPrelightCutout_t> cutouts;
+	shadowMapPrelightCutout_t &cutout = cutouts.Alloc();
+	cutout.v[0].Set( -8.0f, -8.0f, 64.0f );
+	cutout.v[1].Set( 64.0f, -8.0f, 64.0f );
+	cutout.v[2].Set( -8.0f, 64.0f, 64.0f );
+	cutout.bounds.Clear();
+	for ( int i = 0; i < 3; ++i ) {
+		cutout.bounds.AddPoint( cutout.v[i] );
+	}
+	cutout.bounds.ExpandSelf( 1.0f );
+	cutout.plane.FromPoints( cutout.v[0], cutout.v[1], cutout.v[2] );
+	srfTriangles_t *none = R_ShadowMapBuildPrelightCaster( &volume, &cutouts );
+	cutout.plane.SetDist( cutout.plane.Dist() + 8.0f );	// a cutout in another plane leaves it
+	srfTriangles_t *apart = R_ShadowMapBuildPrelightCaster( &volume, &cutouts );
+	passed = passed && none == NULL && apart != NULL && apart->numIndexes == 6;
+	if ( none != NULL ) {
+		R_FreeStaticTriSurf( none );
+	}
+	if ( apart != NULL ) {
+		R_FreeStaticTriSurf( apart );
+	}
+	volume.numShadowIndexesNoCaps = 18;
 	volume.numShadowIndexesNoFrontCaps = 21;
 	indexes[21] = 5;
 	verts[5].xyz.w = 0.0f;
 	srfTriangles_t *projected = R_ShadowMapBuildPrelightCaster( &volume );
-	passed = passed && none == NULL && projected == NULL;
-	if ( none != NULL ) {
-		R_FreeStaticTriSurf( none );
-	}
+	passed = passed && projected == NULL;
 	if ( projected != NULL ) {
 		R_FreeStaticTriSurf( projected );
 	}
@@ -1830,7 +2039,7 @@ bool R_ShadowMapPrelightCasterSelfTest( void ) {
 		common->Printf( "Prelight caster self-test FAILED\n" );
 		return false;
 	}
-	common->Printf( "Prelight caster self-test passed: front caps in both windings, folded and projected caps refused\n" );
+	common->Printf( "Prelight caster self-test passed: front caps in both windings, folded caps recovered less cutouts, projected caps refused\n" );
 	return true;
 }
 

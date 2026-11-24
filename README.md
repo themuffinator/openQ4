@@ -188,6 +188,7 @@ These guides describe 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**
 - **Raven Software** and **Ritual Entertainment**: Quake 4: The Awakening, the unreleased expansion
 - **Chris Robinson and the [OpenAL Soft](https://openal-soft.org/) contributors**: cross-platform OpenAL runtime bundled in macOS packages
 - **Sam Lantinga and the [SDL contributors](https://github.com/libsdl-org/SDL/tree/release-3.4.18)**: cross-platform window, input and microphone support, including the dummy audio driver used in automated voice tests; SDL uses the zlib licence
+- **Jean-loup Gailly, Mark Adler and the [zlib-ng contributors](https://github.com/zlib-ng/zlib-ng/tree/2.3.3)**: zlib-licensed inflate and CRC-32 for reading PK4 packs, with run-time SIMD selection; [licence notice](LICENSES/zlib-ng.txt)
 - **Sean Barrett and the [stb_vorbis contributors](https://github.com/nothings/stb/blob/master/stb_vorbis.c)**: MIT/public-domain Vorbis decoding; openQ4 adds a virtual-filesystem callback path for bounded compressed streaming
 - **The Khronos Group and [glslang contributors](https://github.com/KhronosGroup/glslang/tree/16.6.0)**: GLSL-to-SPIR-V compiler used by the Vulkan renderer; its complete licence ships under `licenses/`
 - **[The Khronos Group, Valve Corporation and LunarG](https://github.com/KhronosGroup/OpenXR-SDK/tree/release-1.1.65)**: Apache-2.0 OpenXR loader and headers behind [VR mode](docs/user/vr.md); [licence notice](LICENSES/openxr-sdk.txt)

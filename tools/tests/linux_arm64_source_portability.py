@@ -1211,7 +1211,7 @@ def main() -> None:
     require(renderer_local, "size_t\t\t\t\t\tstaticAllocCount;", "native-width renderer static allocation accounting")
     require(render_world, "staticAllocCount = %zu", "native-width interaction allocation report")
     require(renderer_lightrun, "staticAllocCount = %zu", "native-width regenerated-world allocation report")
-    require(unzip, "Mem_ClearedAlloc(static_cast<size_t>(items) * static_cast<size_t>(size))", "wide zlib allocator multiplication")
+    require(unzip, "zng_inflateInit2(", "PK4 members inflate through zlib-ng")
     reject(unzip, "Mem_ClearedAlloc(items*size)", "32-bit zlib allocator multiplication")
     require(unzip, "uint8_t bytes[2];", "byte-wise classic-ZIP 16-bit read")
     require(unzip, "const uint16_t value = static_cast<uint16_t>( bytes[0] )", "unsigned classic-ZIP 16-bit assembly")

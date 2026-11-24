@@ -1786,6 +1786,11 @@ def build_safe_cases(tiers: tuple[str, ...]) -> list[dict[str, Any]]:
                     "+set",
                     "r_rendererModernExecutor",
                     "1",
+                    # Normal startup builds only the drawn GLSL tier; these
+                    # cases cover every tier the context supports.
+                    "+set",
+                    "r_rendererShaderAllTiers",
+                    "1",
                     "+rendererShaderLibrarySelfTest",
                     "+gfxInfo",
                 ],

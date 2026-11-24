@@ -43,6 +43,10 @@ struct State {
 int VK_GpuSkinning_FindMemo(const void* key,bool,bool& found){
     found=vkExec.gpuSkinningMemo[0].ambientKey==key;return found?0:-1;
 }
+// Resident static geometry is asked only for world streams: a 2D surface's
+// header is recycled within the presentation and must reach the ring.
+int staticGeoQueries=0;
+int VK_StaticGeo_VertexOffset(const srfTriangles_t*,size_t){++staticGeoQueries;return -1;}
 int VK_Ring_Alloc(Ring& ring,const void* data,size_t bytes,int align){
     const int offset=(ring.used+align-1)&~(align-1);
     if(bytes>size_t(ring.capacity)||size_t(offset)+bytes>size_t(ring.capacity))return -1;
@@ -80,11 +84,16 @@ int main(){
     assert(VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && i1!=i0);
     assert(!std::memcmp(vkExec.indexRings[0].bytes.data()+i1,indices.data(),sizeof(indices)));
 
-    // World depth/ambient/light passes retain their existing upload reuse.
+    // No 2D surface was offered to the resident cache.
+    assert(staticGeoQueries==0);
+
+    // World depth/ambient/light passes retain their existing upload reuse;
+    // the resident cache is asked once per stream and frame, before the ring.
     vkExec=State{};view.viewEntitys=&view;
     assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0));
     assert(VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && v0==v1 && i0==i1);
     assert(vkExec.vertexRings[0].uploads==1 && vkExec.indexRings[0].uploads==1);
+    assert(staticGeoQueries==1);
     vkExec.gpuSkinningMemo[0]={&vertexHeader,1024};
     assert(VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && v1==1024 && i1==i0);
     assert(vkExec.vertexRings[0].uploads==1);

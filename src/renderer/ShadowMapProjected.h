@@ -63,6 +63,12 @@ typedef struct shadowMapProjectedLightState_s {
 	// far corner of the light volume it equals worldTexelSize for the whole
 	// map. See R_ShadowMapProjectedNormalOffsetWorld.
 	float				texelPerDepth[SHADOWMAP_PROJECTED_MAX_CASCADES];
+	// The share of the receiver bias this light keeps (1 for most lights).
+	// A map that holds only the faces turned away from the light holds no
+	// receiver that faces it, and needs none of the bias that keeps such a
+	// receiver off its own depth (R_ShadowMapLightStoresFarShell). The
+	// normal offset and texel steps derived from the state carry it too.
+	float				receiverBiasScale;
 	float				sliceNear[SHADOWMAP_PROJECTED_MAX_CASCADES];
 	float				sliceFar[SHADOWMAP_PROJECTED_MAX_CASCADES];
 	float				depthRange[SHADOWMAP_PROJECTED_MAX_CASCADES];

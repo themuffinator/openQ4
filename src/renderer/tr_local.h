@@ -1600,10 +1600,14 @@ extern idCVar r_rendererModernLightingParity;	// diagnostic override forcing lig
 extern idCVar r_rendererModernClassicShapes;	// REN-02 rollback mask for corridor-owned classic shapes
 const int MODERN_CLASSIC_SHAPE_STAGES = 1;	// stage transforms on cutouts and baked-light receivers
 const int MODERN_CLASSIC_SHAPE_STENCIL_SHADOWS = 2;	// stencil-shadowed lights
+const int MODERN_CLASSIC_SHAPE_OVERLAYS = 4;	// additive ambient overlay stages, drawn by ARB2 over the composed frame
+const int MODERN_CLASSIC_SHAPE_CPU_SKINNED = 8;	// CPU-skinned and other front-end-deformed receivers
+const int MODERN_CLASSIC_SHAPE_ALL = 15;
 extern idCVar r_rendererOwnershipCompose;	// REN-02 step 5: compose the aggregate executor with the shared world domains
 extern idCVar r_rendererModernAutoPromote;	// allow gated default modern-visible promotion
 extern idCVar r_rendererPromotionEvidence;	// Phase 8 evidence token required before auto-promotion
 extern idCVar r_rendererShaderReload;	// allow runtime reload of the internal modern GL shader library
+extern idCVar r_rendererShaderAllTiers;	// build the modern GL shader library at every GLSL tier, not only the drawn one
 extern idCVar r_rendererModernVisibleDepth;	// opt-in graph-backed modern depth/shadow-depth execution
 extern idCVar r_rendererModernDepthDebug;	// show graph-backed modern depth resources as a debug overlay
 extern idCVar r_rendererModernOpaque;	// opt-in graph-backed modern opaque G-buffer execution
@@ -2131,7 +2135,16 @@ bool R_StaticIndexCacheAllowed( const idRenderEntityLocal *def );
 // of its prelight volume (tr_light.cpp). NULL when the light has none to give.
 bool R_ShadowMapLightSourceOutsideVolume( const renderLight_t &parms );
 srfTriangles_t *R_ShadowMapPrelightCaster( idRenderLightLocal *light );
-srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri );
+// a perforated world triangle a folded prelight volume casts from (R_ShadowMapBuildPrelightCaster)
+typedef struct shadowMapPrelightCutout_s {
+	idVec3					v[3];
+	idPlane					plane;
+	idBounds				bounds;
+} shadowMapPrelightCutout_t;
+bool R_ShadowMapPrelightVolumeFoldsCaps( const srfTriangles_t *shadowTri );
+bool R_ShadowMapPrelightKeepsCutout( const idRenderLightLocal *light, const idMaterial *shader, const srfTriangles_t *geo );
+srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri,
+	const idList<shadowMapPrelightCutout_t> *cutouts = NULL );
 bool R_ShadowMapPrelightCasterSelfTest( void );
 // links it into the view light's caster chain (Interaction.cpp)
 void R_ShadowMapLinkPrelightCaster( viewLight_t *vLight );

@@ -22,6 +22,7 @@ void R_ShadowMapResetProjectedLightState( shadowMapProjectedLightState_t &state 
 	for ( int matrixIndex = 0; matrixIndex < 16; matrixIndex++ ) {
 		state.baseShadowMatrix[matrixIndex] = ( matrixIndex == 0 || matrixIndex == 5 || matrixIndex == 10 || matrixIndex == 15 ) ? 1.0f : 0.0f;
 	}
+	state.receiverBiasScale = 1.0f;
 	for ( int i = 0; i < SHADOWMAP_PROJECTED_MAX_CASCADES; i++ ) {
 		state.splitDepths[i] = 1.0e30f;
 		state.biasScale[i] = 1.0f;
@@ -457,22 +458,28 @@ bool R_ShadowMapClipPlanesMirrorWinding( const idPlane clipPlanes[4] ) {
 	return determinant < 0.0;
 }
 
-// Measured on 23 November 2026 (shadowmapping-audit-2026-11-09.md, "What the
-// stock volumes hold"): for the two synthesized projections, parallel and
-// distant point, this verdict leaves open casters storing the triangles
-// turned towards the light and sealed hulls their far shell, the reverse of
-// what R_ShadowMapCasterFaces intends. The static world of such a light does
-// not depend on it (the prelight front caps are stored in both windings);
-// its other casters do. Not changed: see the audit for what a correction
-// costs and what it needs first.
+// For the two synthesized projections, parallel and distant point, the
+// determinant calls the picture mirrored (their axes come from NormalVectors,
+// a left-handed pair), and the faces a caster pass kept on that verdict were
+// measured to be the reverse of the ones asked for: open geometry stored its
+// light-facing triangles and sealed hulls their far shell
+// (shadowmapping-audit-2026-11-09.md, "What the stock volumes hold"). With
+// the verdict turned, mcc_landing's light_9083 drawn from whole world
+// surfaces goes from 48.9% of a view shadowed where stencil lights to 0.01%,
+// the same as from its prelight caps. Authored projectors keep the
+// determinant, which measures right for them (storage2's alarm lights, hub2's
+// light_7984). With r_shadowMapDistantFarShell 0 the earlier verdict stands.
 bool R_ShadowMapLightMirrorsCasterWinding( const viewLight_t *vLight ) {
 	if ( vLight == NULL || R_ClassifyShadowMapLight( vLight ).pointLight ) {
 		return false;
 	}
 	idPlane clipPlanes[4];
 	R_ShadowMapBuildBaseClipPlanesForLight( vLight, clipPlanes );
-	return R_ShadowMapClipPlanesMirrorWinding( clipPlanes );
+	const bool mirrored = R_ShadowMapClipPlanesMirrorWinding( clipPlanes );
+	return R_ShadowMapLightStoresFarShell( vLight ) ? !mirrored : mirrored;
 }
+
+extern idCVar r_shadowMapDistantFarShellBias;
 
 // World distance over which the stored falloff depth spans 0..1. The depth
 // row is the authored falloff plane (clipPlanes[2] = lightProject[3]), whose
@@ -534,9 +541,11 @@ float R_ShadowMapTexelDepthStep( const float worldTexelSize, const float depthRa
 }
 
 void R_ShadowMapProjectedTexelDepthSteps( const shadowMapProjectedLightState_t &state, float steps[SHADOWMAP_PROJECTED_MAX_CASCADES] ) {
+	// the steps size the receiver's texel bias and its filter taps' bias
+	const float scale = Max( 0.0f, state.receiverBiasScale );
 	for ( int cascadeIndex = 0; cascadeIndex < SHADOWMAP_PROJECTED_MAX_CASCADES; cascadeIndex++ ) {
 		steps[cascadeIndex] = cascadeIndex < state.cascadeCount
-			? R_ShadowMapTexelDepthStep( state.worldTexelSize[cascadeIndex], state.depthRange[cascadeIndex] )
+			? R_ShadowMapTexelDepthStep( state.worldTexelSize[cascadeIndex], state.depthRange[cascadeIndex] ) * scale
 			: 0.0f;
 	}
 }
@@ -576,7 +585,7 @@ float R_ShadowMapProjectedNormalOffsetWorld( const shadowMapProjectedLightState_
 	if ( cascadeIndex < 0 || cascadeIndex >= SHADOWMAP_PROJECTED_MAX_CASCADES ) {
 		return 0.0f;
 	}
-	const float scale = Max( 0.0f, normalOffsetScale );
+	const float scale = Max( 0.0f, normalOffsetScale ) * Max( 0.0f, state.receiverBiasScale );
 	if ( depthScaled && scale > 0.0f && state.texelPerDepth[cascadeIndex] > 0.0f ) {
 		return -( state.texelPerDepth[cascadeIndex] * scale );
 	}
@@ -1004,7 +1013,7 @@ static bool R_ShadowMapCascadeWholeLightCase( const bool wholeLight, const int c
 				return false;
 			}
 		}
-		if ( state.splitDepths[fitted - 1] != 1536.0f || state.biasScale[expectedWhole] != 1.0f
+		if ( state.splitDepths[fitted - 1] != 1536.0f || state.biasScale[expectedWhole] != state.receiverBiasScale
 				|| !( state.worldTexelSize[expectedWhole] > state.worldTexelSize[fitted - 1] ) ) {
 			common->Printf( "ShadowMap whole-light cascade self-test failed: reach split %.2f bias %.3f texel %.3f/%.3f\n",
 				state.splitDepths[fitted - 1], state.biasScale[expectedWhole],
@@ -1294,6 +1303,8 @@ bool R_ShadowMapDistantNormalOffsetSelfTest( void ) {
 		r_shadowMapCSM.SetBool( cascaded );
 		shadowMapProjectedLightState_t state;
 		R_BuildShadowMapProjectedLightState( &light, cascaded ? &view : NULL, cascaded ? 1024 : 2048, state );
+		// the offset itself; a far-shell light keeps a share of it
+		state.receiverBiasScale = 1.0f;
 		if ( !state.valid || state.cascadeCount != ( cascaded ? 4 : 1 ) || state.cascadeFallback ) {
 			common->Printf( "ShadowMap distant normal offset self-test failed: layout %d valid=%d cascades=%d fallback=%d\n",
 				layout, state.valid ? 1 : 0, state.cascadeCount, state.cascadeFallback ? 1 : 0 );
@@ -1349,6 +1360,7 @@ bool R_ShadowMapDistantNormalOffsetSelfTest( void ) {
 	r_shadowMapCSM.SetBool( false );
 	shadowMapProjectedLightState_t parallelState;
 	R_BuildShadowMapProjectedLightState( &light, NULL, 2048, parallelState );
+	parallelState.receiverBiasScale = 1.0f;
 	if ( !parallelState.valid || parallelState.texelPerDepth[0] != 0.0f
 			|| R_ShadowMapProjectedNormalOffsetWorld( parallelState, 0, 1.0f, true ) != parallelState.worldTexelSize[0] ) {
 		common->Printf( "ShadowMap distant normal offset self-test failed: a parallel light's offset follows depth\n" );
@@ -1418,9 +1430,11 @@ bool R_ShadowMapCasterFacesSelfTest( void ) {
 		projections += 2;
 	}
 
-	// the face table, for a light well outside the caster
+	// the face table, for a light well outside the caster, whose source lies
+	// at its centre (a light with a distant source stores the far shell)
 	parms.parallel = false;
 	light.parallel = false;
+	parms.lightCenter.Zero();
 	light.globalLightOrigin.Set( 0.0f, 0.0f, 4096.0f );
 	float identity[16];
 	memset( identity, 0, sizeof( identity ) );
@@ -1475,6 +1489,20 @@ bool R_ShadowMapCasterFacesSelfTest( void ) {
 			return false;
 		}
 	}
+	// a parallel or distant point light stores sealed hulls by the stencil
+	// rule too, while r_shadowMapDistantFarShell is on
+	parms.parallel = true;
+	light.parallel = true;
+	const bool farShell = R_ShadowMapLightStoresFarShell( &light );
+	if ( R_ShadowMapCasterFaces( 2, &light, false, true, true, identity, mins, maxs, CT_FRONT_SIDED )
+			!= ( farShell ? SHADOWMAP_CASTER_FACES_FAR : SHADOWMAP_CASTER_FACES_NEAR )
+			|| R_ShadowMapCasterFaces( 2, &light, false, true, false, identity, mins, maxs, CT_FRONT_SIDED )
+			!= SHADOWMAP_CASTER_FACES_FAR ) {
+		common->Printf( "Caster face self-test FAILED: far-shell light\n" );
+		return false;
+	}
+	parms.parallel = false;
+	light.parallel = false;
 	// no geometry to judge: both sides, except under the forced near shell
 	if ( R_ShadowMapCasterFaces( 2, &light, false, false, false, NULL, NULL, NULL, CT_FRONT_SIDED )
 				!= SHADOWMAP_CASTER_FACES_BOTH
@@ -1525,6 +1553,19 @@ static void R_BuildShadowMapProjectedLightStateFit( const viewLight_t *vLight, c
 
 void R_BuildShadowMapProjectedLightState( const viewLight_t *vLight, const viewDef_t *viewDef, const int tileSize, shadowMapProjectedLightState_t &state ) {
 	R_BuildShadowMapProjectedLightStateFit( vLight, viewDef, tileSize, state );
+	// A map of far faces only (R_ShadowMapLightStoresFarShell) needs no bias
+	// to keep a receiver that faces the light off its own depth, and every
+	// unit of it lights a receiver that stands that close behind a caster:
+	// tens of units under a coarse distant map (shadowmapping-audit-2026-11-09.md,
+	// "A far shell leaks behind itself").
+	if ( state.valid && R_ShadowMapLightStoresFarShell( vLight ) ) {
+		const float scale = idMath::ClampFloat( 0.0f, 1.0f, r_shadowMapDistantFarShellBias.GetFloat() );
+		state.receiverBiasScale = scale;
+		for ( int cascadeIndex = 0; cascadeIndex < SHADOWMAP_PROJECTED_MAX_CASCADES; cascadeIndex++ ) {
+			state.biasScale[cascadeIndex] *= scale;
+			state.texelDepthBias[cascadeIndex] *= scale;
+		}
+	}
 	// A distant point light's map is a perspective view from a source far
 	// outside its volume, so its texel grows with distance from the source:
 	// Air Defense 1's sun spans 25 world units a texel at the far corner and

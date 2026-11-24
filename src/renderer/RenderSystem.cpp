@@ -329,6 +329,40 @@ void RB_BeginCommandFrame( const emptyCommand_t *cmds ) {
 }
 
 /*
+=============
+RB_FrameClearColor
+
+The color each frame starts from (r_clear), or false when a frame keeps what
+was there. Shared by both back ends: OpenGL clears the window with it in
+RB_SetBuffer and its own scene target in draw_common.cpp (a 3D view clears
+only depth and stencil), and Vulkan takes it as the clear value of the frame's
+targets in RC_SET_BUFFER.
+=============
+*/
+bool RB_FrameClearColor( float color[4] ) {
+	// clear screen for debugging
+	// automatically enable this with several other debug tools
+	// that might leave unrendered portions of the screen
+	if ( !( r_clear.GetFloat() || idStr::Length( r_clear.GetString() ) != 1 || r_lockSurfaces.GetBool() || r_singleArea.GetBool() || r_showOverDraw.GetBool() ) ) {
+		return false;
+	}
+	color[3] = 1.0f;
+	if ( sscanf( r_clear.GetString(), "%f %f %f", &color[0], &color[1], &color[2] ) == 3 ) {
+		return true;
+	}
+	if ( r_clear.GetInteger() == 2 ) {
+		color[0] = color[1] = color[2] = 0.0f;
+	} else if ( r_showOverDraw.GetBool() ) {
+		color[0] = color[1] = color[2] = 1.0f;
+	} else {
+		color[0] = 0.4f;
+		color[1] = 0.0f;
+		color[2] = 0.25f;
+	}
+	return true;
+}
+
+/*
 ====================
 R_IssueRenderCommands
 
@@ -1758,6 +1792,10 @@ Returns the number of msec spent in the back end
 void Usercmd_TakeFrameInputClocks( double &lookSampleClock, double &flashPressClock );
 void Common_RecordFrameInputToSwap( double lookSampleClock, double flashPressClock, double swapClock );
 
+// Back-end time of the last frame CompleteBackEndFrame finished, kept because
+// it clears backEnd.pc before EndFrame reports the frame's timings.
+static int r_completedBackEndMsec = 0;
+
 void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	emptyCommand_t *cmd;
 
@@ -1796,8 +1834,6 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	frameSwapClock = 0.0;
 	R_RendererMetrics_MarkFrameSubmitBegin();
 	const int frameFrontEndMsec = pc.frontEndMsec;
-	// The worker can overwrite backEnd.pc as soon as we hand it this frame.
-	const int previousBackEndMsec = backEnd.pc.msec;
 	if ( R_IssueRenderCommandsOnRenderThread() ) {
 		renderThreadFrameCounters = pc;
 		renderThreadFrameCountersValid = true;
@@ -1809,23 +1845,26 @@ void idRenderSystemLocal::EndFrame( int *frontEndMsec, int *backEndMsec ) {
 		}
 		// The render thread owns this frame's commands, frame memory and
 		// vertex-cache temps until R_RenderThread_Sync completes the frame.
-		// The back-end time reported here is the previous frame's.
+		// The back-end time reported here is the last completed frame's.
 		if ( frontEndMsec ) {
 			*frontEndMsec = frameFrontEndMsec;
 		}
 		if ( backEndMsec ) {
-			*backEndMsec = previousBackEndMsec;
+			*backEndMsec = r_completedBackEndMsec;
 		}
 	} else {
 		R_IssueRenderCommands();
 		CompleteBackEndFrame();
 
 		// save out timing information after the backend has consumed the frame.
+		// CompleteBackEndFrame has cleared backEnd.pc by now, so the time comes
+		// from the copy it kept: read from backEnd.pc here, com_speeds'
+		// back-end column was zero on every renderer.
 		if ( frontEndMsec ) {
 			*frontEndMsec = frameFrontEndMsec;
 		}
 		if ( backEndMsec ) {
-			*backEndMsec = backEnd.pc.msec;
+			*backEndMsec = r_completedBackEndMsec;
 		}
 	}
 
@@ -1903,6 +1942,7 @@ void idRenderSystemLocal::CompleteBackEndFrame( void ) {
 		backEnd.pc.c_indexes );
 
 	// print any other statistics and clear all of them
+	r_completedBackEndMsec = backEnd.pc.msec;
 	R_PerformanceCounters();
 
 	R_RetireRenderSnapshots( submittedFrame );

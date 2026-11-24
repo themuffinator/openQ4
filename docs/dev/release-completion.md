@@ -53,19 +53,94 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   way on the previous tree. Not yet run: Linux, macOS and Android builds, and a
   human session across both modes.
 
+## Vulkan: settings that did nothing now work, and less copying every frame, 24 November 2026
+
+A pass-by-pass comparison of the Vulkan renderer with OpenGL. Automatic picks
+Vulkan on desktop, so these reached most players.
+
+- **Ambient Light works on Vulkan.** The setting (`r_forceAmbient`) brightened
+  nothing there. It now lifts the picture exactly as on OpenGL.
+- **Weapon FOV works on Vulkan.** The view weapon ignored **Weapon FOV**
+  (`cl_gunfov`, `cl_gunfov_adjust`) and always followed the view's field of
+  view. It now takes its own, and temporal anti-aliasing and motion blur
+  follow it.
+- **Less work per frame on Vulkan.** Level geometry was copied to the
+  graphics card again every frame, the largest single cost of drawing a
+  frame there. It is now copied once and kept, which about halves that work
+  (measured on Air Defense 1; the picture is bit-identical). `r_vkStaticGeometry 0`
+  restores the old behaviour, and `r_vkStaticGeometryMegs` sizes the buffer
+  (96 MiB by default).
+- **Smaller shadow maps on AMD and Apple graphics.** Vulkan shadow maps took
+  a depth format with an unused stencil channel on devices without packed
+  24-bit depth. They now take half the memory there, with the same picture,
+  and the point-light shadow cache keeps its full 64 slots within its budget.
+- **Diagnostics.** `com_speeds` showed a back-end time of zero on both
+  renderers and now shows the frame's. On Vulkan, `r_skipRender`,
+  `r_singleTriangle` (the `benchmark` command's "single tri" row), the debug
+  clear colours and the renderer metrics' command counts now behave as on
+  OpenGL. `rendererVulkanMemoryInfo` reports the resident geometry.
+
+Evidence and the gaps still open are in the roadmap under VK-06 and VK-07 and
+in [Vulkan executor resource profiling](vulkan-resource-profiling.md#resident-static-geometry-24-november-2026).
+
+## Sunlight shadows reach into corners and under ledges, 24 November 2026
+
+- **Shadows from sunlight and distant lamps no longer stop short of the wall
+  or ledge that casts them.** With shadow maps on (Quality and above), a
+  strip just behind a wall, under a roof or at the foot of a rock stayed lit
+  where the original shadows are dark: up to tens of units under a large
+  outdoor light. These lights now record every object the way the original
+  shadows do, by the surfaces facing away from the light, and drop the
+  safety margin that let that light through. Against the original shadows,
+  the area wrongly lit in the worst view of twelve such lights falls from 29
+  to 5 points summed, on OpenGL and Vulkan alike; Hub 2's large fill light
+  goes from 13% of a view to under half a percent.
+- **More of these lights cast the original shape of the level's shadows.**
+  About a fifth of the lamps mounted outside the area they light, those whose
+  stored shadow also holds a grating, now use that stored shadow as well.
+  A grating inside the lit area keeps the holes in its shadow; one that
+  reaches outside it casts solid, as in the original game
+  (`r_shadowMapPrelightCutouts 0` casts every grating solid).
+- **What you need to do.** Nothing. `r_shadowMapDistantFarShell 0` brings
+  back the earlier behaviour; `r_shadowMapDistantFarShellBias` (0 to 1) puts
+  part of the margin back if speckles appear in sunlight on your system. The
+  original stencil shadows and the Balanced tier are unchanged.
+- **What is not shown.** The tube lights of Network 1 still darken part of a
+  grate ring the original shadows leave lit (as before this change), and the
+  lights the map compiler gave no stored shadow keep the earlier behaviour.
+  The area the shadow map darkens where the original shadows do not rises
+  slightly on some lights (a few tenths of a percent of a view). One graphics
+  card on Windows was measured.
+- **Checks.** The stencil parity scan on OpenGL and Vulkan; the moving-door,
+  caster-cycle, Air Defense 1 outdoor and cascade-motion scenarios and the
+  continuous-motion receiver check on both; the in-engine shadow self-tests.
+- **Developer detail:** [the rest of the off-centre lights](shadowmapping-audit-2026-11-09.md#the-rest-of-the-off-centre-lights)
+  and REN-03 in the [roadmap](roadmap.md).
+
 ## Faster pack reads and cache writes, oversized screenshots and cleaner mirrors, from openPR06, 24 November 2026
 
 Fixes and speed-ups first made in openPR06, the PREY port built on openQ4,
 brought back to openQ4. Thanks to danperisse-hue, whose openPR06 pull requests
-gave the pack-read and cache-write improvements.
+gave the pack-read, cache-write, shader-startup and Ogg improvements.
 
 - **Faster pack reads.** Reading a file from a PK4 reuses an idle handle on
   that pack instead of opening the pack file again each time
   (`fs_reusePackHandles`, default 1; up to 16 idle handles per pack and 64 in
   all, so the open-file limits on macOS and the Windows C runtime are never
-  reached). Member CRC checks use a slicing-by-8 CRC-32 that gives the same
-  result on every CPU byte order. Writing a file stats its folder once,
-  instead of calling mkdir on every folder in its path.
+  reached). Members inflate and CRC-check through zlib-ng 2.3.3 instead of
+  the zlib 1.1.3 code from 1998 embedded in the engine. zlib-ng picks SIMD
+  paths for the CPU at run time and is linked statically, so packages gain no
+  new file beyond its licence notice. openPR06 measured warm loads of six maps
+  18% faster with it. Writing a file stats its folder once, instead of
+  calling mkdir on every folder in its path.
+- **The first OpenGL launch after an update no longer looks hung.** The
+  modern GL shader library builds only the GLSL tier it draws with: 14
+  programs, not up to 56. A program that fails there falls back to the next
+  tier down without failing the library. Startup says it is building before
+  the wait (`r_rendererShaderAllTiers 1` builds every tier for validation).
+- **Small Ogg sounds are inflated once.** A compressed sound up to 4 MiB is
+  read from its pack once, both for the format check and the decode (it was
+  inflated twice). A small sound that then streams reuses that read.
 - **Level-load caches are written off the load thread.** Generated caches are
   hashed with the CPU's SHA instructions where available and written by a
   background writer, so a first visit no longer waits on disk writes. It
@@ -123,8 +198,30 @@ gave the pack-read and cache-write improvements.
   0.15.0 the OpenGL reflection lost a lit wall panel and the ceiling edge that
   Vulkan drew. Now both renderers draw them and match each other, and
   `r_skipSubviewClip 1` changes nothing in that room. The logs have no errors
-  and the same warnings as 0.15.0. Not yet run: heat haze under TAA, retained
-  menu interaction in game, Linux and macOS.
+  and the same warnings as 0.15.0. Heat haze: stock world surfaces carry no
+  heat haze, so the tram car (`testmodel model_vehicle_tram_car`, whose
+  `tramglass` floor is a static heat-haze stage) was set over medlabs' floor
+  and viewed through its glass. A 5120x2880 tiled capture (off-axis tiles)
+  differed from the window-sized shot over the glass by 0.98 of 255 in
+  0.15.0's OpenGL and 0.72 now, the same as the 0.70 floor with TAA off. In
+  90-frame recordings with TAA on, the glass changes by 0.18-0.29 of 255 per
+  frame, which is invisible. (Screenshots present without TAA, so only a
+  recording shows it. Vulkan's tiled capture renders one capture-sized frame,
+  so that A/B does not reach Vulkan.) zlib-ng, shader and Ogg round:
+  - Native CRC-32, PNG, demo-block and update-core codec tests and the audio
+    decode, memory, stream and restore contracts pass.
+  - airdefense1 on OpenGL and Vulkan, cold then warm:
+    - pack reads and the 198 background cache writes are clean;
+    - Oggs stream through the single read;
+    - a cold NVIDIA shader cache built the library in 113 s (14 programs,
+      no fallbacks), 223 ms warm;
+    - the only warnings are two `non pre-cached lipSync decl` lines on one
+      Vulkan run.
+  - Load timing could not be measured: other sessions loaded the machine.
+    Interleaved warm loads against 0.15.0 showed no regression.
+
+  Not yet run: retained menu interaction in game, Linux, macOS and Android
+  builds with zlib-ng.
 
 ## Low holds 60 FPS on low-end graphics, 24 November 2026
 
