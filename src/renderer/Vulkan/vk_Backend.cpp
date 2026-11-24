@@ -178,6 +178,11 @@ capture instead of repeating the first. Only views drawn to the window move:
 a view drawn into a render texture (a game-owned post target sized to the
 whole capture) stays at the texture's origin, and the view that composites
 the texture to the window moves instead, as RB_TileOffsetX does on OpenGL.
+The main scene view, and the portal-sky and subview contributors drawn into
+its viewport, are moved back when they begin: they render into a scene target
+sized to the whole capture and only its composite takes the offset
+(VK_TiledCapture_Rect, vk_GuiExecutor.cpp), since their scene and
+post-process copies cannot read the part of the view off the window.
 Scissors cut at the attachment edge (vkCmdSetScissorClamped). Ordinary frames
 have a zero offset and are untouched.
 ====================
@@ -1632,6 +1637,29 @@ void R_ReloadARBPrograms_f( const idCmdArgs &args ) {
 void R_ReloadGLSLPrograms_f( const idCmdArgs &args ) {
 	(void)args;
 	VK_MaterialPrograms_Reload();
+}
+
+// Every parsed material's authored programs compile now, behind the loading
+// screen, instead of stalling the first frame that draws them: glslang's
+// process setup plus the pair's compile cost hundreds of milliseconds there.
+void R_PrecacheLevelMaterialPrograms( void ) {
+	R_RenderThread_Sync( "material program precache" );
+	const int start = Sys_Milliseconds();
+	int materials = 0, programs = 0;
+	const int numMaterials = declManager->GetNumDecls( DECL_MATERIAL );
+	for ( int i = 0; i < numMaterials; i++ ) {
+		const idDecl *decl = declManager->DeclByIndex( DECL_MATERIAL, i, false );
+		if ( decl == NULL || decl->GetState() != DS_PARSED ) {
+			continue;
+		}
+		const int ready = VK_MaterialPrograms_Precache( static_cast<const idMaterial *>( decl ) );
+		if ( ready > 0 ) {
+			materials++;
+			programs += ready;
+		}
+	}
+	common->Printf( "Vulkan: %d authored program stages of %d materials ready in %d msec\n",
+			programs, materials, Sys_Milliseconds() - start );
 }
 
 // Vulkan keeps a stage's pipelines in its native caches, already shared by

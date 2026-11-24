@@ -164,14 +164,20 @@ static void R_ShadowMapGetViewExtents( const viewDef_t *viewDef, float &zNear, f
 	xmin = -xmax;
 
 	if ( tr_levelshotProjectionShiftActive ) {
-		const float width = xmax - xmin;
-		const float height = ymax - ymin;
-		const float xShift = 0.5f * width * tr_levelshotProjectionShiftX;
-		const float yShift = 0.5f * height * tr_levelshotProjectionShiftY;
-		xmin += xShift;
-		xmax += xShift;
-		ymin += yShift;
-		ymax += yShift;
+		// Cascades fit the whole levelshot tile, never one of its regions: a
+		// region's narrower frustum gave its cascades smaller crops, finer
+		// texels and other biases, and the same surface came out shadowed in a
+		// one-pass capture and lit in a region-split one. The tile's extents
+		// are the region's divided by its share of the tile, about the tile's
+		// own shift; outside regions that share is 1 and the shift the view's.
+		const float halfWidth = 0.5f * ( xmax - xmin ) / tr_levelshotRegionScaleX;
+		const float halfHeight = 0.5f * ( ymax - ymin ) / tr_levelshotRegionScaleY;
+		const float centerX = halfWidth * tr_levelshotTileShiftX;
+		const float centerY = halfHeight * tr_levelshotTileShiftY;
+		xmin = centerX - halfWidth;
+		xmax = centerX + halfWidth;
+		ymin = centerY - halfHeight;
+		ymax = centerY + halfHeight;
 	}
 }
 

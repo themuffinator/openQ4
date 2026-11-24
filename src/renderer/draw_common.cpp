@@ -8871,6 +8871,12 @@ static bool RB_SoftParticleStageEligible( const drawSurf_t *surf, const shaderSt
 	if ( globalImages == NULL || globalImages->currentDepthImage == NULL || backEnd.viewDef == NULL ) {
 		return false;
 	}
+	// A mirror's oblique near plane (R_SetupObliqueNearPlane) makes depth
+	// depend on more than eye z, so the fade's linearised depth would be wrong:
+	// such a view draws its particles plain, on both renderers.
+	if ( backEnd.viewDef->obliqueNearPlane ) {
+		return false;
+	}
 
 	return RB_SoftParticleStageContractSupported( surf, pStage );
 }
@@ -10108,18 +10114,6 @@ void RB_T_FillDepthBuffer( const drawSurf_t *surf ) {
 	tri = surf->geo;
 	shader = surf->material;
 
-	// update the clip plane if needed
-	if ( backEnd.viewDef->numClipPlanes && surf->space != backEnd.currentSpace ) {
-		GL_SelectTexture( 1 );
-		
-		idPlane	plane;
-
-		R_GlobalPlaneToLocal( surf->space->modelMatrix, backEnd.viewDef->clipPlanes[0], plane );
-		plane[3] += 0.5;	// the notch is in the middle
-		glTexGenfv( GL_S, GL_OBJECT_PLANE, plane.ToFloatPtr() );
-		GL_SelectTexture( 0 );
-	}
-
 	if ( !shader->IsDrawn() ) {
 		return;
 	}
@@ -10296,8 +10290,11 @@ void RB_T_FillDepthBuffer( const drawSurf_t *surf ) {
 =====================
 RB_STD_FillDepthBuffer
 
-If we are rendering a subview with a near clip plane, use a second texture
-to force the alpha test to fail when behind that clip plane
+A mirror view's clip plane is the projection's near plane
+(R_SetupObliqueNearPlane), so the depth fill needs no clip of its own. Doom 3
+clipped only here, through an alpha-notch texture on a second unit: no other
+pass and no Vulkan pass honoured it, and on this renderer the notch could fail
+alpha-tested surfaces in the view, so OpenGL and Vulkan mirrors disagreed.
 =====================
 */
 void RB_STD_FillDepthBuffer( drawSurf_t **drawSurfs, int numDrawSurfs ) {
@@ -10307,15 +10304,6 @@ void RB_STD_FillDepthBuffer( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	}
 
 	RB_LogComment( "---------- RB_STD_FillDepthBuffer ----------\n" );
-
-	// enable the second texture for mirror plane clipping if needed
-	if ( backEnd.viewDef->numClipPlanes ) {
-		GL_SelectTexture( 1 );
-		globalImages->alphaNotchImage->Bind();
-		glDisableClientState( GL_TEXTURE_COORD_ARRAY );
-		glEnable( GL_TEXTURE_GEN_S );
-		glTexCoord2f( 1, 0.5 );
-	}
 
 	// the first texture will be used for alpha tested surfaces
 	GL_SelectTexture( 0 );
@@ -10333,13 +10321,6 @@ void RB_STD_FillDepthBuffer( drawSurf_t **drawSurfs, int numDrawSurfs ) {
 	glStencilFunc( GL_ALWAYS, 1, 255 );
 
 	RB_RenderDrawSurfListWithFunction( drawSurfs, numDrawSurfs, RB_T_FillDepthBuffer );
-
-	if ( backEnd.viewDef->numClipPlanes ) {
-		GL_SelectTexture( 1 );
-		globalImages->BindNull();
-		glDisable( GL_TEXTURE_GEN_S );
-		GL_SelectTexture( 0 );
-	}
 
 }
 
@@ -10448,14 +10429,6 @@ static int RB_STD_FillDepthBufferFiltered( drawSurf_t **drawSurfs, int numDrawSu
 		return 0;
 	}
 
-	if ( backEnd.viewDef->numClipPlanes ) {
-		GL_SelectTexture( 1 );
-		globalImages->alphaNotchImage->Bind();
-		glDisableClientState( GL_TEXTURE_COORD_ARRAY );
-		glEnable( GL_TEXTURE_GEN_S );
-		glTexCoord2f( 1, 0.5 );
-	}
-
 	GL_SelectTexture( 0 );
 	glEnableClientState( GL_TEXTURE_COORD_ARRAY );
 
@@ -10466,13 +10439,6 @@ static int RB_STD_FillDepthBufferFiltered( drawSurf_t **drawSurfs, int numDrawSu
 	glStencilFunc( GL_ALWAYS, 1, 255 );
 
 	const int rendered = RB_RenderDrawSurfListWithFilter( drawSurfs, numDrawSurfs, RB_T_FillDepthBuffer, filter );
-
-	if ( backEnd.viewDef->numClipPlanes ) {
-		GL_SelectTexture( 1 );
-		globalImages->BindNull();
-		glDisable( GL_TEXTURE_GEN_S );
-		GL_SelectTexture( 0 );
-	}
 
 	return rendered;
 }

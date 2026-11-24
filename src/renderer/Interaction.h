@@ -76,6 +76,10 @@ typedef struct {
 	// carrying per-interaction shadowTris.
 	bool					shadowStencilEligible;
 	bool					shadowStencilUsesPrelight;
+	// R_CreateShadowVolume ran for this surface and produced no volume (a
+	// mirror the light stands behind, say): the stencil path casts nothing
+	// from it, so a shadow map that leaves it out loses nothing.
+	bool					shadowVolumeBuiltEmpty;
 
 	// Lifetime cache of the point-light emitter-panel caster verdict. Its inputs
 	// (shadow shader, ambientTris, the interaction's local light origin/radius)

@@ -1186,9 +1186,12 @@ static bool GLESD3_DrawHeatHazeStage( const drawSurf_t *surf, const shaderStage_
 	parms[ 2 ][ 1 ] = modelView[ 6 ];
 	parms[ 2 ][ 2 ] = modelView[ 10 ];
 	parms[ 2 ][ 3 ] = modelView[ 14 ];
+	// Row 0 without its off-axis term (projection[8] times the eye depth),
+	// which would smear the haze in an off-axis or jittered view, as
+	// R_LoadARBProgram rewrites the program on desktop OpenGL.
 	parms[ 3 ][ 0 ] = projection[ 0 ];
 	parms[ 3 ][ 1 ] = projection[ 4 ];
-	parms[ 3 ][ 2 ] = projection[ 8 ];
+	parms[ 3 ][ 2 ] = 0.0f;
 	parms[ 3 ][ 3 ] = projection[ 12 ];
 	parms[ 4 ][ 0 ] = projection[ 3 ];
 	parms[ 4 ][ 1 ] = projection[ 7 ];

@@ -759,6 +759,47 @@ bool VK_MaterialPrograms_ARBTranslatable( unsigned int target, const char *file 
     return translatable;
 }
 
+int VK_MaterialPrograms_Precache( const idMaterial *material ) {
+    if ( material == NULL ) { return 0; }
+    const int translation = cvarSystem->GetCVarInteger( "r_vkARBTranslation" );
+    int programsReady = 0;
+    for ( int i = 0; i < material->GetNumStages(); ++i ) {
+        newShaderStage_t *newStage = material->GetStage( i )->newStage;
+        if ( newStage == NULL ) { continue; }
+        if ( newStage->glslProgram ) {
+            // The stock families draw with native SPIR-V; only the rest compile.
+            const vkGLSLProgramFamily_t family = R_GetGLSLProgramFamily( newStage->glslProgramName );
+            if ( family > VK_GLSL_PROGRAM_FAMILY_UNKNOWN && family < VK_GLSL_PROGRAM_FAMILY_COUNT ) { continue; }
+            if ( !R_ValidateGLSLProgram( newStage ) ) { continue; }
+            const Program *program = Find( newStage );
+            programsReady += program != NULL && program->valid ? 1 : 0;
+            continue;
+        }
+        if ( newStage->customLighting || translation < 1
+            || ( newStage->vertexProgram == 0 && newStage->fragmentProgram == 0 ) ) {
+            continue;
+        }
+        // The same authored test as VK_Exec_DrawProgramStage: a program
+        // without a native family on either side means a translated pair.
+        const vkMaterialProgramFamily_t fragmentFamily = R_GetARBProgramFamily( GL_FRAGMENT_PROGRAM_ARB, newStage->fragmentProgram );
+        const vkMaterialProgramFamily_t vertexFamily = R_GetARBProgramFamily( GL_VERTEX_PROGRAM_ARB, newStage->vertexProgram );
+        const bool authored = ( fragmentFamily == VK_MATERIAL_PROGRAM_FAMILY_UNKNOWN && vertexFamily == VK_MATERIAL_PROGRAM_FAMILY_UNKNOWN )
+            || ( newStage->vertexProgram != 0 && vertexFamily == VK_MATERIAL_PROGRAM_FAMILY_UNKNOWN )
+            || ( newStage->fragmentProgram != 0 && fragmentFamily == VK_MATERIAL_PROGRAM_FAMILY_UNKNOWN )
+            || ( fragmentFamily != VK_MATERIAL_PROGRAM_FAMILY_UNKNOWN && vertexFamily != VK_MATERIAL_PROGRAM_FAMILY_UNKNOWN
+                && fragmentFamily != vertexFamily );
+        if ( !authored && translation < 2 ) { continue; }
+        const char *vertexFile = newStage->vertexProgram != 0
+            ? VK_MaterialProgramFileName( GL_VERTEX_PROGRAM_ARB, newStage->vertexProgram ) : NULL;
+        const char *fragmentFile = newStage->fragmentProgram != 0
+            ? VK_MaterialProgramFileName( GL_FRAGMENT_PROGRAM_ARB, newStage->fragmentProgram ) : NULL;
+        if ( vertexFile == NULL && fragmentFile == NULL ) { continue; }
+        const Program *program = FindARB( vertexFile, fragmentFile );
+        programsReady += program != NULL && program->valid ? 1 : 0;
+    }
+    return programsReady;
+}
+
 void VK_MaterialPrograms_Shutdown() {
     for ( auto &program : programs ) {
         if ( program == nullptr ) { continue; }

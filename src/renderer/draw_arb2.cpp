@@ -13061,7 +13061,12 @@ static void RB_ShadowMapRunPass( const viewLight_t *vLight, shadowMapPassKind_t 
 			g_shadowMapStats.fallbackGlobalPasses++;
 		}
 		RB_ShadowMapPassReport( vLight, passKind, pointLight, SHADOWMAP_PASS_RESULT_SCHEDULED_SKIP, primaryCasters, secondaryCasters, tertiaryCasters, quaternaryCasters, primaryShadowSurfs, secondaryShadowSurfs, interactions );
-		RB_ShadowMapMarkStencilFallbackSticky( vLight );
+		// A budget or subview policy chose stencil, which it may only do when
+		// the stencil represents every caster of this ownership (mapRequired is
+		// false, RB_ShadowMapSchedulePass), and the front end keeps the volumes
+		// whenever such a policy is active (R_ShadowMapLightWillUseShadowMaps).
+		// Nothing failed, so the light is not held on volumes for later views,
+		// as on Vulkan.
 		if ( !deferReceiverDraw ) {
 			RB_ShadowMapStencilFallback( vLight, passKind, primaryShadowSurfs, secondaryShadowSurfs, interactions );
 		}
@@ -18259,6 +18264,35 @@ void R_LoadARBProgram( int progIndex ) {
 	}
 	end[3] = 0;
 
+	// The heat-haze vertex programs (heathaze.vfp, heathazewithmask.vfp and
+	// mods that copy them) scale the deform by the projection distance as the
+	// dot of ( 1, 0, z, 1 ) with projection row 0, which is the row's scale
+	// term only while the projection is symmetric. An off-axis projection (a
+	// levelshot's side tiles, a VR or stereo eye, the temporal AA jitter) also
+	// adds its shift times the view depth there: the deform swelled to a smear,
+	// or flickered with the jitter at range. The scale term alone is what the
+	// program means, and the same value in a symmetric view. Vulkan's native
+	// heat-haze stage takes the same term (VK_Exec_DrawProgramStage).
+	idStr offAxisSafeSource;
+	if ( prog.target == GL_VERTEX_PROGRAM_ARB ) {
+		static const char *deformScaleLine = "R1, R0, state.matrix.projection.row[0];";
+		offAxisSafeSource = start;
+		const int scaleAt = offAxisSafeSource.Find( deformScaleLine );
+		if ( scaleAt > 0 && offAxisSafeSource.Find( "state.matrix.modelview.row[2]" ) >= 0 ) {
+			int opAt = scaleAt - 1;
+			while ( opAt > 0 && ( offAxisSafeSource[opAt] == ' ' || offAxisSafeSource[opAt] == '\t' ) ) {
+				opAt--;
+			}
+			if ( opAt >= 2 && idStr::Icmpn( offAxisSafeSource.c_str() + opAt - 2, "DP4", 3 ) == 0 ) {
+				const int lineEnd = scaleAt + idStr::Length( deformScaleLine );
+				offAxisSafeSource = offAxisSafeSource.Left( opAt - 2 )
+					+ "MUL R1, R0.x, state.matrix.projection.row[0].x;"
+					+ offAxisSafeSource.Right( offAxisSafeSource.Length() - lineEnd );
+				start = const_cast<char *>( offAxisSafeSource.c_str() );
+			}
+		}
+	}
+
 	if ( prog.ident == VPROG_INTERACTION ) {
 		interactionColorMode_t detectedMode = ICM_PACKED;
 		if ( !RB_DetectInteractionColorMode( start, detectedMode ) ) {
@@ -18405,6 +18439,17 @@ int R_FindARBProgram( GLenum target, const char *program ) {
 	R_LoadARBProgram( i );
 
 	return progs[i].ident;
+}
+
+/*
+==================
+R_PrecacheLevelMaterialPrograms
+
+OpenGL loads a material's ARB programs while the material parses, so the
+level has nothing left to compile here.
+==================
+*/
+void R_PrecacheLevelMaterialPrograms( void ) {
 }
 
 /*

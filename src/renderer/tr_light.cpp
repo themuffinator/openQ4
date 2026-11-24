@@ -979,7 +979,8 @@ viewLight_t *R_SetLightDefViewLight( idRenderLightLocal *light ) {
 	vLight->scissorRect.Clear();
 
 	// calculate the shadow cap optimization states
-	vLight->viewInsideLight = R_TestPointInViewLight( tr.viewDef->renderView.vieworg, light );
+	vLight->viewInsideLight = tr.viewDef->obliqueNearPlane
+		|| R_TestPointInViewLight( tr.viewDef->renderView.vieworg, light );
 	if ( !vLight->viewInsideLight ) {
 		vLight->viewSeesShadowPlaneBits = 0;
 		for ( int i = 0 ; i < light->numShadowFrustums ; i++ ) {
@@ -1202,7 +1203,10 @@ bool R_LinkLightSurf( const drawSurf_t **link, const srfTriangles_t *tri, const 
 	drawSurf->decalColorOffset = 0;
 	drawSurf->decalColorStride = 0;
 	drawSurf->decalColorStageCount = 0;
-	if ( viewInsideShadow ) {
+	// A shadow volume drawn without caps counts on a near plane at the eye. A
+	// mirror's oblique near plane cuts volumes far from it, so its
+	// views draw every volume capped.
+	if ( viewInsideShadow || tr.viewDef->obliqueNearPlane ) {
 		drawSurf->dsFlags |= DSF_VIEW_INSIDE_SHADOW;
 	}
 

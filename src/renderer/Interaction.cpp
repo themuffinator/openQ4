@@ -1919,6 +1919,15 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 	const bool entityModelIsDynamic =
 		entityDef->parms.hModel != NULL &&
 		entityDef->parms.hModel->IsDynamicModel() != DM_STATIC;
+	// AddActiveInteraction never admits a view model (drawn only in, or
+	// depth-hacked for, one view) or a depth-hacked model to a shadow map;
+	// it casts from its stencil volumes alone. Leaving those volumes out for
+	// the map dropped such a model from both representations, and its
+	// light's receivers drew unshadowed.
+	const bool entityNeverMapped =
+		entityDef->parms.allowSurfaceInViewID != 0 ||
+		entityDef->parms.weaponDepthHackInViewID != 0 ||
+		entityDef->parms.modelDepthHack != 0.0f;
 
 	interactionGenerated = false;
 	const bool interactionHasShadows = HasShadows();
@@ -2066,6 +2075,7 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 			surfaceCanCastStencilShadowVolume && shadowLODAdmitted &&
 			( surfaceCanCastDedicatedShadowMap ||
 				surfaceCanCastTranslucentShadowMap ) &&
+			!entityNeverMapped &&
 			volumeIsRegenerated &&
 			!forcePointEmitterStencilGeneration &&
 			R_ShadowMapLightWillUseShadowMaps( lightDef );
@@ -2080,6 +2090,7 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 
 				// this is the only place during gameplay (outside the utilities) that R_CreateShadowVolume() is called
 				sint->shadowTris = R_CreateShadowVolume( entityDef, tri, lightDef, shadowGen, sint->cullInfo );
+				sint->shadowVolumeBuiltEmpty = ( sint->shadowTris == NULL );
 				if ( sint->shadowTris ) {
 					if ( shader->Coverage() != MC_OPAQUE || ( !r_skipSuppress.GetBool() && entityDef->parms.suppressSurfaceInViewID ) ) {
 						// if any surface is a shadow-casting perforated or translucent surface, or the
@@ -2554,6 +2565,13 @@ void idInteraction::AddActiveInteraction( void ) {
 				entityDef->parms.suppressShadowInViewID == tr.viewDef->renderView.viewID ) {
 				shadowSuppressed = true;
 			}
+			// A levelshot leaves out the player's view models, so their shadows
+			// go with them: a view model can still reach the view as a
+			// shadow-only entity of a light it is in.
+			if ( R_ShouldSuppressViewModelForLevelshot( tr.viewDef->renderView.viewID,
+					entityDef->parms.allowSurfaceInViewID, entityDef->parms.weaponDepthHackInViewID ) ) {
+				shadowSuppressed = true;
+			}
 			if ( entityDef->parms.suppressShadowInLightID &&
 				entityDef->parms.suppressShadowInLightID == lightDef->parms.lightId ) {
 				shadowSuppressed = true;
@@ -2721,7 +2739,12 @@ void idInteraction::AddActiveInteraction( void ) {
 					// CreateInteraction probes their stencil volume even when
 					// volumes would be elided. An empty probe has no occlusion
 					// to recover and must not invalidate every other caster.
-					( !sint->pointEmitterCasterSkip || shadowTris != NULL ) ) );
+					( !sint->pointEmitterCasterSkip || shadowTris != NULL ) &&
+					// Nor must any other volume that was built and came out
+					// empty. A mirror, which no map admits, with its light
+					// behind it made the light's maps incomplete with nothing
+					// to stamp instead, and their receivers drew unshadowed.
+					!sint->shadowVolumeBuiltEmpty ) );
 		const bool prelightMapMissingCasterNeedsStencil =
 			shadowMapCasterPolicyActive &&
 			sint->shadowStencilUsesPrelight &&

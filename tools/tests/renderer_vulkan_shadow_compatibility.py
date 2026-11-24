@@ -5907,7 +5907,8 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
             !linkedShadowMapCaster &&
             ( admittedShadowMapCaster ||
                 ( sint->shadowStencilEligible &&
-                    ( !sint->pointEmitterCasterSkip || shadowTris != NULL ) ) );""",
+                    ( !sint->pointEmitterCasterSkip || shadowTris != NULL ) &&
+                    !sint->shadowVolumeBuiltEmpty ) );""",
         "actual-caster map completeness provenance",
     )
     require_compact(
@@ -5931,6 +5932,7 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
             surfaceCanCastStencilShadowVolume && shadowLODAdmitted &&
             ( surfaceCanCastDedicatedShadowMap ||
                 surfaceCanCastTranslucentShadowMap ) &&
+            !entityNeverMapped &&
             volumeIsRegenerated &&
             !forcePointEmitterStencilGeneration &&
             R_ShadowMapLightWillUseShadowMaps( lightDef );""",

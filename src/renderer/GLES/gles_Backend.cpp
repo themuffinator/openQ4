@@ -532,6 +532,11 @@ void R_ReloadARBPrograms_f( const idCmdArgs &args ) {
 	( void )args;
 }
 
+// GLES compiles its programs as the materials parse; nothing is left for the
+// end of level load.
+void R_PrecacheLevelMaterialPrograms( void ) {
+}
+
 void R_ReportShaderPrograms_f( const idCmdArgs &args ) {
 	( void )args;
 }

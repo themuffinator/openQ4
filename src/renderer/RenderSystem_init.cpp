@@ -915,6 +915,7 @@ static idCVar r_temporalAADefaultMigrated( "r_temporalAADefaultMigrated", "0", C
 extern idCVar r_temporalAA;
 idCVar r_frontBuffer( "r_frontBuffer", "0", CVAR_RENDERER | CVAR_BOOL, "draw to front buffer for debugging" );
 idCVar r_skipSubviews( "r_skipSubviews", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = don't render any gui elements on surfaces" );
+idCVar r_skipSubviewClip( "r_skipSubviewClip", "0", CVAR_RENDERER | CVAR_BOOL | CVAR_CHEAT, "1 = draw mirror views without their clip plane (diagnostic)" );
 idCVar r_skipParticles( "r_skipParticles", "0", CVAR_RENDERER | CVAR_INTEGER, "1 = skip all particle systems", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1> );
 idCVar r_subviewOnly( "r_subviewOnly", "0", CVAR_RENDERER | CVAR_BOOL, "1 = don't render main view, allowing subviews to be debugged" );
 idCVar r_shadows( "r_shadows", "1", CVAR_RENDERER | CVAR_BOOL  | CVAR_ARCHIVE, "enable shadows" );
@@ -3037,6 +3038,10 @@ bool R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 
 	tr.tiledViewport[0] = width;
 	tr.tiledViewport[1] = height;
+	// The window's size for BeginFrame (tiledWindow), which every tile after
+	// the first would otherwise take from glConfig, by then the capture's.
+	tr.tiledWindow[0] = oldWidth;
+	tr.tiledWindow[1] = oldHeight;
 
 	// Only tiled captures need to disregard unadjusted light scissors. A
 	// window-sized screenshot must preserve the frame's rendering semantics;
@@ -3137,6 +3142,8 @@ bool R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 	tr.viewportOffset[1] = 0;
 	tr.tiledViewport[0] = 0;
 	tr.tiledViewport[1] = 0;
+	tr.tiledWindow[0] = 0;
+	tr.tiledWindow[1] = 0;
 
 	R_StaticFree( temp );
 	R_StaticFree( rgbaTemp );
@@ -3145,6 +3152,15 @@ bool R_ReadTiledPixels( int width, int height, byte *buffer, renderView_t *ref =
 	// the window's size is restored here.
 	glConfig.vidWidth = oldWidth;
 	glConfig.vidHeight = oldHeight;
+	// and the window's UI viewport, which BeginFrame scaled to a capture
+	// larger than the window, before anything draws to the window again
+	if ( tr.tiledUIViewportSaved ) {
+		glConfig.uiViewportX = tr.tiledUIViewport[0];
+		glConfig.uiViewportY = tr.tiledUIViewport[1];
+		glConfig.uiViewportWidth = tr.tiledUIViewport[2];
+		glConfig.uiViewportHeight = tr.tiledUIViewport[3];
+		tr.tiledUIViewportSaved = false;
+	}
 #ifdef OPENQ4_RENDERER_VK_MODULE
 	// Vulkan publishes each new drawable size from its swapchain. A resize
 	// during the capture leaves the tiles sized for the old window: keep the
@@ -3530,6 +3546,9 @@ static void R_CaptureLevelShotTileRGBA( int width, int height, int blends, const
 	const bool previousDisableLevelshotEntityCulling = tr.disableLevelshotEntityCulling;
 	tr_levelshotProjectionShiftActive = true;
 	tr.disableLevelshotEntityCulling = true;
+	// what a region's view-fitted passes (shadow cascades) fit instead of the region
+	tr_levelshotTileShiftX = projectionShiftX;
+	tr_levelshotTileShiftY = projectionShiftY;
 
 	const int guard = LEVELSHOT_REGION_GUARD;
 	if ( width <= glConfig.vidWidth && height <= glConfig.vidHeight ) {
@@ -3570,6 +3589,8 @@ static void R_CaptureLevelShotTileRGBA( int width, int height, int blends, const
 				regionView.fov_y = RAD2DEG( 2.0f * idMath::ATan( halfY * tanY ) );
 				tr_levelshotProjectionShiftX = 0.5f * ( left + right ) / halfX;
 				tr_levelshotProjectionShiftY = 0.5f * ( top + bottom ) / halfY;
+				tr_levelshotRegionScaleX = halfX;
+				tr_levelshotRegionScaleY = halfY;
 
 				idTempArray<byte> region( regionWidth * regionHeight * 4 );
 				R_CaptureTiledPixelsRGBA( regionWidth, regionHeight, blends, &regionView, region.Ptr() );
@@ -3585,6 +3606,10 @@ static void R_CaptureLevelShotTileRGBA( int width, int height, int blends, const
 	tr_levelshotProjectionShiftActive = false;
 	tr_levelshotProjectionShiftX = 0.0f;
 	tr_levelshotProjectionShiftY = 0.0f;
+	tr_levelshotRegionScaleX = 1.0f;
+	tr_levelshotRegionScaleY = 1.0f;
+	tr_levelshotTileShiftX = 0.0f;
+	tr_levelshotTileShiftY = 0.0f;
 }
 
 /*
@@ -6678,6 +6703,8 @@ void idRenderSystemLocal::Clear( void ) {
 	tiledViewport[1] = 0;
 	tiledWindow[0] = 0;
 	tiledWindow[1] = 0;
+	tiledUIViewport[0] = tiledUIViewport[1] = tiledUIViewport[2] = tiledUIViewport[3] = 0;
+	tiledUIViewportSaved = false;
 	backEndRenderer = BE_BAD;
 	backEndRendererHasVertexPrograms = false;
 	backEndRendererMaxLight = 1.0f;
@@ -6932,6 +6959,8 @@ void idRenderSystemLocal::EndLevelLoad( void ) {
 	session->BeginLoadingAssetQueue( pendingImageLoads );
 	globalImages->EndLevelLoad();
 	session->EndLoadingAssetQueue();
+
+	R_PrecacheLevelMaterialPrograms();
 
 	if ( r_forceLoadImages.GetBool() ) {
 		RB_ShowImages();

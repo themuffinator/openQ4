@@ -245,7 +245,11 @@ idScreenRect R_ScreenRectFromViewFrustumBounds( const idBounds &bounds ) {
 				screenRect.x1, screenRect.y1, screenRect.x2, screenRect.y2 );
 	}
 
-	if ( r_useDepthBoundsTest.GetInteger() ) {
+	// An oblique near plane makes depth depend on more than eye z; the rect
+	// keeps its full 0..1 depth range there.
+	screenRect.zmin = 0.0f;
+	screenRect.zmax = 1.0f;
+	if ( r_useDepthBoundsTest.GetInteger() && !tr.viewDef->obliqueNearPlane ) {
 		R_TransformEyeZToWin( -bounds[0].x, tr.viewDef->projectionMatrix, screenRect.zmin );
 		R_TransformEyeZToWin( -bounds[1].x, tr.viewDef->projectionMatrix, screenRect.zmax );
 	}
@@ -949,6 +953,10 @@ void R_TransposeGLMatrix( const float in[16], float out[16] ) {
 bool tr_levelshotProjectionShiftActive = false;
 float tr_levelshotProjectionShiftX = 0.0f;
 float tr_levelshotProjectionShiftY = 0.0f;
+float tr_levelshotRegionScaleX = 1.0f;
+float tr_levelshotRegionScaleY = 1.0f;
+float tr_levelshotTileShiftX = 0.0f;
+float tr_levelshotTileShiftY = 0.0f;
 levelshotDepthCapture_t tr_levelshotDepthCapture = { NULL, 0, 0, false };
 
 /*
@@ -983,6 +991,7 @@ static bool R_ViewUsesOffAxisFrustum( void ) {
 }
 
 static void R_GetViewFrustumExtents( float &zNear, float &xmin, float &xmax, float &ymin, float &ymax );
+static void R_SetupObliqueNearPlane( void );
 
 /*
 =================
@@ -1122,7 +1131,73 @@ void R_SetupProjection( void ) {
 	tr.viewDef->projectionMatrix[11] = -1;
 	tr.viewDef->projectionMatrix[15] = 0;
 
+	R_SetupObliqueNearPlane();
+
 	R_TemporalPresentation_FinalizeViewProjection( tr.viewDef );
+}
+
+/*
+===============
+R_SetupObliqueNearPlane
+
+A mirror view sees the world from behind its surface: R_MirrorViewBySurface
+gives it one clip plane, and everything between the camera and that plane
+must not draw. Doom 3 clipped only its depth fill, with an alpha-tested texgen
+that no programmable pass (and no Vulkan pass) honours, so the clip is made
+the near plane of the projection instead (Lengyel's oblique frustum). Every
+pass of both backends then clips with it, with no shader involved. Consumers
+that linearise depth from projectionMatrix[10] and [14] must check
+viewDef_t::obliqueNearPlane (soft particles draw plain there).
+
+The far plane is at infinity, so the frustum's farthest corner is a direction:
+the row that maps it to the far plane is scaled by 0.999, as the main
+projection is, so vertexes at infinity do not land on the wraparound point.
+===============
+*/
+static void R_SetupObliqueNearPlane( void ) {
+	viewDef_t *view = tr.viewDef;
+	view->obliqueNearPlane = false;
+	if ( view->numClipPlanes <= 0 ) {
+		return;
+	}
+
+	// the clip plane in eye space; the view matrix is orthonormal, mirrored
+	// or not, so the normal rotates like a direction
+	const float *m = view->worldSpace.modelViewMatrix;
+	const idPlane &world = view->clipPlanes[0];
+	const idVec3 point = world.Normal() * -world[3];
+	idVec4 plane;
+	float pointDot = 0.0f;
+	for ( int row = 0; row < 3; row++ ) {
+		plane[row] = m[0 * 4 + row] * world[0] + m[1 * 4 + row] * world[1] + m[2 * 4 + row] * world[2];
+		const float eyePoint = m[0 * 4 + row] * point[0] + m[1 * 4 + row] * point[1]
+			+ m[2 * 4 + row] * point[2] + m[3 * 4 + row];
+		pointDot += plane[row] * eyePoint;
+	}
+	plane[3] = -pointDot;
+
+	// A camera on the visible side (or on the plane) would put the near plane
+	// behind the eye: keep the ordinary projection for it.
+	if ( plane[3] >= -0.01f ) {
+		return;
+	}
+
+	float *p = view->projectionMatrix;
+	const idVec3 corner(
+		( ( plane[0] >= 0.0f ? 1.0f : -1.0f ) + p[8] ) / p[0],
+		( ( plane[1] >= 0.0f ? 1.0f : -1.0f ) + p[9] ) / p[5],
+		-1.0f );
+	const float cornerDot = plane[0] * corner[0] + plane[1] * corner[1] + plane[2] * corner[2];
+	if ( cornerDot <= 1e-6f ) {
+		// no direction of the frustum reaches the visible side
+		return;
+	}
+	const float scale = 0.999f * 2.0f / cornerDot;
+	p[2] = plane[0] * scale;
+	p[6] = plane[1] * scale;
+	p[10] = plane[2] * scale + 1.0f;
+	p[14] = plane[3] * scale;
+	view->obliqueNearPlane = true;
 }
 
 static void R_GetViewFrustumExtents( float &zNear, float &xmin, float &xmax, float &ymin, float &ymax ) {

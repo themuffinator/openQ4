@@ -29,6 +29,11 @@ bool VK_MaterialPrograms_BindARB( const char *vertexFile, const char *fragmentFi
 const char *VK_MaterialProgramFileName( unsigned int target, unsigned int handle );
 // Whether one ARB program, on its own, translates for this backend.
 bool VK_MaterialPrograms_ARBTranslatable( unsigned int target, const char *file );
+// Compiles the authored GLSL and translated ARB programs the material's
+// stages draw with, as their first draw would; returns how many are ready.
+// Level load calls it (R_PrecacheLevelMaterialPrograms) so glslang runs behind
+// the loading screen instead of in the first frame that shows the material.
+int VK_MaterialPrograms_Precache( const idMaterial *material );
 
 // True the first time a subject/reason pair is seen since the last reload, so
 // a rejected or approximated stage is reported once instead of every frame.

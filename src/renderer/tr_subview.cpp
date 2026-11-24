@@ -309,8 +309,11 @@ static viewDef_t *R_MirrorViewBySurface( drawSurf_t *drawSurf ) {
 
 	R_LocalPointToGlobal( drawSurf->space->modelMatrix, viewOrigin, parms->initialViewAreaOrigin );
 
-	// set the mirror clip plane
-	parms->numClipPlanes = 1;
+	// set the mirror clip plane, as Doom 3 and retail do: what lies behind the
+	// mirror must not draw in front of the reflection. R_SetupProjection makes
+	// it the view's oblique near plane (R_SetupObliqueNearPlane), so every pass
+	// of both backends clips with it.
+	parms->numClipPlanes = r_skipSubviewClip.GetBool() ? 0 : 1;
 	parms->clipPlanes[0] = -camera.axis[0];
 
 	parms->clipPlanes[0][3] = -( camera.origin * parms->clipPlanes[0].Normal() );
@@ -371,6 +374,8 @@ static void R_RemoteRender( drawSurf_t *surf, textureStage_t *stage ) {
 
 	parms->renderView = *surf->space->entityDef->parms.remoteRenderView;
 	parms->renderView.viewID = 0;	// clear to allow player bodies to show up, and suppress view weapons
+	// a camera elsewhere: a parent mirror's clip plane is not its own
+	parms->numClipPlanes = 0;
 	R_SyncSubviewTime( parms );
 	R_ResetSubviewTemporalState( parms );
 	parms->initialViewAreaOrigin = parms->renderView.vieworg;
