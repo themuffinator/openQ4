@@ -16,6 +16,18 @@ namespace openq4 {
 //    button press or a stick or trigger moved past its dead zone. A gamepad
 //    that connects takes over from a plain joystick, as it always has, but
 //    never from another gamepad.
+//  - Use moves charge only from a controller that has been put down: one that
+//    holds nothing (no button, no stick or trigger past its dead zone) and has
+//    not been used for CONTROLLER_HANDOVER_REST_MSEC. One pair of hands often
+//    shows up as two devices: a remapper's virtual pad (DS4Windows, reWASD,
+//    x360ce, Steam Input) beside the physical one. Both report every movement,
+//    and without this rule each event handed charge to the other, releasing
+//    what was held and switching between two differently shaped sticks.
+//  - Twins: when the controller that just lost charge is used again within
+//    CONTROLLER_TWIN_WINDOW_MSEC, it is the same hands on a second device. The
+//    pair is remembered, and the twin takes charge back only after the active
+//    one has rested for CONTROLLER_TWIN_REST_MSEC, so the race at the start of
+//    each movement does not move charge back and forth.
 //  - Chosen device: while the saved device is connected only it can be
 //    active. While it is away the rules above apply, and it takes charge
 //    again when it returns.
@@ -25,6 +37,9 @@ namespace openq4 {
 
 constexpr int CONTROLLER_ROSTER_MAX = 16;
 constexpr int CONTROLLER_IDENTITY_CHARS = 96;
+constexpr int CONTROLLER_HANDOVER_REST_MSEC = 1000;
+constexpr int CONTROLLER_TWIN_WINDOW_MSEC = 250;
+constexpr int CONTROLLER_TWIN_REST_MSEC = 5000;
 
 enum class ControllerChange {
 	None,		// the active controller is the one it was
@@ -37,6 +52,9 @@ struct ControllerEntry {
 	std::uint32_t id = 0;		// the platform's instance id; never 0 for a connected device
 	bool gamepad = false;		// a mapped gamepad, not a plain joystick
 	char identity[CONTROLLER_IDENTITY_CHARS] = {};	// stable across reconnects: GUID, and serial where reported
+	bool used = false;			// whether lastUseMsec holds a use
+	int lastUseMsec = 0;		// when it was last used, on the caller's millisecond clock
+	std::uint32_t twin = 0;		// the other device the same hands drive, if one was seen
 };
 
 class ControllerRoster {
@@ -99,6 +117,14 @@ public:
 			entries[i] = entries[i + 1];
 		}
 		entries[--count] = ControllerEntry();
+		for (int i = 0; i < count; ++i) {
+			if (entries[i].twin == id) {
+				entries[i].twin = 0;
+			}
+		}
+		if (handedFrom == id) {
+			handedFrom = 0;
+		}
 		if (id != active) {
 			return ControllerChange::None;
 		}
@@ -120,17 +146,48 @@ public:
 	}
 
 	// A connected device was used: a button went down, or a stick or trigger
-	// passed its dead zone.
-	ControllerChange NoteUse(std::uint32_t id) {
+	// passed its dead zone. The caller reports use of the active controller
+	// too, so its rest is known, and says whether the active controller holds
+	// anything now (a button, or a stick or trigger past its dead zone).
+	ControllerChange NoteUse(std::uint32_t id, int nowMsec, bool activeHolding) {
 		const int index = Find(id);
-		if (index < 0 || id == active) {
+		if (index < 0) {
+			return ControllerChange::None;
+		}
+		entries[index].used = true;
+		entries[index].lastUseMsec = nowMsec;
+		if (id == active) {
 			return ControllerChange::None;
 		}
 		const int preferred = FindPreferred();
 		if (preferred >= 0 && preferred != index) {
 			return ControllerChange::None;
 		}
+		const int current = Find(active);
+		if (current < 0) {
+			return Activate(id);
+		}
+		ControllerEntry &holder = entries[current];
+		if (id == handedFrom && nowMsec - handoverMsec <= CONTROLLER_TWIN_WINDOW_MSEC) {
+			// the controller that just lost charge moved with the one that took it
+			holder.twin = id;
+			entries[index].twin = holder.id;
+			handedFrom = 0;
+			return ControllerChange::None;
+		}
+		const int rest = holder.twin == id ? CONTROLLER_TWIN_REST_MSEC : CONTROLLER_HANDOVER_REST_MSEC;
+		if (activeHolding || (holder.used && nowMsec - holder.lastUseMsec < rest)) {
+			return ControllerChange::None;
+		}
+		handedFrom = holder.id;
+		handoverMsec = nowMsec;
 		return Activate(id);
+	}
+
+	// The device the active one is known to mirror, or 0.
+	std::uint32_t ActiveTwin() const {
+		const int index = Find(active);
+		return index >= 0 ? entries[index].twin : 0;
 	}
 
 	void Clear() {
@@ -139,6 +196,7 @@ public:
 		}
 		count = 0;
 		active = 0;
+		handedFrom = 0;
 	}
 
 private:
@@ -198,6 +256,8 @@ private:
 	ControllerEntry entries[CONTROLLER_ROSTER_MAX];
 	int count = 0;
 	std::uint32_t active = 0;
+	std::uint32_t handedFrom = 0;	// the controller the last use handover took charge from
+	int handoverMsec = 0;
 	char preference[CONTROLLER_IDENTITY_CHARS] = {};
 };
 

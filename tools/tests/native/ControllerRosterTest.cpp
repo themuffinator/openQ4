@@ -13,6 +13,13 @@
 using openq4::ControllerChange;
 using openq4::ControllerRoster;
 
+// Uses far enough apart that the active controller has always rested.
+static int s_clock = 0;
+static ControllerChange Use(ControllerRoster &roster, std::uint32_t id) {
+	s_clock += 10 * openq4::CONTROLLER_TWIN_REST_MSEC;
+	return roster.NoteUse(id, s_clock, false);
+}
+
 static void ConnectAndUse() {
 	ControllerRoster roster;
 	ControllerChange change;
@@ -26,14 +33,14 @@ static void ConnectAndUse() {
 	CHECK(roster.Active() == 11 && roster.Count() == 2 && roster.Has(12));
 
 	// using the active pad changes nothing
-	CHECK(roster.NoteUse(11) == ControllerChange::None);
+	CHECK(Use(roster, 11) == ControllerChange::None);
 	// using the other pad hands charge over, and back again
-	CHECK(roster.NoteUse(12) == ControllerChange::HandedOver && roster.Active() == 12);
-	CHECK(roster.NoteUse(12) == ControllerChange::None);
-	CHECK(roster.NoteUse(11) == ControllerChange::HandedOver && roster.Active() == 11);
+	CHECK(Use(roster, 12) == ControllerChange::HandedOver && roster.Active() == 12);
+	CHECK(Use(roster, 12) == ControllerChange::None);
+	CHECK(Use(roster, 11) == ControllerChange::HandedOver && roster.Active() == 11);
 	// a device the roster never opened is nobody
-	CHECK(roster.NoteUse(99) == ControllerChange::None && roster.Active() == 11);
-	CHECK(roster.NoteUse(0) == ControllerChange::None);
+	CHECK(Use(roster, 99) == ControllerChange::None && roster.Active() == 11);
+	CHECK(Use(roster, 0) == ControllerChange::None);
 
 	// duplicates and the zero id are refused
 	CHECK(!roster.Add(11, true, "guid-xbox", change) && change == ControllerChange::None);
@@ -76,7 +83,7 @@ static void GamepadOverJoystick() {
 	// a joystick that connects does not take over from a gamepad
 	CHECK(roster.Add(7, false, "stick-two", change) && change == ControllerChange::None && roster.Active() == 6);
 	// but using it does
-	CHECK(roster.NoteUse(7) == ControllerChange::HandedOver && roster.Active() == 7);
+	CHECK(Use(roster, 7) == ControllerChange::HandedOver && roster.Active() == 7);
 }
 
 static void ChosenDevice() {
@@ -90,18 +97,18 @@ static void ChosenDevice() {
 	CHECK(roster.SetPreference("guid-dualsense/serial-7") == ControllerChange::HandedOver && roster.Active() == 12);
 	CHECK(roster.PreferenceConnected());
 	// and use of another pad no longer takes it
-	CHECK(roster.NoteUse(11) == ControllerChange::None && roster.Active() == 12);
+	CHECK(Use(roster, 11) == ControllerChange::None && roster.Active() == 12);
 
 	// while the chosen device is away the others work as Automatic
 	CHECK(roster.Remove(12) == ControllerChange::HandedOver && roster.Active() == 11);
 	CHECK(!roster.PreferenceConnected());
 	roster.Add(13, true, "guid-switch", change);
-	CHECK(roster.NoteUse(13) == ControllerChange::HandedOver && roster.Active() == 13);
+	CHECK(Use(roster, 13) == ControllerChange::HandedOver && roster.Active() == 13);
 
 	// reconnecting keeps the choice: it takes charge back under a new instance id
 	CHECK(roster.Add(31, true, "guid-dualsense/serial-7", change) && change == ControllerChange::HandedOver);
 	CHECK(roster.Active() == 31);
-	CHECK(roster.NoteUse(13) == ControllerChange::None && roster.Active() == 31);
+	CHECK(Use(roster, 13) == ControllerChange::None && roster.Active() == 31);
 
 	// a chosen joystick keeps charge when a gamepad connects
 	ControllerRoster stick;
@@ -120,7 +127,7 @@ static void ChosenDevice() {
 
 	// Automatic again: nothing moves until a pad is used
 	CHECK(roster.SetPreference("") == ControllerChange::None && roster.Active() == 31);
-	CHECK(roster.NoteUse(13) == ControllerChange::HandedOver);
+	CHECK(Use(roster, 13) == ControllerChange::HandedOver);
 	CHECK(roster.SetPreference(nullptr) == ControllerChange::None);
 
 	// a choice made with nothing connected waits for the device
@@ -128,6 +135,77 @@ static void ChosenDevice() {
 	CHECK(empty.SetPreference("later") == ControllerChange::None);
 	CHECK(empty.Add(1, true, "first", change) && change == ControllerChange::Activated);
 	CHECK(empty.Add(2, true, "later", change) && change == ControllerChange::HandedOver && empty.Active() == 2);
+}
+
+static void PutDownBeforeHandover() {
+	ControllerRoster roster;
+	ControllerChange change;
+	roster.Add(11, true, "guid-xbox", change);
+	roster.Add(12, true, "guid-dualsense", change);
+	const int rest = openq4::CONTROLLER_HANDOVER_REST_MSEC;
+	// the active pad is used; the other pad's use waits for it to rest
+	CHECK(roster.NoteUse(11, 1000, false) == ControllerChange::None);
+	CHECK(roster.NoteUse(12, 1000 + rest - 1, false) == ControllerChange::None && roster.Active() == 11);
+	// nor does charge move while the active pad holds something, however long
+	CHECK(roster.NoteUse(12, 1000 + 10 * rest, true) == ControllerChange::None && roster.Active() == 11);
+	// put down and rested: use moves charge
+	CHECK(roster.NoteUse(12, 1000 + 10 * rest + 300, false) == ControllerChange::HandedOver && roster.Active() == 12);
+	// a pad never used since it connected has nothing to rest from
+	ControllerRoster fresh;
+	fresh.Add(1, true, "a", change);
+	fresh.Add(2, true, "b", change);
+	CHECK(fresh.NoteUse(2, 5, false) == ControllerChange::HandedOver && fresh.Active() == 2);
+}
+
+// One pair of hands seen as two devices (a remapper's virtual pad beside the
+// physical one): both report every movement, a few milliseconds apart.
+static void Twins() {
+	ControllerRoster roster;
+	ControllerChange change;
+	roster.Add(11, true, "guid-dualshock", change);
+	roster.Add(12, true, "guid-virtual-xbox", change);
+	CHECK(roster.Active() == 11);
+
+	// a movement held on both: the active pad reports first, every event, and
+	// charge never moves (it used to move on every event)
+	int now = 100;
+	for (int i = 0; i < 200; ++i, now += 4) {
+		CHECK(roster.NoteUse(11, now, true) == ControllerChange::None);
+		CHECK(roster.NoteUse(12, now + 1, true) == ControllerChange::None);
+	}
+	CHECK(roster.Active() == 11 && roster.ActiveTwin() == 0);
+
+	// after a rest the waiting device wins the race once: charge moves, and
+	// the old device moving within the twin window marks the pair
+	now += 2000;
+	CHECK(roster.NoteUse(12, now, false) == ControllerChange::HandedOver && roster.Active() == 12);
+	CHECK(roster.NoteUse(11, now + 3, true) == ControllerChange::None && roster.Active() == 12);
+	CHECK(roster.ActiveTwin() == 11);
+
+	// later races after ordinary rests do not move it back
+	for (int race = 0; race < 5; ++race) {
+		now += 2000;
+		CHECK(roster.NoteUse(11, now, false) == ControllerChange::None);
+		CHECK(roster.NoteUse(12, now + 2, true) == ControllerChange::None);
+		CHECK(roster.Active() == 12);
+	}
+
+	// a long rest of the active device lets the twin take charge: a false
+	// pairing is never permanent
+	now += openq4::CONTROLLER_TWIN_REST_MSEC + 10;
+	CHECK(roster.NoteUse(11, now, false) == ControllerChange::HandedOver && roster.Active() == 11);
+
+	// the twin going away forgets the pair
+	CHECK(roster.Remove(12) == ControllerChange::None && roster.ActiveTwin() == 0);
+
+	// two separate pads used one after another more than the window apart
+	// are not twins
+	ControllerRoster pair;
+	pair.Add(1, true, "a", change);
+	pair.Add(2, true, "b", change);
+	CHECK(pair.NoteUse(2, 10, false) == ControllerChange::HandedOver);
+	CHECK(pair.NoteUse(1, 10 + openq4::CONTROLLER_TWIN_WINDOW_MSEC + 1, false) == ControllerChange::None);
+	CHECK(pair.ActiveTwin() == 0 && pair.Active() == 2);
 }
 
 static void Capacity() {
@@ -194,6 +272,8 @@ int main() {
 	Loss();
 	GamepadOverJoystick();
 	ChosenDevice();
+	PutDownBeforeHandover();
+	Twins();
 	Capacity();
 	Battery();
 	std::puts("controller roster: ok");

@@ -3237,7 +3237,6 @@ and AND-05.
   crosshair at the target's depth, and the Apple GL 2.1 and GLES renderers,
   which keep a flat frame and say why.
 
-
 ## Android and mobile rendering
 
 Sources: [Android build and packaging](android-build.md),
@@ -5216,7 +5215,7 @@ prediction/rewind defaults.
 | MP-19 — Partial | Browser with favourites, filters, find player and tiles; LAN scan. 23 November: an openQ4 master program (`tools/master/openq4_master.py`: challenge-verified heartbeats, the legacy and the extended list, a JSON list for HTTPS) and the browser's HTTPS fallback (`net_serverListUrl`, merged with the master's list); the user chose to keep id's master as the default and the list address empty until the project's hosts are chosen. | A discovery service the project controls with a list fallback, recent servers, region sorting; a fresh install on each platform finds a server. |
 | MP-20 — Not started | Stock Quake 4 physics; Classic double jump and hook; `pm_jumpheight`, `pm_slidevelocity` and `pm_powerslide` synced. | Retail 1.4.2 movement parity evidence on the stock maps at 30, 60 and 90 tics; an optional ProMode-style movement ruleset the bots use. |
 | MP-21 — Partial | Render v14 block container with keyframes, 64-bit files and `compressDemo`; MVD 1.3 records with CRCs and readers for 1.0 to 1.2; the update policy. | One container for every stream, `demoConvert`, the format registry, per-version golden fixtures, byte-identical cross-platform reads in CI. |
-| MP-22 — Partial | Server MVDs with markers, keyframes and auto-tracking; render demos record the local view; a deck with pause, speed, step, seek and follow. 23 November: a player records their own view on any server (`record`, `stopRecord`) as a client-view MVD and plays it back as that player; `demoExport` writes PNG pictures and a WAV sound track; retail Quake 4 render `.demo` files and Quake 4 1.4.2 `.ndmo85` network demos play. | Client-side recording on any server, autoaction, named list, reverse scrub, `timeDemo` for MVD, video and image export, thumbnails and metadata; the retail-demo decision. |
+| MP-22 — Partial | Server MVDs with markers, keyframes and auto-tracking; render demos record the local view; a deck with pause, speed, step, seek and follow. 23 November: a player records their own view on any server (`record`, `stopRecord`) as a client-view MVD and plays it back as that player; `demoExport` writes PNG pictures and a WAV sound track; `recordVideo`, `aviGame` and `aviDemo` record MP4/MKV/WebM/MOV/AVI/GIF video with sound; retail Quake 4 render `.demo` files and Quake 4 1.4.2 `.ndmo85` network demos play. | Client-side recording on any server, autoaction, named list, reverse scrub, `timeDemo` for MVD, video and image export, thumbnails and metadata; the retail-demo decision. |
 | MP-23 — Partial | The render container packs its stream 4.78:1; joints are predicted (v12). | MVD compression and field encodings, 2D/sound/effect encodings, `demoStats`, budgets and targets met byte-exact. |
 | MP-24 — Partial | Native codec flips, truncations and hostile payloads; MVD cut points and recovery; damaged render files play on. | One fuzz corpus for every reader; MVD worker-thread, 64-bit and hours-long recordings; cheats-off, under-load, Vulkan/Linux/macOS/ARM64 recording and playback; cross-platform determinism; a listening check. |
 | MP-25 — Not started; staged plan 21 November | Survey: the server already runs networkless local clients (bots through `InitLocalClient`), and `Draw( clientNum )` and `renderView_t`'s viewport rectangle exist. One human local client, one command generator, one open gamepad, one listener and one active GUI; `src/mpgame/` asks who is local on about 730 lines; whole-target post passes; temporal history slotted only for VR eyes. | Decisions D1-D6 (remote transport, seat identity, stock-interface policy, listener model, keyboard seat, automated seats); then the stages: seats and input, listen-server seats, split views, HUD and menus, audio, remote servers, spectating and demos, cost and qualification. |
@@ -6872,10 +6871,32 @@ Completion substeps:
   opens again at the end ([sound in exports](multiview-demos.md#client-view-recordings-mp-22-23-november-2026)).
   `SoundCaptureTest` covers the arithmetic and the WAV header;
   `mp_client_demo_smoke.py` checks the file's format, length and level and
-  the device's return. The unfinished render-demo `aviDemo` path writes no
-  pictures, so it gets no track. No optional pipe to an external encoder: the
+  the device's return. No optional pipe to an external encoder: the
   [demos guide](../user/multiview-demos.md#export-a-demo-as-pictures) gives
   the `ffmpeg` line instead.
+  Progress, 23 November (fifth round): video capture
+  ([guide](../user/video-capture.md)). `recordVideo`/`stopVideo`/`toggleVideo`
+  record the presented frame (HUD, menus, console) with the game's sound, and
+  `aviGame`/`aviDemo` now produce video instead of the commented-out TGA
+  path. The renderer reads every presented frame back through a four-buffer
+  asynchronous ring beside the save preview (render API 37: GL pixel-pack
+  buffers, Vulkan host buffers retired with their frame slot), so no frame
+  waits for its read. Sound comes from the same loopback mixer the export
+  uses, rendered from the main thread each frame and also played to the
+  speakers through SDL3. Offline recordings run whole tics per video frame
+  (the game slows instead of the video stuttering, and `com_videoFixedStep`
+  pins the presentation fraction to the tic's pose); online they follow the
+  clock and repeat late frames. Encoders: Media Foundation H.264/HEVC + AAC MP4
+  on Windows (loaded at run time for N editions), FFmpeg through SDL3's process
+  API for MKV/WebM/MOV/GIF and other codecs, with GPU encoders used only after
+  a test encode passes, and a built-in OpenDML Motion JPEG AVI writer that
+  needs nothing. Windows checks, decoded with FFmpeg 7.1: MF MP4 on OpenGL and
+  Vulkan (stock `airdefense1` cinematic, `storage1` gameplay), FFmpeg MKV with
+  NVENC in real time (300 of 301 frames distinct), libvpx WebM + Opus, GIF,
+  built-in AVI (300 distinct frames, PCM, no decode errors) and `aviGame`
+  (30 fps, 200 distinct frames), each with audible sound. Open: a multiplayer recording, `aviDemo` of a render demo,
+  Linux and macOS (FFmpeg or AVI there), long recordings past the AVI segment
+  limit, a settings-menu page, and `demoExport` straight to video.
   Progress, 23 November (retail render demos): retail Quake 4 1.4.2 render
   `.demo` files play from the library (listed as **Retail Quake 4 render
   demo** with their level) and with `playDemo` and `timeDemo`, with pause,
@@ -7713,6 +7734,12 @@ session can give, and PAD-10 is a decision.
   loss of the inactive and the active pad, reconnect keeping the choice); an SP
   gameplay harness pausing on loss; an MP HUD notice capture; a battery notice
   from the virtual device's power state; physical runs under PAD-09.
+  24 November 2026: use moves charge only from a controller that has been put
+  down (holding nothing, unused for a second), and a device that moves with
+  the one that just took charge is marked its twin, so a remapper's virtual
+  pad beside the physical one no longer hands charge over on every stick
+  event; gate: the `twins` runtime scenario (79 handovers and a 30% slower
+  turn before, none and the single-pad rate after).
 - [ ] **PAD-02 — P1, implementation: stick aim that reaches full speed and
   turns quickly.** Today both sticks share one radial inner dead zone (`0.18`)
   with no outer dead zone, so a worn stick that never reports full deflection

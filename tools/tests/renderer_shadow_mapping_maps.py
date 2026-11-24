@@ -252,6 +252,9 @@ def main() -> int:
                 "r_mode": -1, "r_customWidth": 960, "r_customHeight": 540,
                 "r_windowWidth": 960, "r_windowHeight": 540,
                 "in_mouse": 0, "in_nograb": 1,
+                # Isolated savepaths: run beside another client instead of
+                # exiting at once, with no log, on the single-instance check.
+                "win_allowMultipleInstances": 1,
                 "com_skipLoadingContinue": 1, "com_allowConsole": 1,
                 "com_maxfps": 120, "r_swapInterval": 0,
                 "g_stopTime": 0, "g_autoScreenshot": 0, "g_autoSkipCinematics": 1,
