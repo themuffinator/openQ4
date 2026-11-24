@@ -9737,6 +9737,10 @@ void idPlayer::UpdateViewAngles( void ) {
 	if ( ( weaponWheelActive || ( usercmd.buttons & ( BUTTON_WEAPONWHEEL | BUTTON_QUICKCHAT ) ) != 0 ) && !spectating && health > 0 &&
 		 !vrTrackedAim ) {
 		UpdateDeltaViewAngles( viewAngles );
+		// The gun's turning sway reads this ring by frame number. A held view
+		// that skipped it left the slots of the last 64 tics in place, and the
+		// raised gun under the wheel shook through that old turning history.
+		loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
 		return;
 	}
 	int i;
@@ -9750,6 +9754,7 @@ void idPlayer::UpdateViewAngles( void ) {
 		if ( !vrTrackedAim ) {
 			UpdateDeltaViewAngles( viewAngles );
 		}
+		loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
 		return;
 	}
 
@@ -9759,6 +9764,7 @@ void idPlayer::UpdateViewAngles( void ) {
 		if ( !vrTrackedAim ) {
 			UpdateDeltaViewAngles( viewAngles );
 		}
+		loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
 		return;
 	}
 

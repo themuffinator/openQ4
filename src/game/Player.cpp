@@ -8941,6 +8941,10 @@ void idPlayer::UpdateViewAngles( void ) {
 	// still against it would turn the tracked world with the hand instead
 	if ( weaponWheelActive && !( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) ) {
 		UpdateDeltaViewAngles( viewAngles );
+		// The gun's turning sway reads this ring by frame number. A held view
+		// that skipped it left the slots of the last 64 tics in place, and the
+		// raised gun under the wheel shook through that old turning history.
+		loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
 		return;
 	}
 
@@ -8953,6 +8957,7 @@ void idPlayer::UpdateViewAngles( void ) {
 		if ( !( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) ) {
 			UpdateDeltaViewAngles( viewAngles );
 		}
+		loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
 		return;
 	}
 

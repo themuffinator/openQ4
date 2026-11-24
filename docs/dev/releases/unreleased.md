@@ -580,6 +580,10 @@ the [development roadmap](../roadmap.md) for current scope.
   camera with autofocus, f-stop, focal length, focus range, round or bladed
   bokeh and a focus view, on OpenGL and Vulkan. See
   [Depth of Field for Screenshots and Video](../../user/depth-of-field.md).
+- Your weapon holds still while the weapon wheel is open, and while quick
+  chat is open in multiplayer. If you had been turning just before, it used
+  to swing back and forth through that turn about once a second until the
+  wheel closed.
 - **Depth of Field** (Settings > Display > Effects, `r_depthOfField`) turns
   the game's own depth of field on or off: the weapon wheel's focus and
   scripted cutscene focus. Enhanced, Quality, Ultra and Maximum turn it on.
