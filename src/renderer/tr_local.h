@@ -2131,7 +2131,16 @@ bool R_StaticIndexCacheAllowed( const idRenderEntityLocal *def );
 // of its prelight volume (tr_light.cpp). NULL when the light has none to give.
 bool R_ShadowMapLightSourceOutsideVolume( const renderLight_t &parms );
 srfTriangles_t *R_ShadowMapPrelightCaster( idRenderLightLocal *light );
-srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri );
+// a perforated world triangle a folded prelight volume casts from (R_ShadowMapBuildPrelightCaster)
+typedef struct shadowMapPrelightCutout_s {
+	idVec3					v[3];
+	idPlane					plane;
+	idBounds				bounds;
+} shadowMapPrelightCutout_t;
+bool R_ShadowMapPrelightVolumeFoldsCaps( const srfTriangles_t *shadowTri );
+bool R_ShadowMapPrelightKeepsCutout( const idRenderLightLocal *light, const idMaterial *shader, const srfTriangles_t *geo );
+srfTriangles_t *R_ShadowMapBuildPrelightCaster( const srfTriangles_t *shadowTri,
+	const idList<shadowMapPrelightCutout_t> *cutouts = NULL );
 bool R_ShadowMapPrelightCasterSelfTest( void );
 // links it into the view light's caster chain (Interaction.cpp)
 void R_ShadowMapLinkPrelightCaster( viewLight_t *vLight );
