@@ -11,8 +11,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER_PATH = ROOT / "src/mpgame/mp/match/MatchRules.h"
-SOURCE_PATH = ROOT / "src/mpgame/mp/match/MatchRules.cpp"
+HEADER_PATH = ROOT / "src/game/mp/match/MatchRules.h"
+SOURCE_PATH = ROOT / "src/game/mp/match/MatchRules.cpp"
 
 
 def read(path: Path) -> str:
@@ -365,15 +365,14 @@ def main() -> None:
             sys.executable,
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchRules.cpp" not in {line.strip() for line in listing}:
+    if "game/mp/match/MatchRules.cpp" not in {line.strip() for line in listing}:
         raise AssertionError("MatchRules.cpp is absent from the canonical MP source list")
 
     print("mp_match_rules_contract: ok")

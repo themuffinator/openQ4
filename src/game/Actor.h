@@ -1,5 +1,5 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
@@ -144,6 +144,7 @@ public:
 	virtual bool			LoadAF( const char* keyname = NULL, bool purgeAF = false );
 	void					SetupBody( void );
 
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	virtual void			CheckBlink( void );
 
 	bool					PointVisible(const idVec3& point) const;
@@ -198,7 +199,7 @@ public:
 	const char *			GetDamageGroup( int location );
 
 							// Scales on the damage this actor deals and takes (1 = unchanged).
-							// AI status modifiers are composed by the virtual accessors.
+							// Not saved: whatever buffs an actor re-applies it after a restore.
 	void					SetDamageScales( float dealt, float taken ) { damageDealtScale = dealt; damageTakenScale = taken; }
 	virtual float			GetDamageDealtScale( void ) const { return damageDealtScale; }
 	virtual float			GetDamageTakenScale( void ) const { return damageTakenScale; }

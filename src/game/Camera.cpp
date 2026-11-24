@@ -1,5 +1,5 @@
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 
@@ -1463,6 +1463,7 @@ bool idDeclCameraDef::Parse( const char *text, const int textLength, bool noCach
 	
 	TIME_THIS_SCOPE( __FUNCLINE__);	
 	(void)noCaching;
+
 	src.LoadMemory( text, textLength, GetFileName(), GetLineNum() );
 	src.SetFlags( DECL_LEXER_FLAGS );
 	src.SkipUntilString( "{" );
@@ -1633,6 +1634,7 @@ CLASS_DECLARATION( idCamera, idCameraAnim )
 	EVENT( EV_IsActive,				idCameraAnim::Event_IsActive )
 	// RAVEN END
 END_CLASS
+
 
 /*
 =====================

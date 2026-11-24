@@ -9,12 +9,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PROTOCOL_H = ROOT / "src/mpgame/mp/match/MatchProtocol.h"
-PROTOCOL_CPP = ROOT / "src/mpgame/mp/match/MatchProtocol.cpp"
-OPERATIONS_H = ROOT / "src/mpgame/mp/match/MatchOperations.h"
-OPERATIONS_CPP = ROOT / "src/mpgame/mp/match/MatchOperations.cpp"
-MODEL_H = ROOT / "src/mpgame/mp/match/MatchControlModel.h"
-MODEL_CPP = ROOT / "src/mpgame/mp/match/MatchControlModel.cpp"
+PROTOCOL_H = ROOT / "src/game/mp/match/MatchProtocol.h"
+PROTOCOL_CPP = ROOT / "src/game/mp/match/MatchProtocol.cpp"
+OPERATIONS_H = ROOT / "src/game/mp/match/MatchOperations.h"
+OPERATIONS_CPP = ROOT / "src/game/mp/match/MatchOperations.cpp"
+MODEL_H = ROOT / "src/game/mp/match/MatchControlModel.h"
+MODEL_CPP = ROOT / "src/game/mp/match/MatchControlModel.cpp"
 OPERATIONS_TEST = ROOT / "tools/tests/mp_match_operations_contract.py"
 MODEL_TEST = ROOT / "tools/tests/mp_match_control_model_contract.py"
 

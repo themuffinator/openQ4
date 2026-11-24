@@ -6,8 +6,8 @@ AI.cpp
 ================
 */
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -1440,6 +1440,7 @@ void idAI::Think( void ) {
 		ClearRetchBuff( buffOwner );
 	}
 
+	// if we are completely closed off from the player, don't do anything at all
 	if ( CheckDormant() ) {
 		return;
 	}
@@ -1694,9 +1695,13 @@ void idAI::UpdateStates ( void ) {
 
 	// Continue updating tactical state if for some reason we dont have one 
 	if ( !aifl.dead && !aifl.scripted && !aifl.action && stateThread.IsIdle ( ) && aifl.scriptedEndWithIdle ) {
-		if ( !UpdateTactical ( 0 ) && stateThread.IsIdle ( ) && !combat.fl.ignoreEnemies && ( enemy.ent || combat.tacticalMaskUpdate ) ) {
-			// Keep combat actions alive while async tactical searches continue.
-			PostState ( "State_Combat" );
+		if ( gameLocal.isMultiplayer ) {
+			UpdateTactical ( 0 );
+		} else {
+			if ( !UpdateTactical ( 0 ) && stateThread.IsIdle ( ) && !combat.fl.ignoreEnemies && ( enemy.ent || combat.tacticalMaskUpdate ) ) {
+				// Keep combat actions alive while async tactical searches continue.
+				PostState ( "State_Combat" );
+			}
 		}
 	} else {
 		UpdateState();
@@ -2006,8 +2011,8 @@ void idAI::RestoreAwakeningState( idRestoreGame *savefile ) {
 		  renderEntity.overlayShader == declManager->FindMaterial( "common/damage_boost_overlay", false ) ) ) {
 		// Retch restore events reconstruct v3 buffs after all allies restore.
 		renderEntity.overlayShader = NULL;
-		UpdateVisuals();
-	}
+	UpdateVisuals();
+}
 }
 
 /*
@@ -2681,7 +2686,10 @@ void idAI::UpdateEnemy ( void ) {
 	// Skill level 4: (1.0 - 2.0), with pressure starting farther out
 	if ( combat.aggressiveRange > 0.0f ) {
 		float aggressiveRange = combat.aggressiveRange;
-		if ( g_skill.GetInteger() >= MAX_SKILL_LEVELS - 1 ) {
+		// openQ4: SP's fifth (nightmare) level starts the pressure farther out; MP
+		// keeps the retail range. Both divide by four: retail MP had four skill
+		// levels and divided by MAX_SKILL_LEVELS, SP has five and divides by MAX - 1.
+		if ( !gameLocal.isMultiplayer && g_skill.GetInteger() >= MAX_SKILL_LEVELS - 1 ) {
 			aggressiveRange *= 1.5f;
 		}
 		combat.aggressiveScale = (g_skill.GetFloat() / ( MAX_SKILL_LEVELS - 1 ));
@@ -4319,7 +4327,7 @@ void idAI::OnDeath( void ){
 		ExecScriptFunction( funcs.death, this );
 		funcs.death.RemoveIndex( 0 );
 	} else {
-		ExecScriptFunction( funcs.death );
+	ExecScriptFunction( funcs.death );
 	}
 
 /* DONT DROP ANYTHING FOR NOW

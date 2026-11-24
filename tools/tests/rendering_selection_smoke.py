@@ -55,7 +55,7 @@ def main():
     if (game / 'openQ4Config.cfg').exists(): raise RuntimeError('Use a fresh isolated profile')
     runtime = ROOT / '.install'
     verify_runtime_is_current(runtime)
-    paths = [runtime / n for n in ('openQ4-client_x64.exe', 'renderer-gl_x64.dll', 'renderer-vk_x64.dll', 'baseoq4/game-sp_x64.dll')]
+    paths = [runtime / n for n in ('openQ4-client_x64.exe', 'renderer-gl_x64.dll', 'renderer-vk_x64.dll', 'baseoq4/game_x64.dll')]
     hashes = {p.relative_to(runtime).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     launch = []
     settings = {'fs_savepath': str(save), 'fs_devpath': str(save), 'fs_game': 'baseoq4',

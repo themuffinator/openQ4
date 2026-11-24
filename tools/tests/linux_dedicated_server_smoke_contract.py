@@ -185,7 +185,7 @@ def main() -> None:
         "validate_linux_dedicated_runtime_dependencies(root, dedicated_runtime_specs)",
         "staged Linux dedicated dependency validation",
     )
-    require(validator, 'staged_binary_arch(binary_path, "game-mp")', "staged MP module dependency validation")
+    require(validator, "staged_binary_arch(binary_path, GAME_MODULE_STEM)", "staged game module dependency validation")
     for dependency in (
         "libc.so.6",
         "libstdc++.so.6",
@@ -208,7 +208,7 @@ def main() -> None:
     )
     require(
         release_verifier,
-        "[(dedicated[0], arch), (mp_modules[0], arch)]",
+        "[(dedicated[0], arch), (game_modules[0], arch)]",
         "extracted Linux release dedicated and MP module dependency validation",
     )
 

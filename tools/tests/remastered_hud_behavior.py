@@ -13,7 +13,7 @@ from filesystem_case_segments import function_body
 ROOT = Path(__file__).resolve().parents[2]
 
 SUPPORT = r'''
-#include "src/mpgame/mp/MatchPhase.h"
+#include "src/game/mp/MatchPhase.h"
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -141,7 +141,7 @@ def main():
     if not output.is_relative_to((ROOT / '.tmp').resolve()):
         parser.error('use a project-local .tmp output')
     output.mkdir(parents=True, exist_ok=True)
-    path = ROOT / 'src/mpgame/MultiplayerGame.cpp'
+    path = ROOT / 'src/game/MultiplayerGame.cpp'
     source = path.read_text(encoding='utf-8-sig')
     context = function_body(source, 'void idMultiplayerGame::ProjectClientManagedMatchContext(')
     start = context.index('\t// Keep the full record')

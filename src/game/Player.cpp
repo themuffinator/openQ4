@@ -1,12 +1,13 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
+#include "gamesys/HudPrimitives.h"
 
 #include "ai/AI.h"
 #include "ai/AI_Manager.h"
@@ -15,6 +16,7 @@
 #include "vehicle/Vehicle.h"
 #include "client/ClientModel.h"
 #include "ai/AAS_tactical.h"
+#include "bots/Bot.h"
 #include "Healing_Station.h"
 #include "ai/AI_Medic.h"
 
@@ -46,6 +48,7 @@ idCVar cl_player_brightskin_enemy( "cl_player_brightskin_enemy", "0", CVAR_FLOAT
 idCVar cl_player_brightskin_team( "cl_player_brightskin_team", "0", CVAR_FLOAT | CVAR_GAME | CVAR_ARCHIVE, "teammate player brightskin strength in multiplayer", 0.0f, 1.0f );
 idCVar cl_player_brightskin_enemy_color( "cl_player_brightskin_enemy_color", "1 0.05 0.02", CVAR_GAME | CVAR_ARCHIVE, "enemy player brightskin color as RGB floats" );
 idCVar cl_player_brightskin_team_color( "cl_player_brightskin_team_color", "0.05 1 0.22", CVAR_GAME | CVAR_ARCHIVE, "teammate player brightskin color as RGB floats" );
+idCVar g_showPlayerVisibilityEffects( "g_showPlayerVisibilityEffects", "0", CVAR_GAME | CVAR_BOOL, "log which players receive the outline / rimlight / brightskin overlays and why the rest do not" );
 
 
 /*
@@ -78,8 +81,32 @@ const float	PLAYER_ITEM_DROP_SPEED	= 100.0f;
 // how many units to raise spectator above default view height so it's in the head of someone
 const int SPECTATE_RAISE = 25;
 
+// openQ4: the knockback a fresh spawn starts (SpawnToPoint).  Its physics runs it down a
+// frame at a time from the spawn's own frame, so a client reads from what is left how many
+// frames ago the server placed the player (ReadFromSnapshot).
+const int SPAWN_KNOCKBACK_MSEC = 100;
+// openQ4: the longest gap in a player's snapshots that still shows a death or a hit it
+// hid (idPlayer::ReadFromSnapshot): four snapshots at the default 33 ms
+const int FEEDBACK_HITCH_MSEC = 150;
+// openQ4: the hit count a player's snapshots carry (idPlayer::WritePlayerStateToSnapshot),
+// and the longest pause in reading it across which a moved count still sounds a hit
+const int HIT_FEEDBACK_COUNT_BITS = 4;
+const int HIT_FEEDBACK_COUNT_MASK = ( 1 << HIT_FEEDBACK_COUNT_BITS ) - 1;
+const int HIT_FEEDBACK_RESUME_MSEC = 500;
+
 const int	HEALTH_PULSE		= 1000;			// Regen rate and heal leak rate (for health > 100)
 const int	ARMOR_PULSE			= 1000;			// armor ticking down due to being higher than maxarmor
+
+// openQ4: where an Instagib kill leaves the body, well past the gib threshold (health < -20)
+const int	INSTAGIB_GIB_HEALTH	= -100;
+
+// Quake 4: The Awakening's powerups
+const int	ADRENALINE_HEALTH_BOOST	= 400;		// health Adrenaline lends, taken back over its time
+const int	ADRENALINE_HEALTH_FLOOR	= 100;		// Adrenaline ends when the payback reaches this
+const int	FC_ARMOR_REGEN_PULSE	= 500;
+const int	FC_ARMOR_REGEN_STEP		= 5;
+const int	FC_ARMOR_REGEN_OVER_MAX	= 100;		// how far past max armor FC Armor Regen builds
+const int	FC_ARMOR_REGEN_WIRE_MAX	= 255;		// the player snapshot carries armor in a byte
 const int	AMMO_REGEN_PULSE	= 1000;			// ammo regen in Arena CTF
 const int	POWERUP_BLINKS		= 5;			// Number of times the powerup wear off sound plays
 const int	POWERUP_BLINK_TIME	= 1000;			// Time between powerup wear off sounds
@@ -98,7 +125,7 @@ const int	MAX_INVENTORY_ITEMS = 20;
 const int	ARENA_POWERUP_MASK = ( 1 << POWERUP_AMMOREGEN ) | ( 1 << POWERUP_GUARD ) | ( 1 << POWERUP_DOUBLER ) | ( 1 << POWERUP_SCOUT );
 
 static int Player_GetCorpseRemoveDelayMS( void ) {
-	const float overrideDelay = g_corpseRemoveDelaySP.GetFloat();
+	const float overrideDelay = gameLocal.IsMultiplayerMode() ? g_corpseRemoveDelayMP.GetFloat() : g_corpseRemoveDelaySP.GetFloat();
 
 	if ( overrideDelay < 0.0f ) {
 		return -1;
@@ -122,8 +149,160 @@ static bool Player_UseCorpseSinkNoRagdoll( void ) {
 	return Player_GetCorpseSinkMode() >= 2;
 }
 
+/*
+================
+Player_ServerVisibilityLimit
+
+openQ4 (MP-15): the strongest brightskin, rimlight or outline the server lets a
+player put on another player. Read from the server info, so every client of a
+server draws under the same limit.
+================
+*/
+static float Player_ServerVisibilityLimit( void ) {
+	if ( !gameLocal.isMultiplayer ) {
+		return 1.0f;
+	}
+	return idMath::ClampFloat( 0.0f, 1.0f, gameLocal.serverInfo.GetFloat( "si_maxBrightskin", "1" ) );
+}
+
 static float Player_ClampedVisibilityCVar( const idCVar &cvar ) {
 	return idMath::ClampFloat( 0.0f, 1.0f, cvar.GetFloat() );
+}
+
+// Identifies the answer the overlay decision reached, so a steady state prints one
+// line instead of one per frame. An id rather than the message text, because the
+// applied case varies along several axes and enumerating a literal per combination
+// stopped scaling the moment spectating and through-world joined the set.
+enum playerVisibilityReason_t {
+	PVR_NONE = 0,
+	PVR_NOT_MULTIPLAYER,
+	PVR_HIDDEN,
+	PVR_SPECTATING,
+	PVR_DEAD,
+	PVR_NO_VIEWER,
+	PVR_IS_VIEWER,
+	PVR_VIEWER_DEAD,
+	PVR_OTHER_INSTANCE,
+	PVR_NO_STRENGTH,
+	PVR_APPLIED,
+
+	PVR_APPLIED_TEAM_COLOR	= 1 << 8,
+	PVR_APPLIED_SPECTATING	= 1 << 9,
+	PVR_APPLIED_HEAD		= 1 << 10,
+	PVR_APPLIED_WEAPON		= 1 << 11,
+	PVR_APPLIED_THROUGH		= 1 << 12
+};
+
+/*
+================
+Player_ReportVisibilityEffects
+
+Says what happened to one player's overlays, once per change of answer. The last
+answer is forgotten while the diagnostic is off - otherwise turning it on to ask
+why a player has no overlay is met with silence, because that same answer was
+already printed the last time it was on.
+================
+*/
+static void Player_ReportVisibilityEffects( const int clientNum, const int reasonId, const char *reason ) {
+	static int lastReason[MAX_CLIENTS] = { PVR_NONE };
+
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+	if ( !g_showPlayerVisibilityEffects.GetBool() ) {
+		lastReason[clientNum] = PVR_NONE;
+		return;
+	}
+	if ( reasonId == lastReason[clientNum] ) {
+		return;
+	}
+	lastReason[clientNum] = reasonId;
+
+	const char *name = gameLocal.userInfo[clientNum].GetString( "ui_name" );
+	gameLocal.Printf( "player visibility: client %d '%s'%s %s\n",
+		clientNum,
+		( name != NULL && name[0] != '\0' ) ? name : "?",
+		botManager.IsBot( clientNum ) ? " (bot)" : "",
+		reason );
+}
+
+/*
+================
+Player_VisibilityReference
+
+The player whose side the overlays are judged from.
+
+A live viewer is its own reference. A spectator following someone borrows that
+player's side, which is what makes team colours mean the same thing to the
+spectator as to the player being followed. Free flight has no side at all, and
+that is a state the colour choice has to answer for rather than a reason to skip:
+a free spectator is exactly who most needs to see everyone.
+================
+*/
+static idPlayer *Player_VisibilityReference( idPlayer *localViewer, bool &spectatorView ) {
+	// A participant in a spectator camera (eliminated, benched) keeps its own
+	// side's view: only someone who chose to watch sees everyone.
+	spectatorView = localViewer->spectating && localViewer->wantSpectate;
+	if ( !spectatorView ) {
+		return localViewer;
+	}
+
+	if ( localViewer->spectator >= 0 && localViewer->spectator != localViewer->entityNumber ) {
+		idPlayer *followed = gameLocal.GetClientByNum( localViewer->spectator );
+		if ( followed != NULL && !followed->spectating ) {
+			return followed;
+		}
+	}
+
+	return NULL;
+}
+
+/*
+================
+Player_VisibilityUsesTeamColor
+
+Which of the two visibility colours a player takes.
+
+With a reference player it is the ordinary question - ally or opponent. Free
+flight has no side, so in a team game the two colours become the two teams, keyed
+on the team index so the assignment holds for a whole match instead of shifting
+with whoever happens to be on screen. Outside a team game there are no sides and
+everyone reads as an opponent, which is the same single colour a player sees.
+================
+*/
+static bool Player_VisibilityUsesTeamColor( const idPlayer *reference, const idPlayer *subject ) {
+	if ( !gameLocal.IsTeamGame() ) {
+		return false;
+	}
+	if ( reference != NULL ) {
+		return reference->team == subject->team;
+	}
+
+	return subject->team == TEAM_MARINE;
+}
+
+/*
+================
+Player_VisibilityStrength
+
+A spectator is watching the whole match, so what it sees must not depend on which
+of a player's two side-specific cvars happens to be set: either one being above
+zero shows everybody. A live viewer keeps the exact cvar for the side it is
+looking at.
+================
+*/
+static float Player_VisibilityStrength( const bool spectatorView, const bool teamColor,
+		const idCVar &teamCVar, const idCVar &enemyCVar ) {
+	const float teamValue = Player_ClampedVisibilityCVar( teamCVar );
+	const float enemyValue = Player_ClampedVisibilityCVar( enemyCVar );
+
+	if ( spectatorView ) {
+		return Max( teamValue, enemyValue );
+	}
+
+	// openQ4 (MP-15): a server may cap how strongly its players mark each other
+	// (si_maxBrightskin). Someone watching is not playing and keeps their own setting.
+	return Min( teamColor ? teamValue : enemyValue, Player_ServerVisibilityLimit() );
 }
 
 static bool Player_ParseVisibilityColor( const char *text, idVec3 &color ) {
@@ -179,6 +358,10 @@ static idVec4 Player_BrightSkinColor( const bool teammate, const float alpha ) {
 static const char *Player_ForcedModelCVarString( const idCVar &cvar ) {
 	const char *model = cvar.GetString();
 	if ( model == NULL || model[0] == '\0' || idStr::Icmp( model, "_disabled" ) == 0 ) {
+		return "";
+	}
+	// openQ4 (MP-15): a server may ask that every player is drawn as they chose to be
+	if ( gameLocal.isMultiplayer && !gameLocal.serverInfo.GetBool( "si_forcedModels", "1" ) ) {
 		return "";
 	}
 
@@ -344,6 +527,9 @@ nextWeaponCombo_t weaponComboChart[12] = {
 // RAVEN END
 
 #include "gamesys/WeaponWheelLegacy.inl"
+#include "gamesys/WeaponWheel.inl"
+#include "QuickChat.inl"
+#include "gamesys/RetainedStatusBar.inl"
 
 const idVec4 marineHitscanTint( 0.69f, 1.0f, 0.4f, 1.0f );
 const idVec4 stroggHitscanTint( 1.0f, 0.5f, 0.0f, 1.0f );
@@ -360,6 +546,7 @@ void idInventory::Clear( void ) {
 	carryOverWeapons	= 0;
 	powerups			= 0;
 	armor				= 0;
+	armorTier			= 0;
 	maxarmor			= 0;
 	secretAreasDiscovered = 0;
 
@@ -414,6 +601,26 @@ void idInventory::ClearPowerUps( void ) {
 		powerupEndTime[ i ] = 0;
 	}
 	powerups = 0;
+}
+
+void idInventory::ShiftMatchTime( int deltaMsec ) {
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+	const int maxInt = 0x7fffffff;
+#define SHIFT_INVENTORY_TIME( value ) \
+	do { if ( ( value ) > 0 ) { ( value ) = ( value ) > maxInt - deltaMsec ? maxInt : ( value ) + deltaMsec; } } while ( 0 )
+	for ( int index = 0; index < POWERUP_MAX; ++index ) {
+		SHIFT_INVENTORY_TIME( powerupEndTime[ index ] );
+	}
+	for ( int index = 0; index < MAX_WEAPONS; ++index ) {
+		SHIFT_INVENTORY_TIME( ammoRegenTime[ index ] );
+	}
+	SHIFT_INVENTORY_TIME( ammoPredictTime );
+	SHIFT_INVENTORY_TIME( lastGiveTime );
+	SHIFT_INVENTORY_TIME( nextItemPickup );
+	SHIFT_INVENTORY_TIME( onePickupTime );
+#undef SHIFT_INVENTORY_TIME
 }
 
 /*
@@ -495,6 +702,7 @@ void idInventory::RestoreInventory( idPlayer *owner, const idDict &dict ) {
 	// health/armor
 	maxHealth		= dict.GetInt( "maxhealth", "100" );
 	armor			= dict.GetInt( "armor", "50" );
+	armorTier		= 0;
 	maxarmor		= dict.GetInt( "maxarmor", "100" );
 
 	// ammo
@@ -571,7 +779,7 @@ void idInventory::Save( idSaveGame *savefile ) const {
 		savefile->WriteInt( weaponMods[i] );
 	}
 
-	for( i = 0; i < POWERUP_MAX; i++ ) {
+	for( i = 0; i < POWERUP_SAVED_COUNT; i++ ) {
 		savefile->WriteInt( powerupEndTime[ i ] );
 	}
 
@@ -651,8 +859,11 @@ void idInventory::Restore( idRestoreGame *savefile ) {
 		savefile->ReadInt( weaponMods[i] );
 	}
 
-	for( i = 0; i < POWERUP_MAX; i++ ) {
+	for( i = 0; i < POWERUP_SAVED_COUNT; i++ ) {
 		savefile->ReadInt( powerupEndTime[ i ] );
+	}
+	for( ; i < POWERUP_MAX; i++ ) {
+		powerupEndTime[ i ] = 0;
 	}
 
 	savefile->ReadInt( ammoPredictTime );
@@ -1014,6 +1225,10 @@ bool idInventory::Give( idPlayer *owner, const idDict &spawnArgs, const char *st
 	int						max;
 	int						amount;
 
+	if ( owner->IsFakeClient() ) {
+		return false;
+	}
+
 	if ( !idStr::Icmpn( statname, "ammo_", 5 ) ) {
 		i = AmmoIndexForAmmoClass( statname );
 		max = MaxAmmoForAmmoClass( owner, statname );
@@ -1098,13 +1313,10 @@ bool idInventory::Give( idPlayer *owner, const idDict &spawnArgs, const char *st
 
 			// find the number of the matching weapon names
 			i = owner->SlotForWeapon ( weaponName );
-// RAVEN BEGIN
-// mekberg: check for not found weapons
 			if ( i == -1 ) {
 				gameLocal.Warning( "Unknown weapon '%s'", weaponName.c_str() );
 				return false;
 			}
-// RAVEN END
 
  			if ( gameLocal.isMultiplayer 
 				&& ( weapons & ( 1 << i ) ) ) {
@@ -1129,20 +1341,22 @@ bool idInventory::Give( idPlayer *owner, const idDict &spawnArgs, const char *st
 
  			if ( !gameLocal.world->spawnArgs.GetBool( "no_Weapons" ) || ( weaponName == "weapon_fists" ) ) {
  				if ( ( weapons & ( 1 << i ) ) == 0 || gameLocal.isMultiplayer ) {
-					if ( ( owner->GetUserInfo()->GetBool( "ui_autoSwitch" ) 
-						|| ( gameLocal.isMultiplayer && gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ) )
-						&& idealWeapon && !checkOnly )
+					// openQ4: ui_autoSwitch (Smart by default) and ui_weaponOrder decide
+					// whether a pickup takes over the weapon in hand. Buying always switches.
+					if ( idealWeapon && !checkOnly &&
+						 ( ( gameLocal.isMultiplayer && gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ) ||
+						   owner->AutoSwitchOnPickup( *idealWeapon, i ) ) )
 					{
 						// client prediction should not get here
 						assert( !gameLocal.isClient );
  						*idealWeapon = i;
- 					} 
+ 					}
  					if ( owner->hud && updateHud && lastGiveTime + 1000 < gameLocal.time && !checkOnly ) {
  						owner->hud->SetStateInt( "newWeapon", i );
  						owner->hud->HandleNamedEvent( "newWeapon" );
  						lastGiveTime = gameLocal.time;
  					}
-					if( !checkOnly ) {
+					if ( !checkOnly ) {
  						weapons |= ( 1 << i );
 					}
  					tookWeapon = true;
@@ -1251,11 +1465,19 @@ idPlayer::idPlayer
 ==============
 */
 idPlayer::idPlayer() {
+	InitWeaponWheel();
+	InitQuickChat();
+	InitStatusBar();
+	memset( &usercmd, 0, sizeof( usercmd ) );
 	vrButtonCrouch = false;
 	vrVehicleDeltaYaw = 0.0f;
 	vrVehicleYaw = 0.0f;
 	vrVehicleYawValid = false;
 	vrVehicleSeatPending = false;
+	vrPresentationCamera = false;
+
+	vrRoomScaleOrigin.Zero();
+	vrRoomScaleOriginValid = false;
 	vrRoomScaleStep.Zero();
 	vrRoomScaleStepTime = -1;
 	memset( &vrBodyRig, 0, sizeof( vrBodyRig ) );
@@ -1280,6 +1502,8 @@ idPlayer::idPlayer() {
 	unarmedArmsLeaveWeight = 0.0f;
 	unarmedWorldModelHidden = false;
 	unarmedIdleRestartTime = -1;
+	vrSnapshotDeltaYaw = 0.0f;
+	vrSnapshotDeltaYawValid = false;
 	vrBodyScale = 1.0f;
 	vrBodyOrigin.Zero();
 	vrBodyAxis.Identity();
@@ -1288,7 +1512,6 @@ idPlayer::idPlayer() {
 		vrBodyElbow[ vrHand ].Zero();
 		vrBodyWrist[ vrHand ].Zero();
 	}
-	memset( &usercmd, 0, sizeof( usercmd ) );
 
 	alreadyDidTeamAnnouncerSound = false;
 
@@ -1311,6 +1534,11 @@ idPlayer::idPlayer() {
 	oldFlags				= 0;
 
 	lastHitTime				= 0;
+	lastHitFrame			= 0;
+	lastHitArmor			= false;
+	hitFeedbackCount		= 0;
+	netHitFeedbackCount		= -1;
+	netHitFeedbackTime		= 0;
 	lastSavingThrowTime		= 0;
 
 	weapon					= NULL;
@@ -1334,6 +1562,21 @@ idPlayer::idPlayer() {
 	deathClearContentsTime	= 0;
 	corpseSinkStartTime		= 0;
 	nextHealthPulse			= 0;
+	adrenalineHealthDrain	= 0;
+	classicMegaDecayTime	= 0;
+	classicHookState		= CLASSIC_HOOK_NONE;
+	classicHookOrigin.Zero();
+	classicHookStart.Zero();
+	classicHookDir.Zero();
+	classicHookFireTime		= 0;
+	classicHookReleaseTime	= 0;
+	classicHookAnchor		= NULL;
+	classicHookAnchorLocal.Zero();
+	classicHookReelSound	= false;
+	memset( &classicHookCable, 0, sizeof( classicHookCable ) );
+	classicHookCableHandle	= -1;
+	memset( &classicHookHead, 0, sizeof( classicHookHead ) );
+	classicHookHeadHandle	= -1;
 
 	scoreBoardOpen			= false;
 	forceScoreBoard			= false;
@@ -1360,6 +1603,14 @@ idPlayer::idPlayer() {
 	minRespawnTime			= 0;
 	maxRespawnTime			= 0;
 
+	warmupArsenalRestoreWeapons = 0;
+	warmupArsenalGranted	= false;
+
+	hitFeedbackVictim		= NULL;
+	hitFeedbackWeapon		= -1;
+	hitFeedbackDamage		= 0;
+	hitFeedbackFlags		= 0;
+
 	firstPersonViewOrigin	= vec3_zero;
 	firstPersonViewAxis		= mat3_identity;
 	ResetPresentationViewState();
@@ -1367,6 +1618,7 @@ idPlayer::idPlayer() {
 	hipJoint				= INVALID_JOINT;
 	chestJoint				= INVALID_JOINT;
  	headJoint				= INVALID_JOINT;
+	neckLeanJoint			= INVALID_JOINT;
 
 	bobFoot					= 0;
 	bobFrac					= 0.0f;
@@ -1462,8 +1714,6 @@ idPlayer::idPlayer() {
 	
 	oldMouseX				= 0;
 	oldMouseY				= 0;
-	InitWeaponWheel();
-	InitStatusBar();
 
 	lastDamageDef			= 0;
 	lastDamageDir			= vec3_zero;
@@ -1471,6 +1721,8 @@ idPlayer::idPlayer() {
 	lastDamageLocation		= 0;
 
 	predictedFrame			= 0;
+	remotePredictedTics		= 0;
+	remoteChainResimulatedTics = 0;
 	predictedOrigin			= vec3_zero;
 	predictedAngles			= ang_zero;
 	predictedUpdated		= false;
@@ -1495,16 +1747,25 @@ idPlayer::idPlayer() {
 
  	respawning				= false;
  	ready					= false;
+	readyUserInfo			= false;
  	leader					= false;
  	lastSpectateChange		= 0;
+	spectatorFollowSlot		= -1;
+	spectatorFollowSpawnId	= 0;
+	spectatorAutoFollow		= MP_AUTOTRACK_OFF;
+	spectatorSpeedScale		= 1.0f;
 	lastArenaChange			= 0;
  	lastTeleFX				= -9999;
 
  	weaponCatchup			= false;
+	netWeaponRaiseTime		= -1;
 	startupLoadoutDepth		= 0;
  	lastSnapshotSequence	= 0;
+	lastSnapshotTime		= 0;
  
  	aimClientNum			= -1;
+	MPWeaponOrderClear( weaponOrder );
+	weaponOrderParsed		= false;
  
  	spawnedTime				= 0;
  
@@ -1538,6 +1799,8 @@ idPlayer::idPlayer() {
 
 	mutedPlayers = 0;
 	friendPlayers = 0;
+	memset( mutedPlayerIdentities, 0, sizeof( mutedPlayerIdentities ) );
+	memset( friendPlayerIdentities, 0, sizeof( friendPlayerIdentities ) );
 	connectTime = 0;
 	rank = -1;
 	arena = 0;
@@ -1564,10 +1827,8 @@ idPlayer::idPlayer() {
 
 	lastPickupTime = 0;
 
-	int		i;
-
-	for( i = 0; i < MAX_CONCURRENT_VOICES; i++ ) {
-
+	int	i;
+	for ( i = 0; i < MAX_CONCURRENT_VOICES; i++ ) {
 		voiceDest[i] = -1;
 		voiceDestTimes[i] = 0;
 	}
@@ -1580,6 +1841,19 @@ idPlayer::idPlayer() {
 	teamAmmoRegenPending	= false;
 	teamDoubler			= NULL;		
 	teamDoublerPending		= false;
+
+	leanVelocity = vec3_zero;
+	leanMaxSpeed = 0.0f;
+	leanBlendRatio = 0.0f;
+	leanMaxLateralAngle = 0.0f;
+	leanMaxForwardAngle = 0.0f;
+	leanHeadRatio = 0.0f;
+	leanHipRatio = 0.0f;
+
+	ignoreOnGroundUntilFrame = 0;
+	prevOnGround = true;
+	clientIdealWeaponPredictFrame = -1;
+	serverReceiveEvent = false;
 }
 
 /*
@@ -1650,7 +1924,7 @@ void idPlayer::SetWeapon( int weaponIndex ) {
 	
 	// Make sure weapon is hidden
 	if ( !weaponEnabled ) {
-		Event_DisableWeapon( );
+		Event_DisableWeapon();
 	}
 }
 
@@ -1789,7 +2063,14 @@ idPlayer::Init
 ==============
 */
 void idPlayer::Init( void ) {
+	ResetWeaponWheel( true );
+	ResetQuickChat();
 	const char			*value;
+	const idDict		*userInfo = GetUserInfo();
+
+	if ( gameLocal.isMultiplayer ) {
+		Hide();
+	}
 	if ( entityNumber == gameLocal.localClientNum ) {
 		ResetOpenQ4TestInput();
 	}
@@ -1797,6 +2078,8 @@ void idPlayer::Init( void ) {
 	noclip					= false;
 	godmode					= false;
 	godmodeDamage			= 0;
+	inactivityLastInputTime	= gameLocal.time;
+	inactivityWarned		= false;
 	undying					= g_forceUndying.GetBool() ? !gameLocal.isMultiplayer : false;
 
 	oldButtons				= 0;
@@ -1808,8 +2091,14 @@ void idPlayer::Init( void ) {
 	weaponSwitchTime		= 0;
 	weaponEnabled			= true;
 	startupLoadoutDepth		= 0;
- 	showWeaponViewModel		= GetUserInfo()->GetBool( "ui_showGun" );
+ 	showWeaponViewModel		= userInfo ? userInfo->GetBool( "ui_showGun" ) : cvarSystem->GetCVarBool( "ui_showGun" );
 	oldInventoryWeapons		= 0;
+
+	lastHitFrame			= 0;
+	lastHitArmor			= false;
+	netHitFeedbackCount		= -1;
+	// openQ4: never carry a live hit marker across a respawn
+	rvHitMarker::Clear();
 
 	lastDmgTime				= 0;
 	
@@ -1846,7 +2135,6 @@ void idPlayer::Init( void ) {
 	
 	talkingNPC				= NULL;
  	talkCursor				= 0;
-	ResetWeaponWheel( true );
 
 	lightningEffects		= 0;
 	lightningNextTime		= 0;
@@ -1866,27 +2154,37 @@ void idPlayer::Init( void ) {
 	// restore persistent data
 	RestorePersistantInfo();
 
+	// openQ4: a new life starts with no mega health draining and the hook in.
+	classicMegaDecayTime = 0;
+	ResetClassicHook( false );
+
 	bobCycle	= 0;
 
 	SetupWeaponEntity( );
 	currentWeapon = -1;
 	previousWeapon = -1;
-	flashlightOn	  = false;
+	
+	// Flashlight is a single-player mechanic.
+	flashlightOn	  = gameLocal.IsMultiplayerMode() && !gameLocal.isMultiplayer;
+
 	idealLegsYaw = 0.0f;
 	legsYaw = 0.0f;
 	legsForward = true;
 	oldViewYaw = 0.0f;
 
-// RAVEN BEGIN
-// abahr: need to init this
+	leanVelocity = vec3_zero;
+
+	ignoreOnGroundUntilFrame = 0;
+	prevOnGround = true;
+
 	vehicleCameraDist = 0.0f;
 
-// mekberg: moved into function.
-	SetPMCVars( );	
-// RAVEN END
+	SetPMCVars();
 
 	// air always initialized to maximum too
 	airTics = pm_airTics.GetFloat();
+	airReadout.Reset( gameLocal.time );
+	airPublishClock.Reset();
 	airless = false;
 
 // openQ4 BEGIN
@@ -1903,11 +2201,8 @@ void idPlayer::Init( void ) {
 	gibsLaunched = false;
 	gibDir.Zero();
 
-// RAVEN BEGIN
-// abahr: changed to GetCurrentGravity
 	// set the gravity
 	physicsObj.SetGravity( gameLocal.GetCurrentGravity(this) );
-// RAVEN END
 
 	// start out standing
 	SetEyeHeight( pm_normalviewheight.GetFloat() );
@@ -1917,14 +2212,13 @@ void idPlayer::Init( void ) {
 	viewBobAngles.Zero();
 	viewBob.Zero();
 
-	if( gameLocal.isMultiplayer && gameLocal.IsTeamGame() ) {
+	if ( gameLocal.isMultiplayer && gameLocal.IsTeamGame() ) {
 		value = spawnArgs.GetString( va( "model_%s", team ? "strogg" : "marine" ), NULL );
-	}
-	else {
+	} else {
 		value = spawnArgs.GetString( "model" );
 	}
 
-	if( gameLocal.isMultiplayer ) {
+	if ( gameLocal.isMultiplayer ) {
 		UpdateModelSetup( true );
 	} else {
 		if ( value && ( *value != 0 ) ) {
@@ -1982,8 +2276,24 @@ void idPlayer::Init( void ) {
  		gameLocal.Error( "Joint '%s' not found for 'joint_head' on '%s'", value, name.c_str() );
  	}
 
+	if ( gameLocal.isMultiplayer ) {
+		value = spawnArgs.GetString( "joint_neckLean", "neckcontrol" );
+		neckLeanJoint = animator.GetJointHandle( value );
+		if ( neckLeanJoint == INVALID_JOINT ) {
+			gameLocal.Error( "Joint '%s' not found for 'joint_neck' on '%s'", value, name.c_str() );
+		}
+
+		// read player lean properties
+		spawnArgs.GetFloat( "lean_maxSpeed", "500", leanMaxSpeed );
+		spawnArgs.GetFloat( "lean_blendRatio", "0.9", leanBlendRatio );
+		spawnArgs.GetFloat( "lean_maxLateralAngle", "30", leanMaxLateralAngle );
+		spawnArgs.GetFloat( "lean_maxForwardAngle", "50", leanMaxForwardAngle );
+		spawnArgs.GetFloat( "lean_headRatio", "-0.5", leanHeadRatio );
+		spawnArgs.GetFloat( "lean_hipRatio", "0.5", leanHipRatio );
+
+	}
 	// initialize the script variables
-	memset ( &pfl, 0, sizeof( pfl ) );
+	memset( &pfl, 0, sizeof( pfl ) );
 	pfl.onGround = true;
 	pfl.noFallingDamage = false;
 
@@ -1998,6 +2308,10 @@ void idPlayer::Init( void ) {
 	privateCameraView	= NULL;
 
 	lastSpectateChange	= 0;
+	spectatorFollowSlot	= -1;
+	spectatorFollowSpawnId = 0;
+	spectatorAutoFollow	= MP_AUTOTRACK_OFF;
+	spectatorAutoTrack.Reset();
 	lastArenaChange		= 0;
  	lastTeleFX			= -9999;
 
@@ -2012,6 +2326,7 @@ void idPlayer::Init( void ) {
  	SetPrivateCameraView( NULL );
  
  	lastSnapshotSequence	= 0;
+	netWeaponRaiseTime		= -1;
  
 	if ( !gameLocal.isMultiplayer ) {
 		// in MP we set isStrogg in UpdateModelSetup()
@@ -2043,7 +2358,7 @@ void idPlayer::Init( void ) {
 	invisibilityOverlay = declManager->FindMaterial( spawnArgs.GetString( "mtr_invisibility_overlay" ), false );
 	powerUpOverlay		= NULL;
 
-	if ( gameLocal.isMultiplayer && entityNumber == gameLocal.localClientNum ) {
+	if ( gameLocal.isMultiplayer && IsLocalClient() ) {
 		if ( (gameLocal.mpGame.GetGameState()->GetMPGameState() != WARMUP) && gameLocal.mpGame.GetGameState()->GetMPGameState() != SUDDENDEATH ){
 			if( gameLocal.gameType != GAME_TOURNEY || ((rvTourneyGameState*)(gameLocal.mpGame.GetGameState()))->GetArena( arena ).GetState() != AS_WARMUP && ((rvTourneyGameState*)(gameLocal.mpGame.GetGameState()))->GetArena( arena ).GetState() != AS_SUDDEN_DEATH )  {
 				// don't clear notices while in warmup modes or sudden death
@@ -2080,6 +2395,9 @@ void idPlayer::Init( void ) {
 		teamDoublerPending = false;
 		teamDoubler = PlayEffect( "fx_doubler", renderEntity.origin, renderEntity.axis, true );
 	}
+	
+	clientIdealWeaponPredictFrame = -1;
+	serverReceiveEvent = false;
 }
 
 /*
@@ -2102,7 +2420,7 @@ idPlayer::GetCursorGUI
 idUserInterface* idPlayer::GetCursorGUI( void ) {
 	idStr temp;
 
-	assert( !gameLocal.isMultiplayer || gameLocal.localClientNum == entityNumber );
+	assert( !gameLocal.isMultiplayer || IsLocalClient() );
 	if ( cursor ) {
 		return cursor;
 	}
@@ -2124,7 +2442,7 @@ void idPlayer::Spawn( void ) {
 	idBounds	bounds;
 	bool		startupLoadoutApplied = false;
 
-	if ( entityNumber >= MAX_CLIENTS ) {
+	if ( entityNumber >= MAX_CLIENTS && !IsFakeClient() ) {
 		gameLocal.Error( "entityNum > MAX_CLIENTS for player.  Player may only be spawned with a client." );
 	}
 
@@ -2135,9 +2453,9 @@ void idPlayer::Spawn( void ) {
 		// always start in spectating state waiting to be spawned in
 		// do this before SetClipModel to get the right bounding box
 		spectating = true;
-		initialJoinPending = !gameLocal.isClient && !spawnArgs.FindKey( "botname" );
+		initialJoinPending = !gameLocal.isClient && !IsFakeClient();
 		initialJoinSpectateApplied = false;
-		initialJoinMenuPending = ( entityNumber == gameLocal.localClientNum ) && !cvarSystem->GetCVarBool( "ui_autoJoin" );
+		initialJoinMenuPending = IsLocalClient() && !cvarSystem->GetCVarBool( "ui_autoJoin" );
 		if ( initialJoinPending ) {
 			idDict *userInfo = GetUserInfo();
 			const bool autoJoin = userInfo->GetBool( "ui_autoJoin", "0" );
@@ -2172,7 +2490,7 @@ void idPlayer::Spawn( void ) {
 
 	// only the local player needs guis
 	// for server netdemos that have no local player, we use demo_* guis in idGameLocal
-	if ( !gameLocal.isMultiplayer || entityNumber == gameLocal.localClientNum ) {
+	if ( !gameLocal.isMultiplayer || IsLocalClient() ) {
 		
 		// load HUD
 		hud = NULL;
@@ -2231,7 +2549,6 @@ void idPlayer::Spawn( void ) {
 		gameLocal.mpGame.ClearVote( entityNumber );
 	}
 
-	SetLastHitTime( 0, false );
 	// openQ4: never carry a live hit marker across a spawn
 	rvHitMarker::Clear();
 
@@ -2243,7 +2560,7 @@ void idPlayer::Spawn( void ) {
 	// initialize user info related settings
 	// on server, we wait for the userinfo broadcast, as this controls when the player is initially spawned in game
 	// ocassionally, a race condition may mark a client in-game before he is spawned, if this is the case, parse the userinfo here
-	if ( (gameLocal.isClient || entityNumber == gameLocal.localClientNum) || (gameLocal.isServer && gameLocal.mpGame.IsInGame( entityNumber ) ) ) {
+	if ( (gameLocal.isClient || IsLocalClient() ) || (gameLocal.isServer && gameLocal.mpGame.IsInGame( entityNumber ) ) ) {
 		UserInfoChanged();
 	}
 
@@ -2320,11 +2637,8 @@ void idPlayer::Spawn( void ) {
 		if ( weapon ) {
 			weapon->LowerWeapon();
 		}
-// RAVEN BEGIN
-// mekberg: set to blaster now and disable the weapon.
-		idealWeapon = SlotForWeapon ( "weapon_blaster" ); 
-		Event_DisableWeapon( );
-// RAVEN END
+		idealWeapon = SlotForWeapon( "weapon_blaster" ); 
+		Event_DisableWeapon();
 	} else {
 		hiddenWeapon = false;
 	}
@@ -2341,7 +2655,7 @@ void idPlayer::Spawn( void ) {
 	tipUp = false;
 	objectiveUp = false;
 
-	aiManager.AddTeammate ( this );
+	aiManager.AddTeammate( this );
 
 	if ( inventory.levelTriggers.Num() ) {
 		PostEventMS( &EV_Player_LevelTrigger, 0 );
@@ -2354,20 +2668,7 @@ void idPlayer::Spawn( void ) {
 	noFallDelta = spawnArgs.GetFloat("no_fall_delta", "7");
 
 	// precache decls
-	declManager->FindType( DECL_ENTITYDEF, "damage_fatalfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_hardfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_softfall", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_noair", false, false );
-// openQ4 BEGIN
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_drown", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_lava", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_openq4_slime", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "liquid_openq4", false, false );
-// openQ4 END
-	declManager->FindType( DECL_ENTITYDEF, "damage_suicide", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "damage_telefrag", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "dmg_shellshock", false, false );
-	declManager->FindType( DECL_ENTITYDEF, "dmg_shellshock_nohl", false, false );
+	PrecacheSpawnDecls();
 
 	gibSkin = declManager->FindSkin( spawnArgs.GetString( "skin_gibskin" ) );
 
@@ -2401,7 +2702,7 @@ void idPlayer::Spawn( void ) {
 
 	// zero out view angles when we spawn ourselves in MP - the server will send down
 	// the correct ones (only zero if our input is still zero'd)
-	if( gameLocal.isClient && gameLocal.localClientNum == entityNumber && usercmd.angles[ 0 ] == 0 && usercmd.angles[ 1 ] == 0 && usercmd.angles[ 2 ] == 0 ) {
+	if( gameLocal.isClient && IsLocalClient() && usercmd.angles[ 0 ] == 0 && usercmd.angles[ 1 ] == 0 && usercmd.angles[ 2 ] == 0 ) {
 		deltaViewAngles = ang_zero;
 	}
 //RITUAL BEGIN
@@ -2409,11 +2710,12 @@ void idPlayer::Spawn( void ) {
 	inventory.carryOverWeapons = 0;
 //RITUAL END
 
-	itemCosts = static_cast< const idDeclEntityDef * >( declManager->FindType( DECL_ENTITYDEF, "ItemCostConstants", false ) );
-
 	// The local player's retained gameplay documents load now, inside the
 	// level load, so their first use builds nothing.
 	PrecacheWeaponWheelGui();
+	if ( gameLocal.isMultiplayer ) {
+		PrecacheQuickChatGui();
+	}
 	PrecacheHudPresentation();
 }
 
@@ -2421,10 +2723,15 @@ void idPlayer::Spawn( void ) {
 ==============
 idPlayer::PrecacheHudPresentation
 
-The crosshair and hit marker the game draws itself (rvHudPrimitives) each draw
-through a retained view of the HUD artwork. A view built on its first draw held
-that frame, so the first hit of a level stalled. The local player builds the
-views as it spawns, inside the level load; they last until the next one.
+The crosshair, hit marker and damage numbers the game draws itself
+(rvHudPrimitives) each draw through a retained view of the HUD artwork. A view
+built on its first draw held that frame, so the first damage number of a match
+stalled the client mid-fight. A client sends the server no commands while a
+frame stalls: the server's copy of its aim stood still while it turned, and
+after MAX_USERCMD_DUPLICATION repeated commands the server let go of the
+attack. The local player builds the views as it spawns, inside the level load
+on a listen server (a joining client spawns with its first snapshot). They
+last until the next level load, through respawns and spectating.
 ==============
 */
 void idPlayer::PrecacheHudPresentation( void ) {
@@ -2435,6 +2742,11 @@ void idPlayer::PrecacheHudPresentation( void ) {
 		uiManager->PrecacheHudPrimitives( "native/crosshair" );
 	} else if ( hud_hitMarker.GetBool() ) {
 		uiManager->PrecacheHudPrimitives( "native/hit-marker" );
+	}
+	if ( gameLocal.isMultiplayer ) {
+		if ( hud_damageNumbers.GetInteger() > DAMAGENUMBERS_OFF ) {
+			uiManager->PrecacheHudPrimitives( "native/damage-numbers" );
+		}
 	}
 }
 
@@ -2453,7 +2765,9 @@ idPlayer::~idPlayer() {
 	if ( vrBodyJoints != NULL ) {
 		Mem_Free16( vrBodyJoints );
 	}
+	FreeClassicHookPresentation();
 	FreeWeaponWheelGui();
+	FreeQuickChatGui();
 	FreeStatusBar();
 	if( gameLocal.mpGame.GetGameState() ) {
 		gameLocal.mpGame.GetGameState()->ClientDisconnect( this );
@@ -3185,6 +3499,9 @@ void idPlayer::Restart( void ) {
 	if ( gameLocal.isClient ) {
 		// clear the existing model to force a reload
 		Init();
+		if ( !spectating ) {
+			Show();
+		}
 	} else {
 		// choose a random spot and prepare the point of view in case player is left spectating
 		assert( spectating );
@@ -3195,6 +3512,10 @@ void idPlayer::Restart( void ) {
 	}
 
 	lastKiller = NULL;
+	// openQ4: a hit staged by a projectile or splash lands after this player's own
+	// think and is published on the next one.  If a restart happens in that window
+	// the plum would be positioned from the victim's NEW location, so drop it.
+	FlushHitFeedbackState();
 	useInitialSpawns = true;
 }
 
@@ -3203,6 +3524,30 @@ void idPlayer::Restart( void ) {
 idPlayer::ServerSpectate
 ================
 */
+/*
+================
+idPlayer::RevokeWarmupArsenal
+
+Hands back the loadout the player had before warmup armed them. Called when the
+match goes live: nothing else takes those weapons away, because MP respawns do
+not clear inventory.weapons.
+================
+*/
+void idPlayer::RevokeWarmupArsenal( void ) {
+	if ( !warmupArsenalGranted ) {
+		return;
+	}
+	inventory.weapons = warmupArsenalRestoreWeapons;
+	warmupArsenalRestoreWeapons = 0;
+	warmupArsenalGranted = false;
+	CacheWeapons();
+	// The warmup weapon may no longer be held, so make sure something valid is
+	// in hand rather than leaving the view model on a revoked slot.
+	if ( currentWeapon >= 0 && ( inventory.weapons & ( 1 << currentWeapon ) ) == 0 ) {
+		NextBestWeapon();
+	}
+}
+
 void idPlayer::ServerSpectate( bool spectate ) {
 	assert( !gameLocal.isClient );
 
@@ -3296,10 +3641,14 @@ when called here with spectating set to true, just place yourself and init
 void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_angles ) {
 	idVec3 spec_origin;
 
-	assert( !gameLocal.isClient );
+	assert( !gameLocal.isClient || IsFakeClient() );
 
 // RITUAL BEGIN
 // squirrel: Mode-agnostic buymenus
+	// openQ4: Init() clears the weapon mods; the ones bought for a weapon the
+	// buying mode carries over come back with it below.
+	int carriedWeaponMods[ MAX_WEAPONS ];
+	memcpy( carriedWeaponMods, inventory.weaponMods, sizeof( carriedWeaponMods ) );
 	if ( gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ) {
 		// Record previous weapons for later restoration
 		inventory.carryOverWeapons &= ~CARRYOVER_WEAPONS_MASK;
@@ -3311,11 +3660,21 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 
 	Init();
 
+	// openQ4: a respawn teleports the player, so every position the lag
+	// compensation recorded for them is now a lie about where they can be shot.
+	if ( gameLocal.isServer ) {
+		gameLocal.InvalidateMPLagCompensationHistory( entityNumber );
+		if ( net_mpHitscanDebug.GetBool() && !spectating ) {
+			// The weapon for this life is made and raised on this frame (MP_WEAPON
+			// raise); a client raises its own from that time.
+			gameLocal.Printf( "MP_WEAPON respawn client=0 owner=%d local=%d time=%d\n", entityNumber,
+				entityNumber == gameLocal.localClientNum ? 1 : 0, gameLocal.time );
+		}
+	}
+
 	// Force players to use bounding boxes when in multiplayer
 	if ( gameLocal.isMultiplayer ) {
-// jmarshall - breaks multiplayer.
-//		use_combat_bbox = true;
-// jmarshall end
+		use_combat_bbox = true;
 
 		// Make sure the combat model is unlinked
 		if ( combatModel ) {
@@ -3371,6 +3730,7 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 	legsYaw = 0.0f;
 	idealLegsYaw = 0.0f;
 	oldViewYaw = viewAngles.yaw;
+	leanVelocity = vec3_zero;
 
 	if ( spectating ) {
 		Hide();
@@ -3413,7 +3773,7 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 	}
 
 	// don't allow full run speed for a bit
-	physicsObj.SetKnockBack( 100 );
+	physicsObj.SetKnockBack( SPAWN_KNOCKBACK_MSEC );
 
 	// set our respawn time and buttons so that if we're killed we don't respawn immediately
 	minRespawnTime = gameLocal.time;
@@ -3436,6 +3796,11 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 			{
 				int ammoIndex	= inventory.AmmoIndexForWeaponIndex( weaponIndex );
 				inventory.ammo[ ammoIndex ] = inventory.StartingAmmoForWeaponIndex( weaponIndex );
+			}
+			// openQ4: and the mods bought for a carried weapon
+			if ( inventory.carryOverWeapons & ( 1 << weaponIndex ) )
+			{
+				inventory.weaponMods[ weaponIndex ] |= carriedWeaponMods[ weaponIndex ];
 			}
 		}
 
@@ -3464,6 +3829,65 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 	}
 // RITUAL END
 
+// openQ4 BEGIN
+	// A fixed loadout - Instagib's railgun, a weapon arena's weapon - replaces
+	// every other loadout, warmup's included: the match is fought with exactly
+	// this from the first spawn to the last.
+	const char *fixedWeapon = gameLocal.isMultiplayer ? gameLocal.mpGame.FixedLoadoutWeapon() : NULL;
+	const bool fixedLoadout = ( fixedWeapon != NULL );
+	const bool instagib = gameLocal.isMultiplayer && gameLocal.mpGame.IsInstagib();
+	if ( fixedLoadout && !spectating ) {
+		GiveFixedLoadout( fixedWeapon );
+	}
+
+	// Warmup is for warming up: Quake Live hands out the full arsenal so the
+	// pre-match period is practice rather than a race for the rocket launcher.
+	if ( gameLocal.isMultiplayer && !spectating && !fixedLoadout && gameLocal.serverInfo.GetBool( "si_warmupWeapons" ) ) {
+		mpGameState_t mpState = gameLocal.mpGame.GetGameState()->GetMPGameState();
+
+		if ( mpState == WARMUP || mpState == COUNTDOWN ) {
+			// Only what the map actually contains: warmup is practice for the
+			// fight that follows, and a weapon that is not on the map is not
+			// part of it.
+			//
+			// Remember the loadout underneath so it can be handed back when the
+			// match goes live. Nothing clears inventory.weapons on an MP respawn
+			// (idInventory::Clear is not called there), so without this the
+			// warmup arsenal simply stays for the whole match.
+			if ( !warmupArsenalGranted ) {
+				warmupArsenalRestoreWeapons = inventory.weapons;
+				warmupArsenalGranted = true;
+			}
+			inventory.weapons |= gameLocal.mpGame.GetMapWeaponMask();
+			CacheWeapons();
+			GiveStuffToPlayer( this, "ammo", "" );
+		}
+	}
+
+	// Clan Arena is fought on a fixed loadout: everyone starts every round on
+	// exactly equal terms, which is what makes it a fight rather than a map
+	// control game.  Granting it here rather than on the round-live edge means a
+	// player is armed from the moment they exist - through the countdown, after
+	// a mid-round join, and after a thaw - instead of being handed the arsenal
+	// at "FIGHT" with a blaster already in their hands.
+	if ( gameLocal.isMultiplayer && !spectating && !instagib &&
+		 MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) ) {
+		// Magazines too. Init() preserves inventory.clip across a respawn, so
+		// without this a player carries last round's part-empty magazines into
+		// a mode whose whole point is that every round starts identical - and
+		// bots, which are built fresh, would get full ones.
+		// A weapon arena played over such a mode keeps its one weapon and
+		// still gets the mode's armour and health.
+		if ( !fixedLoadout ) {
+			memset( inventory.clip, -1, sizeof( inventory.clip ) );
+			GiveStuffToPlayer( this, "weapons", "" );
+			GiveStuffToPlayer( this, "ammo", "" );
+		}
+		GiveStuffToPlayer( this, "armor", "" );
+		GiveStuffToPlayer( this, "health", "" );
+	}
+// openQ4 END
+
 	BecomeActive( TH_THINK );
 
 	// run a client frame to drop exactly to the floor,
@@ -3480,7 +3904,42 @@ void idPlayer::SpawnToPoint( const idVec3 &spawn_origin, const idAngles &spawn_a
 
 // openQ4 BEGIN
 	SpawnLiquidTestVolume();
+
+	// A bot moved here by a round or match restart never passes through the
+	// dead frame that resets its route, enemy memory and aim, so tell it that
+	// this is a new life.
+	if ( gameLocal.isServer && gameLocal.isMultiplayer ) {
+		botManager.OnPlayerRespawned( entityNumber );
+	}
 // openQ4 END
+}
+
+/*
+===============
+idPlayer::GiveFixedLoadout
+
+openQ4: one weapon that never runs out, and the gauntlet as the one other way
+to kill: Instagib's railgun, or a weapon arena's weapon
+(idMultiplayerGame::FixedLoadoutWeapon). Runs on every spawn, on the server
+and on each client alike, and replaces whatever Init() handed out from the
+player def.
+===============
+*/
+void idPlayer::GiveFixedLoadout( const char *weaponDef ) {
+	const int fixed = SlotForWeapon( weaponDef );
+	const int gauntlet = SlotForWeapon( "weapon_gauntlet" );
+	if ( fixed < 0 ) {
+		gameLocal.Warning( "idPlayer::GiveFixedLoadout: '%s' has no %s slot", spawnArgs.GetString( "classname" ), weaponDef );
+		return;
+	}
+
+	inventory.weapons = ( 1 << fixed ) | ( gauntlet >= 0 ? ( 1 << gauntlet ) : 0 );
+	// A negative count is unlimited: HasAmmo always answers it, UseAmmo never
+	// spends it, and the snapshot carries -1 as a value of its own.
+	inventory.ammo[ inventory.AmmoIndexForWeaponIndex( fixed ) ] = -1;
+	inventory.clip[ fixed ] = -1;
+	CacheWeapons();
+	idealWeapon = fixed;
 }
 
 /*
@@ -3491,6 +3950,10 @@ Saves any inventory and player stats when changing levels.
 ===============
 */
 void idPlayer::SavePersistantInfo( void ) {
+	if ( IsFakeClient() ) {
+		return;
+	}
+
 	idDict &playerInfo = gameLocal.persistentPlayerInfo[entityNumber];
 
 	playerInfo.Clear();
@@ -3514,10 +3977,14 @@ Restores any inventory and player stats when changing levels.
 ===============
 */
 void idPlayer::RestorePersistantInfo( void ) {
+	if ( IsFakeClient() ) {
+		return;
+	}
+
  	if ( gameLocal.isMultiplayer ) {
  		gameLocal.persistentPlayerInfo[entityNumber].Clear();
  	}
-
+ 
 	// openQ4: the run's play time as the player first entered this map. A
 	// player who enters again (playerModel) keeps it, since the persistent
 	// info may hold a later save's snapshot by then; a new game starts at zero.
@@ -3560,6 +4027,9 @@ idPlayer::GetUserInfo
 ================
 */
 idDict *idPlayer::GetUserInfo( void ) {
+	if ( IsFakeClient() ) {
+		return NULL;
+	}
 	return &gameLocal.userInfo[ entityNumber ];
 }
 
@@ -3590,7 +4060,7 @@ void idPlayer::UpdateModelSetup( bool forceReload ) {
 			newModelName = Player_ForcedModelCVarString( g_forceStroggModel );
 		} else {
 			uiKeyName = va( "ui_model_%s", idMultiplayerGame::teamNames[ team ] );
-			newModelName = GetUserInfo()->GetString( uiKeyName );
+			newModelName = GetUserInfo() ? GetUserInfo()->GetString( uiKeyName ) : "";
 		}
 	} else {
 		defaultModel = spawnArgs.GetString( "def_default_model" );
@@ -3599,7 +4069,7 @@ void idPlayer::UpdateModelSetup( bool forceReload ) {
 			newModelName = Player_ForcedModelCVarString( g_forceModel );
 		} else {
 			uiKeyName = "ui_model";
-			newModelName = GetUserInfo()->GetString( uiKeyName );
+			newModelName = GetUserInfo() ? GetUserInfo()->GetString( uiKeyName ) : "";
 		}	
 	}
 
@@ -3617,7 +4087,7 @@ void idPlayer::UpdateModelSetup( bool forceReload ) {
 	// validate that the model they've selected is OK for this team game
 	if( gameLocal.IsTeamGame() && model ) {
 		if( idStr::Icmp( model->team, idMultiplayerGame::teamNames[ team ] ) ) {
-			gameLocal.Warning( "idPlayer::UpdateModelSetup() - Player %d (%s) set to model %s which is restricted to team %s (Player team: %s)\n", entityNumber, GetUserInfo()->GetString( "ui_name" ), newModelName, model->team.c_str(), idMultiplayerGame::teamNames[ team ] );
+			gameLocal.Warning( "idPlayer::UpdateModelSetup() - Player %d (%s) set to model %s which is restricted to team %s (Player team: %s)\n", entityNumber, GetUserInfo() ? GetUserInfo()->GetString( "ui_name" ) : "?", newModelName, model->team.c_str(), idMultiplayerGame::teamNames[ team ] );
 			if( uiKeyName ) {
 				cvarSystem->SetCVarBool( uiKeyName, "" );
 			}
@@ -3635,10 +4105,10 @@ void idPlayer::UpdateModelSetup( bool forceReload ) {
 			gameLocal.Error( "idPlayer::UpdateModelSetup() - Can't find default model (%s)\n", defaultModel );
 		} else {
 			// If it's not valid, set the cvar to the default model
-			if( uiKeyName ) {
+			if( uiKeyName && GetUserInfo() ) {
 				GetUserInfo()->Set( uiKeyName, defaultModel );
 
-				if( entityNumber == gameLocal.localClientNum ) {
+				if( IsLocalClient() ) {
 					cvarSystem->SetCVarString( uiKeyName, defaultModel );
 				}
 
@@ -3661,6 +4131,24 @@ void idPlayer::UpdateModelSetup( bool forceReload ) {
 	if( modelDecl && !modelDecl->team.Icmp( "strogg" ) ) {
 		isStrogg = true;
 	}
+	
+	if (gameLocal.isClient || gameLocal.isListenServer)
+		UpdateSounds(modelDecl);
+}
+
+void idPlayer::UpdateSounds(const rvDeclPlayerModel *modelDecl)
+{
+	// reset to the player.def sounds just in case we're switching from a model 
+	// which defines sounds back to one that doesnt
+	const idDict* playerDict = gameLocal.FindEntityDefDict( "player_marine", false );
+	const idKeyValue *kv = playerDict->MatchPrefix( "snd_", NULL );
+	while (kv) 
+	{
+		spawnArgs.Set(kv->GetKey().c_str(), kv->GetValue().c_str());
+		kv = playerDict->MatchPrefix( "snd_", kv );
+	}
+
+	spawnArgs.Copy(modelDecl->sounds);
 }
 
 /*
@@ -3669,6 +4157,8 @@ idPlayer::BalanceTeam
 ==============
 */
 bool idPlayer::BalanceTeam( void ) {
+	assert( !IsFakeClient() );
+
 	int			i, balanceTeam, teamCount[2];
 	idEntity	*ent;
 
@@ -3766,23 +4256,84 @@ idPlayer::UserInfoChanged
 bool idPlayer::UserInfoChanged( void ) {
  	idDict	*userInfo;
  	bool	modifiedInfo;
- 	bool	spec;
- 	bool	newready;
+	bool	spec;
+	bool	newready;
 	bool	initialJoinSpectate;
+	bool	managedMatch;
+
+	if ( IsFakeClient() ) {
+		showWeaponViewModel = cvarSystem->GetCVarBool( "ui_showGun" );
+		spectatorSpeedScale = idMath::ClampFloat( 0.25f, 3.0f, ui_spectatorSpeed.GetInteger() * 0.01f );
+		wantSpectate = true;
+		spectator = this->entityNumber;
+		return false;
+	}
  
  	userInfo = GetUserInfo();
  	showWeaponViewModel = userInfo->GetBool( "ui_showGun" );
+	// openQ4: clamped here on both ends, so the predicted free camera and the
+	// server's agree whatever a client puts in its userinfo
+	spectatorSpeedScale = idMath::ClampFloat( 0.25f, 3.0f, userInfo->GetInt( "ui_spectatorSpeed", "100" ) * 0.01f );
 
 	if ( !gameLocal.isMultiplayer ) {
+		handicap = 1.0f;
 		return false;
 	}
 
- 	modifiedInfo = false;
+	// UserInfoChanged is also called directly by spawn and restart paths.  Keep
+	// managed participation reconciliation here so no ingress can bypass the
+	// authoritative roster/team transaction layer.
+	modifiedInfo = gameLocal.isServer &&
+		gameLocal.mpGame.ServerReconcileManagedUserInfo( entityNumber, *userInfo );
+	managedMatch = gameLocal.mpGame.IsManagedMatch();
 	initialJoinSpectate = false;
- 
- 	spec = ( idStr::Icmp( userInfo->GetString( "ui_spectate" ), "Spectate" ) == 0 );
+
+	// update/apply handicap
+	handicap = userInfo->GetInt( "ui_handicap", "100" ) / 100.0f;
+	if ( handicap <= 0.0f || handicap >= 1.0f ) {
+		handicap = 1.0f;
+	}
+
+	if( PowerUpActive( POWERUP_GUARD ) ) {
+		inventory.maxHealth = 200;
+		inventory.maxarmor = 200;
+	} else {
+		inventory.maxHealth = spawnArgs.GetInt( "maxhealth", "100" );
+		inventory.maxarmor = spawnArgs.GetInt( "maxarmor", "100" );
+	}
+
+	spec = ( idStr::Icmp( userInfo->GetString( "ui_spectate" ), "Spectate" ) == 0 );
+	// openQ4: someone whose first join is decided by this call (see the lock below)
+	const bool arriving = !gameLocal.isClient && initialJoinPending && !botManager.IsBot( entityNumber );
 	if ( !gameLocal.isClient && initialJoinPending ) {
-		if ( userInfo->GetBool( "ui_autoJoin", "0" ) ) {
+		if ( gameLocal.isServer && managedMatch ) {
+			// Managed userinfo has already been reconciled through the authoritative
+			// join/queue/roster evaluator.  Do not overwrite that accepted result
+			// with the stock initial-join menu default afterward.
+			// The listen host spawns before the session enters warmup. Keep its
+			// one-shot auto-join intent pending while admission is unavailable;
+			// the server retries it through the same evaluator on the next frame.
+			if ( gameLocal.mpGame.GetMatchSession().GetPhase() != INACTIVE &&
+				userInfo->FindKey( "ui_autoJoin" ) != NULL ) {
+				initialJoinPending = false;
+				initialJoinSpectateApplied = true;
+				initialJoinMenuPending = false;
+				if ( !userInfo->GetBool( "ui_joined", "0" ) ) {
+					userInfo->SetBool( "ui_joined", true );
+					modifiedInfo = true;
+				}
+				if ( IsLocalClient() ) {
+					cvarSystem->SetCVarBool( "ui_joined", true );
+					cvarSystem->SetCVarString( "ui_spectate", spec ? "Spectate" : "Play" );
+				}
+				// Spawn can invoke this directly, and an outer userinfo broadcast
+				// may still hold the pre-admission dictionary. Publish the final
+				// one-shot decision after that caller has completed its broadcast.
+				// Insert it so a looping config cannot starve the publication.
+				cmdSystem->BufferCommandText( CMD_EXEC_INSERT,
+					va( "updateUI %d\n", entityNumber ) );
+			}
+		} else if ( userInfo->GetBool( "ui_autoJoin", "0" ) ) {
 			initialJoinPending = false;
 			initialJoinSpectateApplied = true;
 			initialJoinMenuPending = false;
@@ -3790,12 +4341,12 @@ bool idPlayer::UserInfoChanged( void ) {
 				userInfo->SetBool( "ui_joined", true );
 				modifiedInfo |= true;
 			}
-			if ( entityNumber == gameLocal.localClientNum ) {
+			if ( IsLocalClient() ) {
 				cvarSystem->SetCVarBool( "ui_joined", true );
 			}
 			if ( spec ) {
 				userInfo->Set( "ui_spectate", "Play" );
-				if ( entityNumber == gameLocal.localClientNum ) {
+				if ( IsLocalClient() ) {
 					cvarSystem->SetCVarString( "ui_spectate", "Play" );
 				}
 				modifiedInfo |= true;
@@ -3809,7 +4360,7 @@ bool idPlayer::UserInfoChanged( void ) {
 			initialJoinSpectate = true;
 			if ( !spec ) {
 				userInfo->Set( "ui_spectate", "Spectate" );
-				if ( entityNumber == gameLocal.localClientNum ) {
+				if ( IsLocalClient() ) {
 					cvarSystem->SetCVarString( "ui_spectate", "Spectate" );
 				}
 				modifiedInfo |= true;
@@ -3820,15 +4371,44 @@ bool idPlayer::UserInfoChanged( void ) {
 		}
 	}
 
-	if ( initialJoinSpectate ) {
+	if ( managedMatch ) {
+		// The managed-session adapter has already reduced ui_spectate to the
+		// authoritative participation intent.  Legacy spectator policy must not
+		// force a denied join back into play or prevent a permitted withdrawal.
+		if ( spec != wantSpectate && !spec ) {
+			forceRespawn = true;
+		}
+		wantSpectate = spec;
+	} else if ( initialJoinSpectate ) {
 		wantSpectate = true;
 		if ( spectating ) {
 			SetSpectateOrigin();
 		}
 	} else if ( gameLocal.serverInfo.GetBool( "si_spectators" ) ) {
- 		// never let spectators go back to game while sudden death is on
- 		if ( gameLocal.mpGame.GetGameState()->GetMPGameState() == SUDDENDEATH && !spec && wantSpectate == true ) {
+ 		// never let spectators go back to game while sudden death is on;
+ 		// openQ4 MP-12: si_spectatorLock holds the roster through live play too
+ 		// (1: spectators wait for the match to end, 2: players stay in as well)
+ 		const mpGameState_t liveState = gameLocal.mpGame.GetGameState()->GetMPGameState();
+ 		const bool livePlay = liveState == GAMEON || liveState == SUDDENDEATH;
+ 		const int spectatorLock = gameLocal.serverInfo.GetInt( "si_spectatorLock" );
+ 		// A client that connects with ui_autoJoin has never been in play and its
+ 		// wantSpectate is still false, so the lock, which asked only about
+ 		// spectators coming back, let it straight into a live match or a sudden
+ 		// death: a locked-out spectator had only to reconnect. Bots fill by their
+ 		// own rules. The side a disconnect pause is held for may take its player
+ 		// back (idMultiplayerGame::DisconnectPauseAdmits).
+ 		const bool joiningPlay = !spec && ( wantSpectate == true || arriving );
+ 		const bool heldOpen = livePlay && gameLocal.mpGame.DisconnectPauseAdmits( userInfo->GetString( "ui_team" ) );
+ 		if ( ( liveState == SUDDENDEATH || ( livePlay && spectatorLock >= 1 ) ) && joiningPlay && !heldOpen ) {
  			userInfo->Set( "ui_spectate", "Spectate" );
+ 			modifiedInfo |= true;
+ 			wantSpectate = true;
+ 			if ( arriving && gameLocal.isServer ) {
+ 				// the client asked for nothing it could be answered for: say why it is watching
+ 				gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42776" );
+ 			}
+ 		} else if ( livePlay && spectatorLock >= 2 && spec && !wantSpectate ) {
+ 			userInfo->Set( "ui_spectate", "Play" );
  			modifiedInfo |= true;
  		} else {
  			if ( spec != wantSpectate && !spec ) {
@@ -3850,10 +4430,16 @@ bool idPlayer::UserInfoChanged( void ) {
 
 	if ( gameLocal.serverInfo.GetBool( "si_useReady" ) ) {
 		newready = ( idStr::Icmp( userInfo->GetString( "ui_ready" ), "Ready" ) == 0 );
-		if ( ready != newready && gameLocal.mpGame.GetGameState()->GetMPGameState() == WARMUP && !wantSpectate ) {
- 			gameLocal.mpGame.AddChatLine( common->GetLocalizedString( "#str_107180" ), userInfo->GetString( "ui_name" ), newready ? common->GetLocalizedString( "#str_104300" ) : common->GetLocalizedString( "#str_104301" ) );
+		// openQ4: only act on a real change in the userinfo string.  A resend
+		// carrying a stale ui_ready must not undo a ready set by the reliable
+		// ready message, which is not subject to the userinfo throttle.
+		if ( newready != readyUserInfo ) {
+			readyUserInfo = newready;
+			if ( ready != newready && gameLocal.mpGame.GetGameState()->GetMPGameState() == WARMUP && !wantSpectate ) {
+				gameLocal.mpGame.AddChatLine( common->GetLocalizedString( "#str_107180" ), userInfo->GetString( "ui_name" ), newready ? common->GetLocalizedString( "#str_104300" ) : common->GetLocalizedString( "#str_104301" ) );
+			}
+			ready = newready;
 		}
-		ready = newready;
 	}
 
 	int newTeam = ( idStr::Icmp( userInfo->GetString( "ui_team" ), "Strogg" ) == 0 );
@@ -3871,8 +4457,8 @@ bool idPlayer::UserInfoChanged( void ) {
 			int verifyTeam = gameLocal.mpGame.VerifyTeamSwitch( newTeam, this );
 			if( verifyTeam != newTeam ) {
 				if( verifyTeam == TEAM_MARINE || verifyTeam == TEAM_STROGG ) {
-					gameLocal.userInfo[ entityNumber ].Set( "ui_team", gameLocal.mpGame.teamNames[ verifyTeam ] );
-					if( gameLocal.localClientNum == entityNumber ) {
+					userInfo->Set( "ui_team", gameLocal.mpGame.teamNames[ verifyTeam ] );
+					if( IsLocalClient() ) {
 						cvarSystem->SetCVarString( "ui_team", gameLocal.mpGame.teamNames[ verifyTeam ] );
 					}
 					modifiedInfo = true;
@@ -3893,7 +4479,7 @@ bool idPlayer::UserInfoChanged( void ) {
 				mphud->HandleNamedEvent( "TeamChange" );
 			}
 
-			if( entityNumber == gameLocal.localClientNum ) {
+			if( IsLocalClient() ) {
 				alreadyDidTeamAnnouncerSound = true;
 				// the client might set its team to a value before the server corrects for team balance
 				gameLocal.mpGame.RemoveAnnouncerSound( AS_TEAM_JOIN_MARINE );
@@ -3922,7 +4508,7 @@ bool idPlayer::UserInfoChanged( void ) {
 
 	UpdateModelSetup();
 
-	if( (gameLocal.isServer && gameLocal.mpGame.IsInGame( entityNumber )) || (gameLocal.isClient && gameLocal.localClientNum == entityNumber) ) {
+	if( (gameLocal.isServer && gameLocal.mpGame.IsInGame( entityNumber )) || (gameLocal.isClient && IsLocalClient() ) ) {
  		isChatting = userInfo->GetBool( "ui_chat", "0" );
  		if ( isChatting && pfl.dead ) {
  			// if dead, always force chat icon off.
@@ -3976,7 +4562,7 @@ void idPlayer::UpdateHudAmmo( idUserInterface *_hud ) {
 		_hud->SetStateInt ( "player_totalammo", ammoamount );
 		_hud->SetStateInt ( "player_ammo", -1 );
 	} 
-
+	
 	_hud->SetStateBool( "player_ammo_empty", ( ammoamount == 0 ) );
 }
 
@@ -3989,6 +4575,9 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 	int temp;
 	
 	assert ( _hud );
+	if ( gameLocal.isMultiplayer ) {
+		_hud->SetStateInt( "player_air", GetAirReadoutPercent() );
+	}
 
 	// openQ4: compare what the HUD shows. Against the raw value, a gibbed
 	// player (health below -100) re-sent updateHealth and a bogus delta every
@@ -4011,7 +4600,16 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 		_hud->SetStateFloat	( "player_armorpct", idMath::ClampFloat ( 0.0f, 1.0f, (float)inventory.armor / (float)inventory.maxarmor ) );
 		_hud->HandleNamedEvent ( "updateArmor" );
 	}
+
+	if ( gameLocal.isMultiplayer ) {
+		// openQ4: the Classic ruleset's armour tier (classicArmorTier_t) colours the HUD's
+		// armour icon green, yellow or red; 0 keeps the stock icon (Quake 4 rules, no armour).
+		const int armorTier = gameLocal.IsClassicRuleset() ? rvClassicRules::EffectiveArmorTier( inventory.armorTier, inventory.armor ) : 0;
+		if ( _hud->State().GetInt( "player_armorTier", "-1" ) != armorTier ) {
+			_hud->SetStateInt( "player_armorTier", armorTier );
+		}
 	
+	}
 	// Boss bar
 	if ( _hud->State().GetInt ( "boss_health", "-1" ) != (bossEnemy ? bossEnemy->health : -1) ) {
 		if ( !bossEnemy || bossEnemy->health <= 0 ) {
@@ -4045,7 +4643,54 @@ void idPlayer::UpdateHudStats( idUserInterface *_hud ) {
 		UpdateHudAmmo( _hud );
 	}
 	
+	if ( gameLocal.isMultiplayer ) {
+		UpdateHudPowerUps( _hud );
+
+		if ( hud_showSpeed.GetBool() ) {
+			idVec3 velocity = physicsObj.GetLinearVelocity();
+			velocity[2] = 0;
+			_hud->SetStateString("player_speed", va("%d ups", (int)velocity.Length()));
+		}
+
+		if (hud_showInput.GetBool())
+			DrawInput();
+
+	}
 	_hud->StateChanged( gameLocal.time );
+}
+
+void idPlayer::DrawInput()
+{
+	rvHudPrimitives presentation;
+	idVec4 highlightColor(1.0f, 0.0f, 0.0f, 0.8f);
+	sscanf( hud_inputColor.GetString(), "%f %f %f", &highlightColor.x, &highlightColor.y, &highlightColor.z );
+
+	const idVec4 normalColor(1.0f, 1.0f, 1.0f, 0.8f);
+
+	idVec2 inputPos(500,90);
+	sscanf( hud_inputPosition.GetString(), "%f %f", &inputPos.x, &inputPos.y );
+
+	const idMaterial *centerMaterial = declManager->FindMaterial("gfx/guis/showinput/hud_showinput_center");
+	presentation.Rect(inputPos.x + 10, inputPos.y + 10, 10.0f, 10.0f, normalColor, centerMaterial);
+
+	const idMaterial *forwardMaterial = declManager->FindMaterial("gfx/guis/showinput/hud_showinput_forward");
+	presentation.Rect(inputPos.x + 10, inputPos.y, 10.0f, 10.0f, (usercmd.forwardmove == 127) ? highlightColor : normalColor, forwardMaterial);
+
+	const idMaterial *backMaterial = declManager->FindMaterial("gfx/guis/showinput/hud_showinput_back");
+	presentation.Rect(inputPos.x + 10, inputPos.y + 20, 10.0f, 10.0f, (usercmd.forwardmove == -127) ? highlightColor : normalColor, backMaterial);
+
+	const idMaterial *leftMaterial = declManager->FindMaterial("gfx/guis/showinput/hud_showinput_moveleft");
+	presentation.Rect(inputPos.x, inputPos.y + 10, 10.0f, 10.0f, (usercmd.rightmove == -127) ? highlightColor : normalColor, leftMaterial);
+
+	const idMaterial *rightMaterial = declManager->FindMaterial("gfx/guis/showinput/hud_showinput_moveright");
+	presentation.Rect(inputPos.x + 20, inputPos.y + 10, 10.0f, 10.0f, (usercmd.rightmove == 127) ? highlightColor : normalColor, rightMaterial);
+
+	const idMaterial *upMaterial = declManager->FindMaterial("gfx/guis/showinput/hud_showinput_moveup");
+	presentation.Rect(inputPos.x + 36, inputPos.y, 14.0f, 14.0f, physicsObj.IsJumping() ? highlightColor : normalColor, upMaterial);
+
+	const idMaterial *downMaterial = declManager->FindMaterial("gfx/guis/showinput/hud_showinput_movedown");
+	presentation.Rect(inputPos.x + 36, inputPos.y + 17, 14.0f, 14.0f, physicsObj.IsCrouching() ? highlightColor : normalColor, downMaterial);
+	presentation.Draw("native/movement-input");
 }
 
 /*
@@ -4055,7 +4700,7 @@ idPlayer::UpdateHudWeapon
 */
 void idPlayer::UpdateHudWeapon( int displayWeapon ) {
 	
-	if ( (displayWeapon < -1) || (displayWeapon >= MAX_WEAPONS) ) {
+	if ( ( displayWeapon < -1 ) || ( displayWeapon >= MAX_WEAPONS ) ) {
 		common->DPrintf( "displayweapon was out of range" );
 		return;
 	}
@@ -4066,22 +4711,11 @@ void idPlayer::UpdateHudWeapon( int displayWeapon ) {
 	idUserInterface * mphud = idPlayer::mphud;
 	idUserInterface * cursor = idPlayer::cursor;
 
-	if ( !gameLocal.GetLocalPlayer() ) {
-		// server netdemo
-		if ( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() && gameLocal.GetDemoFollowClient() == entityNumber ) {
-			hud = gameLocal.GetDemoHud();
-			mphud = gameLocal.GetDemoMphud();
-			cursor = gameLocal.GetDemoCursor();
-		}
-	} else {
-		// if updating the hud of a followed client
-		idPlayer *p = gameLocal.GetLocalPlayer();
-		if ( p->spectating && p->spectator == entityNumber ) {
-			assert( p->hud && p->mphud );
-			hud = p->hud;
-			mphud = p->mphud;
-			cursor = p->GetCursorGUI();
-		}
+	idPlayer *p = gameLocal.GetLocalPlayer();
+	if ( p && p->spectating && p->spectator == entityNumber ) {
+		hud = p->hud;
+		mphud = p->mphud;
+		cursor = p->cursor;
 	}
 
 	if ( !hud || !weapon ) {
@@ -4091,7 +4725,7 @@ void idPlayer::UpdateHudWeapon( int displayWeapon ) {
 	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
 		const char *weapnum = va( "weapon%d", i );
 		int weapstate = 0;
-		if ( inventory.weapons & ( 1 << i ) && spawnArgs.GetBool( va( "weapon%d_cycle", i ) ) ) {
+		if ( ( inventory.weapons & ( 1 << i ) ) && spawnArgs.GetBool( va( "weapon%d_cycle", i ) ) ) {
 			hud->SetStateBool( weapnum, true );
 			const char *weap = spawnArgs.GetString( va( "def_weapon%d", i ) );
 			if ( weap && *weap ) {
@@ -4102,14 +4736,10 @@ void idPlayer::UpdateHudWeapon( int displayWeapon ) {
 				}
 
 				const char *weaponIcon = GetWeaponDef ( i )->dict.GetString ( "inv_icon" );
-				//const idMaterial *material = declManager->FindMaterial( weaponIcon );
-				//if ( material ) {
-				//	material->SetSort( SS_GUI );
-				//}			
 				
-				hud->SetStateInt	( va("weapon%d_index", i ), index++ );
-				hud->SetStateString ( va("weapon%d_icon", i ), weaponIcon );
-				hud->SetStateInt	( va("weapon%d_ammo", i ), inventory.ammo[inventory.AmmoIndexForWeaponClass ( weap ) ] );				
+				hud->SetStateInt	( va( "weapon%d_index", i ), index++ );
+				hud->SetStateString ( va( "weapon%d_icon", i ), weaponIcon );
+				hud->SetStateInt	( va( "weapon%d_ammo", i ), inventory.ammo[ inventory.AmmoIndexForWeaponClass( weap ) ] );
 			}
 		} else {
 			hud->SetStateBool( weapnum, false );
@@ -4123,20 +4753,21 @@ void idPlayer::UpdateHudWeapon( int displayWeapon ) {
 		material->SetSort( SS_GUI );
 	}			
 
-	material = declManager->FindMaterial( weapon->spawnArgs.GetString ( "inv_icon" ) );
-	//if ( material ) {
-	//	material->SetSort( SS_GUI );
-	//}			
+	material = declManager->FindMaterial( weapon->spawnArgs.GetString( "inv_icon" ) );
 
-	hud->SetStateString( "weapicon", weapon->GetIcon() );	
-	hud->SetStateString( "ammoIcon", weapon->spawnArgs.GetString ( "inv_icon" ) );
+	hud->SetStateString( "weapicon", weapon->GetIcon() );
+	hud->SetStateString( "ammoIcon", weapon->spawnArgs.GetString( "inv_icon" ) );
  	hud->SetStateInt( "player_weapon", currentWeapon );
 	hud->SetStateInt( "player_lastweapon", previousWeapon );
-	hud->SetStateInt( "player_idealweapon", ((displayWeapon!=-1)?displayWeapon:idealWeapon) );
-	hud->SetStateInt( "player_idealIndex", idealIndex );
+	int hud_idealWeapon = ( displayWeapon != -1 ) ? displayWeapon : idealWeapon;
+	hud->SetStateInt( "player_idealWeapon", hud_idealWeapon );
+	// unused in q4mp hud.gui; the single-player HUDs read it
+	if ( !gameLocal.isMultiplayer ) {
+		hud->SetStateInt( "player_idealIndex", idealIndex );
+	}
 
 	// Weapon name for weapon selection
-	const idDeclEntityDef* w = GetWeaponDef( ( displayWeapon != -1 ) ? displayWeapon:idealWeapon );
+	const idDeclEntityDef* w = GetWeaponDef( ( displayWeapon != -1 ) ? displayWeapon : idealWeapon );
 	if ( w ) {
 		idStr langToken = w->dict.GetString( "inv_name" );
 		hud->SetStateString( "weaponname", common->GetLocalizedString( langToken ) );
@@ -4156,13 +4787,60 @@ void idPlayer::UpdateHudWeapon( int displayWeapon ) {
 	hud->HandleNamedEvent( "weaponChange" );
 	hud->StateChanged( gameLocal.time ); 			
 	weaponChangeIconsUp = true;
+}
 
-	// if previousWeapon is -1, the weaponChange state won't update it, so manually reset it
-#ifdef _XENON
-	if( previousWeapon == -1 ) {
-		ResetHUDWeaponSwitch();
+void idPlayer::UpdateHudPowerUps( idUserInterface *_hud ) {
+	assert( _hud );
+	
+	int i, index;
+
+	// openQ4: what the last update showed.
+	const bool carried = _hud->GetStateInt( "powerup_flag_visible" ) != 0;
+	// The stock clearPowerups event is not sent: every slot and the flag are
+	// written below, shown or hidden. Sent every frame, it ran the script's six
+	// writes, flipped each live slot to 0 and back to 1 (so the HUD's state
+	// never rested and the Remastered document re-evaluated every frame a
+	// powerup was held), and dropped the GUI's evaluated-state cache.
+
+	bool flag = false;
+	for ( i = 0, index = 0; i < POWERUP_MAX; i++ ) {
+		// Do we have this powerup?
+		if ( !(inventory.powerups & ( 1 << i ) ) ) {
+			continue;
+		}
+
+		if ( inventory.powerupEndTime[i] > gameLocal.time || inventory.powerupEndTime[i] == -1 ) {
+			// If there is still time remaining on the powerup then update the hud
+			// for flags, set the powerup_flag_* variables, which give us a special pulsing flag display
+			if( i == POWERUP_CTF_MARINEFLAG || i == POWERUP_CTF_STROGGFLAG || i == POWERUP_CTF_ONEFLAG ) {
+				_hud->SetStateInt( "powerup_flag_visible", 1 );
+				flag = true;
+			} else if ( index < 5 ) {
+				_hud->SetStateString ( va("powerup%d_icon", index ), GetPowerupDef(i)->dict.GetString ( "inv_icon" ) );
+				_hud->SetStateString ( va("powerup%d_time", index ), inventory.powerupEndTime[i] == -1 ? "" : va( "%d" , (int)MS2SEC(inventory.powerupEndTime[i] - gameLocal.time) + 1 ) );
+				_hud->SetStateInt ( va( "powerup%d_visible", index ), 1 );
+				// openQ4: the Remastered countdown ring's remaining share, in 60ths
+				const int duration = SEC2MS( GetPowerupDef(i)->dict.GetFloat( "time", "30" ) );
+				_hud->SetStateFloat( va( "oq4_powerup%d_left", index ), inventory.powerupEndTime[i] == -1 || duration <= 0 ? 1.0f :
+					idMath::ClampFloat( 0.0f, 1.0f, ceilf( 60.0f * (float)( inventory.powerupEndTime[i] - gameLocal.time ) / (float)duration ) / 60.0f ) );
+				index++;
+			}
+
+			continue;
+		}
 	}
-#endif
+	// openQ4: the slots past the last powerup, and the flag, hide explicitly;
+	// the Remastered HUD never sees the stock script's clearPowerups writes.
+	for ( ; index < 5; index++ ) {
+		_hud->SetStateInt( va( "powerup%d_visible", index ), 0 );
+	}
+	if ( !flag ) {
+		_hud->SetStateInt( "powerup_flag_visible", 0 );
+	}
+	// The Remastered carried flag beats only while it shows.
+	if ( flag != carried ) {
+		_hud->HandleNamedEvent( "oq4_carriedFlag" );
+	}
 }
 
 /*
@@ -4268,7 +4946,7 @@ void idPlayer::DrawShadow( renderEntity_t *headRenderEnt ) {
 		renderEntity.suppressShadowInViewID	= entityNumber+1;
  		if ( headRenderEnt ) {
  			headRenderEnt->suppressShadowInViewID = entityNumber+1;
-   		}
+		}
 	}
 }
 
@@ -4290,42 +4968,71 @@ void idPlayer::UpdateMultiplayerVisibilityEffects( renderEntity_t *headRenderEnt
 		weaponRenderEnt->flatDiffuseFlags = 0;
 	}
 
-	if ( !gameLocal.isMultiplayer || IsHidden() || fl.hidden || spectating || health <= 0 ) {
+	if ( !gameLocal.isMultiplayer ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_NOT_MULTIPLAYER, "skipped: not a multiplayer game" );
+		return;
+	}
+	if ( IsHidden() || fl.hidden ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_HIDDEN, "skipped: body is hidden" );
+		return;
+	}
+	if ( spectating ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_SPECTATING, "skipped: spectating, so there is no body to mark" );
+		return;
+	}
+	if ( health <= 0 ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_DEAD, "skipped: dead" );
 		return;
 	}
 
-	idPlayer *viewer = gameLocal.GetLocalPlayer();
-	if ( viewer == NULL ) {
+	idPlayer *localViewer = gameLocal.GetLocalPlayer();
+	if ( localViewer == NULL ) {
 		const int demoFollowClient = gameLocal.GetDemoFollowClient();
 		if ( demoFollowClient >= 0 ) {
-			viewer = gameLocal.GetClientByNum( demoFollowClient );
+			localViewer = gameLocal.GetClientByNum( demoFollowClient );
 		}
 	}
-	if ( viewer == NULL ) {
+	if ( localViewer == NULL ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_NO_VIEWER,
+			"skipped: no local viewer (dedicated server or demo with no follow)" );
 		return;
 	}
 
-	if ( viewer->spectating && viewer->spectator >= 0 ) {
-		idPlayer *spectatedPlayer = gameLocal.GetClientByNum( viewer->spectator );
-		if ( spectatedPlayer != NULL ) {
-			viewer = spectatedPlayer;
-		}
-	}
+	bool spectatorView = false;
+	idPlayer *reference = Player_VisibilityReference( localViewer, spectatorView );
 
-	if ( viewer == this || viewer->spectating || viewer->health <= 0 || viewer->GetInstance() != instance ) {
+	if ( reference == this ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_IS_VIEWER, "skipped: this is the viewer" );
+		return;
+	}
+	// A live viewer has to be alive to be shown anything. A spectator always is -
+	// free flight has no reference player to be alive or dead in the first place.
+	if ( !spectatorView && reference->health <= 0 ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_VIEWER_DEAD, "skipped: viewer is dead" );
+		return;
+	}
+	// Instances partition a match into separate games. A spectator belongs to one
+	// even while flying free, so the test falls back to its own.
+	const idPlayer *instanceOwner = ( reference != NULL ) ? reference : localViewer;
+	if ( instanceOwner->GetInstance() != instance ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_OTHER_INSTANCE, "skipped: viewer is in another instance" );
 		return;
 	}
 
-	const bool teammate = gameLocal.IsTeamGame() && viewer->team == team;
-	if ( g_mpFlatOpponentWeapons.GetBool() && !teammate && weaponRenderEnt != NULL &&
+	const bool teamColor = Player_VisibilityUsesTeamColor( reference, this );
+	if ( g_mpFlatOpponentWeapons.GetBool() && !teamColor && weaponRenderEnt != NULL &&
 		weaponRenderEnt->flatDiffuseColor.w > 0.0f ) {
 		weaponRenderEnt->flatDiffuseFlags = REF_FLAT_DIFFUSE;
 	}
 
-	const float outlineStrength = Player_ClampedVisibilityCVar( teammate ? cl_player_outline_team : cl_player_outline_enemy );
-	const float rimlightStrength = Player_ClampedVisibilityCVar( teammate ? cl_player_rimlight_team : cl_player_rimlight_enemy );
-	const float brightSkinStrength = Player_ClampedVisibilityCVar( teammate ? cl_player_brightskin_team : cl_player_brightskin_enemy );
+	const float outlineStrength = Player_VisibilityStrength( spectatorView, teamColor,
+		cl_player_outline_team, cl_player_outline_enemy );
+	const float rimlightStrength = Player_VisibilityStrength( spectatorView, teamColor,
+		cl_player_rimlight_team, cl_player_rimlight_enemy );
+	const float brightSkinStrength = Player_VisibilityStrength( spectatorView, teamColor,
+		cl_player_brightskin_team, cl_player_brightskin_enemy );
 	if ( outlineStrength <= 0.0f && rimlightStrength <= 0.0f && brightSkinStrength <= 0.0f ) {
+		Player_ReportVisibilityEffects( entityNumber, PVR_NO_STRENGTH, "skipped: every strength cvar that applies is zero" );
 		return;
 	}
 
@@ -4337,21 +5044,44 @@ void idPlayer::UpdateMultiplayerVisibilityEffects( renderEntity_t *headRenderEnt
 	brightSkinColor.Zero();
 
 	if ( outlineStrength > 0.0f ) {
-		outlineColor = Player_VisibilityColor( teammate, outlineStrength );
+		outlineColor = Player_VisibilityColor( teamColor, outlineStrength );
 	}
 	if ( rimlightStrength > 0.0f ) {
-		rimlightColor = Player_VisibilityColor( teammate, rimlightStrength );
+		rimlightColor = Player_VisibilityColor( teamColor, rimlightStrength );
 	}
 	if ( brightSkinStrength > 0.0f ) {
-		brightSkinColor = Player_BrightSkinColor( teammate, brightSkinStrength );
+		brightSkinColor = Player_BrightSkinColor( teamColor, brightSkinStrength );
 	}
 
-	const int outlineFlags = teammate ? REF_OUTLINE_NODEPTH : 0;
+	// An ally, and everyone once you are spectating, gets a ring wherever they are:
+	// both are cases where knowing where people stand is the whole point, and
+	// neither leaks anything the viewer is not entitled to. An opponent seen by a
+	// live player stays depth tested and bounded by what they can actually see.
+	//
+	// THROUGH_WORLD carries NODEPTH with it - the renderer draws that implication
+	// itself - but both are set here so the flags read as what was asked for.
+	const bool throughWorld = teamColor || spectatorView;
+	const int outlineFlags = throughWorld ? ( REF_OUTLINE_NODEPTH | REF_OUTLINE_THROUGH_WORLD ) : 0;
 	const float outlineWidth = idMath::ClampFloat( 0.5f, 6.0f, cl_player_outline_width.GetFloat() );
 
 	Player_SetVisibilityEffects( &renderEntity, outlineColor, outlineWidth, outlineFlags, rimlightColor, brightSkinColor );
 	Player_SetVisibilityEffects( headRenderEnt, outlineColor, outlineWidth, outlineFlags, rimlightColor, brightSkinColor );
 	Player_SetVisibilityEffects( weaponRenderEnt, outlineColor, outlineWidth, outlineFlags, rimlightColor, brightSkinColor );
+
+	// Body, head and world weapon are three separate render entities, and a missing
+	// one is the likeliest reason an overlay looks like it only half applied.
+	const int reasonId = PVR_APPLIED
+		| ( teamColor ? PVR_APPLIED_TEAM_COLOR : 0 )
+		| ( spectatorView ? PVR_APPLIED_SPECTATING : 0 )
+		| ( headRenderEnt != NULL ? PVR_APPLIED_HEAD : 0 )
+		| ( weaponRenderEnt != NULL ? PVR_APPLIED_WEAPON : 0 )
+		| ( throughWorld ? PVR_APPLIED_THROUGH : 0 );
+	Player_ReportVisibilityEffects( entityNumber, reasonId, va( "applied as %s%s (body%s%s)%s",
+		teamColor ? "team" : "opponent",
+		spectatorView ? ", spectating" : "",
+		headRenderEnt != NULL ? " + head" : ", no head",
+		weaponRenderEnt != NULL ? " + world weapon" : ", no world weapon",
+		throughWorld ? ", outline through the world" : "" ) );
 }
 
 /*
@@ -4423,30 +5153,21 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 		_hud->SetStateInt( "radio_audio_channel", SND_CHANNEL_RADIO );
 	}
  
-	if ( !gameLocal.GetLocalPlayer() ) {
-		// server netdemo
-		if ( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() && gameLocal.GetDemoFollowClient() == entityNumber ) {
-			cursor = gameLocal.GetDemoCursor();
-			if ( cursor ) {
-				cursor->HandleNamedEvent( "showCrossCombat" );
-			}
-		}		
-	} else {
-
+	if ( gameLocal.GetLocalPlayer() ) {
 		if ( team != gameLocal.GetLocalPlayer()->hudTeam && _hud ) {
 			_hud->HandleNamedEvent( (team ? "setTeam_strogg" : "setTeam_marine") );	
 			gameLocal.GetLocalPlayer()->hudTeam = team;
 		}
-	
-		// if updating the hud of a followed client
-		idPlayer *p = gameLocal.GetLocalPlayer();
-		if ( p->spectating && p->spectator == entityNumber ) {
-			cursor = p->GetCursorGUI();
-			if ( cursor ) {
-				cursor->HandleNamedEvent( "showCrossCombat" );
-			}
-		}		
 	}
+
+	// if updating the hud of a followed client
+	idPlayer *p = gameLocal.GetLocalPlayer();
+	if ( p && p != this && p->spectating && p->spectator == entityNumber ) {
+		cursor = p->GetCursorGUI();
+		if ( cursor ) {
+			cursor->HandleNamedEvent( "showCrossCombat" );
+		}
+	}		
 
 	if ( disableHud || influenceActive != INFLUENCE_NONE || privateCameraView || !_hud || !g_showHud.GetBool() ) {
 		return;
@@ -4552,22 +5273,22 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 			// openQ4 VR: the scope picture is head-locked on the HUD, so it would
 			// point where the head looks; while a controller aims, the laser dot
 			// in the magnified eyes is the reticle
-			if ( weapon && weapon->GetZoomGui( ) && zoomed && !IsVRHandAiming() ) {
-				weapon->GetZoomGui( )->Redraw( gameLocal.time );
+			if ( weapon && weapon->GetZoomGui() && zoomed && !IsVRHandAiming() ) {
+				weapon->GetZoomGui()->Redraw( gameLocal.time );
 			}
 		}
 		return;
 	}
 
 	if ( gameLocal.isMultiplayer ) {
-		_hud->SetStateBool( "mp", true );
+	_hud->SetStateBool( "mp", true );
 	} else {
 		_hud->SetStateBool( "mp", false );
 	}
 
 	// Draw the cinematic hud when in a cinematic
-	if ( gameLocal.GetCamera( ) ) {
-		if ( cinematicHud ) {
+	if ( gameLocal.GetCamera() ) {
+		if ( cinematicHud && ( !gameLocal.isMultiplayer || !(gameLocal.editors & EDITOR_MODVIEW) ) ) {
 			cinematicHud->Redraw( gameLocal.time );
 		}
 		return;
@@ -4577,7 +5298,7 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 	if ( vehicleController.IsDriving( ) ) {
 		if ( !gameDebug.IsHudActive( DBGHUD_ANY ) ) {
 			vehicleController.DrawHUD( );
-			if ( cursor && health > 0 && weaponWheelBlend <= 0.01f ) {		
+			if ( cursor && health > 0 && weaponWheelBlend <= 0.01f ) {			
 				// mekberg: adjustable crosshair size.
 				int crossSize = cvarSystem->GetCVarInteger( "g_crosshairSize" );
 				crossSize = crossSize - crossSize % 8;
@@ -4622,29 +5343,31 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 	// for mod developers to enable for the same functionality
 	_hud->SetStateInt( "s_debug", cvarSystem->GetCVarInteger( "s_showLevelMeter" ) );
 
+	// openQ4: an Arena presentation shot is a camera, not the player's eyes. The
+	// crosshair, the zoom and the status bar would sit over the cinematic card;
+	// the mphud below still draws, because it carries the letterbox and cards.
+	const bool arenaPresentation = gameLocal.isMultiplayer &&
+		gameLocal.mpGame.ArenaCampaignPresentationActive();
+
 	// don't draw main hud in spectator (only mphud)
-	if ( !spectating && !gameDebug.IsHudActive( DBGHUD_ANY ) ) {
-		// weapon targeting crosshair
-		if ( !GuiActive() ) {
+	if ( !spectating && !arenaPresentation && !gameDebug.IsHudActive( DBGHUD_ANY ) ) {
+		// weapon targeting crosshair; a third-person, chase or death camera is
+		// not the weapon's line of sight, so it gets neither crosshair nor scope
+		if ( !GuiActive() && FollowCameraMode() == FOLLOW_CAMERA_FIRST ) {
 			// openQ4 VR: the scope picture is head-locked on the HUD, so it would
 			// point where the head looks; while a controller aims, the laser dot
 			// in the magnified eyes is the reticle
-			if ( weapon && weapon->GetZoomGui( ) && zoomed && !IsVRHandAiming() ) {
-				weapon->GetZoomGui( )->Redraw( gameLocal.time );
+			if ( weapon && weapon->GetZoomGui() && zoomed && !IsVRHandAiming() ) {
+				weapon->GetZoomGui()->Redraw( gameLocal.time );
 			}
-// RAVEN BEGIN
-// mekberg: removed check for weapon->ShowCrosshair.
-//			we want to show the crosshair regardless for NPC tags
 			// openQ4 VR: the weapon hand aims, so a screen-centre crosshair would lie.
 			// The weapon wheel hides it, as it does over a vehicle's.
 			if ( cursor && health > 0 && !IsVRHandAiming() && weaponWheelBlend <= 0.01f ) {
 				// Pass the current weapon to the cursor gui for custom crosshairs
-// mekberg: adjustable crosshair size.
 				int crossSize = cvarSystem->GetCVarInteger( "g_crosshairSize" );
 				crossSize = crossSize - crossSize % 8;
 				cvarSystem->SetCVarInteger( "g_crosshairSize", crossSize );
 				cursor->SetStateInt( "g_crosshairSize", crossSize );
-// RAVEN END
 				cursor->Redraw( gameLocal.time );
 				// openQ4: switching the animated crosshair hands the combat picture
 				// over, or back, through the same refresh as a color change
@@ -4661,14 +5384,19 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 				// gating - no marker in a gui, a vehicle, or while dead
 				rvHitMarker::Draw();
 			}
-		}
+		}	
 
 		UpdateHudStats( _hud );
 
 		// openQ4: The Awakening's HUD turns its ship panel's view cone (m03, on
 		// foot) by the view's yaw, which its game code wrote here; retail's HUD
 		// does not read it
-		_hud->SetStateFloat( "playerYaw", ( renderView != NULL ? renderView->viewaxis : firstPersonViewAxis ).ToAngles().yaw );
+		if ( !gameLocal.isMultiplayer ) {
+			_hud->SetStateFloat( "playerYaw", ( renderView != NULL ? renderView->viewaxis : firstPersonViewAxis ).ToAngles().yaw );
+		}
+		// Project against the actual presentation camera, after the scene and
+		// below HUD panels and wheels. DrawHUD owns cinematic/GUI/vehicle gates.
+		gameLocal.mpGame.objectiveMarkers.Draw( this, _hud, GetRenderView() );
 
 		if ( focusBrackets ) {
 			// If 2d_calc is still true then the gui didnt render so we can abandon it
@@ -4686,18 +5414,14 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 			}
 		}		
 		DrawHudWithStatusBar( _hud );
-		DrawWeaponWheel();
+		if ( !gameLocal.isMultiplayer ) {
+			DrawWeaponWheel();
+		}
 	}
 
 	if ( gameLocal.isMultiplayer ) {
 		idUserInterface* _mphud = mphud;
-		// server netdemos don't have a local player, grab the right mphud
-		if ( !gameLocal.GetLocalPlayer() ) {
-			assert( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() );
-			assert( gameLocal.GetDemoFollowClient() >= 0 );
-			assert( gameLocal.entities[ gameLocal.GetDemoFollowClient() ] && gameLocal.entities[ gameLocal.GetDemoFollowClient() ]->IsType( idPlayer::GetClassType() ) );
-			_mphud = gameLocal.GetDemoMphud();
-		} else if ( gameLocal.GetLocalPlayer() != this ) {
+		if ( gameLocal.GetLocalPlayer() && gameLocal.GetLocalPlayer() != this ) {
 			// if we're spectating someone else, use our local hud
 			_mphud = gameLocal.GetLocalPlayer()->mphud;
 		}
@@ -4707,10 +5431,20 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 		}
 		
 		if ( overlayHud && overlayHudTime > gameLocal.time && overlayHudTime != 0 ) {
-			overlayHud->Redraw( gameLocal.time );
+			// openQ4: nothing over an Arena presentation shot but its own cards.
+			if ( !arenaPresentation ) {
+				overlayHud->Redraw( gameLocal.time );
+			}
 		} else {
 			overlayHud = NULL;
 			overlayHudTime = 0;
+		}
+	}
+	if ( gameLocal.isMultiplayer ) {
+		DrawWeaponWheel();
+		// The local player's quick-chat wheel, also while following another player.
+		if ( gameLocal.GetLocalPlayer() ) {
+			gameLocal.GetLocalPlayer()->DrawQuickChat();
 		}
 	}
 }
@@ -4752,10 +5486,12 @@ void idPlayer::EnterCinematic( void ) {
 	}
 	
    	// Have the cinematic hud start
-	if ( cinematicHud ) {	
-		cinematicHud->Activate ( true, gameLocal.time );
-		cinematicHud->HandleNamedEvent ( "cinematicStart" );
-		cinematicHud->HandleNamedEvent ( "showLetterbox" );
+   	if ( cinematicHud ) {	
+   		cinematicHud->Activate ( true, gameLocal.time );
+   		cinematicHud->HandleNamedEvent ( "cinematicStart" );
+		if ( !gameLocal.isMultiplayer ) {
+			cinematicHud->HandleNamedEvent ( "showLetterbox" );
+		}
 // RAVEN BEGIN
 // jnewquist: Option to adjust vertical fov instead of horizontal for non 4:3 modes
 		if ( gameLocal.GetScreenAspectRatio() > ( 4.0f / 3.0f ) ) {
@@ -4773,7 +5509,7 @@ void idPlayer::EnterCinematic( void ) {
    	}
 
 	// Reset state flags   
-	memset ( &pfl, 0, sizeof(pfl) );
+	memset( &pfl, 0, sizeof(pfl) );
 	pfl.onGround = true;
 	pfl.dead	 = (health <= 0);
 }
@@ -4900,12 +5636,9 @@ void idPlayer::FireWeapon( void ) {
 	idMat3 axis;
 	idVec3 muzzle;
 
-//RITUAL BEGIN
-	if( gameLocal.GetIsFrozen() && gameLocal.gameType == GAME_DEADZONE )
-	{
+	if ( gameLocal.GetIsFrozen() && gameLocal.gameType == GAME_DEADZONE ) {
 		return;
 	}
-//RITUAL END
 	if ( privateCameraView ) {
 		return;
 	}
@@ -4916,11 +5649,24 @@ void idPlayer::FireWeapon( void ) {
 		return;
 	}
 
-	// openQ4: a weapon may not start an attack while it is being swapped out.  Kept in
-	// step with the multiplayer tree (src/mpgame/Player.cpp), where this matters: a
-	// client strips BUTTON_ATTACK for the whole of a weapon change, so a weapon that
-	// still fires server-side during that window spends ammo and spawns shots nobody
-	// rendered.  Inert here - gameLocal.isMultiplayer is never true in this tree.
+	// openQ4: a weapon may not start an attack while it is being swapped out.
+	//
+	// Both client think paths strip BUTTON_ATTACK for the whole of a weapon change
+	// (idPlayer::LocalClientPredictionThink and idPlayer::NonLocalClientPredictionThink),
+	// so no client ever animates a shot during that window.  idPlayer::Think does not,
+	// which left the authoritative simulation firing the outgoing weapon while every
+	// client showed it holstering.  Weapon_Combat calls PutAway() and then FireWeapon()
+	// in the same frame, so the outgoing weapon could even be told to begin a fresh
+	// attack after it had been told to lower - the shotgun re-enters "Fire" from its own
+	// fire loop without re-testing wsfl.lowerWeapon, and spends another shell nobody saw.
+	// This is unmissable with the pickup auto-switch, which opens the window with no
+	// input from the player at all: run over a weapon with the trigger held and the
+	// server fires shots the shooter never sees.
+	//
+	// Raven patched exactly this for the lightning gun only (NoFireWhileSwitching), and
+	// their comment - "consistent with the visual feedback clients are getting" - is the
+	// argument for applying it to every weapon.  It is also what Q3/QL do: no firing
+	// during a weapon change.
 	const bool noFireWhileSwitching =
 		( gameLocal.isMultiplayer && idealWeapon != currentWeapon && weapon->NoFireWhileSwitching() );
 
@@ -4944,19 +5690,8 @@ void idPlayer::FireWeapon( void ) {
 	else if ( weapon->IsReloading() ) {
 		weapon->CancelReload();
 	}
-/* twhitaker: removed this at the request of Matt Vainio.
-	if ( !gameLocal.isMultiplayer ) {
-		if ( hud && tipUp ) {
-			HideTip();
-		}
-		// may want to track with with a bool as well
-		// keep from looking up named events so often
-		if ( objectiveSystem && objectiveUp ) {
-			HideObjective();
-		}
-	}
-*/
-	if( hud && weaponChangeIconsUp ) {
+
+	if ( hud && weaponChangeIconsUp ) {
 		hud->HandleNamedEvent( "weaponFire" );
 		// nrausch: objectiveSystem does not necessarily exist (in mp it doesn't)
 		if ( objectiveSystem ) {
@@ -5031,6 +5766,25 @@ bool idPlayer::Give( const char *statname, const char *value, bool dropped, bool
  			if ( health > boundaryHealth ) {
  				health = boundaryHealth;
  			}
+		}
+	} else if ( !idStr::Icmp( statname, "bonushealth" ) && gameLocal.IsClassicRuleset() ) {
+		// openQ4: Classic stimpacks stack past the limit and never drain
+		if ( health >= CLASSIC_HEALTH_CAP ) {
+			return false;
+		}
+		health = Min( health + atoi( value ), CLASSIC_HEALTH_CAP );
+	} else if ( !idStr::Icmp( statname, "megahealth" ) ) {
+		// openQ4: Classic mega health; idItem::Pickup starts the drain and holds the respawn
+		if ( health >= CLASSIC_HEALTH_CAP ) {
+			return false;
+		}
+		health = Min( health + atoi( value ), CLASSIC_HEALTH_CAP );
+	} else if ( !idStr::Icmp( statname, "armor_tier" ) ) {
+		// openQ4: Classic tiered armour. Scout trades armour for speed, so its
+		// carrier takes none, as the stock armour above (boundaryArmor 0) and the
+		// buy menu already refuse it.
+		if ( PowerUpActive( POWERUP_SCOUT ) || !rvClassicRules::GiveArmor( this, value ) ) {
+			return false;
 		}
 	} else if ( !idStr::Icmp( statname, "bonushealth" ) ) {
 		// allow health over max health
@@ -5183,10 +5937,10 @@ bool idPlayer::GiveItem( idItem *item, bool updateHud ) {
 		// the armor/ammo/health because they are updated every
 		// frame no matter what
 		if ( gameLocal.isMultiplayer ) {
-			UpdateHudWeapon( );
+			UpdateHudWeapon();
 		} else {
 			//so weapon mods highlight the correct weapon when received
-			int weapon = SlotForWeapon ( arg->GetValue() );
+			int weapon = SlotForWeapon( arg->GetValue() );
 			UpdateHudWeapon( weapon );
 		}
 		hud->HandleNamedEvent( "weaponPulse" );
@@ -5223,12 +5977,13 @@ float idPlayer::PowerUpModifier( int type ) {
 
 	if ( PowerUpActive( POWERUP_QUADDAMAGE ) ) {
 		switch( type ) {
+			// openQ4: the Classic ruleset's quad damage is Quake 2's, four times
 			case PMOD_PROJECTILE_DAMAGE: {
-				mod *= 3.0f;
+				mod *= gameLocal.IsClassicRuleset() ? 4.0f : 3.0f;
 				break;
 			}
 			case PMOD_MELEE_DAMAGE: {
-				mod *= 3.0f;
+				mod *= gameLocal.IsClassicRuleset() ? 4.0f : 3.0f;
 				break;
 			}
 			case PMOD_PROJECTILE_DEATHPUSH: {
@@ -5472,16 +6227,23 @@ idPlayer::StopPowerUpEffect
 */
 void idPlayer::StopPowerUpEffect( int powerup ) {
 	//if the player doesn't have quad, regen, haste or invisibility remaining on him, remove the power up overlay.
-	if( !( 
+	if ( !( 
 		(inventory.powerups & ( 1 << POWERUP_QUADDAMAGE ) ) || 
 		(inventory.powerups & ( 1 << POWERUP_REGENERATION ) ) || 
 		(inventory.powerups & ( 1 << POWERUP_HASTE ) ) || 
 		(inventory.powerups & ( 1 << POWERUP_INVISIBILITY ) ) 
 		) )	{
-
-			powerUpOverlay = NULL;
+		powerUpOverlay = NULL;
+		if ( !gameLocal.isMultiplayer ) {
+			// single player stops the idle hum together with the overlay
 			StopSound( SND_CHANNEL_POWERUP_IDLE, false );
 		}
+	}
+
+	// only quad has a hum, clear it even when other powerups might mean leaving the overlay on
+	if ( gameLocal.isMultiplayer && ( inventory.powerups & ( 1 << POWERUP_QUADDAMAGE ) ) == 0 ) {
+		StopSound( SND_CHANNEL_POWERUP_IDLE, false );
+	}
 
 	switch( powerup ) {
 		case POWERUP_QUADDAMAGE: {
@@ -5586,7 +6348,7 @@ bool idPlayer::GivePowerUp( int powerup, int time, bool team ) {
 
 	// only start client effects in the same instance
 	// play all stuff in instance 0 for server netdemo - atm other instances are not recorded
-	bool playClientEffects = ( ( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() && instance == 0 ) ||
+	bool playClientEffects = ( ( gameLocal.IsServerDemoPlaying() && instance == 0 ) ||
 							   ( gameLocal.GetLocalPlayer() && gameLocal.GetLocalPlayer()->GetInstance() == instance ) );
 
 	switch( powerup ) {
@@ -5673,6 +6435,23 @@ bool idPlayer::GivePowerUp( int powerup, int time, bool team ) {
 			}
 			break;
 		}
+		case POWERUP_ADRENALINE: {
+			// lends ADRENALINE_HEALTH_BOOST health at once, less the first pulse's
+			// share; UpdatePowerUps takes it back over the powerup's time
+			nextHealthPulse = gameLocal.time + HEALTH_PULSE;
+			if ( gameLocal.isServer ) {
+				adrenalineHealthDrain = ADRENALINE_HEALTH_BOOST / Max( 1, time / 1000 );
+				health += ADRENALINE_HEALTH_BOOST - adrenalineHealthDrain;
+			}
+			break;
+		}
+		case POWERUP_FC_ARMOR_REGEN: {
+			nextArmorPulse = gameLocal.time + FC_ARMOR_REGEN_PULSE;
+			if ( gameLocal.GetLocalPlayer() == this ) {
+				gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_REGENERATION, gameLocal.time, gameLocal.gameType == GAME_TOURNEY ? GetInstance() : -1 );
+			}
+			break;
+		}
 //RITUAL BEGIN
 		case POWERUP_DEADZONE: {
 			if ( playClientEffects && this == gameLocal.GetLocalPlayer() ) {
@@ -5717,8 +6496,16 @@ void idPlayer::ClearPowerup( int i ) {
  	inventory.powerups &= ~( 1 << i );
 	inventory.powerupEndTime[ i ] = 0;
 
+	// openQ4: Classic drains only mega health, so the health Regeneration builds
+	// past the limit (up to twice it) stayed for good once the powerup ran out.
+	// It drains the way mega health's does, a point a second down to the limit.
+	if ( i == POWERUP_REGENERATION && gameLocal.isServer && gameLocal.IsClassicRuleset() &&
+		 health > inventory.maxHealth && !ClassicMegaHealthActive() ) {
+		classicMegaDecayTime = gameLocal.time + CLASSIC_MEGA_DECAY_PULSE;
+	}
+
 	//if the player doesn't have quad, regen, haste or invisibility remaining on him, remove the power up overlay.
-	if( !( 
+	if ( !( 
 			(inventory.powerups & ( 1 << POWERUP_TEAM_DAMAGE_MOD ) ) ||
 			(inventory.powerups & ( 1 << POWERUP_QUADDAMAGE ) ) || 
 			(inventory.powerups & ( 1 << POWERUP_REGENERATION ) ) || 
@@ -5726,11 +6513,18 @@ void idPlayer::ClearPowerup( int i ) {
 			(inventory.powerups & ( 1 << POWERUP_INVISIBILITY ) ) ||
 			(inventory.powerups & ( 1 << POWERUP_DEADZONE ) ) 
 		) )	{
-
 		powerUpOverlay = NULL;
+		if ( !gameLocal.isMultiplayer ) {
+			// single player stops the idle hum together with the overlay
+			StopSound( SND_CHANNEL_POWERUP_IDLE, false );
+		}
+	}
+
+	// only quad has a hum, clear it even when other powerups might mean leaving the overlay on
+	if ( gameLocal.isMultiplayer && ( inventory.powerups & ( 1 << POWERUP_QUADDAMAGE ) ) == 0 ) {
 		StopSound( SND_CHANNEL_POWERUP_IDLE, false );
 	}
-	
+
 	StopPowerUpEffect( i );
 }
 
@@ -5760,34 +6554,41 @@ idPlayer::UpdatePowerUps
 */
 void idPlayer::UpdatePowerUps( void ) {
 	int i;
-	int index;
-	int wearoff;
-
-	idUserInterface *hud = idPlayer::hud;
-	if ( !gameLocal.GetLocalPlayer() ) {
-		// server netdemo
-		if ( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() && gameLocal.GetDemoFollowClient() == entityNumber ) {
-			hud = gameLocal.GetDemoHud();
+	int index = 0;
+	int wearoff = -1;
+	bool playWearoffSound = false;
+	// single player draws its powerup slots here; multiplayer in UpdateHudPowerUps
+	idUserInterface *hud = NULL;
+	
+	idPlayer *p = gameLocal.GetLocalPlayer();
+	if ( gameLocal.isMultiplayer ) {
+		if ( p && ( p->spectating && p->spectator == entityNumber || !p->spectating && p->entityNumber == entityNumber ) ) {
+			playWearoffSound = true;
 		}
 	} else {
-		// if updating the hud of a followed client
-		idPlayer *p = gameLocal.GetLocalPlayer();
-		if ( p->spectating && p->spectator == entityNumber ) {
+		hud = idPlayer::hud;
+		if ( !p ) {
+			// server netdemo
+			if ( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() && gameLocal.GetDemoFollowClient() == entityNumber ) {
+				hud = gameLocal.GetDemoHud();
+			}
+		} else if ( p->spectating && p->spectator == entityNumber ) {
+			// if updating the hud of a followed client
 			assert( p->hud && p->mphud );
 			hud = p->hud;
 		}
+
+		// openQ4: the stock script only hides the powerup slots. With nothing owned
+		// now and nothing shown on this hud since its last clear, it changes nothing,
+		// so it runs once rather than every tic.
+		if ( hud && ( inventory.powerups != 0 || hud != powerupHudCleared ) ) {
+			hud->HandleNamedEvent( "clearPowerups" );
+			powerupHudCleared = inventory.powerups != 0 ? NULL : hud;
+		}
+		playWearoffSound = ( hud != NULL );
 	}
 
-	wearoff = -1;
-	// openQ4: the stock script only hides the powerup slots. With nothing owned
-	// now and nothing shown on this hud since its last clear, it changes nothing,
-	// so it runs once rather than every tic.
-	if ( hud && ( inventory.powerups != 0 || hud != powerupHudCleared ) ) {
-		hud->HandleNamedEvent( "clearPowerups" );
-		powerupHudCleared = inventory.powerups != 0 ? NULL : hud;
-	}
-
-	for ( i = 0, index = 0; i < POWERUP_MAX; i++ ) {
+	for ( i = 0; i < POWERUP_MAX; i++ ) {
 		// Do we have this powerup?
 		if ( !(inventory.powerups & ( 1 << i ) ) ) {
 			continue;
@@ -5795,12 +6596,14 @@ void idPlayer::UpdatePowerUps( void ) {
 			
 		if ( inventory.powerupEndTime[i] > gameLocal.time || inventory.powerupEndTime[i] == -1 ) {
 			// If there is still time remaining on the powerup then update the hud		
-			if ( hud ) {
+			if ( playWearoffSound ) {
 				// Play the wearoff sound for the powerup that is closest to wearing off
 				if ( ( wearoff == -1 || inventory.powerupEndTime[i] < inventory.powerupEndTime[wearoff] ) && inventory.powerupEndTime[i] != -1 ) {
 					wearoff = i;
 				}
+			}
 
+			if ( hud ) {
 				// for flags, set the powerup_flag_* variables, which give us a special pulsing flag display
 				if( i == POWERUP_CTF_MARINEFLAG || i == POWERUP_CTF_STROGGFLAG || i == POWERUP_CTF_ONEFLAG ) {
 					hud->SetStateInt( "powerup_flag_visible", 1 );
@@ -5811,7 +6614,6 @@ void idPlayer::UpdatePowerUps( void ) {
 					index++;
 				}
 			}
-
 			continue;
 		} else if ( inventory.powerupEndTime[ i ] != -1 && gameLocal.isServer ) {
 			// This particular powerup needs to respawn in a special way.
@@ -5837,6 +6639,24 @@ void idPlayer::UpdatePowerUps( void ) {
 // RITUAL BEGIN
 // squirrel: health regen only applies if you have positive health
 		if( health > 0 ) {
+			// Adrenaline takes back what it lent, a share each pulse while health is
+			// at max or above; it ends when health falls below max or the payback
+			// reaches ADRENALINE_HEALTH_FLOOR
+			if ( gameLocal.isServer && PowerUpActive( POWERUP_ADRENALINE ) ) {
+				bool keepAdrenaline = false;
+				if ( health >= inventory.maxHealth ) {
+					health -= adrenalineHealthDrain;
+					nextHealthPulse = gameLocal.time + HEALTH_PULSE;
+					keepAdrenaline = ( health >= ADRENALINE_HEALTH_FLOOR );
+					if ( !keepAdrenaline ) {
+						health = ADRENALINE_HEALTH_FLOOR;
+					}
+				}
+				if ( !keepAdrenaline ) {
+					ClearPowerup( POWERUP_ADRENALINE );
+				}
+			}
+
 			if ( PowerUpActive ( POWERUP_REGENERATION ) || PowerUpActive ( POWERUP_GUARD ) ) {
 				int healthBoundary = inventory.maxHealth; // health will regen faster under this value, slower above
 				int healthTic = 15;
@@ -5870,7 +6690,8 @@ void idPlayer::UpdatePowerUps( void ) {
 					nextHealthPulse = gameLocal.time + HEALTH_PULSE;
 				}	
 			// Health above max technically isnt a powerup but functions as one so handle it here
-			} else if ( health > inventory.maxHealth && gameLocal.isServer ) { 
+			// openQ4: under the Classic ruleset only mega health drains (UpdateClassicMegaHealth)
+			} else if ( health > inventory.maxHealth && gameLocal.isServer && !gameLocal.IsClassicRuleset() ) { 
 				nextHealthPulse = gameLocal.time + HEALTH_PULSE;
 				health--;
 			}
@@ -5886,7 +6707,11 @@ void idPlayer::UpdatePowerUps( void ) {
 				int max			= inventory.StartingAmmoForWeaponIndex( i );
 
 				// only regen ammo if lower than starting
-				if( gameLocal.time > nextAmmoRegenPulse[ ammoIndex ] && inventory.ammo[ ammoIndex ] < max ) {
+				// openQ4: and not unlimited. A fixed loadout's ammunition is -1, which is
+				// lower than any start: the Ammo Regen rune in a weapon arena counted it
+				// up from there and left the carrier with none.
+				if( gameLocal.time > nextAmmoRegenPulse[ ammoIndex ] && inventory.ammo[ ammoIndex ] >= 0 &&
+					inventory.ammo[ ammoIndex ] < max ) {
 					int step		= inventory.AmmoRegenStepForWeaponIndex( i );
 					int time		= inventory.AmmoRegenTimeForWeaponIndex( i );
 
@@ -5898,10 +6723,10 @@ void idPlayer::UpdatePowerUps( void ) {
 					}
 
 					nextAmmoRegenPulse[ ammoIndex ] = gameLocal.time + time;
-				}
+				}	
 			}
 		}
-	} else if ( !gameLocal.isClient ) {
+	} else if ( !gameLocal.isClient && !gameLocal.isMultiplayer ) {
 		// openQ4: The Awakening's freeze gun runs on a battery that recharges
 		// by itself, held or holstered, at its def's ammoRegenStep per
 		// ammoRegenTime up to its starting charge. Firing holds the next pulse
@@ -5927,12 +6752,50 @@ void idPlayer::UpdatePowerUps( void ) {
 		}
 	}
 
-	// Tick armor down if greater than max armor
+	// openQ4: Weapons Frenzy brings carried ammo back, a twentieth of the type's
+	// limit a second. Unlimited ammo (a negative count) is left alone.
+	if ( gameLocal.isServer && gameLocal.isMultiplayer && health > 0 && !spectating &&
+		 gameLocal.mpGame.HasModifier( MPMOD_FRENZY ) ) {
+		for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+			if ( !( inventory.weapons & ( 1 << i ) ) ) {
+				continue;
+			}
+			const int ammoIndex = inventory.AmmoIndexForWeaponIndex( i );
+			if ( ammoIndex <= 0 || ammoIndex >= MAX_AMMO || inventory.ammo[ ammoIndex ] < 0 ||
+				 gameLocal.time <= nextAmmoRegenPulse[ ammoIndex ] ) {
+				continue;
+			}
+			const int limit = inventory.MaxAmmoForAmmoClass( this, rvWeapon::GetAmmoNameForIndex( ammoIndex ) );
+			if ( inventory.ammo[ ammoIndex ] < limit ) {
+				inventory.ammo[ ammoIndex ] = Min( inventory.ammo[ ammoIndex ] + Max( 1, limit / MP_FRENZY_REGEN_DIVISOR ), limit );
+			}
+			nextAmmoRegenPulse[ ammoIndex ] = gameLocal.time + MP_FRENZY_REGEN_PULSE_MS;
+		}
+	}
+
+	// Tick armor down if greater than max armor. FC Armor Regen builds it up
+	// instead, FC_ARMOR_REGEN_STEP a pulse, to FC_ARMOR_REGEN_OVER_MAX past max.
 	if ( !gameLocal.isClient && gameLocal.time > nextArmorPulse ) {
-		if ( inventory.armor > inventory.maxarmor ) { 
+		if ( PowerUpActive( POWERUP_FC_ARMOR_REGEN ) ) {
+			const int armorCap = Min( inventory.maxarmor + FC_ARMOR_REGEN_OVER_MAX, FC_ARMOR_REGEN_WIRE_MAX );
+			if ( inventory.armor < armorCap ) {
+				inventory.armor = Min( inventory.armor + FC_ARMOR_REGEN_STEP, armorCap );
+			}
+			// openQ4: the clock runs for the whole powerup. Left to stand while the
+			// armour sat at its cap, it was up to twenty seconds stale when the
+			// powerup ran out, and the decay below then took a point a frame until
+			// it caught up: twenty armour gone in a third of a second.
+			nextArmorPulse = gameLocal.time + FC_ARMOR_REGEN_PULSE;
+		} else if ( inventory.armor > inventory.maxarmor && !gameLocal.IsClassicRuleset() ) {
+			// openQ4: Classic armour keeps its points; each tier has its own limit
 			nextArmorPulse += ARMOR_PULSE;
 			inventory.armor--;
-		}		
+		}
+	}
+
+	// openQ4: Classic mega health drain
+	if ( gameLocal.isServer && gameLocal.IsClassicRuleset() ) {
+		UpdateClassicMegaHealth();
 	}
 		
 	// Assign the powerup skin as long as we are alive
@@ -6517,10 +7380,88 @@ void idPlayer::LastWeapon( void ) {
 	if ( !(inventory.weapons & ( 1 << previousWeapon ) ) ) {
 		return;
 	}
-
-	// openQ4: through SelectWeapon, which refuses while weapons are disabled, in a
+	
+	// openQ4: single player goes through SelectWeapon, which refuses while weapons are disabled, in a
 	// cinematic or when the last weapon is out of ammunition, as a weapon key does.
-	SelectWeapon( previousWeapon, false );
+	if ( gameLocal.isMultiplayer ) {
+		idealWeapon = previousWeapon;
+	} else {
+		SelectWeapon( previousWeapon, false );
+	}
+}
+
+/*
+===============
+idPlayer::GetWeaponOrder
+
+openQ4 (MP-15): the player's ui_weaponOrder, parsed against this player's own
+weapon slots and kept until the text changes. A bot and single player have
+none, which leaves every decision to Quake 4's rules.
+===============
+*/
+const mpWeaponOrder_t &idPlayer::GetWeaponOrder( void ) {
+	const idDict *userInfo = ( gameLocal.isMultiplayer && !IsFakeClient() ) ? GetUserInfo() : NULL;
+	const char *text = userInfo ? userInfo->GetString( "ui_weaponOrder" ) : "";
+	if ( !weaponOrderParsed || weaponOrderText.Cmp( text ) != 0 ) {
+		const char *names[ MAX_WEAPONS ];
+		for ( int slot = 0; slot < MAX_WEAPONS; slot++ ) {
+			names[ slot ] = spawnArgs.GetString( va( "def_weapon%d", slot ) );
+		}
+		MPWeaponOrderParse( text, names, MAX_WEAPONS, weaponOrder );
+		weaponOrderText = text;
+		weaponOrderParsed = true;
+	}
+	return weaponOrder;
+}
+
+/*
+===============
+idPlayer::SmartSwitchRole
+
+openQ4: how smart switching treats the weapon in a slot (mp/WeaponOrder.h).
+===============
+*/
+int idPlayer::SmartSwitchRole( int slot ) {
+	const char *weap = ( slot >= 0 && slot < MAX_WEAPONS ) ? spawnArgs.GetString( va( "def_weapon%d", slot ) ) : "";
+	if ( !weap[ 0 ] ) {
+		return MP_SWITCH_ROLE_ARMED;
+	}
+	int ammoRequired = 0;
+	const int ammoIndex = inventory.AmmoIndexForWeaponClass( weap, &ammoRequired );
+	return MPSmartSwitchRole( weap, ammoIndex != 0 && ammoRequired != 0 );
+}
+
+/*
+===============
+idPlayer::AutoSwitchOnPickup
+
+openQ4: whether picking up the weapon in slot picked takes the player off held,
+the weapon in hand or being raised. ui_autoSwitch 0 never switches and 1 always
+does, as Quake 4's switch did; 2, Smart and openQ4's default, lets a pickup take
+over only from the gauntlet, the machinegun or an empty weapon. A ui_weaponOrder
+then lets the switch through only upward in the player's order (MP-15).
+===============
+*/
+bool idPlayer::AutoSwitchOnPickup( int held, int picked ) {
+	const idDict *userInfo = GetUserInfo();
+	const int mode = userInfo ? userInfo->GetInt( "ui_autoSwitch" ) : MP_AUTO_SWITCH_NEVER;
+	if ( mode <= MP_AUTO_SWITCH_NEVER ) {
+		return false;
+	}
+	if ( !gameLocal.isMultiplayer ) {
+		return true;
+	}
+	if ( mode >= MP_AUTO_SWITCH_SMART ) {
+		const bool heldOwned = held >= 0 && held < MAX_WEAPONS && ( inventory.weapons & ( 1 << held ) ) != 0;
+		const char *heldWeapon = heldOwned ? spawnArgs.GetString( va( "def_weapon%d", held ) ) : "";
+		const bool heldUsable = heldWeapon[ 0 ] != '\0' && inventory.HasAmmo( heldWeapon ) != 0;
+		if ( !MPSmartSwitchAllows( heldUsable, heldUsable ? SmartSwitchRole( held ) : MP_SWITCH_ROLE_ARMED,
+								   SmartSwitchRole( picked ) ) ) {
+			return false;
+		}
+	}
+	const mpWeaponOrder_t &order = GetWeaponOrder();
+	return !MPWeaponOrderActive( order ) || MPWeaponOrderSwitchOnPickup( order, held, picked );
 }
 
 /*
@@ -6536,6 +7477,26 @@ void idPlayer::NextBestWeapon( void ) {
  		return;
  	}
  
+	// openQ4 (MP-15): the best weapon the player's own order names that still has
+	// ammunition; Quake 4's choice below when the order names none of them.
+	const mpWeaponOrder_t &order = GetWeaponOrder();
+	if ( MPWeaponOrderActive( order ) ) {
+		unsigned int usable = 0;
+		for ( int slot = 0; slot < MAX_WEAPONS; slot++ ) {
+			weap = spawnArgs.GetString( va( "def_weapon%d", slot ) );
+			if ( weap[ 0 ] && ( inventory.weapons & ( 1 << slot ) ) != 0 && inventory.HasAmmo( weap ) ) {
+				usable |= 1u << slot;
+			}
+		}
+		const int ranked = MPWeaponOrderBest( order, usable );
+		if ( ranked >= 0 ) {
+			idealWeapon = ranked;
+			weaponSwitchTime = gameLocal.time + WEAPON_SWITCH_DELAY;
+			UpdateHudWeapon();
+			return;
+		}
+	}
+
  	while ( w > 0 ) {
 		w--;
 		weap = spawnArgs.GetString( va( "def_weapon%d", w ) );
@@ -6565,59 +7526,27 @@ void idPlayer::NextWeapon( void ) {
  		return;
  	}
  
-// RAVEN BEGIN
-// nrausch: support for turning the weapon change ui on and off
-
 	// check if we have any weapons
 	if ( !inventory.weapons ) {
 		return;
 	}
 
-#ifdef _XENON
-
-	w = idealWeapon;
-	while( 1 ) {
-		w++;
-		if ( w >= MAX_WEAPONS ) {
-			w = 0;
-		} 
- 		weap = spawnArgs.GetString( va( "def_weapon%d", w ) );
-		if ( !spawnArgs.GetBool( va( "weapon%d_cycle", w ) ) ) {
-			continue;
-		}
-		if ( !weap[ 0 ] ) {
-			continue;
-		}
-		if ( ( inventory.weapons & ( 1 << w ) ) == 0 ) {
-			continue;
-		}
-		if ( inventory.HasAmmo( weap ) ) {
-			break;
-		}
-	}
-
-	if ( ( w != currentWeapon ) && ( w != idealWeapon ) ) {		
-		if ( entityNumber == gameLocal.localClientNum ) {
-			hud->SetPresentationValue( "p_weapswitch::visible", "1", false );
-		}
- 		
- 		if ( gameLocal.isClient ) {
+	if ( gameLocal.isClient ) {
+		if ( !net_clientPredictWeaponSwitch.GetBool() ) {
 			return;
 		}
-
-		idealWeapon = w;
-		weaponSwitchTime = gameLocal.time + WEAPON_SWITCH_DELAY;
-		UpdateHudWeapon();
-	}
-
-#else
-
- 	if ( gameLocal.isClient ) {
-		return;
+		if ( entityNumber != gameLocal.localClientNum ) {
+			return;
+		}
+	} else {
+		// if we are processing a GAME_RELIABLE_MESSAGE_EVENT, then the impulse has been predicted on the client,
+		// who now expects a ACK back to know when it's ok to read snapshot data again
+		// if the weapon change below fails (weapon not present), we still send back a ACK just in case the client decided it had a weapon
+		CheckAckReply();
 	}
 	
 	w = idealWeapon;
-	while( 1 ) {
+	while ( 1 ) {
 		w++;
 		if ( w >= MAX_WEAPONS ) {
 			w = 0;
@@ -6637,14 +7566,19 @@ void idPlayer::NextWeapon( void ) {
 		}
 	}
 
-	if ( ( w != currentWeapon ) && ( w != idealWeapon ) ) {
+	// single player keeps Raven's SP rule: never cycle back onto the weapon in hand
+	if ( w != idealWeapon && ( gameLocal.isMultiplayer || w != currentWeapon ) ) {
+
+		if ( gameLocal.isClient && entityNumber == gameLocal.localClientNum ) {
+			// only if we are actually predicting a weapon change because if the server doesn't reply
+			// we'll be stuck with a bad weapon
+			clientIdealWeaponPredictFrame = gameLocal.framenum;
+		}
+
 		idealWeapon = w;
 		weaponSwitchTime = gameLocal.time + WEAPON_SWITCH_DELAY;
 		UpdateHudWeapon();
 	}
-
-#endif
-// RAVEN END
 }
 
 /*
@@ -6660,55 +7594,22 @@ void idPlayer::PrevWeapon( void ) {
  		return;
  	}
  
-// RAVEN BEGIN
-// nrausch: support for turning the weapon change ui on and off
-
 	// check if we have any weapons
 	if ( !inventory.weapons ) {
 		return;
 	}
 
-#ifdef _XENON
-	
-	w = idealWeapon;
-	while( 1 ) {
-		w--;
-		if ( w < 0 ) {
-			w = MAX_WEAPONS - 1;
-		}
- 		weap = spawnArgs.GetString( va( "def_weapon%d", w ) );
-		if ( !spawnArgs.GetBool( va( "weapon%d_cycle", w ) ) ) {
-			continue;
-		}
-		if ( !weap[ 0 ] ) {
-			continue;
-		}
-		if ( ( inventory.weapons & ( 1 << w ) ) == 0 ) {
-			continue;
-		}
-		if ( inventory.HasAmmo( weap ) ) {
-			break;
-		}
-	}
-
-	if ( ( w != currentWeapon ) && ( w != idealWeapon ) ) {
-		if ( entityNumber == gameLocal.localClientNum ) {
-			hud->SetPresentationValue( "p_weapswitch::visible", "1", false );
-		}
- 		
-		if ( gameLocal.isClient ) {
+ 	if ( gameLocal.isClient ) {
+		if ( !net_clientPredictWeaponSwitch.GetBool() ) {
 			return;
 		}
-
-		idealWeapon = w;
-		weaponSwitchTime = gameLocal.time + WEAPON_SWITCH_DELAY;
-		UpdateHudWeapon();
-	}
-
-#else
-
- 	if ( gameLocal.isClient ) {
-		return;
+		if ( entityNumber != gameLocal.localClientNum ) {
+			return;
+		}
+	} else {
+		// if we are processing a GAME_RELIABLE_MESSAGE_EVENT, then the impulse has been predicted on the client,
+		// who now expects a ACK back to know when it's ok to read snapshot data again
+		CheckAckReply();
 	}
 
 	w = idealWeapon;
@@ -6732,13 +7633,19 @@ void idPlayer::PrevWeapon( void ) {
 		}
 	}
 
-	if ( ( w != currentWeapon ) && ( w != idealWeapon ) ) {
+	// single player keeps Raven's SP rule: never cycle back onto the weapon in hand
+	if ( w != idealWeapon && ( gameLocal.isMultiplayer || w != currentWeapon ) ) {
+
+		if ( gameLocal.isClient && entityNumber == gameLocal.localClientNum ) {
+			// only if we are actually predicting a weapon change because if the server doesn't reply
+			// we'll be stuck with a bad weapon
+			clientIdealWeaponPredictFrame = gameLocal.framenum;
+		}
+
 		idealWeapon = w;
 		weaponSwitchTime = gameLocal.time + WEAPON_SWITCH_DELAY;
 		UpdateHudWeapon();
 	}
-#endif
-// RAVEN END
 }
 
 /*
@@ -6766,9 +7673,19 @@ void idPlayer::SelectWeapon( int num, bool force ) {
 		return;
 	}
 
- 	if ( gameLocal.isClient ) {
- 		return;
- 	}
+	if ( gameLocal.isClient ) {
+		if ( !net_clientPredictWeaponSwitch.GetBool() ) {
+			return;
+		}
+		if ( entityNumber != gameLocal.localClientNum ) {
+ 			return;
+		}
+	} else {
+		// if we are processing a GAME_RELIABLE_MESSAGE_EVENT, then the impulse has been predicted on the client,
+		// who now expects a ACK back to know when it's ok to read snapshot data again
+		// if the weapon change below fails (weapon not present), we still send back a ACK just in case the client decided it had a weapon
+		CheckAckReply();
+	}
 
  	weap = spawnArgs.GetString( va( "def_weapon%d", num ) );
 	if ( !weap[ 0 ] ) {
@@ -6779,20 +7696,17 @@ void idPlayer::SelectWeapon( int num, bool force ) {
 	// cycle in-between weapons
 	// if a weapon_def has a "def_weapon_swap" keyvalue pointing to another 
 	// weapon, hitting that impulse twice will cycle to the target swap. 
-	if( num == currentWeapon ) {
+	if ( num == currentWeapon ) {
 		const idDict* weapDict = gameLocal.FindEntityDefDict( weap, false );
 
-		if( weapDict == NULL ) {
+		if ( weapDict == NULL ) {
 			gameLocal.Warning( "Invalid weapon entity %s\n", weap );
 			return;
 		}
 
-// RAVEN BEGIN
-// nrausch: we have no need for weapon swapping on the xenon, and it gets in the way of the quick weapon select ui
-#ifndef _XENON
 		const char* destWeapon = weapDict->GetString( "def_weapon_swap", NULL );
 
-		if( destWeapon != NULL ) {
+		if ( destWeapon != NULL ) {
 			int swapNum = SlotForWeapon( destWeapon );
 			if( swapNum == -1 ) {
 				gameLocal.Warning( "Swap weapon for %s (%s) is invalid", weap, destWeapon );
@@ -6800,25 +7714,26 @@ void idPlayer::SelectWeapon( int num, bool force ) {
 				num = swapNum;
 			}
 		} 
-#endif
-// RAVEN END
 	} 
 
 	if ( force || ( inventory.weapons & ( 1 << num ) ) ) {
  		if ( !inventory.HasAmmo( weap ) && !spawnArgs.GetBool( va( "weapon%d_allowempty", num ) ) ) {
  			return;
  		}
+
+		if ( gameLocal.isClient && entityNumber == gameLocal.localClientNum ) {
+			// only if we are actually predicting a weapon change because if the server doesn't reply
+			// we'll be stuck with a bad weapon
+			clientIdealWeaponPredictFrame = gameLocal.framenum;
+		}
+
 		if ( ( previousWeapon >= 0 ) && ( idealWeapon == num ) && ( spawnArgs.GetBool( va( "weapon%d_toggle", num ) ) ) ) {
+			assert( !gameLocal.isMultiplayer ); // I'm assuming this does not happen in MP
  			weap = spawnArgs.GetString( va( "def_weapon%d", previousWeapon ) );
  			if ( !inventory.HasAmmo( weap ) && !spawnArgs.GetBool( va( "weapon%d_allowempty", previousWeapon ) ) ) {
  				return;
  			}
 			idealWeapon = previousWeapon;
-/* NO PDA yet
-		} else if ( ( weapon_pda >= 0 ) && ( num == weapon_pda ) && ( inventory.pdas.Num() == 0 ) ) {
-			ShowTip( spawnArgs.GetString( "text_infoTitle" ), spawnArgs.GetString( "text_noPDA" ), true );
-			return;
-*/
 		} else {
 			idealWeapon = num;
 		}
@@ -6831,7 +7746,7 @@ void idPlayer::SelectWeapon( int num, bool force ) {
 idPlayer::DropItem
 =================
 */
-idEntity* idPlayer::DropItem ( const char* itemClass, const idDict& customArgs, const idVec3& velocity ) const {
+idEntity* idPlayer::DropItem( const char* itemClass, const idDict& customArgs, const idVec3& velocity ) const {
 	idDict		args;
 	idEntity*	ent;
 	args.Set( "classname", itemClass );
@@ -6876,7 +7791,7 @@ void idPlayer::DropPowerups( void ) {
 		}		
 		
 		// These powerups aren't dropped
-		if ( i >= POWERUP_TEAM_AMMO_REGEN && i <= POWERUP_TEAM_DAMAGE_MOD )
+		if ( ( i >= POWERUP_TEAM_AMMO_REGEN && i <= POWERUP_TEAM_DAMAGE_MOD ) || i == POWERUP_FC_ARMOR_REGEN )
 			continue;
 
 		// Don't drop this either with buying enabled.
@@ -6992,6 +7907,17 @@ void idPlayer::DropWeapon( void ) {
 	}
 // RITUAL END
 
+	// openQ4: a fixed-loadout mode has nothing to scavenge for. Everyone spawns
+	// with the whole arsenal and full ammo, so a dropped weapon can only ever be
+	// an ammo resupply - which turns an equal-terms round into a corpse-camping
+	// game and is exactly what the fixed loadout exists to prevent.
+	// Instagib and the weapon arenas likewise: a dropped copy of the one weapon
+	// everybody carries would be a pickup nobody needs.
+	if ( gameLocal.isMultiplayer &&
+		 ( MPGameTypeHasAny( gameLocal.gameType, GTF_FULLARSENAL ) || gameLocal.mpGame.HasFixedLoadout() ) ) {
+		return;
+	}
+
  	if ( spectating || weaponGone || !weapon ) {
 		return;
 	}
@@ -7082,13 +8008,20 @@ idPlayer::Weapon_Combat
 ===============
 */
 void idPlayer::Weapon_Combat( void ) {
+	// multiplayer: the weapon and quick-chat wheels stop the weapon before anything else
+	if ( gameLocal.isMultiplayer && ( weaponWheelActive || ( usercmd.buttons & ( BUTTON_WEAPONWHEEL | BUTTON_QUICKCHAT ) ) != 0 ) ) {
+		pfl.weaponFired = false; pfl.attackHeld = false;
+		if ( weapon ) weapon->EndAttack();
+		return;
+	}
 	
  	if ( influenceActive || !weaponEnabled || gameLocal.inCinematic || privateCameraView ) {
 		return;
 	}
 
 	// The weapon stays raised under the wheel, as in multiplayer: the wheel's
-	// depth of field focuses on it. It only stops firing.
+	// depth of field focuses on it. It only stops firing. (Single player; the
+	// multiplayer test above has already returned for an open wheel.)
 	if ( weaponWheelActive ) {
 		pfl.weaponFired = false;
 		pfl.attackHeld = false;
@@ -7357,6 +8290,18 @@ void idPlayer::UpdateWeapon( void ) {
 	if ( !weapon ) {
 		if ( idealWeapon != -1 ) {
 			SetWeapon( idealWeapon );
+			// A snapshot can replace the weapon while a demo seek skips its
+			// animation frames. Honour that catch-up request before clearing it,
+			// just as Weapon_Combat does for an existing weapon. Otherwise the
+			// first paused frame starts a fresh raise animation below the view.
+			// A weapon for a new life the client saw begin raises with the
+			// server's instead (netWeaponRaiseTime, set in ReadFromSnapshot).
+			if ( weaponCatchup ) {
+				weapon->NetCatchup();
+			} else if ( netWeaponRaiseTime >= 0 ) {
+				weapon->SetNetRaiseStartTime( netWeaponRaiseTime );
+			}
+			netWeaponRaiseTime = -1;
 			weaponCatchup = false;
 			assert( weapon );
 		} else {
@@ -7415,12 +8360,14 @@ void idPlayer::UpdateWeapon( void ) {
 		gameRenderWorld->DrawText( va( "%d 2d", ( int )DistanceTo2d( tr.endpos ) ), start + forward * 100.0f + right * 25.0f - up * 12.0f, .2f, colorCyan, viewAxis );
 	}
 
- 	if ( hiddenWeapon ) {
- 		weapon->LowerWeapon();
- 	}
+	if ( weapon ) {
+		if ( hiddenWeapon ) {
+			weapon->LowerWeapon();
+		}
 
-	// update weapon state, particles, dlights, etc
-	weaponViewModel->PresentWeapon( showWeaponViewModel );
+		// update weapon state, particles, dlights, etc
+		weaponViewModel->PresentWeapon( showWeaponViewModel );
+	}
 }
 
 /*
@@ -7477,24 +8424,260 @@ void idPlayer::SpectateFreeFly( bool force ) {
 idPlayer::SpectateCycle
 ===============
 */
-void idPlayer::SpectateCycle( void ) {
-	idPlayer *player;
-
+void idPlayer::SpectateCycle( int direction ) {
 	if ( gameLocal.time > lastSpectateChange ) {
-		int latchedSpectator = spectator;
-		spectator = gameLocal.GetNextClientNum( spectator );
-		player = gameLocal.GetClientByNum( spectator );
-		assert( player ); // never call here when the current spectator is wrong
-		// ignore other spectators
-		while ( latchedSpectator != spectator && player->spectating ) {
-			spectator = gameLocal.GetNextClientNum( spectator );
-			player = gameLocal.GetClientByNum( spectator );
-		}
 		lastSpectateChange = gameLocal.time + 500;
+		CycleSpectatorFollow( direction );
+	}
+}
 
-		if ( player ) {
-			UpdateHudWeapon( player->currentWeapon );
+static idPlayer *SpectatorFollowClient( int slot ) {
+	// GetClientByNum deliberately maps an out-of-range index back to slot zero;
+	// command targets need exact slot/type validation instead of that fallback.
+	if ( slot < 0 || slot >= MAX_CLIENTS || slot >= gameLocal.numClients ||
+		gameLocal.entities[slot] == NULL || !gameLocal.entities[slot]->IsType( idPlayer::GetClassType() ) ) {
+		return NULL;
+	}
+	idPlayer *player = static_cast<idPlayer *>( gameLocal.entities[slot] );
+	return player->IsFakeClient() ? NULL : player;
+}
+
+bool idPlayer::CycleSpectatorFollow( int direction ) {
+	if ( direction != 1 && direction != -1 ) {
+		return false;
+	}
+	const int count = Min( gameLocal.numClients, MAX_CLIENTS );
+	const int start = spectator >= 0 && spectator < count ? spectator : ( direction > 0 ? -1 : 0 );
+	for ( int attempt = 1; attempt <= count; ++attempt ) {
+		const int candidateSlot = ( start + direction * attempt + count ) % count;
+		idPlayer *candidate = SpectatorFollowClient( candidateSlot );
+		if ( candidate == NULL || candidate->spectating ||
+			!gameLocal.mpGame.CanSpectatorFollow( entityNumber, candidateSlot ) ) {
+			continue;
 		}
+		// Attack and console cycling share this fresh authorization check.
+		spectator = candidateSlot;
+		candidate->UpdateHudWeapon( candidate->currentWeapon );
+		return true;
+	}
+	// Nobody to follow. Release a followed player; a camera that is already free
+	// stays where it is. SpectateFreeFly with no one followed puts the camera on
+	// a spawn point, so every attack press alone on a server was a teleport.
+	if ( spectator != entityNumber ) {
+		SpectateFreeFly( true );
+	}
+	return false;
+}
+
+void idPlayer::RequestSpectatorFollow( spectatorFollow_t operation, int targetSlot ) {
+	if ( !gameLocal.isMultiplayer || gameLocal.GetLocalPlayer() != this ||
+		gameLocal.GetDemoState() != DEMO_NONE || gameLocal.isRepeater ||
+		entityNumber < 0 || entityNumber >= MAX_CLIENTS || IsFakeClient() || !spectating ) {
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_42881" ) );
+		return;
+	}
+	int targetSpawnId = 0;
+	if ( operation == SPECTATOR_FOLLOW_PLAYER ) {
+		idPlayer *target = SpectatorFollowClient( targetSlot );
+		if ( target == NULL ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_42882" ) );
+			return;
+		}
+		targetSpawnId = gameLocal.GetSpawnId( target );
+	} else if ( operation == SPECTATOR_FOLLOW_AUTO &&
+		( targetSlot < MP_AUTOTRACK_OFF || targetSlot >= MP_AUTOTRACK_MODE_COUNT ) ) {
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_232206" ) );
+		return;
+	} else if ( operation == SPECTATOR_FOLLOW_CASTER && targetSlot != 0 && targetSlot != 1 ) {
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_232214" ) );
+		return;
+	}
+	if ( gameLocal.isServer ) {
+		ServerSpectatorFollow( operation, targetSlot, targetSpawnId );
+	} else if ( gameLocal.isClient ) {
+		idBitMsg request;
+		byte buffer[6];
+		request.Init( buffer, sizeof( buffer ) );
+		request.BeginWriting();
+		request.WriteByte( operation );
+		request.WriteByte( targetSlot + 1 );
+		request.WriteLong( targetSpawnId );
+		// The existing event envelope proves this player's current spawn and
+		// sender ownership before dispatch. Target identity is checked again.
+		// A request, not a simulated event: it must not be lost to the frame
+		// re-run test (idEntity::ClientSendRequestEvent).
+		ClientSendRequestEvent( EVENT_SPECTATOR_FOLLOW, &request );
+	}
+}
+
+void idPlayer::ServerSpectatorFollow( int operation, int targetSlot, int targetSpawnId ) {
+	if ( !gameLocal.isServer || !gameLocal.isMultiplayer || gameLocal.isRepeater ||
+		SpectatorFollowClient( entityNumber ) != this || botManager.IsBot( entityNumber ) ||
+		!gameLocal.mpGame.IsInGame( entityNumber ) ||
+		operation < SPECTATOR_FOLLOW_NEXT || operation > SPECTATOR_FOLLOW_CASTER ||
+		( operation < SPECTATOR_FOLLOW_PLAYER && ( targetSlot != -1 || targetSpawnId != 0 ) ) ||
+		( operation == SPECTATOR_FOLLOW_PLAYER && ( targetSlot < 0 || targetSlot >= MAX_CLIENTS ) ) ||
+		( operation == SPECTATOR_FOLLOW_AUTO && ( targetSlot < MP_AUTOTRACK_OFF ||
+			targetSlot >= MP_AUTOTRACK_MODE_COUNT || targetSpawnId != 0 ) ) ||
+		( operation == SPECTATOR_FOLLOW_CASTER && ( ( targetSlot != 0 && targetSlot != 1 ) || targetSpawnId != 0 ) ) ) {
+		return;
+	}
+	// Rate-limit rejected requests as well as successful camera changes.
+	if ( gameLocal.time <= lastSpectateChange ) {
+		return;
+	}
+	lastSpectateChange = gameLocal.time + 500;
+	if ( !spectating ) {
+		gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42881", "" );
+		return;
+	}
+	if ( operation == SPECTATOR_FOLLOW_CASTER ) {
+		// a view right, not a camera: it moves nothing and leaves auto-follow alone
+		const char *notice = gameLocal.mpGame.ServerRequestCasterRole( entityNumber, targetSlot != 0 );
+		if ( notice != NULL ) {
+			gameLocal.ServerSendChatMessage( entityNumber, "server", notice, "" );
+		}
+		return;
+	}
+	if ( operation == SPECTATOR_FOLLOW_AUTO ) {
+		SetSpectatorAutoFollow( targetSlot );
+		return;
+	}
+	// A camera chosen by hand takes it back from auto-follow.
+	if ( spectatorAutoFollow != MP_AUTOTRACK_OFF ) {
+		SetSpectatorAutoFollow( MP_AUTOTRACK_OFF );
+	}
+	if ( operation == SPECTATOR_FOLLOW_FREE ) {
+		// already free: stay put (see CycleSpectatorFollow)
+		if ( spectator != entityNumber ) {
+			SpectateFreeFly( true );
+		}
+		gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42884", "" );
+		return;
+	}
+	if ( operation == SPECTATOR_FOLLOW_NEXT || operation == SPECTATOR_FOLLOW_PREV ) {
+		if ( gameLocal.gameType == GAME_TOURNEY ) {
+			// Keep the bracket order, arena transitions and existing cooldown.
+			rvTourneyGameState *tourney = static_cast<rvTourneyGameState *>( gameLocal.mpGame.GetGameState() );
+			if ( operation == SPECTATOR_FOLLOW_NEXT ) {
+				tourney->SpectateCycleNext( this );
+			} else {
+				tourney->SpectateCyclePrev( this );
+			}
+		} else {
+			CycleSpectatorFollow( operation == SPECTATOR_FOLLOW_NEXT ? 1 : -1 );
+		}
+		if ( spectator == entityNumber ) {
+			gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42883", "" );
+		}
+		return;
+	}
+	idPlayer *target = SpectatorFollowClient( targetSlot );
+	if ( target == NULL || gameLocal.GetSpawnId( target ) != targetSpawnId ||
+		!gameLocal.mpGame.CanSpectatorFollow( entityNumber, targetSlot ) ) {
+		gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42882", "" );
+		return;
+	}
+	if ( gameLocal.gameType == GAME_TOURNEY ) {
+		const int arena = target->GetArena();
+		rvTourneyGameState *tourney = static_cast<rvTourneyGameState *>( gameLocal.mpGame.GetGameState() );
+		if ( arena < 0 || arena >= MAX_ARENAS ||
+			tourney->GetArena( arena ).GetState() == AS_INACTIVE || tourney->GetArena( arena ).GetState() == AS_DONE ||
+			( tourney->GetArenaPlayers( arena )[0] != target && tourney->GetArenaPlayers( arena )[1] != target ) ||
+			( arena != GetArena() && gameLocal.time <= lastArenaChange ) ) {
+			gameLocal.ServerSendChatMessage( entityNumber, "server", "#str_42882", "" );
+			return;
+		}
+		if ( arena != GetArena() ) {
+			JoinInstance( arena );
+			lastArenaChange = gameLocal.time + 2000;
+		}
+	}
+	spectator = targetSlot;
+	target->UpdateHudWeapon( target->currentWeapon );
+}
+
+/*
+===============
+idPlayer::SetSpectatorAutoFollow
+
+openQ4: the mode is the spectator's own request; the server answers with the
+mode it now runs so the client needs no replicated state to show it.
+===============
+*/
+void idPlayer::SetSpectatorAutoFollow( int mode ) {
+	static const char *const notices[ MP_AUTOTRACK_MODE_COUNT ] = {
+		"#str_232200", "#str_232201", "#str_232202", "#str_232203", "#str_232204", "#str_232205"
+	};
+	if ( mode < MP_AUTOTRACK_OFF || mode >= MP_AUTOTRACK_MODE_COUNT ) {
+		return;
+	}
+	if ( mode != spectatorAutoFollow ) {
+		spectatorAutoTrack.Reset();
+	}
+	spectatorAutoFollow = mode;
+	gameLocal.ServerSendChatMessage( entityNumber, "server", notices[ mode ], "" );
+}
+
+/*
+===============
+idPlayer::UpdateSpectatorAutoFollow
+
+openQ4: moves an auto-following spectator's camera. Every candidate passes the
+same fresh CanSpectatorFollow check as a camera chosen by hand, so auto-follow
+can never reach a player this spectator may not watch. Attack and jump are the
+camera's own controls and hand it back.
+===============
+*/
+void idPlayer::UpdateSpectatorAutoFollow( void ) {
+	if ( spectatorAutoFollow == MP_AUTOTRACK_OFF ) {
+		return;
+	}
+	if ( ( usercmd.buttons & BUTTON_ATTACK ) != 0 || usercmd.upmove > 0 ) {
+		SetSpectatorAutoFollow( MP_AUTOTRACK_OFF );
+		return;
+	}
+	mpAutoTrackPlayer players[ MP_AUTOTRACK_CLIENTS ];
+	for ( int slot = 0; slot < MAX_CLIENTS && slot < MP_AUTOTRACK_CLIENTS; ++slot ) {
+		idPlayer *candidate = SpectatorFollowClient( slot );
+		if ( candidate == NULL || candidate == this ||
+			!gameLocal.mpGame.CanSpectatorFollow( entityNumber, slot ) ) {
+			continue;
+		}
+		// Tourney cameras change arena only by the bracket controls.
+		if ( gameLocal.gameType == GAME_TOURNEY && candidate->GetArena() != GetArena() ) {
+			continue;
+		}
+		gameLocal.FillAutoTrackPlayer( candidate, slot, players[ slot ] );
+	}
+	const int followed = spectator != entityNumber ? spectator : -1;
+	const int target = spectatorAutoTrack.Choose( spectatorAutoFollow, -1, followed, players, gameLocal.time );
+	if ( target < 0 || target == followed ) {
+		return;
+	}
+	idPlayer *chosen = SpectatorFollowClient( target );
+	if ( chosen == NULL ) {
+		return;
+	}
+	spectator = target;
+	chosen->UpdateHudWeapon( chosen->currentWeapon );
+}
+
+/*
+===============
+idPlayer::NoteSpectatorAutoFollowKill
+===============
+*/
+void idPlayer::NoteSpectatorAutoFollowKill( int attackerSlot, int victimSlot ) {
+	for ( int slot = 0; slot < MAX_CLIENTS; ++slot ) {
+		idPlayer *observer = SpectatorFollowClient( slot );
+		if ( observer == NULL || !observer->spectating ) {
+			continue;
+		}
+		// Every spectator's chooser remembers kills, so a mode switched on
+		// later already knows who has been fighting.
+		observer->spectatorAutoTrack.NoteKill( attackerSlot, victimSlot,
+			observer->spectator != slot ? observer->spectator : -1, gameLocal.time );
 	}
 }
 
@@ -7505,14 +8688,34 @@ idPlayer::UpdateSpectating
 */
 void idPlayer::UpdateSpectating( void ) {
 	assert( spectating );
-	assert( !gameLocal.isClient );
+	assert( !gameLocal.isClient || IsFakeClient() );
 	assert( IsHidden() );
 	idPlayer *player;
 	if ( !gameLocal.isMultiplayer ) {
 		return;
 	}
 	player = gameLocal.GetClientByNum( spectator );
+	// Latch the followed entity the first frame a slot is followed. A different
+	// entity in the same slot later is a disconnect and a new connection, even
+	// if no frame ever saw the slot empty.
+	if ( player != NULL && player != this ) {
+		const int spawnId = gameLocal.GetSpawnId( player );
+		if ( spectatorFollowSlot != spectator ) {
+			spectatorFollowSlot = spectator;
+			spectatorFollowSpawnId = spawnId;
+		} else if ( spectatorFollowSpawnId != spawnId ) {
+			player = NULL;
+		}
+	} else {
+		spectatorFollowSlot = -1;
+		spectatorFollowSpawnId = 0;
+	}
 	if ( !player || ( player->spectating && player != this ) ) {
+		SpectateFreeFly( true );
+	} else if ( player != this && !gameLocal.mpGame.CanSpectatorFollow(
+		entityNumber, player->entityNumber ) ) {
+		// Revalidate continuously so a countdown, role change, disconnect or
+		// slot-generation change revokes an already selected POV immediately.
 		SpectateFreeFly( true );
 	} else if ( usercmd.upmove > 0 && player && player != this ) {
 		// following someone and hit jump? release.
@@ -7520,6 +8723,9 @@ void idPlayer::UpdateSpectating( void ) {
 	} else if ( usercmd.buttons & BUTTON_ATTACK && gameLocal.gameType != GAME_TOURNEY ) {
 		// tourney mode uses seperate cycling
 		SpectateCycle();
+	}
+	if ( gameLocal.isServer ) {
+		UpdateSpectatorAutoFollow();
 	}
 }
 
@@ -7560,26 +8766,6 @@ bool idPlayer::HandleSingleGuiCommand( idEntity *entityGui, idLexer *src ) {
 		PerformImpulse( IMPULSE_17 );
 		return true;
 	}
-
-// RAVEN BEGIN
-// twhitaker: no more database system
-/*	if ( token.Icmp( "updateDB" ) == 0 ) {
-		UpdateDatabaseInfo();
-		return true;
-	}
-	
-	if ( token.Icmp ( "filterDB" ) == 0 ) {
-		if ( !src->ReadToken( &token ) ) {
-			return false;
-		}
-
-		if ( objectiveSystem ) {
-			objectiveSystem->SetStateString ( "dbFilter", token );
-			UpdateDatabaseInfo ( );
-		}
-	}
-*/
-// RAVEN END
 
 	if ( token.Icmp( "heal" ) == 0 && 
 		entityGui->IsType( rvHealingStation::GetClassType() ) &&
@@ -7723,7 +8909,16 @@ void idPlayer::UpdateFocus( void ) {
 	}
 
 #ifndef _XENON
-	cvarSystem->SetCVarInteger( "pm_isZoomed", zoomed ? pm_zoomedSlow.GetInteger() : 0 );
+	// openQ4: pm_isZoomed is this process's look-sensitivity scale. Every player's
+	// Think wrote it, so on a listen server the host's mouse slowed whenever the
+	// player who thought last was scoped, and the host's own scope was undone by
+	// anyone who was not.
+	if ( IsLocalClient() ) {
+		const int zoomedSlow = zoomed ? pm_zoomedSlow.GetInteger() : 0;
+		if ( pm_isZoomed.GetInteger() != zoomedSlow ) {
+			pm_isZoomed.SetInteger( zoomedSlow );
+		}
+	}
 #endif
 
 #ifdef _XENON
@@ -7745,23 +8940,31 @@ void idPlayer::UpdateFocus( void ) {
 	oldTalkCursor = talkCursor;
 	talkCursor = 0;
 	start = GetEyePosition();
-	// openQ4 VR: the weapon hand points at world GUIs, characters and usable
-	// things from where it aims, so a GUI's cursor lands where the laser does
-	// rather than a forearm away from it (single player; multiplayer keeps the
-	// eye, which the server can trace). Aimed by the head, they answer the
-	// tracked head, where the crosshair is drawn from.
-	if ( !GetVRAimOrigin( start ) ) {
-		GetVRHeadOrigin( start );
+	if ( !gameLocal.isMultiplayer ) {
+		// openQ4 VR: the weapon hand points at world GUIs, characters and usable
+		// things from where it aims, so a GUI's cursor lands where the laser does
+		// rather than a forearm away from it (single player; multiplayer keeps the
+		// eye, which the server can trace). Aimed by the head, they answer the
+		// tracked head, where the crosshair is drawn from.
+		if ( !GetVRAimOrigin( start ) ) {
+			GetVRHeadOrigin( start );
+		}
 	}
 	end = start + viewAngles.ToForward() * 768.0f;
 
  	// player identification -> names to the hud
- 	if ( gameLocal.isMultiplayer && entityNumber == gameLocal.localClientNum ) {
+ 	if ( gameLocal.isMultiplayer && IsLocalClient() ) {
 		trace_t trace;
  		idVec3 end = start + viewAngles.ToForward() * 768.0f;
 		gameLocal.TracePoint( this, trace, start, end, MASK_SHOT_BOUNDINGBOX, this );
 		// no aim text if player is invisible
- 		if ( ( trace.fraction < 1.0f ) && ( trace.c.entityNum < MAX_CLIENTS ) && ( !((idPlayer*)gameLocal.entities[ trace.c.entityNum ])->PowerUpActive( POWERUP_INVISIBILITY ) ) ) {
+		// openQ4 (MP-15): hud_crosshairNames 0 names nobody, 2 only team mates
+		bool aimNamed = ( trace.fraction < 1.0f ) && ( trace.c.entityNum < MAX_CLIENTS ) && ( !((idPlayer*)gameLocal.entities[ trace.c.entityNum ])->PowerUpActive( POWERUP_INVISIBILITY ) );
+		if ( aimNamed && hud_crosshairNames.GetInteger() != 1 ) {
+			const idPlayer *aimed = static_cast< const idPlayer * >( gameLocal.entities[ trace.c.entityNum ] );
+			aimNamed = hud_crosshairNames.GetInteger() == 2 && gameLocal.IsTeamGame() && aimed->team == team;
+		}
+ 		if ( aimNamed ) {
 			const char* teammateHealth = "";
 			idPlayer* p = static_cast<idPlayer*>(gameLocal.entities[ trace.c.entityNum ]);			
 			
@@ -7925,7 +9128,7 @@ void idPlayer::UpdateFocus( void ) {
 				}
 			}
 			
-			if ( !gameLocal.isMultiplayer || (gameLocal.isMultiplayer && entityNumber == gameLocal.localClientNum) ) {
+			if ( !gameLocal.isMultiplayer || (gameLocal.isMultiplayer && IsLocalClient() ) ) {
 				if ( bestEnemy ) {
 					if ( cursor ) {
 						cursor->SetStateInt("enemyFocus", 1);
@@ -7962,51 +9165,6 @@ void idPlayer::UpdateFocus( void ) {
 	bounds.AddPoint( end );
 	
 	listedClipModels = gameLocal.ClipModelsTouchingBounds( this, bounds, -1, clipModelList, MAX_GENTITIES );
-
-	// Do autoaim
-	
-	
-//RAVEN BEGIN
-//asalmon: auto-aim for Xenon, finds a best enemy and changes the crosshairs.
-#ifdef _XBOX
-	
-		bool doAimAssist = cvarSystem->GetCVarBool("pm_AimAssist") || gameLocal.isMultiplayer;
-		
-		bestEnemy = NULL;
-		bool showDebug = cvarSystem->GetCVarBool("pm_showAimAssist");
-		float bDist = cvarSystem->GetCVarInteger("pm_AimAssistDistance");
-		float dist;
-		idFrustum aimArea;
-		float dNear, dFar, size;
-		renderView_t *rv = GetRenderView();
-		float fovY, fovX;
-		
-		if ( weapon && doAimAssist ) {
-		
-			// field of view
- 			gameLocal.CalcFov( CalcFov( true ), fovX, fovY );
-		
-			dNear = cvarSystem->GetCVarFloat( "r_znear" );
-			dFar = bDist;
-#ifndef _FINAL
-			if ( cvarSystem->GetCVarInteger("pm_AimAssistTest") != 0 ) {
-				size = dFar * idMath::Tan( DEG2RAD( fovY * 0.5f ) ) * pm_AimAssistFOV.GetFloat()/100.0;
-			} else 
-#endif
-			{
-				size = dFar * idMath::Tan( DEG2RAD( fovY * 0.5f ) ) * weapon->GetAutoAimFOV()/100.0;
-			}
-			aimArea.SetOrigin( GetEyePosition() );
-			aimArea.SetAxis( viewAngles.ToMat3() );
-			aimArea.SetSize( dNear, dFar, size, size );
-	
-			if ( showDebug ) {
-				gameRenderWorld->DebugFrustum( colorRed, aimArea, false, 20 );
-			}
-		}
-
-#endif
-//RAVEN END
 
 	// dluetscher: added optimization to eliminate redundant traces
 	renderTrace.fraction = -1;
@@ -8287,8 +9445,10 @@ void idPlayer::UpdateFocus( void ) {
 
 				ui->SetStateString( "player_health", va("%i", health ) );
 				ui->SetStateString( "player_armor", va( "%i%%", inventory.armor ) );
-				if ( vrSystem != NULL && vrSystem->IsActive() && cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
-					gameLocal.Printf( "VR GUI focus %s at %.2f %.2f\n", ent->GetName(), pt.x, pt.y );
+				if ( !gameLocal.isMultiplayer ) {
+					if ( vrSystem != NULL && vrSystem->IsActive() && cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+						gameLocal.Printf( "VR GUI focus %s at %.2f %.2f\n", ent->GetName(), pt.x, pt.y );
+					}
 				}
 
 				kv = ent->spawnArgs.MatchPrefix( "gui_", NULL );
@@ -8329,7 +9489,7 @@ void idPlayer::UpdateFocus( void ) {
 	}
 
 #ifdef _XENON
-	if ( !gameLocal.isMultiplayer || (gameLocal.isMultiplayer && entityNumber == gameLocal.localClientNum) ) {
+	if ( !gameLocal.isMultiplayer || (gameLocal.isMultiplayer && IsLocalClient() ) ) {
 		
 		if ( !weapon || !weapon->AllowAutoAim() ) {
 			if ( cursor ) {
@@ -8362,7 +9522,7 @@ void idPlayer::UpdateFocus( void ) {
 	}
 #endif
 
-	if ( !gameLocal.isMultiplayer || (gameLocal.isMultiplayer && entityNumber == gameLocal.localClientNum) ) {
+	if ( !gameLocal.isMultiplayer || (gameLocal.isMultiplayer && IsLocalClient() ) ) {
 		if ( wasTargetFriendly && !targetFriendly && focusType == FOCUS_NONE ) {
 			if ( cursor ) {
 				cursor->HandleNamedEvent ( WeaponIsEnabled() ? "showCrossCombat" : "crossHide" );
@@ -8559,6 +9719,18 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 		}
 	}
 
+	// openQ4: in Instagib only another player can hurt you; the landing still
+	// shows, but costs nothing. A pit's trigger_hurt is world damage and still kills.
+	if ( gameLocal.isMultiplayer && gameLocal.mpGame.IsInstagib() ) {
+		noDamage = true;
+	}
+
+	// openQ4: si_fallDamage scales what a landing costs; at 0 it costs nothing.
+	const float fallDamageScale = rvMPModifiers::FallDamageScale();
+	if ( fallDamageScale <= 0.0f ) {
+		noDamage = true;
+	}
+
 	//jshepard: no falling damage if falling damage is disabled
 	if( pfl.noFallingDamage )	{
 		return;
@@ -8631,7 +9803,7 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 		landTime = gameLocal.time;
  		if ( !noDamage ) {
  			pain_debounce_time = gameLocal.time + pain_delay + 1;  // ignore pain since we'll play our landing anim
- 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_fatalfall", 1.0f, 0 );
+ 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_fatalfall", fallDamageScale, 0 );
  		}
 	} else if ( delta > hardFallDelta && hardFallDelta > 0.0f ) {
 		pfl.hardLanding = true;
@@ -8639,7 +9811,7 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 		landTime	= gameLocal.time;
  		if ( !noDamage ) {
  			pain_debounce_time = gameLocal.time + pain_delay + 1;  // ignore pain since we'll play our landing anim
- 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_hardfall", 1.0f, 0 );
+ 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_hardfall", fallDamageScale, 0 );
  		}
 	} else if ( delta > softFallDelta && softFallDelta > 0.0f ) {
 		pfl.softLanding = true;
@@ -8647,7 +9819,7 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
  		landTime	= gameLocal.time;
  		if ( !noDamage ) {
  			pain_debounce_time = gameLocal.time + pain_delay + 1;  // ignore pain since we'll play our landing anim
- 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_softfall", 1.0f, 0 );
+ 			Damage( NULL, NULL, idVec3( 0, 0, -1 ), "damage_softfall", fallDamageScale, 0 );
 		}
 	} else if ( delta > noFallDelta && noFallDelta > 0.0f ) {
 		pfl.softLanding = true;
@@ -8843,28 +10015,20 @@ void idPlayer::SetViewAngles( const idAngles &angles ) {
 	// so the facing above points the gun where the player was meant to look,
 	// wherever the hand happens to hang: a teleporter could leave the player
 	// facing a wall with the gun at their side. Turn the tracking space by the
-	// angle between hand and head as well, and the head faces there.
-	if ( ( usercmd.buttons & BUTTON_VRAIM ) != 0 && vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) {
-		vrFrameState_t frame;
-		vrSystem->GetFrameState( frame );
-		const vrPose_t &aim = frame.aim[ frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT ];
-		if ( frame.active && frame.aimMode == VR_AIM_HAND && frame.head.valid && aim.valid ) {
-			const float handFromHead = idMath::AngleNormalize180( aim.axis[0].ToYaw() - VR_PoseHeading( frame.head ) );
-			idAngles delta = deltaViewAngles;
-			delta.yaw = idMath::AngleNormalize180( delta.yaw + handFromHead );
-			SetDeltaViewAngles( delta );
-			viewAngles.yaw = idMath::AngleNormalize180( viewAngles.yaw + handFromHead );
-		}
+	// angle between hand and head as well, and the head faces there. A client
+	// does not own its delta: it turns its body when the server's facing
+	// arrives instead (ReadFromSnapshot).
+	float handFromHead;
+	if ( !gameLocal.isClient && ( usercmd.buttons & BUTTON_VRAIM ) != 0 && GetVRHandFromHead( handFromHead ) ) {
+		idAngles delta = deltaViewAngles;
+		delta.yaw = idMath::AngleNormalize180( delta.yaw + handFromHead );
+		SetDeltaViewAngles( delta );
+		viewAngles.yaw = idMath::AngleNormalize180( viewAngles.yaw + handFromHead );
 	}
 }
 
 /*
 ================
-idPlayer::UpdateViewAngles
-================
-*/
-/*
-==============
 idPlayer::StartBenchmarkViewSweep
 
 Begins a deterministic, game-time driven yaw pan from the current view.
@@ -8934,13 +10098,48 @@ bool idPlayer::UpdateBenchmarkViewSweep( void ) {
 	return true;
 }
 
-void idPlayer::UpdateViewAngles( void ) {
-	int i;
-	idAngles delta;
+/*
+================
+idPlayer::GetVRHandFromHead
 
-	// openQ4 VR: the weapon hand moves the wheel's cursor, and holding the view
-	// still against it would turn the tracked world with the hand instead
-	if ( weaponWheelActive && !( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) ) {
+openQ4 VR: how far the weapon hand's aim is turned from the head's heading,
+degrees, for the local player aiming with a tracked hand.
+================
+*/
+bool idPlayer::GetVRHandFromHead( float &handFromHead ) const {
+	handFromHead = 0.0f;
+	if ( vrSystem == NULL || !vrSystem->IsActive() || gameLocal.GetLocalPlayer() != this ) {
+		return false;
+	}
+	vrFrameState_t frame;
+	vrSystem->GetFrameState( frame );
+	const vrPose_t &aim = frame.aim[ frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT ];
+	if ( !frame.active || frame.aimMode != VR_AIM_HAND || !frame.head.valid || !aim.valid ) {
+		return false;
+	}
+	handFromHead = idMath::AngleNormalize180( aim.axis[0].ToYaw() - VR_PoseHeading( frame.head ) );
+	return true;
+}
+
+/*
+================
+idPlayer::UpdateViewAngles
+================
+*/
+void idPlayer::UpdateViewAngles( void ) {
+	// openQ4 VR: a headset's view is where the head is. Holding the view still
+	// against a tracked weapon hand would turn the tracked world by however far
+	// the hand moved meanwhile, so a frozen view leaves the delta as it is. The
+	// server knows a VR client by its usercmd; the server's delta is the one
+	// every client takes (ReadFromSnapshot), so it must decide the same way.
+	// Single player asks the headset alone, and only its open weapon wheel holds
+	// the view (the weapon hand moves the wheel's cursor).
+	const bool vrHeadset = vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this;
+	const bool vrTrackedAim = gameLocal.isMultiplayer ? ( ( usercmd.buttons & BUTTON_VRAIM ) != 0 || vrHeadset ) : vrHeadset;
+	const bool wheelHoldsView = gameLocal.isMultiplayer ?
+		( ( weaponWheelActive || ( usercmd.buttons & ( BUTTON_WEAPONWHEEL | BUTTON_QUICKCHAT ) ) != 0 ) && !spectating && health > 0 ) :
+		weaponWheelActive;
+	if ( wheelHoldsView && !vrTrackedAim ) {
 		UpdateDeltaViewAngles( viewAngles );
 		// The gun's turning sway reads this ring by frame number. A held view
 		// that skipped it left the slots of the last 64 tics in place, and the
@@ -8948,22 +10147,35 @@ void idPlayer::UpdateViewAngles( void ) {
 		loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
 		return;
 	}
+	int i;
+	idAngles delta;
 
-	if ( !noclip && ( gameLocal.inCinematic || privateCameraView || gameLocal.GetCamera() || influenceActive == INFLUENCE_LEVEL2 ) ) {
-		// no view changes at all, but we still want to update the deltas or else when
-		// we get out of this mode, our view will snap to a kind of random angle
-		// openQ4 VR: a headset's view is where the head is. Holding the delta
-		// against the weapon hand would turn the tracked world by however far
-		// the hand moved meanwhile, so it stays as it is.
-		if ( !( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) ) {
+	const bool arenaFreeLook =
+		gameLocal.isMultiplayer && gameLocal.mpGame.ArenaCampaignAllowsFreeLook();
+	if ( gameLocal.isMultiplayer && gameLocal.mpGame.ArenaCampaignLocksPlayers() && !arenaFreeLook ) {
+		// The Arena entrance and spawn-in freeze facing as well as movement.
+		// Keep input deltas current so returning to gameplay cannot snap the view.
+		if ( !vrTrackedAim ) {
 			UpdateDeltaViewAngles( viewAngles );
 		}
 		loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
 		return;
 	}
 
-	// if dead
-	if ( health <= 0 ) {
+	if ( !noclip && ( gameLocal.inCinematic || privateCameraView || gameLocal.GetCamera() || influenceActive == INFLUENCE_LEVEL2 ) ) {
+		// no view changes at all, but we still want to update the deltas or else when
+		// we get out of this mode, our view will snap to a kind of random angle
+		if ( !vrTrackedAim ) {
+			UpdateDeltaViewAngles( viewAngles );
+		}
+		loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
+		return;
+	}
+
+	// if dead - except in the Arena tableau, whose orbit is steered by look input
+	// whether or not the player survived the final frag. On a defeat they
+	// usually did not, and the death view's fixed angles froze the orbit.
+	if ( health <= 0 && !arenaFreeLook ) {
 		if ( pm_thirdPersonDeath.GetBool() ) {
 			viewAngles.roll = 0.0f;
 			viewAngles.pitch = 30.0f;
@@ -8974,12 +10186,6 @@ void idPlayer::UpdateViewAngles( void ) {
 		return;
 	}
 
-	// circularly clamp the angles with deltas
-//	if( gameLocal.localClientNum == entityNumber ) {
-//		gameLocal.Printf( "BEFORE VIEWANGLES: %s\n", viewAngles.ToString() );
-//		gameLocal.Printf( "\tUSERCMD: <%d, %d, %d>\n", usercmd.angles[ 0 ], usercmd.angles[ 1 ], usercmd.angles[ 2 ] );
-//		gameLocal.Printf( "\tDELTAVIEW: %s\n", deltaViewAngles.ToString() );
-//	}
 	// openQ4 VR: no pitch offset rides on a tracked aim (UpdateDeltaViewAngles).
 	// A spawn, a loaded save, a teleport or a pusher may have left one before
 	// this command carried the flag.
@@ -9000,9 +10206,6 @@ void idPlayer::UpdateViewAngles( void ) {
 	if ( !vrAim && !centerView.IsDone( gameLocal.time ) ) {
 		viewAngles.pitch = centerView.GetCurrentValue( gameLocal.time );
 	}
-//	if( gameLocal.localClientNum == entityNumber ) {
-//		gameLocal.Printf( "AFTER VIEWANGLES: %s\n", viewAngles.ToString() );
-//	}
 
 	// clamp the pitch
 	if ( noclip ) {
@@ -9027,28 +10230,28 @@ void idPlayer::UpdateViewAngles( void ) {
 
 	UpdateDeltaViewAngles( viewAngles );
 
-	// openQ4 VR: under a tracked aim the model, seen in mirrors and shadows,
-	// holds its heading while the gun points near straight up or down, where
-	// the hand's yaw is only its roll (VR_ModelYawFollow)
+	// The Arena final tableau lets the player orbit the frozen victor, so look
+	// input still integrates above -- but the bodies stay exactly where the match
+	// ended. Turning the model here would spin the victor on the spot while the
+	// camera circled it.
+	// openQ4 VR: under a tracked aim the model holds its heading while the gun
+	// points near straight up or down, where the hand's yaw is only its roll
+	// (VR_ModelYawFollow); the server and every client turn it alike
 	float modelYaw = viewAngles.yaw;
 	if ( vrAim && vrModelYawValid ) {
 		modelYaw = VR_ModelYawFollow( vrModelYaw, viewAngles.yaw, viewAngles.pitch );
 	}
-	vrModelYaw = modelYaw;
-	vrModelYawValid = vrAim;
-
-	// orient the model towards the direction we're looking
-	SetAngles( idAngles( 0, modelYaw, 0 ) );
+	if ( !arenaFreeLook ) {
+		// orient the model towards the direction we're looking
+		SetAngles( idAngles( 0, modelYaw, 0 ) );
+		vrModelYaw = modelYaw;
+		vrModelYawValid = vrAim;
+	}
 
 	// save in the log for analyzing weapon angle offsets
 	loggedViewAngles[ gameLocal.framenum & (NUM_LOGGED_VIEW_ANGLES-1) ] = viewAngles;
 }
 
-/*
-==============
-idPlayer::UpdateAir
-==============
-*/
 // openQ4 BEGIN
 /*
 ==============
@@ -9276,6 +10479,11 @@ void idPlayer::UpdateLiquid( void ) {
 }
 // openQ4 END
 
+/*
+==============
+idPlayer::UpdateAir
+==============
+*/
 void idPlayer::UpdateAir( void ) {
 
 	if ( health <= 0 ) {
@@ -9402,12 +10610,38 @@ void idPlayer::UpdateAir( void ) {
 	}
 
 	airless = newAirless;
+	if ( gameLocal.isServer && gameLocal.isNewFrame &&
+		airPublishClock.Admit( gameLocal.time, MPAirPercent( airTics, pm_airTics.GetInteger() ) ) ) {
+		byte bytes[32];
+		idBitMsg message;
+		message.Init( bytes, sizeof( bytes ) );
+		WriteAirReadoutMessage( message, false );
+		gameLocal.SendUnreliableMessage( message, -1 );
+	}
 
 	if ( hud ) {
-		// openQ4: pm_air 0 (no air supply to lose) divided by zero here.
-		const int airCapacity = pm_airTics.GetInteger();
-		hud->SetStateInt( "player_air", airCapacity > 0 ? idMath::ClampInt( 0, 100, (int)( (int64)airTics * 100 / airCapacity ) ) : 100 );
+		hud->SetStateInt( "player_air", GetAirReadoutPercent() );
 	}
+}
+
+int idPlayer::GetAirReadoutPercent( void ) const {
+	return gameLocal.isClient && airReadout.percent >= 0 ? airReadout.percent :
+		MPAirPercent( airTics, pm_airTics.GetInteger() );
+}
+
+// Use the existing length-delimited entity-event envelope. This optional HUD
+// state changes no snapshot layout, demo format or gameplay air reservoir.
+void idPlayer::WriteAirReadoutMessage( idBitMsg &msg, bool reliable ) const {
+	msg.BeginWriting();
+	msg.WriteByte( reliable ? GAME_RELIABLE_MESSAGE_EVENT : GAME_UNRELIABLE_MESSAGE_EVENT );
+	msg.WriteBits( gameLocal.GetSpawnId( this ), 32 );
+	msg.WriteByte( EVENT_AIR_READOUT );
+	if ( reliable ) {
+		msg.WriteLong( gameLocal.time );
+		msg.WriteBits( 5, idMath::BitsForInteger( MAX_EVENT_PARAM_SIZE ) );
+	}
+	msg.WriteLong( gameLocal.time );
+	msg.WriteByte( MPAirPercent( airTics, pm_airTics.GetInteger() ) );
 }
 
 // RAVEN BEGIN
@@ -9500,7 +10734,7 @@ void idPlayer::Spectate( bool spectate, bool force ) {
  	// all hiding and showing should be performed through Spectate calls
  	// except for the private camera view, which is used for teleports
 	// ok for players in other instances to be hidden
-	assert( force || ( teleportEntity.GetEntity() != NULL ) || ( IsHidden() == spectating ) || ( IsHidden() && gameLocal.GetLocalPlayer() && gameLocal.GetLocalPlayer()->GetInstance() != instance ) );
+	assert( force || ( teleportEntity.GetEntity() != NULL ) || ( IsHidden() || !spectating ) || ( IsHidden() && gameLocal.GetLocalPlayer() && gameLocal.GetLocalPlayer()->GetInstance() != instance ) );
 
 	if ( spectating == spectate && !force ) {
 		return;
@@ -9512,6 +10746,7 @@ void idPlayer::Spectate( bool spectate, bool force ) {
 
 	// don't do any smoothing with this snapshot
 	predictedFrame = gameLocal.framenum;
+	remotePredictedTics = 0;
  
  	if ( gameLocal.isServer ) {
  		msg.Init( msgBuf, sizeof( msgBuf ) );
@@ -9527,10 +10762,17 @@ void idPlayer::Spectate( bool spectate, bool force ) {
 
 		ClearPowerUps();
 		spectator = this->entityNumber;
+		const unsigned int latchSnapshotSequence = lastSnapshotSequence;
 		Init();
+		// openQ4: as on a respawn (ReadFromSnapshot), Init() must not start the snapshot
+		// sequence over: the next snapshot would read as a state hitch, and its change of
+		// weapon would leave a catch-up request standing until the player joins again,
+		// which then caught the weapon for that life straight up to ready.
+		lastSnapshotSequence = latchSnapshotSequence;
+		weaponCatchup = false;
 		StopRagdoll();
 		SetPhysics( &physicsObj );
-		common->DPrintf( "idPlayer::Spectate() - Disabling clip for %d '%s' - spectate: %d force: %d\n", entityNumber, GetUserInfo()->GetString( "ui_name" ), spectate, force );
+		common->DPrintf( "idPlayer::Spectate() - Disabling clip for %d '%s' - spectate: %d force: %d\n", entityNumber, GetUserInfo() ? GetUserInfo()->GetString( "ui_name" ) : "?", spectate, force );
 		physicsObj.DisableClip();
 		Hide();
 		Event_DisableWeapon();
@@ -9571,7 +10813,7 @@ idPlayer::SetClipModel
 void idPlayer::SetClipModel( bool forceSpectatorBBox ) {
 	idBounds bounds;
 
-	common->DPrintf( "idPlayer::SetClipModel() - Called on %d '%s' forceSpectatorBBox = %d spectate = %d instance = %d local instance = %d\n", entityNumber, GetUserInfo()->GetString( "ui_name" ), forceSpectatorBBox, spectating, instance, gameLocal.GetLocalPlayer() ? gameLocal.GetLocalPlayer()->GetInstance() : -1 );
+	common->DPrintf( "idPlayer::SetClipModel() - Called on %d '%s' forceSpectatorBBox = %d spectate = %d instance = %d local instance = %d\n", entityNumber, GetUserInfo() ? GetUserInfo()->GetString( "ui_name" ) : "", forceSpectatorBBox, spectating, instance, gameLocal.GetLocalPlayer() ? gameLocal.GetLocalPlayer()->GetInstance() : -1 );
 	if ( spectating || forceSpectatorBBox ) {
  		bounds = idBounds( vec3_origin ).Expand( pm_spectatebbox.GetFloat() * 0.5f );
 	} else {
@@ -9586,15 +10828,33 @@ void idPlayer::SetClipModel( bool forceSpectatorBBox ) {
 	RV_PUSH_HEAP_MEM_AUTO(p0,this);
 // RAVEN END
 
-	if ( pm_usecylinder.GetBool() ) {
+	if ( gameLocal.isMultiplayer ) {
+		// < 0: don't use alternate alignment, > 0: use alternate alignment (faces aligned with axes for even-sided cylinders)
+		// 0: use AABB; 1: use 8-sided cylinder; 3+: use custom number of sides for cylinder
+		int sides = pm_usecylinder.GetInteger();
+		bool alt_align = (sides > 0);
+		sides = idMath::Abs( sides );
+
+		if ( sides >= 1 ) {
+			if ( sides < 3 ) {
+				sides = 8;
+			}
+			idTraceModel trm( bounds, sides, alt_align );
+	//		trm.findWalkSurfaces = true;
+			newClip = new idClipModel( trm, NULL );
+		} else {
+			idTraceModel trm( bounds );
+	//		trm.findWalkSurfaces = true;
+			newClip	= new idClipModel( trm, NULL );
+		}
+	} else if ( pm_usecylinder.GetBool() ) {
 		newClip = new idClipModel( idTraceModel( bounds, 8 ), declManager->FindMaterial( "textures/flesh_boundingbox" ) );
-		newClip->Translate( physicsObj.PlayerGetOrigin() );
-		physicsObj.SetClipModel( newClip, 1.0f );
 	} else {
 		newClip = new idClipModel( idTraceModel( bounds ), declManager->FindMaterial( "textures/flesh_boundingbox" ) );
-		newClip->Translate( physicsObj.PlayerGetOrigin() );
-		physicsObj.SetClipModel( newClip, 1.0f );
 	}
+
+	newClip->Translate( physicsObj.PlayerGetOrigin() );
+	physicsObj.SetClipModel( newClip, 1.0f );
 }
 
 /*
@@ -9609,21 +10869,23 @@ bool idPlayer::EnterVehicle( idEntity* vehicle ) {
 	if ( !idActor::EnterVehicle ( vehicle ) ) {
 		return false;
 	}
-	vrVehicleDeltaYaw = facing;
-	vrVehicleYawValid = false;
-	vrVehicleSeatPending = false;
-	const rvVehicle *entered = vehicleController.GetVehicle();
-	const rvVehiclePosition *seat = entered != NULL ? entered->GetPosition( vehicleController.GetPosition() ) : NULL;
-	vrFrameState_t vrFrame;
-	float vrTrackingYaw;
-	if ( seat != NULL && GetVRView( vrFrame, vrTrackingYaw ) ) {
-		FaceVRVehicleSeat( entered, seat, vrFrame );
-		if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
-			gameLocal.Printf( "VR vehicle %s: %s\n", entered->GetClassname(),
-				seat->TurretAlignsVehicle() ? "steers after its turret, the view stays put" : "its turns carry the view" );
+	if ( !gameLocal.isMultiplayer ) {
+		vrVehicleDeltaYaw = facing;
+		vrVehicleYawValid = false;
+		vrVehicleSeatPending = false;
+		const rvVehicle *entered = vehicleController.GetVehicle();
+		const rvVehiclePosition *seat = entered != NULL ? entered->GetPosition( vehicleController.GetPosition() ) : NULL;
+		vrFrameState_t vrFrame;
+		float vrTrackingYaw;
+		if ( seat != NULL && GetVRView( vrFrame, vrTrackingYaw ) ) {
+			FaceVRVehicleSeat( entered, seat, vrFrame );
+			if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+				gameLocal.Printf( "VR vehicle %s: %s\n", entered->GetClassname(),
+					seat->TurretAlignsVehicle() ? "steers after its turret, the view stays put" : "its turns carry the view" );
+			}
 		}
 	}
-
+	
 // RAVEN BEGIN
 // jshepard: safety first
 	if( weapon)	{
@@ -9648,13 +10910,15 @@ bool idPlayer::ExitVehicle ( bool force ) {
 	}
 	vrVehicleYawValid = false;
 	vrVehicleSeatPending = false;
-
+	
 	SetViewAngles( viewAxis[0].ToAngles() );
-	// openQ4 VR: stepping out keeps the world where the seat had it, rather
-	// than turning it to the exit's facing
-	if ( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) {
-		deltaViewAngles.yaw = vrVehicleDeltaYaw;
-		viewAngles.yaw = idMath::AngleNormalize180( SHORT2ANGLE( usercmd.angles[ YAW ] ) + vrVehicleDeltaYaw );
+	if ( !gameLocal.isMultiplayer ) {
+		// openQ4 VR: stepping out keeps the world where the seat had it, rather
+		// than turning it to the exit's facing
+		if ( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this ) {
+			deltaViewAngles.yaw = vrVehicleDeltaYaw;
+			viewAngles.yaw = idMath::AngleNormalize180( SHORT2ANGLE( usercmd.angles[ YAW ] ) + vrVehicleDeltaYaw );
+		}
 	}
 
 // RAVEN BEGIN
@@ -9676,74 +10940,36 @@ bool idPlayer::ExitVehicle ( bool force ) {
 /*
 ==============
 GetItemCost
+
+The item's price under the server's buying rules (mp/Buying.cpp).
 ==============
 */
 int idPlayer::GetItemCost( const char* itemName ) {
-	if ( !itemCosts ) {
-		assert( false );
-		return 99999;
-	}
-	return itemCosts->dict.GetInt( itemName, "99999" );
+	return gameLocal.mpGame.mpBuyingManager.GetItemPrice( itemName );
 }
 
 /*
 ==============
 GetItemBuyImpulse
+
+A buy travels from client to server as the item's impulse (buyCatalog).
 ==============
 */
 int GetItemBuyImpulse( const char* itemName )
 {
-// jmarshall - multiplayer
+	const buyCatalogItem_t *entry = MP_FindBuyCatalogItem( itemName );
+	return entry != NULL ? entry->impulse : 0;
+}
+
 /*
-	struct ItemBuyImpulse
-	{
-		const char*	itemName;
-		int			itemBuyImpulse;
-	};
-
-	ItemBuyImpulse itemBuyImpulseTable[] =
-	{
-		{ "weapon_shotgun",					IMPULSE_100, },
-		{ "weapon_machinegun",				IMPULSE_101, },
-		{ "weapon_hyperblaster",			IMPULSE_102, },
-		{ "weapon_grenadelauncher",			IMPULSE_103, },
-		{ "weapon_nailgun",					IMPULSE_104, },
-		{ "weapon_rocketlauncher",			IMPULSE_105, },
-		{ "weapon_railgun",					IMPULSE_106, },
-		{ "weapon_lightninggun",			IMPULSE_107, },
-		//									IMPULSE_108 - Unused
-		{ "weapon_napalmgun",				IMPULSE_109, },
-		//		{ "weapon_dmg",						IMPULSE_110, },
-		//									IMPULSE_111 - Unused
-		//									IMPULSE_112 - Unused
-		//									IMPULSE_113 - Unused
-		//									IMPULSE_114 - Unused
-		//									IMPULSE_115 - Unused
-		//									IMPULSE_116 - Unused
-		//									IMPULSE_117 - Unused
-		{ "item_armor_small",				IMPULSE_118, },
-		{ "item_armor_large",				IMPULSE_119, },
-		{ "ammorefill",						IMPULSE_120, },
-		//									IMPULSE_121 - Unused
-		//									IMPULSE_122 - Unused
-		{ "ammo_regen",						IMPULSE_123, },
-		{ "health_regen",					IMPULSE_124, },
-		{ "damage_boost",					IMPULSE_125, },
-		//									IMPULSE_126 - Unused
-		//									IMPULSE_127 - Unused
-	};
-	const int itemBuyImpulseTableSize = sizeof(itemBuyImpulseTable) / sizeof(itemBuyImpulseTable[0]);
-
-	for( int i = 0; i < itemBuyImpulseTableSize; ++ i )
-	{
-		if( !stricmp( itemBuyImpulseTable[ i ].itemName, itemName ) )
-		{
-			return itemBuyImpulseTable[ i ].itemBuyImpulse;
-		}
-	}
+==============
+GetBuyItemForImpulse
+==============
 */
-// jmarshall end
-	return 0;
+static const char* GetBuyItemForImpulse( int impulse )
+{
+	const buyCatalogItem_t *entry = MP_FindBuyCatalogItemForImpulse( impulse );
+	return entry != NULL ? entry->item : NULL;
 }
 
 
@@ -9754,20 +10980,64 @@ bool idPlayer::CanBuyItem( const char* itemName )
 }
 
 
+/*
+================
+Player_ClassicArmorPurchaseAddsArmor
+
+openQ4: under the Classic ruleset an armour item is a tier (inv_armor_tier), and
+one that adds nothing to what the player wears is not picked up. A purchase
+was charged all the same: 100 combat armour bought combat armour for nothing.
+Always true outside Classic.
+================
+*/
+static bool Player_ClassicArmorPurchaseAddsArmor( const idPlayer *player, const char *itemName ) {
+	if ( !gameLocal.IsClassicRuleset() ) {
+		return true;
+	}
+	const idDict *itemDict = gameLocal.FindEntityDefDict( itemName, false );
+	const char *tier = itemDict != NULL ? itemDict->GetString( "inv_armor_tier", "" ) : "";
+	if ( tier[ 0 ] == '\0' ) {
+		return true;
+	}
+	int newTier;
+	int newArmor;
+	return rvClassicRules::ArmorAfterPickup( player->inventory.armorTier, player->inventory.armor, tier, newTier, newArmor );
+}
+
 itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 {
 	idStr itemNameStr = itemName;
-	if ( itemNameStr == "notimplemented" )
+
+	// only what the server's buying rules sell and the content defines
+	if ( !gameLocal.mpGame.mpBuyingManager.IsItemSold( itemName ) )
 	{
 		return IBS_NOT_ALLOWED;
 	}
-	else if( !idStr::Cmpn( itemName, "wpmod_", 6 ) )
+
+	if( !idStr::Cmpn( itemName, "wpmod_", 6 ) )
 	{
-		return IBS_NOT_ALLOWED;
+		// a weapon mod only for a weapon the player carries, and only once
+		const idDict* modDict = gameLocal.FindEntityDefDict( itemName, false );
+		const char* weaponClass = modDict ? modDict->GetString( "weapon" ) : "";
+		const idDict* weaponDict = gameLocal.FindEntityDefDict( weaponClass, false );
+		const int weaponIndex = weaponDict ? SlotForWeapon( weaponClass ) : -1;
+		if ( weaponIndex < 0 || weaponIndex >= MAX_WEAPONS || !( inventory.weapons & ( 1 << weaponIndex ) ) )
+			return IBS_NOT_ALLOWED;
+
+		for ( int m = 0; m < MAX_WEAPONMODS; m++ ) {
+			if ( !idStr::Icmp( weaponDict->GetString( va( "def_mod%d", m + 1 ) ), itemName ) ) {
+				if ( inventory.weaponMods[ weaponIndex ] & ( 1 << m ) )
+					return IBS_ALREADY_HAVE;
+				break;
+			}
+		}
 	}
 	else if( itemNameStr == "item_armor_small" )
 	{
-		if( inventory.armor >= 190 )
+		if( !Player_ClassicArmorPurchaseAddsArmor( this, itemName ) )
+			return IBS_ALREADY_HAVE;
+
+		if( !gameLocal.IsClassicRuleset() && inventory.armor >= 190 )
 			return IBS_ALREADY_HAVE;
 
 		if( inventory.carryOverWeapons & CARRYOVER_FLAG_ARMOR_LIGHT )
@@ -9778,7 +11048,10 @@ itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 	}
 	else if( itemNameStr == "item_armor_large" )
 	{
-		if( inventory.armor >= 190 )
+		if( !Player_ClassicArmorPurchaseAddsArmor( this, itemName ) )
+			return IBS_ALREADY_HAVE;
+
+		if( !gameLocal.IsClassicRuleset() && inventory.armor >= 190 )
 			return IBS_ALREADY_HAVE;
 
 		if( inventory.carryOverWeapons & CARRYOVER_FLAG_ARMOR_HEAVY )
@@ -9802,10 +11075,6 @@ itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 		if ( fullAmmo )
 			return IBS_NOT_ALLOWED;
 	}
-	else if ( itemNameStr == "fc_armor_regen" )
-	{
-		return IBS_NOT_ALLOWED;
-	}
 
 	if ( gameLocal.gameType == GAME_DM || gameLocal.gameType == GAME_TOURNEY || gameLocal.gameType == GAME_ARENA_CTF || gameLocal.gameType == GAME_1F_CTF || gameLocal.gameType == GAME_ARENA_1F_CTF ) {
 		if ( itemNameStr == "ammo_regen" )
@@ -9813,6 +11082,8 @@ itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )
 		if ( itemNameStr == "health_regen" )
 			return IBS_NOT_ALLOWED;
 		if ( itemNameStr == "damage_boost" )
+			return IBS_NOT_ALLOWED;
+		if ( itemNameStr == "fc_armor_regen" )
 			return IBS_NOT_ALLOWED;
 	}
 
@@ -9898,6 +11169,11 @@ bool idPlayer::AttemptToBuyTeamPowerup( const char* itemName )
 		UpdateTeamPowerups( true );
 		return true;
 	}
+	else if ( itemNameStr == "fc_armor_regen" ) {
+		gameLocal.mpGame.AddTeamPowerup(POWERUP_FC_ARMOR_REGEN, SEC2MS(30), team);
+		UpdateTeamPowerups( true );
+		return true;
+	}
 
 	return false;
 }
@@ -9909,11 +11185,20 @@ idPlayer::AttemptToBuyItem
 */
 bool idPlayer::AttemptToBuyItem( const char* itemName )
 {
+	assert( !IsFakeClient() );
+
 	if ( gameLocal.isClient ) {
 		return false;
 	}
 
 	if( !itemName ) {
+		return false;
+	}
+
+	// openQ4: the authoritative gate.  Clients test CanBuy before sending the
+	// buy impulse, but the server never did, so a raw impulse bought armour or
+	// weapons in modes and at moments where buying is off.
+	if ( !CanBuy() ) {
 		return false;
 	}
 
@@ -9936,7 +11221,7 @@ bool idPlayer::AttemptToBuyItem( const char* itemName )
 	// Team-based effects
 	idStr itemNameStr = itemName;
 
-	if ( itemNameStr == "ammo_regen" || itemNameStr == "health_regen" || itemNameStr == "damage_boost" ) {
+	if ( itemNameStr == "ammo_regen" || itemNameStr == "health_regen" || itemNameStr == "damage_boost" || itemNameStr == "fc_armor_regen" ) {
 		return AttemptToBuyTeamPowerup(itemName);
 	}
 
@@ -9959,6 +11244,24 @@ void idPlayer::GenerateImpulseForBuyAttempt( const char* itemName ) {
 		return;
 
 	int itemBuyImpulse = GetItemBuyImpulse( itemName );
+	if ( itemBuyImpulse == 0 ) {
+		// not an item the buy menu sells; impulse 0 would select weapon 0
+		return;
+	}
+	if ( gameLocal.isClient ) {
+		// openQ4: a buy comes from a bind or a menu button, between frames, and is
+		// made once. PerformImpulse sends through ClientSendEvent, which drops an
+		// event whenever the last prediction pass was a re-run, so the purchase
+		// was lost at random with nothing said. Nothing else in PerformImpulse
+		// acts on a buy impulse on a client: the server does the buying.
+		idBitMsg	msg;
+		byte		msgBuf[MAX_EVENT_PARAM_SIZE];
+		msg.Init( msgBuf, sizeof( msgBuf ) );
+		msg.BeginWriting();
+		msg.WriteBits( itemBuyImpulse, IMPULSE_NUMBER_OF_BITS );
+		ClientSendRequestEvent( EVENT_IMPULSE, &msg );
+		return;
+	}
 	PerformImpulse( itemBuyImpulse );
 }
 // RITUAL END
@@ -9971,28 +11274,17 @@ idPlayer::PerformImpulse
 */
 void idPlayer::PerformImpulse( int impulse ) {
 
-	// openQ4: the weapon controls choose on an open weapon wheel.
+	// openQ4: the weapon controls choose on an open weapon wheel, and nothing
+	// goes to the server until its release equips the choice.
 	if ( HandleWeaponWheelImpulse( impulse ) ) {
 		return;
 	}
 
-//RAVEN BEGIN
-// nrausch: Don't send xenon dpad impulses over the network
-#ifdef _XENON
-	
-	if ( objectiveSystemOpen ) {
-		return;
-	}
-	
-	if ( gameLocal.isClient && (impulse < IMPULSE_70) ) {
-#else
 	if ( gameLocal.isClient ) {
-#endif
-//RAVEN END
 		idBitMsg	msg;
 		byte		msgBuf[MAX_EVENT_PARAM_SIZE];
 
- 		assert( entityNumber == gameLocal.localClientNum );
+ 		assert( IsLocalClient() );
 		msg.Init( msgBuf, sizeof( msgBuf ) );
 		msg.BeginWriting();
 		msg.WriteBits( impulse, IMPULSE_NUMBER_OF_BITS );
@@ -10008,21 +11300,6 @@ void idPlayer::PerformImpulse( int impulse ) {
 		return;
 	}
 
-//RAVEN BEGIN
-//asalmon: D-pad events for in game guis on Xenon
-#ifdef _XBOX
-	sysEvent_t ev;
-	ev.evType = SE_KEY;
-	ev.evValue2 = 1;
-	ev.evPtrLength = 0;
-	ev.evPtr = NULL;
-
-	const char *command = NULL;
-	idUserInterface *ui = ActiveGui();
-	bool updateVisuals = false;
-#endif
-//RAVEN END
-
 	switch( impulse ) {
 		case IMPULSE_13: {
 			Reload();
@@ -10035,12 +11312,16 @@ void idPlayer::PerformImpulse( int impulse ) {
 			{
 				const int asked = idealWeapon;
 				NextWeapon();
-				if ( idealWeapon == asked ) {
+				if ( idealWeapon == asked && ( !gameLocal.isClient || net_clientPredictWeaponSwitch.GetBool() ) ) {
 					RefuseWeaponSelection( -1 );
 				}
 			}
 			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
 				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCycleNext( this );
+			} else if ( gameLocal.isServer && spectating && spectator != entityNumber ) {
+				// openQ4: a following spectator steps through the players with the
+				// weapon-cycle controls, next and previous, as Tourney's do.
+				SpectateCycle( 1 );
 			}
 			break;
 		}
@@ -10051,12 +11332,14 @@ void idPlayer::PerformImpulse( int impulse ) {
 			{
 				const int asked = idealWeapon;
 				PrevWeapon();
-				if ( idealWeapon == asked ) {
+				if ( idealWeapon == asked && ( !gameLocal.isClient || net_clientPredictWeaponSwitch.GetBool() ) ) {
 					RefuseWeaponSelection( -1 );
 				}
 			}
 			if( gameLocal.isServer && spectating && gameLocal.gameType == GAME_TOURNEY ) {	
 				((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->SpectateCyclePrev( this );
+			} else if ( gameLocal.isServer && spectating && spectator != entityNumber ) {
+				SpectateCycle( -1 );
 			}
 			break;
 		}
@@ -10133,50 +11416,28 @@ void idPlayer::PerformImpulse( int impulse ) {
 			idFuncRadioChatter::RepeatLast();
 			break;
 		}
-// jmarshall - buy menu impulse items? Multiplayer only I assume
-//// RITUAL BEGIN
-//// squirrel: Mode-agnostic buymenus
-//		case IMPULSE_100:	AttemptToBuyItem( "weapon_shotgun" );				break;
-//		case IMPULSE_101:	AttemptToBuyItem( "weapon_machinegun" );			break;
-//		case IMPULSE_102:	AttemptToBuyItem( "weapon_hyperblaster" );			break;
-//		case IMPULSE_103:	AttemptToBuyItem( "weapon_grenadelauncher" );		break;
-//		case IMPULSE_104:	AttemptToBuyItem( "weapon_nailgun" );				break;
-//		case IMPULSE_105:	AttemptToBuyItem( "weapon_rocketlauncher" );		break;
-//		case IMPULSE_106:	AttemptToBuyItem( "weapon_railgun" );				break;
-//		case IMPULSE_107:	AttemptToBuyItem( "weapon_lightninggun" );			break;
-//		case IMPULSE_108:	break; // Unused
-//		case IMPULSE_109:	AttemptToBuyItem( "weapon_napalmgun" );				break;
-//		case IMPULSE_110:	/* AttemptToBuyItem( "weapon_dmg" );*/				break;
-//		case IMPULSE_111:	break; // Unused
-//		case IMPULSE_112:	break; // Unused
-//		case IMPULSE_113:	break; // Unused
-//		case IMPULSE_114:	break; // Unused
-//		case IMPULSE_115:	break; // Unused
-//		case IMPULSE_116:	break; // Unused
-//		case IMPULSE_117:	break; // Unused
-//		case IMPULSE_118:	AttemptToBuyItem( "item_armor_small" );				break;
-//		case IMPULSE_119:	AttemptToBuyItem( "item_armor_large" );				break;
-//		case IMPULSE_120:	AttemptToBuyItem( "ammorefill" );					break;
-//		case IMPULSE_121:	break; // Unused
-//		case IMPULSE_122:	break; // Unused
-//		case IMPULSE_123:	AttemptToBuyItem( "ammo_regen" );					break;
-//		case IMPULSE_124:	AttemptToBuyItem( "health_regen" );					break;
-//		case IMPULSE_125:	AttemptToBuyItem( "damage_boost" );					break;
-//		case IMPULSE_126:	break; // Unused
-//		case IMPULSE_127:	break; // Unused
-//// RITUAL END
+
+		default: {
+			// the buy menu's impulses (buyCatalog in mp/Buying.cpp)
+			const char *buyItem = GetBuyItemForImpulse( impulse );
+			if ( buyItem != NULL ) {
+				AttemptToBuyItem( buyItem );
+			}
+			break;
+		}
 
 		case IMPULSE_50: {
-			ToggleFlashlight ( );
+			// Flashlight is single-player only.
+			if ( !gameLocal.isMultiplayer ) {
+				ToggleFlashlight ( );
+			}
 			break;
 		}
 
-		// openQ4: the last weapon (Quake Live's "weapon toggle"), as in multiplayer
-		case IMPULSE_51: {
-			LastWeapon();
-			break;
-		}
-// jmarshall end
+ 		case IMPULSE_51: {
+ 			LastWeapon();
+ 			break;
+ 		}
 	} 
 
 //RAVEN BEGIN
@@ -10208,7 +11469,13 @@ idPlayer::HandleESC
 ==============
 */
 bool idPlayer::HandleESC( void ) {
-	if ( weaponWheelActive || weaponWheelBlend > 0.0f ) {
+	if ( gameLocal.IsMultiplayerMode() ) {
+		const bool radialOpen = weaponWheelActive || weaponWheelBlend > 0.0f || quickChatActive || quickChatBlend > 0.0f;
+		ResetWeaponWheel( !radialOpen );
+		ResetQuickChat( !radialOpen );
+		if ( radialOpen ) return true;
+	} else if ( weaponWheelActive || weaponWheelBlend > 0.0f ) {
+		// single player: an open wheel closes; otherwise the reset waits for the end (no reset in a cinematic)
 		ResetWeaponWheel( false );
 		return true;
 	}
@@ -10216,14 +11483,18 @@ bool idPlayer::HandleESC( void ) {
 // jdischler: Straight from the top, cinematic skipping on xenon is OFFICIALLY OUT.  Too many problems with it and not enough time to properly address them.
 #ifndef _XENON
 	if ( gameLocal.inCinematic ) {
-		if ( gameLocal.time < gameLocal.cinematicSkipTime ) {
-			// ignore skip input briefly when a cinematic starts
-			return true;
+		if ( !gameLocal.IsMultiplayerMode() ) {
+			if ( gameLocal.time < gameLocal.cinematicSkipTime ) {
+				// ignore skip input briefly when a cinematic starts
+				return true;
+			}
 		}
 		return SkipCinematic();
 	}
 #endif
-	ResetWeaponWheel( true );
+	if ( !gameLocal.IsMultiplayerMode() ) {
+		ResetWeaponWheel( true );
+	}
 	return false;
 }
  
@@ -10308,11 +11579,16 @@ void idPlayer::EvaluateControls( void ) {
 		gameLocal.sessionCommand = "died";
 	}
 
+	// openQ4: impulses are very much used in multiplayer. default.cfg binds
+	// reload, next/previous weapon and the direct weapon slots to _impulse*, and
+	// PerformImpulse carries its own client path for exactly this case. The
+	// assert this replaces was a stale Raven "is this reachable?" marker and it
+	// fired on every reload and every mouse-wheel weapon change.
 	if ( ( usercmd.flags & UCF_IMPULSE_SEQUENCE ) != ( oldFlags & UCF_IMPULSE_SEQUENCE ) )  {
 		PerformImpulse( usercmd.impulse );
 	}
 
-	if( forceScoreBoard && forceScoreBoardTime && gameLocal.time > forceScoreBoardTime ) {
+	if ( forceScoreBoard && forceScoreBoardTime && gameLocal.time > forceScoreBoardTime ) {
 		forceScoreBoardTime = 0;
 		forceScoreBoard = false;
 	}
@@ -10371,12 +11647,12 @@ void idPlayer::AdjustSpeed( void ) {
 	float speed;
 
 	if ( spectating ) {
-		speed = pm_spectatespeed.GetFloat();
+		speed = pm_spectatespeed.GetFloat() * spectatorSpeedScale;
 		bobFrac = 0.0f;
 	} else if ( noclip ) {
 		speed = pm_noclipspeed.GetFloat();
 		bobFrac = 0.0f;
-	} else if ( !physicsObj.OnLadder() && ( usercmd.buttons & BUTTON_RUN ) && ( usercmd.forwardmove || usercmd.rightmove ) && ( usercmd.upmove >= 0 ) ) {
+ 	} else if ( !physicsObj.OnLadder() && ( usercmd.buttons & BUTTON_RUN ) && ( usercmd.forwardmove || usercmd.rightmove ) && ( usercmd.upmove >= 0 ) ) {
 		bobFrac = 1.0f;
 		speed = pm_speed.GetFloat();
 	} else {
@@ -10413,7 +11689,6 @@ void idPlayer::AdjustBodyAngles( void ) {
 	idMat3		legsAxis;
 	bool		blend;
 	float		diff;
-	float		frac;
 	float		upBlend;
 	float		forwardBlend;
 	float		downBlend;
@@ -10476,16 +11751,71 @@ void idPlayer::AdjustBodyAngles( void ) {
 	legsAxis = idAngles( 0.0f, legsYaw, 0.0f ).ToMat3();
 	animator.SetJointAxis( hipJoint, JOINTMOD_WORLD, legsAxis );
 
-	// calculate the blending between down, straight, and up
-	frac = viewAngles.pitch / 90.0f;
-	if ( frac > 0.0f ) {
-		downBlend		= frac;
-		forwardBlend	= 1.0f - frac;
+	// ==============================================================================================
+	// leaning - orient parts of the body towards the movement direction
+	// we control the chest, neck and hip orientations
+
+	float leanGunCorrection = 0.0f;
+	// (multiplayer only: single player keeps the stock upright body)
+	if ( gameLocal.isMultiplayer && g_playerLean.GetFloat() != 0.0f ) {
+
+		idVec3 velocity = physicsObj.GetLinearVelocity();
+		velocity.z = 0.0f;
+
+		// clamp and scale max speed to unit velocity
+		float horizSpeed = velocity.Normalize();
+		if ( horizSpeed > leanMaxSpeed ) {
+			horizSpeed = leanMaxSpeed;
+		}
+		velocity *= horizSpeed / leanMaxSpeed;
+		// now express this velocity in the view's axis base 
+		velocity *= viewAxis.Transpose();
+
+		// blend
+		leanVelocity = velocity * leanBlendRatio + leanVelocity * ( 1.0f - leanBlendRatio );
+
+		// build the rotation
+		float t = fabs( leanVelocity.x ) + fabs( leanVelocity.y );
+		if ( t > 1e-3f ) {
+			float maxAngle = ( leanMaxForwardAngle * fabs( leanVelocity.x ) + leanMaxLateralAngle * fabs( leanVelocity.y ) ) / t;
+			maxAngle *= g_playerLean.GetFloat();
+
+			idVec3 rotate;
+			rotate.Cross( leanVelocity, idVec3( 0.0f, 0.0f, 1.0f ) );
+			float chestAngle = maxAngle * rotate.Normalize(); // doing the blend on the vectors, but idRotation wants a normalized rotation
+			idRotation chestRotate( vec3_origin, rotate, chestAngle );
+			animator.SetJointAxis( chestJoint, JOINTMOD_WORLD, chestRotate.ToMat3() );
+
+			// extract a rotation angle in the forward plane, this is used to compensate the gun later
+			idVec3 p( 1.0f, 0.0f, 0.0f );
+			chestRotate.RotatePoint( p );
+			leanGunCorrection = RAD2DEG( idMath::ATan( p.z, p.x ) );
+
+			float headAngle = chestAngle * leanHeadRatio;
+			idRotation neckRotate( vec3_origin, rotate, headAngle );
+			animator.SetJointAxis( neckLeanJoint, JOINTMOD_WORLD, neckRotate.ToMat3() );
+
+			float hipAngle = chestAngle * leanHipRatio;
+			idRotation hipRotate( vec3_origin, rotate, hipAngle );
+			animator.SetJointAxis( hipJoint, JOINTMOD_WORLD, hipRotate.ToMat3() );
+		} else {
+			leanVelocity = vec3_origin;
+			leanGunCorrection = 0.0f;
+		}
+	}
+
+	// ==============================================================================================
+	// calculate the blending between down, straight, and up. account for the chest lean
+
+	float leanFrac = gameLocal.isMultiplayer ? idMath::ClampFloat( -1.0f, 1.0f, ( viewAngles.pitch + leanGunCorrection ) / 90.0f ) : viewAngles.pitch / 90.0f;
+	if ( leanFrac > 0.0f ) {
+		downBlend		= leanFrac;
+		forwardBlend	= 1.0f - leanFrac;
 		upBlend			= 0.0f;
 	} else {
 		downBlend		= 0.0f;
-		forwardBlend	= 1.0f + frac;
-		upBlend			= -frac;
+		forwardBlend	= 1.0f + leanFrac;
+		upBlend			= -leanFrac;
 	}
 
     animator.CurrentAnim( ANIMCHANNEL_TORSO )->SetSyncedAnimWeight( 0, downBlend );
@@ -10495,7 +11825,6 @@ void idPlayer::AdjustBodyAngles( void ) {
 	animator.CurrentAnim( ANIMCHANNEL_LEGS )->SetSyncedAnimWeight( 0, downBlend );
 	animator.CurrentAnim( ANIMCHANNEL_LEGS )->SetSyncedAnimWeight( 1, forwardBlend );
 	animator.CurrentAnim( ANIMCHANNEL_LEGS )->SetSyncedAnimWeight( 2, upBlend );
-
 }
 
 /*
@@ -10591,11 +11920,39 @@ void idPlayer::GetAASLocation( idAAS *aas, idVec3 &pos, int &areaNum ) const {
 
 /*
 ==============
+idPlayer::UpdateEyeHeight
+==============
+*/
+void idPlayer::UpdateEyeHeight( bool snap ) {
+	float newEyeOffset;
+	if ( spectating ) {
+		newEyeOffset = 0.0f;
+	} else if ( health <= 0 ) {
+		newEyeOffset = pm_deadviewheight.GetFloat();
+	} else if ( physicsObj.IsCrouching() ) {
+		newEyeOffset = pm_crouchviewheight.GetFloat();
+	} else if ( IsInVehicle() ) {
+		newEyeOffset = 0.0f;
+	} else {
+		newEyeOffset = pm_normalviewheight.GetFloat();
+	}
+
+	if ( EyeHeight() != newEyeOffset ) {
+		if ( spectating || snap ) {
+			SetEyeHeight( newEyeOffset );
+		} else {
+			// smooth out duck height changes
+			SetEyeHeight( EyeHeight() * pm_crouchrate.GetFloat() + newEyeOffset * ( 1.0f - pm_crouchrate.GetFloat() ) );
+		}
+	}
+}
+
+/*
+==============
 idPlayer::Move
 ==============
 */
 void idPlayer::Move( void ) {
-	float newEyeOffset;
 	idVec3 oldOrigin;
 	idVec3 oldVelocity;
 	idVec3 pushVelocity;
@@ -10615,6 +11972,16 @@ void idPlayer::Move( void ) {
 	} else if ( spectating || ( gameLocal.isClient && gameLocal.GetLocalPlayer() && gameLocal.GetLocalPlayer()->GetInstance() != instance ) ) {
 		physicsObj.SetContents( 0 );
 		physicsObj.SetMovementType( PM_SPECTATOR );
+	} else if ( gameLocal.isMultiplayer && gameLocal.mpGame.ArenaCampaignLocksPlayers() ) {
+		physicsObj.SetContents( health <= 0
+			? CONTENTS_CORPSE | CONTENTS_MONSTERCLIP
+			: CONTENTS_BODY | ( use_combat_bbox ? CONTENTS_SOLID : 0 ) );
+		// PM_FREEZE returns from MovePlayer before gravity and before the ground
+		// trace, so freezing a player who is still falling suspends them in
+		// mid-air in a falling pose - which is exactly what the match-start shot
+		// circles. Let gravity finish first and only hold them once they have
+		// landed; the zeroed input below is what actually stops them acting.
+		physicsObj.SetMovementType( physicsObj.OnGround() ? PM_FREEZE : PM_NORMAL );
 	} else if ( health <= 0 ) {
 		physicsObj.SetContents( CONTENTS_CORPSE | CONTENTS_MONSTERCLIP );
 		physicsObj.SetMovementType( PM_DEAD );
@@ -10635,7 +12002,21 @@ void idPlayer::Move( void ) {
 	}
 
 	physicsObj.SetDebugLevel( g_debugMove.GetBool() );
-	physicsObj.SetPlayerInput( usercmd, viewAngles );
+	if ( gameLocal.isMultiplayer && gameLocal.mpGame.ArenaCampaignLocksPlayers() ) {
+		// The Arena presentations let gravity settle a player who is still in the
+		// air, so movement is stopped here instead of by PM_FREEZE. Feed the
+		// physics a neutral command: they fall, land and stand, but cannot walk,
+		// jump or crouch out of the shot. Facing comes from the latched view
+		// angles so the body does not turn either.
+		usercmd_t held;
+		memset( &held, 0, sizeof( held ) );
+		held.angles[0] = usercmd.angles[0];
+		held.angles[1] = usercmd.angles[1];
+		held.angles[2] = usercmd.angles[2];
+		physicsObj.SetPlayerInput( held, viewAngles );
+	} else {
+		physicsObj.SetPlayerInput( usercmd, viewAngles );
+	}
 
 	// FIXME: physics gets disabled somehow
 	BecomeActive( TH_PHYSICS );
@@ -10652,30 +12033,11 @@ void idPlayer::Move( void ) {
 	}
 
  	// update our last valid AAS location for the AI
-	if( !gameLocal.isMultiplayer ) {
+	if ( !gameLocal.isMultiplayer ) {
 		SetAASLocation(); 
 	}
 
-	if ( spectating ) {
-		newEyeOffset = 0.0f;
-	} else if ( health <= 0 ) {
-		newEyeOffset = pm_deadviewheight.GetFloat();
-	} else if ( physicsObj.IsCrouching() ) {
-		newEyeOffset = pm_crouchviewheight.GetFloat();
-	} else if ( IsInVehicle ( ) ) {
-		newEyeOffset = 0.0f;
-	} else {
-		newEyeOffset = pm_normalviewheight.GetFloat();
-	}
-
-	if ( EyeHeight() != newEyeOffset ) {
-		if ( spectating ) {
-			SetEyeHeight( newEyeOffset );
-		} else {
-			// smooth out duck height changes
-			SetEyeHeight( EyeHeight() * pm_crouchrate.GetFloat() + newEyeOffset * ( 1.0f - pm_crouchrate.GetFloat() ) );
-		}
-	}
+	UpdateEyeHeight( false );
 
 	if ( noclip || gameLocal.inCinematic || ( influenceActive == INFLUENCE_LEVEL2 ) ) {
 		pfl.crouch		= false;
@@ -10683,17 +12045,14 @@ void idPlayer::Move( void ) {
 		pfl.onLadder	= false;
 		pfl.jump		= false;
 	} else {
-		pfl.crouch	= physicsObj.IsCrouching();
-		pfl.onGround	= physicsObj.HasGroundContacts();
+		pfl.crouch		= physicsObj.IsCrouching();
+		pfl.onGround	= gameLocal.isMultiplayer ? physicsObj.OnGround() : physicsObj.HasGroundContacts();
 		pfl.onLadder	= physicsObj.OnLadder();
 		pfl.jump		= physicsObj.HasJumped();
 
  		// check if we're standing on top of a monster and give a push if we are
  		idEntity *groundEnt = physicsObj.GetGroundEntity();
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
  		if ( groundEnt && groundEnt->IsType( idAI::GetClassType() ) ) {
-// RAVEN END
  			idVec3 vel = physicsObj.GetLinearVelocity();
  			if ( vel.ToVec2().LengthSqr() < 0.1f ) {
  				vel.ToVec2() = physicsObj.GetOrigin().ToVec2() - groundEnt->GetPhysics()->GetAbsBounds().GetCenter().ToVec2();
@@ -10713,6 +12072,28 @@ void idPlayer::Move( void ) {
 		acc->time = gameLocal.time;
 		acc->dir[2] = 200;
 		acc->dir[0] = acc->dir[1] = 0;
+		if ( gameLocal.isMultiplayer ) {
+
+			// PMF_JUMP can get stuck when dead, which causes some bad spamming
+			// a cleaner fix would be to make sure PMF_JUMP gets cleared, but this close to release, that will do
+			// (the AF becomes the active physics object, so physics don't run on idPlayer_Physics and that flag never gets cleared)
+			if ( health > 0 ) {
+				// don't use the sound broadcasting facility in StartSound, we only need unreliable, and we need to filter for local client prediction
+				if ( gameLocal.isServer || IsLocalClient() ) {
+					StartSound( "snd_jump", (s_channelType)FC_SOUND, 0, false, NULL );
+				}
+
+				if ( gameLocal.isServer ) {
+					idBitMsg	msg;
+					byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
+					msg.Init( msgBuf, sizeof( msgBuf ) );
+					msg.WriteByte( GAME_UNRELIABLE_MESSAGE_EVENT );
+					msg.WriteBits( gameLocal.GetSpawnId( this ), 32 );
+					msg.WriteByte( EVENT_JUMP );
+					gameLocal.SendUnreliableMessagePVS( msg, this, gameRenderWorld->PointInArea( physicsObj.GetOrigin() ) );
+				}
+			}
+		}
 	}
 
 	if ( pfl.onLadder ) {
@@ -10728,12 +12109,9 @@ void idPlayer::Move( void ) {
 
 	BobCycle( pushVelocity );
 
-// RAVEN BEGIN
-// abahr: don't crashland while no clipping.
 	if( !noclip ) {
 		CrashLand( oldOrigin, oldVelocity );
 	}
-// RAVEN END
 }
 
 /*
@@ -10761,7 +12139,7 @@ void idPlayer::BiasIntentDir( idVec3 newIntentDir, float prevBias ) {
 idPlayer::UpdateIntentDir
 ==============
 */
-void idPlayer::UpdateIntentDir ( void ) {
+void idPlayer::UpdateIntentDir( void ) {
 	idVec3 newIntentDir;
 	idVec3 viewDir = viewAxis[0];
 	viewDir.z = 0;
@@ -10772,7 +12150,7 @@ void idPlayer::UpdateIntentDir ( void ) {
 	} else {
 		newIntentDir = viewDir*intentDir.Length();
 		if ( IsFlashlightOn() ) {
-			//bias them more heavily to looking where I'm looking
+			// bias them more heavily to looking where I'm looking
 			prevBias = 19.0f;
 		}
 	}
@@ -10840,21 +12218,33 @@ void idPlayer::UpdateControllerState( void ) const {
 ===============
 idPlayer::AimAssistTargets
 
-Whether aim assistance may take the entity as its target: a live enemy
-monster that is not acting out a script, or an opposing player or bot in
-Arena. Allies never are.
+Whether aim assistance may take the entity as its target. Multiplayer: a
+live opposing player in this player's instance who can be seen; team mates,
+spectators and a player under invisibility never are. Single player: a live
+enemy monster that is not acting out a script, or an opposing player or bot
+in Arena; allies never are.
 ===============
 */
 bool idPlayer::AimAssistTargets( idEntity *ent ) const {
-	if ( ent->IsType( idAI::GetClassType() ) ) {
-		const idAI *ai = static_cast<const idAI *>( ent );
-		return ai->team != team && !ai->aifl.dead && !ai->aifl.scripted;
+	if ( !gameLocal.isMultiplayer ) {
+		if ( ent->IsType( idAI::GetClassType() ) ) {
+			const idAI *ai = static_cast<const idAI *>( ent );
+			return ai->team != team && !ai->aifl.dead && !ai->aifl.scripted;
+		}
+		if ( ent->IsType( idPlayer::GetClassType() ) ) {
+			const idPlayer *other = static_cast<const idPlayer *>( ent );
+			return !other->spectating && ( !gameLocal.IsTeamGame() || other->team != team );
+		}
+		return false;
 	}
-	if ( ent->IsType( idPlayer::GetClassType() ) ) {
-		const idPlayer *other = static_cast<const idPlayer *>( ent );
-		return !other->spectating && ( !gameLocal.IsTeamGame() || other->team != team );
+	if ( !ent->IsType( idPlayer::GetClassType() ) ) {
+		return false;
 	}
-	return false;
+	const idPlayer *other = static_cast<const idPlayer *>( ent );
+	if ( other->spectating || other->instance != instance || other->PowerUpActive( POWERUP_INVISIBILITY ) ) {
+		return false;
+	}
+	return !gameLocal.IsTeamGame() || other->team != team;
 }
 
 /*
@@ -10983,19 +12373,20 @@ void idPlayer::UpdateAimAssist( void ) {
 void idPlayer::UpdateHud( void ) {
 	UpdateControllerState();
 	UpdateAimAssist();
-	if ( gameLocal.isMultiplayer && initialJoinMenuPending ) {
-		initialJoinMenuPending = false;
-		if ( !cvarSystem->GetCVarBool( "ui_autoJoin" ) ) {
-			gameLocal.mpGame.ShowInitialJoinMenu();
-		}
-	}
-
 	if ( !hud ) {
 		return;
 	}
 
-	if ( entityNumber != gameLocal.localClientNum ) {
+	if ( !IsLocalClient() ) {
 		return;
+	}
+
+	if ( gameLocal.isMultiplayer && initialJoinMenuPending ) {
+		initialJoinMenuPending = false;
+		// openQ4 MP-22: a demo's recorded player has nothing to join
+		if ( !cvarSystem->GetCVarBool( "ui_autoJoin" ) && gameLocal.GetDemoState() != DEMO_PLAYING ) {
+			gameLocal.mpGame.ShowInitialJoinMenu();
+		}
 	}
 
 	// FIXME: this is here for level ammo balancing to see pct of hits 
@@ -11006,7 +12397,7 @@ void idPlayer::UpdateHud( void ) {
 		hud->SetStateString( "projectilepct", "Hit % 0.0" );
 	}
 
- 	if ( isLagged && gameLocal.isMultiplayer && gameLocal.localClientNum == entityNumber ) {
+ 	if ( isLagged && gameLocal.isMultiplayer && IsLocalClient() ) {
  		hud->SetStateString( "hudLag", "1" );
  	} else {
  		hud->SetStateString( "hudLag", "0" );
@@ -11031,6 +12422,13 @@ void idPlayer::UpdateDeathSkin( bool state_hitch ) {
 				deathSkinTime = 0;
 				deathClearContentsTime = 0;
 				doingDeathSkin = false;
+				return;
+			}
+
+			// openQ4: the step is relative, and prediction replays a frame
+			// several times on a client: a corpse sank once a pass, not once a
+			// frame. The server's frames are all new.
+			if ( !gameLocal.isNewFrame ) {
 				return;
 			}
 
@@ -11139,7 +12537,7 @@ Called every tic for each player
 */
 void idPlayer::Think( void ) {
 	renderEntity_t *headRenderEnt;
- 
+
 	if ( talkingNPC ) {
 		if ( !talkingNPC.IsValid() ) {
 			talkingNPC = NULL;
@@ -11163,7 +12561,7 @@ void idPlayer::Think( void ) {
 	// (Player_RefreshCrosshairGUI), which stock did here on the Xbox 360 only.
 
  	// Dont do any thinking if we are in modview
-	if ( gameEdit->PlayPlayback() ) {
+	if ( ( gameLocal.isMultiplayer && ( gameLocal.editors & EDITOR_MODVIEW ) ) || gameEdit->PlayPlayback() ) {
 		// calculate the exact bobbed view position, which is used to
 		// position the view weapon, among other things
 		CalculateFirstPersonView();
@@ -11200,11 +12598,23 @@ void idPlayer::Think( void ) {
 
 	// grab out usercmd
 	usercmd_t oldCmd = usercmd;
-	usercmd = gameLocal.usercmds[ entityNumber ];
+	usercmd = gameLocal.usercmds[ IsFakeClient() ? MAX_CLIENTS : entityNumber ];
+	botManager.RefreshKnockbackMove( this, usercmd );
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
 	ApplyWeaponWheelInputMask();
 	ApplyTestInput();
+	if ( gameLocal.isMultiplayer ) {
+		ApplyQuickChatInputMask();
+	}
+	CheckInactivity( oldCmd );
+
+	// openQ4: attack lockout.  Quake Live freezes weapons while a round is
+	// being set up or has just been decided; this is the equivalent of its
+	// PMF_ATTACK_LOCKOUT pmove flag, applied where the usercmd is taken in.
+	if ( !spectating && gameLocal.isMultiplayer && gameLocal.mpGame.GetGameState() != NULL && gameLocal.mpGame.GetGameState()->WeaponsLocked() ) {
+		usercmd.buttons &= ~BUTTON_ATTACK;
+	}
 
 	HandleObjectiveInput();
 	if ( objectiveSystemOpen ) {
@@ -11256,6 +12666,11 @@ void idPlayer::Think( void ) {
 		usercmd.upmove = 0;
 	}
 	
+	if ( gameLocal.isMultiplayer ) {
+		if ( gameLocal.isNewFrame ) UpdateWeaponWheel();
+		if ( gameLocal.isNewFrame ) UpdateQuickChat();
+
+	}
 	// zooming
 	bool zoom = (usercmd.buttons & BUTTON_ZOOM) && CanZoom();
 	if ( zoom != zoomed ) {
@@ -11269,14 +12684,18 @@ void idPlayer::Think( void ) {
 #ifdef _XENON
 			usercmdGen->SetSlowJoystick( zoom ? pm_zoomedSlow.GetInteger() : 100 );
 #else
-			cvarSystem->SetCVarInteger( "pm_isZoomed", zoom ? pm_zoomedSlow.GetInteger() : 0 );
+			if ( IsLocalClient() ) {
+				cvarSystem->SetCVarInteger( "pm_isZoomed", zoom ? pm_zoomedSlow.GetInteger() : 0 );
+			}
 #endif
 		}
 
 	}
 
 	if ( IsInVehicle ( ) ) {	
-		UpdateVRVehicleFrame();
+		if ( !gameLocal.isMultiplayer ) {
+			UpdateVRVehicleFrame();
+		}
 		vehicleController.SetInput ( usercmd, viewAngles );
 				
 		// calculate the exact bobbed view position, which is used to
@@ -11364,15 +12783,25 @@ void idPlayer::Think( void ) {
 	}
 // RAVEN END
 
-	// openQ4 VR: a step about the room walks the body first
-	UpdateVRRoomScale();
+	// openQ4 VR: a step about the room walks the body first (single player;
+	// multiplayer reports the walk after Move, ReportVRRoomScaleWalk)
+	if ( !gameLocal.isMultiplayer ) {
+		UpdateVRRoomScale();
+	}
+	// openQ4: Classic ruleset grappling hook; fixing it before Move lets this frame pull
+	UpdateClassicHook();
 
 	Move();
+	if ( gameLocal.isMultiplayer ) {
+		ReportVRRoomScaleWalk();
+	}
 
 	if ( !g_stopTime.GetBool() ) {
  		if ( !noclip && !spectating && ( health > 0 ) && !IsHidden() ) {
  			TouchTriggers();
- 		}
+ 		} else if ( spectating && !noclip ) {
+			TouchTriggers( &idTrigger_Multi::GetClassType() );
+		}
 
 		// not done on clients for various reasons. don't do it on server and save the sound channel for other things
 		if ( !gameLocal.isMultiplayer ) {
@@ -11432,6 +12861,8 @@ void idPlayer::Think( void ) {
 
 	UpdatePowerUps();
 
+	PresentClassicHook();
+
 	UpdateDeathSkin( false );
 
 	UpdateDeathShader( deathStateHitch );
@@ -11484,7 +12915,9 @@ void idPlayer::Think( void ) {
   	}
 
  	if ( !g_stopTime.GetBool() ) {
-		UpdateUnarmedBody();
+		if ( !gameLocal.isMultiplayer ) {
+			UpdateUnarmedBody();
+		}
 		UpdateAnimation();
 		UpdateMultiplayerVisibilityEffects( headRenderEnt );
 
@@ -11512,6 +12945,139 @@ void idPlayer::Think( void ) {
 		inBuyZone = false;
 
 	inBuyZonePrev = false;
+
+	// openQ4: publish the hits landed this frame as a single message.  Hitscan
+	// damage is applied from inside UpdateWeapon above, so a whole pellet burst
+	// has already been staged by the time we get here.
+	if ( gameLocal.isMultiplayer && !gameLocal.isClient ) {
+		FlushHitFeedback();
+	}
+}
+
+/*
+==============
+idPlayer::CheckInactivity
+
+openQ4 MP-12: g_inactivity. A playing human whose command has not changed for
+that many seconds is warned ten seconds ahead, then moved to spectators, or
+dropped where the server allows no spectators. Bots, spectators and frozen
+play are never counted; ThinkMatchPaused carries the clock across a pause.
+==============
+*/
+void idPlayer::CheckInactivity( const usercmd_t &oldCmd ) {
+	if ( !gameLocal.isMultiplayer || gameLocal.isClient || IsFakeClient() || spectating || wantSpectate ||
+		botManager.IsBot( entityNumber ) || gameLocal.mpGame.IsArenaCampaignMatch() ) {
+		inactivityLastInputTime = gameLocal.time;
+		inactivityWarned = false;
+		return;
+	}
+	const int limitMsec = g_inactivity.GetInteger() * 1000;
+	const bool changed = usercmd.buttons != oldCmd.buttons || usercmd.forwardmove != oldCmd.forwardmove ||
+		usercmd.rightmove != oldCmd.rightmove || usercmd.upmove != oldCmd.upmove || usercmd.impulse != oldCmd.impulse ||
+		usercmd.angles[ 0 ] != oldCmd.angles[ 0 ] || usercmd.angles[ 1 ] != oldCmd.angles[ 1 ] || usercmd.angles[ 2 ] != oldCmd.angles[ 2 ];
+	if ( limitMsec <= 0 || changed || inactivityLastInputTime <= 0 ) {
+		inactivityLastInputTime = gameLocal.time;
+		inactivityWarned = false;
+		return;
+	}
+	const mpGameState_t state = gameLocal.mpGame.GetGameState() != NULL ?
+		gameLocal.mpGame.GetGameState()->GetMPGameState() : INACTIVE;
+	if ( state == GAMEREVIEW || state == NEXTGAME || state == INACTIVE ) {
+		inactivityLastInputTime = gameLocal.time;
+		return;
+	}
+	const int idleMsec = gameLocal.time - inactivityLastInputTime;
+	const int warnMsec = Max( limitMsec / 2, limitMsec - 10000 );
+	if ( idleMsec >= limitMsec ) {
+		inactivityLastInputTime = gameLocal.time;
+		inactivityWarned = false;
+		if ( gameLocal.serverInfo.GetBool( "si_spectators" ) ) {
+			gameLocal.mpGame.CenterPrint( -1, "#str_42778", idMultiplayerGame::CPARM_CLIENT, entityNumber );
+			// the house idiom for a server-side move: the userinfo path, so
+			// wantSpectate, the team menu and every peer agree
+			GetUserInfo()->Set( "ui_spectate", "Spectate" );
+			wantSpectate = true;
+			cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "updateUI %d\n", entityNumber ) );
+		} else {
+			// queued: the drop deletes this player, and this is its own Think
+			gameLocal.mpGame.QueueClientDrop( entityNumber, "#str_42779" );
+		}
+		return;
+	}
+	if ( idleMsec >= warnMsec && !inactivityWarned ) {
+		inactivityWarned = true;
+		gameLocal.mpGame.CenterPrint( entityNumber, "#str_42777", idMultiplayerGame::CPARM_INT,
+			( limitMsec - idleMsec + 999 ) / 1000 );
+	}
+}
+
+void idPlayer::ThinkMatchPaused( int deltaMsec ) {
+	idActor::ThinkMatchPaused( deltaMsec );
+	inventory.ShiftMatchTime( deltaMsec );
+	if ( weapon != NULL ) {
+		weapon->ShiftMatchTime( deltaMsec );
+	}
+
+	if ( deltaMsec > 0 ) {
+		const int maxInt = 0x7fffffff;
+#define SHIFT_PLAYER_TIME( value ) \
+		do { if ( ( value ) > 0 ) { ( value ) = ( value ) > maxInt - deltaMsec ? maxInt : ( value ) + deltaMsec; } } while ( 0 )
+		SHIFT_PLAYER_TIME( lastSavingThrowTime );
+		SHIFT_PLAYER_TIME( lastDmgTime );
+		SHIFT_PLAYER_TIME( deathClearContentsTime );
+		SHIFT_PLAYER_TIME( nextHealthPulse );
+		for ( int index = 0; index < MAX_AMMO; ++index ) {
+			SHIFT_PLAYER_TIME( nextAmmoRegenPulse[ index ] );
+		}
+		SHIFT_PLAYER_TIME( nextArmorPulse );
+		SHIFT_PLAYER_TIME( forceScoreBoardTime );
+		SHIFT_PLAYER_TIME( spawnedTime );
+		SHIFT_PLAYER_TIME( inactivityLastInputTime );
+		SHIFT_PLAYER_TIME( minRespawnTime );
+		SHIFT_PLAYER_TIME( maxRespawnTime );
+		SHIFT_PLAYER_TIME( lastPickupTime );
+		SHIFT_PLAYER_TIME( stepUpTime );
+		SHIFT_PLAYER_TIME( landTime );
+		SHIFT_PLAYER_TIME( weaponSwitchTime );
+		SHIFT_PLAYER_TIME( lastAirDamage );
+		SHIFT_PLAYER_TIME( demoViewAngleTime );
+		SHIFT_PLAYER_TIME( focusTime );
+		SHIFT_PLAYER_TIME( focusBracketsTime );
+		SHIFT_PLAYER_TIME( overlayHudTime );
+		SHIFT_PLAYER_TIME( predictionErrorTime );
+		SHIFT_PLAYER_TIME( deathSkinTime );
+		SHIFT_PLAYER_TIME( corpseSinkStartTime );
+		SHIFT_PLAYER_TIME( powerupEffectTime );
+		SHIFT_PLAYER_TIME( lastImpulseTime );
+		SHIFT_PLAYER_TIME( lastArenaChange );
+		SHIFT_PLAYER_TIME( lastSpectateTeleport );
+#undef SHIFT_PLAYER_TIME
+		zoomFov.SetStartTime( zoomFov.GetStartTime() + deltaMsec );
+		centerView.SetStartTime( centerView.GetStartTime() + deltaMsec );
+	}
+
+	if ( gameLocal.usercmds == NULL ) {
+		return;
+	}
+
+	// Consume the command so button edges cannot queue across a pause.  Only
+	// view angles and the scoreboard are observed; movement, impulses, attacks,
+	// vehicle input and GUI weapon clicks remain inert.
+	usercmd = gameLocal.usercmds[ IsFakeClient() ? MAX_CLIENTS : entityNumber ];
+	usercmd.forwardmove = 0;
+	usercmd.rightmove = 0;
+	usercmd.upmove = 0;
+	const int sampledButtons = usercmd.buttons;
+	usercmd.buttons &= BUTTON_SCORES;
+	usercmd.impulse = 0;
+	UpdateViewAngles();
+	scoreBoardOpen = ( usercmd.buttons & BUTTON_SCORES ) != 0 || forceScoreBoard;
+	CalculateFirstPersonView();
+	CalculateRenderView();
+	UpdateHud();
+	Present();
+	oldButtons = sampledButtons;
+	oldFlags = usercmd.flags;
 }
 
 /*
@@ -11758,9 +13324,6 @@ void idPlayer::ApplyTestInput( void ) {
 	usercmd.angles[ PITCH ] += ANGLE2SHORT( openq4TestInput.pitchOffset );
 }
 
-#include "gamesys/WeaponWheel.inl"
-#include "gamesys/RetainedStatusBar.inl"
-
 bool idPlayer::CanZoom( void  )
 {
 	if ( vehicleController.IsDriving() ) {
@@ -11843,12 +13406,14 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 		return;
 	}
 
+	// openQ4: Classic ruleset: the hook lets go and any mega health stops draining
+	ResetClassicHook( false );
+	classicMegaDecayTime = 0;
+
 // squirrel: Mode-agnostic buymenus
 	if ( gameLocal.isMultiplayer ) {
-		if( gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() )
-		{
-			if( gameLocal.mpGame.GetGameState()->GetMPGameState() != WARMUP )
-			{
+		if ( gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() ) {
+			if ( gameLocal.mpGame.GetGameState()->GetMPGameState() != WARMUP ) {
 				/// Remove the player's armor
 				inventory.armor = 0;
 
@@ -11856,26 +13421,20 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 				carryOverCurrentWeapon = currentWeapon;
 				inventory.carryOverWeapons = inventory.weapons;
 
-				if( attacker )
-				{
+				if ( attacker ) {
 					idPlayer* killer = NULL;
-					if ( attacker->IsType( idPlayer::Type ) )
-					{
+					if ( attacker->IsType( idPlayer::Type ) ) {
 						killer = static_cast<idPlayer*>(attacker);
-						if( killer == this )
-						{
+						if ( killer == this ) {
 							// Killed by self
 							float cashAward = (float) gameLocal.mpGame.mpBuyingManager.GetIntValueForKey( "playerCashAward_killingSelf", 0 );
 							killer->GiveCash( cashAward );
 						}
-						else if( gameLocal.IsTeamGame() && killer->team == team )
-						{
+						else if ( gameLocal.IsTeamGame() && killer->team == team ) {
 							// Killed by teammate
 							float cashAward = (float) gameLocal.mpGame.mpBuyingManager.GetIntValueForKey( "playerCashAward_killingTeammate", 0 );
 							killer->GiveCash( cashAward );
-						}
-						else
-						{
+						} else {
 							// Killed by enemy
 							float cashAward = (float) gameLocal.mpGame.mpBuyingManager.GetOpponentKillCashAward();
 							killer->GiveCash( cashAward );
@@ -11912,22 +13471,8 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 
 	if ( StartRagdoll() ) {
 		pm_modelView.SetInteger( 0 );
-#ifdef _XENON
-		if ( gameLocal.isMultiplayer )
-		{
-			// didn't want to have any chance of affecting multiplayer...
-			minRespawnTime = gameLocal.time + RAGDOLL_DEATH_TIME;
-			maxRespawnTime = minRespawnTime + MAX_RESPAWN_TIME;
-		}
-		else
-		{
-			minRespawnTime = gameLocal.time + RAGDOLL_DEATH_TIME_XEN_SP;
-			maxRespawnTime = minRespawnTime + MAX_RESPAWN_TIME_XEN_SP;
-		}
-#else
 		minRespawnTime = gameLocal.time + RAGDOLL_DEATH_TIME;
 		maxRespawnTime = minRespawnTime + MAX_RESPAWN_TIME;
-#endif
 	} else {
 		// don't allow respawn until the death anim is done
 		// g_forcerespawn may force spawning at some later time
@@ -11936,13 +13481,25 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 		maxRespawnTime = minRespawnTime + MAX_RESPAWN_TIME;
 	}
 
+	// openQ4: while a match is running on overtime the respawn delay grows, so
+	// trading deaths stops being a way to stall out the extension.  This is
+	// what Quake Live means by "sudden death" - a respawn penalty, not a phase.
+	if ( gameLocal.isMultiplayer && !gameLocal.isClient ) {
+		int overtimeDelay = gameLocal.mpGame.GetOvertimeRespawnDelay();
+
+		if ( overtimeDelay > 0 ) {
+			minRespawnTime = Max( minRespawnTime, gameLocal.time + overtimeDelay );
+			maxRespawnTime = minRespawnTime + MAX_RESPAWN_TIME;
+		}
+	}
+
 	physicsObj.SetMovementType( PM_DEAD );
  	StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
  	StopSound( SND_CHANNEL_BODY2, false );
 
 	fl.takedamage = true;		// can still be gibbed
 
-	if (weapon) {					// cnicholson: Fix for crash if player dies while in vehicle
+	if ( weapon ) {					// cnicholson: Fix for crash if player dies while in vehicle
 		weapon->OwnerDied();		// get rid of weapon
 		if ( !noDrop ) {
 			DropWeapon( );				// drop the weapon as an item 
@@ -11981,7 +13538,8 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 				lastKiller = NULL;
 			}
 
-			if ( health < -20 || killer->PowerUpActive( POWERUP_QUADDAMAGE ) ) {
+			if ( !MPGameTypeHasAny( gameLocal.gameType, GTF_FREEZE ) &&
+				( health < -20 || killer->PowerUpActive( POWERUP_QUADDAMAGE ) ) ) {
 				gibDeath = true;
 				gibDir = dir;
 				gibsLaunched = false;
@@ -11990,7 +13548,7 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 				}
 			}
 
-			if( !isTelefragged ) {
+			if ( !isTelefragged ) {
 				if ( inflictor->IsType( idProjectile::GetClassType() ) ) {
 					methodOfDeath = static_cast<idProjectile*>(inflictor)->methodOfDeath;
 				} else if ( inflictor->IsType( idPlayer::Type ) ) {
@@ -11999,7 +13557,7 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 				}
 			}
 
-			if( methodOfDeath == -1 ) {
+			if ( methodOfDeath == -1 ) {
 				methodOfDeath = MAX_WEAPONS + isTelefragged;
 			}
 
@@ -12007,7 +13565,7 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 // jnewquist: Use accessor for static class type 
 		} else if ( attacker->IsType( idWorldspawn::GetClassType() ) ) {
 // RAVEN END
-			if( lastImpulseTime > gameLocal.time && lastImpulsePlayer ) {
+			if ( lastImpulseTime > gameLocal.time && lastImpulsePlayer ) {
 				killer = lastImpulsePlayer;
 			}
 		}
@@ -12030,7 +13588,7 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 			RemoveClientModel( "mp_ctf_one_flag" );
 		}
 
-		if ( PowerUpActive( POWERUP_CTF_STROGGFLAG ) || PowerUpActive( POWERUP_CTF_MARINEFLAG ) || PowerUpActive( POWERUP_CTF_ONEFLAG ) ) {
+		if( PowerUpActive( POWERUP_CTF_STROGGFLAG ) || PowerUpActive( POWERUP_CTF_MARINEFLAG ) || PowerUpActive( POWERUP_CTF_ONEFLAG ) ) {
 			idPlayer* killer = (idPlayer*)attacker;
 			if ( killer != NULL && killer->IsType( idPlayer::GetClassType() ) && killer != this ) {
 				if ( killer->team != team ) {
@@ -12042,7 +13600,7 @@ void idPlayer::Killed( idEntity *inflictor, idEntity *attacker, int damage, cons
 		}
 	}
 
-	DropPowerups();	
+	DropPowerups();
 
 	ClearPowerUps();
 
@@ -12074,7 +13632,7 @@ void idPlayer::CalcDamagePoints( idEntity *inflictor, idEntity *attacker, const 
 	damage = GetDamageForLocation( damage, location );
 
 	// optional different damage in team games
-	if( gameLocal.isMultiplayer && gameLocal.IsTeamGame() && damageDef->GetInt( "damage_team" ) ) {
+	if ( gameLocal.isMultiplayer && gameLocal.IsTeamGame() && damageDef->GetInt( "damage_team" ) ) {
 		damage = damageDef->GetInt( "damage_team" );
 	}
 
@@ -12123,8 +13681,19 @@ void idPlayer::CalcDamagePoints( idEntity *inflictor, idEntity *attacker, const 
 		}
 	}
 
+	if ( gameLocal.isMultiplayer ) {
+		// reduce damage by handicap, except to self
+		if( player && player != this ) {
+			damage = ceil(player->handicap*(float)damage);
+		}
+
+	}
 	// save some from armor
-	if ( !damageDef->GetBool( "noArmor" ) ) {
+	if ( !damageDef->GetBool( "noArmor" ) && gameLocal.IsClassicRuleset() ) {
+		// openQ4: Classic armour stops a share set by its tier, and may stop a hit outright
+		armorSave = rvClassicRules::AbsorbDamage( inventory.armorTier, inventory.armor, damage, damageDef->GetBool( "classic_energy" ) );
+		damage -= armorSave;
+	} else if ( !damageDef->GetBool( "noArmor" ) ) {
 		float armor_protection;
 
  		armor_protection = ( gameLocal.isMultiplayer ) ? g_armorProtectionMP.GetFloat() : g_armorProtection.GetFloat();
@@ -12153,6 +13722,12 @@ void idPlayer::CalcDamagePoints( idEntity *inflictor, idEntity *attacker, const 
  		&& player != this		// you get self damage no matter what
  		&& player->team == team ) {
  			damage = 0;
+ 			// openQ4: the armour save is computed above, before this test, and
+ 			// idPlayer::Damage subtracts it from inventory.armor unconditionally.
+ 			// Zeroing only the health component let a team mate silently drain
+ 			// your armour to nothing with si_teamDamage off.  Self damage still
+ 			// burns your own armour: this branch never fires for player == this.
+ 			armorSave = 0;
  	}
 
 	*health = damage;
@@ -12184,8 +13759,6 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
  	idVec3		damage_from;
  	float		attackerPushScale;
 
-	// RAVEN BEGIN
-	// twhitaker: difficulty levels
 	float modifiedDamageScale = damageScale;
 	
 	if ( !gameLocal.isMultiplayer ) {
@@ -12193,7 +13766,6 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 			modifiedDamageScale *= ( 1.0f + gameLocal.GetDifficultyModifier() );
 		}
 	}
-	// RAVEN END
 
 	if ( forwardDamageEnt.IsValid() ) {
 		forwardDamageEnt->Damage( inflictor, attacker, dir, damageDefName, modifiedDamageScale, location );
@@ -12249,8 +13821,7 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 	// enter it. Previously environmental deaths inherited the prior hit and became generic dm0.
 	lastDamageDef = damageDef->Index();
 
-	if ( damageDef->dict.GetBool( "lightning_damage_effect" ) )
-	{
+	if ( damageDef->dict.GetBool( "lightning_damage_effect" ) ) {
 		lightningEffects = 0;
 		lightningNextTime = gameLocal.GetTime();
 	}
@@ -12258,6 +13829,29 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 	// We pass in damageScale, because this function calculates a modified damageScale 
 	// based on g_skill, and we don't want to compensate for skill level twice.
 	CalcDamagePoints( inflictor, attacker, &damageDef->dict, damageScale, location, &damage, &armorSave );
+
+	// openQ4: Instagib. Whatever another player lands is lethal and armour
+	// saves nothing. A hit that was already worth nothing - a team mate's with
+	// team damage off, or one on god mode - stays that way, and the world and
+	// your own weapons hurt you exactly as they always do.
+	const bool instagibHit = gameLocal.isMultiplayer && gameLocal.mpGame.IsInstagib() &&
+		damage > 0 && health > 0 && attacker != this && attacker->IsType( idPlayer::GetClassType() );
+	if ( instagibHit ) {
+		damage = Max( damage, health );
+		armorSave = 0;
+	}
+
+	// openQ4: si_selfDamage scales what a player's own weapons do to them, the
+	// armour's share included. The push is left alone, so a rocket jump at 0
+	// costs nothing and still lifts. A suicide is its own inflictor and is
+	// never scaled.
+	if ( gameLocal.isMultiplayer && attacker == this && inflictor != this && ( damage > 0 || armorSave > 0 ) ) {
+		const float selfDamageScale = rvMPModifiers::SelfDamageScale();
+		if ( selfDamageScale != 1.0f ) {
+			damage = static_cast<int>( damage * selfDamageScale + 0.5f );
+			armorSave = Min( static_cast<int>( armorSave * selfDamageScale + 0.5f ), inventory.armor );
+		}
+	}
 
 	//
 	// determine knockback
@@ -12285,11 +13879,30 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 
 			kick.Normalize();
  			kick *= g_knockback.GetFloat() * knockback * attackerPushScale / 200.0f;
+			// openQ4: si_knockback, the server's scale over every push a player takes
+			kick *= rvMPModifiers::KnockbackScale();
 			
 			physicsObj.SetLinearVelocity( physicsObj.GetLinearVelocity() + kick );
+			if ( gameLocal.isMultiplayer && botManager.IsBot( entityNumber ) ) {
+				// A thrown bot may need to fight its fall; see rvBot::RecoverInAir.
+				botManager.OnPlayerKnockback( this, kick );
+			}
+			const int previousKnockback = physicsObj.GetKnockBack();
+			// An existing movement timer can refuse the requested interval.
 
 			// set the timer so that the player can't cancel out the movement immediately
- 			physicsObj.SetKnockBack( idMath::ClampInt( 50, 200, knockback * 2 ) );
+			physicsObj.SetKnockBack( idMath::ClampInt( 50, 200, knockback * 2 ) );
+			if ( gameLocal.isMultiplayer && bot_debug.GetInteger() >= 2 && botManager.IsBot( entityNumber ) ) {
+				// Friendly fire and armour can suppress health damage while the
+				// impulse still moves a bot. Keep that cause visible to fall audits.
+				// health is what this hit leaves, which an impulse replay restores.
+				// Preserve actual post/pre timers, not the requested duration.
+				gameLocal.Printf( "BOT_IMPULSE client=%d time=%d attacker=%d damage=%d origin=%s kick=%s velocity=%s def=%s health=%d knock=%d armor=%d armorSave=%d preKnock=%d\n",
+					entityNumber, gameLocal.time, attacker->entityNumber, damage, physicsObj.GetOrigin().ToString( 3 ),
+					kick.ToString( 3 ), physicsObj.GetLinearVelocity().ToString( 3 ), damageDefName, health - damage,
+					physicsObj.GetKnockBack(), inventory.armor - armorSave, armorSave, previousKnockback );
+			}
+
 		}
 	}
 	
@@ -12310,18 +13923,10 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 	}
 
 	// move the world direction vector to local coordinates
-	ClientDamageEffects ( damageDef->dict, dir, damage, damageDefName );
+	ClientDamageEffects( damageDef->dict, dir, damage, damageDefName );
 
  	// inform the attacker that they hit someone
  	attacker->DamageFeedback( this, inflictor, damage );
-// jmarshall
-	if (gameLocal.IsMultiplayer() && gameLocal.isServer) {
-		if (attacker->IsType(rvmBot::GetClassType()) || attacker->IsType(idPlayer::GetClassType()))
-		{
-			InflictedDamageEvent(attacker);
-		}
-	}
-// jmarshall end
 	
 	int debugMethodOfDeath = -1;
 	if ( inflictor->IsType( idProjectile::GetClassType() ) ) {
@@ -12329,21 +13934,18 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 	} else if ( inflictor->IsType( idPlayer::Type ) ) {
 		debugMethodOfDeath = static_cast<idPlayer*>(inflictor)->GetCurrentWeapon();
 	}
+	// openQ4: in multiplayer the body stays damageable after death - fl.takedamage
+	// is left alone above - so latch the health from before this hit is applied.
+	// Without it every extra pellet of the blast that killed someone reported
+	// another kill marker, another damage plum and more damage dealt against a
+	// corpse.  idPlayer::DamageFeedback already gates the hit sound this way.
+	const int preDamageHealth = health;
 
-//RAVEN BEGIN
-//asalmon: Xenon needs stats in singleplayer
-#ifndef _XENON
-	if( gameLocal.isMultiplayer )
-#endif 
-	{
-//RAVEN END
+	if( gameLocal.isMultiplayer && preDamageHealth > 0 ) {
 		idEntity* attacker = NULL;
 
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
 		int methodOfDeath = -1;
 		if ( inflictor->IsType( idProjectile::GetClassType() ) ) {
-// RAVEN END
 			methodOfDeath = static_cast<idProjectile*>(inflictor)->methodOfDeath;
 			attacker = static_cast<idProjectile*>(inflictor)->GetOwner();
 		} else if ( inflictor->IsType( idPlayer::Type ) ) {
@@ -12353,6 +13955,49 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 		}
 
 		statManager->Damage( attacker, this, methodOfDeath, damage );
+
+		// openQ4: let the game state score the damage.  Clan Arena and Attack
+		// & Defend pay personal score per hundred points of damage dealt
+		// rather than per frag, so a support player is not stuck on zero.
+		if ( !gameLocal.isClient && gameLocal.mpGame.GetGameState() != NULL &&
+			 attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
+			gameLocal.mpGame.GetGameState()->PlayerDamage( static_cast< idPlayer * >( attacker ), this, damage, armorSave );
+		}
+
+		// openQ4: Vampiric Damage hands the attacker a share of the health this hit takes
+		if ( attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
+			gameLocal.mpGame.ApplyVampiricDamage( static_cast< idPlayer * >( attacker ), this, damage, preDamageHealth );
+		}
+
+		// openQ4: Classic CTF remembers who has been hurting a flag carrier
+		if ( attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
+			rvClassicRules::NoteDamage( this, static_cast< idPlayer * >( attacker ) );
+		}
+
+		// openQ4: floating damage numbers, ported from Quake Live's damage
+		// plums.  Quake Live reports the damage the shot was worth, so armour
+		// counts towards the number rather than being subtracted from it.
+		//
+		// The hit flags ride along for the crosshair hit marker: the damage is
+		// still to be applied below, so this is the last place that knows both
+		// what armour soaked and whether the hit is about to be fatal.
+		int hitFlags = 0;
+		if ( armorSave > 0 ) {
+			hitFlags |= HITFLAG_ARMOR;
+		}
+		if ( preDamageHealth - damage <= 0 && !undying ) {
+			hitFlags |= HITFLAG_KILL;
+		}
+
+		// openQ4: hitscan weapons apply damage once per pellet - the shotgun
+		// fires eleven - so publishing here would be eleven unreliable
+		// messages, eleven hit marker re-arms and eleven jittered plums for
+		// one trigger pull.  Hand the hit to the attacker instead; they flush
+		// a single accumulated message at the end of their think, which for
+		// hitscan is the same frame the pellets were traced in.
+		if ( attacker != NULL && attacker->IsType( idPlayer::GetClassType() ) ) {
+			static_cast< idPlayer * >( attacker )->AccumulateHitFeedback( this, methodOfDeath, damage + armorSave, hitFlags );
+		}
 	}
 		
 // RAVEN BEGIN
@@ -12420,6 +14065,15 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 				health = -999;
 			}
 
+			// openQ4: and an Instagib kill gibs. The hit took exactly the health
+			// that was left, so the score, the stats and the damage number stay
+			// honest; this takes the body past the gib threshold Killed() and
+			// every client test (health < -20), since health is what replicates.
+			// Freeze Tag freezes instead of killing, and keeps its body whole.
+			if ( instagibHit && !MPGameTypeHasAny( gameLocal.gameType, GTF_FREEZE ) ) {
+				health = Min( health, INSTAGIB_GIB_HEALTH );
+			}
+
  			isTelefragged = damageDef->dict.GetBool( "telefrag" );
  
  			lastDmgTime = gameLocal.time;
@@ -12459,6 +14113,14 @@ void idPlayer::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &di
 	lastDamageDir = dir;
 	lastDamageDir.Normalize();
 	lastDamageLocation = location;
+
+	// Give server-side bots the same concrete information a player gets from
+	// the hit reaction: who caused it and from which direction.  This avoids
+	// omniscient scans while allowing a sustained attack to trigger one timely
+	// dodge instead of continually postponing it through lastDmgTime.
+	if ( gameLocal.isMultiplayer && !gameLocal.isClient && damage > 0 ) {
+		botManager.OnPlayerDamaged( this, attacker, damage, dir );
+	}
 }
 
 /*
@@ -12503,13 +14165,27 @@ idPlayer::Teleport
 ============
 */
 void idPlayer::Teleport( const idVec3 &origin, const idAngles &angles, idEntity *destination ) {
+	// A teleport is a discontinuity, so every position lag compensation recorded for this
+	// player is now a lie about where they could have been shot.  Teleport does not route
+	// through SpawnToPoint, which was the only invalidation site.
+	if ( gameLocal.isServer && gameLocal.isMultiplayer ) {
+		gameLocal.InvalidateMPLagCompensationHistory( entityNumber );
+	}
  	idVec3 org;
  
+	// openQ4: Classic ruleset: a teleport takes the player away from whatever the hook holds,
+	// and a pull left in place would drag them straight back across the map.
+	ResetClassicHook( false );
+
  	if ( weapon ) {
  		weapon->LowerWeapon();
  	}
  
-	SetOrigin( origin + idVec3( 0, 0, CM_CLIP_EPSILON ) );
+	if ( !spectating ) {
+		SetOrigin( origin + idVec3( 0, 0, CM_CLIP_EPSILON ) );
+	} else {
+		SetOrigin( origin + idVec3( 0, 0, CM_CLIP_EPSILON ) + idVec3( 0, 0, SPECTATE_RAISE ) );
+	}
  	if ( !gameLocal.isMultiplayer && GetFloorPos( 16.0f, org ) ) {
  		SetOrigin( org );
  	}
@@ -12523,6 +14199,7 @@ void idPlayer::Teleport( const idVec3 &origin, const idAngles &angles, idEntity 
 	legsYaw = 0.0f;
 	idealLegsYaw = 0.0f;
 	oldViewYaw = viewAngles.yaw;
+	leanVelocity = vec3_zero;
 
  	if ( gameLocal.isMultiplayer ) {
  		playerView.Flash( colorWhite, 140 );
@@ -12530,12 +14207,13 @@ void idPlayer::Teleport( const idVec3 &origin, const idAngles &angles, idEntity 
 
 	// don't do any smoothing with this snapshot
 	predictedFrame = gameLocal.framenum;
+	remotePredictedTics = 0;
 
 	UpdateVisuals();
 
  	teleportEntity = destination;
 
-	if ( !gameLocal.isClient && !noclip ) {
+	if ( !gameLocal.isClient && !noclip && !spectating ) {
  		if ( gameLocal.isMultiplayer ) {
  			// kill anything at the new position or mark for kill depending on immediate or delayed teleport
  			gameLocal.KillBox( this, destination != NULL );
@@ -12750,11 +14428,25 @@ void idPlayer::CalculateViewWeaponPos( idVec3 &origin, idMat3 &axis, const idVec
 	const idVec3 &viewOrigin = ( viewOriginOverride != NULL ) ? *viewOriginOverride : firstPersonViewOrigin;
 	const idMat3 &viewAxis = ( viewAxisOverride != NULL ) ? *viewAxisOverride : firstPersonViewAxis;
 
+	// the constant was -0.2 in quake3, but -.1 seems closest to the same visual effect in quake4
+	// (multiplayer only; single player keeps the gun where the weapon def puts it)
+	float fovOffset = 0; 
+	float curfov = g_fov.GetFloat();
+	if ( gameLocal.isMultiplayer && g_weaponFovEffect.GetBool() && curfov > 90.0f )
+		fovOffset = -0.1f * ( curfov - 90.0f );
+
 	// these cvars are just for hand tweaking before moving a value to the weapon def
 	idVec3	gunpos( g_gun_x.GetFloat() + cl_gun_x.GetFloat(),
 					g_gun_y.GetFloat() + cl_gun_y.GetFloat(),
-					g_gun_z.GetFloat() + cl_gun_z.GetFloat() );
-	gunpos += weapon->GetViewModelOffset ( );
+					g_gun_z.GetFloat() + cl_gun_z.GetFloat() + fovOffset );
+	
+	const idPlayer* player = gameLocal.GetLocalPlayer();
+	if (player && (this == player || player->spectating && player->spectator == this->entityNumber) ) {
+		gunpos += weapon->GetViewModelOffset();
+	} else {
+		gunpos = weapon->GetViewModelOffset();
+	}
+
 
 	// as the player changes direction, the gun will take a small lag
 	idVec3	gunOfs = GunAcceleratingOffset();
@@ -12996,6 +14688,88 @@ void idPlayer::OffsetThirdPersonView( float angle, float range, float height, bo
 
 /*
 ===============
+idPlayer::FollowCameraMode
+
+openQ4: the view the local client draws this player with. First person unless
+the local player is a spectator following them with a third-person or chase
+view selected, or this is the local player's own death with g_deathCamera set.
+All of it is presentation: a following spectator's snapshot is built from the
+followed player's position whichever view draws it, and the cameras stay
+within reach of that position, clipped against the world.
+===============
+*/
+idPlayer::followCamera_t idPlayer::FollowCameraMode( void ) const {
+	if ( !gameLocal.isMultiplayer || spectating || IsInVehicle() ) {
+		return FOLLOW_CAMERA_FIRST;
+	}
+	const idPlayer *local = gameLocal.GetLocalPlayer();
+	if ( local == NULL ) {
+		return FOLLOW_CAMERA_FIRST;
+	}
+	if ( local == this ) {
+		return ( health <= 0 && g_deathCamera.GetBool() ) ? FOLLOW_CAMERA_DEATH : FOLLOW_CAMERA_FIRST;
+	}
+	if ( !local->spectating || local->spectator != entityNumber ) {
+		return FOLLOW_CAMERA_FIRST;
+	}
+	switch ( g_spectatorFollowView.GetInteger() ) {
+		case 1:		return FOLLOW_CAMERA_THIRD;
+		case 2:		return FOLLOW_CAMERA_CHASE;
+		default:	return FOLLOW_CAMERA_FIRST;
+	}
+}
+
+/*
+===============
+idPlayer::OffsetChaseCameraView
+
+openQ4: a camera that looks at this player from `range` away along `look`,
+pulled in where the world is in the way. The chase view passes the spectator's
+own view angles, so the spectator orbits the player they follow.
+===============
+*/
+void idPlayer::OffsetChaseCameraView( const idAngles &look, float range, float height ) {
+	const idMat3 &gravityAxis = physicsObj.GetGravityAxis();
+	idVec3 focus = GetEyePosition();
+	if ( health <= 0 ) {
+		// the dead view height sits on the floor; look at the body instead
+		focus += gravityAxis[2] * 16.0f;
+	}
+	focus += gravityAxis[2] * height;
+
+	idAngles angles = look;
+	angles.roll = 0.0f;
+	angles.pitch = idMath::ClampFloat( -80.0f, 80.0f, angles.pitch );
+	const idMat3 axis = angles.ToMat3() * gravityAxis;
+	idVec3 view = focus - axis[0] * range;
+
+	// an 8 unit box keeps the near plane out of whatever stopped the camera
+	trace_t trace;
+	const idBounds bounds( idVec3( -4.0f, -4.0f, -4.0f ), idVec3( 4.0f, 4.0f, 4.0f ) );
+
+	// openQ4: the raised focus is clipped too. The pull-back below started from
+	// it unchecked, so under a low ceiling it began inside the brush and the
+	// camera stayed there. Rise from the middle of the player's own box, which
+	// is clear space, up to the focus.
+	const idVec3 bodyCenter = GetPhysics()->GetAbsBounds().GetCenter();
+	gameLocal.TraceBounds( this, trace, bodyCenter, focus, bounds, MASK_SOLID, this );
+	if ( trace.fraction < 1.0f ) {
+		focus = trace.endpos;
+		view = focus - axis[0] * range;
+	}
+
+	gameLocal.TraceBounds( this, trace, focus, view, bounds, MASK_SOLID, this );
+	if ( trace.fraction < 1.0f ) {
+		view = trace.endpos;
+	}
+
+	renderView->vieworg = view;
+	renderView->viewaxis = axis;
+	renderView->viewID = 0;
+}
+
+/*
+===============
 idPlayer::GetEyePosition
 ===============
 */
@@ -13081,10 +14855,17 @@ bool idPlayer::GetVRView( vrFrameState_t &frame, float &trackingYaw ) const {
 		return false;
 	}
 	// cinematics, cameras and third person play flat on the virtual screen,
-	// and so do vehicles while vr_vehicleStereo is off
-	if ( gameLocal.inCinematic || gameLocal.GetCamera() != NULL || privateCameraView != NULL
+	// and so do vehicles while vr_vehicleStereo is off; in multiplayer also
+	// spectating, every vehicle and the Arena's authored shots: the eyes would
+	// show the locked player's own view instead, turning with the weapon hand
+	const bool flatView = gameLocal.isMultiplayer ?
+		( gameLocal.GetCamera() != NULL || privateCameraView != NULL || spectating
+			|| pm_thirdPerson.GetBool() || IsInVehicle() || vrPresentationCamera
+			|| ( health <= 0 && ( pm_thirdPersonDeath.GetBool() || g_deathCamera.GetBool() ) ) ) :
+		( gameLocal.inCinematic || gameLocal.GetCamera() != NULL || privateCameraView != NULL
 			|| pm_thirdPerson.GetBool() || ( health <= 0 && pm_thirdPersonDeath.GetBool() )
-			|| ( IsInVehicle() && !cvarSystem->GetCVarBool( "vr_vehicleStereo" ) ) ) {
+			|| ( IsInVehicle() && !cvarSystem->GetCVarBool( "vr_vehicleStereo" ) ) );
+	if ( flatView ) {
 		return false;
 	}
 	vrSystem->GetFrameState( frame );
@@ -13168,15 +14949,94 @@ bool idPlayer::GetVRAimOrigin( idVec3 &origin ) const {
 ===============
 idPlayer::GetVRAimMarker
 
-Where a shot from the weapon hand would land this frame: the path
-GetVRAimOrigin gives the weapon, followed along the tracked aim from the
-same presentation pose the view weapon is drawn at.
+Where a shot would land this frame. Multiplayer shots leave the eye along
+the weapon hand's aim (the server only knows usercmd angles), so the trace
+does too; a beam still starts at the hand. Single player follows the path
+GetVRAimOrigin gives the weapon, along the tracked aim from the same
+presentation pose the view weapon is drawn at.
 ===============
 */
 bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
 	vrFrameState_t frame;
 	float trackingYaw;
 	if ( health <= 0 || !GetVRView( frame, trackingYaw ) || frame.aimMode != VR_AIM_HAND ) {
+		return false;
+	}
+	if ( !gameLocal.isMultiplayer ) {
+		// single player: the shot leaves the weapon hand (GetVRAimOrigin), a vehicle's its turret
+		const vrPose_t &aim = frame.aim[ frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT ];
+		if ( !aim.valid ) {
+			return false;
+		}
+		idVec3 eyeOrigin;
+		idMat3 eyeAxis;
+		GetPresentationViewPos( eyeOrigin, eyeAxis );
+		eyeOrigin.z += VRCrouchLift( frame );
+		const idVec3 headCorrection = VR_HeadOffsetCorrection( frame );
+
+		trace_t trace;
+		if ( IsInVehicle() ) {
+			// a vehicle's guns follow its turret, which the head turns at the
+			// turret's own rate: the marker shows where the turret aims now, the
+			// way its shots converge on the line of its eye
+			rvVehicle *vehicle = vehicleController.GetVehicle();
+			rvVehiclePosition *position = vehicle != NULL ? vehicle->GetPosition( vehicleController.GetPosition() ) : NULL;
+			rvVehicleWeapon *vehicleWeapon = position != NULL ? position->GetActiveWeapon() : NULL;
+			if ( vehicleWeapon == NULL ) {
+				return false;
+			}
+			const idVec3 &start = position->GetEyeOrigin();
+			gameLocal.TracePoint( vehicle, trace, start, start + position->GetEyeAxis()[0] * VR_AIM_RANGE, MASK_SHOT_RENDERMODEL, vehicle );
+			if ( !vehicleWeapon->GetMuzzleOrigin( marker.muzzle ) ) {
+				marker.muzzle = start;
+			}
+		} else {
+			// A focused world GUI shows its own cursor, and a weapon without a
+			// crosshair marks nothing. With the weapon away the hand still
+			// points, at who to talk to and what to use, so its mark stays.
+			const bool armed = weapon != NULL && !weapon->IsHidden();
+			if ( focusType == FOCUS_GUI || ( armed && !weapon->ShowCrosshair() ) ) {
+				return false;
+			}
+			vrPose_t pose = aim;
+			pose.origin += headCorrection;
+			idVec3 handOrigin;
+			idMat3 handAxis;
+			VR_PoseToWorld( pose, eyeOrigin, trackingYaw, handOrigin, handAxis );
+
+			gameLocal.TracePoint( this, trace, eyeOrigin, handOrigin, MASK_SHOT_RENDERMODEL, this );
+			const idVec3 start = trace.fraction < 1.0f ? eyeOrigin + ( trace.endpos - eyeOrigin ) * 0.9f : handOrigin;
+			gameLocal.TracePoint( this, trace, start, start + handAxis[0] * VR_AIM_RANGE, MASK_SHOT_RENDERMODEL, this );
+			// a beam leaves the drawn weapon's muzzle, or the hand without one
+			if ( !armed || !weapon->GetVRMuzzle( marker.muzzle ) ) {
+				marker.muzzle = handOrigin;
+			}
+		}
+		marker.target = trace.endpos;
+		marker.hit = trace.fraction < 1.0f;
+
+		// round a corner the hand can see what the head can't
+		marker.hidden = false;
+		if ( frame.head.valid ) {
+			vrPose_t head = frame.head;
+			head.origin += headCorrection;
+			idVec3 headOrigin;
+			idMat3 headAxis;
+			VR_PoseToWorld( head, eyeOrigin, trackingYaw, headOrigin, headAxis );
+			const idVec3 toTarget = marker.target - headOrigin;
+			const float distance = toTarget.Length();
+			if ( distance > 8.0f ) {
+				// in a vehicle the head looks out past its own hull
+				const idEntity *seat = IsInVehicle() ? static_cast<const idEntity *>( vehicleController.GetVehicle() ) : this;
+				trace_t sight;
+				gameLocal.TracePoint( this, sight, headOrigin, marker.target - toTarget * ( 4.0f / distance ), MASK_SHOT_RENDERMODEL, seat );
+				marker.hidden = sight.fraction < 1.0f;
+			}
+		}
+		return true;
+	}
+	// a holstered or hidden weapon has nothing to aim, and a focused world GUI shows its own cursor
+	if ( weapon == NULL || weapon->IsHidden() || !weapon->ShowCrosshair() || focusType == FOCUS_GUI ) {
 		return false;
 	}
 	const vrPose_t &aim = frame.aim[ frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT ];
@@ -13186,65 +15046,38 @@ bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
 	idVec3 eyeOrigin;
 	idMat3 eyeAxis;
 	GetPresentationViewPos( eyeOrigin, eyeAxis );
-	eyeOrigin.z += VRCrouchLift( frame );
+	// the tracked poses sit on the lifted origin; the shot leaves the body's eye
+	idVec3 trackingOrigin = eyeOrigin;
+	trackingOrigin.z += VRCrouchLift( frame );
 	const idVec3 headCorrection = VR_HeadOffsetCorrection( frame );
+	vrPose_t pose = aim;
+	pose.origin += headCorrection;
+	idVec3 handOrigin;
+	idMat3 handAxis;
+	VR_PoseToWorld( pose, trackingOrigin, trackingYaw, handOrigin, handAxis );
 
 	trace_t trace;
-	if ( IsInVehicle() ) {
-		// a vehicle's guns follow its turret, which the head turns at the
-		// turret's own rate: the marker shows where the turret aims now, the
-		// way its shots converge on the line of its eye
-		rvVehicle *vehicle = vehicleController.GetVehicle();
-		rvVehiclePosition *position = vehicle != NULL ? vehicle->GetPosition( vehicleController.GetPosition() ) : NULL;
-		rvVehicleWeapon *vehicleWeapon = position != NULL ? position->GetActiveWeapon() : NULL;
-		if ( vehicleWeapon == NULL ) {
-			return false;
-		}
-		const idVec3 &start = position->GetEyeOrigin();
-		gameLocal.TracePoint( vehicle, trace, start, start + position->GetEyeAxis()[0] * VR_AIM_RANGE, MASK_SHOT_RENDERMODEL, vehicle );
-		if ( !vehicleWeapon->GetMuzzleOrigin( marker.muzzle ) ) {
-			marker.muzzle = start;
-		}
-	} else {
-		// A focused world GUI shows its own cursor, and a weapon without a
-		// crosshair marks nothing. With the weapon away the hand still
-		// points, at who to talk to and what to use, so its mark stays.
-		const bool armed = weapon != NULL && !weapon->IsHidden();
-		if ( focusType == FOCUS_GUI || ( armed && !weapon->ShowCrosshair() ) ) {
-			return false;
-		}
-		vrPose_t pose = aim;
-		pose.origin += headCorrection;
-		idVec3 handOrigin;
-		idMat3 handAxis;
-		VR_PoseToWorld( pose, eyeOrigin, trackingYaw, handOrigin, handAxis );
-
-		gameLocal.TracePoint( this, trace, eyeOrigin, handOrigin, MASK_SHOT_RENDERMODEL, this );
-		const idVec3 start = trace.fraction < 1.0f ? eyeOrigin + ( trace.endpos - eyeOrigin ) * 0.9f : handOrigin;
-		gameLocal.TracePoint( this, trace, start, start + handAxis[0] * VR_AIM_RANGE, MASK_SHOT_RENDERMODEL, this );
-		// a beam leaves the drawn weapon's muzzle, or the hand without one
-		if ( !armed || !weapon->GetVRMuzzle( marker.muzzle ) ) {
-			marker.muzzle = handOrigin;
-		}
+	gameLocal.TracePoint( this, trace, eyeOrigin, eyeOrigin + handAxis[0] * VR_AIM_RANGE, MASK_SHOT_RENDERMODEL, this );
+	// a beam leaves the drawn weapon's muzzle, or the hand without one
+	if ( !weapon->GetVRMuzzle( marker.muzzle ) ) {
+		marker.muzzle = handOrigin;
 	}
 	marker.target = trace.endpos;
 	marker.hit = trace.fraction < 1.0f;
 
-	// round a corner the hand can see what the head can't
+	// the tracked head can lean round what the body's eye sees past
 	marker.hidden = false;
 	if ( frame.head.valid ) {
 		vrPose_t head = frame.head;
 		head.origin += headCorrection;
 		idVec3 headOrigin;
 		idMat3 headAxis;
-		VR_PoseToWorld( head, eyeOrigin, trackingYaw, headOrigin, headAxis );
+		VR_PoseToWorld( head, trackingOrigin, trackingYaw, headOrigin, headAxis );
 		const idVec3 toTarget = marker.target - headOrigin;
 		const float distance = toTarget.Length();
 		if ( distance > 8.0f ) {
-			// in a vehicle the head looks out past its own hull
-			const idEntity *seat = IsInVehicle() ? static_cast<const idEntity *>( vehicleController.GetVehicle() ) : this;
 			trace_t sight;
-			gameLocal.TracePoint( this, sight, headOrigin, marker.target - toTarget * ( 4.0f / distance ), MASK_SHOT_RENDERMODEL, seat );
+			gameLocal.TracePoint( this, sight, headOrigin, marker.target - toTarget * ( 4.0f / distance ), MASK_SHOT_RENDERMODEL, this );
 			marker.hidden = sight.fraction < 1.0f;
 		}
 	}
@@ -13295,12 +15128,53 @@ void idPlayer::UpdateVRRoomScale( void ) {
 
 /*
 ===============
+idPlayer::ReportVRRoomScaleWalk
+
+openQ4 VR: multiplayer room scale. The engine walks the body after the head
+through the usercmd (VR_RoomScaleWalkInput), because only usercmds move a
+networked body. This reports each new tic's predicted horizontal progress so
+the tracking space can follow the body; the engine keeps only a room-scale
+walk's part of it. A jump of more than 32 units is a teleport or a respawn.
+===============
+*/
+void idPlayer::ReportVRRoomScaleWalk( void ) {
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( !gameLocal.isNewFrame ) {
+		return;
+	}
+	if ( spectating || noclip || health <= 0 || !GetVRView( frame, trackingYaw ) || !frame.roomScale ) {
+		vrRoomScaleOriginValid = false;
+		vrRoomScaleStepTime = -1;
+		return;
+	}
+	const idVec3 origin = physicsObj.GetOrigin();
+	if ( vrRoomScaleOriginValid ) {
+		idVec3 moved = origin - vrRoomScaleOrigin;
+		moved.z = 0.0f;
+		if ( moved.LengthSqr() > 0.0f && moved.LengthSqr() < 32.0f * 32.0f ) {
+			idVec3 movedTracking = moved * VR_TrackingAxis( trackingYaw ).Transpose();
+			movedTracking.z = 0.0f;
+			if ( vrSystem->ShiftTrackingOrigin( movedTracking ) ) {
+				// a real step: the eye drawn towards this tic's sample still has
+				// part of it to cover, and the vignette leaves its speed out
+				vrRoomScaleStep = moved;
+				vrRoomScaleStepTime = gameLocal.time;
+			}
+		}
+	}
+	vrRoomScaleOrigin = origin;
+	vrRoomScaleOriginValid = true;
+}
+
+/*
+===============
 idPlayer::VRRoomScaleLag
 
 openQ4 VR: how far an eye drawn between two presentation samples lags the
-tracked head after room scale moved the tracking space by a whole step. The
-step belongs to the tic of the current sample; the eye still has the rest of
-it to cover, a fraction of one tic's walk. Without it a walk about the room
+tracked head after the tracking space took a room-scale step whole. The step
+belongs to the tic of the current sample; the eye still has the rest of it
+to cover, a fraction of one tic's walk. Without it a walk about the room
 shimmered by up to a tic's step, at every tic.
 ===============
 */
@@ -13451,6 +15325,19 @@ bool idPlayer::GetVRVehicleAim( idAngles &seatAim, idAngles &worldAim ) const {
 	worldAim.Set( idMath::AngleNormalize180( seatAim.pitch + deltaViewAngles.pitch ),
 		idMath::AngleNormalize180( seatAim.yaw + vrVehicleDeltaYaw ), 0.0f );
 	return false;
+}
+
+/*
+===============
+idPlayer::VRRoomScaleStepping
+
+openQ4 VR: the latest predicted tic moved the body by a room-scale step the
+tracking space took: a step the player made about the room, through the
+usercmd, not motion the body does not feel.
+===============
+*/
+bool idPlayer::VRRoomScaleStepping( void ) const {
+	return vrRoomScaleStepTime >= 0 && vrRoomScaleStepTime == presentationViewTime;
 }
 
 /*
@@ -14131,6 +16018,15 @@ void idPlayer::UpdatePresentationViewState( void ) {
 	const float simFov = CalcFov( true );
 	const idAngles simLookAngles = viewAngles;
 	const idAngles simCmdAngles( SHORT2ANGLE( usercmd.angles[0] ), SHORT2ANGLE( usercmd.angles[1] ), SHORT2ANGLE( usercmd.angles[2] ) );
+	const float predictionDecayTime = net_predictionErrorDecay.GetFloat();
+	const bool activePredictionViewSmoothing =
+		WantSmoothing() &&
+		predictionDecayTime > 0.0f &&
+		predictionErrorTime > 0 &&
+		gameLocal.time >= predictionErrorTime &&
+		( gameLocal.time - predictionErrorTime ) < predictionDecayTime &&
+		( predictionOriginError.LengthSqr() > Square( 0.01f ) ||
+			predictionAnglesError.LengthSqr() > Square( 0.01f ) );
 
 	if ( presentationViewTime < 0 ) {
 		presentationViewTime = gameLocal.time;
@@ -14163,7 +16059,7 @@ void idPlayer::UpdatePresentationViewState( void ) {
 		presentationCurFov = simFov;
 		presentationCurLookAngles = simLookAngles;
 		presentationCurCmdAngles = simCmdAngles;
-		if ( !continuousView ) {
+		if ( !continuousView || activePredictionViewSmoothing ) {
 			presentationCanInterpolate = false;
 			presentationPrevViewOrigin = presentationCurViewOrigin;
 			presentationPrevViewAxis = presentationCurViewAxis;
@@ -14200,7 +16096,8 @@ void idPlayer::UpdatePresentationViewState( void ) {
 	presentationCanInterpolate =
 		gameLocal.GetMHz() == common->GetUserCmdHz() &&
 		sequentialFrame &&
-		continuousView;
+		continuousView &&
+		!activePredictionViewSmoothing;
 
 	if ( !presentationCanInterpolate ) {
 		presentationPrevViewOrigin = presentationCurViewOrigin;
@@ -14539,15 +16436,25 @@ bool idPlayer::GetPresentationLookDiagnostic( float &inputYaw, float &correction
 ===============
 idPlayer::AllowsPresentationLook
 
-Late look applies only where usercmd angles drive the drawn first-person eye.
-Views that hold, script or replace the angles keep the authoritative view; the
-coupling check in UpdatePresentationViewState catches any mode not named here.
-Vehicles and their joint-bound eyes stay on the interpolated view.
+Late look applies only where usercmd angles drive the drawn first-person eye
+of this client's own player; a followed player is a remote actor. Views that
+hold, script or replace the angles keep the authoritative view; the coupling
+check in UpdatePresentationViewState catches any mode not named here, such as
+an Arena freeze. Vehicles and their joint-bound eyes stay on the interpolated
+view.
 ===============
 */
 bool idPlayer::AllowsPresentationLook( void ) const {
 	if ( gameLocal.GetLocalPlayer() != this || health <= 0 || weaponWheelActive || IsInVehicle() ) {
 		return false;
+	}
+	if ( gameLocal.isMultiplayer ) {
+		if ( ( usercmd.buttons & ( BUTTON_WEAPONWHEEL | BUTTON_QUICKCHAT ) ) != 0 ) {
+			return false;
+		}
+		if ( gameLocal.mpGame.ArenaCampaignLocksPlayers() && !gameLocal.mpGame.ArenaCampaignAllowsFreeLook() ) {
+			return false;
+		}
 	}
 	if ( !noclip && ( gameLocal.inCinematic || privateCameraView != NULL || gameLocal.GetCamera() != NULL ) ) {
 		return false;
@@ -14558,7 +16465,7 @@ bool idPlayer::AllowsPresentationLook( void ) const {
 	if ( pm_thirdPerson.GetBool() || pm_thirdPersonDeath.GetBool() || pm_modelView.GetInteger() == 1 ) {
 		return false;
 	}
-	if ( g_stopTime.GetBool() || gameLocal.GetDemoState() != DEMO_NONE || gameLocal.IsTimeDemo() ) {
+	if ( ( !gameLocal.isMultiplayer && g_stopTime.GetBool() ) || gameLocal.GetDemoState() != DEMO_NONE || gameLocal.IsTimeDemo() ) {
 		return false;
 	}
 	return vrSystem == NULL || !vrSystem->IsActive();
@@ -14592,12 +16499,13 @@ spectate follow?
 ==================
 */
 void idPlayer::SmoothenRenderView( bool firstPerson ) {
-// jmarshall - new demo support?
+// jmarshall - the engine usercmd_t carries no realTime field, so the recorded
+// interval needed for this interpolation is unavailable.
 /*
 	int d1, d2;
 	idAngles angles, anglesDelta, newAngles;
 
-	if ( gameLocal.GetDemoState() == DEMO_PLAYING ) {
+	if ( gameLocal.IsServerDemoPlaying() ) {
 
 		d1 = usercmd.gameTime - demoViewAngleTime;
 		if ( d1 < 0 ) {
@@ -14629,6 +16537,7 @@ void idPlayer::SmoothenRenderView( bool firstPerson ) {
 		}
 	}
 */
+// jmarshall end
 }
 
 /*
@@ -14671,8 +16580,13 @@ void idPlayer::CalculateRenderView( void ) {
 	renderView->height = SCREEN_HEIGHT;
 	renderView->viewID = 0;
 
-	// check if we should be drawing from a camera's POV
-	if ( !noclip && (gameLocal.GetCamera() || privateCameraView) ) {
+	// Arena campaign entrances and results use a local presentation camera while
+	// leaving the match participants in the world for the tableau.
+	vrPresentationCamera = false;
+	if ( gameLocal.isMultiplayer && gameLocal.mpGame.BuildArenaCampaignPresentationView( this, renderView ) ) {
+		// The presentation view has already supplied its origin, axis, and FOV.
+		vrPresentationCamera = true;
+	} else if ( !noclip && (gameLocal.GetCamera() || privateCameraView) ) {
 		// get origin, axis, and fov
 		if ( privateCameraView ) {
 			privateCameraView->GetViewParms( renderView );
@@ -14686,6 +16600,7 @@ void idPlayer::CalculateRenderView( void ) {
 		}
 	} else {
 		bool cameraIsSet = false;
+		const followCamera_t followCamera = FollowCameraMode();
 
 		// First try out any camera views that can possibly fail.
 		if( !cameraIsSet ){
@@ -14698,6 +16613,21 @@ void idPlayer::CalculateRenderView( void ) {
 	 				// allow the right player view weapons
 	 				renderView->viewID = entityNumber + 1;
 	 			}
+			} else if ( followCamera == FOLLOW_CAMERA_THIRD ) {
+				// openQ4: behind the followed player, turning with their view
+				OffsetThirdPersonView( 0.0f, g_chaseCameraRange.GetFloat(), g_chaseCameraHeight.GetFloat(), true );
+				SmoothenRenderView( false );
+				altViewKind = PRESENTATION_ALT_VIEW_THIRD_PERSON;
+			} else if ( followCamera == FOLLOW_CAMERA_CHASE ) {
+				// openQ4: orbiting the followed player on the spectator's own look
+				OffsetChaseCameraView( gameLocal.GetLocalPlayer()->viewAngles, g_chaseCameraRange.GetFloat(), g_chaseCameraHeight.GetFloat() );
+				SmoothenRenderView( false );
+				altViewKind = PRESENTATION_ALT_VIEW_THIRD_PERSON;
+			} else if ( followCamera == FOLLOW_CAMERA_DEATH ) {
+				// openQ4: the view yaw already faces the killer (LookAtKiller)
+				OffsetChaseCameraView( idAngles( 20.0f, viewAngles.yaw, 0.0f ), g_chaseCameraRange.GetFloat(), g_chaseCameraHeight.GetFloat() );
+				SmoothenRenderView( false );
+				altViewKind = PRESENTATION_ALT_VIEW_DEATH;
 			} else if ( pm_thirdPerson.GetBool() && IsInVehicle ( ) ) {
 // RAVEN BEGIN
 // jnewquist: option to avoid clipping against world
@@ -14940,6 +16870,121 @@ void idPlayer::SetLastHitTime( int time, bool armorHit ) {
 		lastArmorHit = armorHit;
 		lastHitToggle ^= 1;
 	}
+}
+
+/*
+=============
+idPlayer::TriggerHitSound
+=============
+*/
+void idPlayer::TriggerHitSound( bool armor ) {
+	if ( gameLocal.framenum <= lastHitFrame ) {
+		return;
+	}
+
+	lastHitFrame = gameLocal.framenum;
+	lastHitArmor = armor;
+	if ( !gameLocal.isClient ) {
+		// what the attacker's snapshots carry (WritePlayerStateToSnapshot)
+		hitFeedbackCount++;
+	}
+
+	idUserInterface *cursor		= idPlayer::cursor;
+	bool spectated = false;
+
+	idPlayer *p = gameLocal.GetLocalPlayer();
+	if ( p && p->spectating && p->spectator == entityNumber ) {
+		cursor = p->GetCursorGUI();
+		spectated = true;
+	}
+
+	if ( cursor && rvHitMarker::CrosshairFlashEnabled() ) {
+		cursor->HandleNamedEvent( "weaponHit" );
+	}
+
+	// spectated so we get blips for a client we're following
+	// localClientNum check so listen server plays only for local player
+	if ( spectated || IsLocalClient() ) {
+		// openQ4: the marker's fallback path.  This pulse is all a pure client
+		// gets when the server withholds hit info, and it knows nothing but
+		// whether armour was in the way; rvHitMarker drops it when the hit-info
+		// pipeline has already covered the same hit.
+		rvHitMarker::Trigger( HITMARKER_DAMAGE_UNKNOWN, armor ? HITMARKER_ARMOR : 0,
+							  HITMARKER_COARSE );
+
+		// openQ4 (MP-15): hud_hitSound picks the cue. With a tone set the amount
+		// arrives in the hit-info message, so this pulse waits a moment for it and
+		// sounds Quake 4's cue only when none comes (mp/HitSounds.h).
+		rvHitSounds::OnPulse( this, armor );
+		
+		if ( aimClientNum != -1 ) {
+			if ( mphud ) {
+				mphud->HandleNamedEvent( "aim_hit" );
+			}
+		}
+
+	}
+}
+
+/*
+=============
+idPlayer::AccumulateHitFeedback
+
+openQ4: stages one hit this player landed.  Damage is applied per pellet, so a
+single shotgun blast arrives here eleven times; holding it until the end of the
+frame turns that into one message, one hit marker and one number.  Only one hit
+is pending at a time - a different victim or a different weapon is a different
+number on the screen, so the pending one is published first.
+=============
+*/
+void idPlayer::AccumulateHitFeedback( idPlayer *victim, int weapon, int damage, int hitFlags ) {
+	if ( gameLocal.isClient || !gameLocal.isMultiplayer || victim == NULL || damage <= 0 ) {
+		return;
+	}
+
+	if ( hitFeedbackVictim.GetEntity() != victim || hitFeedbackWeapon != weapon ) {
+		FlushHitFeedback();
+	}
+
+	hitFeedbackVictim	= victim;
+	hitFeedbackWeapon	= weapon;
+	hitFeedbackDamage	+= damage;
+	hitFeedbackFlags	|= hitFlags;
+}
+
+/*
+=============
+idPlayer::FlushHitFeedback
+
+openQ4: publishes whatever AccumulateHitFeedback has staged.  Called at the end
+of this player's think, which for hitscan is the same frame the shot was traced
+in: the whole burst is applied from inside UpdateWeapon above this point.
+=============
+*/
+void idPlayer::FlushHitFeedback( void ) {
+	idPlayer *victim = hitFeedbackVictim.GetEntity();
+
+	if ( victim != NULL && hitFeedbackDamage > 0 ) {
+		rvDamageNumbers::ServerSend( victim, this, hitFeedbackWeapon, hitFeedbackDamage, hitFeedbackFlags );
+	}
+
+	FlushHitFeedbackState();
+}
+
+/*
+=============
+idPlayer::FlushHitFeedbackState
+
+openQ4: discard whatever is staged without publishing it.  Used wherever the
+world moves under a pending hit - a respawn or a round restart - because
+rvDamageNumbers::ServerSend samples the victim's position at publish time.
+=============
+*/
+void idPlayer::FlushHitFeedbackState( void ) {
+	hitFeedbackVictim	= NULL;
+	hitFeedbackWeapon	= -1;
+	hitFeedbackDamage	= 0;
+	hitFeedbackFlags	= 0;
 }
 
 /*
@@ -15346,7 +17391,7 @@ void idPlayer::Event_ZoomOut ( void ) {
 		zoomFov.Init( gameLocal.time, SEC2MS(t), currentFov, DefaultFov() );
 		zoomed = false;
 		if ( weapon->GetZoomGui() )	{
-			weaponViewModel->StartSound ( "snd_zoomout", SND_CHANNEL_ANY, 0, false, NULL );
+			weaponViewModel->StartSound( "snd_zoomout", SND_CHANNEL_ANY, 0, false, NULL );
 		}
 	}
 }
@@ -15378,7 +17423,7 @@ void idPlayer::Event_ExitTeleporter( void ) {
 
 	pushVel = exitEnt->spawnArgs.GetFloat( "push", "300" );
 
- 	if ( gameLocal.isServer ) {
+ 	if ( gameLocal.isServer && !spectating ) {
  		ServerSendInstanceEvent( EVENT_EXIT_TELEPORTER, NULL, false, -1 );
    	}
 
@@ -15445,14 +17490,24 @@ void idPlayer::LocalClientPredictionThink( void ) {
 	oldFlags = usercmd.flags;
 	oldButtons = usercmd.buttons;
 
-	usercmd = gameLocal.usercmds[ entityNumber ];
+	usercmd = gameLocal.usercmds[ IsFakeClient() ? MAX_CLIENTS : entityNumber ];
 
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
 	ApplyWeaponWheelInputMask();
+	ApplyQuickChatInputMask();
 
-	if ( idealWeapon != currentWeapon ) {
+	// Spectators use attack to cycle cameras, including the offline demo viewer.
+	// Their inactive weapon state must not consume that camera command.
+	if ( !spectating && idealWeapon != currentWeapon ) {
 		usercmd.buttons &= ~BUTTON_ATTACK;		
+	}
+
+	// openQ4: attack lockout.  Quake Live freezes weapons while a round is
+	// being set up or has just been decided; this is the equivalent of its
+	// PMF_ATTACK_LOCKOUT pmove flag, applied where the usercmd is taken in.
+	if ( !spectating && gameLocal.isMultiplayer && gameLocal.mpGame.GetGameState() != NULL && gameLocal.mpGame.GetGameState()->WeaponsLocked() ) {
+		usercmd.buttons &= ~BUTTON_ATTACK;
 	}
 
  	// clear the ik before we do anything else so the skeleton doesn't get updated twice
@@ -15469,6 +17524,9 @@ void idPlayer::LocalClientPredictionThink( void ) {
 		forceScoreBoard = false;
 	}
 	scoreBoardOpen = ( ( usercmd.buttons & BUTTON_SCORES ) != 0 || forceScoreBoard );
+
+	if ( gameLocal.isNewFrame ) UpdateWeaponWheel();
+	if ( gameLocal.isNewFrame ) UpdateQuickChat();
 
 	// zooming
 	bool zoom = (usercmd.buttons & BUTTON_ZOOM) && CanZoom();
@@ -15518,10 +17576,14 @@ void idPlayer::LocalClientPredictionThink( void ) {
  		// don't allow client to move when lagged
 		predictedUpdated = false;
  		Move();
+		ReportVRRoomScaleWalk();
 
 		// predict collisions with items
 		if ( !noclip && !spectating && ( health > 0 ) && !IsHidden() ) {
 			TouchTriggers( &idItem::GetClassType() );
+		} else if ( spectating && !noclip ) {
+			// predict teleports for specs
+			TouchTriggers( &idTrigger_Multi::GetClassType() );
 		}
  	}
 
@@ -15549,15 +17611,37 @@ void idPlayer::LocalClientPredictionThink( void ) {
 	// this may use firstPersonView, or a thirdPerson / camera view
 	CalculateRenderView();
 
+	if ( IsFakeClient() && spectating ) {
+		UpdateSpectating();
+	}
+
  	if ( !gameLocal.inCinematic && weaponViewModel && ( health > 0 ) && !( gameLocal.isMultiplayer && spectating ) ) {
 		UpdateWeapon();
 	}
 
-	UpdateHud();
+// openQ4 BEGIN
+	// A client never runs Think, so without this the air reservoir never drains here and the HUD
+	// air bar sits at full while the server quietly drowns you. The damage and the gurp inside
+	// UpdateAir are server-guarded, so this only drives the local readout and its cues, from the
+	// same water level the server derives.
+	// The reservoir is not part of the snapshot, so it must step once per game frame: every
+	// replay pass re-runs this function, and a lead of N frames drained it N+1 times as fast as
+	// the server's.
+	if ( gameLocal.isNewFrame ) {
+		UpdateAir();
+	}
+// openQ4 END
+
+	// openQ4: the HUD shows the last pass; each replay pass republished it
+	if ( gameLocal.isLastPredictFrame ) {
+		UpdateHud();
+	}
 
  	if ( gameLocal.isNewFrame ) {
  		UpdatePowerUps();
  	}
+
+	PresentClassicHook();
 
  	UpdateDeathSkin( false );
 
@@ -15617,12 +17701,47 @@ void idPlayer::LocalClientPredictionThink( void ) {
 
 /*
 ===============
+idPlayer::AllowsFullRemotePrediction
+
+Whether this remote player may be re-simulated on the engine's replay passes rather than only
+on the leading one.
+
+The server relays each in-PVS client's REAL usercmds for the first net_serverMaxUsercmdRelay
+tics and idAsyncNetwork::DuplicateUsercmd holds the last one after that, so the commands to
+re-simulate with are already on hand - the engine files them per frame index and hands one over
+per replay pass.
+
+The tic budget exists because idAsyncClient clamps its game time to net_clientMaxPrediction,
+which is 1000 ms - 62 tics.  One post-stall recovery frame would otherwise hand over 62 replay
+tics for every visible player at once.
+===============
+*/
+bool idPlayer::AllowsFullRemotePrediction( void ) const {
+	if ( !gameLocal.isMultiplayer || !gameLocal.isClient ) {
+		return false;
+	}
+	if ( !net_mpPredictMode.GetBool() ) {
+		return false;
+	}
+	// A corpse, a ragdoll, a spectator and a vehicle occupant are all driven by something other
+	// than plain player movement, so re-running Move() for them predicts nothing.
+	if ( health <= 0 || IsActiveAF() || spectating || IsInVehicle() ) {
+		return false;
+	}
+	return remotePredictedTics < net_mpPredictMaxFrames.GetInteger();
+}
+
+/*
+===============
 idPlayer::NonLocalClientPredictionThink
 ===============
 */
+#define LIMITED_PREDICTION		1
+
 void idPlayer::NonLocalClientPredictionThink( void ) {
+	assert( !IsFakeClient() );
+
 	renderEntity_t *headRenderEnt;
-	const bool fullRemotePrediction = gameLocal.isMultiplayer && net_mpPredictMode.GetBool();
 
 	oldFlags = usercmd.flags;
 	oldButtons = usercmd.buttons;
@@ -15632,10 +17751,18 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
 	ApplyWeaponWheelInputMask();
+	ApplyQuickChatInputMask();
 
 	//jshepard: added this to make sure clients can see other clients and the host switching weapons
-	if ( idealWeapon != currentWeapon )	{
+	if ( !spectating && idealWeapon != currentWeapon )	{
 		usercmd.buttons &= ~BUTTON_ATTACK;		
+	}
+
+	// openQ4: attack lockout.  Quake Live freezes weapons while a round is
+	// being set up or has just been decided; this is the equivalent of its
+	// PMF_ATTACK_LOCKOUT pmove flag, applied where the usercmd is taken in.
+	if ( !spectating && gameLocal.isMultiplayer && gameLocal.mpGame.GetGameState() != NULL && gameLocal.mpGame.GetGameState()->WeaponsLocked() ) {
+		usercmd.buttons &= ~BUTTON_ATTACK;
 	}
 
  	// clear the ik before we do anything else so the skeleton doesn't get updated twice
@@ -15653,6 +17780,9 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 	}
 	scoreBoardOpen = ( ( usercmd.buttons & BUTTON_SCORES ) != 0 || forceScoreBoard );
 
+	if ( gameLocal.isNewFrame ) UpdateWeaponWheel();
+	if ( gameLocal.isNewFrame ) UpdateQuickChat();
+
 	// zooming
 	bool zoom = (usercmd.buttons & BUTTON_ZOOM) && CanZoom();
 	if ( zoom != zoomed ) {
@@ -15663,7 +17793,8 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 		}
 	}
 
-	if ( fullRemotePrediction && IsInVehicle ( ) ) {	
+#if !LIMITED_PREDICTION
+	if ( IsInVehicle ( ) ) {	
 		vehicleController.SetInput ( usercmd, viewAngles );
 
 		// calculate the exact bobbed view position, which is used to
@@ -15683,36 +17814,43 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 		
 		return;
 	}
+#endif
 
 	AdjustSpeed();
 
 	UpdateViewAngles();
 
-	if ( gameLocal.isLastPredictFrame && jumpDuringHitch ) {
-		// only play sound if still alive
-		if ( health > 0 ) {
-			StartSound( "snd_jump", (s_channelType)FC_SOUND, 0, false, NULL );
-		}
-		jumpDuringHitch = false;
-	}
-
 	if ( !isLagged ) {
  		// don't allow client to move when lagged
 		predictedUpdated = false;
-		if ( fullRemotePrediction || gameLocal.isNewFrame ) {
+		// Raven ran this only on the leading pass, with the note "only running on new frames
+		// causes prediction errors even when the input does not change!".  They were right: it
+		// leaves a remote a whole client lead behind the server.  See
+		// AllowsFullRemotePrediction.
+		//
+		// Re-simulating a tic is safe because one-shots are gated at the SINK, not at the caller -
+		// idEntity::StartSound, StartSoundShader, both PlayEffect overloads, StopSound, Present and
+		// ServerSendEvent all early-out on !gameLocal.isNewFrame - and every tic is the leading
+		// pass of exactly one chain, because idGameLocal::ClientPrediction takes isNewFrame from a
+		// monotonic high-water mark.  So a transition fires once, on its leading pass, and is
+		// swallowed on every re-simulation of that same tic.
+		//
+		// MAINTENANCE: any future per-tic side effect added to Move() that is NOT routed through
+		// those sinks will run once per replay pass.
+		if ( gameLocal.isNewFrame ) {
  			Move();
+		} else if ( AllowsFullRemotePrediction() ) {
+			remotePredictedTics++;
+			remoteChainResimulatedTics++;
+			Move();
 		} else {
 			PredictionErrorDecay();
 		}
  	}
 
-#if defined( _XENON )
+#if defined( _XENON ) || !LIMITED_PREDICTION
+	// update GUIs, Items, and character interactions
 	UpdateFocus();
-#else
-	if ( fullRemotePrediction ) {
-		// update GUIs, Items, and character interactions
-		UpdateFocus();
-	}
 #endif
 
 	// service animations
@@ -15743,11 +17881,14 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 
 		UpdateHud();
  		UpdatePowerUps();
+		PresentClassicHook();
  	}
 
+//#if !LIMITED_PREDICTION
  	UpdateDeathSkin( false );
 
 	UpdateDeathShader( deathStateHitch );
+//#endif
 
 	if( gameLocal.isMultiplayer ) {
 		if ( clientHead.GetEntity() ) {
@@ -15804,12 +17945,7 @@ void idPlayer::NonLocalClientPredictionThink( void ) {
 idPlayer::ClientPredictionThink
 ================
 */
-void idPlayer::ClientPredictionThink( void ) {
-	
-	if ( doInitWeapon ) {
-		InitWeapon();
-	}
-	
+void idPlayer::ClientPredictionThink( void ) {	
 	// common code for both the local & non local clients
 	if ( reloadModel ) {
 		LoadDeferredModel();
@@ -15821,7 +17957,7 @@ void idPlayer::ClientPredictionThink( void ) {
 		return;
 	}
 
-	if ( entityNumber == gameLocal.localClientNum ) {
+	if ( IsLocalClient() ) {
 		LocalClientPredictionThink();
 		return;
 	}
@@ -15864,6 +18000,9 @@ void idPlayer::PredictionErrorDecay( void ) {
 		idMat3 renderAxis = viewAxis * GetPhysics()->GetAxis();
 		idVec3 renderOrigin = GetPhysics()->GetOrigin() + modelOffset * renderAxis;
 		predictedOrigin = renderOrigin;
+		if ( gameLocal.isMultiplayer ) {
+			predictedAngles = viewAngles;
+		}
 		return;
 	}
 
@@ -15877,6 +18016,24 @@ void idPlayer::PredictionErrorDecay( void ) {
 			predictionAnglesError = predictedAngles - viewAngles;
 			predictionAnglesError.Normalize180();
 			predictionErrorTime = gameLocal.time;
+
+			// retail multiplayer only: single player keeps its stock decay on the spawn frame
+			if ( gameLocal.isMultiplayer ) {
+				// skip doing error decay if the error is too high to be due to misprediction
+				// this would take care of stray cases where we fail to mark that no decaying should happen
+				if ( predictionOriginError.Length() > 64.0f ) {
+					if ( net_showPredictionError.GetInteger() == entityNumber ) {
+						//renderSystem->DebugGraph( 1.0f, 0.0f, 1.0f, colorRed );
+					}
+					idMat3 renderAxis = viewAxis * GetPhysics()->GetAxis();
+					idVec3 renderOrigin = GetPhysics()->GetOrigin() + modelOffset * renderAxis;
+					predictedOrigin = renderOrigin;
+					predictedAngles = viewAngles;
+					predictedFrame = gameLocal.framenum;
+					remotePredictedTics = 0;
+					return;
+				}
+			}
 
 			if ( net_showPredictionError.GetInteger() == entityNumber ) {
 				//renderSystem->DebugGraph( predictionOriginError.Length(), 0.0f, 100.0f, colorGreen );
@@ -15896,6 +18053,7 @@ void idPlayer::PredictionErrorDecay( void ) {
 		}
 
 		predictedFrame = gameLocal.framenum;
+	remotePredictedTics = 0;
 
 	}
 
@@ -15989,6 +18147,8 @@ idPlayer::WriteToSnapshot
 ================
 */
 void idPlayer::WriteToSnapshot( idBitMsgDelta &msg ) const {
+	assert( !IsFakeClient() );
+
 	physicsObj.WriteToSnapshot( msg );
 	WriteBindToSnapshot( msg );
 	msg.WriteDeltaFloat( 0.0f, deltaViewAngles[0] );
@@ -15996,24 +18156,39 @@ void idPlayer::WriteToSnapshot( idBitMsgDelta &msg ) const {
 	msg.WriteDeltaFloat( 0.0f, deltaViewAngles[2] );
 	msg.WriteShort( health );
 	msg.WriteByte( inventory.armor );
+	// openQ4: Classic ruleset state.  Both ends latch the ruleset from the same server
+	// info at map load, so only Classic maps (and Classic demos) carry these bits.
+	if ( gameLocal.IsClassicRuleset() ) {
+		msg.WriteBits( inventory.armorTier, CLASSIC_ARMOR_TIER_BITS );
+		msg.WriteBits( classicHookState, CLASSIC_HOOK_STATE_BITS );
+		if ( classicHookState == CLASSIC_HOOK_FLYING ) {
+			// the throw, from which every end works out where the hook is
+			msg.WriteFloat( classicHookStart[0] );
+			msg.WriteFloat( classicHookStart[1] );
+			msg.WriteFloat( classicHookStart[2] );
+			msg.WriteFloat( classicHookDir[0] );
+			msg.WriteFloat( classicHookDir[1] );
+			msg.WriteFloat( classicHookDir[2] );
+			msg.WriteLong( classicHookFireTime );
+		} else if ( classicHookState == CLASSIC_HOOK_ATTACHED ) {
+			msg.WriteFloat( classicHookOrigin[0] );
+			msg.WriteFloat( classicHookOrigin[1] );
+			msg.WriteFloat( classicHookOrigin[2] );
+		}
+	}
  	msg.WriteBits( lastDamageDef, gameLocal.entityDefBits );
 	msg.WriteDir( lastDamageDir, 9 );
 	msg.WriteShort( lastDamageLocation );
-	msg.WriteBits( idealWeapon, idMath::BitsForInteger( MAX_WEAPONS ) );
+	msg.WriteBits( idealWeapon, -idMath::BitsForInteger( MAX_WEAPONS ) );
 	msg.WriteBits( inventory.weapons, MAX_WEAPONS );
 	msg.WriteBits( weaponViewModel.GetSpawnId(), 32 );
 	msg.WriteBits( weaponWorldModel.GetSpawnId(), 32 );
-//	msg.WriteBits( head.GetSpawnId(), 32 );
 	msg.WriteBits( spectator, idMath::BitsForInteger( MAX_CLIENTS ) );
-	msg.WriteBits( lastHitToggle, 1 );
-	msg.WriteBits( lastArmorHit, 1 );
  	msg.WriteBits( weaponGone, 1 );
  	msg.WriteBits( isLagged, 1 );
  	msg.WriteBits( isChatting, 1 );
 	msg.WriteLong( connectTime );
 	msg.WriteByte( lastKiller ? lastKiller->entityNumber : 255 );
- 	
-	// 	vehicleController.WriteToSnapshot( msg );
  	
  	if ( weapon ) {
  		msg.WriteBits( 1, 1 );
@@ -16021,10 +18196,45 @@ void idPlayer::WriteToSnapshot( idBitMsgDelta &msg ) const {
  	} else {
  		msg.WriteBits( 0, 1 );
  	}
-//RITUAL BEGIN
 	msg.WriteBits( inBuyZone, 1 );
 	msg.WriteLong( (int)buyMenuCash );
-//RITUAL END
+	WriteWeaponModsToSnapshot( msg );
+}
+
+/*
+================
+idPlayer::WriteWeaponModsToSnapshot
+
+openQ4: the weapon mods a buying mode sells (mp/Buying.cpp) change how the
+weapon fires, and every client builds the weapon from them: which weapons
+carry mods, then each one's mod bits.
+================
+*/
+void idPlayer::WriteWeaponModsToSnapshot( idBitMsgDelta &msg ) const {
+	int moddedWeapons = 0;
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( inventory.weaponMods[ i ] & WEAPON_MODS_SNAPSHOT_MASK ) {
+			moddedWeapons |= ( 1 << i );
+		}
+	}
+	msg.WriteBits( moddedWeapons, MAX_WEAPONS );
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( moddedWeapons & ( 1 << i ) ) {
+			msg.WriteBits( inventory.weaponMods[ i ] & WEAPON_MODS_SNAPSHOT_MASK, MAX_WEAPONMODS );
+		}
+	}
+}
+
+/*
+================
+idPlayer::ReadWeaponModsFromSnapshot
+================
+*/
+void idPlayer::ReadWeaponModsFromSnapshot( const idBitMsgDelta &msg, int weaponMods[ MAX_WEAPONS ] ) {
+	const int moddedWeapons = msg.ReadBits( MAX_WEAPONS );
+	for ( int i = 0; i < MAX_WEAPONS; i++ ) {
+		weaponMods[ i ] = ( moddedWeapons & ( 1 << i ) ) ? msg.ReadBits( MAX_WEAPONMODS ) : 0;
+	}
 }
 
 /*
@@ -16033,14 +18243,21 @@ idPlayer::ReadFromSnapshot
 ================
 */
 void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
+	assert( !IsFakeClient() );
+
 	int		i, oldHealth, newIdealWeapon, newWeaponSpawnId, newWeaponWorldSpawnId;
-	bool	newHitToggle, stateHitch, newHitArmor;
+	bool	stateHitch;
 	int		lastKillerEntity;
-	bool	proto69 = ( gameLocal.GetCurrentDemoProtocol() == 69 );
 	playerPState_t decodedPhysics;
 	idAngles decodedDeltaViewAngles;
 	int decodedHealth;
 	int decodedArmor;
+	int decodedArmorTier = CLASSIC_ARMOR_NONE;
+	int decodedHookState = CLASSIC_HOOK_NONE;
+	idVec3 decodedHookOrigin = vec3_origin;
+	idVec3 decodedHookStart = vec3_origin;
+	idVec3 decodedHookDir = vec3_origin;
+	int decodedHookFireTime = 0;
 	int decodedLastDamageDef;
 	idVec3 decodedLastDamageDir;
 	int decodedLastDamageLocation;
@@ -16052,15 +18269,29 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	int decodedConnectTime;
 	bool hasWeaponState;
 	int decodedWeaponAmmo = 0;
-	bool decodedInBuyZone = false;
-	int decodedCash = 0;
+	bool decodedInBuyZone;
+	int decodedCash;
+	int decodedWeaponMods[ MAX_WEAPONS ];
 
 	if ( static_cast<unsigned int>( snapshotSequence ) - static_cast<unsigned int>( lastSnapshotSequence ) > 1u ) {
  		stateHitch = true;
  	} else {
  		stateHitch = false;
  	}
+	// openQ4: the snapshots for this player the client missed (under jitter the channel drops
+	// one that arrives after a later one, so a single miss is routine) and the game time since
+	// it read the last one; see the spawn clock below.
+	const unsigned int missedSnapshots = stateHitch ? static_cast<unsigned int>( snapshotSequence ) - static_cast<unsigned int>( lastSnapshotSequence ) - 1u : 0u;
+	const int snapshotAge = gameLocal.time - lastSnapshotTime;
 	oldHealth = health;
+	// openQ4: what a death or a hit read across a gap shows. A gap in this player's
+	// snapshots once meant it had been out of view, so a death found on its return was
+	// hidden and silent and a hit showed nothing. But a single missed snapshot is a gap
+	// as well, and jitter loses one routinely (above): the death or hit it carried came
+	// with no death sound, the body hidden instead of falling, no pain, no view kick and
+	// no damage direction on the HUD. Only a gap long enough to have been out of view
+	// hides them now.
+	const bool feedbackHitch = stateHitch && ( snapshotAge <= 0 || snapshotAge > FEEDBACK_HITCH_MSEC );
 
 	if ( !physicsObj.DecodeSnapshotState( msg, decodedPhysics ) ) {
 		return;
@@ -16071,7 +18302,33 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	decodedDeltaViewAngles[2] = msg.ReadDeltaFloat( 0.0f );
 	decodedHealth = msg.ReadShort();
 	decodedArmor = msg.ReadByte();
-	decodedLastDamageDef = msg.ReadBits( gameLocal.entityDefBits );
+	// openQ4 MP-22: Quake 4 1.4.2 had no classic ruleset fields
+	if ( gameLocal.IsClassicRuleset() && !gameLocal.RetailSnapshotFormat() ) {
+		decodedArmorTier = msg.ReadBits( CLASSIC_ARMOR_TIER_BITS );
+		decodedHookState = msg.ReadBits( CLASSIC_HOOK_STATE_BITS );
+		if ( decodedHookState == CLASSIC_HOOK_FLYING ) {
+			decodedHookStart[0] = msg.ReadFloat();
+			decodedHookStart[1] = msg.ReadFloat();
+			decodedHookStart[2] = msg.ReadFloat();
+			decodedHookDir[0] = msg.ReadFloat();
+			decodedHookDir[1] = msg.ReadFloat();
+			decodedHookDir[2] = msg.ReadFloat();
+			decodedHookFireTime = msg.ReadLong();
+			decodedHookOrigin = decodedHookStart;
+		} else if ( decodedHookState == CLASSIC_HOOK_ATTACHED ) {
+			decodedHookOrigin[0] = msg.ReadFloat();
+			decodedHookOrigin[1] = msg.ReadFloat();
+			decodedHookOrigin[2] = msg.ReadFloat();
+		} else if ( decodedHookState != CLASSIC_HOOK_NONE ) {
+			msg.MarkReadOverflowed();
+		}
+	}
+	decodedLastDamageDef = gameLocal.NetworkDeclIndex( DECL_ENTITYDEF, msg.ReadBits( gameLocal.entityDefBits ) );
+	if ( decodedLastDamageDef < 0 || decodedLastDamageDef >= declManager->GetNumDecls( DECL_ENTITYDEF ) ) {
+		// openQ4 MP-22: no definition in a retail recording's numbering
+		msg.MarkReadOverflowed();
+		decodedLastDamageDef = 0;
+	}
 	decodedLastDamageDir = msg.ReadDir( 9 );
 	decodedLastDamageLocation = msg.ReadShort();
 	newIdealWeapon = msg.ReadBits( -idMath::BitsForInteger( MAX_WEAPONS ) );
@@ -16089,8 +18346,6 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		msg.MarkReadOverflowed();
 		return;
 	}
-	newHitToggle = msg.ReadBits( 1 ) != 0;
-	newHitArmor = msg.ReadBits( 1 ) != 0;
 	decodedWeaponGone = msg.ReadBits( 1 ) != 0;
 	decodedIsLagged = msg.ReadBits( 1 ) != 0;
 	decodedIsChatting = msg.ReadBits( 1 ) != 0;
@@ -16100,49 +18355,99 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	if ( hasWeaponState ) {
 		decodedWeaponAmmo = rvWeapon::DecodeSnapshotAmmo( msg );
 	}
-	if ( !proto69 ) {
-		decodedInBuyZone = msg.ReadBits( 1 ) != 0;
-		decodedCash = msg.ReadLong();
+	decodedInBuyZone = msg.ReadBits( 1 ) != 0;
+	decodedCash = msg.ReadLong();
+	if ( gameLocal.RetailSnapshotFormat() ) {
+		// openQ4 MP-22: nor weapon mods
+		memcpy( decodedWeaponMods, inventory.weaponMods, sizeof( decodedWeaponMods ) );
+	} else {
+		ReadWeaponModsFromSnapshot( msg, decodedWeaponMods );
 	}
 	if ( msg.IsReadOverflowed() ) {
 		return;
 	}
 
 	lastSnapshotSequence = snapshotSequence;
+	lastSnapshotTime = gameLocal.time;
+	// A snapshot begins a new replay chain, so the re-simulation budget starts over.  It is
+	// also the only point at which the client's prediction for a frame can be compared with
+	// the server's authoritative state for that same frame.
+	if ( net_mpPredictDebug.GetInteger() > 0 && gameLocal.isClient &&
+		 entityNumber != gameLocal.localClientNum && !spectating && health > 0 ) {
+		const float predictionError = ( physicsObj.GetOrigin() - decodedPhysics.origin ).Length();
+		// The chain replayed lastChainReplayTics frames; every one this remote was not
+		// re-simulated for left it a frame behind this client's predicted present.
+		// errorUnits compares this client's state with the snapshot's older frame, so in mode 1
+		// it includes the distance the remote was deliberately drawn ahead.
+		const int poseAgeMS = Max( 0, gameLocal.lastChainReplayTics - remoteChainResimulatedTics ) * gameLocal.GetMSec();
+		gameLocal.Printf( "MPPredict: client=%d mode=%d tics=%d chain=%d ageMS=%d errorUnits=%.2f\n",
+			entityNumber, net_mpPredictMode.GetInteger(), remoteChainResimulatedTics, gameLocal.lastChainReplayTics,
+			poseAgeMS, predictionError );
+	}
+	remoteChainResimulatedTics = 0;
 	physicsObj.ApplySnapshotState( decodedPhysics );
+	remotePredictedTics = 0;
 	ApplyBindSnapshotInfo( decodedBindInfo );
+	// openQ4 VR: the server set a new facing (a spawn, a teleporter) from this
+	// client's usercmd, which a tracked weapon hand turns: the gun faces where
+	// the player was meant to look. Turn the body by the angle between hand and
+	// head, and the next usercmds face the head there instead.
+	if ( entityNumber == gameLocal.localClientNum && vrSnapshotDeltaYawValid
+			&& idMath::Fabs( idMath::AngleNormalize180( decodedDeltaViewAngles.yaw - vrSnapshotDeltaYaw ) ) > 0.001f ) {
+		float handFromHead;
+		if ( ( usercmd.buttons & BUTTON_VRAIM ) != 0 && GetVRHandFromHead( handFromHead ) ) {
+			vrSystem->TurnBody( handFromHead );
+			if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+				gameLocal.Printf( "VR facing from the server: %.1f, head turned onto it by %.1f\n",
+					idMath::AngleNormalize180( SHORT2ANGLE( usercmd.angles[ YAW ] ) + decodedDeltaViewAngles.yaw ), handFromHead );
+			}
+		}
+		vrModelYawValid = false;
+	}
+	vrSnapshotDeltaYaw = decodedDeltaViewAngles.yaw;
+	vrSnapshotDeltaYawValid = true;
 	deltaViewAngles = decodedDeltaViewAngles;
 	health = decodedHealth;
 	inventory.armor = decodedArmor;
+	inventory.armorTier = decodedArmorTier;
+	classicHookState = decodedHookState;
+	classicHookOrigin = decodedHookOrigin;
+	classicHookStart = decodedHookStart;
+	classicHookDir = decodedHookDir;
+	classicHookFireTime = decodedHookFireTime;
 	lastDamageDef = decodedLastDamageDef;
 	lastDamageDir = decodedLastDamageDir;
 	lastDamageLocation = decodedLastDamageLocation;
 	inventory.weapons = decodedWeapons;
 	const int latchedSpectator = spectator;
 	spectator = decodedSpectator;
-	if ( spectating && latchedSpectator != spectator && this == gameLocal.GetLocalPlayer() ) {
+	if ( spectating && latchedSpectator != spectator ) {
 		// don't do any smoothing with this snapshot
 		predictedFrame = gameLocal.framenum;
-		// this is where the client updates their spectated player
-		if ( gameLocal.gameType == GAME_TOURNEY ) {
-			rvTourneyArena& arena = ((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->GetArena( GetArena() );
+	remotePredictedTics = 0;
+		
+		if ( this == gameLocal.GetLocalPlayer() ) {
+			// this is where the client updates their spectated player
+			if ( gameLocal.gameType == GAME_TOURNEY ) {
+				rvTourneyArena& arena = ((rvTourneyGameState*)gameLocal.mpGame.GetGameState())->GetArena( GetArena() );
 
-			if( arena.GetPlayers()[ 0 ] == NULL || arena.GetPlayers()[ 1 ] == NULL || (spectator != arena.GetPlayers()[ 0 ]->entityNumber && spectator != arena.GetPlayers()[ 1 ]->entityNumber) ) {
-				gameLocal.mpGame.tourneyGUI.ArenaSelect( GetArena(), TGH_BRACKET );
-			} else if( spectator == arena.GetPlayers()[ 0 ]->entityNumber ) {
-				gameLocal.mpGame.tourneyGUI.ArenaSelect( GetArena(), TGH_PLAYER_ONE );
-			} else if( spectator == arena.GetPlayers()[ 1 ]->entityNumber ) {
-				gameLocal.mpGame.tourneyGUI.ArenaSelect( GetArena(), TGH_PLAYER_TWO );
+				if( arena.GetPlayers()[ 0 ] == NULL || arena.GetPlayers()[ 1 ] == NULL || (spectator != arena.GetPlayers()[ 0 ]->entityNumber && spectator != arena.GetPlayers()[ 1 ]->entityNumber) ) {
+					gameLocal.mpGame.tourneyGUI.ArenaSelect( GetArena(), TGH_BRACKET );
+				} else if( spectator == arena.GetPlayers()[ 0 ]->entityNumber ) {
+					gameLocal.mpGame.tourneyGUI.ArenaSelect( GetArena(), TGH_PLAYER_ONE );
+				} else if( spectator == arena.GetPlayers()[ 1 ]->entityNumber ) {
+					gameLocal.mpGame.tourneyGUI.ArenaSelect( GetArena(), TGH_PLAYER_TWO );
+				}
+
+				gameLocal.mpGame.tourneyGUI.UpdateScores();
 			}
 
-			gameLocal.mpGame.tourneyGUI.UpdateScores();
-		}
-
-		if ( gameLocal.entities[ spectator ] && gameLocal.entities[ spectator ]->IsType( idPlayer::GetClassType() ) ) {
-			idPlayer *p = static_cast< idPlayer * >( gameLocal.entities[ spectator ] );
-			p->UpdateHudWeapon( p->currentWeapon );
-			if ( p->weapon ) {
-				p->weapon->SpectatorCycle();
+			if ( gameLocal.entities[ spectator ] && gameLocal.entities[ spectator ]->IsType( idPlayer::GetClassType() ) ) {
+				idPlayer *p = static_cast< idPlayer * >( gameLocal.entities[ spectator ] );
+				p->UpdateHudWeapon( p->currentWeapon );
+				if ( p->weapon ) {
+					p->weapon->SpectatorCycle();
+				}
 			}
 		}
 	}
@@ -16158,21 +18463,81 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		lastKiller = NULL;
 	}
 	
-	if ( idealWeapon != newIdealWeapon ) {
-		if ( stateHitch ) {
+	bool weaponChange = ( idealWeapon != newIdealWeapon );
+	if ( gameLocal.clientAckSequence < clientIdealWeaponPredictFrame ) {
+		// we have predicted a weapon change, and sent a reliable message to the server about it
+		// but it has not been processed yet, so ignore what may be contradictory information here
+		weaponChange = false;
+	} else {
+		clientIdealWeaponPredictFrame = -1;
+	}
+
+	if ( weaponChange ) {
+		// openQ4: a change of weapon across a state hitch is a swap the client missed, so the
+		// weapon catches up.  One read while a new life's raise time still waits for its weapon
+		// is not: the respawn's Init() cleared idealWeapon, and this snapshot only names the
+		// weapon that raises from that time.  A snapshot dropped right after the respawn's
+		// used to catch that weapon up as well.
+		if ( stateHitch && netWeaponRaiseTime < 0 ) {
 			weaponCatchup = true;
 		}
 		idealWeapon = newIdealWeapon;
 		StopFiring();
 		UpdateHudWeapon();
-		usercmd.buttons &= (~BUTTON_ATTACK);		
+		usercmd.buttons &= (~BUTTON_ATTACK);
+		clientIdealWeaponPredictFrame = -1;
 	}
 
+	// openQ4: when this player is placed in the world afresh (a respawn, or a join from
+	// spectating, which also brings new weapon entities), the server makes the weapon for
+	// the new life on the spawn's frame and raises it from there.  The client's weapon for
+	// the new life raises from that time (netWeaponRaiseTime), so both are ready, and fire,
+	// on the same frames.  Catching it straight up to ready instead fired shots the server
+	// never fired; only a genuine state hitch still does.  A snapshot without the server's
+	// weapon means it is made next frame.  One with it was taken on the spawn's frame or a
+	// frame or two later (a snapshot goes out every 33 ms): the spawn's knockback, which
+	// the server's physics runs down from that frame, says which, and only when it reads as
+	// that clock is the snapshot's own frame taken instead.
+	//
+	// The knockback reads as that clock only while it must still be running: the spawn fell
+	// after the last snapshot read for this player, and a knockback is refused while another
+	// runs, so if that snapshot is at most spawnClockSpan old nothing but the spawn can have
+	// set it.  Then it places the server's raise across a state hitch too: under jitter the
+	// channel routinely drops one snapshot that arrives after a later one, and catching up
+	// across that drop ran the burst out of step with the server's.  Across a longer loss,
+	// or with no clock to read, the client cannot know the raise frame and still catches up.
+	const int frameMsec = gameLocal.GetMSec();
+	const int spawnElapsed = SPAWN_KNOCKBACK_MSEC - physicsObj.GetKnockBack();
+	const int spawnClockSpan = ( ( SPAWN_KNOCKBACK_MSEC - 1 ) / frameMsec ) * frameMsec;
+	const bool spawnClock = physicsObj.GetKnockBack() > 0 && spawnElapsed >= frameMsec && spawnElapsed % frameMsec == 0 &&
+		snapshotAge > 0 && snapshotAge <= spawnClockSpan;
+	int serverWeaponRaiseTime = gameLocal.time + frameMsec;
+	if ( hasWeaponState ) {
+		serverWeaponRaiseTime = spawnClock ? gameLocal.time + frameMsec - spawnElapsed : gameLocal.time;
+	}
+	const bool serverRaisePlaced = !stateHitch || ( hasWeaponState && spawnClock );
+
 	// Attach the world and view entities  
-	weaponWorldModel.SetSpawnId( newWeaponWorldSpawnId );
-	if ( weaponWorldModel.IsValid() && weaponViewModel.SetSpawnId( newWeaponSpawnId ) ) {
-		currentWeapon = -1;
-		SetWeapon( idealWeapon );
+	if ( weaponWorldModel.GetSpawnId() != newWeaponWorldSpawnId || weaponViewModel.GetSpawnId() != newWeaponSpawnId ) {
+		SetWeapon( -1 );
+
+		if ( weaponWorldModel.SetSpawnId( newWeaponWorldSpawnId ) && weaponViewModel.SetSpawnId( newWeaponSpawnId ) ) {
+			if ( !serverRaisePlaced ) {
+				weaponCatchup = true;
+			} else {
+				netWeaponRaiseTime = serverWeaponRaiseTime;
+				if ( stateHitch ) {
+					// A weapon change read across the same hitch asked for a catch-up
+					// above; the weapon for the new entities raises with the server's.
+					weaponCatchup = false;
+				}
+			}
+			if ( net_mpHitscanDebug.GetBool() ) {
+				gameLocal.Printf( "MP_WEAPON entities client=%d owner=%d local=%d time=%d hitch=%d serverWeapon=%d raise=%d missed=%u age=%d\n",
+					gameLocal.isClient ? 1 : 0, entityNumber, entityNumber == gameLocal.localClientNum ? 1 : 0,
+					gameLocal.time, stateHitch ? 1 : 0, hasWeaponState ? 1 : 0, netWeaponRaiseTime, missedSnapshots, snapshotAge );
+			}
+		}
 	}
 
 	// rjohnson: instance persistance information
@@ -16185,6 +18550,16 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		weaponViewModel->SetInstance( GetInstance() );
 	}
 
+	// Clear the weapon for clients entering PVS
+	if ( fl.networkStale && currentWeapon != idealWeapon && entityNumber != gameLocal.localClientNum && weaponWorldModel.IsValid() && weaponViewModel.IsValid() ) {
+		// We've probably already mispredicted a few frames without the client.
+		// Clearing the weapon here (during snapshot reading) prevents
+		// the wrong weapon from getting ClientUnstale()
+		// Weapon_Combat will set the proper weapon.
+		SetWeapon( -1 );
+		weaponCatchup = true;
+	}
+
 	// If we have a weapon then update it from the snapshot, otherwise
 	// we just skip whatever it would have read if it were there
 	if ( hasWeaponState ) {
@@ -16192,34 +18567,52 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 			weapon->ApplySnapshotAmmo( decodedWeaponAmmo );
 		}
 	}
-	if ( proto69 ) {
-		inBuyZone = false;
-		buyMenuCash = 0.0f;
-	} else {
-//RITUAL BEGIN
-		inBuyZone = decodedInBuyZone;
-		if ( decodedCash != (int)buyMenuCash ) {
-			buyMenuCash = (float)decodedCash;
-			gameLocal.mpGame.RedrawLocalBuyMenu();
+	inBuyZone = decodedInBuyZone;
+	if ( decodedCash != (int)buyMenuCash ) {
+		buyMenuCash = (float)decodedCash;
+		gameLocal.mpGame.RedrawLocalBuyMenu();
+	}
+	// A weapon whose mods changed is rebuilt from them, as the server rebuilt
+	// it when they were bought (GiveWeaponMod).
+	bool weaponModsChanged = false;
+	for ( i = 0; i < MAX_WEAPONS; i++ ) {
+		if ( inventory.weaponMods[ i ] != decodedWeaponMods[ i ] ) {
+			if ( i == currentWeapon && weapon != NULL ) {
+				currentWeapon = -1;
+			}
+			inventory.weaponMods[ i ] = decodedWeaponMods[ i ];
+			weaponModsChanged = true;
 		}
-//RITUAL END
+	}
+	if ( weaponModsChanged ) {
+		gameLocal.mpGame.RedrawLocalBuyMenu();
 	}
  	// no msg reading below this
 	
 	// if not a local client assume the client has all ammo types
-	if ( entityNumber != gameLocal.localClientNum ) {
+	// don't do this for server demos because they have the player states included
+	if ( !gameLocal.isRepeater && (entityNumber != gameLocal.GetDemoFollowClient()) && !IsLocalClient() && !IsSpectatedClient() ) {
 		for( i = 0; i < MAX_AMMO; i++ ) {
-			inventory.ammo[ i ] = 999;
+			inventory.ammo[ i ] = -1;
 		}
 	}
 
 	if ( oldHealth > 0 && health <= 0 ) {
- 		if ( stateHitch ) {
+ 		if ( feedbackHitch ) {
  			// so we just hide and don't show a death skin
  			UpdateDeathSkin( true );
  		}
 		// die
 		pfl.dead = true;
+		// openQ4: mirror the respawn hold Killed() sets on the server - the
+		// fall, longer in overtime - which the Remastered HUD's respawn
+		// prompt counts down.
+		minRespawnTime = gameLocal.time + RAGDOLL_DEATH_TIME;
+		const int overtimeDelay = gameLocal.mpGame.GetOvertimeRespawnDelay();
+		if ( overtimeDelay > 0 ) {
+			minRespawnTime = Max( minRespawnTime, gameLocal.time + overtimeDelay );
+		}
+		maxRespawnTime = minRespawnTime + MAX_RESPAWN_TIME;
 		ClearPowerUps();
 		SetAnimState( ANIMCHANNEL_LEGS, "Legs_Dead", 4 );
 		SetAnimState( ANIMCHANNEL_TORSO, "Torso_Dead", 4 );
@@ -16227,7 +18620,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		StartRagdoll();
 		physicsObj.SetMovementType( PM_DEAD );
 
-		if ( !stateHitch ) {
+		if ( !feedbackHitch ) {
  			StartSound( "snd_death", SND_CHANNEL_VOICE, 0, false, NULL );
  		}
 		
@@ -16238,7 +18631,7 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 			ClientDamageEffects ( def->dict, lastDamageDir, ( oldHealth - health ) * 4, def->GetName() );
 		}
 
-		//gib them here
+		// gib them here
 		if ( health < -20 || ( lastKiller && lastKiller->PowerUpActive( POWERUP_QUADDAMAGE )) )	{	
 			ClientGib( lastDamageDir );
 		}		
@@ -16253,19 +18646,40 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		}
 	} else if ( oldHealth <= 0 && health > 0 ) {
  		// respawn
-		//common->DPrintf( "idPlayer::ReadFromSnapshot() - Player respawn detected for %d '%s' - re-enabling clip\n", entityNumber, GetUserInfo()->GetString( "ui_name" ) );
+		//common->DPrintf( "idPlayer::ReadFromSnapshot() - Player respawn detected for %d '%s' - re-enabling clip\n", entityNumber, GetUserInfo() ? GetUserInfo()->GetString( "ui_name" ) : "" );
 
 		// this is the first time we've seen the player since we heard he died - he may have picked up
 		// some powerups since he actually spawned in, so restore those
 		int latchPowerup = inventory.powerups;
+		const unsigned int latchSnapshotSequence = lastSnapshotSequence;
+		// the weapon mods this snapshot carried, which Init() clears: the new
+		// weapon is built with them rather than rebuilt when the next one says so
+		int latchWeaponMods[ MAX_WEAPONS ];
+		memcpy( latchWeaponMods, inventory.weaponMods, sizeof( latchWeaponMods ) );
 		Init();
 		inventory.powerups = latchPowerup;
+		memcpy( inventory.weaponMods, latchWeaponMods, sizeof( latchWeaponMods ) );
+		// openQ4: Init() starts the snapshot sequence over, so the next snapshot read as a
+		// state hitch, and its change of weapon (Init() also clears idealWeapon) caught the new
+		// weapon straight up to ready while the server's raised: the client fired shots the
+		// server never fired, then the rest of a held burst out of step with it.  Only a
+		// respawn seen across a hitch the spawn's clock does not span catches up now; otherwise
+		// the new weapon raises with the server's (serverWeaponRaiseTime above).
+		lastSnapshotSequence = latchSnapshotSequence;
+		weaponCatchup = !serverRaisePlaced;
+		netWeaponRaiseTime = serverRaisePlaced ? serverWeaponRaiseTime : -1;
+		if ( net_mpHitscanDebug.GetBool() ) {
+			gameLocal.Printf( "MP_WEAPON respawn client=%d owner=%d local=%d time=%d hitch=%d serverWeapon=%d raise=%d movementTime=%d movementFlags=%d missed=%u age=%d\n",
+				gameLocal.isClient ? 1 : 0, entityNumber, entityNumber == gameLocal.localClientNum ? 1 : 0, gameLocal.time,
+				stateHitch ? 1 : 0, hasWeaponState ? 1 : 0, netWeaponRaiseTime, decodedPhysics.movementTime, decodedPhysics.movementFlags,
+				missedSnapshots, snapshotAge );
+		}
 		StopRagdoll();
 		SetPhysics( &physicsObj );
 		physicsObj.EnableClip();
 		SetCombatContents( true );
 	} else if ( oldHealth - health > 2 && health > 0 ) {
- 		if ( stateHitch ) {
+ 		if ( feedbackHitch ) {
 			lastDmgTime = gameLocal.time;
    		} else {
  			// damage feedback
@@ -16280,18 +18694,14 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		}
 	}
 
- 	if ( lastHitToggle != newHitToggle ) {
-		SetLastHitTime( gameLocal.realClientTime, newHitArmor );
+	if ( oldHealth > 0 && health > 0 && IsHidden() && !spectating ) {
+		// ensure the client is shown after the initial spawn frame
+		Show();
 	}
-	
+
 	if ( msg.HasChanged() ) {
 		UpdateVisuals();
 	}
-
-	/*if ( (head == NULL || headSpawnId != head.GetSpawnId()) && headSpawnId > 0 ) {
-		head.SetSpawnId( headSpawnId );
-		SetupHead();
-	}*/
 }
 
 /*
@@ -16299,8 +18709,23 @@ void idPlayer::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 idPlayer::WritePlayerStateToSnapshot
 ================
 */
-void idPlayer::WritePlayerStateToSnapshot( idBitMsgDelta &msg ) const {
+void idPlayer::WritePlayerStateToSnapshot( int lastSnapshotFrame, idBitMsgDelta &msg ) const {
 	int i;
+
+	// openQ4: a count of the hits that sounded, not a flag for "one since the last
+	// snapshot" (protocol 2.42). The flag was set in one snapshot only, so when that
+	// snapshot was lost, refused by the rate or overflowed, the hit made no sound, no
+	// crosshair flash and no marker, and nothing sent it again. A count that has moved
+	// stays different from the client's until a snapshot that carries it arrives.
+	msg.WriteBits( hitFeedbackCount & HIT_FEEDBACK_COUNT_MASK, HIT_FEEDBACK_COUNT_BITS );
+	msg.WriteBits( lastHitArmor, 1 );
+
+	// the velocity this player's own prediction starts from, exact; the entity state
+	// carries it in 16 bits a component for everyone else (idPhysics_Player::WriteToSnapshot)
+	const idVec3 &exactVelocity = physicsObj.GetLinearVelocity();
+	msg.WriteDeltaFloat( 0.0f, exactVelocity[0] );
+	msg.WriteDeltaFloat( 0.0f, exactVelocity[1] );
+	msg.WriteDeltaFloat( 0.0f, exactVelocity[2] );
 
 	msg.WriteDeltaByte( 0, bobCycle );
 	msg.WriteDeltaLong( 0, stepUpTime );
@@ -16308,9 +18733,10 @@ void idPlayer::WritePlayerStateToSnapshot( idBitMsgDelta &msg ) const {
 
 	msg.WriteShort( inventory.weapons );
 	msg.WriteByte( inventory.armor );
-	msg.WriteShort( inventory.powerups );
+	msg.WriteBits( inventory.powerups, POWERUP_MAX );
 
 	for( i = 0; i < MAX_AMMO; i++ ) {
+		// send a value of -1 as the max positive value as we have ASYNC_PLAYER_INV_AMMO_BITS>0
 		if ( inventory.ammo[i] == -1 ) {
 			msg.WriteBits( ( 1 << ASYNC_PLAYER_INV_AMMO_BITS ) - 1, ASYNC_PLAYER_INV_AMMO_BITS );
 		} else {
@@ -16318,7 +18744,7 @@ void idPlayer::WritePlayerStateToSnapshot( idBitMsgDelta &msg ) const {
 		}
 	}
 
-	for( i = 0; i < POWERUP_MAX; i ++ ) {
+	for ( i = 0; i < POWERUP_MAX; i ++ ) {
 		msg.WriteLong( inventory.powerupEndTime[ i ] );
 	}
 }
@@ -16331,13 +18757,42 @@ idPlayer::ReadPlayerStateFromSnapshot
 void idPlayer::ReadPlayerStateFromSnapshot( const idBitMsgDelta &msg ) {
 	int i, ammo;
 
+	if ( gameLocal.LegacySnapshotFormat() ) {
+		// a multiview demo recorded before protocol 2.42: the one-snapshot flag
+		bool trigger = ( msg.ReadBits( 1 ) != 0 );
+		bool armor = ( msg.ReadBits( 1 ) != 0 );
+		if ( trigger ) {
+			TriggerHitSound( armor );
+		}
+	} else {
+		const int hitCount = msg.ReadBits( HIT_FEEDBACK_COUNT_BITS );
+		const bool armor = ( msg.ReadBits( 1 ) != 0 );
+		// The count sounds a hit when it moves from the last one read. After a pause in
+		// this player's state (a first read, a new life, a spectator coming back to this
+		// player) the count has moved for hits that are long over, so it only resumes.
+		const int sinceRead = gameLocal.time - netHitFeedbackTime;
+		if ( netHitFeedbackCount >= 0 && sinceRead >= 0 && sinceRead <= HIT_FEEDBACK_RESUME_MSEC &&
+			 hitCount != netHitFeedbackCount ) {
+			TriggerHitSound( armor );
+		}
+		netHitFeedbackCount = hitCount;
+		netHitFeedbackTime = gameLocal.time;
+
+		idVec3 exactVelocity;
+		exactVelocity[0] = msg.ReadDeltaFloat( 0.0f );
+		exactVelocity[1] = msg.ReadDeltaFloat( 0.0f );
+		exactVelocity[2] = msg.ReadDeltaFloat( 0.0f );
+		physicsObj.SetLinearVelocity( exactVelocity );
+	}
+
 	bobCycle = msg.ReadDeltaByte( 0 );
 	stepUpTime = msg.ReadDeltaLong( 0 );
 	stepUpDelta = msg.ReadDeltaFloat( 0.0f );
 
 	inventory.weapons = msg.ReadShort();
 	inventory.armor = msg.ReadByte();
-	inventory.powerups = msg.ReadShort();
+	// openQ4 MP-22: Quake 4 1.4.2 had sixteen powerups, sent in a short
+	inventory.powerups = msg.ReadBits( gameLocal.RetailSnapshotFormat() ? 16 : POWERUP_MAX );
 
 	for( i = 0; i < MAX_AMMO; i++ ) {
  		ammo = msg.ReadBits( ASYNC_PLAYER_INV_AMMO_BITS );
@@ -16350,7 +18805,8 @@ void idPlayer::ReadPlayerStateFromSnapshot( const idBitMsgDelta &msg ) {
  		}
 	}
 
-	int powerup_max = gameLocal.GetCurrentDemoProtocol() == 69 ? 11 : POWERUP_MAX;
+	// openQ4 MP-22: Quake 4 1.4.2 sent the end times of its sixteen powerups
+	int powerup_max = gameLocal.RetailSnapshotFormat() ? 16 : POWERUP_MAX;
 	for ( i = 0; i < powerup_max; i ++ ) {
 		inventory.powerupEndTime[ i ] = msg.ReadLong();
 	}
@@ -16392,23 +18848,76 @@ bool idPlayer::ServerReceiveEvent( int event, int time, const idBitMsg &msg ) {
 	}
 
 	// client->server events
-	switch( event ) {
+	switch ( event ) {
+		case EVENT_SPECTATOR_FOLLOW: {
+			if ( msg.IsReadOverflowed() || msg.GetRemainingReadBits() != 48 ) {
+				return true;
+			}
+			const int operation = msg.ReadByte();
+			const int targetSlot = msg.ReadByte() - 1;
+			const int targetSpawnId = msg.ReadLong();
+			if ( !msg.IsReadOverflowed() ) {
+				ServerSpectatorFollow( operation, targetSlot, targetSpawnId );
+			}
+			return true;
+		}
 		case EVENT_IMPULSE: {
-			PerformImpulse( msg.ReadBits( IMPULSE_NUMBER_OF_BITS ) );
+			int impulse = msg.ReadBits( IMPULSE_NUMBER_OF_BITS );
+			serverReceiveEvent = true;	// marking so we know if ACKs are needed
+			PerformImpulse( impulse );
+			serverReceiveEvent = false;
 			return true;
 		}
 		case EVENT_EMOTE: {
+			// openQ4: an emote is one byte. The sender's parameters used to be
+			// forwarded as they came, up to MAX_EVENT_PARAM_SIZE bytes of them and
+			// as many times a frame as the event queue allows, each as a reliable
+			// message to every client in the instance - enough to overflow the
+			// other players' reliable queues and have the server drop them.
+			// Validate, throttle and forward a message built here instead.
+			const int newEmote = msg.ReadByte();
+			if ( msg.IsReadOverflowed() || newEmote < PE_NONE || newEmote > PE_TAUNT ) {
+				return true;
+			}
+			if ( !gameLocal.CheckClientReliableFlood( entityNumber, RELIABLE_FLOOD_EMOTE, RELIABLE_FLOOD_EMOTE_DELAY ) ) {
+				return true;
+			}
+
+			idBitMsg	forwardMsg;
+			byte		forwardBuf[8];
+
+			forwardMsg.Init( forwardBuf, sizeof( forwardBuf ) );
+			forwardMsg.BeginWriting();
+			forwardMsg.WriteByte( newEmote );
+
 			// forward the emote on to all clients except the one that sent it to us
-			ServerSendInstanceEvent( EVENT_EMOTE, &msg, false, entityNumber );
+			ServerSendInstanceEvent( EVENT_EMOTE, &forwardMsg, false, entityNumber );
 
 			// Set the emote locally
-			SetEmote( (playerEmote_t)msg.ReadByte() );
+			SetEmote( (playerEmote_t)newEmote );
 			
 			return true;
 		}
 		default: {
 			return false;
 		}
+	}
+}
+
+/*
+===============
+idPlayer::CheckAckReply
+===============
+*/
+void idPlayer::CheckAckReply( void ) const {
+	assert( !gameLocal.isClient );
+	if ( serverReceiveEvent ) {
+		idBitMsg	outMsg;
+		byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
+		outMsg.Init( msgBuf, sizeof( msgBuf ) );
+		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_EVENT_ACK );
+		outMsg.WriteLong( gameLocal.framenum );
+		networkSystem->ServerSendReliableMessage( entityNumber, outMsg );
 	}
 }
 
@@ -16422,6 +18931,11 @@ bool idPlayer::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
 	bool start;
 
 	switch ( event ) {
+		case EVENT_AIR_READOUT: {
+			const int stamp = msg.ReadLong();
+			const int percent = msg.ReadByte();
+			return !msg.IsReadOverflowed() && airReadout.Apply( stamp, percent );
+		}
 		case EVENT_EXIT_TELEPORTER:
 			Event_ExitTeleporter();
 			return true;
@@ -16432,10 +18946,7 @@ bool idPlayer::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
  			powerup = msg.ReadShort();
  			start = ( msg.ReadBits( 1 ) != 0 );
  			if ( start ) {
-				bool team = false;
-				if ( gameLocal.GetCurrentDemoProtocol() != 69 ) {
-					team = ( msg.ReadBits( 1 ) != 0 );
-				}
+				bool team = ( msg.ReadBits( 1 ) != 0 );
  				GivePowerUp( powerup, 0, team );
  			} else {
  				ClearPowerup( powerup );
@@ -16450,7 +18961,7 @@ bool idPlayer::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
  			Spectate( spectate );
 
 			// spectate might re-link clip for stale players, so re-call ClientStale if we're stale
-			if( fl.networkStale ) {
+			if ( fl.networkStale ) {
 				ClientStale();	
 			}
    			return true;
@@ -16469,12 +18980,18 @@ bool idPlayer::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
 
 			return true;
 		}
+		case EVENT_JUMP: {
+			// jumps for the local client are predicted
+			if ( IsLocalClient() ) {
+				return true;
+			}
+			StartSound( "snd_jump", (s_channelType)FC_SOUND, 0, false, NULL );
+			return true;
+		}
  		default: {
 			return idActor::ClientReceiveEvent( event, time, msg );
 		}
 	}
-//unreachable
-//	return false;
 }
 
 /*
@@ -16575,40 +19092,42 @@ idPlayer::SetSpectateOrigin
 ===============
 */
 void idPlayer::SetSpectateOrigin( void ) {
-	idEntity *spot;
 	idVec3 neworig;
 	idAngles newangles;
+	idEntity *spot;
 
 	spot = gameLocal.FindEntityUsingDef( NULL, "info_player_intermission" );
-	if ( spot ) {
+	if ( spot == NULL && gameLocal.isMultiplayer ) {
+		spot = gameLocal.SelectSpawnPoint( this );
+	}
+
+	if ( spot != NULL ) {
 		neworig = spot->GetPhysics()->GetOrigin();
 		newangles = spot->GetPhysics()->GetAxis().ToAngles();
 
 		const char *targetName = spot->spawnArgs.GetString( "target" );
-		if ( targetName && targetName[0] ) {
-			idEntity *target = gameLocal.FindEntity( targetName );
-			if ( target ) {
-				idVec3 dir = target->GetPhysics()->GetOrigin() - neworig;
-				if ( dir.LengthSqr() > 1.0f ) {
-					newangles = dir.ToAngles();
-				}
+		idEntity *target = ( targetName != NULL && targetName[ 0 ] != '\0' ) ? gameLocal.FindEntity( targetName ) : NULL;
+		if ( target != NULL ) {
+			idVec3 dir = target->GetPhysics()->GetOrigin() - neworig;
+			if ( dir.LengthSqr() > 1.0f ) {
+				newangles = dir.ToAngles();
 			}
 		}
-	} else if ( gameLocal.isMultiplayer && ( spot = gameLocal.SelectSpawnPoint( this ) ) != NULL ) {
-		neworig = spot->GetPhysics()->GetOrigin();
-		neworig[ 2 ] += EyeHeight();
-		neworig[ 2 ] += 25;
-		newangles = spot->GetPhysics()->GetAxis().ToAngles();
-	} else {
-		neworig = GetPhysics()->GetOrigin();
-		neworig[ 2 ] += EyeHeight();
-		neworig[ 2 ] += 25;
-		newangles = viewAngles;
+
+		if ( idStr::Icmp( spot->GetEntityDefName(), "info_player_intermission" ) != 0 ) {
+			neworig[ 2 ] += EyeHeight();
+			neworig[ 2 ] += 25;
+		}
+
+		SetOrigin( neworig );
+		SetViewAngles( newangles );
+		return;
 	}
 
+	neworig = GetPhysics()->GetOrigin();
+	neworig[ 2 ] += EyeHeight();
+	neworig[ 2 ] += 25;
 	SetOrigin( neworig );
-	SetViewAngles( newangles );
-	SetDeltaViewAngles( ang_zero );
 }
 
 /*
@@ -16734,47 +19253,54 @@ idPlayer::DamageFeedback
 ================
 */
 void idPlayer::DamageFeedback( idEntity *victim, idEntity *inflictor, int &damage ) {
+
+	assert( !gameLocal.isClient );
 	
 	//rvTramCars weren't built on the idActor inheritance hierarchy but need to be treated like one when shot.
 	//TODO: Maybe add a key to entity flags that will allow them to be shot as actors even if they aren't actors?
-	if( !victim || ( !victim->IsType( idActor::GetClassType() ) && !victim->IsType( rvTramCar::GetClassType() ) ) || victim->health <= 0 ) {
+	if ( !victim || ( !victim->IsType( idActor::GetClassType() ) && !victim->IsType( rvTramCar::GetClassType() ) ) || victim->health <= 0 ) {
 		return;
 	}
 
 	bool armorHit = false;
 
-	if( gameLocal.isMultiplayer && victim->IsType( idPlayer::GetClassType() ) ) {
-		if( this == victim ) {
+	if ( gameLocal.isMultiplayer && victim->IsType( idPlayer::GetClassType() ) ) {
+		if ( this == victim ) {
 			// no feedback for self hits
 			return;
 		}
-		if( gameLocal.IsTeamGame() && ((idPlayer*)victim)->team == team ) {
+		idPlayer *p = static_cast< idPlayer * >( victim );
+		if ( gameLocal.IsTeamGame() && p->team == team ) {
 			// no feedback for team hits
 			return;
 		}
-		if( ((idPlayer*)victim)->inventory.armor > 0 ) {
+		if ( p->inventory.armor > 0 ) {
 			armorHit = true;
 		}
-	}
+	} 
 
-	// openQ4: the crosshair hit marker's precise path.  Single player has no hit
-	// info to send - the shooter is the server - so this is where the amount and
-	// the killing blow are known, and the damage has yet to be applied below the
-	// caller.
-	if ( this == gameLocal.GetLocalPlayer() ) {
-		int markerFlags = armorHit ? HITMARKER_ARMOR : 0;
+	if ( gameLocal.isMultiplayer ) {
+		TriggerHitSound( armorHit );
+	} else {
+		// openQ4: the crosshair hit marker's precise path.  Single player has no hit
+		// info to send - the shooter is the server - so this is where the amount and
+		// the killing blow are known, and the damage has yet to be applied below the
+		// caller.
+		if ( this == gameLocal.GetLocalPlayer() ) {
+			int markerFlags = armorHit ? HITMARKER_ARMOR : 0;
 
-		if ( this == victim ) {
-			markerFlags |= HITMARKER_SELF;
+			if ( this == victim ) {
+				markerFlags |= HITMARKER_SELF;
+			}
+			if ( victim->health - damage <= 0 ) {
+				markerFlags |= HITMARKER_KILL;
+			}
+
+			rvHitMarker::Trigger( damage, markerFlags, HITMARKER_PRECISE );
 		}
-		if ( victim->health - damage <= 0 ) {
-			markerFlags |= HITMARKER_KILL;
-		}
 
-		rvHitMarker::Trigger( damage, markerFlags, HITMARKER_PRECISE );
+		SetLastHitTime( gameLocal.time, armorHit );
 	}
-
-	SetLastHitTime( gameLocal.time, armorHit );
 }
 
 /*
@@ -16806,6 +19332,75 @@ const idDeclEntityDef* idPlayer::GetWeaponDef ( int weaponIndex ) {
 
 /*
 ==============
+idPlayer::GetPowerupDefName
+
+The entity def each powerup type stands for. Content numbers its powerups in
+its "powerup_types" def, and the retail game and the Awakening expansion
+number them differently; the def names are what they agree on.
+==============
+*/
+const char* idPlayer::GetPowerupDefName( int powerup ) {
+	static const char * const powerupDefNames[] = {
+		"powerup_quad_damage",			// POWERUP_QUADDAMAGE
+		"powerup_haste",				// POWERUP_HASTE
+		"powerup_regeneration",			// POWERUP_REGENERATION
+		"powerup_invisibility",			// POWERUP_INVISIBILITY
+		"mp_ctf_marine_flag",			// POWERUP_CTF_MARINEFLAG
+		"mp_ctf_strogg_flag",			// POWERUP_CTF_STROGGFLAG
+		"mp_ctf_one_flag",				// POWERUP_CTF_ONEFLAG
+		"powerup_ammoregen",			// POWERUP_AMMOREGEN
+		"powerup_guard",				// POWERUP_GUARD
+		"powerup_doubler",				// POWERUP_DOUBLER
+		"powerup_scout",				// POWERUP_SCOUT
+		"powerup_moderator",			// POWERUP_MODERATOR
+		"powerup_deadzone",				// POWERUP_DEADZONE
+		"powerup_team_ammo_regen",		// POWERUP_TEAM_AMMO_REGEN
+		"powerup_team_health_regen",	// POWERUP_TEAM_HEALTH_REGEN
+		"powerup_team_damage_mod",		// POWERUP_TEAM_DAMAGE_MOD
+		"powerup_adrenaline",			// POWERUP_ADRENALINE
+		"powerup_fc_armor_regen",		// POWERUP_FC_ARMOR_REGEN
+	};
+	static_assert( sizeof( powerupDefNames ) / sizeof( powerupDefNames[0] ) == POWERUP_MAX, "one def name per powerup type" );
+
+	if ( powerup < 0 || powerup >= POWERUP_MAX ) {
+		return "";
+	}
+	return powerupDefNames[ powerup ];
+}
+
+/*
+==============
+idPlayer::PowerupForContentType
+
+Translates a powerup number from content (a powerup def's "type") into the
+game's powerup type, through the def name "powerup_types" gives that number.
+The Awakening inserted Adrenaline at 12, moving DeadZone and the team
+powerups one along; retail's numbers translate to themselves. A number the
+content does not name, or names with a def this table does not know, is kept.
+==============
+*/
+int idPlayer::PowerupForContentType( int contentType ) {
+	const idDict *types = gameLocal.FindEntityDefDict( "powerup_types", false );
+	if ( types == NULL ) {
+		return contentType;
+	}
+	for ( int i = 0; i < types->GetNumKeyVals(); i++ ) {
+		const idKeyValue *kv = types->GetKeyVal( i );
+		if ( atoi( kv->GetValue() ) != contentType ) {
+			continue;
+		}
+		for ( int powerup = 0; powerup < POWERUP_MAX; powerup++ ) {
+			if ( !kv->GetKey().Icmp( GetPowerupDefName( powerup ) ) ) {
+				return powerup;
+			}
+		}
+		break;
+	}
+	return contentType;
+}
+
+/*
+==============
 idPlayer::GetPowerupDef
 
 Returns the powerup dictionary for the given powerup index.  The dictionary is cached to ensure a
@@ -16819,6 +19414,14 @@ const idDeclEntityDef* idPlayer::GetPowerupDef ( int powerupIndex ) {
 	
 	if ( cachedPowerupDefs[powerupIndex] ) {
 		return cachedPowerupDefs[powerupIndex];
+	}
+
+	// multiplayer: the def named for the type, whatever number the content gives it
+	if ( gameLocal.isMultiplayer ) {
+		cachedPowerupDefs[powerupIndex] = gameLocal.FindEntityDef( GetPowerupDefName( powerupIndex ), false );
+		if ( cachedPowerupDefs[powerupIndex] ) {
+			return cachedPowerupDefs[powerupIndex];
+		}
 	}
 	
 	types = gameLocal.FindEntityDefDict( "powerup_types", false );
@@ -16896,7 +19499,12 @@ void idPlayer::SetInitialHud ( void ) {
 	if( gameLocal.IsFlagGameType() ) {
 		mphud->SetStateFloat( "ap", gameLocal.mpGame.assaultPoints.Num() );
 
-		for( int i = 0; i < TEAM_MAX; i++ ) {
+		// openQ4: One Flag CTF's neutral flag has its own slot after the two team
+		// flags, and it is the only flag the one flag HUD draws.  The team flags
+		// never leave base in that mode, so their pass just resets the display
+		// before the neutral flag's real state is sent.
+		const int numFlags = ( gameLocal.gameType == GAME_1F_CTF || gameLocal.gameType == GAME_ARENA_1F_CTF ) ? MAX_CTF_FLAGS : TEAM_MAX;
+		for( int i = 0; i < numFlags; i++ ) {
 			mphud->SetStateInt( "team", i );
 			if( ((rvCTFGameState*)gameLocal.mpGame.GetGameState())->GetFlagState( i ) == FS_DROPPED ) {
 				mphud->HandleNamedEvent( "flagDrop" );
@@ -17008,6 +19616,12 @@ ddynerman: Spawns client side gibs around this player
 */
 void idPlayer::ClientGib( const idVec3& dir ) {
 	
+	// The corpse is Freeze Tag's rescue objective on every peer. This also
+	// covers snapshot-driven gib requests after an overkill or suicide.
+	if ( gameLocal.isMultiplayer && MPGameTypeHasAny( gameLocal.gameType, GTF_FREEZE ) ) {
+		return;
+	}
+
 	if( !spawnArgs.GetBool( "gib" )	)	{
 		return;
 	}
@@ -17051,7 +19665,7 @@ void idPlayer::ClientGib( const idVec3& dir ) {
 //		list[i]->GetPhysics()->SetLinearVelocity( velocity * ( 25.0f + ( gameLocal.random.RandomFloat() * 300.0f)));
 		list[i]->GetPhysics()->SetAngularVelocity( velocity * ( -250.0f + ( gameLocal.random.RandomFloat() * 500.0f)));
 
-		list[i]->GetRenderEntity()->noShadow = !G_ShadowMapCorpseShadowsEnabled();
+		list[i]->GetRenderEntity()->noShadow = gameLocal.isMultiplayer || !G_ShadowMapCorpseShadowsEnabled();
 		list[i]->GetRenderEntity()->shaderParms[ SHADERPARM_TIME_OF_DEATH ] = gameLocal.time * 0.001f;
 
 		list[i]->PostEventMS( &CL_FadeOut, SEC2MS( 4.0f ), SEC2MS( 2.0f ) );
@@ -17267,6 +19881,17 @@ void idPlayer::SetupHead( const char* headModel, idVec3 headOffset ) {
 		}
 
 		headEnt->SetBody ( this, headDict->GetString ( "model" ), joint );
+
+		// A head that survived a previous SetupHead (a respawn re-runs this with
+		// the same client entity) is still bound to us, and while it is bound
+		// SetOrigin/SetAxis write the *bind offset* rather than the world
+		// transform.  rvClientEntity::Bind then re-seeds that offset from the
+		// world transform it still carries, so the head would be re-bound at
+		// its old world position expressed as a local offset - hundreds or
+		// thousands of units away from the joint, outside the map, in no portal
+		// area, and therefore never drawn.  Unbind first so the calls below
+		// land on the world transform exactly as they do for a fresh head.
+		headEnt->Unbind();
 		headEnt->SetOrigin( vec3_origin + headOffset );
 		headEnt->SetAxis( mat3_identity );
 		UpdateModelTransform();
@@ -17404,6 +20029,152 @@ const char* idPlayer::GetSpawnClassname ( void ) {
 	return world->spawnArgs.GetString( "player", "player_marine" );
 }
 
+// openQ4 BEGIN
+/*
+=====================
+idPlayer::PrecacheSpawnDecls
+
+The damage and liquid defs a spawned player can need at any moment.
+=====================
+*/
+void idPlayer::PrecacheSpawnDecls( void ) {
+	static const char * const spawnDefs[] = {
+		"damage_fatalfall",
+		"damage_hardfall",
+		"damage_softfall",
+		"damage_noair",
+		"damage_openq4_drown",
+		"damage_openq4_lava",
+		"damage_openq4_slime",
+		"liquid_openq4",
+		"damage_suicide",
+		"damage_telefrag",
+		"damage_gib",
+		"dmg_shellshock",
+		"dmg_shellshock_nohl",
+	};
+
+	for ( int i = 0; i < (int)( sizeof( spawnDefs ) / sizeof( spawnDefs[ 0 ] ) ); i++ ) {
+		declManager->FindType( DECL_ENTITYDEF, spawnDefs[ i ], false, false );
+		// openQ4: in multiplayer gameLocal.FindEntityDef asks for the "_mp" definition
+		// first, and the falls have one. The plain names cached here were not the
+		// ones used, so the first fall of a match read its definition from disk.
+		if ( gameLocal.isMultiplayer ) {
+			declManager->FindType( DECL_ENTITYDEF, va( "%s_mp", spawnDefs[ i ] ), false, false );
+		}
+	}
+}
+
+/*
+=====================
+idPlayer::PrecachePlayerModel
+
+A playerModel names its model, head and skin in keys the def_ media rule does
+not follow, so they are cached directly; a model the player setup menu already
+parsed would not cache them again either.
+=====================
+*/
+void idPlayer::PrecachePlayerModel( const rvDeclPlayerModel *model ) {
+	if ( model == NULL ) {
+		return;
+	}
+	idDict media;
+	media.Set( "model", model->model.c_str() );
+	media.Set( "def_head", model->head.c_str() );
+	media.Set( "def_head_ui", model->uiHead.c_str() );
+	media.Set( "skin", model->skin.c_str() );
+	media.SetDefaults( &model->sounds );
+	gameLocal.CacheDictionaryMedia( &media );
+}
+
+/*
+=====================
+idPlayer::PrecacheMultiplayerSpawn
+
+A multiplayer player spawns when its client enters the game, after the level
+load has ended, so everything the first spawn touched for the first time was
+parsed and loaded mid-frame: about ninety decls and their images on mp/q4dm1,
+from the player model and crosshairs to the damage defs. Touch that set from
+inside the load instead.
+=====================
+*/
+void idPlayer::PrecacheMultiplayerSpawn( void ) {
+	const idDeclEntityDef *playerDef = gameLocal.FindEntityDef( GetSpawnClassname(), false );
+	if ( playerDef == NULL ) {
+		return;
+	}
+
+	// The retained multiplayer menus parse this def with media caching off,
+	// in which case finding it again caches nothing.
+	gameLocal.CacheDictionaryMedia( &playerDef->dict );
+
+	// The def_default_model keys name playerModel decls, which the def_ media
+	// rule looks up as entityDefs and so misses. Cache the models this game
+	// type can fall back to or force, plus the local player's own choice, the
+	// same set UpdateModelSetup picks from. Cache each model's media directly,
+	// because a model the player setup menu already parsed would not cache it
+	// again. Other players' choices arrive with their userinfo.
+	const bool teamGame = gameLocal.IsTeamGame();
+	const char *modelNames[] = {
+		teamGame ? playerDef->dict.GetString( "def_default_model_marine" ) : playerDef->dict.GetString( "def_default_model" ),
+		teamGame ? playerDef->dict.GetString( "def_default_model_strogg" ) : "",
+		teamGame ? Player_ForcedModelCVarString( g_forceMarineModel ) : Player_ForcedModelCVarString( g_forceModel ),
+		teamGame ? Player_ForcedModelCVarString( g_forceStroggModel ) : "",
+		teamGame ? cvarSystem->GetCVarString( "ui_model_marine" ) : cvarSystem->GetCVarString( "ui_model" ),
+		teamGame ? cvarSystem->GetCVarString( "ui_model_strogg" ) : "",
+	};
+	for ( int i = 0; i < (int)( sizeof( modelNames ) / sizeof( modelNames[ 0 ] ) ); i++ ) {
+		if ( modelNames[ i ] == NULL || modelNames[ i ][ 0 ] == '\0' ) {
+			continue;
+		}
+		PrecachePlayerModel( static_cast<const rvDeclPlayerModel *>( declManager->FindType( DECL_PLAYER_MODEL, modelNames[ i ], false ) ) );
+	}
+
+	// Everyone else's. A player or a bot arriving with a model nobody had used yet
+	// had it read from disk in the middle of the match, on the server and on every
+	// client that could see them: the model declaration, the head, the skin and
+	// their images, a visible hitch each time. The models share most of their
+	// meshes and animations, so loading them all costs little next to that.
+	if ( g_precachePlayerModels.GetBool() ) {
+		const int numModels = declManager->GetNumDecls( DECL_PLAYER_MODEL );
+		for ( int i = 0; i < numModels; i++ ) {
+			PrecachePlayerModel( static_cast<const rvDeclPlayerModel *>( declManager->DeclByIndex( DECL_PLAYER_MODEL, i, true ) ) );
+		}
+	}
+
+	// The weapons SetupWeaponEntity caches on spawn, the warmup arsenal's included.
+	for ( int w = 0; w < MAX_WEAPONS; w++ ) {
+		const char *weaponName = playerDef->dict.GetString( va( "def_weapon%d", w ) );
+		if ( weaponName[ 0 ] != '\0' ) {
+			rvWeapon::CacheWeapon( weaponName );
+		}
+	}
+
+	// In multiplayer the cursor and cinematic HUD are shared templates, like
+	// the hud and mphud in MPGuis, so loading them now leaves the spawn a lookup.
+	static const char * const guiKeys[] = { "cursor", "cinematicHud" };
+	for ( int i = 0; i < (int)( sizeof( guiKeys ) / sizeof( guiKeys[ 0 ] ) ); i++ ) {
+		const char *guiName = playerDef->dict.GetString( guiKeys[ i ] );
+		if ( guiName[ 0 ] != '\0' ) {
+			uiManager->FindGui( guiName, true, false, true );
+		}
+	}
+
+	// Not a media key, so CacheDictionaryMedia skips it.
+	const char *afName = playerDef->dict.GetString( "articulatedFigure" );
+	if ( afName[ 0 ] != '\0' ) {
+		declManager->FindType( DECL_AF, afName, false );
+	}
+
+	declManager->FindType( DECL_ENTITYDEF, "player_viewweapon", false, false );
+	declManager->FindType( DECL_ENTITYDEF, "player_animatedentity", false, false );
+	declManager->FindType( DECL_ENTITYDEF, "ammo_types", false, false );
+	declManager->FindType( DECL_ENTITYDEF, "ItemCostConstants", false );
+	declManager->FindSound( "player_sounds_hitArmor" );
+	PrecacheSpawnDecls();
+}
+// openQ4 END
+
 /*
 ===============
 idPlayer::SetInstance
@@ -17499,7 +20270,7 @@ void idPlayer::SetEmote( playerEmote_t newEmote ) {
 	emote = newEmote;
 
 	// if we're the ones generating the emote, pass it along
-	if( gameLocal.localClientNum == entityNumber ) {
+	if( IsLocalClient() ) {
 		idBitMsg	msg;
 		byte		msgBuf[MAX_EVENT_PARAM_SIZE];
 
@@ -17510,7 +20281,8 @@ void idPlayer::SetEmote( playerEmote_t newEmote ) {
 		if( gameLocal.isServer ) {
 			ServerSendInstanceEvent( EVENT_EMOTE, &msg, false, -1 );
 		} else {
-			ClientSendEvent( EVENT_EMOTE, &msg );
+			// openQ4: asked for from the console, between frames (see ClientSendRequestEvent)
+			ClientSendRequestEvent( EVENT_EMOTE, &msg );
 		}
 	}
 }
@@ -17625,11 +20397,11 @@ void idPlayer::UpdateDeathShader ( bool state_hitch ) {
 			corpseSinkStartTime = gameLocal.time;
 			deathClearContentsTime = 0;
 			doingDeathSkin = true;
-			renderEntity.noShadow = !G_ShadowMapCorpseShadowsEnabled();
+			renderEntity.noShadow = gameLocal.isMultiplayer || !G_ShadowMapCorpseShadowsEnabled();
 
 			if( gameLocal.isMultiplayer ) {
 				if( clientHead ) {
-					clientHead.GetEntity()->GetRenderEntity()->noShadow = !G_ShadowMapCorpseShadowsEnabled();
+					clientHead.GetEntity()->GetRenderEntity()->noShadow = true;
 				}
 			} else {
 				if( head ) {
@@ -17652,7 +20424,7 @@ void idPlayer::UpdateDeathShader ( bool state_hitch ) {
 			if( gameLocal.isMultiplayer ) {
 				if( clientHead ) {
 					clientHead.GetEntity()->GetRenderEntity()->shaderParms[ SHADERPARM_TIME_OF_DEATH ] = gameLocal.time * 0.001f - 2.0f;
-					clientHead.GetEntity()->GetRenderEntity()->noShadow = !G_ShadowMapCorpseShadowsEnabled();
+					clientHead.GetEntity()->GetRenderEntity()->noShadow = true;
 				}
 			} else {
 				if( head ) {
@@ -17665,7 +20437,7 @@ void idPlayer::UpdateDeathShader ( bool state_hitch ) {
 			if( gameLocal.isMultiplayer ) {
 				if( clientHead ) {
 					clientHead.GetEntity()->GetRenderEntity()->shaderParms[ SHADERPARM_TIME_OF_DEATH ] = gameLocal.time * 0.001f;
-					clientHead.GetEntity()->GetRenderEntity()->noShadow = !G_ShadowMapCorpseShadowsEnabled();
+					clientHead.GetEntity()->GetRenderEntity()->noShadow = true;
 				}
 			} else {
 				if( head ) {
@@ -17674,7 +20446,7 @@ void idPlayer::UpdateDeathShader ( bool state_hitch ) {
 				}
 			}
 		}
-		renderEntity.noShadow = !G_ShadowMapCorpseShadowsEnabled();
+		renderEntity.noShadow = gameLocal.isMultiplayer || !G_ShadowMapCorpseShadowsEnabled();
 		UpdateVisuals();
 	}
 }
@@ -17696,6 +20468,8 @@ idPlayer::GetHitscanTint
 ===============
 */
 const idVec4& idPlayer::GetHitscanTint( void ) {
+	assert( !IsFakeClient() );
+
 	if( gameLocal.IsTeamGame() ) {
 		if( gameLocal.serverInfo.GetInt( "si_allowHitscanTint" ) >= 2 ) {
 			if( team == TEAM_MARINE ) {
@@ -17764,7 +20538,7 @@ We need to hide/show them on the client as we switch to/from instances
 void idPlayer::ClientInstanceJoin( void ) {
 	assert( gameLocal.isClient );
 
-	common->DPrintf( "idPlayer::ClientInstanceJoin() - client %d ('%s') is being shown\n", entityNumber, GetUserInfo()->GetString( "ui_name" ) );
+	common->DPrintf( "idPlayer::ClientInstanceJoin() - client %d ('%s') is being shown\n", entityNumber, GetUserInfo() ? GetUserInfo()->GetString( "ui_name" ) : "?" );
 
 	// restore client
 	Spectate( spectating, true );
@@ -17779,7 +20553,7 @@ We need to hide/show them on the client as we switch to/from instances
 */
 void idPlayer::ClientInstanceLeave( void ) {
 	assert( gameLocal.isClient );
-	common->DPrintf( "idPlayer::ClientInstanceLeave() - client %d ('%s') is being hidden\n", entityNumber, GetUserInfo()->GetString( "ui_name" ) );
+	common->DPrintf( "idPlayer::ClientInstanceLeave() - client %d ('%s') is being hidden\n", entityNumber, GetUserInfo() ? GetUserInfo()->GetString( "ui_name" ) : "?" );
 
 	// force client to spectate
 	Spectate( spectating, true );
@@ -17806,6 +20580,8 @@ bool idPlayer::ClientStale( void ) {
 		clientHead = NULL;
 	}
 
+	Hide();
+
 	// never delete client
 	return false;
 }
@@ -17824,6 +20600,7 @@ void idPlayer::ClientUnstale( void ) {
 
 	// don't do any smoothing with this snapshot
 	predictedFrame = gameLocal.framenum;
+	remotePredictedTics = 0;
 	// the powerup effects ( rvClientEntity ) will do some bindings, which in turn will call GetPosition
 	// which uses the predictedOrigin .. which won't be updated till we Think() so just don't leave the predictedOrigin to the old position
 	predictedOrigin = renderEntity.origin;
@@ -18006,3 +20783,391 @@ float idPlayer::GetViewHeight(void) {
 	return newEyeOffset;
 }
 // jmarshall end
+
+bool idPlayer::IsSpectatedClient( void ) const {
+	idPlayer *localPlayer = gameLocal.GetLocalPlayer();
+	if ( !localPlayer ) {
+		return false;
+	}
+	if ( localPlayer->spectating && localPlayer->spectator == entityNumber ) {
+		return true;
+	}
+	return false;
+}
+
+// Player marks belong to one connection; a reused slot starts unmarked even
+// when a snapshot replaces its entity before a disconnect notification arrives.
+bool idPlayer::IsPlayerMuted( int clientNum ) const {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS || ( mutedPlayers & ( 1u << clientNum ) ) == 0 ) {
+		return false;
+	}
+	idEntity *target = gameLocal.entities[ clientNum ];
+	return target != NULL && target->IsType( idPlayer::GetClassType() ) &&
+		mutedPlayerIdentities[ clientNum ] == gameLocal.GetSpawnId( target );
+}
+
+void idPlayer::MutePlayer( int clientNum, bool mute ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+	idEntity *target = gameLocal.entities[ clientNum ];
+	const unsigned int mask = 1u << clientNum;
+	if ( mute && target != NULL && target->IsType( idPlayer::GetClassType() ) ) {
+		mutedPlayers |= mask;
+		mutedPlayerIdentities[ clientNum ] = gameLocal.GetSpawnId( target );
+	} else {
+		mutedPlayers &= ~mask;
+		mutedPlayerIdentities[ clientNum ] = 0;
+	}
+}
+
+// Player marks belong to one connection; a reused slot starts unmarked even
+// when a snapshot replaces its entity before a disconnect notification arrives.
+bool idPlayer::IsFriend( int clientNum ) const {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS || ( friendPlayers & ( 1u << clientNum ) ) == 0 ) {
+		return false;
+	}
+	idEntity *target = gameLocal.entities[ clientNum ];
+	return target != NULL && target->IsType( idPlayer::GetClassType() ) &&
+		friendPlayerIdentities[ clientNum ] == gameLocal.GetSpawnId( target );
+}
+
+void idPlayer::SetFriend( int clientNum, bool isFriend ) {
+	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+	idEntity *target = gameLocal.entities[ clientNum ];
+	const unsigned int mask = 1u << clientNum;
+	if ( isFriend && target != NULL && target->IsType( idPlayer::GetClassType() ) ) {
+		friendPlayers |= mask;
+		friendPlayerIdentities[ clientNum ] = gameLocal.GetSpawnId( target );
+	} else {
+		friendPlayers &= ~mask;
+		friendPlayerIdentities[ clientNum ] = 0;
+	}
+}
+
+/*
+===============================================================================
+
+	openQ4: Classic ruleset (mp/ClassicRules.h) - mega health and the grappling hook.
+
+===============================================================================
+*/
+
+/*
+================
+idPlayer::StartClassicMegaHealth
+
+Quake 2's mega health: the extra points hold for five seconds, then drain a
+point a second until the player is back at the normal limit.  The item that
+gave it waits for that before it starts its own respawn (idItem::Think).
+================
+*/
+void idPlayer::StartClassicMegaHealth( void ) {
+	classicMegaDecayTime = gameLocal.time + CLASSIC_MEGA_DECAY_DELAY;
+}
+
+/*
+================
+idPlayer::UpdateClassicMegaHealth
+================
+*/
+void idPlayer::UpdateClassicMegaHealth( void ) {
+	if ( !classicMegaDecayTime ) {
+		return;
+	}
+	if ( health <= 0 || health <= inventory.maxHealth ) {
+		classicMegaDecayTime = 0;
+		return;
+	}
+	if ( gameLocal.time < classicMegaDecayTime ) {
+		return;
+	}
+	health--;
+	classicMegaDecayTime = ( health > inventory.maxHealth ) ? gameLocal.time + CLASSIC_MEGA_DECAY_PULSE : 0;
+}
+
+/*
+================
+idPlayer::ResetClassicHook
+================
+*/
+void idPlayer::ResetClassicHook( bool playSound ) {
+	if ( classicHookState != CLASSIC_HOOK_NONE ) {
+		classicHookReleaseTime = gameLocal.time;
+		if ( playSound && !gameLocal.isClient ) {
+			StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_RELEASE, false ), SND_CHANNEL_ITEM, 0, true, NULL );
+		}
+	}
+	classicHookState = CLASSIC_HOOK_NONE;
+	classicHookAnchor = NULL;
+	classicHookAnchorLocal.Zero();
+	physicsObj.ClearClassicGrapple();
+}
+
+/*
+================
+idPlayer::ClassicHookFlightPoint
+
+Where a thrown hook is at a given time.  The flight is a straight line at a
+fixed speed from the throw, so the snapshot carries the throw and every client
+draws the hook in step with its own clock instead of jumping from snapshot to
+snapshot.  The frame of the throw already counts, as the server moves the hook
+in that frame.
+================
+*/
+idVec3 idPlayer::ClassicHookFlightPoint( int time ) const {
+	const int elapsed = idMath::ClampInt( 0, CLASSIC_HOOK_MAX_FLY_TIME, time - classicHookFireTime + gameLocal.GetMSec() );
+	return classicHookStart + classicHookDir * ( CLASSIC_HOOK_FLY_SPEED * MS2SEC( elapsed ) );
+}
+
+/*
+================
+idPlayer::UpdateClassicHookAnchor
+
+Server side.  A hook that bit into a mover - a door, a lift, a platform - rides
+it: the held point is kept in the mover's own frame and put back in the world
+every frame, and the pull follows it.  The hook lets go when the mover is
+removed, hidden or stops being solid.  Returns false when the hook let go.
+================
+*/
+bool idPlayer::UpdateClassicHookAnchor( void ) {
+	if ( !classicHookAnchor.IsValid() ) {
+		// held by the world, which never moves
+		return true;
+	}
+	idEntity *anchor = classicHookAnchor.GetEntity();
+	if ( anchor == NULL || anchor->IsHidden() || anchor->GetPhysics() == NULL || anchor->GetPhysics()->GetContents() == 0 ) {
+		ResetClassicHook( true );
+		return false;
+	}
+	const idVec3 point = anchor->GetPhysics()->GetOrigin() + classicHookAnchorLocal * anchor->GetPhysics()->GetAxis();
+	if ( point != classicHookOrigin ) {
+		classicHookOrigin = point;
+		physicsObj.SetClassicGrapple( classicHookOrigin );
+	}
+	return true;
+}
+
+/*
+================
+idPlayer::UpdateClassicHook
+
+Server side.  Pressing _hook throws the hook from the eye; it flies until it
+bites into the world or a mover, then the player physics reels the player in
+for as long as the button stays down (idPhysics_Player::ClassicGrappleMove).
+Letting go, dying, teleporting, or the hook striking a player, an item, the sky
+or nothing within its reach brings it back.  It does not hurt anyone.
+================
+*/
+void idPlayer::UpdateClassicHook( void ) {
+	if ( gameLocal.isClient ) {
+		return;
+	}
+
+	const bool allowed = rvClassicRules::GrappleAllowed() && !spectating && health > 0 && !pfl.dead && !IsInVehicle() && !noclip;
+	const bool held = ( usercmd.buttons & BUTTON_HOOK ) != 0;
+	if ( !allowed || !held ) {
+		if ( classicHookState != CLASSIC_HOOK_NONE ) {
+			ResetClassicHook( allowed );
+		}
+		return;
+	}
+
+	if ( classicHookState == CLASSIC_HOOK_NONE ) {
+		// a fresh press, and not straight after the last hook came back
+		if ( ( oldButtons & BUTTON_HOOK ) != 0 || gameLocal.time < classicHookReleaseTime + CLASSIC_HOOK_REFIRE_DELAY ) {
+			return;
+		}
+		classicHookStart = GetEyePosition();
+		classicHookOrigin = classicHookStart;
+		classicHookDir = viewAngles.ToForward();
+		classicHookFireTime = gameLocal.time;
+		classicHookState = CLASSIC_HOOK_FLYING;
+		StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_THROW, false ), SND_CHANNEL_ITEM, 0, true, NULL );
+	}
+
+	if ( classicHookState == CLASSIC_HOOK_ATTACHED ) {
+		UpdateClassicHookAnchor();
+		return;
+	}
+
+	if ( classicHookState != CLASSIC_HOOK_FLYING ) {
+		return;
+	}
+
+	if ( gameLocal.time - classicHookFireTime >= CLASSIC_HOOK_MAX_FLY_TIME ) {
+		ResetClassicHook( true );
+		return;
+	}
+
+	const idVec3 end = ClassicHookFlightPoint( gameLocal.time );
+	trace_t tr;
+	gameLocal.TracePoint( this, tr, classicHookOrigin, end, MASK_SHOT_RENDERMODEL, this );
+	if ( tr.fraction >= 1.0f ) {
+		classicHookOrigin = end;
+		return;
+	}
+
+	const idMaterial *material = tr.c.material;
+	idEntity *hit = ( tr.c.entityNum >= 0 && tr.c.entityNum < MAX_GENTITIES ) ? gameLocal.entities[ tr.c.entityNum ] : NULL;
+	if ( ( material != NULL && ( material->GetSurfaceFlags() & SURF_NOIMPACT ) ) ||
+		( hit != NULL && ( hit->IsType( idActor::GetClassType() ) || hit->IsType( idItem::GetClassType() ) ||
+						   hit->IsType( idProjectile::GetClassType() ) ) ) ) {
+		// the sky, a player, a pickup or a shot: the hook has nothing to hold
+		ResetClassicHook( true );
+		return;
+	}
+
+	classicHookOrigin = tr.endpos - classicHookDir * 2.0f;
+	classicHookAnchor = NULL;
+	classicHookAnchorLocal.Zero();
+	if ( hit != NULL && hit != gameLocal.world && hit->GetPhysics() != NULL ) {
+		// anything but the world may move, so the bite is kept in its frame
+		classicHookAnchor = hit;
+		classicHookAnchorLocal = ( classicHookOrigin - hit->GetPhysics()->GetOrigin() ) * hit->GetPhysics()->GetAxis().Transpose();
+	}
+	classicHookState = CLASSIC_HOOK_ATTACHED;
+	physicsObj.SetClassicGrapple( classicHookOrigin );
+	StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_BITE, false ), SND_CHANNEL_ITEM, 0, true, NULL );
+}
+
+/*
+================
+idPlayer::FreeClassicHookPresentation
+================
+*/
+void idPlayer::FreeClassicHookPresentation( void ) {
+	if ( gameRenderWorld != NULL ) {
+		if ( classicHookCableHandle != -1 ) {
+			gameRenderWorld->FreeEntityDef( classicHookCableHandle );
+		}
+		if ( classicHookHeadHandle != -1 ) {
+			gameRenderWorld->FreeEntityDef( classicHookHeadHandle );
+		}
+	}
+	classicHookCableHandle = -1;
+	classicHookHeadHandle = -1;
+	if ( classicHookReelSound ) {
+		StopSound( SND_CHANNEL_HEART, false );
+		classicHookReelSound = false;
+	}
+}
+
+/*
+================
+idPlayer::PresentClassicHook
+
+The cable is a beam in Quake 4's multiplayer pulse-line material, tinted by
+team, from the player's hand to the hook; the hook head is the nailgun's nail.
+Both are client side render entities, so nothing new rides the snapshot beyond
+the hook's state, its throw and the point it holds.  A flying hook is placed by
+the clock (ClassicHookFlightPoint) and stopped at the first wall this end can
+see, so it moves smoothly between snapshots.  While the hook holds, the reel
+hums on this end, so nothing is broadcast for it.
+================
+*/
+void idPlayer::PresentClassicHook( void ) {
+	// a dedicated server draws nothing
+	if ( gameRenderWorld == NULL || ( gameLocal.isServer && !gameLocal.isListenServer ) ) {
+		return;
+	}
+	if ( classicHookState == CLASSIC_HOOK_NONE || !gameLocal.IsClassicRuleset() || spectating || health <= 0 || IsHidden() ) {
+		FreeClassicHookPresentation();
+		return;
+	}
+
+	idVec3 start;
+	const idPlayer *local = gameLocal.GetLocalPlayer();
+	idVec3 muzzle;
+	idMat3 muzzleAxis;
+	if ( local == this && !pm_thirdPerson.GetBool() ) {
+		start = firstPersonViewOrigin + firstPersonViewAxis[ 0 ] * 20.0f - firstPersonViewAxis[ 1 ] * 8.0f - firstPersonViewAxis[ 2 ] * 10.0f;
+	} else if ( weapon != NULL && weapon->flashJointWorld != INVALID_JOINT &&
+				weapon->GetGlobalJointTransform( false, weapon->flashJointWorld, muzzle, muzzleAxis ) ) {
+		// from the hands, which hold the weapon
+		start = muzzle;
+	} else {
+		start = GetPhysics()->GetOrigin() + idVec3( 0.0f, 0.0f, 48.0f );
+	}
+
+	idVec3 end = classicHookOrigin;
+	if ( classicHookState == CLASSIC_HOOK_FLYING ) {
+		end = ClassicHookFlightPoint( gameLocal.time );
+		trace_t tr;
+		gameLocal.TracePoint( this, tr, classicHookStart, end, MASK_SHOT_RENDERMODEL, this );
+		if ( tr.fraction < 1.0f ) {
+			end = tr.endpos - classicHookDir * 2.0f;
+		}
+	}
+
+	const bool reeling = ( classicHookState == CLASSIC_HOOK_ATTACHED );
+	// openQ4: a client starts and stops sounds only on a new frame, and this runs on
+	// replayed ones too. When the hook's catch was first seen on a replay the start was
+	// swallowed but remembered as made, so the reel never sounded; a stop first seen on
+	// one left it running. Wait for a frame that can make the change.
+	if ( reeling != classicHookReelSound && ( !gameLocal.isClient || gameLocal.isNewFrame ) ) {
+		if ( reeling ) {
+			StartSoundShader( declManager->FindSound( CLASSIC_HOOK_SND_REEL, false ), SND_CHANNEL_HEART, 0, false, NULL );
+		} else {
+			StopSound( SND_CHANNEL_HEART, false );
+		}
+		classicHookReelSound = reeling;
+	}
+
+	idVec3 dir = end - start;
+	if ( dir.Normalize() < 1.0f ) {
+		dir = viewAngles.ToForward();
+	}
+
+	idVec4 color( 1.0f, 0.85f, 0.4f, 1.0f );
+	if ( gameLocal.IsTeamGame() ) {
+		color = ( team == TEAM_MARINE ) ? idVec4( 0.35f, 0.65f, 1.0f, 1.0f ) : idVec4( 1.0f, 0.4f, 0.2f, 1.0f );
+	}
+
+	idRenderModel *beamModel = renderModelManager->FindModel( "_BEAM" );
+	if ( beamModel != NULL ) {
+		memset( &classicHookCable, 0, sizeof( classicHookCable ) );
+		classicHookCable.hModel = beamModel;
+		classicHookCable.customShader = declManager->FindMaterial( "textures/mptextures/mp_linepulse", false );
+		classicHookCable.origin = start;
+		classicHookCable.axis = mat3_identity;
+		classicHookCable.shaderParms[ SHADERPARM_RED ] = color[ 0 ];
+		classicHookCable.shaderParms[ SHADERPARM_GREEN ] = color[ 1 ];
+		classicHookCable.shaderParms[ SHADERPARM_BLUE ] = color[ 2 ];
+		classicHookCable.shaderParms[ SHADERPARM_ALPHA ] = color[ 3 ];
+		classicHookCable.shaderParms[ SHADERPARM_TIMEOFFSET ] = 2.0f;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_X ] = end.x;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_Y ] = end.y;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_END_Z ] = end.z;
+		classicHookCable.shaderParms[ SHADERPARM_BEAM_WIDTH ] = 3.0f;
+		classicHookCable.noShadow = true;
+		classicHookCable.bounds = beamModel->Bounds( &classicHookCable );
+		if ( classicHookCableHandle == -1 ) {
+			classicHookCableHandle = gameRenderWorld->AddEntityDef( &classicHookCable );
+		} else {
+			gameRenderWorld->UpdateEntityDef( classicHookCableHandle, &classicHookCable );
+		}
+	}
+
+	const idDict *nail = gameLocal.FindEntityDefDict( "projectile_nail", false );
+	idRenderModel *headModel = nail ? renderModelManager->FindModel( nail->GetString( "model" ) ) : NULL;
+	if ( headModel == NULL ) {
+		return;
+	}
+	memset( &classicHookHead, 0, sizeof( classicHookHead ) );
+	classicHookHead.hModel = headModel;
+	classicHookHead.origin = end;
+	classicHookHead.axis = dir.ToMat3();
+	classicHookHead.bounds = headModel->Bounds( &classicHookHead );
+	classicHookHead.shaderParms[ SHADERPARM_RED ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_GREEN ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_BLUE ] = 1.0f;
+	classicHookHead.shaderParms[ SHADERPARM_ALPHA ] = 1.0f;
+	if ( classicHookHeadHandle == -1 ) {
+		classicHookHeadHandle = gameRenderWorld->AddEntityDef( &classicHookHead );
+	} else {
+		gameRenderWorld->UpdateEntityDef( classicHookHeadHandle, &classicHookHead );
+	}
+}

@@ -81,7 +81,7 @@ def validate_engine_file_identity_contract() -> None:
 
 def validate_game_cache_contract() -> None:
     sp = read(GAME_LIBS_ROOT, "src/game/anim/Anim.cpp")
-    mp = read(GAME_LIBS_ROOT, "src/mpgame/anim/Anim.cpp")
+    mp = read(GAME_LIBS_ROOT, "src/game/anim/Anim.cpp")
 
     sp_shared = sp[sp.index("bool idAnimManager::forceExport") :]
     mp_shared = mp[mp.index("bool idAnimManager::forceExport") :]

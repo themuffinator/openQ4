@@ -17,13 +17,10 @@ Event are used for scheduling tasks and for linking script commands.
 #define D_EVENT_ENTITY				'e'
 #define	D_EVENT_ENTITY_NULL			'E'			// event can handle NULL entity pointers
 #define D_EVENT_TRACE				't'
-// jmarshall - 64bit
 #define D_EVENT_INTEGER64bit		'y'
-// jmarshall end
 
 #define MAX_EVENTS					8192		// Upped from 4096
 
-// stack size of idVec3, aligned to native pointer size
 #define E_EVENT_SIZEOF_VEC			((sizeof(idVec3) + (sizeof(intptr_t) - 1)) & ~(sizeof(intptr_t) - 1))
 
 class idClass;
@@ -96,6 +93,9 @@ public:
 	static bool					EventIsPosted( const idClass *obj, const idEventDef *evdef );
 // RAVEN END
 	static void					ClearEventList( void );
+	// Transactionally shift every posted gameplay event by one frozen frame.
+	// Returns false without mutation if any timestamp would overflow.
+	static bool					ShiftEvents( int deltaMsec );
 	static void					ServiceEvents( void );
 	static void					Init( void );
 	static void					Shutdown( void );

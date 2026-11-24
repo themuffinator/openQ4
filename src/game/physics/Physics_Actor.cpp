@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -267,8 +267,6 @@ idPhysics_Actor::ClipTranslation
 */
 void idPhysics_Actor::ClipTranslation( trace_t &results, const idVec3 &translation, const idClipModel *model ) const {
 	if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
 		gameLocal.TranslationModel( self, results, clipModel->GetOrigin(), clipModel->GetOrigin() + translation,
 								clipModel, clipModel->GetAxis(), clipMask,
 								model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
@@ -276,7 +274,6 @@ void idPhysics_Actor::ClipTranslation( trace_t &results, const idVec3 &translati
 	else {
 		gameLocal.Translation( self, results, clipModel->GetOrigin(), clipModel->GetOrigin() + translation,
 								clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END
 	}
 }
 
@@ -287,8 +284,6 @@ idPhysics_Actor::ClipRotation
 */
 void idPhysics_Actor::ClipRotation( trace_t &results, const idRotation &rotation, const idClipModel *model ) const {
 	if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple clip worlds
 		gameLocal.RotationModel( self, results, clipModel->GetOrigin(), rotation,
 								clipModel, clipModel->GetAxis(), clipMask,
 								model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
@@ -296,7 +291,6 @@ void idPhysics_Actor::ClipRotation( trace_t &results, const idRotation &rotation
 	else {
 		gameLocal.Rotation( self, results, clipModel->GetOrigin(), rotation,
 								clipModel, clipModel->GetAxis(), clipMask, self );
-// RAVEN END
 	}
 }
 

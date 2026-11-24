@@ -67,7 +67,7 @@ def stage(package: Path, runtime: Path, drop: str | None, stale: str | None, lef
         ):
             link_or_copy(source, runtime / source.name)
     for source in (package / "baseoq4").iterdir():
-        if source.is_file() and (source.name == "mod.json" or source.name.startswith("game-") or source.suffix == ".pk4"):
+        if source.is_file() and (source.name == "mod.json" or source.name.startswith("game_") or source.suffix == ".pk4"):
             if source.name == drop:
                 continue
             if source.name == stale:

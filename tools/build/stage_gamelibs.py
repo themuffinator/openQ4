@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
-"""Stage openQ4-game game sources into a temporary local tree.
+"""Stage a GameLibs checkout's game sources into a temporary local tree.
 
 usage: stage_gamelibs.py <project-root> <gamelibs-root> <stage-root> [--layer <layer-root>]
        stage_gamelibs.py --check-fresh <stage-root>
 
-With --layer, a game-library layer (see game_layer.py) is staged on top: its
-sources are copied into src/game/<id>/ and src/mpgame/<id>/ beside the
-unchanged openQ4-game trees, so they include base headers exactly as base
-sources do. A layer never replaces an openQ4-game file. --check-fresh exits
-0 when a stage still matches its recorded sources and 3 when it is stale.
+One game module, game_<arch>, serves both single-player and multiplayer, so
+the stage holds one game tree: src/game of the GameLibs root, beside the
+openQ4 support directories its sources include. Nothing else in the GameLibs
+root is staged; a leftover src/mpgame from the retired split modules is not
+part of the module and is ignored.
+
+With --layer, a game-library layer (see game_layer.py) is staged on top: every
+one of its source trees is copied into src/game/<id>/ inside the base game
+tree, so layer sources include base headers exactly as base sources do. A
+layer never replaces a base game file, and two of its trees may not provide
+the same path. --check-fresh exits 0 when a stage still matches its recorded
+sources and 3 when it is stale.
 
 Restaging updates an existing stage in place. A staged file whose bytes still
 match its source keeps its mtime, so ninja recompiles only what changed; new
@@ -39,6 +46,9 @@ OPENQ4_SUPPORT_DIRS = (
     "bse",
     "mayaimport",
 )
+
+# the one game source tree, relative to the GameLibs root and to the stage
+GAME_SOURCE_DIR = Path("src") / "game"
 
 MANIFEST_NAME = "openq4_gamelibs_stage_manifest.json"
 PYTHON_BYTECODE_SUFFIXES = (".pyc", ".pyo")
@@ -274,38 +284,38 @@ def write_stage_manifest(
 def plan_layer_sources(
     layer: dict, stage_root: Path, base_files: dict[Path, Path]
 ) -> tuple[dict[Path, Path], list[tuple[Path, Path]], list[Path]]:
-    """Plan a layer's source trees into src/<module>/<id>/ of the stage.
+    """Plan a layer's source trees into src/game/<id>/ of the stage.
 
-    A layer only ever adds files, so no staged openQ4-game file may sit in its
-    directories. The stage persists between runs and its layer directories
-    exist from the last one, so the check runs against the openQ4-game files
-    being staged (base_files), never against the stage on disk. Returns the
-    layer's planned files, its source roots, and its two module directories,
-    which exist even when a layer only feeds one of them.
+    Every layer source tree feeds the one game module, so all of them land in
+    that one directory and a path two trees both provide is refused. A layer
+    only ever adds files, so no staged base game file may sit in its
+    directory either. The stage persists between runs and the layer directory
+    exists from the last one, so that check runs against the base files being
+    staged (base_files), never against the stage on disk. Returns the layer's
+    planned files, its source roots, and its directory, which is kept even
+    while the layer's trees hold no files.
     """
     layer_id = layer["id"]
+    layer_rel = (GAME_SOURCE_DIR / layer_id).as_posix()
+    dest_root = stage_root / GAME_SOURCE_DIR / layer_id
+    if any(is_relative_to(path, dest_root) for path in base_files):
+        raise RuntimeError(f"the base game sources already have {layer_rel}; layer '{layer_id}' would replace it")
+
     planned: dict[Path, Path] = {}
     roots: list[tuple[Path, Path]] = []
     claimed: dict[Path, str] = {}
-    module_dirs = [stage_root / "src" / module / layer_id for module in ("game", "mpgame")]
-    for module, dest_root in zip(("game", "mpgame"), module_dirs):
-        if any(is_relative_to(path, dest_root) for path in base_files):
-            raise RuntimeError(f"openQ4-game already has src/{module}/{layer_id}; layer '{layer_id}' would replace it")
-
     for tree, source_dir in layer["sources"].items():
-        for module in game_layer.LAYER_TREE_MODULES[tree]:
-            dest_root = stage_root / "src" / module / layer_id
-            for dest_path, source_path in plan_regular_tree(source_dir, dest_root).items():
-                if dest_path in claimed:
-                    rel = dest_path.relative_to(dest_root).as_posix()
-                    raise RuntimeError(
-                        f"layer '{layer_id}' provides src/{module}/{layer_id}/{rel} "
-                        f"from both '{claimed[dest_path]}' and '{tree}'"
-                    )
-                claimed[dest_path] = tree
-                planned[dest_path] = source_path
-            roots.append((source_dir, dest_root))
-    return planned, roots, module_dirs
+        for dest_path, source_path in plan_regular_tree(source_dir, dest_root).items():
+            if dest_path in claimed:
+                rel = dest_path.relative_to(dest_root).as_posix()
+                raise RuntimeError(
+                    f"layer '{layer_id}' provides {layer_rel}/{rel} "
+                    f"from both '{claimed[dest_path]}' and '{tree}'"
+                )
+            claimed[dest_path] = tree
+            planned[dest_path] = source_path
+        roots.append((source_dir, dest_root))
+    return planned, roots, [dest_root]
 
 
 def check_stage_fresh(stage_root: Path) -> bool:
@@ -438,14 +448,10 @@ def main(argv: list[str]) -> int:
         return 1
     stage_root = raw_stage_root.resolve()
 
-    source_game_dirs = {
-        "game": gamelibs_root / "src" / "game",
-        "mpgame": gamelibs_root / "src" / "mpgame",
-    }
-    for module_name, source_game_dir in source_game_dirs.items():
-        if not source_game_dir.is_dir():
-            print(f"error: {module_name} source directory not found: {source_game_dir}", file=sys.stderr)
-            return 1
+    source_game_dir = gamelibs_root / GAME_SOURCE_DIR
+    if not source_game_dir.is_dir():
+        print(f"error: game source directory not found: {source_game_dir}", file=sys.stderr)
+        return 1
 
     if not project_root.is_dir():
         print(f"error: openQ4 root not found: {project_root}", file=sys.stderr)
@@ -458,11 +464,9 @@ def main(argv: list[str]) -> int:
             raise RuntimeError(f"refusing to stage over source repository: {stage_root}")
         # plan the whole stage before touching it, so a refused source leaves
         # the previous stage and its manifest as they were
-        planned: dict[Path, Path] = {}
-        source_roots: list[tuple[Path, Path]] = []
-        for module_name, source_game_dir in source_game_dirs.items():
-            planned.update(plan_game_sources(source_game_dir, stage_root / "src" / module_name))
-            source_roots.append((source_game_dir, stage_root / "src" / module_name))
+        stage_game_dir = stage_root / GAME_SOURCE_DIR
+        planned: dict[Path, Path] = plan_game_sources(source_game_dir, stage_game_dir)
+        source_roots: list[tuple[Path, Path]] = [(source_game_dir, stage_game_dir)]
         planned.update(plan_project_support_dirs(project_root, stage_root))
         for dir_name in OPENQ4_SUPPORT_DIRS:
             if (project_root / "src" / dir_name).is_dir():

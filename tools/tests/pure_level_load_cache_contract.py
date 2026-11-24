@@ -55,9 +55,9 @@ SOURCES = {
     "cm_load": "src/cm/CollisionModel_load.cpp",
     "cm_files": "src/cm/CollisionModel_files.cpp",
     "anim_sp": "src/game/anim/Anim.cpp",
-    "anim_mp": "src/mpgame/anim/Anim.cpp",
+    "anim_mp": "src/game/anim/Anim.cpp",
     "game_sp": "src/game/Game_local.cpp",
-    "game_mp": "src/mpgame/Game_local.cpp",
+    "game_mp": "src/game/Game_local.cpp",
 }
 
 TOKEN = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|[{}]', re.S)

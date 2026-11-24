@@ -59,7 +59,7 @@ def validate_mode(directory: str) -> None:
 
 def main() -> None:
     validate_mode("game")
-    validate_mode("mpgame")
+    validate_mode("game")
     validation = (ROOT / "tools" / "validation" / "openq4_validate.py").read_text(encoding="utf-8")
     require(validation, "weapon_zoom_view_alignment.py", "zoom presentation regression wiring")
     print("weapon zoom view alignment: ok")

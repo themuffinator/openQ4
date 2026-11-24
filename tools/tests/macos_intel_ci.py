@@ -58,7 +58,7 @@ def validate_engine_corridor() -> None:
         'if machine in {"x86_64", "amd64"}',
         'return "x64"',
         'f"openQ4-ded_{arch}"',
-        'f"game-mp_{arch}.dylib"',
+        'f"game_{arch}.dylib"',
     ):
         require(dedicated, token, "macOS dedicated smoke Intel support")
 
@@ -98,9 +98,7 @@ def validate_companion_corridor() -> None:
     workflow=read('.github/workflows/commit-validation.yml')
     for token in ("binary_arch = 'x64'", "binary_arch = 'arm64'"):
         require(meson,token,'canonical macOS game architecture')
-    for token in ("'-Wl,-install_name,@loader_path/' + game_sp_binary_name + '.dylib'",
-                  "'-Wl,-install_name,@loader_path/' + game_mp_binary_name + '.dylib'"):
-        require(modules,token,'canonical macOS game install names')
+    require(modules,"'-Wl,-install_name,@loader_path/' + game_binary_name + '.dylib'",'canonical macOS game install name')
     push=read('.github/workflows/push-verification.yml')
     for token in ('macos-15',"MACOSX_DEPLOYMENT_TARGET: \"11.0\""):
         require(workflow,token,'canonical macOS CI corridor')

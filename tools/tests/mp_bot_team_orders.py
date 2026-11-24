@@ -4,7 +4,7 @@
 A human player can order the bots on their own team in team chat - "kane
 defend", "everyone follow me", "sorg and bagby hold here" - and the objective
 planner honours the order before it shares roles out.  The parser is spliced
-verbatim from src/mpgame/bots/Bot.cpp into
+verbatim from src/game/bots/Bot.cpp into
 tools/tests/native/MpBotTeamOrdersFixture.cpp and run against phrasings that
 must and must not be orders; the wiring around it - who may give orders, when
 an order lapses, how every mode's planner reads it - is pinned by source.
@@ -19,9 +19,9 @@ import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-BOT = ROOT / "src/mpgame/bots/Bot.cpp"
-BOT_H = ROOT / "src/mpgame/bots/Bot.h"
-OBJECTIVE = ROOT / "src/mpgame/bots/BotObjective.cpp"
+BOT = ROOT / "src/game/bots/Bot.cpp"
+BOT_H = ROOT / "src/game/bots/Bot.h"
+OBJECTIVE = ROOT / "src/game/bots/BotObjective.cpp"
 
 
 def function(source: str, signature: str) -> str:

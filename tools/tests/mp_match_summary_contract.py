@@ -30,13 +30,13 @@ HARNESS = r'''
 #define ID_INLINE inline
 #include "idlib/containers/List.h"
 #include "idlib/containers/Pair.h"
-#include "mpgame/mp/GameTypeIds.h"
-#include "mpgame/mp/match/MatchSession.h"
-#include "mpgame/mp/match/MatchView.h"
-#include "mpgame/mp/match/MatchRules.h"
+#include "game/mp/GameTypeIds.h"
+#include "game/mp/match/MatchSession.h"
+#include "game/mp/match/MatchView.h"
+#include "game/mp/match/MatchRules.h"
 #define BIT(x) (1 << (x))
 struct idDict;
-#include "mpgame/mp/GameTypes.h"
+#include "game/mp/GameTypes.h"
 template<class T> static T Min(T a, T b) { return std::min(a, b); }
 static const int MAX_CLIENTS = 32, MAX_WEAPONS = 16;
 static const int MP_PLAYER_MINFRAGS = -100, MP_PLAYER_MAXFRAGS = 999;
@@ -436,8 +436,8 @@ def verify_gui() -> None:
 
 def main() -> None:
     verify_gui()
-    source = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
-    header = (ROOT / "src/mpgame/MultiplayerGame.h").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    header = (ROOT / "src/game/MultiplayerGame.h").read_text(encoding="utf-8")
     enum_end = header.index("} playerRankMode_t;") + len("} playerRankMode_t;")
     enum_start = header.rindex("typedef enum", 0, enum_end)
     production = "\n".join(function(source, signature) for signature in (
@@ -452,15 +452,15 @@ def main() -> None:
     cvar_names = set(re.findall(r'(si_\w+)\.(?:SetBool|SetInteger|SetFloat)', mirror))
     cvar_names.update(re.findall(r'MIRROR_MATCH_(?:BOOL|INT)\(\s*(si_\w+)', mirror))
     cvar_names.update(re.findall(r'SetCVar(?:Bool|Integer)\(\s*"(si_\w+)"', mirror))
-    cvar_source = (ROOT / "src/mpgame/gamesys/SysCvar.cpp").read_text(encoding="utf-8")
+    cvar_source = (ROOT / "src/game/gamesys/SysCvar.cpp").read_text(encoding="utf-8")
     cvar_declarations = []
     for name in sorted(cvar_names):
         declaration = re.search(r'^idCVar\s+' + name + r'\([^\n]+\);', cvar_source, re.MULTILINE)
         assert declaration, name
         cvar_declarations.append(declaration.group(0))
-    rules = (ROOT / "src/mpgame/mp/match/MatchRules.cpp").read_text(encoding="utf-8")
+    rules = (ROOT / "src/game/mp/match/MatchRules.cpp").read_text(encoding="utf-8")
     rules = re.sub(r'^#(?:include|pragma).*$', '', rules, flags=re.MULTILINE)
-    types = (ROOT / "src/mpgame/mp/GameTypes.cpp").read_text(encoding="utf-8")
+    types = (ROOT / "src/game/mp/GameTypes.cpp").read_text(encoding="utf-8")
     begin = types.index("static const mpGameTypeInfo_t mpGameTypeInfoTable[]")
     end = types.index("\n/*", types.index("const int mpNumGameTypeInfo", begin))
     definitions = types[begin:end] + "\n".join(function(types, signature) for signature in (
@@ -480,7 +480,7 @@ def main() -> None:
                        .replace("@RULE_CORE@", definitions + rules)
                        .replace("@PRODUCTION@", production), encoding="utf-8")
         command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-DMP_MATCH_SESSION_STANDALONE_TEST",
-                   f"-I{ROOT / 'src'}", str(cpp), str(ROOT / "src/mpgame/mp/match/MatchSession.cpp"), "-o", str(exe)]
+                   f"-I{ROOT / 'src'}", str(cpp), str(ROOT / "src/game/mp/match/MatchSession.cpp"), "-o", str(exe)]
         if os.environ.get("MP_MATCH_TEST_SANITIZERS") == "1":
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
         subprocess.run(command, cwd=ROOT, check=True)

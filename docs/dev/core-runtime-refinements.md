@@ -65,8 +65,7 @@ Five native suites are registered by `build_native_tests`:
 | `openq4-idlist` | All permutations of seven heap values, duplicates, aliased string growth/insertion, self-append, bounded assignment count for a 4096-element bulk append |
 | `openq4-interpolation` | Same-time mutations, rewinds, negative sample times, retiming, linear/sine endpoint changes and phase resets |
 | `openq4-bitmsg` | Empty/discard/truncated strings, invalid lengths, overflow cursor restore, empty-block alignment, binary deltas through 8192 bytes and truncated-baseline recovery/rejection |
-| `openq4-aas-tactical-game` | Production SP search ordering, reuse, stale results, area numbers above 32000, invalid graph edges and a subsequent smaller map |
-| `openq4-aas-tactical-mpgame` | The same cases compiled from the canonical MP implementation |
+| `openq4-aas-tactical-game` | Production search ordering, reuse, stale results, area numbers above 32000, invalid graph edges and a subsequent smaller map (one implementation serves both modes since CORE-07) |
 
 The container and motion tests include production headers. Bit-message and
 tactical tests compile the selected production declarations/methods verbatim,

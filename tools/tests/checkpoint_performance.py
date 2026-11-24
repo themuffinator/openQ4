@@ -107,7 +107,7 @@ def main():
     write_script(game / 'restored.cfg', restored + ['quit'])
     report = dict(command=args, preset=options.preset, quality=quality, developer=options.developer, log_mode=options.log_mode, runtime={str(path.relative_to(runtime)):
         hashlib.sha256(path.read_bytes()).hexdigest() for path in
-        (runtime / 'openQ4-client_x64.exe', runtime / 'baseoq4/game-sp_x64.dll', runtime / f'renderer-{options.render_api}_x64.dll')})
+        (runtime / 'openQ4-client_x64.exe', runtime / 'baseoq4/game_x64.dll', runtime / f'renderer-{options.render_api}_x64.dll')})
     (output / 'plan.json').write_text(json.dumps(report, indent=2), encoding='utf-8')
     code, timeout, elapsed = benchmark.launch_and_wait(runtime / 'openQ4-client_x64.exe',
         args, runtime, output / 'stdout.txt', output / 'stderr.txt', 180)

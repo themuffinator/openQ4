@@ -63,8 +63,8 @@ def point_distance(point: tuple[float, float, float],
 
 
 def main() -> None:
-    header = read("src/mpgame/bots/BotCombat.h")
-    source = read("src/mpgame/bots/BotCombat.cpp")
+    header = read("src/game/bots/BotCombat.h")
+    source = read("src/game/bots/BotCombat.cpp")
     source_lister = read("tools/build/list_sources.py")
 
     # Public helper boundary: no rvBot internals or persistent state.
@@ -290,7 +290,7 @@ def validate_penetrating_hitscan() -> None:
     def's penetrate is positive (the multiplayer railgun's is 1.0), so the bot
     traces the whole range the same way instead of stopping at the first hit.
     """
-    combat = read("src/mpgame/bots/BotCombat.cpp")
+    combat = read("src/game/bots/BotCombat.cpp")
     context = "penetrating hitscan team safety"
     check = function_body(combat, "static bool BotCombatPenetratingShotHitsTeamMate(")
     for token in (
@@ -309,7 +309,7 @@ def validate_penetrating_hitscan() -> None:
     require_before(line_of_fire, "MASK_SHOT_BOUNDINGBOX, shooter );",
                    "BotCombatPenetratingShotHitsTeamMate( shooter, shotOrigin, shotDirection )", context)
 
-    game = read("src/mpgame/Game_local.cpp")
+    game = read("src/game/Game_local.cpp")
     for token in (
         'penetrate = hitscanDict.GetFloat( "penetrate" );',
         "if ( ent->IsType ( idActor::GetClassType() ) && penetrate > 0.0f ) {",
@@ -325,7 +325,7 @@ def validate_team_knockback_throw() -> None:
     falloff and fudged multiplayer direction, idPlayer::Damage's knockback_team
     and g_knockback scale.  Both sides are pinned so they cannot drift apart.
     """
-    combat = read("src/mpgame/bots/BotCombat.cpp")
+    combat = read("src/game/bots/BotCombat.cpp")
     context = "team knockback throw"
     throw = function_body(combat, "static bool BotCombatSplashThrowsTeamMate(")
     for token in (
@@ -351,13 +351,13 @@ def validate_team_knockback_throw() -> None:
     require_before(line_of_fire, "BotCombatSplashThrowsShooter( shooter, splashIgnore, actualImpact, shotModel, impactTime )",
                    "const float selfDamage", "self trajectory before health-only splash trade")
 
-    game = read("src/mpgame/Game_local.cpp")
+    game = read("src/game/Game_local.cpp")
     radius = function_body(game, "void idGameLocal::RadiusDamage(")
     require(radius, "idVec3( 0.0f, 0.0f, 31.875f )", "RadiusDamage push direction the bot predicts")
     require(radius, "dir[2] += 24;", "RadiusDamage push direction the bot predicts")
     require(radius, "damageScale = dmgPower * ( 1.0f - dist / radius );", "RadiusDamage falloff the bot predicts")
     require(radius, "damageScale *= attackerDamageScale;", "RadiusDamage self falloff")
-    player = read("src/mpgame/Player.cpp")
+    player = read("src/game/Player.cpp")
     require(player, 'damageDef->dict.GetInt( "knockback_team", va( "%d", knockback ), knockback );', "player team knockback")
     require(player, "kick *= g_knockback.GetFloat() * knockback * attackerPushScale / 200.0f;", "player knockback scale")
 

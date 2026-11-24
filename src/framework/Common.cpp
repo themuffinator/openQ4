@@ -7442,7 +7442,7 @@ void idCommonLocal::Async( void ) {
 }
 
 // Mirror of the multiplayer rows in the GameLibs descriptor table
-// (src/mpgame/mp/GameTypes.cpp), including whether each row is selectable. The
+// (src/game/mp/GameTypes.cpp), including whether each row is selectable. The
 // engine has to choose a game module before any module is loaded, so it cannot
 // ask the game for its own table; tools/tests/game_type_module_selection.py
 // cross-checks the two tables.
@@ -7553,13 +7553,18 @@ static const char *openQ4_SelectGameModuleBaseName( void ) {
 #else
 	#define OPENQ4_MODULE_ARCH_TAG "unknown"
 #endif
-static void openQ4_BuildGameModuleBinaryNameForArch( const char *moduleName, const char *archTag, char outName[ MAX_OSPATH ] ) {
-	const char *variant = ( moduleName && idStr::Icmp( moduleName, "game_mp" ) == 0 ) ? "mp" : "sp";
-	idStr::snPrintf( outName, MAX_OSPATH, "game-%s_%s", variant, archTag );
+// One library (game_<arch>) serves both logical modules; game_sp and game_mp
+// name the mode it is loaded for (CORE-07).
+static void openQ4_BuildGameModuleBinaryNameForArch( const char *archTag, char outName[ MAX_OSPATH ] ) {
+	idStr::snPrintf( outName, MAX_OSPATH, "game_%s", archTag );
 }
 
-static void openQ4_BuildGameModuleBinaryName( const char *moduleName, char outName[ MAX_OSPATH ] ) {
-	openQ4_BuildGameModuleBinaryNameForArch( moduleName, OPENQ4_MODULE_ARCH_TAG, outName );
+static void openQ4_BuildGameModuleBinaryName( char outName[ MAX_OSPATH ] ) {
+	openQ4_BuildGameModuleBinaryNameForArch( OPENQ4_MODULE_ARCH_TAG, outName );
+}
+
+static gameModuleMode_t openQ4_GameModuleMode( const char *moduleName ) {
+	return ( moduleName != NULL && idStr::Icmp( moduleName, "game_mp" ) == 0 ) ? GAME_MODULE_MULTIPLAYER : GAME_MODULE_SINGLEPLAYER;
 }
 
 static void openQ4_DisableBSEWithWarning( const char *reason, bool showDialog = true ) {
@@ -7726,16 +7731,16 @@ void idCommonLocal::LoadGameDLL( void ) {
 
 	Com_SetGameModuleLoadPhase( GAME_MODULE_PHASE_LOCATE );
 
-	openQ4_BuildGameModuleBinaryName( gameModuleBaseName, preferredGameModuleBinary );
+	openQ4_BuildGameModuleBinaryName( preferredGameModuleBinary );
 	selectedModuleBinary = preferredGameModuleBinary;
 	fileSystem->FindDLL( selectedModuleBinary, dllPath, true );
 
 #if defined( MACOS_X ) || defined( __APPLE__ )
 	// Thin packages retain architecture-specific module names. A universal2
-	// package instead carries a single two-slice module per game variant, so
-	// both executable slices must converge on the same trusted module name.
+	// package instead carries a single two-slice module, so both executable
+	// slices must converge on the same trusted module name.
 	if ( !dllPath[ 0 ] ) {
-		openQ4_BuildGameModuleBinaryNameForArch( gameModuleBaseName, "universal2", universalGameModuleBinary );
+		openQ4_BuildGameModuleBinaryNameForArch( "universal2", universalGameModuleBinary );
 		fileSystem->FindDLL( universalGameModuleBinary, dllPath, true );
 		if ( dllPath[ 0 ] ) {
 			selectedModuleBinary = universalGameModuleBinary;
@@ -7796,6 +7801,7 @@ void idCommonLocal::LoadGameDLL( void ) {
 	gameImport.bse						= ::bse;
 	gameImport.vrSystem					= ::vrSystem;
 	gameImport.usercmdGen				= ::usercmdGen;
+	gameImport.mode						= openQ4_GameModuleMode( gameModuleBaseName );
 
 	Com_SetGameModuleLoadPhase( GAME_MODULE_PHASE_CALL_GET_GAME_API );
 	const gameExport_t *gameExportPtr = GetGameAPI( &gameImport );

@@ -670,7 +670,7 @@ def test_the_game_applies_the_overlays_to_every_player_including_bots():
     nothing here may key on being a bot. Verified in a live match: with nine bots
     the diagnostic reports 'applied as enemy' for each of them."""
 
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         print(f"renderer_player_visibility: skipped game checks (no GameLibs checkout at {GAME_LIBS_ROOT})")
         return
@@ -700,7 +700,7 @@ def test_the_game_applies_the_overlays_to_every_player_including_bots():
 
 
 def test_the_visibility_diagnostic_does_not_repeat_itself():
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -934,7 +934,7 @@ def test_the_view_build_adds_forced_outlines_last():
 
 
 def test_spectators_see_every_player_through_the_world():
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -973,7 +973,7 @@ def test_spectators_see_every_player_through_the_world():
 
 
 def test_spectator_colours_mean_something_in_team_games():
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -1012,7 +1012,7 @@ def test_pvs_replication_is_exempted_only_where_the_viewer_is_entitled():
     enemy position. Widening it for allies and spectators is the feature; widening
     it for opponents would make a wallhack a matter of reading packets."""
 
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 

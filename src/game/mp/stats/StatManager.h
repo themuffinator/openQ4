@@ -287,6 +287,14 @@ public:
 	void						SetupStatWindow( idUserInterface* statHud );
 	void						SelectStatWindow( int selectionIndex, int selectionTeam );
 	int							GetSelectedClientNum( int* selectionIndexOut = NULL, int* selectionTeamOut = NULL );
+	// openQ4: resolve a stat window list index/team pair to a client num without changing
+	// the current stat selection, and with no side effects - no gui selection writes and no
+	// warning - so a per-frame poller can use it.  The window itself is not reachable from
+	// outside the stat manager.
+	int							ResolveSelection( int selectionIndex, int selectionTeam ) const;
+	// openQ4: a client asks the server for a player's stats, one request at a
+	// time; the reply updates GetPlayerStat( clientNum )
+	void						RequestPlayerStat( int clientNum );
 
 	//asalmon: Sends all stats to all clients.  For Xenon periodic update of stats.
 	void						SendAllStats( int clientNum = -1, bool full = true );
@@ -311,6 +319,12 @@ private:
 	// local hud support
 	int							localInGameAwards[ IGA_NUM_AWARDS ];
 	int							inGameAwardHudTime;
+
+	// openQ4: throttling state for the in-game stat window, which used to be rebuilt from
+	// scratch on every render frame the stats key was held down
+	int							statWindowUpdateTime;
+	int							statWindowSpectator;
+	bool						statWindowVisible;
 
 	rvPlayerStat				playerStats[ MAX_CLIENTS ];
 

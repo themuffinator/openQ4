@@ -650,7 +650,7 @@ def main() -> None:
                  "tools/tests/sound_distance_retail_compare.py"):
         report["source_sha256"][name] = sha(ROOT / name)
     executable = runtime / "openQ4-client_x64.exe"
-    for path in (executable, runtime / "baseoq4/game-sp_x64.dll", runtime / "OpenAL32.dll",
+    for path in (executable, runtime / "baseoq4/game_x64.dll", runtime / "OpenAL32.dll",
                  runtime / "baseoq4/pak0.pk4"):
         if path.is_file():
             report["runtime_sha256"][path.relative_to(runtime).as_posix()] = sha(path)

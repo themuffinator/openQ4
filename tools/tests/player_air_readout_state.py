@@ -13,16 +13,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> int:
-    player = (ROOT / "src/mpgame/Player.cpp").read_text()
-    header = (ROOT / "src/mpgame/PlayerAirReadout.h").read_text()
-    network = (ROOT / "src/mpgame/Game_network.cpp").read_text()
+    player = (ROOT / "src/game/Player.cpp").read_text()
+    header = (ROOT / "src/game/PlayerAirReadout.h").read_text()
+    network = (ROOT / "src/game/Game_network.cpp").read_text()
     codec = block(player, "void idPlayer::WriteAirReadoutMessage(")
     getter = block(player, "int idPlayer::GetAirReadoutPercent(")
     event = player.split("bool idPlayer::ClientReceiveEvent(", 1)[1]
     receiver = block(event, "case EVENT_AIR_READOUT:").replace("case EVENT_AIR_READOUT:", "")
-    assert player.count("airReadout.Reset( gameLocal.time );") == 2 and player.count("airPublishClock.Reset();") == 2
+    # One Player.cpp serves both modes. Each (re)spawned player starts with a fresh readout and
+    # publish clock. game_mp also reset both in its Restore; the merged Restore keeps the campaign's
+    # save text, and a restored (campaign) player never reads that state: the readout is a network
+    # client's and the publication a network server's, and isMultiplayer is isServer || isClient.
+    init = block(player, "void idPlayer::Init( void )")
+    assert player.count("airReadout.Reset( gameLocal.time );") == 1 and player.count("airPublishClock.Reset();") == 1
+    assert "airReadout.Reset( gameLocal.time );\n\tairPublishClock.Reset();" in init.replace("\r\n", "\n")
+    assert "gameLocal.isClient && airReadout.percent >= 0 ? airReadout.percent :" in getter
     assert 'SetStateInt( "player_air", GetAirReadoutPercent() )' in block(player, "void idPlayer::UpdateHudStats(")
-    assert "airPublishClock.Admit" in block(player, "void idPlayer::UpdateAir(")
+    assert "if ( gameLocal.isServer && gameLocal.isNewFrame &&\n\t\tairPublishClock.Admit" in block(player, "void idPlayer::UpdateAir(").replace("\r\n", "\n")
     assert "WriteAirReadoutMessage( outMsg, true )" in block(network, "void idGameLocal::ServerWriteInitialReliableMessages(")
     bootstrap = block(network, "void idGameLocal::ServerWriteServerDemoSnapshot(")
     assert "sequence == 1" in bootstrap and "GAME_UNRELIABLE_RECORD_CLIENTNUM" in bootstrap and "route.WriteChar( -1 )" in bootstrap

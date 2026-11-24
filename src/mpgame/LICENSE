@@ -1,7 +1,0 @@
-This directory contains Quake 4 SDK-derived multiplayer game code subject to
-the Quake 4 Software Development Kit Limited Use License Agreement.
-
-The complete agreement is retained at ../../LICENSES/QUAKE-4-SDK-EULA.rtf.
-Original notices and explicitly identified third-party terms remain applicable.
-This notice does not relicense SDK code under the engine's GPL licence.
-See ../../LICENSING.md and ../../docs/dev/game-source-provenance.md.

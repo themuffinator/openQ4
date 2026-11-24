@@ -50,11 +50,11 @@ def before(text: str, first: str, second: str, label: str) -> None:
 
 
 def check_votes() -> None:
-    header = read("src/mpgame/MultiplayerGame.h")
-    game = read("src/mpgame/MultiplayerGame.cpp")
-    network = read("src/mpgame/Game_network.cpp")
-    commands = read("src/mpgame/gamesys/SysCmds.cpp")
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    header = read("src/game/MultiplayerGame.h")
+    game = read("src/game/MultiplayerGame.cpp")
+    network = read("src/game/Game_network.cpp")
+    commands = read("src/game/gamesys/SysCmds.cpp")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
 
     for name, value in (("NEXTMAP", 0x1000), ("ROUNDLIMIT", 0x2000), ("RULESET", 0x4000), ("INSTAGIB", 0x8000),
                         ("OVERTIME", 0x10000), ("COINTOSS", 0x20000), ("RANDOMMAP", 0x40000), ("READYALL", 0x80000)):
@@ -153,12 +153,12 @@ def check_votes() -> None:
 
 
 def check_timeouts() -> None:
-    game = read("src/mpgame/MultiplayerGame.cpp")
-    rules = read("src/mpgame/mp/match/MatchRules.cpp")
-    operations = read("src/mpgame/mp/match/MatchOperations.cpp")
-    operations_h = read("src/mpgame/mp/match/MatchOperations.h")
-    network = read("src/mpgame/Game_network.cpp")
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    game = read("src/game/MultiplayerGame.cpp")
+    rules = read("src/game/mp/match/MatchRules.cpp")
+    operations = read("src/game/mp/match/MatchOperations.cpp")
+    operations_h = read("src/game/mp/match/MatchOperations.h")
+    network = read("src/game/Game_network.cpp")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
 
     require(re.search(r'"si_timeouts",\s*"0",[^\n]*CVAR_SERVERINFO[^\n]*, 0, 10 \);', cvars) is not None, "si_timeouts defaults to none")
     require(re.search(r'"si_timeoutLength",\s*"60",[^\n]*, 10, 600 \);', cvars) is not None, "si_timeoutLength defaults to a minute")
@@ -218,12 +218,12 @@ def check_timeouts() -> None:
 
 
 def check_policies() -> None:
-    player = read("src/mpgame/Player.cpp")
-    player_h = read("src/mpgame/Player.h")
-    game = read("src/mpgame/MultiplayerGame.cpp")
-    session = read("src/mpgame/mp/match/MatchSession.cpp")
-    session_h = read("src/mpgame/mp/match/MatchSession.h")
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    player = read("src/game/Player.cpp")
+    player_h = read("src/game/Player.h")
+    game = read("src/game/MultiplayerGame.cpp")
+    session = read("src/game/mp/match/MatchSession.cpp")
+    session_h = read("src/game/mp/match/MatchSession.h")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
 
     require(re.search(r'"si_spectatorLock",\s*"0",[^\n]*CVAR_SERVERINFO[^\n]*, 0, 2 \);', cvars) is not None, "si_spectatorLock defaults off")
     require(re.search(r'"g_inactivity",\s*"0",[^\n]*, 0, 3600 \);', cvars) is not None, "g_inactivity defaults off")
@@ -311,7 +311,7 @@ def check_strings() -> None:
             require(string_id in values and values[string_id].strip(), f"{language} defines {string_id}")
             require(values[string_id].count("%d") == english[string_id].count("%d") and values[string_id].count("%s") == english[string_id].count("%s"),
                     f"{language} {string_id} keeps the placeholders")
-    sources = "".join(read(path) for path in ("src/mpgame/MultiplayerGame.cpp", "src/mpgame/Player.cpp"))
+    sources = "".join(read(path) for path in ("src/game/MultiplayerGame.cpp", "src/game/Player.cpp"))
     referenced = set(re.findall(r'"(#str_427[5-8]\d)"', sources))
     for string_id in referenced:
         require(string_id in english, f"{string_id} used by the game code exists in the English table")
@@ -320,9 +320,9 @@ def check_strings() -> None:
 
 
 def check_intermission() -> None:
-    game = read("src/mpgame/MultiplayerGame.cpp")
-    host = read("src/mpgame/mp/MapDatabaseHost.cpp")
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    game = read("src/game/MultiplayerGame.cpp")
+    host = read("src/game/mp/MapDatabaseHost.cpp")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
 
     require(re.search(r'"g_intermissionAnnounce",\s*"0",\s*CVAR_GAME \| CVAR_ARCHIVE \| CVAR_BOOL,', cvars) is not None,
             "g_intermissionAnnounce defaults off: a casual server keeps Quake 4's quiet scoreboard")

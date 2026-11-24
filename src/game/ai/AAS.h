@@ -102,7 +102,7 @@ public:
 // bdube: added
 								// Returns a reachable point inside the given area.
 	virtual float				AreaRadius( int areaNum ) const = 0;
-	virtual const idBounds &	AreaBounds( int areaNum ) const = 0;
+	virtual const idBounds &		AreaBounds( int areaNum ) const = 0;
 	virtual float				AreaCeiling( int areaNum ) const = 0;
 // RAVEN END	
 								// Returns the area flags.

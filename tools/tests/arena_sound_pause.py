@@ -156,7 +156,7 @@ int main() {
 
 
 def source() -> str:
-    multiplayer = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    multiplayer = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     sound = (ROOT / "src/sound/snd_world.cpp").read_text(encoding="utf-8")
     session = (ROOT / "src/framework/Session.cpp").read_text(encoding="utf-8")
     menu = (ROOT / "src/framework/Session_menu.cpp").read_text(encoding="utf-8")

@@ -11,8 +11,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchSeries.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchSeries.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchSeries.h"
+SOURCE = ROOT / "src/game/mp/match/MatchSeries.cpp"
 
 
 def read(path: Path) -> str:
@@ -71,7 +71,7 @@ def static_contracts(header: str, source: str) -> None:
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchSeries.h"
+#include "game/mp/match/MatchSeries.h"
 #include <string.h>
 
 #define CHECK(condition) do { if (!(condition)) { return __LINE__; } } while (0)

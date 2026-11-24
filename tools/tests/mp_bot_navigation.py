@@ -103,7 +103,7 @@ def validate_engine() -> None:
 
 
 def validate_game_wiring() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         print(f"mp_bot_navigation: skipped game checks (no GameLibs checkout at {GAME_LIBS_ROOT})")
         return
@@ -117,7 +117,8 @@ def validate_game_wiring() -> None:
         "botManager.Think();",
         "idGameLocal::RunFrame",
     )
-    run_frame = game_local[game_local.index("gameReturn_t idGameLocal::RunFrame") :][:6000]
+    run_frame_start = game_local.index("gameReturn_t idGameLocal::RunFrame")
+    run_frame = game_local[run_frame_start : game_local.index("\n}\n", run_frame_start)]
     require_order(run_frame, "botManager.Think();", "SetupPlayerPVS();", "idGameLocal::RunFrame")
     player = read(mp / "Player.cpp")
     player_think = player[player.index("void idPlayer::Think( void )"):player.index("void idPlayer::ThinkMatchPaused(")]
@@ -424,7 +425,7 @@ def validate_game_wiring() -> None:
 
 
 def validate_navmesh() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -473,10 +474,11 @@ def validate_navmesh() -> None:
 
     # A listen server reads no snapshots, so its RunFrame clears the debug
     # lines that bot_debugNav draws or the renderer's line pool fills up.
-    game_local = (GAME_LIBS_ROOT / "src/mpgame/Game_local.cpp").read_text(encoding="utf-8")
+    game_local = (GAME_LIBS_ROOT / "src/game/Game_local.cpp").read_text(encoding="utf-8")
     run_frame = game_local[game_local.index("gameReturn_t idGameLocal::RunFrame(") :]
     run_frame = run_frame[: run_frame.index("\tdo {")]
-    require(run_frame, "gameRenderWorld->DebugClear( time );", "MP server frame debug line clear")
+    # (the campaign keeps the retail clear of every line, time 0)
+    require(run_frame, "gameRenderWorld->DebugClear( isMultiplayer ? time : 0 );", "MP server frame debug line clear")
 
     # Closed proximity doors are usable traversal, not permanent holes in a
     # graph that happens to be generated before the first player approaches.
@@ -863,7 +865,7 @@ def validate_navmesh() -> None:
 
 
 def validate_cvars() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -880,23 +882,21 @@ def validate_cvars() -> None:
         "bot_navCellSize",
         "bot_pause",
     ):
-        require(declared, f'idCVar {name}(', "mpgame SysCvar.cpp")
-        require(exported, f"extern idCVar {name};", "mpgame SysCvar.h")
+        require(declared, f'idCVar {name}(', "game SysCvar.cpp")
+        require(exported, f"extern idCVar {name};", "game SysCvar.h")
 
-    # These legacy SP bot diagnostics share global names with the richer MP
-    # diagnostics. Keep their declaration signatures aligned so loading SP
-    # before MP cannot leave the CVar system with conflicting types or policy.
-    for name in ("bot_debug", "bot_debugnav"):
-        sp_signature = cvar_signature(sp_bots, name, "game bots/Bot.cpp")
-        mp_signature = cvar_signature(declared, name, "mpgame SysCvar.cpp")
-        if sp_signature != mp_signature:
-            raise AssertionError(f"SP/MP bot CVar signatures differ for {name!r}")
-        if "CVAR_INTEGER" not in sp_signature[1] or "CVAR_BOOL" in sp_signature[1]:
-            raise AssertionError(f"{name} must retain the shared integer diagnostic type")
+    # The single-player module's older bot fork declared its own bot_debug and
+    # bot_debugnav; one game module (CORE-07) declares each bot cvar once.
+    for name in ("bot_debug", "bot_debugNav"):
+        if f'idCVar {name}(' in sp_bots or f'idCVar {name.lower()}(' in sp_bots:
+            raise AssertionError(f"{name} is declared again in bots/Bot.cpp")
+        signature = cvar_signature(declared, name, "game SysCvar.cpp")
+        if "CVAR_INTEGER" not in signature[1] or "CVAR_BOOL" in signature[1]:
+            raise AssertionError(f"{name} must retain the integer diagnostic type")
 
     commands = read(mp / "gamesys" / "SysCmds.cpp")
     for command in ("addbot", "removebot", "kickbots", "botlist", "navmesh"):
-        require(commands, f'"{command}"', "mpgame console commands")
+        require(commands, f'"{command}"', "game console commands")
 
 
 def validate_liquid_dive() -> None:
@@ -906,7 +906,7 @@ def validate_liquid_dive() -> None:
     to surface whenever its eyes were under water and then trod water above that
     corner until the stuck check gave up.  Lava and slime still always climb.
     """
-    bot = read(GAME_LIBS_ROOT / "src/mpgame/bots/Bot.cpp")
+    bot = read(GAME_LIBS_ROOT / "src/game/bots/Bot.cpp")
     context = "rvBot::UpdateLiquidMovement dive"
     body = bot[bot.index("void rvBot::UpdateLiquidMovement(") :]
     body = body[: body.index("\n}\n") + 3]
@@ -922,14 +922,14 @@ def validate_liquid_dive() -> None:
     require_order(body, "cmd.upmove = -127;", "if ( LiquidAtEye() ) {", context)
     require(bot, "const float BOT_LIQUID_DIVE_DEPTH\t= 16.0f;", context)
 
-    player_h = read(GAME_LIBS_ROOT / "src/mpgame/Player.h")
+    player_h = read(GAME_LIBS_ROOT / "src/game/Player.h")
     require(player_h, "GetAirTics( void ) const { return airTics; }", "idPlayer air accessor")
 
     # "Half the reservoir is six seconds of stock air": underwater the whole
     # pm_air reservoir drains over pm_waterAir frames at 60 Hz.
-    player = read(GAME_LIBS_ROOT / "src/mpgame/Player.cpp")
+    player = read(GAME_LIBS_ROOT / "src/game/Player.cpp")
     require(player, "airDrain = fullAir / waterAir;", "idPlayer::UpdateAir underwater drain")
-    cvars = read(GAME_LIBS_ROOT / "src/mpgame/gamesys/SysCvar.cpp")
+    cvars = read(GAME_LIBS_ROOT / "src/game/gamesys/SysCvar.cpp")
     air, _ = cvar_signature(cvars, "pm_air", "SysCvar.cpp")
     water_air, _ = cvar_signature(cvars, "pm_waterAir", "SysCvar.cpp")
     if (air, water_air) != ("1800", "720") or int(water_air) // 2 != 6 * 60:

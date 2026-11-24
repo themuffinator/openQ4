@@ -127,9 +127,9 @@ counts `seq` gaps and starts over on a `stream` line.
 
 | File | Role |
 | --- | --- |
-| `src/mpgame/mp/LiveEvents.h` | The state that is compared, the line builder and the diff. No engine dependency. |
-| `src/mpgame/mp/LiveEventStream.cpp` | Captures the state from the game, owns the file, declares both cvars and asserts that the header's tables match the game's enums. One class, `mpLiveEventStream`, of two kinds: `LIVE` and `MATCH_LOG`. |
-| `src/mpgame/MultiplayerGame.cpp` | Calls `liveEvents.Update()` once a frame on servers and clients, `Kill()` where a death is scored (server) or received (client), and `Close()` on reset and shutdown; and the same on `matchLog`, which acts only on a server with `g_matchLog` set. |
+| `src/game/mp/LiveEvents.h` | The state that is compared, the line builder and the diff. No engine dependency. |
+| `src/game/mp/LiveEventStream.cpp` | Captures the state from the game, owns the file, declares both cvars and asserts that the header's tables match the game's enums. One class, `mpLiveEventStream`, of two kinds: `LIVE` and `MATCH_LOG`. |
+| `src/game/MultiplayerGame.cpp` | Calls `liveEvents.Update()` once a frame on servers and clients, `Kill()` where a death is scored (server) or received (client), and `Close()` on reset and shutdown; and the same on `matchLog`, which acts only on a server with `g_matchLog` set. |
 
 ## Checks
 

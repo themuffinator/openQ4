@@ -10,7 +10,7 @@ at both widths for one to six players and splices in, verbatim:
 
   * MVD_StartStateMatchesPlayers and idMultiViewDemo::ValidateNetworkStateRecord
     from src/framework/async/MultiViewDemo.cpp, and
-  * MP_StartStatePowerupBits from src/mpgame/MultiplayerGame.cpp.
+  * MP_StartStatePowerupBits from src/game/MultiplayerGame.cpp.
 
 Both layouts must validate and be read at their own width; malformed start
 states must be refused at every width. Single-reversal controls re-run the
@@ -87,7 +87,7 @@ def compile_and_run(source: str, directory: Path, name: str, compiler: str) -> s
 
 def main() -> None:
     mvd = (ROOT / "src/framework/async/MultiViewDemo.cpp").read_text(encoding="utf-8")
-    game = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    game = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     reader = block(game, "void idMultiplayerGame::ClientReadStartState(")
     for token in ("const int powerupBits = gameLocal.RetailSnapshotFormat() ? 16 : MP_StartStatePowerupBits( msg );",
                   "msg.GetRemainingReadBits() < powerupBits + ASYNC_PLAYER_INSTANCE_BITS + 1",

@@ -681,7 +681,7 @@ def validate_session_source_contract() -> None:
 
 
 def validate_gamelibs_save_payload_contract() -> None:
-    for module in ("game", "mpgame"):
+    for module in ("game",):
         save_header = read_game_libs(f"src/{module}/gamesys/SaveGame.h")
         save_source = read_game_libs(f"src/{module}/gamesys/SaveGame.cpp")
         game_header = read_game_libs(f"src/{module}/Game_local.h")
@@ -938,8 +938,7 @@ def validate_gamelibs_save_payload_contract() -> None:
         "generate_savegame_compat_header.py",
         "openq4_savegame_compat_generated.h",
         "savegame_compat_header = custom_target",
-        "game_sp_sources += [savegame_compat_header, generated_version_header]",
-        "game_mp_sources += [savegame_compat_header, generated_version_header]",
+        "game_module_sources = game_sources + [savegame_compat_header, generated_version_header]",
         "openq4_engine_sources += [savegame_compat_header]",
         "depend_files: files(engine_source_paths) + game_sources",
     ):
@@ -956,7 +955,7 @@ def validate_gamelibs_save_payload_contract() -> None:
         "PROJECT_SCAN_DIRS",
         "GAME_SCAN_DIRS",
         '"src/game"',
-        '"src/mpgame"',
+        '"src/game"',
     ):
         require(generator, token, "savegame compatibility header generator")
 
@@ -1256,7 +1255,7 @@ def validate_gui_stream_alignment_contract() -> None:
     ):
         require(ui_source, token, "top-level GUI positional restore validation")
 
-    for game in ("game", "mpgame"):
+    for game in ("game",):
         require(read(f"src/{game}/gamesys/SaveGame.cpp"),
                 "aborting before its positional state payload can desynchronize the stream",
                 "serialized GUI restore boundary")
@@ -1735,7 +1734,7 @@ def validate_restore_teardown_lists() -> None:
     unset pointers or unresolved signal functions. Restored physics objects are
     attached to the entity restoring them instead of a saved owner pointer.
     """
-    for module in ("game", "mpgame"):
+    for module in ("game",):
         entity = read_game_libs(f"src/{module}/Entity.cpp")
         signals = entity[entity.index("bool readsignals;"):entity.index("savefile->ReadInt( mpGUIState );")]
         require(signals, "num > MAX_SIGNAL_THREADS", f"{module} signal count bound")

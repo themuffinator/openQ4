@@ -30,9 +30,9 @@ GAME_LIBS_ROOT = Path(os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT)).resolve()
 
 SOURCES = {
     "mvd": ROOT / "src" / "framework" / "async" / "MultiViewDemo.cpp",
-    "game_local": GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.h",
-    "moveable": GAME_LIBS_ROOT / "src" / "mpgame" / "client" / "ClientMoveable.cpp",
-    "game_network": GAME_LIBS_ROOT / "src" / "mpgame" / "Game_network.cpp",
+    "game_local": GAME_LIBS_ROOT / "src" / "game" / "Game_local.h",
+    "moveable": GAME_LIBS_ROOT / "src" / "game" / "client" / "ClientMoveable.cpp",
+    "game_network": GAME_LIBS_ROOT / "src" / "game" / "Game_network.cpp",
 }
 
 

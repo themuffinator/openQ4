@@ -53,7 +53,7 @@ def validate_runner() -> None:
         "IsWow64Process2",
         'f"arm64 binaries cannot start on this {host_arch} host"',
         'f"openQ4-ded_{arch}.exe"',
-        'f"game-mp_{arch}.dll"',
+        'f"game_{arch}.dll"',
         'executable.parent / "OpenAL32.dll"',
         'require_pe_arch(executable, arch, "dedicated-server executable")',
         'require_pe_arch(game_module, arch, "multiplayer game module")',

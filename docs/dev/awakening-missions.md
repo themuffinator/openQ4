@@ -1608,7 +1608,7 @@ restore. The Awakening's scripts move Tak constantly and repair armour at 35 or
 less, so a repair interrupted by the next scene was routine. Stock never showed
 it: its medics and techs carry no weapon.
 
-The fix (`src/game/ai/AI_Medic.cpp`, mirrored in `src/mpgame/`):
+The fix (`src/game/ai/AI_Medic.cpp`):
 
 - `patientPassive` records that the current passivity is the heal's.
   `RestorePatientCombatFlags` gives the remembered awareness and ignore-enemies

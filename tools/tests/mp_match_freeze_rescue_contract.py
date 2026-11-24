@@ -150,7 +150,7 @@ int main() {
 
 
 def main() -> None:
-    source = (ROOT / "src/mpgame/mp/RoundModes.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/mp/RoundModes.cpp").read_text(encoding="utf-8")
     bodies = function(source, "bool rvFreezeTagGameState::CanReachToThaw(")
     bodies += function(source, "void rvFreezeTagGameState::Run(")
     compiler = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("g++")

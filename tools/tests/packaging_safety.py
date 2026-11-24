@@ -400,9 +400,9 @@ def validate_list_sources_guards() -> None:
 # guard/copy fixture must use the host platform's artifact names; explicit
 # per-platform policy output is pinned by validate_fast_stage_cross_platform_policy.
 FAST_STAGE_HOST_FIXTURES = {
-    "win32": ("openQ4-client_x64.exe", "renderer-gl_x64.dll", "game-sp_x64.dll"),
-    "linux": ("openQ4-client_x64", "renderer-gl_x64.so", "game-sp_x64.so"),
-    "darwin": ("openQ4-client_x64", "renderer-vk_x64.dylib", "game-sp_x64.dylib"),
+    "win32": ("openQ4-client_x64.exe", "renderer-gl_x64.dll", "game_x64.dll"),
+    "linux": ("openQ4-client_x64", "renderer-gl_x64.so", "game_x64.so"),
+    "darwin": ("openQ4-client_x64", "renderer-vk_x64.dylib", "game_x64.dylib"),
 }
 
 
@@ -555,13 +555,14 @@ def validate_fast_stage_cross_platform_policy() -> None:
         "OpenAL32.dll",
     )
     game_files = (
+        "game_x64.dll",
+        "game_x64.pdb",
+        "game_x64.so",
+        "game_x64.dylib",
+        # an older build's split modules are never copied forward
         "game-sp_x64.dll",
         "game-sp_x64.pdb",
-        "game-mp_x64.dll",
-        "game-mp_x64.pdb",
-        "game-sp_x64.so",
         "game-mp_x64.so",
-        "game-sp_x64.dylib",
         "game-mp_x64.dylib",
         "mod.json",
         "pak0.pk4",
@@ -587,10 +588,8 @@ def validate_fast_stage_cross_platform_policy() -> None:
                 "OpenAL32.dll",
             },
             {
-                "game-sp_x64.dll",
-                "game-sp_x64.pdb",
-                "game-mp_x64.dll",
-                "game-mp_x64.pdb",
+                "game_x64.dll",
+                "game_x64.pdb",
                 "mod.json",
                 "pak0.pk4",
                 "pak1.pk4",
@@ -605,8 +604,7 @@ def validate_fast_stage_cross_platform_policy() -> None:
                 "renderer-vk_x64.so",
             },
             {
-                "game-sp_x64.so",
-                "game-mp_x64.so",
+                "game_x64.so",
                 "mod.json",
                 "pak0.pk4",
                 "pak1.pk4",
@@ -620,8 +618,7 @@ def validate_fast_stage_cross_platform_policy() -> None:
                 "renderer-vk_x64.dylib",
             },
             {
-                "game-sp_x64.dylib",
-                "game-mp_x64.dylib",
+                "game_x64.dylib",
                 "mod.json",
                 "pak0.pk4",
                 "pak1.pk4",
@@ -662,12 +659,15 @@ def validate_fast_stage_cross_platform_policy() -> None:
     cleanup_root = WORK / "fast-stage-platform-policy" / "windows-cleanup"
     cleanup_game = cleanup_root / "baseoq4"
     retained_root = cleanup_root / "renderer-gl_x64.dll"
-    retained_game = cleanup_game / "game-sp_x64.dll"
+    retained_game = cleanup_game / "game_x64.dll"
     foreign_paths = (
         cleanup_root / "renderer-gl_x64.so",
         cleanup_root / "renderer-vk_x64.dylib",
-        cleanup_game / "game-sp_x64.so",
-        cleanup_game / "game-mp_x64.dylib",
+        cleanup_game / "game_x64.so",
+        cleanup_game / "game_x64.dylib",
+        # the retired split modules of an older build are removed on every host
+        cleanup_game / "game-sp_x64.dll",
+        cleanup_game / "game-mp_x64.pdb",
     )
     for path in (*foreign_paths, retained_root, retained_game):
         write_file(path)
@@ -1263,6 +1263,12 @@ def validate_windows_runtime_staging_guards() -> None:
         f"renderer-{renderer}_{arch}.dll.mainbak"
         for renderer in ("gl", "vk")
         for arch in ("x86", "x64", "arm64")
+    } | {
+        # one game_<arch> module replaced the split game-sp/game-mp modules
+        f"baseoq4/game-{kind}_{arch}.{extension}"
+        for kind in ("sp", "mp")
+        for arch in ("x86", "x64", "arm64")
+        for extension in ("dll", "pdb")
     }
     if set(WINDOWS_RUNTIME.WINDOWS_STALE_STAGE_FILE_MANIFEST) != expected_stale_stage_files:
         raise AssertionError("Windows stage cleanup must remain an exact stale-file allowlist")
@@ -1276,8 +1282,11 @@ def validate_windows_runtime_staging_guards() -> None:
     current_client = hygiene_root / "openQ4-client_x64.exe"
     current_renderer = hygiene_root / "renderer-vk_x64.dll"
     unlisted_extensionless = hygiene_root / "openQ4-client_custom"
+    retired_game = hygiene_root / "baseoq4" / "game-mp_x64.dll"
+    current_game = hygiene_root / "baseoq4" / "game_x64.dll"
     empty_skins = hygiene_root / "baseoq4" / "skins"
-    for path in (stale_client, stale_dedicated, stale_backup, current_client, current_renderer, unlisted_extensionless):
+    for path in (stale_client, stale_dedicated, stale_backup, current_client, current_renderer, unlisted_extensionless,
+                 retired_game, current_game):
         write_file(path)
     empty_skins.mkdir(parents=True)
 
@@ -1286,14 +1295,15 @@ def validate_windows_runtime_staging_guards() -> None:
         "openQ4-client_x64",
         "openQ4-ded_x64",
         "renderer-vk_x64.dll.mainbak",
+        "baseoq4/game-mp_x64.dll",
     }:
         raise AssertionError(f"unexpected Windows stale-stage cleanup result: {hygiene_result!r}")
     if hygiene_result["removed_empty_directories"] != ["baseoq4/skins"]:
         raise AssertionError(f"empty Windows stage directory was not pruned: {hygiene_result!r}")
-    for removed_path in (stale_client, stale_dedicated, stale_backup, empty_skins):
+    for removed_path in (stale_client, stale_dedicated, stale_backup, retired_game, empty_skins):
         if removed_path.exists() or removed_path.is_symlink():
             raise AssertionError(f"known stale Windows stage entry was retained: {removed_path}")
-    for preserved_path in (current_client, current_renderer, unlisted_extensionless):
+    for preserved_path in (current_client, current_renderer, unlisted_extensionless, current_game):
         if not preserved_path.is_file():
             raise AssertionError(f"Windows stage cleanup removed an unlisted runtime entry: {preserved_path}")
 
@@ -1359,7 +1369,7 @@ def validate_windows_runtime_staging_guards() -> None:
 
     mixed_root = WORK / "windows-runtime" / "mixed"
     write_file(mixed_root / "openQ4-client_x64.exe", b"MZ\n")
-    write_file(mixed_root / "baseoq4" / "game-sp_arm64.dll", b"MZ\n")
+    write_file(mixed_root / "baseoq4" / "game_arm64.dll", b"MZ\n")
     expect_runtime_error(
         lambda: WINDOWS_RUNTIME.detect_binary_arch(mixed_root),
         "Mixed openQ4 binary architectures",
@@ -1435,16 +1445,16 @@ def validate_windows_runtime_staging_guards() -> None:
     # intermediates may be locked by a compiler and never belong in a runtime.
     generated_build = WORK / "windows-runtime" / "generated-build"
     generated = generated_build / "content/baseoq4"
-    write_file(generated / "game-mp_x64.dll", b"runtime\n")
+    write_file(generated / "game_x64.dll", b"runtime\n")
     write_file(generated / "mod.json", b"{}\n")
-    for artifact in ("game-mp_x64.dll.p/module.obj", "libopenq4_game_mp_core.a.p/Game.obj",
-                     "game_core.lib.p/Game.obj", "libopenq4_game_mp_core.a", "game-mp_x64.lib",
-                     "game-mp_x64.exp", "stray.obj", "stray.o"):
+    for artifact in ("game_x64.dll.p/module.obj", "libopenq4_game_core.a.p/Game.obj",
+                     "game_core.lib.p/Game.obj", "libopenq4_game_core.a", "game_x64.lib",
+                     "game_x64.exp", "stray.obj", "stray.o"):
         write_file(generated / artifact, b"build-only\n")
     WINDOWS_RUNTIME.stage_build_game_directory(runtime_source, generated_build)
     staged = {p.relative_to(generated_build / "baseoq4").as_posix()
               for p in (generated_build / "baseoq4").rglob("*") if p.is_file()}
-    if staged != {"game-mp_x64.dll", "mod.json"}:
+    if staged != {"game_x64.dll", "mod.json"}:
         raise AssertionError(f"build-only game-core artifacts entered the direct-run runtime: {staged}")
 
     symlink_tree_source = WORK / "windows-runtime" / "symlink-tree-source"
@@ -1603,6 +1613,24 @@ def validate_layer_retirement() -> None:
             raise AssertionError('layer retirement accepted a symlink')
         assert link.is_symlink() and (outside / 'game-sp_x64.dll').read_bytes() == b'preserve'
         link.unlink()
+
+    # One game_<arch> module replaced the split modules: an install retires the
+    # old names from baseoq4 (and an Android stage's lib) but keeps the directory,
+    # the current module and everything else.
+    from retire_game_layers import retire_split_game_modules
+    stage = WORK / 'retire-split'
+    for name in ('baseoq4/game-sp_x64.dll', 'baseoq4/game-sp_x64.pdb', 'baseoq4/game-mp_x64.dll',
+                 'baseoq4/game-mp_arm64.dylib', 'lib/libgame-sp_arm64.so', 'lib/libgame-mp_arm64.so'):
+        write_file(stage / name, b'retired module')
+    for name in ('baseoq4/game_x64.dll', 'baseoq4/game_x64.pdb', 'baseoq4/pak0.pk4', 'baseoq4/game-sp_custom.txt',
+                 'lib/libgame_arm64.so'):
+        write_file(stage / name, b'current file')
+    assert len(retire_split_game_modules(stage)) == 6
+    assert retire_split_game_modules(stage) == []
+    for name in ('baseoq4/game_x64.dll', 'baseoq4/game_x64.pdb', 'baseoq4/pak0.pk4', 'baseoq4/game-sp_custom.txt',
+                 'lib/libgame_arm64.so'):
+        assert (stage / name).read_bytes() == b'current file'
+    assert retire_split_game_modules(WORK / 'retire-split-missing') == []
 
 def main() -> None:
     shutil.rmtree(WORK, ignore_errors=True)

@@ -14,7 +14,7 @@ from game_regression_suite import discover as discover_game_regressions
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH_DIR = ROOT / "src/mpgame/mp/match"
+MATCH_DIR = ROOT / "src/game/mp/match"
 HEADER = MATCH_DIR / "MatchItemTiming.h"
 SOURCE = MATCH_DIR / "MatchItemTiming.cpp"
 SESSION_SOURCE = MATCH_DIR / "MatchSession.cpp"
@@ -153,16 +153,15 @@ def static_contracts(header: str, source: str) -> None:
             shutil.which("python") or shutil.which("python3") or "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         cwd=ROOT,
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchItemTiming.cpp" not in {
+    if "game/mp/match/MatchItemTiming.cpp" not in {
         line.strip() for line in listing
     }:
         raise AssertionError("recursive MP source discovery omits MatchItemTiming.cpp")
@@ -171,7 +170,7 @@ def static_contracts(header: str, source: str) -> None:
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchItemTiming.h"
+#include "game/mp/match/MatchItemTiming.h"
 
 #include <limits.h>
 #include <stdio.h>

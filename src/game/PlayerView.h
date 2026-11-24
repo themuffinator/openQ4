@@ -1,5 +1,5 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 07/07/2004
 
@@ -163,7 +163,6 @@ private:
 	const idMaterial *	bloodSprayMaterial; // blood spray
 //	const idMaterial *	bfgMaterial;		// when targeted with BFG
 // RAVEN END
-	const idMaterial *	lagoMaterial;		// lagometer drawing
 
 	float				lastDamageTime;		// accentuate the tunnel effect for a while
 

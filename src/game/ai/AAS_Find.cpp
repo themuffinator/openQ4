@@ -8,8 +8,8 @@ This file has all aas search classes.
 ===============================================================================
 */
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "AI.h"

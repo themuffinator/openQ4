@@ -153,7 +153,7 @@ def capture(args):
         if count == 1 or original[index + 1].lower() not in {k.lower() for k in overrides}:
             command += [v.replace("${workspaceFolder}", str(ROOT)) for v in original[index:index + count]]
         index += count
-    binaries = [executable, *runtime.glob("renderer-*.dll"), *(runtime / "baseoq4").glob("game-*.dll")]
+    binaries = [executable, *runtime.glob("renderer-*.dll"), *(runtime / "baseoq4").glob("game_*.dll")]
     binding = {str(p.relative_to(runtime)): page.digest(p) for p in binaries}
     for path in binaries:
         built = getattr(args, "build", ROOT / "builddir") / path.relative_to(runtime)

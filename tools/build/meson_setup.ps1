@@ -334,8 +334,6 @@ function Get-SetupArgsForExistingBuildDir {
         "use_pch",
         "build_engine",
         "build_games",
-        "build_game_sp",
-        "build_game_mp",
         "enforce_msvc_2026"
     )
 
@@ -446,8 +444,12 @@ function Remove-NonRuntimeInstallArtifacts {
         "*.map",
         "*.so",
         "*.dylib",
-        "game-sp_x86.dll",
-        "game-mp_x86.dll"
+        "game_x86.dll",
+        # one game_<arch> module replaced the split game-sp/game-mp modules
+        "game-sp_*.dll",
+        "game-sp_*.pdb",
+        "game-mp_*.dll",
+        "game-mp_*.pdb"
     )
 
     # baseoq4 and every staged mod game directory (such as q4xbase) that
@@ -506,8 +508,7 @@ function Copy-WindowsDiagnosticSymbols {
         (Join-Path $BuildDir "baseoq4")
     )
     $gamePatterns = @(
-        "game-sp_*.pdb",
-        "game-mp_*.pdb"
+        "game_*.pdb"
     )
 
     foreach ($gameBuildDir in $gameBuildDirs) {

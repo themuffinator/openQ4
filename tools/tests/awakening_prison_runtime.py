@@ -76,9 +76,9 @@ def main():
     runtime = ROOT/'.install'
     exe = runtime/'openQ4-client_x64.exe'
     identity = {name: sha256(runtime/name) for name in
-                ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll', 'baseoq4/pak0.pk4')}
+                ('openQ4-client_x64.exe', 'baseoq4/game_x64.dll', 'baseoq4/pak0.pk4')}
     if not args.baseline:
-        for name in ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll'):
+        for name in ('openQ4-client_x64.exe', 'baseoq4/game_x64.dll'):
             assert identity[name] == sha256(ROOT/'builddir'/name), 'Stage the current build first'
     home = task_path(args.output)
     game = home/'q4xbase'

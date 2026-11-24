@@ -23,10 +23,7 @@ PROJECT_ALWAYS_FILES = (
     "src/sys/AutoVersion.h",
 )
 
-GAME_SCAN_DIRS = (
-    "src/game",
-    "src/mpgame",
-)
+GAME_SCAN_DIRS = ("src/game",)
 
 RELEVANCE_TOKENS = (
     "SaveGame",

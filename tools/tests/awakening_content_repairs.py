@@ -232,10 +232,14 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     if len(tables["m01lines"]) != len(set(tables["m01lines"])):
         raise AssertionError(f"{M01_RADIO_SCRIPT}: a draft line is placed twice")
 
-    # The Awakening is single player only.
-    for path in (ROOT / "src/mpgame").rglob("*"):
-        if path.suffix in (".cpp", ".h", ".inl") and "ContentRepairs" in read(path):
-            raise AssertionError(f"{path} must not carry the Awakening's content repairs")
+    # The Awakening is single player only. One game module serves both modes
+    # (CORE-07), so every repair runs behind a guard that refuses network play.
+    if (ROOT / "src/mpgame").exists():
+        raise AssertionError("src/mpgame is retired; the game tree is src/game")
+    repairs = read(ROOT / "src/game/awakening/ContentRepairs.inl")
+    require(repairs, "static bool Awakening_ContentRepairsActive( void ) {\n"
+            "\treturn !gameLocal.isMultiplayer && g_awakeningContentRepairs.GetBool() && FS_AwakeningActive();",
+            "the content repairs never run in network play")
     return tables
 
 

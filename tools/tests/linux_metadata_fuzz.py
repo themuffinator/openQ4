@@ -155,7 +155,7 @@ def validate_stage_manifest_fuzz() -> None:
     stage_root = project_root / ".tmp" / "gamelibs_stage"
 
     write_text(gamelibs_root / "src" / "game" / "Game_local.cpp", "// canonical game\n")
-    write_text(gamelibs_root / "src" / "mpgame" / "Game_local.cpp", "// canonical multiplayer game\n")
+    write_text(gamelibs_root / "src" / "game" / "Game_local.cpp", "// canonical multiplayer game\n")
     write_text(project_root / "src" / "idlib" / "idlib_public.h", "// idlib\n")
     write_text(project_root / "src" / "renderer" / "RenderWorld.h", "// renderer\n")
 

@@ -4,8 +4,20 @@
 // Copyright 2002-2005 Raven Software
 //----------------------------------------------------------------
 
-#include "../Game_local.h"
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
+
 #include "GameState.h"
+
+static const int ARENA_CAMPAIGN_ENTRANCE_MIN_MSEC = 3000;
+
+static void ShiftGameStateDeadline( int &deadline, int deltaMsec ) {
+	if ( deadline <= 0 || deltaMsec <= 0 ) {
+		return;
+	}
+	const int maxInt = 0x7fffffff;
+	deadline = deadline > maxInt - deltaMsec ? maxInt : deadline + deltaMsec;
+}
 
 /*
 ===============================================================================
@@ -55,6 +67,76 @@ void rvGameState::Clear( void ) {
 	nextState = INACTIVE;
 	nextStateTime = 0;
 	fragLimitTimeout = 0;
+	overtimeCount = 0;
+	overtimeAccumulatedMsec = 0;
+	overtimeStartTime = 0;
+}
+
+void rvGameState::ShiftMatchTime( int deltaMsec ) {
+	ShiftGameStateDeadline( nextStateTime, deltaMsec );
+	ShiftGameStateDeadline( fragLimitTimeout, deltaMsec );
+	ShiftGameStateDeadline( overtimeStartTime, deltaMsec );
+}
+
+/*
+================
+rvGameState::StartOvertime
+
+Grants another overtime period by extending the match clock, the way Quake
+Live does.  Returns false when the server has overtime turned off, which is
+the caller's cue to fall back to Quake 4 sudden death.
+================
+*/
+bool rvGameState::StartOvertime( void ) {
+	int overtimeSeconds;
+
+	if ( gameLocal.isClient ) {
+		return false;
+	}
+
+	// an untimed match has nothing to extend; sudden death is the only way out
+	if ( gameLocal.serverInfo.GetInt( "si_timeLimit" ) <= 0 ) {
+		return false;
+	}
+
+	overtimeSeconds = gameLocal.serverInfo.GetInt( "si_overtime" );
+	if ( overtimeSeconds <= 0 ) {
+		return false;
+	}
+	if ( !gameLocal.mpGame.BeginMatchOvertimePeriod() ) {
+		return false;
+	}
+
+	overtimeCount++;
+	overtimeAccumulatedMsec += overtimeSeconds * 1000;
+	overtimeStartTime = gameLocal.time;
+	gameLocal.Printf( "overtime: period %d extended match by %d seconds\n",
+		overtimeCount, overtimeSeconds );
+
+	// the frag limit timeout must not carry into the extension, or the match
+	// ends on the stale deadline the instant overtime begins
+	fragLimitTimeout = 0;
+
+	if ( overtimeCount > 1 ) {
+		gameLocal.mpGame.CenterPrint( -1, "#str_41311", idMultiplayerGame::CPARM_INT, overtimeCount );
+	} else {
+		gameLocal.mpGame.CenterPrint( -1, "#str_41310" );
+	}
+
+	gameLocal.mpGame.ScheduleTimeAnnouncements();
+
+	return true;
+}
+
+/*
+================
+rvGameState::StopOvertime
+================
+*/
+void rvGameState::StopOvertime( void ) {
+	overtimeCount = 0;
+	overtimeAccumulatedMsec = 0;
+	overtimeStartTime = 0;
 }
 
 /*
@@ -62,11 +144,11 @@ void rvGameState::Clear( void ) {
 rvGameState::SendState
 ================
 */
-void rvGameState::SendState( int clientNum ) {
+void rvGameState::SendState( const idMessageSender &sender, int clientNum ) {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
 
-	assert( gameLocal.isServer && trackPrevious );
+	assert( (gameLocal.isServer || gameLocal.isRepeater) && trackPrevious );
 
 	if( clientNum == -1 && (*this) == (*previousGameState) ) {
 		return;
@@ -77,7 +159,7 @@ void rvGameState::SendState( int clientNum ) {
 
 	WriteState( outMsg );
 
-	networkSystem->ServerSendReliableMessage( clientNum, outMsg );
+	sender.Send( outMsg );
 	
 	// don't update the state if we are working for a single client
 	if ( clientNum == -1 ) {
@@ -100,14 +182,14 @@ void rvGameState::WriteState( idBitMsg &msg ) {
 rvGameState::SendInitialState
 ================
 */
-void rvGameState::SendInitialState( int clientNum ) {
+void rvGameState::SendInitialState( const idMessageSender &sender, int clientNum ) {
 	rvGameState* previousState = previousGameState;
 
 	rvGameState invalidState;
 
 	previousGameState = &invalidState;
 
-	SendState( clientNum );
+	SendState( sender, clientNum );
 
 	previousGameState = previousState;
 }
@@ -118,7 +200,9 @@ rvGameState::ReceiveState
 ================
 */
 void rvGameState::ReceiveState( const idBitMsg& msg ) {
-	UnpackState( msg );
+	if ( !BaseUnpackState( msg ) ) {
+		return;
+	}
 
 	if ( gameLocal.localClientNum >= 0 ) {
 		GameStateChanged();
@@ -133,22 +217,48 @@ rvGameState::PackState
 ================
 */
 void rvGameState::PackState( idBitMsg& outMsg ) {
+	// server and client changing their rvGameState subclass by guesswork
+	// you can't rely on it being in sync at all times, so read and verify the type first
+	outMsg.WriteByte( gameLocal.gameType );
+
 	// for now, we only transmit 3 bytes.  If we need to sync more data, we should
 	// only transmit the diff
 	outMsg.WriteByte( currentState );
 	outMsg.WriteByte( nextState );
 	outMsg.WriteLong( nextStateTime );
+	// openQ4: overtime rides the base header because it applies to every
+	// gametype, and the HUD clock cannot be right without it
+	outMsg.WriteByte( overtimeCount );
+	outMsg.WriteLong( overtimeAccumulatedMsec );
+	outMsg.WriteLong( overtimeStartTime );
 }
 
 /*
 ================
-rvGameState::UnpackState
+rvGameState::BaseUnpackState
 ================
 */
-void rvGameState::UnpackState( const idBitMsg& inMsg ) {
+bool rvGameState::BaseUnpackState( const idBitMsg& inMsg ) {
+	gameType_t t = (gameType_t)inMsg.ReadByte();
+	if ( t != gameLocal.gameType ) {
+		common->Warning( "rvGameState::UnpackState: client gametype (%d) is out of sync with server (%d). Ignoring", gameLocal.gameType, t );
+		return false;
+	}
+
 	currentState = (mpGameState_t)inMsg.ReadByte();
 	nextState = (mpGameState_t)inMsg.ReadByte();
 	nextStateTime = inMsg.ReadLong();
+	if ( gameLocal.RetailSnapshotFormat() ) {
+		// openQ4 MP-22: Quake 4 1.4.2 had no overtime state
+		overtimeCount = 0;
+		overtimeAccumulatedMsec = 0;
+		overtimeStartTime = 0;
+		return true;
+	}
+	overtimeCount = inMsg.ReadByte();
+	overtimeAccumulatedMsec = inMsg.ReadLong();
+	overtimeStartTime = inMsg.ReadLong();
+	return true;
 }
 
 /*
@@ -159,7 +269,7 @@ rvGameState::GameStateChanged
 void rvGameState::GameStateChanged( void ) {
 	idPlayer* player = gameLocal.GetLocalPlayer();
 	if ( !player ) {
-		if ( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() && gameLocal.GetDemoFollowClient() >= 0 ) {
+		if ( gameLocal.IsServerDemoPlaying() && gameLocal.GetDemoFollowClient() >= 0 ) {
 			player = static_cast< idPlayer * >( gameLocal.entities[ gameLocal.GetDemoFollowClient() ] );
 		}
 	}
@@ -170,8 +280,15 @@ void rvGameState::GameStateChanged( void ) {
 
 	// Check for a currentState change
 	if( currentState != previousGameState->currentState ) {
+		const bool arenaCampaign = gameLocal.mpGame.IsArenaCampaignMatch();
 		if( currentState == WARMUP ) {
-			if( gameLocal.gameType != GAME_TOURNEY ) {
+			// openQ4: the Arena presentation is reset on the authoritative WARMUP
+			// edge in NewState, before Run arms the introduction. This hook runs
+			// after Run in the same frame (SendState -> ReceiveState), so clearing
+			// here wiped the introduction it had just armed.
+			if ( arenaCampaign ) {
+				player->GUIMainNotice( "" );
+			} else if( gameLocal.gameType != GAME_TOURNEY ) {
 				player->GUIMainNotice( common->GetLocalizedString( "#str_107706" ), true );		
 			}
 			soundSystem->SetActiveSoundWorld( true );
@@ -181,7 +298,9 @@ void rvGameState::GameStateChanged( void ) {
 				statManager->Init();
 			}
 		} else if( currentState == COUNTDOWN ) {
-			if( gameLocal.gameType != GAME_TOURNEY ) {
+			if ( arenaCampaign ) {
+				player->GUIMainNotice( "" );
+			} else if( gameLocal.gameType != GAME_TOURNEY ) {
 				player->GUIMainNotice( common->GetLocalizedString( "#str_107706" ), true );		
 			}
 			soundSystem->SetActiveSoundWorld(true);
@@ -191,19 +310,44 @@ void rvGameState::GameStateChanged( void ) {
 				gameLocal.mpGame.RemoveAnnouncerSound( AS_GENERAL_TWO );
 				gameLocal.mpGame.RemoveAnnouncerSound( AS_GENERAL_ONE );
 
-				gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_PREPARE_TO_FIGHT, gameLocal.time );
-				gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_THREE, nextStateTime - 3000 );
-				gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_TWO, nextStateTime - 2000 );
-				gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_ONE, nextStateTime - 1000 );
+				// openQ4: an Arena match counts down over its spawn-in shot, so its
+				// "Fight" lands as control returns (OnMatchStarted). Its entrance
+				// only calls "prepare to fight", and a round mode, which counts its
+				// first round down from GAMEON itself, gets neither here.
+				if ( !arenaCampaign ) {
+					gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_PREPARE_TO_FIGHT, gameLocal.time );
+					gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_THREE, nextStateTime - 3000 );
+					gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_TWO, nextStateTime - 2000 );
+					gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_ONE, nextStateTime - 1000 );
+				} else if ( !gameLocal.IsRoundGameType() ) {
+					gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_PREPARE_TO_FIGHT, gameLocal.time );
+				}
+			}
+			if ( arenaCampaign ) {
+				gameLocal.mpGame.BeginArenaCampaignEntrancePresentation();
 			}
 		} else if( currentState == GAMEON ) {
+			// openQ4: OnMatchStarted, inside NewState( GAMEON ), has already
+			// retired the entrance and armed the Arena spawn-in shot. Clearing the
+			// presentation again on this later edge cancelled the shot outright:
+			// no camera move, no held control and no "Fight".
 			if ( !player->vsMsgState ) {
 				player->GUIMainNotice( "" );
 				player->GUIFragNotice( "" );
 			} else {
 				player->vsMsgState = false;
 			}
-			if( gameLocal.gameType != GAME_TOURNEY ) {
+			// openQ4: a round mode is not fighting yet at GAMEON - the first round
+			// countdown has not even been scheduled.  Its own "FIGHT" comes from
+			// rvRoundGameState::GameStateChanged on the RS_ACTIVE edge, so calling
+			// it here shouts go while weapons are still locked, and again a few
+			// seconds later when the round really starts.
+			// openQ4: the Arena campaign holds control for its match-start camera
+			// move, so shouting go on this edge lands while the player is still
+			// frozen watching it. AdvanceArenaCampaignCeremony calls it when the
+			// shot lands and control actually returns.
+			if( gameLocal.gameType != GAME_TOURNEY && !gameLocal.IsRoundGameType() &&
+				!gameLocal.mpGame.IsArenaCampaignMatch() ) {
 				gameLocal.mpGame.ScheduleAnnouncerSound( AS_GENERAL_FIGHT, gameLocal.time );
 			}
 			//if ( gameLocal.gameType == GAME_DEADZONE ) {
@@ -214,16 +358,14 @@ void rvGameState::GameStateChanged( void ) {
 			//}
 			cvarSystem->SetCVarString( "ui_ready", "Not Ready" );
 			soundSystem->SetActiveSoundWorld( true );
-			
-			// tourney time announcements are scheduled as you join/leave arenas and at arena starts
-			if( gameLocal.gameType != GAME_TOURNEY ) {
-				gameLocal.mpGame.ScheduleTimeAnnouncements( );
-			}
-
 
 			// clear stats on client
 			if( gameLocal.isClient ) {
 				statManager->Init();
+			}
+			// openQ4 MP-22: this player's autoaction starts with live play
+			if ( previousGameState->currentState != SUDDENDEATH ) {
+				gameLocal.mpGame.AutoActionMatchStarted( true );
 			}
  		} else if( currentState == SUDDENDEATH ) {
 			soundSystem->SetActiveSoundWorld( true );
@@ -234,7 +376,15 @@ void rvGameState::GameStateChanged( void ) {
 			gameLocal.mpGame.isBuyingAllowedRightNow = false;
 			// RITUAL END
 			gameLocal.mpGame.ShowStatSummary();
+			// openQ4 MP-17: the match goes in the player's own history
+			if ( previousGameState->currentState == GAMEON || previousGameState->currentState == SUDDENDEATH ) {
+				gameLocal.mpGame.IdentityRecordHistory();
+				// openQ4 MP-22: and this player's autoaction takes the result
+				gameLocal.mpGame.AutoActionMatchEnded( true );
+			}
 		}
+
+		gameLocal.mpGame.ScheduleTimeAnnouncements( );
 	}
 }
 
@@ -275,7 +425,84 @@ void rvGameState::SpawnDeadZonePowerup( void ) {
 		spawnSpot->PostEventMS( &EV_RespawnItem, 0 );
 		spawnSpot->srvReady = 1; // Go ahead and set this, so the loop works properly.
 	} else {
-		gameLocal.Error("Couldn't find enough dead zone spawn spots for the number of dead zone artifacts specified in the map def!");
+		// openQ4: this used to be a gameLocal.Error, which dropped the whole
+		// dedicated server at the instant the match went live just because the map
+		// shipped fewer hidden artifact spawn spots than its decl asks for.  A data
+		// shortfall degrades to fewer artifacts instead.
+		gameLocal.Warning( "Couldn't find enough dead zone spawn spots for the number of dead zone artifacts specified in the map def!" );
+	}
+}
+
+/*
+================
+rvGameState::CountDeadZonePowerupSpawns
+
+How many hidden artifact spawn spots SpawnDeadZonePowerup could still consume.
+Mirrors that function's eligibility test exactly - anything it would skip must
+not be counted here, or the caller asks for one more artifact than exists.
+================
+*/
+int rvGameState::CountDeadZonePowerupSpawns( void ) {
+	idEntity *ent;
+	int count = 0;
+
+	for ( ent = gameLocal.spawnedEntities.Next(); ent != NULL; ent = ent->spawnNode.Next() ) {
+		if ( !ent->IsType( riDeadZonePowerup::GetClassType() ) ) {
+			continue;
+		}
+
+		riDeadZonePowerup* flag;
+		flag = static_cast<riDeadZonePowerup*>(ent);
+		if ( flag->powerup != POWERUP_DEADZONE || flag->IsVisible() ) {
+			continue;
+		}
+
+		// a dropped artifact is removed rather than reused
+		if ( flag->spawnArgs.GetBool("dropped", "0") ) {
+			continue;
+		}
+
+		count++;
+	}
+
+	return count;
+}
+
+/*
+================
+rvGameState::SpawnDeadZonePowerups
+
+Puts out the map's full complement of DeadZone artifacts.  Both the match start
+and the sudden death restart used to carry their own copy of this block.
+================
+*/
+void rvGameState::SpawnDeadZonePowerups( void ) {
+	const char *mapName = gameLocal.serverInfo.GetString( "si_map" );
+	const idDict *mapDict = MultiplayerResolveMapDecl( mapName );
+	if ( mapDict ) {
+		gameLocal.mpGame.deadZonePowerupCount = mapDict->GetInt("deadZonePowerupCount", "3");
+	} else {
+		gameLocal.mpGame.deadZonePowerupCount = 3;
+	}
+
+	int pcount = gameLocal.mpGame.deadZonePowerupCount;
+	if ( pcount == -1 ) {
+		pcount = 3; // Good default.
+	}
+
+	pcount = idMath::ClampInt(1, 12, pcount);
+
+	// openQ4: the decl says how many artifacts the map wants, not how many spawn
+	// spots it actually ships.  Ask for more than exist and the last call finds
+	// nothing left to consume; take what the map has instead.
+	int available = CountDeadZonePowerupSpawns();
+	if ( available < pcount ) {
+		gameLocal.Warning( "map '%s' asks for %d dead zone artifacts but only has %d spawn spots left", mapName, pcount, available );
+		pcount = available;
+	}
+
+	for ( int i = 0; i < pcount; i++ ) {
+		SpawnDeadZonePowerup();
 	}
 }
 
@@ -296,8 +523,9 @@ void rvGameState::Run( void ) {
 	}
 
 	if ( nextState != INACTIVE && gameLocal.time > nextStateTime ) {
-		NewState( nextState );
-		nextState = INACTIVE;
+		if ( NewState( nextState ) ) {
+			nextState = INACTIVE;
+		}
 	}
 
 	switch( currentState ) {
@@ -331,6 +559,10 @@ void rvGameState::Run( void ) {
 			}
 
 			if ( nextState == INACTIVE ) {
+				// openQ4 MP-18: a shutdown that waited for this match stops the server here
+				if ( gameLocal.RunServerShutdown( true ) ) {
+					return;
+				}
 				// game rotation, new map, gametype etc.
 				// only cycle in tourney if tourneylimit is higher than the specified value
 				if( gameLocal.gameType != GAME_TOURNEY || ((rvTourneyGameState*)this)->GetTourneyCount() >= gameLocal.serverInfo.GetInt( "si_tourneyLimit" ) ) {
@@ -373,11 +605,32 @@ void rvGameState::Run( void ) {
 			
 #endif
 //RAVEN END
-			if( !gameLocal.serverInfo.GetBool( "si_warmup" ) && gameLocal.gameType != GAME_TOURNEY ) {
+			if ( gameLocal.mpGame.IsArenaCampaignMatch() ) {
+				// The introduction owns warmup until every authored opponent has
+				// been presented. Arena warmup has no other dwell: AllPlayersReady
+				// is true from the first frame because the roster is populated
+				// before any game frame runs.
+				if ( gameLocal.mpGame.ArenaCampaignIntroBlocksCountdown() ) {
+					break;
+				}
+				if ( gameLocal.mpGame.AllPlayersReady() && NewState( COUNTDOWN ) ) {
+					nextState = GAMEON;
+					nextStateTime = gameLocal.time + Max( ARENA_CAMPAIGN_ENTRANCE_MIN_MSEC,
+						1000 * gameLocal.serverInfo.GetInt( "si_countDown" ) );
+				}
+			} else if( !gameLocal.serverInfo.GetBool( "si_warmup" ) && gameLocal.gameType != GAME_TOURNEY ) {
 				// tourney always needs a warmup, to ensure that at least 2 players get seeded for the tournament.
-				NewState( GAMEON );
-			} else if ( gameLocal.mpGame.AllPlayersReady() ) {			
-				NewState( COUNTDOWN );
+				// Keep the legal lifecycle edge even when the presentation countdown
+				// is disabled. The next frame consumes this zero-length countdown.
+				// Empty or bot-only practice servers still need an active human;
+				// wait quietly instead of rejecting an atomic start every frame.
+				if ( gameLocal.mpGame.CanCommitMatchPhaseTransition( COUNTDOWN ) &&
+						NewState( COUNTDOWN ) ) {
+					nextState = GAMEON;
+					nextStateTime = gameLocal.time;
+				}
+			} else if ( gameLocal.mpGame.CanCommitMatchPhaseTransition( COUNTDOWN ) &&
+					NewState( COUNTDOWN ) ) {
 				nextState = GAMEON;
 				nextStateTime = gameLocal.time + 1000 * gameLocal.serverInfo.GetInt( "si_countDown" );
 			}
@@ -394,15 +647,24 @@ void rvGameState::Run( void ) {
 rvGameState::NewState
 ================
 */
-void rvGameState::NewState( mpGameState_t newState ) {
+bool rvGameState::NewState( mpGameState_t newState ) {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
 	int			i;
 
 	assert( (newState != currentState) && gameLocal.isServer );
+	if ( !gameLocal.mpGame.CommitMatchPhaseTransition( newState ) ) {
+		return false;
+	}
+	common->DPrintf( "MP match phase: %d -> %d at %d\n", currentState, newState, gameLocal.time );
 	
 	switch( newState ) {
 		case WARMUP: {
+			// A cancelled countdown or completed match must not lend its timers
+			// to the next warmup, including restarts on the same map.
+			nextState = INACTIVE;
+			nextStateTime = 0;
+			fragLimitTimeout = 0;
 			//	asalmon: start the stat manager as soon as the game starts
 			statManager->Init();
 			statManager->BeginGame();
@@ -418,6 +680,16 @@ void rvGameState::NewState( mpGameState_t newState ) {
 			//asalmon: clear out lingering team scores.
 			gameLocal.mpGame.ClearTeamScores();
 
+			// openQ4: warmup is never in overtime
+			StopOvertime();
+
+			// openQ4: a fresh Arena warmup (or a countdown that fell back to it)
+			// starts from an empty presentation. This is the authoritative edge:
+			// Run arms the opponent introduction right after it, in this frame.
+			if ( gameLocal.mpGame.IsArenaCampaignMatch() ) {
+				gameLocal.mpGame.ClearArenaCampaignPresentation();
+			}
+
 			if( gameLocal.gameType != GAME_TOURNEY ) {
 				for( i = 0; i < gameLocal.numClients; i++ ) {
 					idEntity *ent = gameLocal.entities[ i ];
@@ -430,8 +702,17 @@ void rvGameState::NewState( mpGameState_t newState ) {
 
 			break;
 		}
+		case COUNTDOWN: {
+			// Every accepted entry, including a typed referee/operator force-ready,
+			// owns its start deadline. Run's automatic warmup path is only one
+			// caller and cannot be the sole place that schedules live play.
+			nextState = GAMEON;
+			nextStateTime = gameLocal.time + 1000 * gameLocal.serverInfo.GetInt( "si_countDown" );
+			break;
+		}
 		case GAMEON: {
 			// allow damage in warmup
+			fragLimitTimeout = 0;
 			//gameLocal.mpGame.EnableDamage( true );
 			gameLocal.LocalMapRestart();
 // RITUAL BEGIN
@@ -466,21 +747,7 @@ void rvGameState::NewState( mpGameState_t newState ) {
 
 			if ( gameLocal.gameType == GAME_DEADZONE ) {
 				// Spawn the powerups!
-				const char *mapName = gameLocal.serverInfo.GetString( "si_map" );
-				const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>(declManager->FindType( DECL_MAPDEF, mapName, false ));
-				if ( mapDef )
-					gameLocal.mpGame.deadZonePowerupCount = mapDef->dict.GetInt("deadZonePowerupCount", "3");
-				else
-					gameLocal.mpGame.deadZonePowerupCount = 3;
-
-				int pcount = gameLocal.mpGame.deadZonePowerupCount;
-				if ( pcount == -1 )
-					pcount = 3; // Good default.
-
-				pcount = idMath::ClampInt(1, 12, pcount);
-				for ( int i = 0; i<pcount; i++ ) {
-					SpawnDeadZonePowerup();
-				}
+				SpawnDeadZonePowerups();
 			}
 // RITUAL END
 
@@ -496,16 +763,31 @@ void rvGameState::NewState( mpGameState_t newState ) {
 			gameLocal.mpGame.SetMatchStartedTime( gameLocal.time );
 
 			fragLimitTimeout = 0;
+			// openQ4: a fresh match never inherits the previous one's overtime
+			StopOvertime();
 
 			// write server initial reliable messages to give everyone new base
 			for( i = 0; i < MAX_CLIENTS; i++ ) {
 				// dont send this to server - we have all the data already and this will
 				// just trigger extra gamestate detection
 				if ( gameLocal.entities[ i ] && i != gameLocal.localClientNum ) {
-					gameLocal.mpGame.ServerWriteInitialReliableMessages( i );
+					gameLocal.mpGame.ServerWriteInitialReliableMessages( serverReliableSender.To( i, true ), i );
 				}
 			}
 			
+			if ( gameLocal.isRepeater ) {
+				gameLocal.mpGame.ServerWriteInitialReliableMessages( repeaterReliableSender.To( -1 ), ENTITYNUM_NONE );
+			}
+
+			// openQ4: the match is live from here on, and the loop below respawns
+			// everybody.  idPlayer::SpawnToPoint grants the si_warmupWeapons arsenal
+			// whenever GetMPGameState() is WARMUP or COUNTDOWN, so leaving the commit
+			// until the end of this function handed every weapon on the map straight
+			// back to the player it had just been taken from - permanently, because
+			// an MP respawn never clears inventory.weapons.  Publishing the state
+			// here closes that gate before the respawn rather than after it.
+			// (The assignment at the end of NewState then re-applies the same value.)
+			currentState = newState;
 
 			for( i = 0; i < gameLocal.numClients; i++ ) {
 				idEntity *ent = gameLocal.entities[ i ];
@@ -513,9 +795,12 @@ void rvGameState::NewState( mpGameState_t newState ) {
 					continue;
 				}
 				idPlayer *p = static_cast<idPlayer *>( ent );
-				p->SetLeader( false ); // don't carry the flag from previous games	
-				gameLocal.mpGame.SetPlayerScore( p, 0 );
-				gameLocal.mpGame.SetPlayerTeamScore( p, 0 );
+				p->SetLeader( false ); // don't carry the flag from previous games
+				// openQ4: warmup hands out the map's arsenal so the pre-match
+				// period is practice. Take it back now the match is real -
+				// nothing else does, because an MP respawn never clears
+				// inventory.weapons, so it would otherwise last all match.
+				p->RevokeWarmupArsenal();
 
 				// in normal gameplay modes, spawn the player in.  For tourney, the tourney manager handles spawning
 				if( gameLocal.gameType != GAME_TOURNEY ) {
@@ -527,18 +812,52 @@ void rvGameState::NewState( mpGameState_t newState ) {
 				}
 			}
 
+			// openQ4: zero the scoreboard AFTER the respawn loop, not inside it.
+			// The state is committed above so the arsenal gate closes before the
+			// respawns, which also means scoring is no longer suppressed during
+			// them - and every MP spawn runs idGameLocal::KillBox, so a player
+			// telefragged by a later client's spawn would otherwise start the
+			// live match on -1.  Resetting last makes the starting line 0 for
+			// everyone regardless of what the spawn wave did.
+			for( i = 0; i < gameLocal.numClients; i++ ) {
+				idEntity *ent = gameLocal.entities[ i ];
+				if ( !ent || !ent->IsType( idPlayer::GetClassType() ) ) {
+					continue;
+				}
+				idPlayer *p = static_cast<idPlayer *>( ent );
+				gameLocal.mpGame.SetPlayerScore( p, 0 );
+				gameLocal.mpGame.SetPlayerTeamScore( p, 0 );
+			}
+			// openQ4 MP-17: the places kept for leavers belonged to the warmup
+			gameLocal.mpGame.IdentityNewMatch();
+
 			gameLocal.mpGame.ClearTeamScores();
+			gameLocal.mpGame.OnMatchStarted();
+			// openQ4 MP-22: the server's autoaction starts with live play
+			gameLocal.mpGame.AutoActionMatchStarted( false );
 
 			cvarSystem->SetCVarString( "ui_ready", "Not Ready" );
 			gameLocal.mpGame.switchThrottle[ 1 ] = 0;	// passby the throttle
 			break;
 		}
 		case GAMEREVIEW: {
+			// Capture every authoritative end-of-match consumer before review
+			// spectates the field.  This also covers disconnect/forfeit transitions
+			// that happen outside idMultiplayerGame::Run.
+			if ( currentState == GAMEON || currentState == SUDDENDEATH ) {
+				gameLocal.mpGame.OnMatchEnded();
+				// openQ4 MP-22: the server's autoaction takes the result
+				gameLocal.mpGame.AutoActionMatchEnded( false );
+			}
 			statManager->EndGame();
+			// openQ4: the map database offers the end-of-match pick, if the
+			// server wants one, while the scoreboard is up
+			mpMapHost.ServerMatchEnded();
 
 			//statManager->DebugPrint();
 			nextState = INACTIVE;	// used to abort a game. cancel out any upcoming state change
 
+			const bool keepArenaTableau = gameLocal.mpGame.IsArenaCampaignMatch();
 			for( i = 0; i < gameLocal.numClients; i++ ) {
 				idEntity *ent = gameLocal.entities[ i ];
 				// RAVEN BEGIN
@@ -553,9 +872,9 @@ void rvGameState::NewState( mpGameState_t newState ) {
 				player->inventory.carryOverWeapons = 0;
 				player->ResetCash();
 				player->forcedReady = false;
-				player->ServerSpectate( true );
-				static_cast< idPlayer *>( ent )->forcedReady = false;
-				static_cast<idPlayer *>(ent)->ServerSpectate( true );
+				if ( !keepArenaTableau ) {
+					player->ServerSpectate( true );
+				}
 // RITUAL END
 			}
 			break;
@@ -580,7 +899,9 @@ void rvGameState::NewState( mpGameState_t newState ) {
 			// Mark everyone tied for the lead as leaders
 			i = 0;
 			idPlayer* leader = gameLocal.mpGame.GetRankedPlayer( i );
-			if( leader ) {
+			if ( !gameLocal.IsTeamGame() && gameLocal.gameType != GAME_TOURNEY ) {
+				gameLocal.mpGame.FragLeader();
+			} else if( leader ) {
 				int highScore = gameLocal.mpGame.GetScore( leader );
 				while( leader ) {
 					if( gameLocal.mpGame.GetScore( leader ) < highScore ) {
@@ -624,21 +945,7 @@ void rvGameState::NewState( mpGameState_t newState ) {
 
 			if ( gameLocal.gameType == GAME_DEADZONE ) {
 				// Spawn the powerups!
-				const char *mapName = gameLocal.serverInfo.GetString( "si_map" );
-				const idDeclEntityDef *mapDef = static_cast<const idDeclEntityDef *>(declManager->FindType( DECL_MAPDEF, mapName, false ));
-				if ( mapDef )
-					gameLocal.mpGame.deadZonePowerupCount = mapDef->dict.GetInt("deadZonePowerupCount", "3");
-				else
-					gameLocal.mpGame.deadZonePowerupCount = 3;
-
-				int pcount = gameLocal.mpGame.deadZonePowerupCount;
-				if ( pcount == -1 )
-					pcount = 3; // Good default.
-
-				pcount = idMath::ClampInt(1, 12, pcount);
-				for ( int i = 0; i<pcount; i++ ) {
-					SpawnDeadZonePowerup();
-				}
+				SpawnDeadZonePowerups();
 			}
 // RITUAL END
 
@@ -652,7 +959,11 @@ void rvGameState::NewState( mpGameState_t newState ) {
 						// RAVEN END
 						continue;
 					}
-					if ( static_cast< idPlayer *>( ent )->IsLeader() ) {
+					// openQ4: the Arena campaign never benches a combatant. Sudden
+					// death there would put the trailing human into spectator for
+					// the rest of their own single-player match.
+					if ( static_cast< idPlayer *>( ent )->IsLeader() ||
+						 gameLocal.mpGame.IsArenaCampaignMatch() ) {
  						static_cast<idPlayer *>(ent)->ServerSpectate( false );
 						continue;
 					}
@@ -669,6 +980,7 @@ void rvGameState::NewState( mpGameState_t newState ) {
 	}
 
 	currentState = newState;
+	return true;
 }
 
 /*
@@ -692,6 +1004,50 @@ void rvGameState::Spectate( idPlayer* player ) {
 	return;
 }
 
+// openQ4 BEGIN
+/*
+================
+rvGameState::AllowRespawn
+================
+*/
+bool rvGameState::AllowRespawn( idPlayer* player ) {
+	return true;
+}
+
+/*
+================
+rvGameState::PlayerDeath
+================
+*/
+void rvGameState::PlayerDeath( idPlayer* dead, idPlayer* killer ) {
+}
+
+/*
+================
+rvGameState::PlayerWithdrew
+================
+*/
+void rvGameState::PlayerWithdrew( idPlayer* player ) {
+}
+
+/*
+================
+rvGameState::PlayerDamage
+================
+*/
+void rvGameState::PlayerDamage( idPlayer* attacker, idPlayer* victim, int damage, int armorSave ) {
+}
+
+/*
+================
+rvGameState::WeaponsLocked
+================
+*/
+bool rvGameState::WeaponsLocked( void ) const {
+	return gameLocal.mpGame.ArenaCampaignLocksPlayers();
+}
+// openQ4 END
+
 /*
 ================
 rvGameState::operator==
@@ -701,7 +1057,10 @@ bool rvGameState::operator==( const rvGameState& rhs ) const {
 	return	(
 		( currentState == rhs.currentState ) &&
 		( nextState	== rhs.nextState ) &&
-		( nextStateTime == rhs.nextStateTime ) 
+		( nextStateTime == rhs.nextStateTime ) &&
+		( overtimeCount == rhs.overtimeCount ) &&
+		( overtimeAccumulatedMsec == rhs.overtimeAccumulatedMsec ) &&
+		( overtimeStartTime == rhs.overtimeStartTime )
 		);
 }
 
@@ -714,7 +1073,10 @@ bool rvGameState::operator!=( const rvGameState& rhs ) const {
 	return	(
 		( currentState != rhs.currentState ) ||
 		( nextState	!= rhs.nextState ) ||
-		( nextStateTime != rhs.nextStateTime ) 
+		( nextStateTime != rhs.nextStateTime ) ||
+		( overtimeCount != rhs.overtimeCount ) ||
+		( overtimeAccumulatedMsec != rhs.overtimeAccumulatedMsec ) ||
+		( overtimeStartTime != rhs.overtimeStartTime )
 		);
 }
 
@@ -727,6 +1089,9 @@ rvGameState& rvGameState::operator=( const rvGameState& rhs ) {
 	currentState = rhs.currentState;
 	nextState = rhs.nextState;
 	nextStateTime = rhs.nextStateTime;
+	overtimeCount = rhs.overtimeCount;
+	overtimeAccumulatedMsec = rhs.overtimeAccumulatedMsec;
+	overtimeStartTime = rhs.overtimeStartTime;
 	return (*this);
 }
 
@@ -756,10 +1121,17 @@ void rvGameState::ReadNetworkInfo( idFile *file, int clientNum ) {
 	byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
 	int			size;
 
-	file->ReadInt( size );
-	msg.Init( msgBuf, size );
+	if ( file->ReadInt( size ) != sizeof( size ) ||
+		 size <= 0 || size > static_cast<int>( sizeof( msgBuf ) ) ) {
+		common->Warning( "rvGameState::ReadNetworkInfo: invalid state size %d", size );
+		return;
+	}
+	msg.Init( msgBuf, sizeof( msgBuf ) );
 	msg.SetSize( size );
-	file->Read( msg.GetData(), size );
+	if ( file->Read( msg.GetData(), size ) != size ) {
+		common->Warning( "rvGameState::ReadNetworkInfo: truncated state" );
+		return;
+	}
 	ReceiveState( msg );
 }
 
@@ -784,16 +1156,9 @@ void rvDMGameState::Run( void ) {
 	switch( currentState ) {
 		case GAMEON: {
 			player = gameLocal.mpGame.FragLimitHit();
-
-			bool tiedForFirst = false;
-			idPlayer* first = gameLocal.mpGame.GetRankedPlayer( 0 );
-			idPlayer* second = gameLocal.mpGame.GetRankedPlayer( 1 );
-
-			if( player == NULL ) {
-				if( first && second && gameLocal.mpGame.GetScore( first ) == gameLocal.mpGame.GetScore( second ) ) {
-					tiedForFirst = true;
-				}
-			}
+			int leadingScore = 0;
+			const bool tiedForFirst = player == NULL &&
+				gameLocal.mpGame.ScoreIsTied( &leadingScore );
 
 			if ( player ) {
 				// delay between detecting frag limit and ending game. let the death anims play
@@ -813,27 +1178,30 @@ void rvDMGameState::Run( void ) {
 				//
 				// jshepard: OR it means that the winner killed himself during the fraglimit delay, and the
 				// game needs to roll on.
-				if( first && second && (gameLocal.mpGame.GetScore( first ) == gameLocal.mpGame.GetScore( second )) )	{
-					//this is a tie...
-					if( gameLocal.mpGame.GetScore( first ) >= gameLocal.serverInfo.GetInt( "si_fragLimit" ) )	{
-						 //and it must be tied at fraglimit, so sudden death.
-						NewState( SUDDENDEATH ); 
+				if ( tiedForFirst && gameLocal.serverInfo.GetInt( "si_fragLimit" ) > 0 &&
+					leadingScore >= gameLocal.serverInfo.GetInt( "si_fragLimit" ) ) {
+					if ( gameLocal.time <= fragLimitTimeout ) {
+						break;
 					}
+					// A score-limit tie is decided by the next lead. Timed
+					// overtime belongs to expiry of the match clock below.
+					NewState( SUDDENDEATH );
 				}
 				//otherwise, just keep playing as normal.
 				fragLimitTimeout = 0;
-				
+
 			} else if ( gameLocal.mpGame.TimeLimitHit() ) {
 				gameLocal.mpGame.PrintMessageEvent( -1, MSG_TIMELIMIT );
 				if( tiedForFirst ) {
-					// if tied at timelimit hit, goto sudden death
 					fragLimitTimeout = 0;
-					NewState( SUDDENDEATH );
+					if ( !StartOvertime() ) {
+						NewState( SUDDENDEATH );
+					}
 				} else {
 					// or just end the game
 					NewState( GAMEREVIEW );
 				}
-			} else if( tiedForFirst && gameLocal.serverInfo.GetInt( "si_fragLimit" ) > 0 && gameLocal.mpGame.GetScore( first ) >= gameLocal.serverInfo.GetInt( "si_fragLimit" ) ) {
+			} else if( tiedForFirst && gameLocal.serverInfo.GetInt( "si_fragLimit" ) > 0 && leadingScore >= gameLocal.serverInfo.GetInt( "si_fragLimit" ) ) {
 				// check for the rare case that two players both hit the fraglimit the same frame
 				// two people tied at fraglimit, advance to sudden death after a delay
 				fragLimitTimeout = gameLocal.time + FRAGLIMIT_DELAY;
@@ -882,12 +1250,12 @@ void rvTeamDMGameState::Run( void ) {
 
 	switch( currentState ) {
 		case GAMEON: {
-			int team = ( ( gameLocal.mpGame.GetScoreForTeam( TEAM_MARINE ) >= gameLocal.serverInfo.GetInt( "si_fragLimit" ) ) ? TEAM_MARINE : ( ( gameLocal.mpGame.GetScoreForTeam( TEAM_STROGG ) >= gameLocal.serverInfo.GetInt( "si_fragLimit" ) ) ? TEAM_STROGG : -1 ) );
-			if( gameLocal.serverInfo.GetInt( "si_fragLimit" ) <= 0 ) {
-				// no fraglimit
-				team = -1;
-			}
-			bool tiedForFirst = gameLocal.mpGame.GetScoreForTeam( TEAM_MARINE ) == gameLocal.mpGame.GetScoreForTeam( TEAM_STROGG );
+			const int marineScore = gameLocal.mpGame.GetScoreForTeam( TEAM_MARINE );
+			const int stroggScore = gameLocal.mpGame.GetScoreForTeam( TEAM_STROGG );
+			const int limit = gameLocal.serverInfo.GetInt( "si_fragLimit" );
+			const int leadingTeam = marineScore >= stroggScore ? TEAM_MARINE : TEAM_STROGG;
+			const int team = limit > 0 && Max( marineScore, stroggScore ) >= limit ? leadingTeam : -1;
+			const bool tiedForFirst = marineScore == stroggScore;
 			if ( team >= 0 && !tiedForFirst ) {
 				if ( !fragLimitTimeout ) {
 					common->DPrintf( "enter FragLimit timeout, team %d is leader\n", team );
@@ -905,21 +1273,29 @@ void rvTeamDMGameState::Run( void ) {
 				//
 				// jshepard: OR it means that the winner killed himself during the fraglimit delay, and the
 				// game needs to roll on.
-				if( tiedForFirst )	{
-					//this is a tie
-					if( gameLocal.mpGame.GetScoreForTeam( TEAM_MARINE ) >= gameLocal.serverInfo.GetInt( "si_fragLimit" ) )	{
-						//and it's tied at the fraglimit.
-						NewState( SUDDENDEATH ); 
+				if ( tiedForFirst && team >= 0 ) {
+					if ( gameLocal.time <= fragLimitTimeout ) {
+						break;
 					}
-					//not a tie, game on.
-					fragLimitTimeout = 0;
+					NewState( SUDDENDEATH );
 				}
+				// openQ4: this used to be cleared only on the tied branch, so a
+				// leader who suicided during FRAGLIMIT_DELAY left the timeout
+				// armed and the match ended on the next frame anyway.
+				fragLimitTimeout = 0;
+			} else if ( gameLocal.mpGame.MercyLimitHit() >= 0 ) {
+				// openQ4: mercy rule, carried over from Quake Live
+				int mercyTeam = gameLocal.mpGame.MercyLimitHit();
+				gameLocal.mpGame.CenterPrint( -1, "#str_41317", idMultiplayerGame::CPARM_TEAM, mercyTeam );
+				gameLocal.mpGame.PrintMessageEvent( -1, MSG_FRAGLIMIT, mercyTeam );
+				NewState( GAMEREVIEW );
 			} else if ( gameLocal.mpGame.TimeLimitHit() ) {
 				gameLocal.mpGame.PrintMessageEvent( -1, MSG_TIMELIMIT );
 				if( tiedForFirst ) {
-					// if tied at timelimit hit, goto sudden death
 					fragLimitTimeout = 0;
-					NewState( SUDDENDEATH );
+					if ( !StartOvertime() ) {
+						NewState( SUDDENDEATH );
+					}
 				} else {
 					// or just end the game
 					NewState( GAMEREVIEW );
@@ -999,7 +1375,7 @@ void rvCTFGameState::Clear( void ) {
 		previousGameState->Clear( );
 	}		
 
-	for( int i = 0; i < TEAM_MAX; i++ ) {
+	for( int i = 0; i < MAX_CTF_FLAGS; i++ ) {
 		flagStatus[ i ].state = FS_AT_BASE;
 		flagStatus[ i ].clientNum = -1;
 	}
@@ -1014,11 +1390,11 @@ void rvCTFGameState::Clear( void ) {
 rvCTFGameState::SendState
 ================
 */
-void rvCTFGameState::SendState( int clientNum ) {
+void rvCTFGameState::SendState( const idMessageSender &sender, int clientNum ) {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
 
-	assert( gameLocal.isServer && trackPrevious && IsType( rvCTFGameState::GetClassType() ) );
+	assert( (gameLocal.isServer || gameLocal.isRepeater) && trackPrevious && IsType( rvCTFGameState::GetClassType() ) );
 
 	if( clientNum == -1 && (rvCTFGameState&)(*this) == (rvCTFGameState&)(*previousGameState) ) {
 		return;
@@ -1029,7 +1405,7 @@ void rvCTFGameState::SendState( int clientNum ) {
 
 	WriteState( outMsg );
 
-	networkSystem->ServerSendReliableMessage( clientNum, outMsg );
+	sender.Send( outMsg );
 
 	// don't update the state if we are working for a single client
 	if ( clientNum == -1 ) {
@@ -1058,7 +1434,9 @@ rvCTFGameState::ReceiveState
 void rvCTFGameState::ReceiveState( const idBitMsg& msg ) {
 	assert( IsType( rvCTFGameState::GetClassType() ) );
 
-	rvGameState::UnpackState( msg );
+	if ( !rvGameState::BaseUnpackState( msg ) ) {
+		return;
+	}
 	UnpackState( msg );
 
 	if ( gameLocal.localClientNum >= 0 ) {
@@ -1077,7 +1455,10 @@ void rvCTFGameState::PackState( idBitMsg& outMsg ) {
 	// use indexing to pack in info
 	int index = 0;
 
-	for( int i = 0; i < TEAM_MAX; i++ ) {
+	// openQ4: MAX_CTF_FLAGS, not TEAM_MAX - the neutral one flag slot is part of
+	// the index space now.  UnpackState below moves with it; both sides of this
+	// wire format live in this file and ship in the same game library.
+	for( int i = 0; i < MAX_CTF_FLAGS; i++ ) {
 		if( flagStatus[ i ] != ((rvCTFGameState*)previousGameState)->flagStatus[ i ] ) {
 			outMsg.WriteByte( index );
 			outMsg.WriteByte( flagStatus[ i ].state );
@@ -1101,16 +1482,26 @@ rvCTFGameState::UnpackState
 ================
 */
 void rvCTFGameState::UnpackState( const idBitMsg& inMsg ) {
+	// openQ4 MP-22: Quake 4 1.4.2 numbered only the two team flags before the
+	// assault points; openQ4 has a third, neutral one
+	const int flags = gameLocal.RetailSnapshotFormat() ? TEAM_MAX : MAX_CTF_FLAGS;
 	while( inMsg.GetRemainingData() ) {
 		int index = inMsg.ReadByte();
 
-		if( index >= 0 && index < TEAM_MAX ) {
+		if( index >= 0 && index < flags ) {
 			flagStatus[ index ].state = (flagState_t)inMsg.ReadByte();
 			flagStatus[ index ].clientNum = inMsg.ReadByte();
-		} else if( index >= TEAM_MAX && index < ( TEAM_MAX + MAX_AP ) ) {
-			apState[ index - TEAM_MAX ] = (apState_t)inMsg.ReadByte();
+		} else if( index >= flags && index < ( flags + MAX_AP ) ) {
+			apState[ index - flags ] = (apState_t)inMsg.ReadByte();
 		} else {
-			gameLocal.Error( "rvCTFGameState::UnpackState() - Unknown data identifier '%d'\n", index );
+			// openQ4: this blob also reaches us from a recorded server demo, and
+			// the index space widened when the neutral one-flag slot got real
+			// storage - so a demo from an older build can land here.  Abandoning
+			// the rest of the delta loses a scoreboard update; killing the process
+			// loses the demo and everything else with it.
+			gameLocal.Warning( "rvCTFGameState::UnpackState() - unknown data identifier '%d', "
+				"ignoring the rest of this state block", index );
+			return;
 		}
 	}
 }
@@ -1120,7 +1511,7 @@ void rvCTFGameState::UnpackState( const idBitMsg& inMsg ) {
 rvCTFGameState::SendInitialState
 ================
 */
-void rvCTFGameState::SendInitialState( int clientNum ) {
+void rvCTFGameState::SendInitialState( const idMessageSender &sender, int clientNum ) {
 	assert( IsType( rvCTFGameState::GetClassType() ) );
 
 	rvCTFGameState* previousState = (rvCTFGameState*)previousGameState;
@@ -1129,7 +1520,7 @@ void rvCTFGameState::SendInitialState( int clientNum ) {
 
 	previousGameState = &invalidState;
 
-	SendState( clientNum );
+	SendState( sender, clientNum );
 
 	previousGameState = previousState;
 }
@@ -1146,7 +1537,7 @@ void rvCTFGameState::GameStateChanged( void ) {
 	// CTF specific stuff
 	idPlayer* player = gameLocal.GetLocalPlayer();
 	if ( !player ) {
-		if ( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() && gameLocal.GetDemoFollowClient() >= 0 ) {
+		if ( gameLocal.IsServerDemoPlaying() && gameLocal.GetDemoFollowClient() >= 0 ) {
 			player = static_cast< idPlayer * >( gameLocal.entities[ gameLocal.GetDemoFollowClient() ] );
 		}
 	}
@@ -1157,6 +1548,16 @@ void rvCTFGameState::GameStateChanged( void ) {
 
 	bool noSounds = false;
 
+	// openQ4: deliberately still only the two team flags, even though flagStatus
+	// now has a third slot for the neutral one-flag entity.  Every branch below
+	// reads flagTeam as the team that OWNS the flag ("flagTeam == player->team"
+	// means "my flag"), while the one-flag remap at the top of the loop sets it
+	// to the team that HOLDS it - so feeding the neutral slot through here plays
+	// each announcement to exactly the wrong side, and FS_DROPPED/FS_AT_BASE are
+	// not remapped at all and would push team index 2 into the MP HUD.  The
+	// neutral flag's HUD display is driven after this loop instead; announcer
+	// lines and notices for it still mean reworking the owner/holder sense of
+	// this whole loop.  The widened storage is what stops it corrupting apState.
 	for( int i = 0; i < TEAM_MAX; i++ ) {
 		if( flagStatus[ i ] == ((rvCTFGameState*)previousGameState)->flagStatus[ i ] ) {
 			continue;
@@ -1275,6 +1676,33 @@ void rvCTFGameState::GameStateChanged( void ) {
 			}
 		}
 	}
+
+	// openQ4: One Flag CTF's neutral flag, which the loop above leaves out.  It
+	// has no owner, so only the MP HUD hears about it, and gui::team is the team
+	// holding it: the one flag display pulses toward that team's colour.  Unlike
+	// the loop, a change that lands with a match state change still reaches the
+	// HUD, so a restart or a capture that ends the match cannot leave it stale.
+	if ( ( gameLocal.gameType == GAME_1F_CTF || gameLocal.gameType == GAME_ARENA_1F_CTF ) && player->mphud &&
+		flagStatus[ TEAM_MAX ] != ((rvCTFGameState*)previousGameState)->flagStatus[ TEAM_MAX ] ) {
+		switch ( flagStatus[ TEAM_MAX ].state ) {
+			case FS_TAKEN_MARINE:
+				player->mphud->SetStateInt( "team", TEAM_MARINE );
+				player->mphud->HandleNamedEvent( "flagTaken" );
+				break;
+			case FS_TAKEN_STROGG:
+				player->mphud->SetStateInt( "team", TEAM_STROGG );
+				player->mphud->HandleNamedEvent( "flagTaken" );
+				break;
+			case FS_DROPPED:
+				player->mphud->HandleNamedEvent( "flagDrop" );
+				break;
+			case FS_AT_BASE:
+				player->mphud->HandleNamedEvent( "flagReturn" );
+				break;
+			default:
+				break;
+		}
+	}
 }
 
 /*
@@ -1288,12 +1716,12 @@ void rvCTFGameState::Run( void ) {
 
 	switch( currentState ) {
 		case GAMEON: {
-			int team = ( ( gameLocal.mpGame.GetScoreForTeam( TEAM_MARINE ) >= gameLocal.serverInfo.GetInt( "si_captureLimit" ) ) ? TEAM_MARINE : ( ( gameLocal.mpGame.GetScoreForTeam( TEAM_STROGG ) >= gameLocal.serverInfo.GetInt( "si_captureLimit" ) ) ? TEAM_STROGG : -1 ) );
-			if( gameLocal.serverInfo.GetInt( "si_captureLimit" ) <= 0 ) {
-				// no capture limit games
-				team = -1;
-			}
-			bool tiedForFirst = gameLocal.mpGame.GetScoreForTeam( TEAM_MARINE ) == gameLocal.mpGame.GetScoreForTeam( TEAM_STROGG );
+			const int marineScore = gameLocal.mpGame.GetScoreForTeam( TEAM_MARINE );
+			const int stroggScore = gameLocal.mpGame.GetScoreForTeam( TEAM_STROGG );
+			const int limit = gameLocal.serverInfo.GetInt( "si_captureLimit" );
+			const int leadingTeam = marineScore >= stroggScore ? TEAM_MARINE : TEAM_STROGG;
+			const int team = limit > 0 && Max( marineScore, stroggScore ) >= limit ? leadingTeam : -1;
+			const bool tiedForFirst = marineScore == stroggScore;
 			if ( team >= 0 && !tiedForFirst ) {
 				if ( !fragLimitTimeout ) {
 					common->DPrintf( "enter capture limit timeout, team %d is leader\n", team );
@@ -1309,16 +1737,26 @@ void rvCTFGameState::Run( void ) {
 				// frag limit was hit and cancelled. means the two teams got even during FRAGLIMIT_DELAY
 				// enter sudden death, the next frag leader will win
 				// OR the winner lost a point in the frag delay, and there's no tie, so no one wins, game on.
-				if( tiedForFirst && ( gameLocal.mpGame.GetScoreForTeam( TEAM_MARINE ) >= gameLocal.serverInfo.GetInt( "si_captureLimit" ) ))	{
+				if ( tiedForFirst && team >= 0 ) {
+					if ( gameLocal.time <= fragLimitTimeout ) {
+						break;
+					}
 					NewState( SUDDENDEATH );
 				}
-				fragLimitTimeout = 0; 
+				fragLimitTimeout = 0;
+			} else if ( gameLocal.mpGame.MercyLimitHit() >= 0 ) {
+				// openQ4: mercy rule, carried over from Quake Live
+				int mercyTeam = gameLocal.mpGame.MercyLimitHit();
+				gameLocal.mpGame.CenterPrint( -1, "#str_41317", idMultiplayerGame::CPARM_TEAM, mercyTeam );
+				gameLocal.mpGame.PrintMessageEvent( -1, MSG_CAPTURELIMIT, mercyTeam );
+				NewState( GAMEREVIEW );
 			} else if ( gameLocal.mpGame.TimeLimitHit() ) {
 				gameLocal.mpGame.PrintMessageEvent( -1, MSG_TIMELIMIT );
 				if( tiedForFirst ) {
-					// if tied at timelimit hit, goto sudden death
 					fragLimitTimeout = 0;
-					NewState( SUDDENDEATH );
+					if ( !StartOvertime() ) {
+						NewState( SUDDENDEATH );
+					}
 				} else {
 					// or just end the game
 					NewState( GAMEREVIEW );
@@ -1368,7 +1806,15 @@ void rvCTFGameState::SetFlagState( int flag, flagState_t newState ) {
 		return;
 	}
 
-	assert( gameLocal.isServer && ( flag >= 0 && flag < TEAM_MAX ) && IsType( rvCTFGameState::GetClassType() ) );
+	assert( IsType( rvCTFGameState::GetClassType() ) );
+
+	// openQ4: a real bound.  rvItemCTFFlag::ResetFlag passes -1 for a powerup it
+	// cannot map back to a flag, and the assert this replaces was compiled out of
+	// a release build, so the write landed on whatever follows the table.
+	if ( flag < 0 || flag >= MAX_CTF_FLAGS ) {
+		gameLocal.Warning( "rvCTFGameState::SetFlagState() - flag index %d out of range", flag );
+		return;
+	}
 
 	flagStatus[ flag ].state = newState;
 }
@@ -1379,7 +1825,14 @@ rvCTFGameState::SetFlagCarrier
 ================
 */
 void rvCTFGameState::SetFlagCarrier( int flag, int clientNum ) {
-	assert( gameLocal.isServer && ( flag >= 0 && flag < TEAM_MAX ) && (clientNum >= 0 && clientNum < MAX_CLIENTS) && IsType( rvCTFGameState::GetClassType() ) );
+	assert( gameLocal.isServer && IsType( rvCTFGameState::GetClassType() ) );
+
+	// openQ4: see SetFlagState - the one flag entity carries team == TEAM_MAX and
+	// this used to write past the end of the table with only an assert to catch it.
+	if ( flag < 0 || flag >= MAX_CTF_FLAGS || clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		gameLocal.Warning( "rvCTFGameState::SetFlagCarrier() - flag %d / client %d out of range", flag, clientNum );
+		return;
+	}
 
 	flagStatus[ flag ].clientNum = clientNum;
 }
@@ -1394,7 +1847,7 @@ bool rvCTFGameState::operator==( const rvCTFGameState& rhs ) const {
 		return false;
 	}
 
-	for( int i = 0; i < TEAM_MAX; i++ ) {
+	for( int i = 0; i < MAX_CTF_FLAGS; i++ ) {
 		if( flagStatus[ i ] != rhs.flagStatus[ i ] ) {
 			return false;
 		}
@@ -1417,7 +1870,7 @@ rvCTFGameState::operator=
 rvCTFGameState& rvCTFGameState::operator=( const rvCTFGameState& rhs ) {
 	(rvGameState&)(*this) = (rvGameState&)rhs;
 
-	for( int i = 0; i < TEAM_MAX; i++ ) {
+	for( int i = 0; i < MAX_CTF_FLAGS; i++ ) {
 		flagStatus[ i ] = rhs.flagStatus[ i ];
 	}
 
@@ -1496,6 +1949,14 @@ void rvTourneyGameState::Clear( void ) {
 	byeArena = -1;
 	tourneyCount = 0;
 	roundTimeout = 0;
+}
+
+void rvTourneyGameState::ShiftMatchTime( int deltaMsec ) {
+	rvGameState::ShiftMatchTime( deltaMsec );
+	ShiftGameStateDeadline( roundTimeout, deltaMsec );
+	for ( int index = 0; index <= MAX_ARENAS; ++index ) {
+		arenas[ index ].ShiftMatchTime( deltaMsec );
+	}
 }
 
 /*
@@ -1725,8 +2186,15 @@ void rvTourneyGameState::Run( void ) {
 rvTourneyGameState::NewState
 ================
 */
-void rvTourneyGameState::NewState( mpGameState_t newState ) {
+bool rvTourneyGameState::NewState( mpGameState_t newState ) {
 	assert( (newState != currentState) && gameLocal.isServer );
+	// Tourney prepares brackets before the base adapter applies the transition.
+	// Preflight first so a rejected authoritative edge has no bracket/spectate
+	// side effects; rvGameState::NewState performs the actual atomic commit.
+	if ( gameLocal.mpGame.GetMatchSession().GetPhase() != newState &&
+		!gameLocal.mpGame.CanCommitMatchPhaseTransition( newState ) ) {
+		return false;
+	}
 
 	switch( newState ) {
 		case WARMUP: {
@@ -1746,7 +2214,7 @@ void rvTourneyGameState::NewState( mpGameState_t newState ) {
 		}
 	}
 
-	rvGameState::NewState( newState );
+	return rvGameState::NewState( newState );
 }
 
 /*
@@ -1907,19 +2375,21 @@ rvTourneyGameState::PackState
 void rvTourneyGameState::PackState( idBitMsg& outMsg ) {
 	assert( IsType( rvTourneyGameState::GetClassType() ) );
 	
-	if( tourneyState != ((rvTourneyGameState*)previousGameState)->tourneyState ) {
+	if ( tourneyState != ((rvTourneyGameState*)previousGameState)->tourneyState ) {
 		outMsg.WriteByte( MSG_TOURNEY_TOURNEYSTATE );
 		outMsg.WriteByte( tourneyState );
 	}
 
-	if( startingRound != ((rvTourneyGameState*)previousGameState)->startingRound ) {
+	if ( startingRound != ((rvTourneyGameState*)previousGameState)->startingRound ) {
 		outMsg.WriteByte( MSG_TOURNEY_STARTINGROUND );
 		outMsg.WriteByte( startingRound );
 	}
 
 	if( round != ((rvTourneyGameState*)previousGameState)->round ) {
 		outMsg.WriteByte( MSG_TOURNEY_ROUND );
-		outMsg.WriteByte( round );
+		// -1 is the reset sentinel; WriteChar keeps its existing 0xff wire
+		// representation without overflowing the unsigned-byte writer.
+		outMsg.WriteChar( round );
 	}
 
 	if( maxRound != ((rvTourneyGameState*)previousGameState)->maxRound ) {
@@ -1927,24 +2397,24 @@ void rvTourneyGameState::PackState( idBitMsg& outMsg ) {
 		outMsg.WriteByte( maxRound );
 	}
 	
-	for( int i = 0; i < MAX_ARENAS; i++ ) {
-		if( arenas[ i ] != ((rvTourneyGameState*)previousGameState)->arenas[ i ] ) {
+	for ( int i = 0; i < MAX_ARENAS; i++ ) {
+		if ( arenas[ i ] != ((rvTourneyGameState*)previousGameState)->arenas[ i ] ) {
 			outMsg.WriteByte( MSG_TOURNEY_ARENAINFO + i );
 			arenas[ i ].PackState( outMsg );
 		}
 	}
 
-	if( packTourneyHistory || forceTourneyHistory ) {
-		if( forceTourneyHistory ) {
-			common->Warning("forcing down tourney history\n");
+	if ( packTourneyHistory || forceTourneyHistory ) {
+		if ( forceTourneyHistory ) {
+			common->Warning( "forcing down tourney history\n" );
 		}
 		// don't write out uninitialized tourney history
-		if( startingRound > 0 && round > 1 ) {
+		if ( startingRound > 0 && round > 1 ) {
 			outMsg.WriteByte( MSG_TOURNEY_HISTORY );
 
 			// client might not yet have startingRound or round
 			outMsg.WriteByte( startingRound ); 
-			outMsg.WriteByte( round ); 
+			outMsg.WriteChar( round ); 
 			outMsg.WriteByte( maxRound );
 
 			for( int i = startingRound - 1; i <= Min( (round - 1), (maxRound - 1) ); i++ ) {
@@ -1953,15 +2423,15 @@ void rvTourneyGameState::PackState( idBitMsg& outMsg ) {
 					outMsg.WriteChar( idMath::ClampChar( tourneyHistory[ i ][ j ].playerOneScore ) );
 					outMsg.WriteString( tourneyHistory[ i ][ j ].playerTwo, MAX_TOURNEY_HISTORY_NAME_LEN );
 					outMsg.WriteChar( idMath::ClampChar( tourneyHistory[ i ][ j ].playerTwoScore ) );
-					outMsg.WriteByte( tourneyHistory[ i ][ j ].playerOneNum );
-					outMsg.WriteByte( tourneyHistory[ i ][ j ].playerTwoNum );
+					outMsg.WriteChar( tourneyHistory[ i ][ j ].playerOneNum );
+					outMsg.WriteChar( tourneyHistory[ i ][ j ].playerTwoNum );
 				}
 			}
 			packTourneyHistory = false;
 		}
 	}
 
-	if( tourneyCount != ((rvTourneyGameState*)previousGameState)->tourneyCount ) {
+	if ( tourneyCount != ((rvTourneyGameState*)previousGameState)->tourneyCount ) {
 		outMsg.WriteByte( MSG_TOURNEY_TOURNEYCOUNT );
 		outMsg.WriteByte( tourneyCount );
 	}
@@ -1990,26 +2460,26 @@ void rvTourneyGameState::UnpackState( const idBitMsg& inMsg ) {
 			case MSG_TOURNEY_ROUND: {
 				round = inMsg.ReadByte();
 				// not a great way of doing this, should clamp the values
-				if( round == 255 ) {
+				if ( round == 255 ) {
 					round = -1;
 				}
 				break;
 			}
 			case MSG_TOURNEY_MAXROUND: {
 				maxRound = inMsg.ReadByte();
-				if( maxRound == 255 ) {
+				if ( maxRound == 255 ) {
 					maxRound = -1;
 				}
 				break;
 			}
 			case MSG_TOURNEY_HISTORY: {
 				int startRound = inMsg.ReadByte();
-				int rnd = inMsg.ReadByte();
+				int rnd = inMsg.ReadChar();
 				int maxr = inMsg.ReadByte();
 				
-				assert( rnd >= 1 ); // something is uninitialized
-
-				// openQ4: these index tourneyHistory's rounds and divide below
+				// openQ4: these index tourneyHistory's rounds, of which there are
+				// MAX_ROUNDS. The check used MAX_ARENAS, twice as many, so a server
+				// or demo could write four rows of names past the array.
 				if ( startRound < 1 || startRound > MAX_ROUNDS ||
 					 rnd < 1 || rnd > MAX_ROUNDS ||
 					 maxr < 1 || maxr > MAX_ROUNDS ) {
@@ -2024,8 +2494,8 @@ void rvTourneyGameState::UnpackState( const idBitMsg& inMsg ) {
 						tourneyHistory[ i ][ j ].playerOneScore = inMsg.ReadChar();
 						inMsg.ReadString( tourneyHistory[ i ][ j ].playerTwo, MAX_TOURNEY_HISTORY_NAME_LEN );
 						tourneyHistory[ i ][ j ].playerTwoScore = inMsg.ReadChar();
-						tourneyHistory[ i ][ j ].playerOneNum = inMsg.ReadByte();
-						tourneyHistory[ i ][ j ].playerTwoNum = inMsg.ReadByte();
+						tourneyHistory[ i ][ j ].playerOneNum = inMsg.ReadChar();
+						tourneyHistory[ i ][ j ].playerTwoNum = inMsg.ReadChar();
 
 						if( tourneyHistory[ i ][ j ].playerOneNum < 0 || tourneyHistory[ i ][ j ].playerOneNum >= MAX_CLIENTS ) {
 							tourneyHistory[ i ][ j ].playerOneNum = -1;
@@ -2046,7 +2516,7 @@ void rvTourneyGameState::UnpackState( const idBitMsg& inMsg ) {
 				break;
 			}
 			default: {
-				if( index >= MSG_TOURNEY_ARENAINFO && index < MSG_TOURNEY_ARENAINFO + MAX_ARENAS ) {
+				if ( index >= MSG_TOURNEY_ARENAINFO && index < MSG_TOURNEY_ARENAINFO + MAX_ARENAS ) {
 					arenas[ index - MSG_TOURNEY_ARENAINFO ].UnpackState( inMsg );
 				} else {
 					gameLocal.Error( "rvTourneyGameState::UnpackState() - Unknown data identifier '%d'\n", index );
@@ -2063,11 +2533,11 @@ void rvTourneyGameState::UnpackState( const idBitMsg& inMsg ) {
 rvTourneyGameState::SendState
 ================
 */
-void rvTourneyGameState::SendState( int clientNum ) {
+void rvTourneyGameState::SendState( const idMessageSender &sender, int clientNum ) {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
 
-	assert( gameLocal.isServer && trackPrevious && IsType( rvTourneyGameState::GetClassType() ) );
+	assert( (gameLocal.isServer || gameLocal.isRepeater) && trackPrevious && IsType( rvTourneyGameState::GetClassType() ) );
 
 	if ( clientNum == -1 && (rvTourneyGameState&)(*this) == (rvTourneyGameState&)(*previousGameState) ) {
 		return;
@@ -2082,7 +2552,7 @@ void rvTourneyGameState::SendState( int clientNum ) {
 		forceTourneyHistory = false;
 	}
 
-	networkSystem->ServerSendReliableMessage( clientNum, outMsg );
+	sender.Send( outMsg );
 
 	// don't update the state if we are working for a single client
 	if ( clientNum == -1 ) {
@@ -2111,7 +2581,9 @@ rvTourneyGameState::ReceiveState
 void rvTourneyGameState::ReceiveState( const idBitMsg& msg ) {
 	assert( IsType( rvTourneyGameState::GetClassType() ) );
 
-	rvGameState::UnpackState( msg );
+	if ( !rvGameState::BaseUnpackState( msg ) ) {
+		return;
+	}
 	UnpackState( msg );
 
 	if ( gameLocal.localClientNum >= 0 ) {
@@ -2126,7 +2598,7 @@ void rvTourneyGameState::ReceiveState( const idBitMsg& msg ) {
 rvTourneyGameState::SendInitialState
 ================
 */
-void rvTourneyGameState::SendInitialState( int clientNum ) {
+void rvTourneyGameState::SendInitialState( const idMessageSender &sender, int clientNum ) {
 	assert( IsType( rvTourneyGameState::GetClassType() ) );
 
 	rvTourneyGameState* previousState = (rvTourneyGameState*)previousGameState;
@@ -2142,7 +2614,7 @@ void rvTourneyGameState::SendInitialState( int clientNum ) {
 		packTourneyHistory = true;
 	}
 	
-	SendState( clientNum );
+	SendState( sender, clientNum );
 
 	previousGameState = previousState;
 }
@@ -2354,8 +2826,13 @@ void rvTourneyGameState::ClientDisconnect( idPlayer* player ) {
 
 			if( gameLocal.entities[ i ] ) {
 				packTourneyHistory = true;
-				SendState( i );
+				SendState( serverReliableSender.To( i, true ), i );
 			}
+		}
+
+		if ( gameLocal.isRepeater ) {
+			packTourneyHistory = true;
+			SendState( repeaterReliableSender.To( -1 ), ENTITYNUM_NONE );
 		}
 		packTourneyHistory = false;
 	}
@@ -2368,7 +2845,7 @@ rvTourneyGameState::Spectate
 */
 void rvTourneyGameState::Spectate( idPlayer* player ) {
 	assert( IsType( rvTourneyGameState::GetClassType() ) );
-	assert( gameLocal.isServer );
+	assert( gameLocal.isServer || player->IsFakeClient() );
 
 	if( player->spectating && player->wantSpectate ) {
 		RemovePlayer( player );
@@ -2512,35 +2989,80 @@ int rvTourneyGameState::GetPrevActiveArena( int arena ) {
 	return arena;
 }
 
-void rvTourneyGameState::SpectateCycleNext( idPlayer* player ) {
-	assert( IsType( rvTourneyGameState::GetClassType() ) );
-	assert( gameLocal.isServer );
+/*
+================
+rvTourneyGameState::CycleSpectatorTarget
 
-	rvTourneyArena& spectatingArena = arenas[ player->GetArena() ];
-	
-	idPlayer** players = spectatingArena.GetPlayers();
-
-	if( !players[ 0 ] || !players[ 1 ] || players[ 0 ]->spectating || players[ 1 ]->spectating ) {
-		// setting the spectated client to ourselves will unlock us
-		player->spectator = player->entityNumber;
-		return;
+Walk the fixed arena/seat space in display order, skipping inactive brackets
+and every camera target rejected by the same fresh disclosure gate used by the
+normal spectator path.  The bounded scan cannot loop forever when all targets
+are private or stale.
+================
+*/
+bool rvTourneyGameState::CycleSpectatorTarget( idPlayer* player,
+		int direction ) {
+	if ( player == NULL || ( direction != 1 && direction != -1 ) ) {
+		return false;
 	}
 
-	if( player->spectator != players[ 0 ]->entityNumber && player->spectator != players[ 1 ]->entityNumber ) {
-		player->spectator = players[ 0 ]->entityNumber;
-	} else if( player->spectator == players[ 0 ]->entityNumber ) {
-		player->spectator = players[ 1 ]->entityNumber;
-	} else if( player->spectator == players[ 1 ]->entityNumber ) {
-		if( gameLocal.time > player->lastArenaChange ) {
-			if ( GetNumArenas() <= 0 ) {
-				player->JoinInstance( 0 );
-			} else {
-				player->JoinInstance( GetNextActiveArena( player->GetArena() ) );
-			}
-			player->lastArenaChange = gameLocal.time + 2000;
-			player->spectator = player->entityNumber;
+	int currentArena = player->GetArena();
+	if ( currentArena < 0 || currentArena >= MAX_ARENAS ) {
+		currentArena = 0;
+	}
+	int currentSeat = -1;
+	idPlayer **currentPlayers = arenas[ currentArena ].GetPlayers();
+	for ( int seat = 0; seat < 2; ++seat ) {
+		if ( currentPlayers[ seat ] != NULL &&
+			player->spectator == currentPlayers[ seat ]->entityNumber ) {
+			currentSeat = seat;
+			break;
 		}
 	}
+
+	const int targetCount = MAX_ARENAS * 2;
+	const int baseTarget = currentSeat >= 0 ?
+		currentArena * 2 + currentSeat :
+		( direction > 0 ? currentArena * 2 - 1 : currentArena * 2 );
+	const bool mayChangeArena = player->GetArena() < 0 ||
+		player->GetArena() >= MAX_ARENAS ||
+		gameLocal.time > player->lastArenaChange;
+
+	for ( int step = 1; step <= targetCount; ++step ) {
+		int flatTarget = ( baseTarget + direction * step ) % targetCount;
+		if ( flatTarget < 0 ) {
+			flatTarget += targetCount;
+		}
+		const int targetArena = flatTarget / 2;
+		const int targetSeat = flatTarget % 2;
+		if ( arenas[ targetArena ].GetState() == AS_INACTIVE ||
+			arenas[ targetArena ].GetState() == AS_DONE ||
+			( targetArena != player->GetArena() && !mayChangeArena ) ) {
+			continue;
+		}
+		idPlayer *target = arenas[ targetArena ].GetPlayers()[ targetSeat ];
+		if ( target == NULL || target->spectating ||
+			!gameLocal.mpGame.CanSpectatorFollow( player->entityNumber,
+				target->entityNumber ) ) {
+			continue;
+		}
+
+		if ( targetArena != player->GetArena() ) {
+			player->JoinInstance( targetArena );
+			player->lastArenaChange = gameLocal.time + 2000;
+		}
+		player->spectator = target->entityNumber;
+		return true;
+	}
+
+	// A private, disconnected or empty bracket must never leave a stale POV.
+	player->spectator = player->entityNumber;
+	return false;
+}
+
+void rvTourneyGameState::SpectateCycleNext( idPlayer* player ) {
+	assert( IsType( rvTourneyGameState::GetClassType() ) );
+	assert( gameLocal.isServer || player->IsFakeClient() );
+	CycleSpectatorTarget( player, 1 );
 
 	// this is where the listen server updates it's gui spectating elements
 	if ( gameLocal.GetLocalPlayer() == player ) {
@@ -2560,44 +3082,8 @@ void rvTourneyGameState::SpectateCycleNext( idPlayer* player ) {
 
 void rvTourneyGameState::SpectateCyclePrev( idPlayer* player ) {
 	assert( IsType( rvTourneyGameState::GetClassType() ) );
-	assert( gameLocal.isServer );
-
-	rvTourneyArena& spectatingArena = arenas[ player->GetArena() ];
-
-	idPlayer** players = spectatingArena.GetPlayers();
-
-	if( !players[ 0 ] || !players[ 1 ] || players[ 0 ]->spectating || players[ 1 ]->spectating ) {
-		// setting the spectated client to ourselves will unlock us
-		player->spectator = player->entityNumber;
-		return;
-	}
-
-	if( player->spectator != players[ 0 ]->entityNumber && player->spectator != players[ 1 ]->entityNumber ) {
-		if( gameLocal.time > player->lastArenaChange ) {
-			if ( GetNumArenas() <= 0 ) {
-				player->JoinInstance( 0 );
-			} else {
-				player->JoinInstance( GetPrevActiveArena( player->GetArena() ) );
-			}
-			player->lastArenaChange = gameLocal.time + 2000;
-			
-			rvTourneyArena& newSpectatingArena = arenas[ player->GetArena() ];
-		
-			idPlayer** newPlayers = newSpectatingArena.GetPlayers();
-
-			if( !newPlayers[ 0 ] || !newPlayers[ 1 ] || newPlayers[ 0 ]->spectating || newPlayers[ 1 ]->spectating ) {
-				// setting the spectated client to ourselves will unlock us
-				player->spectator = player->entityNumber;
-				return;
-			}
-
-			player->spectator = newPlayers[ 1 ]->entityNumber;
-		} 
-	} else if( player->spectator == players[ 0 ]->entityNumber ) {
-		player->spectator = player->entityNumber;
-	} else if( player->spectator == players[ 1 ]->entityNumber ) {
-		player->spectator = players[ 0 ]->entityNumber;
-	}
+	assert( gameLocal.isServer || player->IsFakeClient() );
+	CycleSpectatorTarget( player, -1 );
 
 	// this is where the listen server updates it gui spectating elements
 	if( gameLocal.GetLocalPlayer() == player ) {
@@ -2719,6 +3205,7 @@ gameStateType_t rvDMGameState::type = GS_DM;
 gameStateType_t rvTeamDMGameState::type = GS_TEAMDM;
 gameStateType_t rvCTFGameState::type = GS_CTF;
 gameStateType_t rvTourneyGameState::type = GS_TOURNEY;
+gameStateType_t riDZGameState::type = GS_DZ;
 
 bool rvGameState::IsType( gameStateType_t type ) const {
 	return ( type == rvGameState::type );
@@ -2760,6 +3247,14 @@ gameStateType_t rvTourneyGameState::GetClassType( void ) {
 	return rvTourneyGameState::type;
 }
 
+bool riDZGameState::IsType( gameStateType_t type ) const {
+	return ( type == riDZGameState::type );
+}
+
+gameStateType_t riDZGameState::GetClassType( void ) {
+	return riDZGameState::type;
+}
+
 /*
 ===============================================================================
 
@@ -2785,8 +3280,6 @@ riDZGameState::riDZGameState( bool allocPrevious ) : rvGameState( false ) {
 	}
 
 	trackPrevious = allocPrevious;
-
-	type = GS_DZ;
 }
 
 /*
@@ -2826,11 +3319,11 @@ void riDZGameState::Clear( void ) {
 riDZGameState::SendState
 ================
 */
-void riDZGameState::SendState( int clientNum ) {
+void riDZGameState::SendState( const idMessageSender &sender, int clientNum ) {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
 
-	assert( gameLocal.isServer && trackPrevious && type == GS_DZ );
+	assert( (gameLocal.isServer || gameLocal.isRepeater) && trackPrevious && type == GS_DZ );
 
 	if( clientNum == -1 && (riDZGameState&)(*this) == (riDZGameState&)(*previousGameState) ) {
 		return;
@@ -2841,7 +3334,7 @@ void riDZGameState::SendState( int clientNum ) {
 
 	WriteState( outMsg );
 
-	networkSystem->ServerSendReliableMessage( clientNum, outMsg );
+	sender.Send( outMsg );
 
 	// don't update the state if we are working for a single client
 	if ( clientNum == -1 ) {
@@ -2870,7 +3363,9 @@ riDZGameState::ReceiveState
 void riDZGameState::ReceiveState( const idBitMsg& msg ) {
 	assert( type == GS_DZ );
 
-	rvGameState::UnpackState( msg );
+	if ( !rvGameState::BaseUnpackState( msg ) ) {
+		return;
+	}
 	UnpackState( msg );
 
 	if ( gameLocal.localClientNum >= 0 ) {
@@ -2916,7 +3411,7 @@ void riDZGameState::UnpackState( const idBitMsg& inMsg ) {
 riDZGameState::SendInitialState
 ================
 */
-void riDZGameState::SendInitialState( int clientNum ) {
+void riDZGameState::SendInitialState( const idMessageSender &sender,  int clientNum ) {
 	assert( type == GS_DZ );
 
 	riDZGameState* previousState = (riDZGameState*)previousGameState;
@@ -2925,7 +3420,7 @@ void riDZGameState::SendInitialState( int clientNum ) {
 
 	previousGameState = &invalidState;
 
-	SendState( clientNum );
+	SendState( sender, clientNum );
 
 	previousGameState = previousState;
 }

@@ -104,7 +104,7 @@ def require(text: str, token: str, context: str) -> None:
 
 
 def check_sources(sources: dict[str, str]) -> None:
-    hud, mp, sp, interface = sources["hud"], sources["mp_player"], sources["sp_player"], sources["interface"]
+    hud, player, interface = sources["hud"], sources["player"], sources["interface"]
     precache = block(hud, "void idRetainedHud::Precache() {")
     if not precache.split("{", 1)[1].lstrip().startswith("PrefetchCatalog();"):
         raise AssertionError("idRetainedHud::Precache: a level load must drop the catalog first, whatever the gate says")
@@ -112,9 +112,9 @@ def check_sources(sources: dict[str, str]) -> None:
     require(draw, "if (!Prepare(source) || !RetainedUI_PrepareView(impl->view)) return false;", "idRetainedHud::Draw")
     require(block(hud, "bool idUserInterfaceManagerLocal::DrawHudPrimitives("), "idRetainedHud* hud=GeneratedHud(source);",
             "DrawHudPrimitives")
-    for name, player, follows in (("multiplayer", mp, "PrecacheQuickChatGui();"), ("single player", sp, "PrecacheWeaponWheelGui();")):
-        spawn = block(player, "void idPlayer::Spawn( void ) {")
-        require(spawn, f"{follows}\n\tPrecacheHudPresentation();", f"{name} idPlayer::Spawn")
+    # One spawn serves both modes: the quick-chat wheel only exists in network play.
+    spawn = block(player, "void idPlayer::Spawn( void ) {")
+    require(spawn, "PrecacheWeaponWheelGui();\n\tif ( gameLocal.isMultiplayer ) {\n\t\tPrecacheQuickChatGui();\n\t}\n\tPrecacheHudPresentation();", "idPlayer::Spawn")
     require(interface, "virtual void PrecacheHudPrimitives( const char* source ) { }", "idUserInterfaceManager")
 
 
@@ -134,8 +134,8 @@ def compile_and_run(source: str, directory: Path, name: str, compiler: str) -> s
 
 
 def main() -> None:
-    sources = {"hud": read("src/ui/RetainedHud.cpp"), "mp_player": read("src/mpgame/Player.cpp"),
-               "sp_player": read("src/game/Player.cpp"), "interface": read("src/ui/UserInterface.h")}
+    sources = {"hud": read("src/ui/RetainedHud.cpp"), "player": read("src/game/Player.cpp"),
+               "interface": read("src/ui/UserInterface.h")}
     check_sources(sources)
 
     # The source checks must reject each wiring reversal.
@@ -144,10 +144,10 @@ def main() -> None:
          "void idRetainedHud::Precache() {\n"),
         ("a draw loads without Prepare", "hud", "if (!Prepare(source) || !RetainedUI_PrepareView(impl->view)) return false;",
          "if (!RetainedUI_PrepareView(impl->view)) return false;"),
-        ("multiplayer spawns without precaching", "mp_player", "PrecacheQuickChatGui();\n\tPrecacheHudPresentation();",
-         "PrecacheQuickChatGui();"),
-        ("single player spawns without precaching", "sp_player", "PrecacheWeaponWheelGui();\n\tPrecacheHudPresentation();",
-         "PrecacheWeaponWheelGui();"),
+        ("a spawn without precaching", "player", "\t}\n\tPrecacheHudPresentation();\n}", "\t}\n}"),
+        ("multiplayer spawns without the quick-chat wheel", "player",
+         "\tif ( gameLocal.isMultiplayer ) {\n\t\tPrecacheQuickChatGui();\n\t}\n\tPrecacheHudPresentation();",
+         "\tPrecacheHudPresentation();"),
         ("the manager interface cannot precache", "interface",
          "virtual void PrecacheHudPrimitives( const char* source ) { }", ""),
     )
@@ -163,8 +163,9 @@ def main() -> None:
     compiler = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("g++")
     if not compiler:
         raise RuntimeError("A C++ compiler is required for the retained HUD catalog fixture")
-    parts = {"hud": sources["hud"], "mp_presentation": presentation(sources["mp_player"]),
-             "sp_presentation": presentation(sources["sp_player"])}
+    # the same function, compiled once per mode
+    parts = {"hud": sources["hud"], "mp_presentation": presentation(sources["player"]),
+             "sp_presentation": presentation(sources["player"])}
     output = ROOT / ".tmp"
     output.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="ui-hud-catalog-", dir=output) as directory:

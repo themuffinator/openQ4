@@ -23,7 +23,7 @@ from pathlib import Path
 from mp_match_disclosure_policy_contract import HARNESS as POLICY_HARNESS, function_body
 
 ROOT = Path(__file__).resolve().parents[2]
-GAME = "src/mpgame/MultiplayerGame.cpp"
+GAME = "src/game/MultiplayerGame.cpp"
 
 SIGNATURES = (
     "bool idMultiplayerGame::SetCasualCasterRole( int clientNum, bool enabled )",
@@ -60,8 +60,8 @@ HARNESS = r'''
 #include <string>
 #include <utility>
 #include <vector>
-#include "mpgame/mp/match/MatchSession.h"
-#include "mpgame/mp/match/MatchDisclosurePolicy.h"
+#include "game/mp/match/MatchSession.h"
+#include "game/mp/match/MatchDisclosurePolicy.h"
 
 static const int MAX_CLIENTS = 32;
 struct CVar { bool value = false; bool GetBool() const { return value; } } g_casterAccess;
@@ -285,12 +285,12 @@ int main() {
 def build(bodies: str, directory: Path, name: str, compiler: str, strict: bool) -> Path:
     source = directory / f"{name}.cpp"
     exe = directory / (f"{name}.exe" if os.name == "nt" else name)
-    operations = (ROOT / "src/mpgame/mp/match/MatchOperations.cpp").read_text(encoding="utf-8")
+    operations = (ROOT / "src/game/mp/match/MatchOperations.cpp").read_text(encoding="utf-8")
     target =function_body(operations, "bool MPOperationBroadcasterTargetIsValid( const mpMatchSession &session,")
     # The disclosure contract's preamble supplies the engine types and the real MatchView.
     preamble = POLICY_HARNESS.split("#define CHECK")[0]
     source.write_text(preamble + HARNESS.replace("@TARGET@", target).replace("@BODIES@", bodies), encoding="utf-8")
-    match = ROOT / "src/mpgame/mp/match"
+    match = ROOT / "src/game/mp/match"
     subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra"] + (["-Werror"] if strict else []) + [
         "-DMP_MATCH_SESSION_STANDALONE_TEST", "-DMP_MATCH_DISCLOSURE_STANDALONE_TEST", "-I" + str(ROOT / "src"), str(source),
         str(match / "MatchDisclosurePolicy.cpp"), str(match / "MatchSession.cpp"), "-o", str(exe)],
@@ -316,7 +316,7 @@ def main() -> None:
     policy = function_body(game, "mpMatchDisclosurePolicy_t idMultiplayerGame::BuildMatchDisclosurePolicy( void ) const")
     assert "policy.allowBroadcasterItemTiming = managedMatch;" in policy, "the caster grant must not add item timing"
     # The request reaches the grant only through the checked spectator request.
-    player = (ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8").replace("\r\n", "\n")
+    player = (ROOT / "src/game/Player.cpp").read_text(encoding="utf-8").replace("\r\n", "\n")
     request = function_body(player, "void idPlayer::ServerSpectatorFollow( int operation, int targetSlot, int targetSpawnId )")
     assert request.index("if ( !spectating ) {") < request.index("gameLocal.mpGame.ServerRequestCasterRole( entityNumber, targetSlot != 0 )")
     assert game.count("ServerRequestCasterRole(") == 1 and player.count("ServerRequestCasterRole(") == 1

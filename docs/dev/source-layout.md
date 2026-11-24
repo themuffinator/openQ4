@@ -34,7 +34,7 @@ are local and untracked.
 | `cm` | Collision model |
 | `external` | Vendored code (see below) |
 | `framework` | Common services, file system, cvars, declarations; `async` holds networking |
-| `game`, `mpgame` | SDK-derived single-player and multiplayer game libraries; `game/awakening` holds the expansion |
+| `game` | SDK-derived game library serving single-player and multiplayer; `game/mp` holds the multiplayer rules, `game/awakening` the expansion |
 | `idlib` | Core library |
 | `imagetools` | CPU image codecs and colour handling shared by the engine and renderer modules |
 | `mayaimport` | Interface to the optional Maya import DLL |

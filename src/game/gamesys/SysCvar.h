@@ -2,6 +2,42 @@
 #ifndef __SYS_CVAR_H__
 #define __SYS_CVAR_H__
 
+
+/*
+===============================================================================
+
+	idModeCVar
+
+	openQ4 (CORE-07): a game cvar whose default or flags differ between the
+	campaign (game_sp) and network play (game_mp). One module serves both, but
+	a few settings kept separate declarations while they lived in separate
+	modules (player collision shape, server defaults, archive flags). The
+	constructor takes the single-player declaration first; ApplyModuleMode
+	swaps in the multiplayer default and flags before the module registers its
+	cvars, so registration, reset and the archive see the mode's declaration.
+	A value the player set is kept, as for any cvar.
+
+===============================================================================
+*/
+
+class idModeCVar : public idCVar {
+public:
+							idModeCVar( const char *name, const char *spValue, int spFlags,
+										const char *mpValue, int mpFlags, const char *description,
+										argCompletion_t valueCompletion = NULL );
+							idModeCVar( const char *name, const char *spValue, int spFlags,
+										const char *mpValue, int mpFlags, const char *description,
+										const char **valueStrings, argCompletion_t valueCompletion = NULL );
+
+	// Call once per module load, before idCVar::RegisterStaticVars().
+	static void				ApplyModuleMode( bool multiplayer );
+
+private:
+	const char *			mpValue;
+	int						mpFlags;
+	idModeCVar *			nextModeCVar;
+	static idModeCVar *		modeCVars;
+};
 extern idCVar	developer;
 
 extern idCVar	g_cinematic;
@@ -10,6 +46,7 @@ extern idCVar	g_autoSkipCinematics;
 extern idCVar	g_objectivesToggle;
 extern idCVar	g_allowAssetlessStartup;
 extern idCVar	g_corpseRemoveDelaySP;
+extern idCVar	g_corpseRemoveDelayMP;
 extern idCVar	g_corpseSink;
 
 // RAVEN BEGIN
@@ -31,11 +68,15 @@ extern idCVar	g_classicDynamicLights;
 extern idCVar	g_classicDynamicLightScale;
 extern idCVar	g_doubleVision;
 extern idCVar	g_muzzleFlash;
+
 extern idCVar	g_nailTrail;
 extern idCVar	g_grenadeTrail;
 extern idCVar	g_rocketTrail;
 extern idCVar	g_railTrail;
 extern idCVar	g_napalmTrail;
+
+extern idCVar	g_predictedProjectiles;
+extern idCVar	g_projectilePredictionDebug;
 
 extern idCVar	g_disasm;
 extern idCVar	g_debugBounds;
@@ -179,6 +220,26 @@ extern idCVar	g_dropItemRotation;
 extern idCVar	g_vehicleVelocity;
 extern idCVar	g_vehicleForce;
 
+extern idCVar	hud_showSpeed;
+extern idCVar	hud_showInput;
+extern idCVar	hud_inputPosition;
+extern idCVar	hud_inputColor;
+// openQ4 BEGIN
+extern idCVar	hud_damageNumbers;
+extern idCVar	hud_damageNumberStyle;
+extern idCVar	hud_damageNumberScale;
+extern idCVar	hud_hitMarker;
+extern idCVar	hud_hitMarkerScale;
+extern idCVar	hud_crosshairHitFlash;
+extern idCVar	hud_crosshairAnimated;
+extern idCVar	hud_hitSound;
+extern idCVar	hud_crosshairAmmo;
+extern idCVar	hud_crosshairNames;
+extern idCVar	hud_itemTimers;
+extern idCVar	hud_teamLocations;
+extern idCVar	hud_localClock;
+// openQ4 END
+
 extern idCVar	ik_enable;
 extern idCVar	ik_debug;
 
@@ -256,6 +317,7 @@ extern idCVar	af_enhancedBounce;
 extern idCVar	af_enhancedInheritTime;
 extern idCVar	af_enhancedMaxInheritSpeed;
 extern idCVar	af_enhancedDebug;
+extern idCVar	si_enhancedPhysics;
 
 extern idCVar	rb_showTimings;
 extern idCVar	rb_showBodies;
@@ -276,7 +338,7 @@ extern idCVar 	pm_isZoomed;
 extern idCVar	pm_noclipspeed;
 extern idCVar	pm_spectatespeed;
 extern idCVar	pm_spectatebbox;
-extern idCVar	pm_usecylinder;
+extern idModeCVar pm_usecylinder;
 extern idCVar	pm_minviewpitch;
 extern idCVar	pm_maxviewpitch;
 extern idCVar	pm_stamina;
@@ -304,6 +366,11 @@ extern idCVar	pm_thirdPersonAngle;
 extern idCVar	pm_thirdPersonClip;
 extern idCVar	pm_thirdPerson;
 extern idCVar	pm_thirdPersonDeath;
+extern idCVar	g_spectatorFollowView;
+extern idCVar	g_chaseCameraRange;
+extern idCVar	g_chaseCameraHeight;
+extern idCVar	g_deathCamera;
+extern idCVar	ui_spectatorSpeed;
 extern idCVar	pm_modelView;
 extern idCVar	pm_airTics;
 
@@ -319,25 +386,6 @@ extern idCVar	g_liquidTestVolume;
 extern idCVar	g_liquidTestVolumeSize;
 // openQ4 END
 
-// RAVEN BEGIN
-// asalmon: parameters for aim assistance on Xenon
-#ifdef _XBOX
-extern idCVar pm_AimAssist;
-extern idCVar pm_AimAssistDistance;
-extern idCVar pm_AimAssistThreshold;
-extern idCVar pm_AimAssistFOV;
-extern idCVar pm_AimAssistBump;
-extern idCVar pm_AimAssistShow;
-extern idCVar pm_AimAssistSlow;
-
-extern idCVar pm_ThumbstickConfig;
-extern idCVar pm_ButtonConfig;
-
-extern idCVar pm_RocketJumpAutocenter;
-extern idCVar pm_IAmACheater;
-
-
-#endif
 // nmckenzie: added ability to try alternate accelerations.
 extern idCVar	pm_acceloverride;
 extern idCVar	pm_frictionoverride;
@@ -377,12 +425,6 @@ extern idCVar	g_crosshairColor;
 extern idCVar	g_crosshairCustom;
 extern idCVar	g_crosshairCustomFile;
 extern idCVar	g_crosshairCharInfoFar;
-// openQ4 BEGIN
-extern idCVar	hud_hitMarker;
-extern idCVar	hud_hitMarkerScale;
-extern idCVar	hud_crosshairHitFlash;
-extern idCVar	hud_crosshairAnimated;
-// openQ4 END
 // bdube: hud popups
 extern idCVar	g_showHudPopups;
 // bdube: range
@@ -398,12 +440,13 @@ extern idCVar	g_brassTime;
 extern idCVar	g_gun_x;
 extern idCVar	g_gun_y;
 extern idCVar	g_gun_z;
-extern idCVar	g_weaponMuzzleKick;
-extern idCVar	g_viewKick;
-extern idCVar	g_screenShake;
 extern idCVar	cl_gun_x;
 extern idCVar	cl_gun_y;
 extern idCVar	cl_gun_z;
+extern idCVar	g_weaponFovEffect;
+extern idCVar	g_weaponMuzzleKick;
+extern idCVar	g_viewKick;
+extern idCVar	g_screenShake;
 // RAVEN BEGIN
 // bdube: cvar for messing with foreshortening
 extern idCVar	g_gun_pitch;
@@ -475,13 +518,30 @@ extern idCVar	aas_showRevReach;
 // RAVEN END
 
 extern idCVar	net_clientPredictGUI;
-extern idCVar	net_mpLagCompensation;
-extern idCVar	net_mpLagCompMaxMS;
-extern idCVar	net_mpLagCompBiasMS;
-extern idCVar	net_mpLagCompDebug;
-extern idCVar	net_mpPredictMode;
 
 extern idCVar	si_voteFlags;
+extern idCVar	g_votePercent;
+extern idCVar	g_voteLimit;
+extern idCVar	si_spectatorVote;
+extern idCVar	si_timeouts;
+extern idCVar	si_timeoutLength;
+extern idCVar	si_spectatorLock;
+extern idCVar	g_inactivity;
+extern idCVar	g_pauseOnDisconnect;
+extern idCVar	g_chatFloodMessages;
+extern idCVar	g_chatFloodSeconds;
+extern idCVar	g_chatFloodWait;
+extern idCVar	g_adminLog;
+extern idCVar	g_voteMuteMinutes;
+extern idCVar	g_adminMaxBanMinutes;
+extern idCVar	ui_identity;
+extern idCVar	g_identity;
+extern idCVar	g_reconnectRestore;
+extern idCVar	g_ranking;
+extern idCVar	g_intermissionAnnounce;
+extern idCVar	ui_autoAction;
+extern idCVar	si_autoAction;
+extern idCVar	g_reservedNames;
 extern idCVar	g_mapCycle;
 // RAVEN BEGIN
 // shouchard:  g_balanceTDM->g_balanceTeams so we can also use it for CTF
@@ -493,15 +553,21 @@ extern idCVar	si_autobalance;
 extern idCVar	si_isBuyingEnabled;
 extern idCVar	si_dropWeaponsInBuyingModes;
 extern idCVar	si_buyingRules;
-extern idCVar	si_instagib;
 extern idCVar	si_controlTime;
 // RITUAL END
 
 extern idCVar	si_timeLimit;
 extern idCVar	si_fragLimit;
-extern idCVar	si_gameType;
-extern idCVar	si_map;
-extern idCVar	si_mapCycle;
+extern idModeCVar si_gameType;
+extern idModeCVar si_map;
+extern idModeCVar si_mapCycle;
+extern idCVar	si_arenaCampaign;
+extern idCVar	g_matchProfile;
+extern idCVar	si_matchRules;
+extern idCVar	si_managedMatch;
+extern idCVar	g_refPassword;
+extern idCVar	g_matchEvidence;
+extern idCVar	g_matchSeriesRecoveryId;
 extern idCVar	si_spectators;
 extern idCVar	si_minPlayers;
 // RAVEN BEGIN
@@ -513,13 +579,62 @@ extern idCVar	si_tourneyLimit;
 
 extern const char *si_gameTypeArgs[];
 
-// RAVEN BEGIN
-// bdube: client entities
+// openQ4 BEGIN
+// match progression carried over from Quake Live
+extern idCVar	si_scoreLimit;
+extern idCVar	si_roundLimit;
+extern idCVar	si_roundTimeLimit;
+extern idCVar	si_roundWarmupDelay;
+extern idCVar	si_roundEndDelay;
+extern idCVar	si_mercyLimit;
+extern idCVar	si_overtime;
+extern idCVar	si_suddenDeathRespawnDelay;
+extern idCVar	si_suddenDeathRespawnIncrease;
+extern idCVar	si_suddenDeathRespawnMax;
+extern idCVar	si_forfeit;
+extern idCVar	si_warmupReadyPercentage;
+extern idCVar	si_teamSizeMin;
+extern idCVar	si_teamForcePresent;
+extern idCVar	si_warmupWeapons;
+extern idCVar	si_instagib;
+extern idCVar	si_quadHog;
+extern idCVar	si_vampiric;
+extern idCVar	si_weaponsFrenzy;
+extern idCVar	si_weaponArena;
+extern idCVar	si_powerups;
+extern idCVar	si_selfDamage;
+extern idCVar	si_knockback;
+extern idCVar	si_fallDamage;
+extern idCVar	si_weaponRespawn;
+extern idCVar	si_preset;
+extern idCVar	si_modifiers;
+extern idCVar	g_vampiricPercent;
+extern idCVar	si_warmupScoring;
+extern idCVar	si_autoShuffle;
+extern idCVar	si_shuffleDelay;
+extern idCVar	si_freezeThawTime;
+extern idCVar	si_freezeThawRadius;
+extern idCVar	si_freezeThawThroughSurface;
+extern idCVar	si_freezeAutoThawTime;
+extern idCVar	si_freezeWorldDeathDelay;
+extern idCVar	si_obeliskHealth;
+extern idCVar	si_obeliskRegen;
+extern idCVar	si_obeliskRespawn;
+extern idCVar	si_skullTimeout;
+extern idCVar	si_domCaptureTime;
+extern idCVar	si_domScoreRate;
+extern idCVar	si_ruleset;
+extern idCVar	si_classicGrapple;
+extern idCVar	si_itemTimers;
+extern idCVar	si_maxBrightskin;
+extern idCVar	si_forcedModels;
+extern idCVar	ui_weaponOrder;
+extern idCVar	g_hitFeedback;
+// openQ4 END
+
 extern idCVar	g_gamelog;
 extern idCVar	cl_showEntityInfo;
-// jnewquist: Option to force undying state
 extern idCVar	g_forceUndying;
-// mcg: combat performance testing cvars
 extern idCVar g_perfTest_weaponNoFX;
 extern idCVar g_perfTest_hitscanShort;
 extern idCVar g_perfTest_hitscanBBox;
@@ -530,14 +645,61 @@ extern idCVar g_perfTest_aiNoObstacleAvoid;
 extern idCVar g_perfTest_aiUndying;
 extern idCVar g_perfTest_aiNoVisTrace;
 extern idCVar g_perfTest_noJointTransform;
+extern idCVar g_precachePlayerModels;
 extern idCVar g_perfTest_noPlayerFocus;
 extern idCVar g_perfTest_noProjectiles;
-// RAVEN END
 
 extern idCVar g_clientProjectileCollision;
 
 extern idCVar net_clientLagOMeter;
+extern idCVar net_clientLagOMeterResolution;
 
 extern idCVar net_warnStale;
+
+extern idCVar ri_useViewerPass;
+extern idCVar ri_privateViewers;
+extern idCVar ri_numViewers;
+extern idCVar ri_numPrivateViewers;
+extern idCVar ri_name;
+
+extern idCVar g_noTVChat;
+
+extern idCVar pm_slidevelocity;
+extern idCVar pm_powerslide;
+
+extern idCVar g_playerLean;
+
+extern idCVar net_clientPredictWeaponSwitch;
+
+extern idCVar demo_autoTrack;
+extern idCVar demo_autoTrackTeam;
+extern idCVar net_mpPredictMode;
+extern idCVar net_mpPredictMaxFrames;
+extern idCVar net_mpPredictDebug;
+extern idCVar net_mpRemoteExtrapolation;
+extern idCVar net_mpLagCompensation;
+extern idCVar net_mpLagCompMaxMS;
+extern idCVar net_mpLagCompBiasMS;
+extern idCVar net_mpLagCompSlackMS;
+extern idCVar net_mpLagCompDebug;
+extern idCVar net_mpPredictHitscan;
+extern idCVar net_mpHitscanDebug;
+
+extern idCVar bot_enable;
+extern idCVar bot_minPlayers;
+extern idCVar bot_skill;
+extern idCVar bot_debug;
+extern idCVar bot_debugNav;
+extern idCVar bot_navCellSize;
+extern idCVar bot_pause;
+extern idCVar bot_grapple;
+extern idCVar bot_characters;
+extern idCVar bot_forceCharacter;
+extern idCVar bot_skillVariance;
+extern idCVar bot_chat;
+extern idCVar bot_chatDelay;
+extern idCVar bot_chatCPM;
+extern idCVar bot_debugAim;
+extern idCVar bot_profile;
 
 #endif /* !__SYS_CVAR_H__ */

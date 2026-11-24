@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "PhysicsTelemetry.h"
@@ -7860,8 +7860,6 @@ void idPhysics_AF::ClipTranslation( trace_t &results, const idVec3 &translation,
 
 		if ( body->clipModel->IsTraceModel() ) {
 			if ( model ) {
-// RAVEN BEGIN
-// ddynerman: multiple collision worlds
 				gameLocal.TranslationModel( self, bodyResults, body->current->worldOrigin, body->current->worldOrigin + translation,
 									body->clipModel, body->current->worldAxis, body->clipMask,
 										model->GetCollisionModel(), model->GetOrigin(), model->GetAxis() );
@@ -7869,7 +7867,6 @@ void idPhysics_AF::ClipTranslation( trace_t &results, const idVec3 &translation,
 			else {
 				gameLocal.Translation( self, bodyResults, body->current->worldOrigin, body->current->worldOrigin + translation,
 									body->clipModel, body->current->worldAxis, body->clipMask, self );
-// RAVEN END
 			}
 			if ( bodyResults.fraction < results.fraction ) {
 				results = bodyResults;

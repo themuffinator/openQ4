@@ -40,7 +40,7 @@ def main() -> int:
             trials.append({"name": name + ("Jump" if approach else "Walk"),
                 "command": f"bot_probeWalk 1 {state} {target}" + (" 508 580 328.25" if approach else ""),
                 "setup": ["bot_probeHealth 1 111", "set bot_debug 3", "navmesh probe 628 700 328.25"]})
-    paths = [runtime / executable, *sorted((runtime / "baseoq4").glob("game-mp*")),
+    paths = [runtime / executable, *sorted((runtime / "baseoq4").glob("game_*")),
         *sorted(runtime.glob("renderer-*")), runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4",
         runtime / "baseoq4/mod.json"]
     paths = [p for p in paths if p.is_file() and p.suffix not in (".pdb", ".lib", ".exp")]

@@ -1,5 +1,5 @@
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "AI_Manager.h"

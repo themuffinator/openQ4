@@ -1,9 +1,10 @@
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 #include "ai/AI_Manager.h"
+#include "mp/match/MatchDeadline.h"
 
 // a mover will update any gui entities in it's target list with 
 // a key/val pair of "mover" "state" from below.. guis can represent
@@ -560,6 +561,21 @@ void idMover::Think( void ) {
 	}
 
 	idEntity::Think( );
+}
+
+void idMover::ThinkMatchPaused( int deltaMsec ) {
+	idEntity::ThinkMatchPaused( deltaMsec );
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+
+	if ( attenuate ) {
+		mpMatchShiftTimeOrigin( lastTime, deltaMsec );
+	}
+	if ( physicsObj.GetSpline() != NULL ) {
+		mpMatchShiftTimeOrigin( splineStartTime, deltaMsec );
+	}
+	splineStateThread.ShiftMatchTime( deltaMsec );
 }
 
 // abahr
@@ -1427,7 +1443,11 @@ void idMover::Event_MoveAccelerateTo( float speed, float time ) {
 		return;
 	}
 
-	at = OpenQ4_TurboMoverMilliseconds( this, SEC2MS( time ) );
+	if ( gameLocal.isMultiplayer ) {
+		at = idPhysics::SnapTimeToPhysicsFrame( SEC2MS( time ) );
+	} else {
+		at = OpenQ4_TurboMoverMilliseconds( this, SEC2MS( time ) );
+	}
 
 	lastCommand	= MOVER_MOVING;
 
@@ -1471,7 +1491,11 @@ void idMover::Event_MoveDecelerateTo( float speed, float time ) {
 		return;
 	}
 
-	dt = OpenQ4_TurboMoverMilliseconds( this, SEC2MS( time ) );
+	if ( gameLocal.isMultiplayer ) {
+		dt = idPhysics::SnapTimeToPhysicsFrame( SEC2MS( time ) );
+	} else {
+		dt = OpenQ4_TurboMoverMilliseconds( this, SEC2MS( time ) );
+	}
 
 	lastCommand	= MOVER_MOVING;
 
@@ -1844,16 +1868,13 @@ void idMover::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	moveStage_t oldMoveStage = move.stage;
 	moveStage_t oldRotStage = rot.stage;
 
-	bool proto69 = ( gameLocal.GetCurrentDemoProtocol() == 69 );
-	if ( !proto69 ) {
-		// sync down the TH_PHYSICS flag for movers, now that we skip ClientPredictionThink when thinkFlags == 0 and no longer force TH_PHYSICS on
-		// movers still have prediction issues though, they predict a stop and clear TH_PHYSICS too early
-		bool physics_on = ( msg.ReadBits( 1 ) != 0 );
-		if ( physics_on ) {
-			thinkFlags |= TH_PHYSICS;
-		} else {
-			thinkFlags &= ~TH_PHYSICS;
-		}
+	// sync down the TH_PHYSICS flag for movers, now that we skip ClientPredictionThink when thinkFlags == 0 and no longer force TH_PHYSICS on
+	// movers still have prediction issues though, they predict a stop and clear TH_PHYSICS too early
+	bool physics_on = ( msg.ReadBits( 1 ) != 0 );
+	if ( physics_on ) {
+		thinkFlags |= TH_PHYSICS;
+	} else {
+		thinkFlags &= ~TH_PHYSICS;
 	}
 
 	physicsObj.ReadFromSnapshot( msg );
@@ -2497,6 +2518,11 @@ void idElevator::Think( void ) {
 	} 
 	RunPhysics();
 	Present();
+}
+
+void idElevator::ThinkMatchPaused( int deltaMsec ) {
+	idMover::ThinkMatchPaused( deltaMsec );
+	mpMatchShiftOptionalDeadline( lastTouchTime, deltaMsec );
 }
 
 /*
@@ -4088,6 +4114,27 @@ bool idMover_Binary::IsBlocked( void ) {
 
 /*
 ================
+idMover_Binary::GetTranslationBounds
+================
+*/
+bool idMover_Binary::GetTranslationBounds( const idBounds &worldBounds, idBounds &swept ) const {
+	if ( IsBound() || !GetPhysics() || worldBounds.IsCleared() ) {
+		return false;
+	}
+	// pos1/pos2 are world positions for an unbound binary mover. Its axis
+	// stays fixed throughout the translation, including a reversed/start-open
+	// move. Form both endpoints before writing swept, which may alias input.
+	idBounds first = worldBounds;
+	idBounds last = worldBounds;
+	first.TranslateSelf( pos1 - GetPhysics()->GetOrigin() );
+	last.TranslateSelf( pos2 - GetPhysics()->GetOrigin() );
+	swept = first;
+	swept.AddBounds( last );
+	return true;
+}
+
+/*
+================
 idMover_Binary::GetActivator
 ================
 */
@@ -4123,6 +4170,13 @@ void idMover_Binary::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 			UpdateMoverSound( moverState );
 		}
 		UpdateVisuals();
+	}
+}
+
+void idMover_Binary::ThinkMatchPaused( int deltaMsec ) {
+	idEntity::ThinkMatchPaused( deltaMsec );
+	if ( moverState == MOVER_1TO2 || moverState == MOVER_2TO1 ) {
+		mpMatchShiftTimeOrigin( stateStartTime, deltaMsec );
 	}
 }
 
@@ -4403,7 +4457,7 @@ void idDoor::Spawn( void ) {
 
 	enabled = true;
 	blocked = false;
-
+	
 // RAVEN BEGIN
 // bdube: added
 	// Instruct ai to avoid standing in doors
@@ -4441,6 +4495,11 @@ void idDoor::Think( void ) {
 			}
 		}
 	}
+}
+
+void idDoor::ThinkMatchPaused( int deltaMsec ) {
+	idMover_Binary::ThinkMatchPaused( deltaMsec );
+	mpMatchShiftOptionalDeadline( nextSndTriggerTime, deltaMsec );
 }
 
 /*
@@ -4574,8 +4633,7 @@ idDoor::Use
 ================
 */
 void idDoor::Use( idEntity *other, idEntity *activator ) {
-	const bool requirementMet = gameLocal.RequirementMet( activator, requirement, removeItem );
-	if ( requirementMet ) {
+	if ( gameLocal.RequirementMet( activator, requirement, removeItem ) ) {
 		if ( syncLock.Length() ) {
 			idEntity *sync = gameLocal.FindEntity( syncLock );
 			if ( sync && sync->IsType( idDoor::Type ) ) {
@@ -4833,7 +4891,6 @@ void idDoor::Event_SpawnDoorTrigger( void ) {
 	GetLocalTriggerPosition( trigger );
 
 	MatchActivateTeam( moverState, gameLocal.time );
-
 }
 
 /*

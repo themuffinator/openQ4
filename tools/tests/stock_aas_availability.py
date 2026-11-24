@@ -73,7 +73,7 @@ def check_sources() -> None:
     if loader.find("IsDummyFile( mapFileCRC )") > empty_branch:
         raise AssertionError("placeholder (dummy) files must be recognised before the empty-compile check")
 
-    for module in ("game", "mpgame"):
+    for module in ("game",):
         context = f"src/{module}/ai/AI_Move.cpp"
         body = function_body(read(context), "void idAI::SetAAS( void )", context)
         if "but no such AAS is loaded; this AI cannot path" in body:

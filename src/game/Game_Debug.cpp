@@ -4,8 +4,8 @@
 // Copyright 2002-2004 Raven Software
 //----------------------------------------------------------------
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 
@@ -101,7 +101,7 @@ void rvGameDebug::BeginFrame ( void ) {
 	}
 	
 	//currentHud->ClearState ( );
-		
+
 	// IF there is an override entity just use that, otherwise find one that
 	// is in front of the players crosshair	
 	if ( overrideEntity ) {

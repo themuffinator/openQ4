@@ -18,7 +18,7 @@ import tempfile
 from mp_lag_compensation_state import block
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH = ROOT / "src/mpgame/mp/match"
+MATCH = ROOT / "src/game/mp/match"
 ADAPTERS = (
     ("Evidence", "MP_MATCH_EVIDENCE_STORAGE_JSON_BYTES", "MatchEvidenceStorage.h", True),
     ("SeriesReport", "MP_SERIES_REPORT_MAX_JSON_BYTES", "MatchSeriesReport.h", True),

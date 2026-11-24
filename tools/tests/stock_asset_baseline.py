@@ -775,15 +775,13 @@ def make_runtime_package(tool: ModuleType, runtime_dir: Path) -> tuple[Path, lis
     (runtime_dir / f"openQ4-client_{tool.host_arch()}.pdb").write_bytes(b"symbols")
     (runtime_dir / f"renderer-gl_{tool.host_arch()}{shared}").write_bytes(b"renderer")
     (runtime_dir / f"OpenAL32{shared}").write_bytes(b"audio")
-    (game_dir / f"game-sp_{tool.host_arch()}{shared}").write_bytes(b"sp")
-    (game_dir / f"game-mp_{tool.host_arch()}{shared}").write_bytes(b"mp")
+    (game_dir / f"game_{tool.host_arch()}{shared}").write_bytes(b"game")
     (game_dir / "mod.json").write_text("{}", encoding="utf-8")
-    (game_dir / f"game-sp_{tool.host_arch()}.pdb").write_bytes(b"symbols")
+    (game_dir / f"game_{tool.host_arch()}.pdb").write_bytes(b"symbols")
     records = tool.collect_runtime_files(runtime_dir, executable)
     assert {item["kind"] for item in records} >= {
         "clientExecutable",
-        "singlePlayerGameModule",
-        "multiplayerGameModule",
+        "gameModule",
         "dedicatedServerExecutable",
         "diagnosticSymbols",
         "runtimeLibrary",

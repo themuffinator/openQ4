@@ -60,15 +60,15 @@ def run_native() -> None:
 
 
 def check_wiring() -> None:
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
     require(re.search(r'idCVar ui_autoAction\(\s*"ui_autoAction",\s*"",\s*CVAR_GAME \| CVAR_ARCHIVE \| CVAR_NOCHEAT,', cvars)
             is not None, "ui_autoAction is the player's archived setting and empty by default")
     require(re.search(r'idCVar si_autoAction\(\s*"si_autoAction",\s*"",\s*CVAR_GAME \| CVAR_SERVERINFO \| CVAR_ARCHIVE', cvars)
             is not None, "si_autoAction is in the server info, so players see that their matches are recorded")
-    header = read("src/mpgame/mp/AutoAction.h")
+    header = read("src/game/mp/AutoAction.h")
     require(re.search(r"\b(?:std::)?(?:v?snprintf|strn?cmp|stricmp|strcasecmp)\s*\(", header) is None,
             "the header uses nothing idlib replaces in the game build")
-    host = read("src/mpgame/mp/AutoActionHost.cpp")
+    host = read("src/game/mp/AutoActionHost.cpp")
     actions = body(host, "int idMultiplayerGame::AutoActionActions( bool local ) const {")
     require("gameLocal.GetDemoState() == DEMO_PLAYING" in actions, "a demo being watched runs no autoaction")
     require("actions &= ~MP_AUTOACTION_DEMO;" in actions, "a host whose server records the match records it once")
@@ -81,12 +81,12 @@ def check_wiring() -> None:
     require('screenshot \\"screenshots/%s.tga\\"' in frame and "WriteAutoActionStats( name );" in frame and
             '"stopRecord\\n"' in frame and 'ServerStopMVDRecording( "match ended" )' in frame,
             "the result's screenshot, stats and the end of the demo")
-    state = read("src/mpgame/mp/GameState.cpp")
+    state = read("src/game/mp/GameState.cpp")
     require(state.count("gameLocal.mpGame.AutoActionMatchStarted( true );") == 1 and
             state.count("gameLocal.mpGame.AutoActionMatchEnded( true );") == 1, "the player's edges are the local game's")
     require(state.count("gameLocal.mpGame.AutoActionMatchStarted( false );") == 1 and
             state.count("gameLocal.mpGame.AutoActionMatchEnded( false );") == 1, "the server's edges are its own")
-    require("AutoActionFrame();" in body(read("src/mpgame/MultiplayerGame.cpp"), "void idMultiplayerGame::CommonRun( void ) {"),
+    require("AutoActionFrame();" in body(read("src/game/MultiplayerGame.cpp"), "void idMultiplayerGame::CommonRun( void ) {"),
             "servers and clients both run what the result owes")
 
 

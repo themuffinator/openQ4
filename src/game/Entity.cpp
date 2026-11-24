@@ -1,5 +1,5 @@
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 
@@ -1264,6 +1264,35 @@ void idEntity::Think( void ) {
 	Present();
 }
 
+void idEntity::ThinkMatchPaused( int deltaMsec ) {
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+	// Parametric physics rebases trajectory/interpolation starts here; physics
+	// implementations driven only by frame delta intentionally implement this
+	// as a no-op.  No collision evaluation or contacts run on a frozen frame.
+	if ( physics != NULL ) {
+		const int physicsTime = physics->GetTime();
+		const int maxInt = 0x7fffffff;
+		physics->UpdateTime( physicsTime > maxInt - deltaMsec ?
+			maxInt : physicsTime + deltaMsec );
+	}
+
+	const float deltaSeconds = MS2SEC( deltaMsec );
+	// Shader time is engine time plus TIMEOFFSET.  Moving the offset backwards
+	// preserves the exact sampled frame while engine/network time advances.
+	renderEntity.shaderParms[ SHADERPARM_TIMEOFFSET ] -= deltaSeconds;
+	if ( renderEntity.shaderParms[ SHADERPARM_TIME_OF_DEATH ] > 0.0f ) {
+		renderEntity.shaderParms[ SHADERPARM_TIME_OF_DEATH ] += deltaSeconds;
+	}
+	// The render world owns a submitted copy.  Update only an existing visible
+	// definition: adding/presenting a new definition here could invoke subclass
+	// callbacks or wake dormant gameplay while the simulation is frozen.
+	if ( modelDefHandle != -1 && renderEntity.hModel != NULL && !IsHidden() ) {
+		gameRenderWorld->UpdateEntityDef( modelDefHandle, &renderEntity );
+	}
+}
+
 /*
 ================
 idEntity::DoDormantTests
@@ -1755,19 +1784,23 @@ void idEntity::UpdatePVSAreas( void ) {
 	const idBounds fallbackBounds = idBounds( renderEntity.origin ).Expand( 64.0f );
 	int i;
 
-	if ( IsValidPVSBounds( renderEntity.bounds ) ) {
-		modelAbsBounds.FromTransformedBounds( renderEntity.bounds, renderEntity.origin, renderEntity.axis );
+	if ( gameLocal.isMultiplayer || IsValidPVSBounds( renderEntity.bounds ) ) {
+	modelAbsBounds.FromTransformedBounds( renderEntity.bounds, renderEntity.origin, renderEntity.axis );
 	} else if ( physicsObj != NULL ) {
 		modelAbsBounds = physicsObj->GetAbsBounds();
 	} else {
 		modelAbsBounds = fallbackBounds;
 	}
 
-	if ( !IsValidPVSBounds( modelAbsBounds ) && physicsObj != NULL ) {
-		modelAbsBounds = physicsObj->GetAbsBounds();
-	}
-	if ( !IsValidPVSBounds( modelAbsBounds ) ) {
-		modelAbsBounds = fallbackBounds;
+	// openQ4: SP replaces invalid or huge model bounds; MP keeps the retail
+	// areas, which decide what each snapshot sends.
+	if ( !gameLocal.isMultiplayer ) {
+		if ( !IsValidPVSBounds( modelAbsBounds ) && physicsObj != NULL ) {
+			modelAbsBounds = physicsObj->GetAbsBounds();
+		}
+		if ( !IsValidPVSBounds( modelAbsBounds ) ) {
+			modelAbsBounds = fallbackBounds;
+		}
 	}
 
 	localNumPVSAreas = gameLocal.pvs.GetPVSAreas( modelAbsBounds, localPVSAreas, sizeof( localPVSAreas ) / sizeof( localPVSAreas[0] ) );
@@ -1924,11 +1957,10 @@ void idEntity::Present( void ) {
 	// if there is no handle yet, go ahead and add it, ignoring the last predict frame early out
 	// if not, that causes next render frame to have a bunch of spurious primitive draws ( r_showPrimitives )
 	// ( we suspect this is because TH_UPDATEVISUALS doesn't get cleared? )
-// jmarshall
-	//if ( !gameLocal.isLastPredictFrame && modelDefHandle != -1 ) {
-	//	return;
-	//}
-// jmarshall end
+	// jmarshall: SP presents every catch-up frame; MP keeps the retail early out.
+	if ( gameLocal.isMultiplayer && !gameLocal.isLastPredictFrame && modelDefHandle != -1 ) {
+		return;
+	}
 
 // RAVEN BEGIN
 // ddynerman: don't render objects not in our instance (only on server)
@@ -1939,7 +1971,7 @@ void idEntity::Present( void ) {
 // RAVEN END
 
 	// don't render server demo stuff that's not in our instance
-	if ( gameLocal.GetDemoState() == DEMO_PLAYING && gameLocal.IsServerDemo() ) {
+	if ( gameLocal.IsServerDemoPlaying() ) {
 		const idPlayer *demoViewer = gameLocal.GetLocalPlayer();
 		const int demoInstance = demoViewer != NULL ? demoViewer->GetInstance() : 0;
 		if ( instance != demoInstance ) {
@@ -1972,7 +2004,7 @@ void idEntity::Present( void ) {
 		modelDefHandle = gameRenderWorld->AddEntityDef( &renderEntity );
 	} else {
 		gameRenderWorld->UpdateEntityDef( modelDefHandle, &renderEntity );
-	}
+	}	
 }
 
 /*
@@ -2382,7 +2414,7 @@ renderView_t *idEntity::GetRenderView( void ) {
 idEntity::PlayEffect
 ================
 */
-rvClientEffect* idEntity::PlayEffect( const idDecl *effect, jointHandle_t joint, const idVec3& originOffset, const idMat3& axisOffset, bool loop, const idVec3& endOrigin, bool broadcast, effectCategory_t category, const idVec4& effectTint ) {
+rvClientEffect* idEntity::PlayEffect( const idDecl *effect, jointHandle_t joint, const idVec3& originOffset, const idMat3& axisOffset, bool loop, const idVec3& endOrigin, bool broadcast, bool predictBit, effectCategory_t category, const idVec4& effectTint ) {
 	if ( joint == INVALID_JOINT ) {
 		return NULL;
 	}
@@ -2399,11 +2431,12 @@ rvClientEffect* idEntity::PlayEffect( const idDecl *effect, jointHandle_t joint,
 		msg.BeginWriting();
 		idGameLocal::WriteDecl( msg, effect );
 		msg.WriteLong( joint );
-		msg.WriteBits( loop, 1 );
 		msg.WriteFloat( endOrigin.x );
 		msg.WriteFloat( endOrigin.y );
 		msg.WriteFloat( endOrigin.z );	
 		msg.WriteByte( category );
+		msg.WriteBits( loop, 1 );
+		msg.WriteBits( predictBit, 1 );
 		ServerSendInstanceEvent( EVENT_PLAYEFFECT_JOINT, &msg, false, -1 );
 	}
 
@@ -2430,12 +2463,12 @@ rvClientEffect* idEntity::PlayEffect( const idDecl *effect, jointHandle_t joint,
 	rvClientEffect* clientEffect = new rvClientEffect( effect );
 	RV_POP_HEAP();
 
-	if( !clientEffect ) {
+	if ( !clientEffect ) {
 		common->Warning( "Failed to create effect \'%s\'\n", effect->GetName() );
 		return NULL;
 	}
 
-	if( clientEffect->entityNumber == -1 ) {
+	if ( clientEffect->entityNumber == -1 ) {
 		common->Warning( "Failed to spawn effect \'%s\'\n", effect->GetName() );
 		delete clientEffect;
 		return NULL;
@@ -2471,7 +2504,7 @@ rvClientEffect* idEntity::PlayEffect( const idDecl *effect, jointHandle_t joint,
 	return clientEffect;
 }
 
-rvClientEffect* idEntity::PlayEffect( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop, const idVec3& endOrigin, bool broadcast, effectCategory_t category, const idVec4& effectTint ) {
+rvClientEffect* idEntity::PlayEffect( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop, const idVec3& endOrigin, bool broadcast, bool predictBit, effectCategory_t category, const idVec4& effectTint ) {
 	idVec3 localOrigin;
 	idMat3 localAxis;
 	
@@ -2480,7 +2513,7 @@ rvClientEffect* idEntity::PlayEffect( const idDecl *effect, const idVec3& origin
 	}
 
 	if ( entityNumber == ENTITYNUM_WORLD ) {
-		return gameLocal.PlayEffect( effect, origin, axis, loop, endOrigin, broadcast, false, category, effectTint );
+		return gameLocal.PlayEffect( effect, origin, axis, loop, endOrigin, broadcast, predictBit, category, effectTint );
 	}
 
 	// Calculate the local origin and axis from the given globals
@@ -2653,11 +2686,17 @@ bool idEntity::StartSound( const char *soundName, const s_channelType channel, i
 		*length = 0;
 	}
 
+#ifndef _DEBUG
+	// retail MP checks sound names only in debug builds; SP always does
+	if ( !gameLocal.IsMultiplayerMode() )
+#endif
+	{
 	// we should ALWAYS be playing sounds from the def.
 	// hardcoded sounds MUST be avoided at all times because they won't get precached.
 	idStr soundNameStr = soundName;
-	if( soundNameStr.CmpPrefix( "snd_" ) && soundNameStr.CmpPrefix( "lipsync_" ) ) {
+	if ( soundNameStr.CmpPrefix( "snd_" ) && soundNameStr.CmpPrefix( "lipsync_" ) ) {
 		common->Warning( "Non precached sound \'%s\'", soundName );
+	}
 	}
 
 	if ( !spawnArgs.GetString( soundName, "", &sound ) ) {
@@ -2710,7 +2749,7 @@ bool idEntity::StartSoundShader( const idSoundShader *shader, const s_channelTyp
 	}
 
 	// in MP, don't play sounds from other instances
-	if( gameLocal.isMultiplayer && gameLocal.GetLocalPlayer() && gameLocal.GetLocalPlayer()->GetInstance() != instance ) {
+	if ( gameLocal.isMultiplayer && gameLocal.GetLocalPlayer() && gameLocal.GetLocalPlayer()->GetInstance() != instance ) {
 		return false;
 	}
 
@@ -2734,8 +2773,7 @@ bool idEntity::StartSoundShader( const idSoundShader *shader, const s_channelTyp
 
 	UpdateSound();
 
-	idSoundEmitter* emitter = NULL;
-	emitter = soundSystem->EmitterForIndex(SOUNDWORLD_GAME, refSound.referenceSoundHandle);
+	idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
 	if ( emitter ) {
 		emitter->UpdateEmitter( refSound.origin, refSound.velocity, refSound.listenerId, &refSound.parms );
         len = emitter->StartSound( shader, channel, diversity, soundShaderFlags );
@@ -2777,8 +2815,7 @@ void idEntity::StopSound( const s_channelType channel, bool broadcast ) {
 	}
 
 // RAVEN BEGIN
-	idSoundEmitter* emitter = NULL;
-	emitter = soundSystem->EmitterForIndex(SOUNDWORLD_GAME, refSound.referenceSoundHandle);
+	idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
 	if ( emitter ) {
 		emitter->StopSound( channel );
 	}
@@ -2803,9 +2840,7 @@ idEntity::UpdateSound
 */
 void idEntity::UpdateSound( void ) {
 // RAVEN BEGIN
-	idSoundEmitter* emitter = NULL;
-	
-	emitter = soundSystem->EmitterForIndex(SOUNDWORLD_GAME, refSound.referenceSoundHandle);
+	idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
 	if ( emitter ) {
 // RAVEN END
 		idVec3 origin;
@@ -3669,25 +3704,31 @@ void idEntity::InitDefaultPhysics( const idVec3 &origin, const idMat3 &axis ) {
 
 	// check if a clipmodel key/value pair is set
 	if ( spawnArgs.GetString( "clipmodel", "", &temp ) ) {
-		if ( temp != NULL && temp[ 0 ] == '\0' ) {
+		// openQ4: SP skips an empty or unloadable clipmodel and falls back to the
+		// size keys; MP keeps the retail clip model.
+		if ( !gameLocal.isMultiplayer && temp != NULL && temp[ 0 ] == '\0' ) {
 			temp = NULL;
 		}
 		if ( temp != NULL ) {
 // RAVEN BEGIN
 // mwhitlock: Dynamic memory consolidation
-			RV_PUSH_HEAP_MEM(this);
+		RV_PUSH_HEAP_MEM(this);
 // RAVEN END
-			clipModel = new idClipModel();
-			if ( !clipModel->LoadModel( temp ) ) {
-				delete clipModel;
-				clipModel = NULL;
+			if ( gameLocal.isMultiplayer ) {
+				clipModel = new idClipModel( temp );
+			} else {
+				clipModel = new idClipModel();
+				if ( !clipModel->LoadModel( temp ) ) {
+					delete clipModel;
+					clipModel = NULL;
+				}
 			}
 // RAVEN BEGIN
 // mwhitlock: Dynamic memory consolidation
-			RV_POP_HEAP();
+		RV_POP_HEAP();
 // RAVEN END
-		}
 	}
+		}
 
 	if ( !spawnArgs.GetBool( "noclipmodel", "0" ) ) {
 
@@ -3745,10 +3786,9 @@ void idEntity::InitDefaultPhysics( const idVec3 &origin, const idMat3 &axis ) {
 			temp = spawnArgs.GetString( "model" );
 			if ( ( temp != NULL ) && ( *temp != 0 ) ) {
 // RAVEN BEGIN
-// jscott: slash problems
+// jscott:slash problems
 				idStr canonical = temp;
 				canonical.BackSlashesToSlashes();
-// RAVEN END
 // RAVEN BEGIN
 // mwhitlock: Dynamic memory consolidation
 				RV_PUSH_HEAP_MEM(this);
@@ -4412,6 +4452,9 @@ inflictor, attacker, dir, and point can be NULL for environmental effects
 */
 void idEntity::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, 
 					  const char *damageDefName, const float damageScale, const int location ) {
+	if ( gameLocal.isMultiplayer && gameLocal.mpGame.IsGameplayFrozen() ) {
+		return;
+	}
 	if ( forwardDamageEnt.IsValid() ) {
 		forwardDamageEnt->Damage( inflictor, attacker, dir, damageDefName, damageScale, location );
 		return;
@@ -5320,7 +5363,7 @@ void idEntity::HideSurface ( const char* surface ) {
 		return;
 	}
 
-	renderEntity.suppressSurfaceMask |= renderEntity.hModel->GetSurfaceMask ( surface );
+	renderEntity.suppressSurfaceMask |= renderEntity.hModel->GetSurfaceMask ( surface ) ;
 }
 
 /*
@@ -5491,18 +5534,20 @@ bool idEntity::TouchTriggers( const idTypeInfo* ownerType ) const {
 
 // RAVEN BEGIN
 // abahr: needed so tram car can has collision model and touch triggers
-			bool useSimpleClip = spawnArgs.GetBool("useSimpleTriggerClip");
-			bool triggerHit = useSimpleClip || ( GetPhysics()->ClipContents( cm ) != 0 );
-			if ( !triggerHit && IsType( idPlayer::GetClassType() ) && !ent->IsType( idTrigger_Hurt::GetClassType() ) ) {
-				// x64 can miss some trigger contacts in precise clip tests for player hulls.
-				// Fall back to bounds overlap for non-damaging player triggers to keep trigger/door activation reliable.
-				// Hurt triggers must stay on the retail precise clip path; bounds-only touches can overlap kill volumes.
-				triggerHit = GetPhysics()->GetAbsBounds().IntersectsBounds( cm->GetAbsBounds() );
-			}
-			if ( !triggerHit ) {
+		bool useSimpleClip = spawnArgs.GetBool("useSimpleTriggerClip");
+		bool triggerHit = useSimpleClip || ( GetPhysics()->ClipContents( cm ) != 0 );
+		// openQ4: the SP bounds fallback stays out of MP, where clients predict the
+		// same touches and must match the retail set.
+		if ( !triggerHit && !gameLocal.isMultiplayer && IsType( idPlayer::GetClassType() ) && !ent->IsType( idTrigger_Hurt::GetClassType() ) ) {
+			// x64 can miss some trigger contacts in precise clip tests for player hulls.
+			// Fall back to bounds overlap for non-damaging player triggers to keep trigger/door activation reliable.
+			// Hurt triggers must stay on the retail precise clip path; bounds-only touches can overlap kill volumes.
+			triggerHit = GetPhysics()->GetAbsBounds().IntersectsBounds( cm->GetAbsBounds() );
+		}
+		if ( !triggerHit ) {
 // RAVEN END
-				continue;
-			}
+			continue;
+		}
 
 		numEntities++;
 
@@ -6763,7 +6808,7 @@ void idEntity::ServerSendEvent( int eventId, const idBitMsg *msg, bool saveEvent
 
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
 	outMsg.BeginWriting();
-	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_EVENT );	
+	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_EVENT );
 	outMsg.WriteBits( gameLocal.GetSpawnId( this ), 32 );
 	outMsg.WriteByte( eventId );
 	outMsg.WriteLong( gameLocal.time );
@@ -6777,7 +6822,10 @@ void idEntity::ServerSendEvent( int eventId, const idBitMsg *msg, bool saveEvent
 	networkSystem->ServerSendReliableMessageExcluding( excludeClient, outMsg );
 
 	if ( saveEvent ) {
-		gameLocal.Error( "Unsupported saveEvent == true in idEntity::ServerSendEvent" );
+		// openQ4: this codebase has no saved-event list, so late-join replay simply does not happen.
+		// Dropping the entire server over a missing cosmetic replay is far worse than missing it, so
+		// warn (naming the entity) and let the event go out to the clients already connected.
+		gameLocal.Warning( "Unsupported saveEvent == true in idEntity::ServerSendEvent for '%s' (%s)", GetName(), GetClassname() );
 	}
 }
 
@@ -6794,14 +6842,11 @@ void idEntity::ServerSendInstanceEvent( int eventId, const idBitMsg *msg, bool s
 		return;
 	}
 
-	// prevent dupe events caused by frame re-runs
-	if ( !gameLocal.isNewFrame ) {
-		return;
-	}
+	assert( gameLocal.isNewFrame );
 
 	outMsg.Init( msgBuf, sizeof( msgBuf ) );
 	outMsg.BeginWriting();
-	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_EVENT );	
+	outMsg.WriteByte( GAME_RELIABLE_MESSAGE_EVENT );
 	outMsg.WriteBits( gameLocal.GetSpawnId( this ), 32 );
 	outMsg.WriteByte( eventId );
 	outMsg.WriteLong( gameLocal.time );
@@ -6815,7 +6860,9 @@ void idEntity::ServerSendInstanceEvent( int eventId, const idBitMsg *msg, bool s
 	gameLocal.ServerSendInstanceReliableMessageExcluding( this, excludeClient, outMsg );
 
 	if ( saveEvent ) {
-		gameLocal.Error( "Unsupported saveEvent == true in idEntity::ServerSendEvent" );
+		// openQ4: see idEntity::ServerSendEvent - no saved-event list exists, so warn instead of
+		// killing the server, and name the entity that asked for the unsupported replay.
+		gameLocal.Warning( "Unsupported saveEvent == true in idEntity::ServerSendInstanceEvent for '%s' (%s)", GetName(), GetClassname() );
 	}
 }
 
@@ -6825,15 +6872,29 @@ idEntity::ClientSendEvent
 ================
 */
 void idEntity::ClientSendEvent( int eventId, const idBitMsg *msg ) const {
+	// prevent dupe events caused by frame re-runs
+	if ( !gameLocal.isNewFrame ) {
+		return;
+	}
+	ClientSendRequestEvent( eventId, msg );
+}
+
+/*
+================
+idEntity::ClientSendRequestEvent
+
+openQ4: sends the event whatever the prediction pass last left in isNewFrame.
+ClientSendEvent drops events outside a new frame so that a re-run of a frame
+does not repeat what the simulation already sent. A console command or a menu
+button runs between frames and is made once; held to that test it was dropped
+whenever the last pass happened to be a re-run, with nothing said to the player.
+================
+*/
+void idEntity::ClientSendRequestEvent( int eventId, const idBitMsg *msg ) const {
 	idBitMsg	outMsg;
 	byte		msgBuf[MAX_GAME_MESSAGE_SIZE];
 
 	if ( !gameLocal.isClient ) {
-		return;
-	}
-
-	// prevent dupe events caused by frame re-runs
-	if ( !gameLocal.isNewFrame ) {
 		return;
 	}
 
@@ -6881,9 +6942,15 @@ bool idEntity::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
 		case EVENT_STARTSOUNDSHADER: {
 			// the sound stuff would early out
 			assert( gameLocal.isNewFrame );
-			if ( time < gameLocal.realClientTime - 300 ) {
+			// openQ4: the event's time is the server's, and its age was taken against this
+			// client's predicted clock, which runs ahead of the server by the round trip
+			// and the prediction lead. From about 250 ms of ping every broadcast sound
+			// started to read as more than 300 ms old, and past 285 ms all of them did,
+			// so those players heard none. Age it against the server's clock as this
+			// client last read it, which leaves only a sound that was really delayed.
+			if ( time < gameLocal.clientSnapshotTime - 300 ) {
 				// too old, skip it
-				common->DPrintf( "ent 0x%x: start sound shader too old (%d ms)\n", entityNumber, gameLocal.realClientTime - time );
+				common->DPrintf( "ent 0x%x: start sound shader too old (%d ms)\n", entityNumber, gameLocal.clientSnapshotTime - time );
 				return true;
 			}
 			shader = static_cast< const idSoundShader* >( idGameLocal::ReadDecl( msg, DECL_SOUND ) );
@@ -6902,21 +6969,28 @@ bool idEntity::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
 // bdube: new events
 		case EVENT_PLAYEFFECT_JOINT: {
 			const idDecl*		effect;
+			idCQuat				quat;
 			idVec3				origin;
 			rvClientEffect*		clientEffect;
 			effectCategory_t	category;
 			jointHandle_t		jointHandle;
 			bool				loop;
+			bool				predictBit;
+
+			// NOTE: doesn't actually happen in multiplayer
+			// the joint version of PlayEffect is triggered client side for CTF flags, but doesn't have a broadcast flag and is therefore not transmitted
+			// (and that's pretty much the only instance this is used)
 		
 			effect = idGameLocal::ReadDecl( msg, DECL_EFFECT );
 			jointHandle = ( jointHandle_t )msg.ReadLong();
-			loop = ( msg.ReadBits ( 1 ) != 0 );
-			origin.x = msg.ReadFloat( );
-			origin.y = msg.ReadFloat( );
-			origin.z = msg.ReadFloat( );
+			origin.x = msg.ReadFloat();
+			origin.y = msg.ReadFloat();
+			origin.z = msg.ReadFloat();
 			category = ( effectCategory_t )msg.ReadByte();
+			loop = ( msg.ReadBits ( 1 ) != 0 );
+			predictBit = ( msg.ReadBits ( 1 ) != 0 );
 
-			if ( !effect ) {
+			if ( !effect || ( predictBit && g_predictedProjectiles.GetBool() ) ) {
 				return true;
 			}
 			if ( bse->Filtered( effect->GetName(), category ) ) {
@@ -6929,8 +7003,8 @@ bool idEntity::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
 			clientEffect = new rvClientEffect( effect );
 			RV_POP_HEAP();
 
-			clientEffect->SetOrigin ( vec3_origin );
-			clientEffect->SetAxis ( mat3_identity );
+			clientEffect->SetOrigin( vec3_origin );
+			clientEffect->SetAxis( mat3_identity );
 			clientEffect->Bind( this, jointHandle );
 			clientEffect->SetGravity( gameLocal.GetCurrentGravity( this ) );
 
@@ -7299,6 +7373,11 @@ void idAnimatedEntity::Think( void ) {
 	Present();
 }
 
+void idAnimatedEntity::ThinkMatchPaused( int deltaMsec ) {
+	idEntity::ThinkMatchPaused( deltaMsec );
+	animator.ShiftTime( deltaMsec );
+}
+
 /*
 ================
 idAnimatedEntity::UpdateAnimation
@@ -7571,7 +7650,9 @@ bool idAnimatedEntity::ClientReceiveEvent( int event, int time, const idBitMsg &
 			dir = msg.ReadDir( 24 );
 			const idDeclEntityDef *damageDef = static_cast< const idDeclEntityDef* >( idGameLocal::ReadDecl( msg, DECL_ENTITYDEF ) );
 			const idMaterial *collisionMaterial = static_cast< const idMaterial* >( idGameLocal::ReadDecl( msg, DECL_MATERIAL ) );
-			const rvDeclMatType *collisionMaterialType = ReadDamageEffectMaterialType( msg );
+			// openQ4 MP-22: Quake 4 1.4.2 sent no material type
+			const rvDeclMatType *collisionMaterialType = gameLocal.RetailSnapshotFormat() ? NULL :
+				ReadDamageEffectMaterialType( msg );
 // RAVEN BEGIN
 // ddynerman: removed redundant AddLocalDamageEffect()
 			trace_t collision;

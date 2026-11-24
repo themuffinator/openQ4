@@ -95,7 +95,7 @@ def main():
     verify_runtime_is_current(args.runtime)
     args.output.mkdir(parents=True)
     binaries = [args.runtime / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64'),
-                *sorted(args.runtime.glob('renderer-*')), *sorted((args.runtime / 'baseoq4').glob('game-*'))]
+                *sorted(args.runtime.glob('renderer-*')), *sorted((args.runtime / 'baseoq4').glob('game_*'))]
     binaries = [p for p in binaries if p.is_file()]
     bindings = {str(p.relative_to(args.runtime)): capture.digest(p) for p in binaries}
     sources = ['src/framework/Session_menu.cpp', 'src/framework/Session_local.h', 'src/ui/UserInterfaceRetained.cpp',

@@ -86,7 +86,7 @@ def validate_tree(root: Path, context: str) -> None:
 
 
 def validate_auto_exec_capture_boundary() -> None:
-    for relative_path in ("src/game/Game_local.cpp", "src/mpgame/Game_local.cpp"):
+    for relative_path in ("src/game/Game_local.cpp", "src/game/Game_local.cpp"):
         source = (GAME_LIBS_ROOT / relative_path).read_text(encoding="utf-8")
         body = function_body(
             source,

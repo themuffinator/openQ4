@@ -1,15 +1,15 @@
-# Exported symbol list for the macOS game modules (-Wl,-exported_symbols_list).
+# Exported symbol list for the macOS game module (-Wl,-exported_symbols_list).
 #
-# Darwin peer of tools/build/linux_game_module.map and of the game.def /
-# mpgame.def module definition files used on Windows. macOS was the only host
-# where a game module exported its whole symbol table: every idlib symbol, every
-# weak inline and every vtable, all with default visibility.
+# Darwin peer of tools/build/linux_game_module.map and of the Game.def module
+# definition file used on Windows. macOS was the only host where a game module
+# exported its whole symbol table: every idlib symbol, every weak inline and
+# every vtable, all with default visibility.
 #
-# That matters because a game module carries its own copy of idlib and of the
-# game types, and the single-player and multiplayer modules disagree about those
-# types by construction (GAME_MPAPI selects mpgame/Game_local.h over
-# game/Game_local.h). Two copies of the same symbol name with different
-# definitions, both exported, is a loader-order lottery -- see issue #90.
+# That matters because the game module carries its own copy of idlib and of the
+# game types, which the engine and the renderer modules build differently. Two
+# copies of the same symbol name with different definitions, both exported, is
+# a loader-order lottery -- see issue #90 (then between the single-player and
+# multiplayer modules, before one module served both).
 #
 # Only the module entry point may be exported.
 #

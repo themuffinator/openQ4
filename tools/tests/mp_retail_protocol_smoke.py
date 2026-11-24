@@ -114,7 +114,7 @@ def main() -> int:
     verify_runtime_is_current(runtime)
     paths = {
         "engine": runtime / f"openQ4-client_x64{SUFFIX}", "dedicated": runtime / f"openQ4-ded_x64{SUFFIX}",
-        "game_mp": runtime / "baseoq4/game-mp_x64.dll", "pak0": runtime / "baseoq4/pak0.pk4",
+        "game_mp": runtime / "baseoq4/game_x64.dll", "pak0": runtime / "baseoq4/pak0.pk4",
         "pak1": runtime / "baseoq4/pak1.pk4",
     }
     retail_paths = {"Quake4Ded.exe": retail / "Quake4Ded.exe", "Quake4.exe": retail / "Quake4.exe",

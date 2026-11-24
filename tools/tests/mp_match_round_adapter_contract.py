@@ -6,8 +6,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "src/mpgame/mp/RoundGameState.cpp"
-HEADER = ROOT / "src/mpgame/mp/RoundGameState.h"
+SOURCE = ROOT / "src/game/mp/RoundGameState.cpp"
+HEADER = ROOT / "src/game/mp/RoundGameState.h"
 
 
 def require(text: str, token: str, context: str) -> None:

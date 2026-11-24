@@ -37,7 +37,7 @@ def main() -> int:
         parser.error("use a player slot from 0 to 31 and positive seek times")
     verify_runtime_is_current(runtime)
     exe = runtime / ("openQ4-client_x64.exe" if os.name == "nt" else "openQ4-client_x64")
-    paths = [exe, demo, *sorted((runtime / "baseoq4").glob("game-mp*")),
+    paths = [exe, demo, *sorted((runtime / "baseoq4").glob("game_*")),
              *sorted(runtime.glob("renderer-*")),
              runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4", runtime / "baseoq4/mod.json"]
     paths = [path for path in paths if path.is_file() and path.suffix not in (".pdb", ".lib", ".exp")]

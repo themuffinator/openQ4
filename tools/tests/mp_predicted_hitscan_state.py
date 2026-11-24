@@ -7,7 +7,7 @@ the gun by then. It now draws each shot on the frame it predicts it, from the gu
 draws, and the server's copy of that shot adds only the impacts on actors.
 
 tools/tests/native/MpPredictedHitscanFixture.cpp executes the production bookkeeping
-spliced verbatim from src/mpgame/Game_local.cpp: the spread seed the server and the
+spliced verbatim from src/game/Game_local.cpp: the spread seed the server and the
 shooting client share, and the notes that tell a copy its shot was already drawn
 (oldest first, per hit-scan, one second at most, a full ring giving up its oldest).
 The source checks pin the wiring around it: the client predicts only its own shot on
@@ -17,8 +17,8 @@ server's copy and the copy leaves everything else to the prediction; damage and 
 server's broadcast are unchanged.
 
 tools/tests/native/MpRespawnWeaponRaiseFixture.cpp executes the client's weapon
-bookkeeping across its owner's respawn, spliced from src/mpgame/Player.cpp and
-src/mpgame/Weapon.cpp: the snapshot reader's hitch test, weapon-change block and respawn
+bookkeeping across its owner's respawn, spliced from src/game/Player.cpp and
+src/game/Weapon.cpp: the snapshot reader's hitch test, weapon-change block and respawn
 branch, the weapon UpdateWeapon makes, and the raise rvWeapon::PlayAnim plays. The server
 raises the new life's weapon on its own frame; the client raises its weapon from that game
 time, so its shots fall on the server's frames. Under jitter the channel drops a snapshot that
@@ -279,11 +279,11 @@ def compile_and_run(source: str, directory: Path, name: str, compiler: str) -> s
 
 
 def main() -> None:
-    game_local = read("src/mpgame/Game_local.cpp")
-    network = read("src/mpgame/Game_network.cpp")
-    weapon = read("src/mpgame/Weapon.cpp")
-    header = read("src/mpgame/Game_local.h")
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    game_local = read("src/game/Game_local.cpp")
+    network = read("src/game/Game_network.cpp")
+    weapon = read("src/game/Weapon.cpp")
+    header = read("src/game/Game_local.h")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
     check_sources(game_local, network, weapon, header, cvars)
 
     # The source checks must reject each wiring reversal.
@@ -333,7 +333,7 @@ def main() -> None:
             if control.returncode == 0:
                 raise SystemExit(f"mp_predicted_hitscan_state: control did not fail: {label}")
 
-        respawn_sources = {"player": read("src/mpgame/Player.cpp"), "weapon": weapon}
+        respawn_sources = {"player": read("src/game/Player.cpp"), "weapon": weapon}
         result = compile_and_run(build_respawn_fixture(respawn_sources["player"], weapon), path, "respawn", compiler)
         if result.returncode != 0:
             raise SystemExit(f"mp_predicted_hitscan_state: respawn raise FAILED\n{result.stdout}{result.stderr}")

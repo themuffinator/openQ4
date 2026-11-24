@@ -167,7 +167,7 @@ def with_layer_binaries(manifest: dict[str, object], arch: str, code_records: di
     assert isinstance(binaries, dict)
     for key in ASSEMBLER.optional_thin_code_paths(arch):
         binaries[key] = {
-            **binaries["game-sp"],
+            **binaries["game"],
             "path": code_records[key]["path"],
             "installName": ASSEMBLER.expected_install_name(key, arch),
         }
@@ -188,6 +188,17 @@ def test_game_layer_slices() -> None:
         expect_error("stale or mismatched code file",
                      lambda: ASSEMBLER.classify_staged_tree(work, "arm64"),
                      "retired expansion module in current staging")
+        (work / "q4xbase/game-sp_arm64.dylib").unlink()
+        write_file(work / "q4xbase/game_arm64.dylib", b"retired\n", 0o755)
+        expect_error("stale or mismatched code file",
+                     lambda: ASSEMBLER.classify_staged_tree(work, "arm64"),
+                     "expansion module in current staging")
+        (work / "q4xbase/game_arm64.dylib").unlink()
+        # the split game-sp/game-mp modules of an older build are stale code too
+        write_file(work / "baseoq4/game-sp_arm64.dylib", b"retired\n", 0o755)
+        expect_error("stale or mismatched code file",
+                     lambda: ASSEMBLER.classify_staged_tree(work, "arm64"),
+                     "retired split game module in current staging")
     finally:
         shutil.rmtree(work, ignore_errors=True)
     original_layers = ASSEMBLER.PACKAGED_LAYER_GAME_DIRS
@@ -199,12 +210,12 @@ def test_game_layer_slices() -> None:
 
 
 def test_historical_game_layer_slices() -> None:
-    """Validate archived dual-module fixtures under their explicit historical policy."""
-    if ASSEMBLER.layer_code_keys("q4xbase") != ("q4xbase/game-sp", "q4xbase/game-mp"):
-        raise AssertionError("q4xbase must contribute exactly its SP and MP modules")
-    if ASSEMBLER.expected_install_name("q4xbase/game-sp", "arm64") != "@loader_path/game-sp_arm64.dylib":
+    """Validate layer fixtures under their explicit historical policy, with one module per layer."""
+    if ASSEMBLER.layer_code_keys("q4xbase") != ("q4xbase/game",):
+        raise AssertionError("q4xbase must contribute exactly its one game module")
+    if ASSEMBLER.expected_install_name("q4xbase/game", "arm64") != "@loader_path/game_arm64.dylib":
         raise AssertionError("a layer module keeps its own file name as its install name")
-    if ASSEMBLER.optional_universal_code_paths()["q4xbase/game-mp"] != Path("q4xbase") / "game-mp_universal2.dylib":
+    if ASSEMBLER.optional_universal_code_paths()["q4xbase/game"] != Path("q4xbase") / "game_universal2.dylib":
         raise AssertionError("the merged layer module belongs in q4xbase/")
 
     work = ROOT / ".tmp" / "macos-universal2-layer-contract"
@@ -218,9 +229,9 @@ def test_historical_game_layer_slices() -> None:
         populate_layer(x64_root, "x64")
         arm_code, arm_shared = ASSEMBLER.classify_staged_tree(arm_root, "arm64")
         x64_code, x64_shared = ASSEMBLER.classify_staged_tree(x64_root, "x64")
-        expected_keys = {*ASSEMBLER.CODE_KEYS, "q4xbase/game-sp", "q4xbase/game-mp"}
+        expected_keys = {*ASSEMBLER.CODE_KEYS, "q4xbase/game"}
         if set(arm_code) != expected_keys or set(x64_code) != expected_keys:
-            raise AssertionError("a staged layer's modules must be recorded as code")
+            raise AssertionError("a staged layer's module must be recorded as code")
         if "q4xbase/mod.json" not in arm_shared or arm_shared != x64_shared:
             raise AssertionError("the layer's mod.json is shared payload, identical in both slices")
 
@@ -229,7 +240,7 @@ def test_historical_game_layer_slices() -> None:
         ASSEMBLER.validate_thin_manifest_metadata(arm_manifest, "arm64")
         ASSEMBLER.validate_thin_manifest_metadata(x64_manifest, "x64")
         ASSEMBLER.validate_matching_inputs(arm_manifest, x64_manifest, arm_shared, x64_shared)
-        if ASSEMBLER.staged_layer_keys(arm_manifest["binaries"]) != ("q4xbase/game-sp", "q4xbase/game-mp"):
+        if ASSEMBLER.staged_layer_keys(arm_manifest["binaries"]) != ("q4xbase/game",):
             raise AssertionError("the recorded layer keys decide which modules are merged")
 
         # a layer in one slice only would leave the other architecture without it
@@ -240,16 +251,17 @@ def test_historical_game_layer_slices() -> None:
             "layer staged in one slice",
         )
 
-        # a manifest that records half a layer is corrupt
-        half = json.loads(json.dumps(arm_manifest))
-        del half["binaries"]["q4xbase/game-mp"]
+        # A layer has one module, so a manifest can no longer record half of one;
+        # a retired split-module key is unknown and therefore corrupt.
+        retired = json.loads(json.dumps(arm_manifest))
+        retired["binaries"]["q4xbase/game-sp"] = retired["binaries"]["q4xbase/game"]
         expect_error(
-            "records an incomplete q4xbase/ layer",
-            lambda: ASSEMBLER.validate_thin_manifest_metadata(half, "arm64"),
-            "manifest with half a layer",
+            "invalid binary set",
+            lambda: ASSEMBLER.validate_thin_manifest_metadata(retired, "arm64"),
+            "manifest with a retired split layer module",
         )
         unknown = json.loads(json.dumps(arm_manifest))
-        unknown["binaries"]["q4mp/game-sp"] = unknown["binaries"]["q4xbase/game-sp"]
+        unknown["binaries"]["q4mp/game"] = unknown["binaries"]["q4xbase/game"]
         expect_error(
             "invalid binary set",
             lambda: ASSEMBLER.validate_thin_manifest_metadata(unknown, "arm64"),
@@ -257,18 +269,25 @@ def test_historical_game_layer_slices() -> None:
         )
 
         # the staged tree must hold the whole layer, and only this slice's modules
-        write_file(arm_root / "q4xbase" / "game-sp_x64.dylib", b"stale\n", 0o755)
+        write_file(arm_root / "q4xbase" / "game_x64.dylib", b"stale\n", 0o755)
         expect_error(
             "stale or mismatched code file",
             lambda: ASSEMBLER.classify_staged_tree(arm_root, "arm64"),
             "stale layer module",
         )
-        (arm_root / "q4xbase" / "game-sp_x64.dylib").unlink()
-        (x64_root / "q4xbase" / "game-mp_x64.dylib").unlink()
+        (arm_root / "q4xbase" / "game_x64.dylib").unlink()
+        write_file(arm_root / "q4xbase" / "game-mp_arm64.dylib", b"retired\n", 0o755)
+        expect_error(
+            "stale or mismatched code file",
+            lambda: ASSEMBLER.classify_staged_tree(arm_root, "arm64"),
+            "retired split layer module",
+        )
+        (arm_root / "q4xbase" / "game-mp_arm64.dylib").unlink()
+        (x64_root / "q4xbase" / "game_x64.dylib").unlink()
         expect_error(
             "incomplete q4xbase/ layer",
             lambda: ASSEMBLER.classify_staged_tree(x64_root, "x64"),
-            "layer without its MP module",
+            "layer without its game module",
         )
         (arm_root / "q4xbase" / "mod.json").unlink()
         expect_error(
@@ -413,7 +432,7 @@ def test_thin_manifest_metadata_reinspection_contract() -> None:
             ASSEMBLER.validate_exact_arches = lambda path, expected: None
             ASSEMBLER.validate_recorded_tree(arm_root, "arm64", manifest)
 
-            inspected["game-sp"]["minimumOS"] = "12.0"
+            inspected["game"]["minimumOS"] = "12.0"
             expect_error(
                 "Mach-O metadata changed after recording",
                 lambda: ASSEMBLER.validate_recorded_tree(arm_root, "arm64", manifest),
@@ -441,7 +460,7 @@ def test_source_provenance_validation() -> None:
             "fileCount": 2,
             "files": [
                 {"path": "src/game/A.cpp", "sha256": "1" * 64},
-                {"path": "src/mpgame/B.cpp", "sha256": "2" * 64},
+                {"path": "src/game/B.cpp", "sha256": "2" * 64},
             ],
         }
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -502,9 +521,9 @@ def test_merge_binary_normalizes_and_signs_fused_output() -> None:
     shutil.rmtree(work, ignore_errors=True)
     try:
         work.mkdir(parents=True)
-        arm_path = work / "game-mp-arm64"
-        x64_path = work / "game-mp-x64"
-        module_output = work / "game-mp-universal2.dylib"
+        arm_path = work / "game-arm64"
+        x64_path = work / "game-x64"
+        module_output = work / "game-universal2.dylib"
         dedicated_output = work / "openQ4-ded-universal2"
         write_file(arm_path, b"immutable-arm\n", 0o755)
         write_file(x64_path, b"immutable-x64\n", 0o755)
@@ -524,15 +543,15 @@ def test_merge_binary_normalizes_and_signs_fused_output() -> None:
 
         def fake_install_name(path: Path, *, macho_arch: str) -> str:
             install_name_checks.append((Path(path), macho_arch))
-            return ASSEMBLER.expected_install_name("game-mp", ASSEMBLER.UNIVERSAL_ARCH)
+            return ASSEMBLER.expected_install_name("game", ASSEMBLER.UNIVERSAL_ARCH)
 
         ASSEMBLER.install_name = fake_install_name
         ASSEMBLER.require_module_entry_export = (
             lambda path, *, macho_arch, code_key: export_checks.append((Path(path), macho_arch, code_key))
         )
 
-        ASSEMBLER.merge_binary(arm_path, x64_path, module_output, "game-mp")
-        universal_id = ASSEMBLER.expected_install_name("game-mp", ASSEMBLER.UNIVERSAL_ARCH)
+        ASSEMBLER.merge_binary(arm_path, x64_path, module_output, "game")
+        universal_id = ASSEMBLER.expected_install_name("game", ASSEMBLER.UNIVERSAL_ARCH)
         expected_module_commands = [
             ("lipo", "-create", str(arm_path), str(x64_path), "-output", str(module_output)),
             ("install_name_tool", "-id", universal_id, str(module_output)),
@@ -550,7 +569,7 @@ def test_merge_binary_normalizes_and_signs_fused_output() -> None:
         expected_slices = sorted(ASSEMBLER.UNIVERSAL_MACHO_ARCHES)
         if install_name_checks != [(module_output, macho_arch) for macho_arch in expected_slices]:
             raise AssertionError(f"universal2 module IDs were not checked per slice: {install_name_checks!r}")
-        if export_checks != [(module_output, macho_arch, "game-mp") for macho_arch in expected_slices]:
+        if export_checks != [(module_output, macho_arch, "game") for macho_arch in expected_slices]:
             raise AssertionError(f"universal2 module exports were not checked per slice: {export_checks!r}")
         if arch_checks != [(module_output, ASSEMBLER.UNIVERSAL_MACHO_ARCHES)]:
             raise AssertionError(f"universal2 module exact slices were not checked: {arch_checks!r}")
@@ -591,10 +610,10 @@ def test_thin_payload_preparation_contract() -> None:
     original_install_name = ASSEMBLER.install_name
     original_run_command = ASSEMBLER.run_command
     observed: list[tuple[str, ...]] = []
+    # the renderer module already carries its expected ID, so it is only re-signed
     install_names = {
-        expected_paths["game-sp"]: "/absolute/game-sp_arm64.dylib",
-        expected_paths["game-mp"]: ASSEMBLER.expected_install_name("game-mp", "arm64"),
-        expected_paths["renderer-vk"]: "/absolute/renderer-vk_arm64.dylib",
+        expected_paths["game"]: "/absolute/game_arm64.dylib",
+        expected_paths["renderer-vk"]: ASSEMBLER.expected_install_name("renderer-vk", "arm64"),
         expected_paths["openal-soft"]: "/absolute/libopenal.1.dylib",
     }
     try:
@@ -618,27 +637,18 @@ def test_thin_payload_preparation_contract() -> None:
         ASSEMBLER.run_command = fake_run
         ASSEMBLER.prepare_thin_payload(Path("/thin"), "arm64")
 
-        sp_path = str(Path("/thin") / expected_paths["game-sp"])
-        mp_path = str(Path("/thin") / expected_paths["game-mp"])
+        game_path = str(Path("/thin") / expected_paths["game"])
         renderer_path = str(Path("/thin") / expected_paths["renderer-vk"])
         openal_path = str(Path("/thin") / expected_paths["openal-soft"])
         expected_commands = [
             (
                 "install_name_tool",
                 "-id",
-                ASSEMBLER.expected_install_name("game-sp", "arm64"),
-                sp_path,
+                ASSEMBLER.expected_install_name("game", "arm64"),
+                game_path,
             ),
-            ("codesign", "--force", "--sign", "-", sp_path),
-            ("codesign", "--verify", "--strict", sp_path),
-            ("codesign", "--force", "--sign", "-", mp_path),
-            ("codesign", "--verify", "--strict", mp_path),
-            (
-                "install_name_tool",
-                "-id",
-                ASSEMBLER.expected_install_name("renderer-vk", "arm64"),
-                renderer_path,
-            ),
+            ("codesign", "--force", "--sign", "-", game_path),
+            ("codesign", "--verify", "--strict", game_path),
             ("codesign", "--force", "--sign", "-", renderer_path),
             ("codesign", "--verify", "--strict", renderer_path),
             (
@@ -672,8 +682,7 @@ def make_universal_symbol_manifest() -> bytes:
         ("openQ4.app/Contents/MacOS/openQ4", "openQ4.app.dSYM"),
         ("openQ4-client_universal2", "openQ4-client_universal2.dSYM"),
         ("openQ4-ded_universal2", "openQ4-ded_universal2.dSYM"),
-        ("openQ4.app/Contents/Frameworks/game-sp_universal2.dylib", "game-sp_universal2.dylib.dSYM"),
-        ("openQ4.app/Contents/Frameworks/game-mp_universal2.dylib", "game-mp_universal2.dylib.dSYM"),
+        ("openQ4.app/Contents/Frameworks/game_universal2.dylib", "game_universal2.dylib.dSYM"),
         # The fused renderer module gets a dSYM like any other openQ4-built code.
         # libMoltenVK.dylib rides in the same Frameworks directory but has no
         # record here: it is third-party, ships no DWARF, and the packager's

@@ -1,5 +1,5 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 06/02/2004
 
@@ -30,6 +30,7 @@ public:
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 
 	virtual void			Hide( void );
 	virtual void			Show( void );
@@ -135,6 +136,7 @@ public:
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	virtual void			Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir, 
 								const char *damageDefName, const float damageScale, const int location );
 	virtual void			Killed( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );

@@ -1,11 +1,11 @@
 /*
- * openQ4 player identity core (src/mpgame/mp/Identity.h, roadmap MP-17)
+ * openQ4 player identity core (src/game/mp/Identity.h, roadmap MP-17)
  * compiled alone: per-server keys, the signed proof and what it binds, the
  * fingerprint, ghost codes, the reconnect store and the Elo ratings. Built and
  * run by tools/tests/mp_identity.py.
  */
 #include "../../../src/idlib/Ed25519.cpp"
-#include "../../../src/mpgame/mp/Identity.h"
+#include "../../../src/game/mp/Identity.h"
 
 #include <cstdio>
 #include <cstdlib>

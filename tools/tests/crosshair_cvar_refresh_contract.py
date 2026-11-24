@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOTS = ("src/game", "src/mpgame")
+SOURCE_ROOTS = ("src/game",)
 TEST_PATH = "tools/tests/crosshair_cvar_refresh_contract.py"
 REFRESH = "static void Player_RefreshCrosshairGUI( idUserInterface *cursor, const rvWeapon *weapon, bool driving )"
 
@@ -163,9 +163,9 @@ def check_source_root(source_root: str) -> str:
 
 
 def main() -> None:
-    bodies = {source_root: check_source_root(source_root) for source_root in SOURCE_ROOTS}
-    if bodies[SOURCE_ROOTS[0]] != bodies[SOURCE_ROOTS[1]]:
-        raise AssertionError("SP/MP drift in Player_RefreshCrosshairGUI")
+    # one game tree since CORE-07: there is no second copy to drift from
+    for source_root in SOURCE_ROOTS:
+        check_source_root(source_root)
 
     # One implementation for both trees, and only under the retained interface:
     # its pieces are windows onto vector art the stock interface does not have.
@@ -175,8 +175,6 @@ def main() -> None:
         'retained = cvarSystem->Find( "ui_retained" ); } return hud_crosshairAnimated.GetBool() && retained != NULL && retained->GetBool();',
         "AnimatedCrosshair.inl rvAnimatedCrosshair::Enabled",
     )
-    if (ROOT / "src/mpgame/gamesys/AnimatedCrosshair.inl").exists():
-        raise AssertionError("The animated crosshair has one implementation, under src/game/gamesys")
 
     # Suite membership and CI execution are checked by game_regression_suite.py.
     print("crosshair_cvar_refresh_contract: ok")

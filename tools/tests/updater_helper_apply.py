@@ -75,7 +75,7 @@ def make_install(root: Path, helper: Path, case: str) -> tuple[Path, Path]:
     shutil.rmtree(install, ignore_errors=True)
     (install / "baseoq4").mkdir(parents=True)
     (install / "openQ4-client_x64.exe").write_bytes(b"old client")
-    (install / "baseoq4" / "game-sp_x64.dll").write_bytes(b"old game")
+    (install / "baseoq4" / "game_x64.dll").write_bytes(b"old game")
     (install / "baseoq4" / "pak0.pk4").write_bytes(b"old pak0")
     (install / "baseoq4" / "pak7.pk4").write_bytes(b"retired overlay")
     (install / "keep.txt").write_bytes(b"untouched")
@@ -135,7 +135,7 @@ def main() -> int:
     update = install / ".update"
     files = stage(install, {
         "openQ4-client_x64.exe": b"new client",
-        "baseoq4/game-sp_x64.dll": b"new game",
+        "baseoq4/game_x64.dll": b"new game",
         "baseoq4/pak0.pk4": b"new pak0",
         "docs/new.html": b"new doc",
         relaunch.name: relaunch.read_bytes(),
@@ -163,7 +163,7 @@ def main() -> int:
     update = install / ".update"
     before = tree_digest(install)
     files = stage(install, {
-        "baseoq4/game-sp_x64.dll": b"new game",
+        "baseoq4/game_x64.dll": b"new game",
         "openQ4-client_x64.exe": b"new client",
         "zz/blocked": b"cannot land",
     })

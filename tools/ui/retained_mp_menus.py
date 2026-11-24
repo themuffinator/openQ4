@@ -35,7 +35,7 @@ STRINGS = ROOT / "content" / "baseoq4" / "pak0" / "strings"
 # The maps a game type offers the Vote and Admin pages' map choices: the
 # game's own cap (idMultiplayerGame::RETAINED_VOTE_MAPS), so the two agree.
 MAP_CATALOG = int(re.search(r"static const int RETAINED_VOTE_MAPS = (\d+);",
-                            (ROOT / "src" / "mpgame" / "MultiplayerGame.h").read_text(encoding="utf-8")).group(1))
+                            (ROOT / "src" / "game" / "MultiplayerGame.h").read_text(encoding="utf-8")).group(1))
 
 TAB_GREEN = "#5A652A"          # the active tab's fill (Appendix B.1, ctrls_tab2-4)
 BODY = [0, 0, 0, 0.94]         # the card's body (section 6, panel anatomy)
@@ -1408,9 +1408,9 @@ def server_page(doc: Document, index: int, ident: str, width: float, height: flo
 # the teams; and the mute (MP-18) the kick, whose player it silences instead.
 # The arena and preset lists lead with none, which keeps the server's rules.
 ARENA_ROWS = int(re.search(r"static const int RETAINED_VOTE_ARENAS = (\d+);",
-                           (ROOT / "src" / "mpgame" / "MultiplayerGame.h").read_text(encoding="utf-8")).group(1))
+                           (ROOT / "src" / "game" / "MultiplayerGame.h").read_text(encoding="utf-8")).group(1))
 PRESET_ROWS = int(re.search(r"static const int RETAINED_VOTE_PRESETS = (\d+);",
-                            (ROOT / "src" / "mpgame" / "MultiplayerGame.h").read_text(encoding="utf-8")).group(1))
+                            (ROOT / "src" / "game" / "MultiplayerGame.h").read_text(encoding="utf-8")).group(1))
 VOTE_NONE = "#str_232812"
 VOTE_ROWS = (
     ("map", "mpVoteMap", "#str_200209", ("choice", MAP_CATALOG)),
@@ -2511,7 +2511,7 @@ MATCH_LISTS = ("team", "replacement", "proposal", "profile", "rule", "series_map
 # the way to the stock page past a full server's rows.
 MATCH_ROW_COUNTS = {name: int(value) for name, value in re.findall(
     r"static const int RETAINED_MATCH_(\w+)_ROWS = (\d+);",
-    (ROOT / "src" / "mpgame" / "MultiplayerGame.h").read_text(encoding="utf-8"))}
+    (ROOT / "src" / "game" / "MultiplayerGame.h").read_text(encoding="utf-8"))}
 MATCH_TEAM_ROWS, MATCH_REPLACEMENT_ROWS = MATCH_ROW_COUNTS["TEAM"], MATCH_ROW_COUNTS["REPLACEMENT"]
 MATCH_LIST_ROW_H = 22.0
 MATCH_TEAMS_W = 450.0                   # the Teams section's lists; the role and the actions take the rest

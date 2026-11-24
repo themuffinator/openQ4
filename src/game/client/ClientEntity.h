@@ -151,7 +151,8 @@ ID_INLINE rvClientEntityPtr<type> &rvClientEntityPtr<type>::operator=( type *cen
 
 template< class type >
 ID_INLINE bool rvClientEntityPtr<type>::SetSpawnId( int id ) {
-	if ( id == spawnId ) {
+	// the campaign reports an unchanged id as no change; multiplayer accepts it again
+	if ( !gameLocal.IsMultiplayerMode() && id == spawnId ) {
 		return false;
 	}
 	if ( ( id >> CENTITYNUM_BITS ) == gameLocal.clientSpawnIds[ id & ( ( 1 << CENTITYNUM_BITS ) - 1 ) ] ) {

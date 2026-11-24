@@ -345,17 +345,17 @@ fi
         fi
     done
 
-    printf '\nGame module files in the app Frameworks directory (plus legacy adjacent locations):\n'
+    printf '\nGame module files in the app Frameworks directory (plus legacy adjacent locations and retired split game-sp/game-mp modules):\n'
     found_module=0
     for module_path in \
-        "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-        "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
-        "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-        "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib \
-        "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dll \
-        "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dll \
-        "${PACKAGE_ROOT}/baseoq4"/game-sp_*.so \
-        "${PACKAGE_ROOT}/baseoq4"/game-mp_*.so
+        "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
+        "${PACKAGE_ROOT}/baseoq4"/game_*.dylib \
+        "${PACKAGE_ROOT}/baseoq4"/game_*.dll \
+        "${PACKAGE_ROOT}/baseoq4"/game_*.so \
+        "${APP_FRAMEWORK_ROOT}"/game-sp_* \
+        "${APP_FRAMEWORK_ROOT}"/game-mp_* \
+        "${PACKAGE_ROOT}/baseoq4"/game-sp_* \
+        "${PACKAGE_ROOT}/baseoq4"/game-mp_*
     do
         if [ -L "${module_path}" ]; then
             found_module=1
@@ -377,16 +377,14 @@ fi
 
     for binary_path in \
         "${APP_ROOT}/Contents/MacOS/openQ4" \
-        "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-        "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
+        "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
         "${PACKAGE_ROOT}/openQ4-client_arm64" \
         "${PACKAGE_ROOT}/openQ4-client_x64" \
         "${PACKAGE_ROOT}/openQ4-client_x86" \
         "${PACKAGE_ROOT}/openQ4-ded_arm64" \
         "${PACKAGE_ROOT}/openQ4-ded_x64" \
         "${PACKAGE_ROOT}/openQ4-ded_x86" \
-        "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-        "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib
+        "${PACKAGE_ROOT}/baseoq4"/game_*.dylib
     do
         if path_exists_for_inspection "${binary_path}"; then
             printf '\n-- %s --\n' "${binary_path}"
@@ -413,16 +411,14 @@ fi
     if command -v otool >/dev/null 2>&1; then
         for binary_path in \
             "${APP_ROOT}/Contents/MacOS/openQ4" \
-            "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-            "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
+            "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
             "${PACKAGE_ROOT}/openQ4-client_arm64" \
             "${PACKAGE_ROOT}/openQ4-client_x64" \
             "${PACKAGE_ROOT}/openQ4-client_x86" \
             "${PACKAGE_ROOT}/openQ4-ded_arm64" \
             "${PACKAGE_ROOT}/openQ4-ded_x64" \
             "${PACKAGE_ROOT}/openQ4-ded_x86" \
-            "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-            "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib
+            "${PACKAGE_ROOT}/baseoq4"/game_*.dylib
         do
             if path_exists_for_inspection "${binary_path}"; then
                 printf '\n-- otool -L: %s --\n' "${binary_path}"
@@ -560,16 +556,14 @@ fi
         for signed_path in \
             "${APP_ROOT}" \
             "${APP_ROOT}/Contents/MacOS/openQ4" \
-            "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-            "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
+            "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
             "${PACKAGE_ROOT}/openQ4-client_arm64" \
             "${PACKAGE_ROOT}/openQ4-client_x64" \
             "${PACKAGE_ROOT}/openQ4-client_x86" \
             "${PACKAGE_ROOT}/openQ4-ded_arm64" \
             "${PACKAGE_ROOT}/openQ4-ded_x64" \
             "${PACKAGE_ROOT}/openQ4-ded_x86" \
-            "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-            "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib
+            "${PACKAGE_ROOT}/baseoq4"/game_*.dylib
         do
             if path_exists_for_inspection "${signed_path}"; then
                 printf '\n-- codesign verify: %s --\n' "${signed_path}"
@@ -628,8 +622,7 @@ fi
             "${APP_ROOT}" \
             "${APP_ROOT}/Contents/MacOS/openQ4" \
             "${APP_RESOURCE_ROOT}/baseoq4" \
-            "${APP_FRAMEWORK_ROOT}"/game-sp_*.dylib \
-            "${APP_FRAMEWORK_ROOT}"/game-mp_*.dylib \
+            "${APP_FRAMEWORK_ROOT}"/game_*.dylib \
             "${PACKAGE_ROOT}/openQ4-client_arm64" \
             "${PACKAGE_ROOT}/openQ4-client_x64" \
             "${PACKAGE_ROOT}/openQ4-client_x86" \
@@ -637,8 +630,7 @@ fi
             "${PACKAGE_ROOT}/openQ4-ded_x64" \
             "${PACKAGE_ROOT}/openQ4-ded_x86" \
             "${PACKAGE_ROOT}/baseoq4" \
-            "${PACKAGE_ROOT}/baseoq4"/game-sp_*.dylib \
-            "${PACKAGE_ROOT}/baseoq4"/game-mp_*.dylib \
+            "${PACKAGE_ROOT}/baseoq4"/game_*.dylib \
             "${PACKAGE_ROOT}/collect_macos_support_info.sh"
         do
             if path_exists_for_inspection "${xattr_path}"; then

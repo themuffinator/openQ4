@@ -599,7 +599,7 @@ def main() -> int:
     report = {"runtime": str(runtime), "map": args.map, "mpMap": args.mp_map, "renderer": args.renderer,
               "probeRate": args.probe_rate, "reference": args.reference, "cvars": args.cvar, "fullscreen": args.fullscreen, "swapInterval": args.swap_interval,
               "binaries": {name: sha256(runtime / name) for name in
-                           ("openQ4-client_x64.exe", "baseoq4/game-sp_x64.dll", "baseoq4/game-mp_x64.dll",
+                           ("openQ4-client_x64.exe", "baseoq4/game_x64.dll",
                             f"renderer-{args.renderer}_x64.dll")
                            if (runtime / name).is_file()},
               "cases": []}

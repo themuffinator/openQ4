@@ -582,7 +582,7 @@ def capture(args: argparse.Namespace) -> int:
     for key, value in overrides.items():
         command.extend(['+set', key, value])
     command.extend(value.replace('${workspaceFolder}', str(ROOT)) for value in retained)
-    binaries = [executable] + sorted((runtime / 'baseoq4').glob('game-*'))
+    binaries = [executable] + sorted((runtime / 'baseoq4').glob('game_*'))
     binaries += sorted(runtime.glob('renderer-*'))
     metadata = {
         'status': 'running', 'profile': profile['name'], 'mode': args.mode, 'renderer': args.renderer,

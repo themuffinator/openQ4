@@ -113,6 +113,8 @@ public:
 	bool			CurrentStateIs	( const char* name ) const;
 	
 	stateResult_t	Execute			( void );
+	// Rebase queued state-delay origins while the gameplay clock is frozen.
+	void			ShiftMatchTime	( int deltaMsec );
 	
 	void			Clear			( bool ignoreStateCalls = false );
 	

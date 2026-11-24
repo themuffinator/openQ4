@@ -76,7 +76,7 @@ def function_body(source: str, signature: str, context: str) -> str:
 
 
 def validate_animation_and_models() -> None:
-    for tree in ("src/game", "src/mpgame"):
+    for tree in ("src/game",):
         # numAnimatedComponents * numFrames was taken in int and sized the frame table.
         anim = function_body(read(f"{tree}/anim/Anim.cpp"), "bool idMD5Anim::LoadAnim(", f"{tree} md5anim loader")
         require_before(
@@ -166,7 +166,7 @@ def validate_maps() -> None:
 
 
 def validate_scripts_and_saves() -> None:
-    for tree in ("src/game", "src/mpgame"):
+    for tree in ("src/game",):
         thread = read(f"{tree}/script/Script_Thread.cpp")
         # A "ss" event passes C strings; this took idStr references.
         require(thread, "void idThread::Event_StrFind( const char *sourceStr, const char *subStr ) {", f"{tree} strFind signature")

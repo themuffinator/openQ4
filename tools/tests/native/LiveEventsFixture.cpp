@@ -1,4 +1,4 @@
-// Exercises src/mpgame/mp/LiveEvents.h alone: JSON line building over hostile
+// Exercises src/game/mp/LiveEvents.h alone: JSON line building over hostile
 // names, the state diff and its order, the kill line and line overflow. With a
 // path argument it also writes a sample match as a stream for
 // tools/tests/mp_live_event_stream_contract.py to parse and replay through the
@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "src/mpgame/mp/LiveEvents.h"
+#include "src/game/mp/LiveEvents.h"
 
 static int failures = 0;
 #define CHECK( condition ) do { if ( !( condition ) ) { ++failures; std::fprintf( stderr, "FAILED %s:%d %s\n", __FILE__, __LINE__, #condition ); } } while ( 0 )

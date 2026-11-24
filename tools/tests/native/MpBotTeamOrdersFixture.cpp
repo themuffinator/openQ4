@@ -1,6 +1,6 @@
 // Team-order parsing for the multiplayer bots.  mp_bot_team_orders.py splices
 // BotOrderWordsAt, the phrase tables and BotParseTeamOrder verbatim from
-// src/mpgame/bots/Bot.cpp, and botOrderKind_t from Bot.h, into this file.
+// src/game/bots/Bot.cpp, and botOrderKind_t from Bot.h, into this file.
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>

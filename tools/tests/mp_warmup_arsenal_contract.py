@@ -17,8 +17,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PLAYER = ROOT / "src/mpgame/Player.cpp"
-GAMESTATE = ROOT / "src/mpgame/mp/GameState.cpp"
+PLAYER = ROOT / "src/game/Player.cpp"
+GAMESTATE = ROOT / "src/game/mp/GameState.cpp"
 
 
 def read(path: Path) -> str:

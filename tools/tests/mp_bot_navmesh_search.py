@@ -4,7 +4,7 @@
 The production methods - strongly connected components and their reachability
 closure, ALT landmark selection, the landmark heuristic, and both forms of the
 single-source cost field, and the exact pair pricing behind goal choice - are
-spliced verbatim from src/mpgame/bots/NavMesh.cpp into
+spliced verbatim from src/game/bots/NavMesh.cpp into
 tools/tests/native/MpBotNavSearchFixture.cpp and compiled.  The fixture
 generates two-floor grids with walls, one-way drops, cheap long-range jump pads
 and sealed pits, and checks the methods against brute force: the closure must
@@ -37,7 +37,7 @@ def function(source: str, signature: str) -> str:
 
 
 def main() -> None:
-    nav = (ROOT / "src/mpgame/bots/NavMesh.cpp").read_text(encoding="utf-8")
+    nav = (ROOT / "src/game/bots/NavMesh.cpp").read_text(encoding="utf-8")
     constants = "\n".join(re.findall(r"^static const (?:int|float)\s+NAV_\w+\s*=\s*[0-9][^\n]+", nav, re.M))
     bodies = "\n".join(function(nav, signature) for signature in (
         "void rvNavMesh::BeginSearch(",

@@ -321,7 +321,7 @@ def validate_release_layout_contract(session: str, sp: str, mp: str, minimum_bui
     # build can carry the same number, so only an unstamped payload is retail.
     retail_check = "savefile->GetBuildNumber() == INITIAL_RELEASE_BUILD_NUMBER"
     guarded_check = "!savefile->HasOpenQ4SaveGameCompatibilityStamp() && " + retail_check
-    for tree in ("game", "mpgame"):
+    for tree in ("game",):
         misc = read(GAME_LIBS_ROOT / f"src/{tree}/Misc.cpp")
         if misc.count(retail_check) != misc.count(guarded_check):
             raise AssertionError(f"src/{tree} reads a stamped build-1262 payload as retail 1.0")
@@ -334,7 +334,7 @@ def validate_release_layout_contract(session: str, sp: str, mp: str, minimum_bui
     require(releases_h, 'OPENQ4_SAVEGAME_V2_WIRE_ABI = "windows-msvcabi-x64-le-raw1"', "v2 implied wire ABI")
     # Liquid support arrived with v3 itself, so a v2 payload has none of its fields.
     liquid_gate = "if ( savefile->GetOpenQ4SaveGameCompatibilityVersion() >= OPENQ4_SAVEGAME_TYPED_COMPATIBILITY_VERSION ) {"
-    for tree in ("game", "mpgame"):
+    for tree in ("game",):
         for relative, first_read in (("ai/AI.cpp", "savefile->ReadInt( liquidLevel );"),
                                      ("Player.cpp", "savefile->ReadInt( (int &)previousWaterLevel );")):
             source = read(GAME_LIBS_ROOT / f"src/{tree}/{relative}")
@@ -349,7 +349,7 @@ def validate_release_layout_contract(session: str, sp: str, mp: str, minimum_bui
     extrapolate_h = read(ROOT / "src/idlib/math/Extrapolate.h")
     if re.search(r"mutable\s+bool\s+cacheValid\s*;", extrapolate_h) is None:
         raise AssertionError("idExtrapolate lost the cache flag the legacy interpolator layout omits")
-    for anim, context in ((GAME_LIBS_ROOT / "src/game/anim/Anim_Blend.cpp", "SP"), (GAME_LIBS_ROOT / "src/mpgame/anim/Anim_Blend.cpp", "MP")):
+    for anim, context in ((GAME_LIBS_ROOT / "src/game/anim/Anim_Blend.cpp", "SP"), (GAME_LIBS_ROOT / "src/game/anim/Anim_Blend.cpp", "MP")):
         source = read(anim)
         require(source, "openQ4SaveGameLegacyInterpolate_t<idAngles> angularVelocity;", f"{context} legacy joint modifier record")
         require(source, "Anim_ReadSavedJointMod( savefile, *jointMods[ i ] );", f"{context} joint modifier decoder")
@@ -382,11 +382,11 @@ def validate_source_contracts() -> None:
     sp_class_h = read(GAME_LIBS_ROOT / "src/game/gamesys/Class.h")
     sp_player = read(GAME_LIBS_ROOT / "src/game/Player.cpp")
     sp_physics_player = read(GAME_LIBS_ROOT / "src/game/physics/Physics_Player.cpp")
-    mp = read(GAME_LIBS_ROOT / "src/mpgame/gamesys/SaveGame.cpp")
-    mp_h = read(GAME_LIBS_ROOT / "src/mpgame/gamesys/SaveGame.h")
-    mp_class_h = read(GAME_LIBS_ROOT / "src/mpgame/gamesys/Class.h")
-    mp_player = read(GAME_LIBS_ROOT / "src/mpgame/Player.cpp")
-    mp_physics_player = read(GAME_LIBS_ROOT / "src/mpgame/physics/Physics_Player.cpp")
+    mp = read(GAME_LIBS_ROOT / "src/game/gamesys/SaveGame.cpp")
+    mp_h = read(GAME_LIBS_ROOT / "src/game/gamesys/SaveGame.h")
+    mp_class_h = read(GAME_LIBS_ROOT / "src/game/gamesys/Class.h")
+    mp_player = read(GAME_LIBS_ROOT / "src/game/Player.cpp")
+    mp_physics_player = read(GAME_LIBS_ROOT / "src/game/physics/Physics_Player.cpp")
     game_file_h = read(GAME_LIBS_ROOT / "src/framework/File.h")
     releases_h = read(ROOT / "src/framework/SaveGameReleases.h")
 

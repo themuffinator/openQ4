@@ -37,7 +37,7 @@ from linux_metadata import (
 )
 from generate_release_docs import GeneratedDocSite, generate_release_docs_site
 from gamelibs_stage_path import MANIFEST_NAME as GAMELIBS_STAGE_MANIFEST_NAME, stage_root as gamelibs_stage_root
-from game_layer import PACKAGED_LAYER_GAME_DIRS, RETIRED_LAYER_GAME_DIRS, LayerError, read_layer_mod_json
+from game_layer import GAME_MODULE_STEM, PACKAGED_LAYER_GAME_DIRS, RETIRED_LAYER_GAME_DIRS, LayerError, read_layer_mod_json
 from openq4_pak import (
     OPENQ4_BULK_PACK_NAMES,
     OPENQ4_CONTENT_PACKS_BY_NAME,
@@ -636,12 +636,10 @@ def get_required_renderer_module_binaries(platform: str, arch: str) -> tuple[str
     )
 
 
-def get_required_game_module_binaries(platform: str, arch: str) -> tuple[str, str]:
+def get_required_game_module_binaries(platform: str, arch: str) -> tuple[str, ...]:
+    # One game module serves both logical modules (game_sp and game_mp).
     module_ext = PLATFORM_GAME_MODULE_EXT[platform]
-    return (
-        f"game-sp_{arch}{module_ext}",
-        f"game-mp_{arch}{module_ext}",
-    )
+    return (f"{GAME_MODULE_STEM}_{arch}{module_ext}",)
 
 
 def get_required_windows_root_symbols(arch: str) -> tuple[str, ...]:
@@ -656,11 +654,8 @@ def get_required_windows_root_symbols(arch: str) -> tuple[str, ...]:
     )
 
 
-def get_required_windows_game_symbols(arch: str) -> tuple[str, str]:
-    return (
-        f"game-sp_{arch}.pdb",
-        f"game-mp_{arch}.pdb",
-    )
+def get_required_windows_game_symbols(arch: str) -> tuple[str, ...]:
+    return (f"{GAME_MODULE_STEM}_{arch}.pdb",)
 
 
 def write_text_file(path: Path, lines: list[str]) -> None:
@@ -1209,12 +1204,8 @@ def resolve_macos_signing_config(args: argparse.Namespace) -> MacOSSigningConfig
     )
 
 
-def macos_embedded_game_module_paths(package_root: Path, arch: str) -> tuple[Path, Path]:
-    framework_root = package_root / "openQ4.app" / MACOS_APP_FRAMEWORKS_DIR
-    return (
-        framework_root / f"game-sp_{arch}.dylib",
-        framework_root / f"game-mp_{arch}.dylib",
-    )
+def macos_embedded_game_module_path(package_root: Path, arch: str) -> Path:
+    return package_root / "openQ4.app" / MACOS_APP_FRAMEWORKS_DIR / f"{GAME_MODULE_STEM}_{arch}.dylib"
 
 
 def macos_embedded_renderer_module_path(package_root: Path, arch: str) -> Path:
@@ -1250,9 +1241,8 @@ def macos_embedded_game_layers(package_root: Path) -> list[str]:
 def macos_embedded_game_layer_module_paths(package_root: Path, arch: str) -> list[Path]:
     framework_root = package_root / "openQ4.app" / MACOS_APP_FRAMEWORKS_DIR
     return [
-        framework_root / name / f"game-{kind}_{arch}.dylib"
+        framework_root / name / f"{GAME_MODULE_STEM}_{arch}.dylib"
         for name in macos_embedded_game_layers(package_root)
-        for kind in ("sp", "mp")
     ]
 
 
@@ -1263,10 +1253,8 @@ def macos_embedded_library_paths(package_root: Path, arch: str) -> list[Path]:
     belong to the main executable alone.
     """
 
-    sp_module, mp_module = macos_embedded_game_module_paths(package_root, arch)
     return [
-        sp_module,
-        mp_module,
+        macos_embedded_game_module_path(package_root, arch),
         *macos_embedded_game_layer_module_paths(package_root, arch),
         macos_embedded_renderer_module_path(package_root, arch),
         macos_embedded_moltenvk_path(package_root),
@@ -1283,7 +1271,7 @@ def macos_signable_targets(package_root: Path, arch: str) -> list[Path]:
 
 
 def macos_loadable_module_install_names(package_root: Path, arch: str) -> dict[Path, str]:
-    sp_module, mp_module = macos_embedded_game_module_paths(package_root, arch)
+    game_module = macos_embedded_game_module_path(package_root, arch)
     renderer_module = macos_embedded_renderer_module_path(package_root, arch)
     # Meson's Darwin install depfixer may replace linker-authored IDs with the
     # absolute staging destination for every installed dylib. Normalize every
@@ -1292,9 +1280,8 @@ def macos_loadable_module_install_names(package_root: Path, arch: str) -> dict[P
     # OpenAL Soft is likewise prepared outside Meson, but it is included here
     # because its @rpath identity is part of the package contract.
     return {
-        sp_module: f"@loader_path/game-sp_{arch}.dylib",
-        mp_module: f"@loader_path/game-mp_{arch}.dylib",
-        # a layer's modules (q4xbase) take the same self-relative identity as baseoq4's
+        game_module: f"@loader_path/{GAME_MODULE_STEM}_{arch}.dylib",
+        # a layer's module (q4xbase) takes the same self-relative identity as baseoq4's
         **{
             module: f"@loader_path/{module.name}"
             for module in macos_embedded_game_layer_module_paths(package_root, arch)
@@ -1671,7 +1658,7 @@ def macos_symbol_archive_stem(version_tag: str, arch: str, package_suffix: str) 
 
 
 def macos_symbol_targets(package_root: Path, arch: str) -> list[tuple[Path, Path, Path]]:
-    sp_module, mp_module = macos_embedded_game_module_paths(package_root, arch)
+    game_module = macos_embedded_game_module_path(package_root, arch)
     return [
         (
             Path("openQ4.app") / "Contents" / "MacOS" / "openQ4",
@@ -1689,16 +1676,11 @@ def macos_symbol_targets(package_root: Path, arch: str) -> list[tuple[Path, Path
             Path("dSYMs") / f"{PRODUCT_NAME}-ded_{arch}.dSYM",
         ),
         (
-            Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"game-sp_{arch}.dylib",
-            sp_module,
-            Path("dSYMs") / f"game-sp_{arch}.dylib.dSYM",
+            Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / game_module.name,
+            game_module,
+            Path("dSYMs") / f"{game_module.name}.dSYM",
         ),
-        (
-            Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"game-mp_{arch}.dylib",
-            mp_module,
-            Path("dSYMs") / f"game-mp_{arch}.dylib.dSYM",
-        ),
-        # a layer's modules keep their game directory, so the dSYMs cannot collide
+        # a layer's module keeps its game directory, so the dSYMs cannot collide
         *(
             (
                 Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / module.parent.name / module.name,
@@ -1896,16 +1878,14 @@ def validate_macos_symbol_manifest_bytes(
         "openQ4.app/Contents/MacOS/openQ4": "dSYMs/openQ4.app.dSYM",
         f"{PRODUCT_NAME}-client_{arch}": f"dSYMs/{PRODUCT_NAME}-client_{arch}.dSYM",
         f"{PRODUCT_NAME}-ded_{arch}": f"dSYMs/{PRODUCT_NAME}-ded_{arch}.dSYM",
-        f"openQ4.app/Contents/Frameworks/game-sp_{arch}.dylib": f"dSYMs/game-sp_{arch}.dylib.dSYM",
-        f"openQ4.app/Contents/Frameworks/game-mp_{arch}.dylib": f"dSYMs/game-mp_{arch}.dylib.dSYM",
+        f"openQ4.app/Contents/Frameworks/{GAME_MODULE_STEM}_{arch}.dylib": f"dSYMs/{GAME_MODULE_STEM}_{arch}.dylib.dSYM",
         # Mirrors macos_symbol_targets(); libMoltenVK.dylib is intentionally
         # absent because it is third-party and has no dSYM.
         f"openQ4.app/Contents/Frameworks/renderer-vk_{arch}.dylib": f"dSYMs/renderer-vk_{arch}.dylib.dSYM",
     }
     for layer in game_layers:
-        for kind in ("sp", "mp"):
-            module = f"{layer}/game-{kind}_{arch}.dylib"
-            expected_binaries[f"openQ4.app/Contents/Frameworks/{module}"] = f"dSYMs/{module}.dSYM"
+        module = f"{layer}/{GAME_MODULE_STEM}_{arch}.dylib"
+        expected_binaries[f"openQ4.app/Contents/Frameworks/{module}"] = f"dSYMs/{module}.dSYM"
     if "binaries:" not in [line.strip() for line in lines]:
         raise RuntimeError(f"{label} is missing required token: binaries:")
 
@@ -2052,16 +2032,14 @@ def validate_macos_symbol_archive_contents(
         f"{package_prefix}dSYMs/openQ4.app.dSYM/Contents/Resources/DWARF/openQ4",
         f"{package_prefix}dSYMs/{PRODUCT_NAME}-client_{arch}.dSYM/Contents/Resources/DWARF/{PRODUCT_NAME}-client_{arch}",
         f"{package_prefix}dSYMs/{PRODUCT_NAME}-ded_{arch}.dSYM/Contents/Resources/DWARF/{PRODUCT_NAME}-ded_{arch}",
-        f"{package_prefix}dSYMs/game-sp_{arch}.dylib.dSYM/Contents/Resources/DWARF/game-sp_{arch}.dylib",
-        f"{package_prefix}dSYMs/game-mp_{arch}.dylib.dSYM/Contents/Resources/DWARF/game-mp_{arch}.dylib",
+        f"{package_prefix}dSYMs/{GAME_MODULE_STEM}_{arch}.dylib.dSYM/Contents/Resources/DWARF/{GAME_MODULE_STEM}_{arch}.dylib",
         f"{package_prefix}dSYMs/renderer-vk_{arch}.dylib.dSYM/Contents/Resources/DWARF/renderer-vk_{arch}.dylib",
     }
     forbidden_runtime_entries = {
         f"{package_prefix}openQ4.app/Contents/MacOS/openQ4",
         f"{package_prefix}{PRODUCT_NAME}-client_{arch}",
         f"{package_prefix}{PRODUCT_NAME}-ded_{arch}",
-        f"{package_prefix}openQ4.app/Contents/Frameworks/game-sp_{arch}.dylib",
-        f"{package_prefix}openQ4.app/Contents/Frameworks/game-mp_{arch}.dylib",
+        f"{package_prefix}openQ4.app/Contents/Frameworks/{GAME_MODULE_STEM}_{arch}.dylib",
         f"{package_prefix}openQ4.app/Contents/Frameworks/renderer-vk_{arch}.dylib",
         # libMoltenVK has no dSYM, so it must never appear in the symbol archive
         # at all -- if it does, someone copied runtime payload in by mistake.
@@ -2070,10 +2048,9 @@ def validate_macos_symbol_archive_contents(
         f"{package_prefix}openQ4.app/Contents/Frameworks/{MACOS_OPENAL_SOFT_DYLIB_NAME}",
     }
     for layer in game_layers:
-        for kind in ("sp", "mp"):
-            module = f"game-{kind}_{arch}.dylib"
-            expected_entries.add(f"{package_prefix}dSYMs/{layer}/{module}.dSYM/Contents/Resources/DWARF/{module}")
-            forbidden_runtime_entries.add(f"{package_prefix}openQ4.app/Contents/Frameworks/{layer}/{module}")
+        module = f"{GAME_MODULE_STEM}_{arch}.dylib"
+        expected_entries.add(f"{package_prefix}dSYMs/{layer}/{module}.dSYM/Contents/Resources/DWARF/{module}")
+        forbidden_runtime_entries.add(f"{package_prefix}openQ4.app/Contents/Frameworks/{layer}/{module}")
 
     entry_names: set[str] = set()
     casefold_entry_names: dict[str, str] = {}
@@ -2843,17 +2820,15 @@ def get_package_executable_archive_paths(
         executable_paths.add(Path(MACOS_SUPPORT_INFO_SCRIPT_NAME))
         executable_paths.update(
             {
-                Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"game-sp_{arch}.dylib",
-                Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"game-mp_{arch}.dylib",
+                Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"{GAME_MODULE_STEM}_{arch}.dylib",
                 Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"renderer-vk_{arch}.dylib",
                 Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / MACOS_MOLTENVK_DYLIB_NAME,
                 Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / MACOS_OPENAL_SOFT_DYLIB_NAME,
             }
         )
         executable_paths.update(
-            Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / layer / f"game-{kind}_{arch}.dylib"
+            Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / layer / f"{GAME_MODULE_STEM}_{arch}.dylib"
             for layer in game_layers
-            for kind in ("sp", "mp")
         )
 
     return executable_paths
@@ -2989,25 +2964,22 @@ def validate_macos_archive_contents(
         f"{app_bundle_prefix}{relative_path}"
         for relative_path in MACOS_EXPECTED_APP_BUNDLE_FILES
     }
-    embedded_sp_module_entry = f"{app_bundle_prefix}Contents/Frameworks/game-sp_{arch}.dylib"
-    embedded_mp_module_entry = f"{app_bundle_prefix}Contents/Frameworks/game-mp_{arch}.dylib"
+    embedded_game_module_entry = f"{app_bundle_prefix}Contents/Frameworks/{GAME_MODULE_STEM}_{arch}.dylib"
     embedded_renderer_module_entry = f"{app_bundle_prefix}Contents/Frameworks/renderer-vk_{arch}.dylib"
     embedded_moltenvk_entry = f"{app_bundle_prefix}Contents/Frameworks/{MACOS_MOLTENVK_DYLIB_NAME}"
     embedded_openal_soft_entry = f"{app_bundle_prefix}Contents/Frameworks/{MACOS_OPENAL_SOFT_DYLIB_NAME}"
     expected_app_bundle_entries.update(
         {
-            embedded_sp_module_entry,
-            embedded_mp_module_entry,
+            embedded_game_module_entry,
             embedded_renderer_module_entry,
             embedded_moltenvk_entry,
             embedded_openal_soft_entry,
         }
     )
-    # a game-library layer (q4xbase): modules in Frameworks/<layer>, mod.json in Resources/<layer>
+    # a game-library layer (q4xbase): its module in Frameworks/<layer>, mod.json in Resources/<layer>
     embedded_layer_module_entries = {
-        f"{app_bundle_prefix}Contents/Frameworks/{layer}/game-{kind}_{arch}.dylib"
+        f"{app_bundle_prefix}Contents/Frameworks/{layer}/{GAME_MODULE_STEM}_{arch}.dylib"
         for layer in game_layers
-        for kind in ("sp", "mp")
     }
     embedded_layer_manifest_entries = {
         f"{app_bundle_prefix}Contents/Resources/{layer}/mod.json" for layer in game_layers
@@ -3024,8 +2996,7 @@ def validate_macos_archive_contents(
     expected_entries = {
         client_entry,
         dedicated_entry,
-        embedded_sp_module_entry,
-        embedded_mp_module_entry,
+        embedded_game_module_entry,
         embedded_renderer_module_entry,
         embedded_moltenvk_entry,
         embedded_openal_soft_entry,
@@ -3051,8 +3022,7 @@ def validate_macos_archive_contents(
         dedicated_entry,
         app_executable_entry,
         support_info_entry,
-        embedded_sp_module_entry,
-        embedded_mp_module_entry,
+        embedded_game_module_entry,
         embedded_renderer_module_entry,
         embedded_moltenvk_entry,
         embedded_openal_soft_entry,
@@ -3241,23 +3211,29 @@ def validate_macos_archive_contents(
         )
 
     expected_game_modules = {
-        embedded_sp_module_entry,
-        embedded_mp_module_entry,
+        embedded_game_module_entry,
         *embedded_layer_module_entries,
     }
-    game_module_prefixes = (
-        f"{package_prefix}{GAME_DIR_NAME}/game-",
-        f"{app_bundle_prefix}Contents/Frameworks/game-",
-        f"{app_bundle_prefix}Contents/Resources/{GAME_DIR_NAME}/game-",
-        *(
-            prefix
-            for layer in (*PACKAGED_LAYER_GAME_DIRS, *RETIRED_LAYER_GAME_DIRS)
-            for prefix in (
-                f"{package_prefix}{layer}/game-",
-                f"{app_bundle_prefix}Contents/Frameworks/{layer}/game-",
-                f"{app_bundle_prefix}Contents/Resources/{layer}/game-",
-            )
-        ),
+    # Both the current game_<arch> name and any game-* name count, so the
+    # retired split game-sp/game-mp modules of an older build cannot ride along.
+    game_module_names = (f"{GAME_MODULE_STEM}_", f"{GAME_MODULE_STEM}-")
+    game_module_prefixes = tuple(
+        f"{directory}{name}"
+        for directory in (
+            f"{package_prefix}{GAME_DIR_NAME}/",
+            f"{app_bundle_prefix}Contents/Frameworks/",
+            f"{app_bundle_prefix}Contents/Resources/{GAME_DIR_NAME}/",
+            *(
+                prefix
+                for layer in (*PACKAGED_LAYER_GAME_DIRS, *RETIRED_LAYER_GAME_DIRS)
+                for prefix in (
+                    f"{package_prefix}{layer}/",
+                    f"{app_bundle_prefix}Contents/Frameworks/{layer}/",
+                    f"{app_bundle_prefix}Contents/Resources/{layer}/",
+                )
+            ),
+        )
+        for name in game_module_names
     )
     unexpected_game_modules = sorted(
         name
@@ -3762,7 +3738,7 @@ def require_non_empty_package_file(path: Path, label: str) -> None:
 def validate_macos_app_bundle(package_root: Path, app_root: Path, arch: str, version: str) -> None:
     client_binary = package_root / f"{PRODUCT_NAME}-client_{arch}"
     require_packaged_executable(client_binary, "macOS client binary")
-    embedded_sp_module, embedded_mp_module = macos_embedded_game_module_paths(package_root, arch)
+    embedded_game_module = macos_embedded_game_module_path(package_root, arch)
 
     expected_bundle_dirs = {Path(relative_path) for relative_path in MACOS_EXPECTED_APP_BUNDLE_DIRS}
     embedded_renderer_module = macos_embedded_renderer_module_path(package_root, arch)
@@ -3772,8 +3748,7 @@ def validate_macos_app_bundle(package_root: Path, app_root: Path, arch: str, ver
     expected_bundle_files = {Path(relative_path) for relative_path in MACOS_EXPECTED_APP_BUNDLE_FILES}
     expected_bundle_files.update(
         {
-            embedded_sp_module.relative_to(app_root),
-            embedded_mp_module.relative_to(app_root),
+            embedded_game_module.relative_to(app_root),
             embedded_renderer_module.relative_to(app_root),
             embedded_moltenvk.relative_to(app_root),
             embedded_openal_soft.relative_to(app_root),
@@ -3784,8 +3759,7 @@ def validate_macos_app_bundle(package_root: Path, app_root: Path, arch: str, ver
         expected_bundle_dirs.update({MACOS_APP_FRAMEWORKS_DIR / name, MACOS_APP_RESOURCES_DIR / name})
         expected_bundle_files.update(
             {
-                MACOS_APP_FRAMEWORKS_DIR / name / f"game-sp_{arch}.dylib",
-                MACOS_APP_FRAMEWORKS_DIR / name / f"game-mp_{arch}.dylib",
+                MACOS_APP_FRAMEWORKS_DIR / name / f"{GAME_MODULE_STEM}_{arch}.dylib",
                 MACOS_APP_RESOURCES_DIR / name / "mod.json",
             }
         )
@@ -3859,17 +3833,15 @@ def validate_macos_app_bundle(package_root: Path, app_root: Path, arch: str, ver
         MACOS_APP_SPLASH_DIR / "quake4_rt_bitmap_4001.bmp",
     ):
         require_non_empty_package_file(app_root / relative_path, f"macOS embedded runtime file {relative_path}")
-    require_packaged_executable(embedded_sp_module, "macOS embedded SP game module")
-    require_packaged_executable(embedded_mp_module, "macOS embedded MP game module")
+    require_packaged_executable(embedded_game_module, "macOS embedded game module")
     require_packaged_executable(embedded_renderer_module, "macOS embedded Vulkan renderer module")
     require_packaged_executable(embedded_moltenvk, "macOS embedded MoltenVK runtime")
     require_packaged_executable(embedded_openal_soft, "macOS embedded OpenAL Soft runtime")
     for name in game_layers:
-        for kind in ("sp", "mp"):
-            require_packaged_executable(
-                app_root / MACOS_APP_FRAMEWORKS_DIR / name / f"game-{kind}_{arch}.dylib",
-                f"macOS embedded {name} {kind.upper()} game module",
-            )
+        require_packaged_executable(
+            app_root / MACOS_APP_FRAMEWORKS_DIR / name / f"{GAME_MODULE_STEM}_{arch}.dylib",
+            f"macOS embedded {name} game module",
+        )
         validate_packaged_layer_mod_manifest(app_root / MACOS_APP_RESOURCES_DIR / name, version)
     if not app_pkginfo.is_file() or app_pkginfo.read_bytes() != MACOS_PKGINFO_BYTES:
         raise RuntimeError(f"macOS app bundle is missing a valid PkgInfo file: {app_pkginfo}")
@@ -3979,28 +3951,22 @@ def create_macos_app_bundle(
         raise RuntimeError(
             f"macOS staged game directory is missing before self-contained app creation: {staged_game_dir}"
         )
-    staged_sp_module = staged_game_dir / f"game-sp_{arch}.dylib"
-    staged_mp_module = staged_game_dir / f"game-mp_{arch}.dylib"
+    staged_game_module = staged_game_dir / f"{GAME_MODULE_STEM}_{arch}.dylib"
     for path, label in (
         (staged_game_dir / "mod.json", "macOS staged game metadata"),
         *((staged_game_dir / pak_name, f"macOS staged {pak_name}") for pak_name in OPENQ4_PACK_NAMES),
     ):
         require_non_empty_package_file(path, label)
-    require_packaged_executable(staged_sp_module, "macOS staged SP game module")
-    require_packaged_executable(staged_mp_module, "macOS staged MP game module")
+    require_packaged_executable(staged_game_module, "macOS staged game module")
 
     embedded_game_dir = app_root / MACOS_APP_GAME_DATA_DIR
     shutil.move(str(staged_game_dir), str(embedded_game_dir))
     shutil.move(
-        str(embedded_game_dir / staged_sp_module.name),
-        str(app_frameworks / staged_sp_module.name),
-    )
-    shutil.move(
-        str(embedded_game_dir / staged_mp_module.name),
-        str(app_frameworks / staged_mp_module.name),
+        str(embedded_game_dir / staged_game_module.name),
+        str(app_frameworks / staged_game_module.name),
     )
 
-    # A game-library layer (q4xbase) embeds the same way. Its modules join the signed
+    # A game-library layer (q4xbase) embeds the same way. Its module joins the signed
     # code as Contents/Frameworks/<layer>/, where the engine looks for <moduleRoot>/<fs_game>/,
     # and its mod.json joins the game data as Contents/Resources/<layer>/. Only code may sit
     # under Frameworks; codesign treats anything there as nested code.
@@ -4009,13 +3975,12 @@ def create_macos_app_bundle(
         layer_resources = app_resources / staged_layer_dir.name
         layer_frameworks.mkdir(parents=True, exist_ok=True)
         layer_resources.mkdir(parents=True, exist_ok=True)
-        for kind in ("sp", "mp"):
-            staged_layer_module = staged_layer_dir / f"game-{kind}_{arch}.dylib"
-            require_packaged_executable(
-                staged_layer_module, f"macOS staged {staged_layer_dir.name} {kind.upper()} game module"
-            )
-            copy_regular_file(staged_layer_module, layer_frameworks / staged_layer_module.name)
-            ensure_posix_executable(layer_frameworks / staged_layer_module.name)
+        staged_layer_module = staged_layer_dir / f"{GAME_MODULE_STEM}_{arch}.dylib"
+        require_packaged_executable(
+            staged_layer_module, f"macOS staged {staged_layer_dir.name} game module"
+        )
+        copy_regular_file(staged_layer_module, layer_frameworks / staged_layer_module.name)
+        ensure_posix_executable(layer_frameworks / staged_layer_module.name)
         copy_regular_file(staged_layer_dir / "mod.json", layer_resources / "mod.json")
         validate_packaged_layer_mod_manifest(layer_resources, version)
 

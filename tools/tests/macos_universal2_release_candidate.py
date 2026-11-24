@@ -70,7 +70,7 @@ def validate_candidate_workflow() -> None:
         "xcrun stapler validate",
         "spctl --assess",
         "Finder-style directory",
-        "game-sp_universal2.dylib",
+        "game_universal2.dylib",
         "retention-days: 90",
     ):
         require(workflow, token, "macOS universal2 candidate workflow")
@@ -168,7 +168,7 @@ def validate_candidate_workflow() -> None:
         'require_smoke_output "RendererDefaultSafety self-test passed"',
         'require_smoke_output "Filesystem paths:"',
         'require_smoke_output "fs_cdpath=\'${package_dir}/openQ4.app/Contents/Resources\'"',
-        'require_smoke_output "Selected game module: logical=\'game_sp\' binary=\'game-sp_universal2\'"',
+        'require_smoke_output "Selected game module: logical=\'game_sp\' binary=\'game_universal2\'"',
         'grep -Eiq \'(^|[[:space:]])(FATAL|Sys_Error):\' "${smoke_console}" "${smoke_log}"',
         "Universal2 app smoke output contains a fatal startup diagnostic.",
         'if [ "${app_status}" -ne 0 ]; then',

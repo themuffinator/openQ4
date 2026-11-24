@@ -14,11 +14,11 @@ from mp_match_disclosure_policy_contract import function_body
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH = ROOT / "src/mpgame/mp/match"
+MATCH = ROOT / "src/game/mp/match"
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchTeams.h"
-#include "mpgame/mp/match/MatchSeries.h"
+#include "game/mp/match/MatchTeams.h"
+#include "game/mp/match/MatchSeries.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -339,7 +339,7 @@ int main() {
 
 
 def main() -> None:
-    source = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     body = function_body(source, "bool idMultiplayerGame::RotateManagedDuelQueue")
     forfeit = function_body(source, "void idMultiplayerGame::RecordManagedDuelResult")
     participants = function_body(source, "bool idMultiplayerGame::ResolveManagedDuelForfeitParticipants")

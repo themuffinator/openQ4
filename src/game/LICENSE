@@ -1,6 +1,6 @@
-This directory contains Quake 4 SDK-derived single-player game code and
-independently implemented Awakening additions subject to the Quake 4 Software
-Development Kit Limited Use License Agreement.
+This directory contains Quake 4 SDK-derived single-player and multiplayer game
+code and independently implemented Awakening additions subject to the Quake 4
+Software Development Kit Limited Use License Agreement.
 
 The complete agreement is retained at ../../LICENSES/QUAKE-4-SDK-EULA.rtf.
 Original notices and explicitly identified third-party terms remain applicable.

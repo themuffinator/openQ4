@@ -54,7 +54,7 @@ def link_or_copy(source: Path, destination: Path) -> None:
 def stage_core_server(package: Path, server_runtime: Path) -> list[str]:
     """Refresh the core-only server runtime: the dedicated server, its game module and pak0."""
     server_runtime.mkdir(parents=True, exist_ok=True)
-    wanted = [Path(f"openQ4-ded_x64{SUFFIX}"), Path("baseoq4/mod.json"), Path(f"baseoq4/game-mp_x64{MODULE}")]
+    wanted = [Path(f"openQ4-ded_x64{SUFFIX}"), Path("baseoq4/mod.json"), Path(f"baseoq4/game_x64{MODULE}")]
     wanted += [Path("baseoq4") / spec.name for spec in OPENQ4_CONTENT_PACKS if not spec.client_only]
     if os.name == "nt":
         wanted += [path.relative_to(package) for path in package.glob("*.dll") if path.name.lower() == "openal32.dll"]

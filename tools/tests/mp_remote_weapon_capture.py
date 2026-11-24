@@ -46,7 +46,7 @@ def main() -> int:
     if output.exists() or not exe.is_file() or not (args.basepath / "q4base").is_dir():
         parser.error("use a new output directory, a staged client and installed retail assets")
     output.mkdir(parents=True)
-    paths = [exe, *sorted((runtime / "baseoq4").glob("game-mp*")), *sorted(runtime.glob("renderer-*")),
+    paths = [exe, *sorted((runtime / "baseoq4").glob("game_*")), *sorted(runtime.glob("renderer-*")),
              runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4"]
     identity = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                 for p in paths if p.is_file() and p.suffix not in (".pdb", ".lib", ".exp")}

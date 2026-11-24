@@ -12,7 +12,7 @@ with hidden windows and no operating-system input. The server runs a test mod
 * a client missing the package, or holding an altered package of the same name,
   is refused and never enters the game;
 * game code is never taken from the save path or from inside a package: a
-  garbage `game-mp` module in both places is ignored;
+  garbage `game_x64` module in both places is ignored;
 * a mod module in the trusted executable root is refused for pure startup
   until the operator sets `net_serverAllowServerMod 1`, then loads from the mod;
 * a mod with a broken `mod.json` is ignored and the server runs the normal
@@ -40,7 +40,7 @@ MOD = "oq4modsmoke"
 PACKAGE = "pak000_oq4modsmoke.pk4"
 EXTRA = "pak001_oq4modsmoke_local.pk4"
 SUFFIX = ".exe" if os.name == "nt" else ""
-MODULE = "game-mp_x64" + (".dll" if os.name == "nt" else ".so")
+MODULE = "game_x64" + (".dll" if os.name == "nt" else ".so")
 REFUSAL = re.compile(r"(?i)[^\n]*(?:missing|not in sync|checksum|pure|pak|denied|rejected|refus)[^\n]*")
 
 

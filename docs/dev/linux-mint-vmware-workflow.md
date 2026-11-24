@@ -91,7 +91,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/vmware/Invoke-openQ4Li
 ## Guest Paths
 
 - Guest source workspace: `~/openq4-work/openQ4`
-- Guest game sources: `~/openq4-work/openQ4/src/game` and `src/mpgame`
+- Guest game sources: `~/openq4-work/openQ4/src/game`
 - Guest staged runtime: `~/openq4-work/openQ4/.install`
 - Guest Quake 4 assets: `/mnt/openq4-data/Quake4`
 - Guest desktop launcher: `~/Desktop/openQ4.desktop`

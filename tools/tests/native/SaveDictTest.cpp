@@ -87,8 +87,7 @@ struct idUserInterface {
     std::unique_ptr<SaveUserInterfaceCache> userInterfaceCache; int userInterfaceCacheMode = 0; \
     void InvalidateUserInterface(const idUserInterface*); void WriteUserInterface(const idUserInterface*,bool); \
 };
-SAVE_WRITER(idSaveGame_sp)
-SAVE_WRITER(idSaveGame_mp)
+SAVE_WRITER(idSaveGame_game)
 #undef SAVE_WRITER
 #include "SaveDictUnderTest.inc"
 static void Check(bool yes) { if (!yes) throw std::runtime_error("wire parity failure"); }
@@ -347,9 +346,9 @@ static void TestGuiBounds() {
     Check(tiny.ResidentBytes()==SaveUserInterfaceCache::MaxEntries);
 }
 int main() {
-    Test<idSaveGame_sp>(); Test<idSaveGame_mp>();
-    TestCache<idSaveGame_sp>(); TestCache<idSaveGame_mp>();
+    Test<idSaveGame_game>();
+    TestCache<idSaveGame_game>();
     TestPopulation();
-    TestGui<idSaveGame_sp>(); TestGui<idSaveGame_mp>(); TestGuiBounds();
+    TestGui<idSaveGame_game>(); TestGuiBounds();
     std::puts("Save wire parity, deferred lifetime/deadline/byte bounds, cache mutation, buffer boundaries, GUI aliases/invalidation/oracle/limits and failed writes passed");
 }

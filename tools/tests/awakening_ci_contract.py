@@ -15,14 +15,16 @@ def main():
             assert obsolete not in source, f"{name} depends on retired sources: {obsolete}"
         assert "meson_setup" in source
     release = (workflows / "manual-release.yml").read_text(encoding="utf-8")
+    # one game module serves game_sp and game_mp
+    assert 'game_module="${module_dir}/game_${{ matrix.binary_arch }}.dylib"' in release
+    assert 'check_macos_install_name "${game_module}" "@loader_path/game_${{ matrix.binary_arch }}.dylib"' in release
     for mode in ("sp", "mp"):
-        assert f'{mode}_module="${{module_dir}}/game-{mode}_${{{{ matrix.binary_arch }}}}.dylib"' in release
-        assert f'check_macos_install_name "${{{mode}_module}}" "@loader_path/game-{mode}_${{{{ matrix.binary_arch }}}}.dylib"' in release
+        assert f"{mode}_module=" not in release, f"manual-release still names a split {mode} module"
     meson = (ROOT / "meson.build").read_text(encoding="utf-8")
     assert "game_libs_repo_root = meson.project_source_root()" in meson
     assert "game_source_inventory.py" in meson
     assert "subdir('content/q4xbase')" not in meson
-    for tree in ("game", "mpgame"):
+    for tree in ("game",):
         assert (ROOT / "src" / tree / "Game_local.h").is_file()
         assert "SDK" in (ROOT / "src" / tree / "LICENSE").read_text()
     assert (ROOT / "LICENSES/QUAKE-4-SDK-EULA.rtf").is_file()

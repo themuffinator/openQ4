@@ -57,7 +57,9 @@ def fixture(root: Path, case: str) -> tuple[Path,int,int]:
     game.mkdir(parents=True)
     if case == 'metadata-only':
         (game / 'mod.json').write_text('{"displayName":"obsolete layer"}')
-        (game / 'game-sp_x64.dll').write_bytes(b'OBSOLETE MODULE MUST NEVER LOAD')
+        # an obsolete layer module must never load under its retired or current name
+        for module in ('game-sp_x64.dll', 'game_x64.dll'):
+            (game / module).write_bytes(b'OBSOLETE MODULE MUST NEVER LOAD')
     elif case == 'partial':
         path = game / REQUIRED[0]
         path.parent.mkdir(parents=True)

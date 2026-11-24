@@ -348,7 +348,7 @@ def benchmark_capture_has_samples(text: str) -> bool:
 
 def expected_module_marker(game_module: Path, arch: str) -> str:
     return (
-        f"Selected game module: logical='game_mp' binary='game-mp_{arch}' "
+        f"Selected game module: logical='game_mp' binary='game_{arch}' "
         f"path='{game_module}'"
     )
 
@@ -466,7 +466,7 @@ def main(argv: list[str]) -> int:
     game_libs_repo = args.game_libs_repo.resolve() if args.game_libs_repo else None
     dedicated = (args.dedicated_executable or install_root / f"openQ4-ded_{arch}").resolve()
     client = (args.client_executable or install_root / f"openQ4-client_{arch}").resolve()
-    game_module = install_root / "baseoq4" / f"game-mp_{arch}.so"
+    game_module = install_root / "baseoq4" / f"game_{arch}.so"
     mod_manifest = install_root / "baseoq4" / "mod.json"
     openq4_pak0 = install_root / "baseoq4" / "pak0.pk4"
     openq4_pak1 = install_root / "baseoq4" / "pak1.pk4"

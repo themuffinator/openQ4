@@ -44,21 +44,24 @@ COMMON_GAME_RUNTIME_PATTERNS = (
     *OPENQ4_PACK_NAMES,
 )
 GAME_RUNTIME_PATTERNS = (
-    "game-sp_*.dll",
-    "game-sp_*.pdb",
-    "game-mp_*.dll",
-    "game-mp_*.pdb",
+    "game_*.dll",
+    "game_*.pdb",
     *COMMON_GAME_RUNTIME_PATTERNS,
 )
 LINUX_GAME_RUNTIME_PATTERNS = (
-    "game-sp_*.so",
-    "game-mp_*.so",
+    "game_*.so",
     *COMMON_GAME_RUNTIME_PATTERNS,
 )
 MACOS_GAME_RUNTIME_PATTERNS = (
-    "game-sp_*.dylib",
-    "game-mp_*.dylib",
+    "game_*.dylib",
     *COMMON_GAME_RUNTIME_PATTERNS,
+)
+# One game_<arch> module replaced the split game-sp_<arch>/game-mp_<arch>
+# modules. Fast staging does not run the Meson install hook that retires them,
+# so it removes an older build's copies from .install/baseoq4 itself.
+RETIRED_GAME_RUNTIME_PATTERNS = (
+    "game-sp_*",
+    "game-mp_*",
 )
 NON_RUNTIME_PATTERNS = (
     "*.exp",
@@ -222,6 +225,7 @@ def remove_non_runtime_files(
 ) -> list[Path]:
     removed = remove_matches(install_dir, NON_RUNTIME_PATTERNS)
     removed += remove_matches(install_game_dir, NON_RUNTIME_PATTERNS)
+    removed += remove_matches(install_game_dir, RETIRED_GAME_RUNTIME_PATTERNS)
     removed += remove_matches(install_dir, policy.root_remove_patterns)
     removed += remove_matches(install_game_dir, policy.game_remove_patterns)
     return removed

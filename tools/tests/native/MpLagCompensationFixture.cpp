@@ -1,7 +1,7 @@
 // Executes the production multiplayer lag-compensation functions against a mock
 // server: the history ring, the rewind estimate, the advertised remote extrapolation
 // and the rewind/restore bracket. tools/tests/mp_lag_compensation_state.py splices
-// the functions in verbatim from src/mpgame/Game_local.cpp, so there is no second
+// the functions in verbatim from src/game/Game_local.cpp, so there is no second
 // implementation of the rewind to drift from the real one.
 
 #include "src/idlib/NumericString.h"

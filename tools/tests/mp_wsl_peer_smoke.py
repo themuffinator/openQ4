@@ -63,9 +63,9 @@ def main() -> int:
     verify_runtime_is_current(runtime)
     paths = {
         "windows/engine": runtime / "openQ4-client_x64.exe",
-        "windows/game": runtime / "baseoq4/game-mp_x64.dll",
+        "windows/game": runtime / "baseoq4/game_x64.dll",
         "linux/engine": linux / "openQ4-ded_x64",
-        "linux/game": linux / "baseoq4/game-mp_x64.so",
+        "linux/game": linux / "baseoq4/game_x64.so",
     }
     for package, root in (("windows", runtime), ("linux", linux)):
         for name in ("pak0.pk4", "pak1.pk4", "mod.json"):

@@ -175,7 +175,7 @@ def validate_isolation() -> None:
     assert startup.index('!awakeningAllowed') < startup.index('modInfo.campaign')
     header = (ROOT / 'src/framework/FileSystem.h').read_text(encoding='latin-1')
     assert 'GetCVarBool( "fs_awakeningActive" )' in function_body(header, 'ID_INLINE bool FS_AwakeningActive(')
-    for tree in ('game','mpgame'):
+    for tree in ('game',):
         source = (ROOT / f'src/{tree}/gamesys/Class.cpp').read_text()
         resolve = function_body(source, 'idTypeInfo *idClassSubstitution::Resolve(')
         scope = function_body(source, 'bool idClassSubstitution::InScope(')
@@ -183,7 +183,14 @@ def validate_isolation() -> None:
         assert 'GetActiveGameDir()' in scope and 'FS_AwakeningActive()' in scope and 'GetCVarString' not in scope
     turret = (ROOT / 'src/game/awakening/ai/Monster_Turret.cpp').read_text()
     assert 'SPAWNCLASS_SUBSTITUTION_FOR_GAME( "q4xbase", rvMonsterTurret, riMonsterTurret )' in turret
-    assert not (ROOT / 'src/mpgame/awakening').exists()
+    # One game module serves both modes, so the Awakening additions are linked into the multiplayer mode
+    # too; they stay single player because the engine never mounts q4xbase for game_mp, and every
+    # substitution and repair is scoped to the mounted expansion. There is no second game tree.
+    assert not (ROOT / 'src/mpgame').exists(), 'no second game tree carries its own Awakening copy'
+    assert (ROOT / 'src/game/awakening').is_dir()
+    assert ("const bool awakeningAllowed = !idStr::Icmp( cvarSystem->GetCVarString( \"si_gameType\" ), \"singleplayer\" ) &&\n"
+            "        idStr::Icmp( cvarSystem->GetCVarString( \"com_nextGameModule\" ), \"game_mp\" );") in startup.replace('\r\n', '\n'), \
+        'the multiplayer mode never mounts the expansion, so its classes never spawn in network play'
 
 
 def main() -> None:
@@ -193,7 +200,7 @@ def main() -> None:
         raise RuntimeError('C++ compiler required for class-scope regression checks')
     (ROOT / '.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='campaign-scope-',dir=ROOT / '.tmp') as directory:
-        for tree in ('game','mpgame'):
+        for tree in ('game',):
             source = (ROOT / f'src/{tree}/gamesys/Class.cpp').read_text()
             bodies = '\n'.join(function_body(source,signature) for signature in (
                 'idClassSubstitution::idClassSubstitution(',

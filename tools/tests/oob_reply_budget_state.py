@@ -29,7 +29,8 @@ ROSTER_HEADER = "src/framework/async/ConnectRoster.h"
 FIXTURE = "tools/tests/native/OutOfBandReplyFixture.cpp"
 # Class-qualified names and non-literal defaults (a macro or an array entry)
 # count too; a non-literal default stands in as a short placeholder value.
-CVAR = re.compile(r'^\s*idCVar\s+[\w:]+\(\s*"([A-Za-z_0-9]+)",\s*(?:"([^"]*)"|[^,"]+),[^\n]*CVAR_SERVERINFO', re.M)
+# idModeCVar (CORE-07) declares a per-mode default; its first value is the campaign's.
+CVAR = re.compile(r'^\s*id(?:Mode)?CVar\s+[\w:]+\(\s*"([A-Za-z_0-9]+)",\s*(?:"([^"]*)"|[^,"]+),[^\n]*CVAR_SERVERINFO', re.M)
 
 CONTROLS = (
     (HEADER, "the fill ignores the budget", "used + PairBytes( keys[i], values[i] ) <= budget", "true"),
@@ -47,7 +48,7 @@ CONTROLS = (
 
 def server_info() -> list[tuple[str, str]]:
     found: dict[str, str] = {}
-    for folder in ("src/framework", "src/mpgame", "src/sys"):
+    for folder in ("src/framework", "src/game", "src/sys"):
         for path in sorted((ROOT / folder).rglob("*.cpp")):
             for match in CVAR.finditer(path.read_text(encoding="utf-8", errors="replace")):
                 found.setdefault(match[1], match[2] if match[2] is not None else "default")

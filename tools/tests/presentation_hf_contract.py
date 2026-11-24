@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-TREES = ("src/game", "src/mpgame")
+TREES = ("src/game",)
 
 
 def read(relative: str) -> str:
@@ -162,7 +162,7 @@ def check_engine(usercmd_h: str, usercmd_cpp: str, game_h: str, common_cpp: str)
     require(console, "if ( Usercmd_ConsumeLatencyFlash() && com_latencyFlash.GetBool() ) {", "latency flash consumed every frame, drawn when enabled")
     require(console, '"latencyFlashTest", Con_LatencyFlashTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT', "latency flash test is cheat-gated")
 
-    require(game_h, "const int GAME_API_VERSION\t\t= 63;", "game ABI v63")
+    require(game_h, "const int GAME_API_VERSION\t\t= 64;", "game ABI v64")
     require(game_h, "idUsercmdGen *\t\t\t\tusercmdGen;", "gameImport_t carries the generator")
     require(common_cpp, "gameImport.usercmdGen\t\t\t\t= ::usercmdGen;", "engine hands the generator to the game")
 

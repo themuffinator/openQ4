@@ -1,5 +1,5 @@
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../Projectile.h"
@@ -30,7 +30,11 @@ void rvPhysics_Particle::DropToFloorAndRest( void ) {
 	if ( testSolid ) {
 		testSolid = false;
 		if ( gameLocal.Contents( self, current.origin, clipModel, clipModel->GetAxis(), clipMask, self ) ) {
-			gameLocal.Warning( "entity in solid '%s' type '%s' at (%s)",
+			// Raven's multiplayer demotes this to a developer warning
+			if ( gameLocal.isMultiplayer )
+				gameLocal.DWarning( "entity in solid '%s' type '%s' at (%s)", self->name.c_str(), self->GetType()->classname, current.origin.ToString(0) );
+			else
+				gameLocal.Warning( "entity in solid '%s' type '%s' at (%s)",
 								self->name.c_str(), self->GetType()->classname, current.origin.ToString(0) );
 			PutToRest();
 			dropToFloor = false;
@@ -827,6 +831,12 @@ void rvPhysics_Particle::CheckGround( void ) {
 	}
 
 	if ( ( groundTrace.c.normal * -gravityNormal ) < 0.7f ) {
+		current.onGround = false;
+		return;
+	}
+
+	// multiplayer: a particle resting on a client is not on the ground
+	if ( gameLocal.isMultiplayer && groundTrace.c.entityNum >= 0 && groundTrace.c.entityNum < MAX_CLIENTS ) {
 		current.onGround = false;
 		return;
 	}

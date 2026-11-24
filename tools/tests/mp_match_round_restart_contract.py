@@ -16,8 +16,8 @@ ROOT = Path(__file__).resolve().parents[2]
 STUBS = r'''
 #include <cstdio>
 #include <cstdlib>
-#include "mpgame/mp/MatchPhase.h"
-#include "mpgame/mp/GameTypeIds.h"
+#include "game/mp/MatchPhase.h"
+#include "game/mp/GameTypeIds.h"
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr, "line %d: %s\n", __LINE__, #x); std::exit(1); } } while (0)
 enum { GTF_ROUND };
 bool MPGameTypeHasAny(int type, int) { return type == GAME_CA || type == GAME_FREEZETAG || type == GAME_REDROVER; }
@@ -73,19 +73,19 @@ int main() {
 
 
 def main() -> None:
-    network = (ROOT / "src/mpgame/Game_network.cpp").read_text(encoding="utf-8")
+    network = (ROOT / "src/game/Game_network.cpp").read_text(encoding="utf-8")
     start = network.index("case GAME_RELIABLE_MESSAGE_RESTART: {")
     end = network.index("case GAME_RELIABLE_MESSAGE_STARTVOTE:", start)
     cases = network[start:end]
-    rounds = (ROOT / "src/mpgame/mp/RoundGameState.cpp").read_text(encoding="utf-8")
+    rounds = (ROOT / "src/game/mp/RoundGameState.cpp").read_text(encoding="utf-8")
     reset = function(rounds, "void rvRoundGameState::ResetRound(")
     assert "outMsg.WriteByte( GAME_RELIABLE_MESSAGE_ROUNDRESTART );" in reset
     assert "GAME_RELIABLE_MESSAGE_RESTART" not in reset and "outMsg.WriteBits" not in reset
     assert reset.index("gameLocal.LocalMapRestart();") < reset.index("ServerSendReliableMessage")
-    local = (ROOT / "src/mpgame/Game_local.cpp").read_text(encoding="utf-8")
+    local = (ROOT / "src/game/Game_local.cpp").read_text(encoding="utf-8")
     assert "SetGameType();" in function(local, "void idGameLocal::MapRestart(")
     assert "SetGameType(" not in function(local, "void idGameLocal::LocalMapRestart(")
-    header = (ROOT / "src/mpgame/Game_local.h").read_text(encoding="utf-8")
+    header = (ROOT / "src/game/Game_local.h").read_text(encoding="utf-8")
     assert header.index("GAME_RELIABLE_MESSAGE_ANNOUNCER,") < header.index("GAME_RELIABLE_MESSAGE_ROUNDRESTART,")
     enum_start = header.rfind("enum {", 0, header.index("GAME_RELIABLE_MESSAGE_SPAWN_PLAYER,"))
     wire_enum = header[enum_start:header.index("};", enum_start) + 2]

@@ -462,11 +462,11 @@ def source_checks(failures: list[str]) -> None:
                   "return QueryRetailFileInfo( name, info );", "openq4_retail::ClearDeclRemap();",
                   "cmdSystem->AddCommand( \"playNetTimeDemo\", TimeDemo_f"):
         require(token in mvd, f"MultiViewDemo.cpp has {token!r}", failures)
-    game_h = read("src/mpgame/Game_local.h")
+    game_h = read("src/game/Game_local.h")
     require("GAME_SNAPSHOT_PROTOCOL_RETAIL		= 85" in game_h, "the game names protocol 2.85", failures)
     require("networkSystem->RetailDemoDeclIndex( type, index )" in game_h, "the game asks for the recording's decl numbering", failures)
     require(game_h.count("gameLocal.NetworkDeclIndex( type, msg.ReadLong() )") == 2, "both ReadDecl overloads renumber", failures)
-    network = read("src/mpgame/Game_network.cpp")
+    network = read("src/game/Game_network.cpp")
     require("( minor_ref == GAME_SNAPSHOT_PROTOCOL && minor == GAME_SNAPSHOT_PROTOCOL_RETAIL )" in network,
             "the game accepts a 2.85 recording", failures)
     require("entityDefBits = idMath::BitsForInteger( NetworkDeclCount( DECL_ENTITYDEF ) ) + 1;" in network,
@@ -474,12 +474,12 @@ def source_checks(failures: list[str]) -> None:
     require(network.count("deltaMsg.SetRetailBaseReads( RetailSnapshotFormat() );") == 2,
             "snapshot deltas read the base as 1.4.2 did", failures)
     gates = {
-        "src/mpgame/Player.cpp": ("RetailSnapshotFormat() ? 16 : POWERUP_MAX", "gameLocal.IsClassicRuleset() && !gameLocal.RetailSnapshotFormat()",
+        "src/game/Player.cpp": ("RetailSnapshotFormat() ? 16 : POWERUP_MAX", "gameLocal.IsClassicRuleset() && !gameLocal.RetailSnapshotFormat()",
                                   "memcpy( decodedWeaponMods, inventory.weaponMods, sizeof( decodedWeaponMods ) );"),
-        "src/mpgame/physics/Physics_Player.cpp": ("gameLocal.IsClassicRuleset() && !gameLocal.RetailSnapshotFormat()",),
-        "src/mpgame/mp/GameState.cpp": ("Quake 4 1.4.2 had no overtime state", "gameLocal.RetailSnapshotFormat() ? TEAM_MAX : MAX_CTF_FLAGS"),
-        "src/mpgame/MultiplayerGame.cpp": ("gameLocal.RetailSnapshotFormat() ? 16 : MP_StartStatePowerupBits( msg )",),
-        "src/mpgame/Entity.cpp": ("gameLocal.RetailSnapshotFormat() ? NULL :",),
+        "src/game/physics/Physics_Player.cpp": ("gameLocal.IsClassicRuleset() && !gameLocal.RetailSnapshotFormat()",),
+        "src/game/mp/GameState.cpp": ("Quake 4 1.4.2 had no overtime state", "gameLocal.RetailSnapshotFormat() ? TEAM_MAX : MAX_CTF_FLAGS"),
+        "src/game/MultiplayerGame.cpp": ("gameLocal.RetailSnapshotFormat() ? 16 : MP_StartStatePowerupBits( msg )",),
+        "src/game/Entity.cpp": ("gameLocal.RetailSnapshotFormat() ? NULL :",),
     }
     for path, tokens in gates.items():
         text = read(path)

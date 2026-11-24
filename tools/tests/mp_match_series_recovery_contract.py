@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH_DIR = ROOT / "src/mpgame/mp/match"
+MATCH_DIR = ROOT / "src/game/mp/match"
 HEADER = MATCH_DIR / "MatchSeriesRecovery.h"
 SOURCE = MATCH_DIR / "MatchSeriesRecovery.cpp"
 SERIES_HEADER = MATCH_DIR / "MatchSeries.h"
@@ -146,22 +146,21 @@ def static_contracts() -> None:
             "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchSeriesRecovery.cpp" not in {
+    if "game/mp/match/MatchSeriesRecovery.cpp" not in {
         line.strip() for line in listing
     }:
         raise AssertionError("MatchSeriesRecovery.cpp is absent from MP sources")
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchSeriesRecovery.h"
+#include "game/mp/match/MatchSeriesRecovery.h"
 
 #include <stdint.h>
 #include <string.h>

@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOTS = ("src/game", "src/mpgame")
+SOURCE_ROOTS = ("src/game",)
 PRESENTATION_STATE = (
     "presentationViewTime",
     "presentationCanInterpolate",
@@ -491,7 +491,7 @@ def check_source_root(source_root: str) -> dict[str, str]:
     require(same_time_update, "presentationCanInterpolate = false;", f"{context} same-tic history collapse")
     require(same_time_update, "presentationPrevViewOrigin = presentationCurViewOrigin;", f"{context} same-tic endpoint collapse")
     require(update, "gameLocal.GetMHz() == common->GetUserCmdHz()", f"{context} exact cadence guard")
-    if source_root == "src/mpgame":
+    if source_root == "src/game":
         require(update, "!activePredictionViewSmoothing", f"{context} prediction smoothing guard")
 
     get_view = function(player_cpp, "void idPlayer::GetPresentationViewPos", context)
@@ -751,7 +751,7 @@ def check_source_root(source_root: str) -> dict[str, str]:
     )
     require(projectile_prediction, "if ( !gameLocal.isNewFrame )", f"{context} projectile replay guard")
     require(projectile_prediction, "Think();", f"{context} projectile authoritative-frame update")
-    if source_root == "src/mpgame":
+    if source_root == "src/game":
         projectile_snapshot = function(
             projectile_cpp,
             "void idProjectile::ReadFromSnapshot( const idBitMsgDelta &msg )",
@@ -806,11 +806,9 @@ def check_source_root(source_root: str) -> dict[str, str]:
 
 
 def main() -> None:
-    sp_contract = check_source_root(SOURCE_ROOTS[0])
-    mp_contract = check_source_root(SOURCE_ROOTS[1])
-    for method, sp_body in sp_contract.items():
-        if sp_body != mp_contract[method]:
-            raise AssertionError(f"SP/MP presentation method drift: {method}")
+    # one game tree since CORE-07: there is no second copy to drift from
+    for source_root in SOURCE_ROOTS:
+        check_source_root(source_root)
     print("presentation_interpolation_contract: ok")
 
 

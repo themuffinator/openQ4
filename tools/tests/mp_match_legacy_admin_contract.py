@@ -28,9 +28,9 @@ def require_before(block: str, guard: str, mutation: str, context: str) -> None:
 
 
 def main() -> None:
-    multiplayer = read(ROOT / "src/mpgame/MultiplayerGame.cpp")
-    multiplayer_h = read(ROOT / "src/mpgame/MultiplayerGame.h")
-    game_local = read(ROOT / "src/mpgame/Game_local.cpp")
+    multiplayer = read(ROOT / "src/game/MultiplayerGame.cpp")
+    multiplayer_h = read(ROOT / "src/game/MultiplayerGame.h")
+    game_local = read(ROOT / "src/game/Game_local.cpp")
 
     helper = function(
         multiplayer,

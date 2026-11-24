@@ -217,7 +217,7 @@ int main() {
 
 
 def main() -> None:
-    production = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    production = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     source = HARNESS.replace("@REFRESH@", function_body(production, "bool idMultiplayerGame::RefreshLocalClientMatchView"))
     source = source.replace("@SEND@", function_body(production, "void idMultiplayerGame::SendChangedMatchViews"))
     compiler = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("g++")

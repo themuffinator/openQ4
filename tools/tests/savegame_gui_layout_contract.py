@@ -411,7 +411,7 @@ def validate_release_provenance() -> None:
 
 
 def validate_engine_migration() -> None:
-    for tree, context in (("game", "SP GameLib"), ("mpgame", "MP GameLib")):
+    for tree, context in (("game", "SP GameLib"), ("game", "MP GameLib")):
         source = read(ROOT / "src" / tree / "gamesys" / "SaveGame.cpp")
         start = source.find("void idRestoreGame::ReadUserInterfaceRevision(")
         if start < 0:

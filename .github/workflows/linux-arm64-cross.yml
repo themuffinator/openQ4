@@ -125,8 +125,7 @@ jobs:
           artifacts=(
             builddir-arm64-cross/openQ4-client_arm64
             builddir-arm64-cross/openQ4-ded_arm64
-            builddir-arm64-cross/baseoq4/game-sp_arm64.so
-            builddir-arm64-cross/baseoq4/game-mp_arm64.so
+            builddir-arm64-cross/baseoq4/game_arm64.so
           )
 
           for artifact in "${artifacts[@]}"; do
@@ -163,11 +162,6 @@ jobs:
               }
             '
           done
-
-          if cmp -s "${artifacts[2]}" "${artifacts[3]}"; then
-            echo "SP and MP game modules are byte-identical; src/mpgame was not compiled." >&2
-            exit 1
-          fi
 
       - name: Stage and validate Linux ARM64 package
         shell: bash

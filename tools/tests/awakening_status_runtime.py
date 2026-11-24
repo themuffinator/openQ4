@@ -76,7 +76,7 @@ def main() -> int:
         startup=subprocess.STARTUPINFO();startup.dwFlags|=subprocess.STARTF_USESHOWWINDOW;startup.wShowWindow=0
         options={'startupinfo':startup,'creationflags':subprocess.CREATE_NO_WINDOW}
     env={**os.environ,'TMP':str(output),'TEMP':str(output),'TMPDIR':str(output)}
-    module=ROOT/'.install/baseoq4/game-sp_x64.dll'
+    module=ROOT/'.install/baseoq4/game_x64.dll'
     identity={'executable_sha256':sha256(exe),'module_sha256':sha256(module)}
     started=time.monotonic()
     with (output/(tag+'.stdout')).open('w') as stdout:

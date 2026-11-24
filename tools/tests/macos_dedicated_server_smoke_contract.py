@@ -35,7 +35,7 @@ def main() -> None:
     for token in (
         'sys.platform != "darwin"',
         'f"openQ4-ded_{arch}"',
-        'f"game-mp_{arch}.dylib"',
+        'f"game_{arch}.dylib"',
         "executable.is_symlink()",
         "game_module.is_symlink()",
         'q4base / "pak001.pk4"',

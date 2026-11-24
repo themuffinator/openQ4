@@ -219,7 +219,7 @@ def main() -> int:
     if not exe.is_file() or not (args.basepath / "q4base").is_dir():
         parser.error("the staged client and retail q4base assets are required")
     verify_runtime_is_current(runtime, args.executable_name)
-    identity_paths = [exe, *sorted((runtime / "baseoq4").glob("game-mp*")),
+    identity_paths = [exe, *sorted((runtime / "baseoq4").glob("game_*")),
                       runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4"]
     runtime_identity = {str(path): file_sha256(path)
                         for path in identity_paths

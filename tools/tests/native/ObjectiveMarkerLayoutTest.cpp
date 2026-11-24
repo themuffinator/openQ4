@@ -1,5 +1,5 @@
 // Copyright (C) 2026 DarkMatter Productions. Quake 4 SDK EULA.
-#include "src/mpgame/mp/ObjectiveMarkerLayout.h"
+#include "src/game/mp/ObjectiveMarkerLayout.h"
 #include "src/framework/VRMathCore.h"
 #include <cstdio>
 #include <cstdlib>

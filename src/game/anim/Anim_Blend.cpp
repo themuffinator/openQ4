@@ -1,14 +1,14 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "framework/SaveGameReleases.h"
-#include "../../game/Projectile.h"
+#include "../Projectile.h"
 #include "../ai/AI.h"
 #include "../awakening/ContentRepairs.h"
 
@@ -830,15 +830,22 @@ struct frameCommandInfo_t frameCommandInfo[FC_COUNT] = {
 idAnim::CallFrameCommandSound
 =====================
 */
-void idAnim::CallFrameCommandSound ( const frameCommand_t& command, idEntity* ent, const s_channelType channel ) const {
+void idAnim::CallFrameCommandSound( const frameCommand_t& command, idEntity* ent, const s_channelType channel ) const {
 
 	int flags = 0;
-	if( channel == ( FC_SOUND_GLOBAL - FC_SOUND ) ) {
+	if ( channel == ( FC_SOUND_GLOBAL - FC_SOUND ) ) {
 		flags = SSF_PRIVATE_SOUND;
 	}
 	
 	if ( command.string ) {
-		ent->StartSound ( command.string->c_str(), channel, flags, false, NULL );
+
+		// multiplayer ignores frame command jump sounds:
+		// we trigger jump sounds from the player physics and explicitely send them over the network
+		if ( gameLocal.isMultiplayer && command.string->Icmp( "snd_jump" ) == 0 ) {
+			return;
+		}
+
+		ent->StartSound( command.string->c_str(), channel, flags, false, NULL );
 	} else {
 		ent->StartSoundShader( command.soundShader, channel, flags, false, NULL );
 	}
@@ -884,9 +891,9 @@ void idAnim::CallFrameCommands( idEntity *ent, int from, int to ) const {
 							 command.string?command.string->c_str():"???" );
 			}
 
-			//if ( ( gameLocal.editors & EDITOR_MODVIEW ) && !frameCommandInfo[command.type].modview ) {
-			//	continue;
-			//}
+			if ( gameLocal.IsMultiplayerMode() && ( gameLocal.editors & EDITOR_MODVIEW ) && !frameCommandInfo[command.type].modview ) {
+				continue;
+			}
 // RAVEN END			
 
 			switch( command.type ) {
@@ -910,9 +917,7 @@ void idAnim::CallFrameCommands( idEntity *ent, int from, int to ) const {
 // abahr:
 				case FC_EVENTFUNCTION_ARGS: {
 					assert( command.event );
-// jmarshall - 64bit
 					ent->ProcessEvent( command.event, (intptr_t)command.parmList );
-// jmarshall end
 					break;
 				}
 // bdube: support indirection and simplify
@@ -1782,6 +1787,19 @@ void idAnimBlend::SetStartTime( int _startTime ) {
 
 	// update the anim endtime
 	SetCycleCount( cycle );
+}
+
+void idAnimBlend::ShiftTime( int deltaMsec ) {
+	if ( animNum == 0 || deltaMsec <= 0 ) {
+		return;
+	}
+	const int maxInt = 0x7fffffff;
+	starttime = starttime > maxInt - deltaMsec ? maxInt : starttime + deltaMsec;
+	blendStartTime = blendStartTime > maxInt - deltaMsec ? maxInt : blendStartTime + deltaMsec;
+	// Negative endtime is the established never-ending sentinel.
+	if ( endtime >= 0 ) {
+		endtime = endtime > maxInt - deltaMsec ? maxInt : endtime + deltaMsec;
+	}
 }
 
 /*
@@ -2879,6 +2897,7 @@ bool idDeclModelDef::Parse( const char *text, const int textLength, bool noCachi
 
 	TIME_THIS_SCOPE( __FUNCLINE__);
 	(void)noCaching;
+
 	src.LoadMemory( text, textLength, GetFileName(), GetLineNum() );
 	src.SetFlags( DECL_LEXER_FLAGS );
 	src.SkipUntilString( "{" );
@@ -3099,40 +3118,44 @@ bool idDeclModelDef::Parse( const char *text, const int textLength, bool noCachi
 	anims.SetGranularity( 1 );
 	anims.SetNum( anims.Num() );
 
-	if ( !modelHandle && inheritedModelDef && inheritedModelDef->ModelHandle() ) {
-		modelHandle = inheritedModelDef->ModelHandle();
+	// openQ4 (campaign): a modeldef whose "inherit" left it without a mesh takes the
+	// inherited one; one that still has none defaults
+	if ( !gameLocal.IsMultiplayerMode() ) {
+		if ( !modelHandle && inheritedModelDef && inheritedModelDef->ModelHandle() ) {
+			modelHandle = inheritedModelDef->ModelHandle();
 
-		if ( joints.Num() == 0 ) {
-			joints = inheritedModelDef->Joints();
-		}
+			if ( joints.Num() == 0 ) {
+				joints = inheritedModelDef->Joints();
+			}
 
-		if ( jointParents.Num() == 0 && inheritedModelDef->JointParents() ) {
-			jointParents.SetNum( inheritedModelDef->NumJoints() );
-			SIMDProcessor->Memcpy( jointParents.Ptr(), inheritedModelDef->JointParents(), jointParents.Num() * sizeof( jointParents[0] ) );
-		}
+			if ( jointParents.Num() == 0 && inheritedModelDef->JointParents() ) {
+				jointParents.SetNum( inheritedModelDef->NumJoints() );
+				SIMDProcessor->Memcpy( jointParents.Ptr(), inheritedModelDef->JointParents(), jointParents.Num() * sizeof( jointParents[0] ) );
+			}
 
-		for ( i = 0; i < ANIM_NumAnimChannels; i++ ) {
-			if ( channelJoints[ i ].Num() == 0 && inheritedModelDef->NumJointsOnChannel( i ) > 0 ) {
-				channelJoints[ i ].SetNum( inheritedModelDef->NumJointsOnChannel( i ) );
-				SIMDProcessor->Memcpy( channelJoints[ i ].Ptr(), inheritedModelDef->GetChannelJoints( i ), channelJoints[ i ].Num() * sizeof( channelJoints[ i ][0] ) );
+			for ( i = 0; i < ANIM_NumAnimChannels; i++ ) {
+				if ( channelJoints[ i ].Num() == 0 && inheritedModelDef->NumJointsOnChannel( i ) > 0 ) {
+					channelJoints[ i ].SetNum( inheritedModelDef->NumJointsOnChannel( i ) );
+					SIMDProcessor->Memcpy( channelJoints[ i ].Ptr(), inheritedModelDef->GetChannelJoints( i ), channelJoints[ i ].Num() * sizeof( channelJoints[ i ][0] ) );
+				}
+			}
+
+			if ( !skin && !sawSkin ) {
+				skin = inheritedModelDef->GetDefaultSkin();
+			}
+
+			if ( !sawOffset ) {
+				offset = inheritedModelDef->GetVisualOffset();
 			}
 		}
 
-		if ( !skin && !sawSkin ) {
-			skin = inheritedModelDef->GetDefaultSkin();
+		if ( !modelHandle ) {
+			if ( GetState() != DS_DEFAULTED ) {
+				src.Warning( "Model definition '%s' has no mesh and failed to inherit one", GetName() );
+				MakeDefault();
+			}
+			return false;
 		}
-
-		if ( !sawOffset ) {
-			offset = inheritedModelDef->GetVisualOffset();
-		}
-	}
-
-	if ( !modelHandle ) {
-		if ( GetState() != DS_DEFAULTED ) {
-			src.Warning( "Model definition '%s' has no mesh and failed to inherit one", GetName() );
-			MakeDefault();
-		}
-		return false;
 	}
 
 	return true;
@@ -3840,10 +3863,12 @@ idRenderModel *idAnimator::SetModel( const char *modelname ) {
 	
 	idRenderModel *renderModel = modelDef->ModelHandle();
 	if ( !renderModel ) {
-		// Recover from stale parsed decl state by reloading the source file once.
-		declManager->ReloadFile( modelDef->GetFileName(), true );
-		modelDef = static_cast<const idDeclModelDef *>( declManager->FindType( DECL_MODELDEF, modelname, false ) );
-		renderModel = modelDef ? modelDef->ModelHandle() : NULL;
+		if ( !gameLocal.IsMultiplayerMode() ) {
+			// Recover from stale parsed decl state by reloading the source file once.
+			declManager->ReloadFile( modelDef->GetFileName(), true );
+			modelDef = static_cast<const idDeclModelDef *>( declManager->FindType( DECL_MODELDEF, modelname, false ) );
+			renderModel = modelDef ? modelDef->ModelHandle() : NULL;
+		}
 	}
 	if ( !renderModel ) {
 		modelDef = NULL;
@@ -4307,42 +4332,13 @@ idAnimator::SetJointAxis
 =====================
 */
 void idAnimator::SetJointAxis( jointHandle_t jointnum, jointModTransform_t transform_type, const idMat3 &mat ) {
-// RAVEN BEGIN
-// bdube: moved old code to FindJointMod
-/*
-	int i;
-*/
-// RAVEN END
 	jointMod_t *jointMod;
 
 	if ( !modelDef || !modelDef->ModelHandle() || ( jointnum < 0 ) || ( jointnum >= numJoints ) ) {
 		return;
 	}
 
-// RAVEN BEGIN
-// bdube: moved old code to FindJointMod
-	jointMod = FindJointMod ( jointnum );
-/*
-	jointMod = NULL;
-	for( i = 0; i < jointMods.Num(); i++ ) {
-		if ( jointMods[ i ]->jointnum == jointnum ) {
-			jointMod = jointMods[ i ];
-			break;
-		} else if ( jointMods[ i ]->jointnum > jointnum ) {
-			break;
-		}
-	}
-
-	if ( !jointMod ) {
-		jointMod = new jointMod_t;
-		jointMod->jointnum = jointnum;
-		jointMod->pos.Zero();
-		jointMod->transform_pos = JOINTMOD_NONE;
-		jointMods.Insert( jointMod, i );
-	}
-*/
-// RAVEN END
-
+	jointMod = FindJointMod( jointnum );
 	// Latch what this modifier held on the previous tic so the presentation frame
 	// has something to interpolate from.  Only the first write in a tic shifts, so
 	// repeated sets inside one tic cannot collapse the interval.
@@ -4987,6 +4983,24 @@ void idAnimator::ClearAFPose( void ) {
 idAnimator::ServiceAnims
 =====================
 */
+void idAnimator::ShiftTime( int deltaMsec ) {
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+	for ( int channelIndex = 0; channelIndex < ANIM_NumAnimChannels; ++channelIndex ) {
+		for ( int blendIndex = 0; blendIndex < ANIM_MaxAnimsPerChannel; ++blendIndex ) {
+			channels[ channelIndex ][ blendIndex ].ShiftTime( deltaMsec );
+		}
+	}
+	const int maxInt = 0x7fffffff;
+	if ( lastTransformTime >= 0 ) {
+		lastTransformTime = lastTransformTime > maxInt - deltaMsec ? maxInt : lastTransformTime + deltaMsec;
+	}
+	if ( AFPoseTime > 0 ) {
+		AFPoseTime = AFPoseTime > maxInt - deltaMsec ? maxInt : AFPoseTime + deltaMsec;
+	}
+}
+
 void idAnimator::ServiceAnims( int fromtime, int totime ) {
 	int			i, j;
 	idAnimBlend	*blend;
@@ -5102,11 +5116,11 @@ bool idAnimator::CreateFrame( int currentTime, bool force ) {
 	jointMod_t *		jointMod;
 // RAVEN END	
 	const idJointQuat *	defaultPose;
+
 	static idCVar		r_showSkel( "r_showSkel", "0", CVAR_RENDERER | CVAR_INTEGER, "draw the skeleton when model animates, 1 = draw model with skeleton, 2 = draw skeleton only, 3 = draw joints only", 0, 3, idCmdSystem::ArgCompletion_Integer<0,3> );
 
 	// Any authoritative evaluation or animation-state refresh invalidates the
-	// draw-only cache, even when the requested authoritative time was already
-	// current and CreateFrame exits early below.
+	// draw-only joints before the normal early-outs below.
 	presentationJointsValid = false;
 
 	if ( gameLocal.inCinematic && gameLocal.skipCinematic ) {
@@ -6413,7 +6427,7 @@ idRenderModel *idGameEdit::ANIM_CreateMeshForAnim( idRenderModel *model, const c
 
 	ANIM_CreateAnimFrame( model, md5anim, ent.numJoints, ent.joints, FRAME2MS( frame ), offset, remove_origin_offset );
 
-	newmodel = model->InstantiateDynamicModel( &ent, NULL, NULL );
+	newmodel = model->InstantiateDynamicModel( &ent, NULL, NULL, ~SURF_COLLISION );
 
 	Mem_Free16( ent.joints );
 	ent.joints = NULL;

@@ -246,8 +246,8 @@ def main():
     output.mkdir(parents=True,exist_ok=True)
     paths={name:ROOT/path for name,path in {
         'wheel':'src/game/gamesys/WeaponWheel.inl','classic':'src/game/gamesys/WeaponWheelLegacy.inl',
-        'chat':'src/mpgame/QuickChat.inl','wheel_state':'src/game/gamesys/WeaponWheelState.h',
-        'chat_state':'src/mpgame/QuickChatState.h'}.items()}
+        'chat':'src/game/QuickChat.inl','wheel_state':'src/game/gamesys/WeaponWheelState.h',
+        'chat_state':'src/game/QuickChatState.h'}.items()}
     source={name:path.read_text(encoding='utf-8-sig') for name,path in paths.items()}
     functions=[]
     for key,signatures in {

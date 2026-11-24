@@ -21,7 +21,13 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from tools.validation import openq4_validate as staged_validator  # noqa: E402
-from tools.build.game_layer import PACKAGED_LAYER_GAME_DIRS, LayerError, read_layer_mod_json  # noqa: E402
+from tools.build.game_layer import (  # noqa: E402
+    GAME_MODULE_STEM,
+    PACKAGED_LAYER_GAME_DIRS,
+    RETIRED_GAME_MODULE_STEMS,
+    LayerError,
+    read_layer_mod_json,
+)
 
 
 SUPPORTED_ARCHES = {
@@ -102,22 +108,20 @@ def expected_runtime_binaries(runtime_root: Path, arch: str) -> list[tuple[Path,
     expected = [
         (runtime_root / f"openQ4-client_{arch}", "openQ4-client", False),
         (runtime_root / f"openQ4-ded_{arch}", "openQ4-ded", False),
-        (runtime_root / "baseoq4" / f"game-sp_{arch}.so", "game-sp", True),
-        (runtime_root / "baseoq4" / f"game-mp_{arch}.so", "game-mp", True),
+        (runtime_root / "baseoq4" / f"{GAME_MODULE_STEM}_{arch}.so", GAME_MODULE_STEM, True),
     ]
-    # a layer's modules come after baseoq4's, so expected[2] and expected[3] stay baseoq4's
+    # a layer's module comes after baseoq4's, so expected[2] stays baseoq4's
     for name in packaged_layer_dirs(runtime_root):
-        expected.append((runtime_root / name / f"game-sp_{arch}.so", "game-sp", True))
-        expected.append((runtime_root / name / f"game-mp_{arch}.so", "game-mp", True))
+        expected.append((runtime_root / name / f"{GAME_MODULE_STEM}_{arch}.so", GAME_MODULE_STEM, True))
     # the in-game updater's file-swapping helper ships hardened like the engine
     expected.append((runtime_root / f"openQ4-updater_{arch}", "openQ4-updater", False))
     return expected
 
 
 def validate_layer_game_dir(runtime_root: Path, name: str, arch: str) -> None:
-    """A layer game directory holds exactly its two modules and its layer mod.json."""
+    """A layer game directory holds exactly its game module and its layer mod.json."""
     layer_dir = require_directory(runtime_root / name, f"Linux runtime {name} directory")
-    expected = {f"game-sp_{arch}.so", f"game-mp_{arch}.so", "mod.json"}
+    expected = {f"{GAME_MODULE_STEM}_{arch}.so", "mod.json"}
     actual = {path.relative_to(layer_dir).as_posix() for path in layer_dir.rglob("*")}
     if actual != expected:
         raise ReleaseArtifactError(
@@ -138,8 +142,9 @@ def reject_unexpected_binary_variants(
     candidates.update(runtime_root.glob("openQ4-ded_*"))
     candidates.update(runtime_root.glob("openQ4-updater_*"))
     for module_dir in (game_dir, *(runtime_root / name for name in packaged_layer_dirs(runtime_root))):
-        candidates.update(module_dir.glob("game-sp_*"))
-        candidates.update(module_dir.glob("game-mp_*"))
+        # the retired split game-sp/game-mp modules count as unexpected variants
+        for stem in (GAME_MODULE_STEM, *RETIRED_GAME_MODULE_STEMS):
+            candidates.update(module_dir.glob(f"{stem}_*"))
     actual = {path.resolve(strict=False) for path in candidates}
     expected_paths = {path.resolve(strict=False) for path, _, _ in expected}
     if actual != expected_paths:
@@ -263,8 +268,7 @@ def validate_linux_runtime_payload(runtime_root: Path, arch: str) -> list[tuple[
 
     clients = [expected[0][0]]
     dedicated = [expected[1][0]]
-    sp_modules = [expected[2][0]]
-    mp_modules = [expected[3][0]]
+    game_modules = [expected[2][0]]
     staged_arches = staged_validator.validate_staged_architecture_set(
         runtime_root, game_dir, clients, dedicated
     )
@@ -272,7 +276,6 @@ def validate_linux_runtime_payload(runtime_root: Path, arch: str) -> list[tuple[
         raise ReleaseArtifactError(
             f"Linux runtime architecture set is {sorted(staged_arches)}, expected only {arch}"
         )
-    staged_validator.validate_distinct_game_modules(runtime_root, sp_modules, mp_modules)
     binary_specs = [
         (path, arch, is_game_module) for path, _, is_game_module in expected
     ]
@@ -280,20 +283,18 @@ def validate_linux_runtime_payload(runtime_root: Path, arch: str) -> list[tuple[
     staged_validator.validate_linux_client_runtime_dependencies(runtime_root, clients)
     staged_validator.validate_linux_dedicated_runtime_dependencies(
         runtime_root,
-        [(dedicated[0], arch), (mp_modules[0], arch)],
+        [(dedicated[0], arch), (game_modules[0], arch)],
     )
     for name in packaged_layer_dirs(runtime_root):
         validate_layer_game_dir(runtime_root, name, arch)
         layer_dir = runtime_root / name
-        layer_sp = [layer_dir / f"game-sp_{arch}.so"]
-        layer_mp = [layer_dir / f"game-mp_{arch}.so"]
+        layer_module = layer_dir / f"{GAME_MODULE_STEM}_{arch}.so"
         layer_arches = staged_validator.validate_staged_architecture_set(runtime_root, layer_dir, clients, dedicated)
         if layer_arches != {arch}:
             raise ReleaseArtifactError(
                 f"Linux {name} architecture set is {sorted(layer_arches)}, expected only {arch}"
             )
-        staged_validator.validate_distinct_game_modules(runtime_root, layer_sp, layer_mp)
-        staged_validator.validate_linux_dedicated_runtime_dependencies(runtime_root, [(layer_mp[0], arch)])
+        staged_validator.validate_linux_dedicated_runtime_dependencies(runtime_root, [(layer_module, arch)])
     validate_linux_dependency_contract(runtime_root, binary_specs)
     return expected
 

@@ -1,5 +1,5 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
@@ -40,6 +40,7 @@ public :
 	idEntity *				GetOwner( void ) const;
 
 	virtual void			Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	virtual void			Killed( idEntity *inflictor, idEntity *attacker, int damage, const idVec3 &dir, int location );
 	virtual bool			GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis );
 
@@ -49,6 +50,7 @@ public :
 	void					Fizzle( void );
 
 	static idVec3			GetVelocity( const idDict *projectile );
+	idVec3					DeadReckonOrigin( int atTime ) const;
 	static idVec3			GetGravity( const idDict *projectile );
 
 	void					SetSpeed		( float s, int accelTime = 0 );
@@ -122,12 +124,20 @@ protected:
 	int						ieMinPitch;
 	int						ieMaxPitch;
 	float					ieSlicePercentage;
+	
+	bool					predictedProjectiles;
 
 // RAVEN BEGIN
 // ddynerman: hit count for stats
 	int						hitCount;
 // ddynerman: pre-prediction ( rocket jumping )
 	int						prePredictTime;
+	// The prestep the SERVER folded into this leg's first physics step.  Equal to
+	// prePredictTime for a normal launch, and zero for a leg re-stamped by a
+	// teleporter, which moves launchTime and launchOrig without re-arming
+	// predictTime.  Drives client dead reckoning only, and is deliberately not
+	// serialised: both ends derive it from the shared entityDef.
+	int						deadReckonPrestep;
 // RAVEN END
 	typedef enum {
 		SPAWNED = 0,
@@ -135,13 +145,14 @@ protected:
 		LAUNCHED = 2,
 		FIZZLED = 3,
 		EXPLODED = 4,
-		STUCK = 5			// "sticky": stopped where it hit (Stick)
+		IMPACTED = 5,
+		STUCK = 6,			// "sticky": stopped where it hit (Stick)
 	} projectileState_t;
 	
 	projectileState_t		state;
 
 	void					PlayPainEffect		( idEntity* ent, int damage, const rvDeclMatType* materialType, const idVec3& origin, const idVec3& direction );
-	virtual void			PlayDetonateEffect	( const idVec3& origin, const idMat3& axis );
+	virtual void			PlayDetonateEffect	( const idVec3& origin, const idMat3& axis, bool forceImpact = false );
 
 private:
 	void					DefaultDamageEffect	( const trace_t &collision, const idVec3 &velocity, const char *damageDefName );
@@ -162,6 +173,7 @@ private:
 	idVec3					launchDir;
 	// set from def file in :Launch on both client and server
 	float					launchSpeed;
+	bool					playedDamageEffect;
 };
 
 ID_INLINE float idProjectile::GetSpeed ( void ) const {
@@ -199,6 +211,7 @@ public :
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	virtual void			Launch( const idVec3 &start, const idVec3 &dir, const idVec3 &pushVelocity, const float timeSinceFire = 0.0f, const float dmgPower = 1.0f );
 
 	void					GuideTo			( const idVec3& post, const idVec3& dir );
@@ -293,6 +306,7 @@ public :
 	void					Restore			( idRestoreGame *savefile );
 
 	virtual void			Think			( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	virtual void			Launch			( const idVec3 &start, const idVec3 &dir, const idVec3 &pushVelocity, const float timeSinceFire = 0.0f, const float dmgPower = 1.0f );
 
 protected:

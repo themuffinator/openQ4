@@ -10,22 +10,23 @@ This file describes project goals, rules, and upstream credits for anyone workin
 - Withdrawn release: 0.14.0 (tag `v0.14.000`); retain historical evidence, but do not present it as an available release. Source changes after 0.15.0 are unreleased; see `docs/user/release-status.md`.
 - Website: `www.darkmatter-quake.com`
 - Repository: `https://github.com/themuffinator/openQ4`
-- Game Sources: `src/game/` and `src/mpgame/` (SDK EULA); Awakening SP additions in `src/game/awakening/`
+- Game Sources: `src/game/` (SDK EULA), one tree for single-player and multiplayer; Awakening SP additions in `src/game/awakening/`
 
 **Goals**
 - Deliver a complete code replacement for Quake 4: a GPL-covered engine and SDK-EULA game code.
 - Preserve behavior required by the shipped Quake 4 assets (base PK4s) where practical.
 - Maintain full single-player and multiplayer parity with in-tree game code.
 - Modernize the engine and game code while keeping stock-asset compatibility as a guiding constraint.
-- Package both SP/MP under one unified game directory (`baseoq4/`) with `game_sp` + `game_mp`.
+- Ship one game module (`game_<arch>`) that serves single-player and multiplayer, loaded in the `game_sp` or `game_mp` mode, under the one unified game directory (`baseoq4/`).
 - Establish a cross-platform foundation targeting modern systems (Windows, Linux, macOS; x64 first) through SDL3 and Meson.
-- Keep canonical Quake4SDK-derived game-library sources in-tree under `src/game/` and `src/mpgame/`, with their SDK EULA and provenance preserved.
+- Keep canonical Quake4SDK-derived game-library sources in-tree under `src/game/`, with their SDK EULA and provenance preserved.
 - Keep BSE source integrated in-tree under `src/bse/` and treat it as first-party openQ4 code.
 
 **Rules**
 - Do not target compatibility with the proprietary Quake 4 game DLLs; openQ4 ships its own game modules and keeps full freedom to evolve the project.
 - Treat `openQ4-game` and `openQ4-game-awakening` as archived historical references; apply all new game-library edits in this repository.
-- For SDK/game-library work, edit canonical `src/game/` and `src/mpgame/` directly. Keep Awakening SP additive and scope campaign content/substitutions to active `q4xbase`; do not add an expansion multiplayer module.
+- For SDK/game-library work, edit canonical `src/game/` directly. Keep Awakening SP additive and scope campaign content/substitutions to active `q4xbase`; do not add an expansion multiplayer module.
+- Keep one game tree and one game module. Do not reintroduce a second game tree, a second module or a compile-time mode switch: gate a real single-player/multiplayer difference at runtime with `gameLocal.isMultiplayer` (code that runs with a map loaded) or `gameLocal.IsMultiplayerMode()` (code that can run without one), and use `idModeCVar` for a cvar whose default differs per mode. Campaign save code and multiplayer wire code must keep their formats; see `docs/dev/unified-game-module.md`.
 - Treat `src/bse/` as the canonical BSE source location.
 - Build BSE into the client executable; do not reintroduce an external `openQ4-BSE_<arch>` runtime module without an explicit project decision.
 - Dedicated server builds keep the disabled BSE manager path unless a change proves they genuinely need the full effect runtime.
@@ -68,7 +69,7 @@ This file describes project goals, rules, and upstream credits for anyone workin
 
 **.install/ Folder Layout (Staging Target)**
 - `.install/` is the runtime package root used by local staging and `fs_cdpath` overlays.
-- Keep executable/runtime artifacts here (for example `.install/openQ4-client_x64.exe`, `.install/openQ4-ded_x64.exe`, `.install/baseoq4/game-sp_x64.dll`, `.install/baseoq4/game-mp_x64.dll`).
+- Keep executable/runtime artifacts here (for example `.install/openQ4-client_x64.exe`, `.install/openQ4-ded_x64.exe`, `.install/baseoq4/game_x64.dll`).
 - Stage editable override content under `.install/baseoq4/` (for example GUI scripts in `.install/baseoq4/guis/`).
 - Avoid shipping build-only linker artifacts in `.install/`; keep `*.lib` in `builddir/` unless intentionally producing a developer SDK artifact set.
 

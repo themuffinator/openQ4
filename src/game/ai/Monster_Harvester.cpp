@@ -6,8 +6,8 @@ AI for the fat guy on the putra level
 ================
 */
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../Projectile.h"
@@ -617,19 +617,18 @@ bool rvMonsterHarvester::CheckActions ( void ) {
 		nextTurnTime = gameLocal.time-1;
 	}
 
-	// If not moving, try turning in place. The scripted monster_harvester model has no turn
-	// animations, so it skips the turn rather than failing it every 250ms and losing its attacks.
+	// If not moving, try turning in place
 	if ( !move.fl.moving && gameLocal.time > nextTurnTime ) {
 		float turnYaw = idMath::AngleNormalize180 ( move.ideal_yaw - move.current_yaw ) ;
 		if ( turnYaw > lookMax[YAW] * 0.6f || (turnYaw > 0 && GetEnemy() && !enemy.fl.inFov) ) {
 			if ( HasAnim ( ANIMCHANNEL_TORSO, "turn_90_lt" ) ) {
-				PerformAction ( "Torso_TurnLeft90", 4, true );
-				return true;
+			PerformAction ( "Torso_TurnLeft90", 4, true );
+			return true;
 			}
 		} else if ( turnYaw < -lookMax[YAW] * 0.6f || (turnYaw < 0 && GetEnemy() && !enemy.fl.inFov) ) {
 			if ( HasAnim ( ANIMCHANNEL_TORSO, "turn_90_rt" ) ) {
-				PerformAction ( "Torso_TurnRight90", 4, true );
-				return true;
+			PerformAction ( "Torso_TurnRight90", 4, true );
+			return true;
 			}
 		}
 	}

@@ -9351,7 +9351,7 @@ a stock page. A page or a change of level under way takes no further request.
 // card's Settings page): the weapons ui_weaponOrder ranks, by the game's
 // weapon names and their stock labels, in the default order Use Weapon Order
 // starts from (the strongest first). The game reads the setting itself
-// (src/mpgame/mp/WeaponOrder.h); a name or alias it lists that the dialog
+// (src/game/mp/WeaponOrder.h); a name or alias it lists that the dialog
 // does not know keeps its place no longer once the dialog moves a weapon.
 // RETAINED_WEAPON_ORDER is WEAPON_ORDER_ROWS in tools/ui/retained_player_setup.py.
 typedef struct retainedWeaponOrder_s {
@@ -9836,7 +9836,7 @@ static int Session_RetainedCreateGameType( void ) {
 }
 
 // Weapon Arena's choices: si_weaponArena's tokens, "none" and then the game's
-// table in its order (mpWeaponArenaTable in src/mpgame/mp/Modifiers.cpp).
+// table in its order (mpWeaponArenaTable in src/game/mp/Modifiers.cpp).
 static const char *const RETAINED_CREATE_WEAPON_ARENAS[] = {
 	"none", "machinegun", "shotgun", "hyperblaster", "grenadelauncher", "nailgun", "rocketlauncher", "railgun",
 	"lightninggun", "dmg", "napalmgun"
@@ -9844,7 +9844,7 @@ static const char *const RETAINED_CREATE_WEAPON_ARENAS[] = {
 static const int RETAINED_CREATE_WEAPON_ARENA_COUNT = static_cast<int>( sizeof( RETAINED_CREATE_WEAPON_ARENAS ) / sizeof( RETAINED_CREATE_WEAPON_ARENAS[0] ) );
 
 // Preset's choices after Custom: the game's built-in presets, row for row
-// (mpPresetTable in src/mpgame/mp/Presets.cpp). The page is also shown while
+// (mpPresetTable in src/game/mp/Presets.cpp). The page is also shown while
 // the single-player module is loaded, so the session applies a preset itself:
 // the standard row's settings and then the chosen row's, and si_preset.
 typedef struct retainedCreatePreset_s {

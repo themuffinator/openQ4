@@ -285,7 +285,7 @@ def validate_runtime_components(runtime_dir: Path) -> list[dict[str, Any]]:
     )
     required = [
         runtime_dir / f"openQ4-client_{architecture}{executable_suffix}",
-        runtime_dir / "baseoq4" / f"game-sp_{architecture}{module_suffix}",
+        runtime_dir / "baseoq4" / f"game_{architecture}{module_suffix}",
         runtime_dir / f"renderer-vk_{architecture}{module_suffix}",
     ]
     # macOS keeps OpenGL statically linked and intentionally does not build the

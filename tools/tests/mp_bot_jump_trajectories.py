@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
-    nav = (ROOT / "src/mpgame/bots/NavMesh.cpp").read_text(encoding="utf-8")
+    nav = (ROOT / "src/game/bots/NavMesh.cpp").read_text(encoding="utf-8")
     constants = "\n".join(re.findall(r"^static const (?:int|float)\s+NAV_\w+\s*=\s*[0-9][^\n]+", nav, re.M))
     bodies = "\n".join(function(nav, signature) for signature in (
         "static float NavLandingImpactDelta(",
@@ -42,7 +42,7 @@ def main() -> None:
         "bool rvNavMesh::AirInputLandingSafe(",
         "bool rvNavMesh::KnockSlideLandingSafe(",
     ))
-    physics = (ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8")
+    physics = (ROOT / "src/game/physics/Physics_Player.cpp").read_text(encoding="utf-8")
     constants += "\n" + "\n".join(re.findall(r"^const int PMF_.*$", physics, re.M))
     bodies = "\n".join(function(physics, signature) for signature in (
         "void idPhysics_Player::SetKnockBack(", "void idPhysics_Player::RestoreKnockBack(",
@@ -50,11 +50,11 @@ def main() -> None:
     bodies = function(physics, "idVec3 idPhysics_Player::AdjustVertically(") + "\n" + function(nav, "static bool NavPadLaunchVelocity(") + "\n" + bodies
     for name, value in (("PM_ACCELERATE_MP", 15.0), ("PM_FRICTION", 6.0), ("PM_STOPSPEED", 100.0)):
         assert float(re.search(rf"const float {name}\s*=\s*([\d.]+)f", physics)[1]) == value, name
-    header = (ROOT / "src/mpgame/bots/NavMesh.h").read_text(encoding="utf-8")
+    header = (ROOT / "src/game/bots/NavMesh.h").read_text(encoding="utf-8")
     bodies = function(header, "ID_INLINE bool NavAirSteer(").replace("ID_INLINE ", "") + "\n" + bodies
-    bot = (ROOT / "src/mpgame/bots/Bot.cpp").read_text(encoding="utf-8")
+    bot = (ROOT / "src/game/bots/Bot.cpp").read_text(encoding="utf-8")
     bodies += "\n" + function(bot, "static bool BotRidesPadArc(")
-    item = (ROOT / "src/mpgame/Item.cpp").read_text(encoding="utf-8")
+    item = (ROOT / "src/game/Item.cpp").read_text(encoding="utf-8")
     bodies += "\n" + function(item, "bool idItem::TouchesPickup(")
     bodies += "\n" + function(bot, "static int BotRecoveryHealthAt(")
     bodies += "\n" + function(bot, "static bool BotChooseAirInput(")

@@ -34,7 +34,7 @@ def main() -> int:
     # recording byte counts, including malformed/interrupted user files.
     keeper.write_bytes(bytes((2 << 20) - (64 << 10)))
     keeper_digest = hashlib.sha256(keeper.read_bytes()).hexdigest()
-    paths = [exe, runtime / "baseoq4/game-mp_x64.dll", runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4",
+    paths = [exe, runtime / "baseoq4/game_x64.dll", runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4",
              *sorted(runtime.glob("renderer-*.dll" if os.name == "nt" else "renderer-*.so"))]
     def identity():
         return {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in paths if path.is_file()}

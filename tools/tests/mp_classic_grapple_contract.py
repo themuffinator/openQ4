@@ -42,7 +42,7 @@ def require(condition: bool, message: str) -> None:
 
 
 def check_overlay() -> None:
-    rules = read("src/mpgame/mp/ClassicRules.cpp")
+    rules = read("src/game/mp/ClassicRules.cpp")
     apply_body = function_body(rules, "void rvClassicRules::ApplyDefinitions( void )")
     revert_body = function_body(rules, "void rvClassicRules::RevertDefinitions( void )")
     reparse = function_body(rules, "static void ClassicReparse(")
@@ -62,8 +62,8 @@ def check_overlay() -> None:
 
 
 def check_player() -> None:
-    player = read("src/mpgame/Player.cpp")
-    header = read("src/mpgame/mp/ClassicRules.h")
+    player = read("src/game/Player.cpp")
+    header = read("src/game/mp/ClassicRules.h")
     update = function_body(player, "void idPlayer::UpdateClassicHook( void )")
     present = function_body(player, "void idPlayer::PresentClassicHook( void )")
     anchor = function_body(player, "bool idPlayer::UpdateClassicHookAnchor( void )")
@@ -101,15 +101,15 @@ def check_player() -> None:
 
 
 def check_bots() -> None:
-    bot = read("src/mpgame/bots/Bot.cpp")
+    bot = read("src/game/bots/Bot.cpp")
     hook = function_body(bot, "bool rvBot::UpdateHook( idPlayer *self, usercmd_t &cmd )")
     find = function_body(bot, "bool rvBot::FindHookShortcut( idPlayer *self, bool relaxed, idVec3 &bite, idVec3 &landing ) const")
     bite = function_body(bot, "bool rvBot::FindHookBite( idPlayer *self, const idVec3 &landing, const idVec3 &along, idVec3 &bite ) const")
     rescue = function_body(bot, "bool rvBot::FindHookRescue( idPlayer *self, idVec3 &bite, idVec3 &landing ) const")
     movement = function_body(bot, "void rvBot::UpdateMovement( idPlayer *self, usercmd_t &cmd )")
     aim = function_body(bot, "void rvBot::UpdateAim( idPlayer *self, usercmd_t &cmd )")
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
-    traits = read("src/mpgame/bots/BotCharacter.cpp")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
+    traits = read("src/game/bots/BotCharacter.cpp")
 
     require("bot_grapple.GetBool()" in hook and "rvClassicRules::GrappleAllowed()" in hook,
             "bots hook only where the server allows it and bot_grapple is on")
@@ -144,9 +144,9 @@ def check_bots() -> None:
 
 def check_rules() -> None:
     """The ruleset audit of 2026-11-23: rows and rules that had been missing."""
-    rules = read("src/mpgame/mp/ClassicRules.cpp")
-    player = read("src/mpgame/Player.cpp")
-    item_h = read("src/mpgame/Item.h")
+    rules = read("src/game/mp/ClassicRules.cpp")
+    player = read("src/game/Player.cpp")
+    item_h = read("src/game/Item.h")
     rows = set(re.findall(r'\{\s*"([^"]+)",\s*"([^"]+)",\s*(NULL|"[^"]*")\s*\}', rules))
     # the zoomed nailgun's seeking nails had kept a 25 point splash
     require(("projectile_nail_seek", "def_splash_damage", "NULL") in rows, "seeking nails lose their splash")

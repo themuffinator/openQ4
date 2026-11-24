@@ -24,11 +24,11 @@ GAME_LIBS_ROOT = Path(os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT)).resolve()
 
 SCRIPT_PROGRAM_SOURCES = (
     "src/game/script/Script_Program.cpp",
-    "src/mpgame/script/Script_Program.cpp",
+    "src/game/script/Script_Program.cpp",
 )
 
 # Directories whose save/restore code the check sweeps.
-SWEPT_GAME_DIRS = ("src/game", "src/mpgame")
+SWEPT_GAME_DIRS = ("src/game",)
 
 # Casting a fixed-width read onto a reference is only width-safe when the cast
 # type is itself that width.  Anything wider (or pointer-sized) silently leaves

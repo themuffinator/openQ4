@@ -244,7 +244,7 @@ def main() -> None:
                  "src/sound/sound.h", "src/sound/OpenAL/AL_SoundHardware.cpp", "src/sound/OpenAL/AL_SoundVoice.cpp",
                  "tools/tests/sound_distance_runtime.py"):
         report["source_sha256"][name] = sha(ROOT / name)
-    for path in (executable, runtime / "baseoq4/game-sp_x64.dll", runtime / "baseoq4/game-sp_x64.so",
+    for path in (executable, runtime / "baseoq4/game_x64.dll", runtime / "baseoq4/game_x64.so",
                  runtime / "OpenAL32.dll", runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4"):
         if path.is_file():
             report["runtime_sha256"][path.relative_to(runtime).as_posix()] = sha(path)

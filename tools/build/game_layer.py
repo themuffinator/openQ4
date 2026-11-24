@@ -1,29 +1,42 @@
 #!/usr/bin/env python3
 """Read and validate a game-library layer manifest (layer.json).
 
-A game layer is a companion repository that extends openQ4-game into a
-separate mod game directory without replacing any of its files. The layer
-contributes whole new sources only; openQ4 links them together with the
-unchanged openQ4-game objects, so a layer build is always "the current openQ4
-game plus the layer". openQ4-game-awakening, which targets the Quake 4: The
-Awakening expansion (q4xbase), is the first layer.
+A game layer is a companion repository that extends the openQ4 game sources
+into a separate mod game directory without replacing any of their files. The
+layer contributes whole new sources only; openQ4 links them together with the
+unchanged base game objects, so a layer build is always "the current openQ4
+game plus the layer". openQ4-game-awakening, which targeted the Quake 4: The
+Awakening expansion (q4xbase), was the first layer; Awakening SP has since
+moved into the canonical game sources.
+
+There is one game module, game_<arch>, and the engine loads it as game_sp or
+game_mp. Every layer source tree is compiled into it, so every layer source
+is present in both modes and tests the mode at run time where it matters:
+gameLocal.isMultiplayer for a network game, gameLocal.IsMultiplayerMode() for
+the module's load mode.
 
 layer.json:
 
     {
       "format": 1,
       "id": "awakening",                   identifier, [a-z][a-z0-9_]*
-      "gameDir": "q4xbase",                mod game directory the modules serve
+      "gameDir": "q4xbase",                mod game directory the module serves
       "sources": {                         repository-relative source roots
-        "shared": "src/shared",            compiled into both game modules
-        "game": "src/game",                single-player module only
-        "mpgame": "src/mpgame"             multiplayer module only
+        "shared": "src/shared",            compiled into the game module
+        "game": "src/game"                 compiled into the game module
       },
       "mod": {                             mod.json identity for gameDir
         "name": "...", "version": "x.y.z", "releaseDate": "YYYY-MM-DD",
         "website": "...", "author": "..."
       }
     }
+
+Both source trees stage into the same directory (src/game/<id>/), so no path
+may appear in both. The "mpgame" tree, which fed the retired multiplayer-only
+module, is refused: its sources belong in "game" behind a runtime mode check.
+The format stays 1: a manifest that names only "shared" and "game" loads as
+before, and one that names "mpgame" gets that explanation rather than the
+bare format error a bump would give it.
 
 usage:
     game_layer.py field <layer-root> <gameDir|id|name|version>
@@ -41,18 +54,31 @@ from pathlib import Path
 
 LAYER_MANIFEST_NAME = "layer.json"
 LAYER_FORMAT = 1
-LAYER_SOURCE_TREES = ("shared", "game", "mpgame")
-# which staged game trees each layer source tree is compiled into
-LAYER_TREE_MODULES = {
-    "shared": ("game", "mpgame"),
-    "game": ("game",),
-    "mpgame": ("mpgame",),
+# Every layer source tree is compiled into the one game module. The two names
+# remain so that existing manifests keep loading; they stage into one
+# directory, where a path both provide is a clash.
+LAYER_SOURCE_TREES = ("shared", "game")
+# Source trees a layer manifest may no longer name, and why.
+RETIRED_LAYER_SOURCE_TREES = {
+    "mpgame": (
+        "one game module serves both single-player and multiplayer, so there is no "
+        "multiplayer-only module to build it into; move the layer's multiplayer-only "
+        "sources into 'game' and guard them with runtime mode checks "
+        "(gameLocal.isMultiplayer for a network game, gameLocal.IsMultiplayerMode() "
+        "for the module's load mode)"
+    ),
 }
 MOD_FIELDS = ("name", "version", "releaseDate", "website", "author")
 RESERVED_GAME_DIRS = {"q4base", "baseoq4", "q4mp", "base"}
+# One game library, game_<arch>, serves both logical modules (game_sp and
+# game_mp). It replaced the split game-sp_<arch> and game-mp_<arch> libraries;
+# staging removes those retired names and validators reject them, so an older
+# build's modules never ride along in a stage or a package.
+GAME_MODULE_STEM = "game"
+RETIRED_GAME_MODULE_STEMS = ("game-sp", "game-mp")
 # Game directories that packages carry beside baseoq4 when their layer was built. Each holds
-# exactly its two game modules (plus their Windows .pdb files) and the mod.json below.
-# Awakening SP is compiled into the canonical game_sp. Its user-supplied
+# exactly its game module (plus its Windows .pdb file) and the mod.json below.
+# Awakening SP is compiled into the canonical game module. Its user-supplied
 # campaign assets and obsolete layer DLLs are never package collateral.
 PACKAGED_LAYER_GAME_DIRS = ()
 RETIRED_LAYER_GAME_DIRS = ("q4xbase",)
@@ -106,6 +132,8 @@ def load_layer(layer_root: Path) -> dict:
         raise LayerError(f"{manifest_path}: 'sources' must map at least one of {LAYER_SOURCE_TREES}")
     resolved_sources: dict[str, Path] = {}
     for tree, rel in sources.items():
+        if tree in RETIRED_LAYER_SOURCE_TREES:
+            raise LayerError(f"{manifest_path}: source tree '{tree}' is retired: {RETIRED_LAYER_SOURCE_TREES[tree]}")
         if tree not in LAYER_SOURCE_TREES:
             raise LayerError(f"{manifest_path}: unknown source tree '{tree}' (expected {LAYER_SOURCE_TREES})")
         if not isinstance(rel, str) or not rel or Path(rel).is_absolute():

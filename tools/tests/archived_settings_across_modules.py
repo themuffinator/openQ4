@@ -97,7 +97,7 @@ def main() -> int:
         ("src/framework/Session_menu.cpp", "static void SetMainMenuMPModelVars( idUserInterface *gui )",
          "MainMenuFirstModelFromList("),
         ("src/game/MultiplayerGame.cpp", "static void ResolveAndApplyMPMenuModelSelection(", "FirstMPMenuModelFromList("),
-        ("src/mpgame/MultiplayerGame.cpp", "static void ResolveAndApplyMPMenuModelSelection(", "FirstMPMenuModelFromList("),
+        ("src/game/MultiplayerGame.cpp", "static void ResolveAndApplyMPMenuModelSelection(", "FirstMPMenuModelFromList("),
     )
     for path, signature, first in menus:
         resolve = code(body(read(path), signature))

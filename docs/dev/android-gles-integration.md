@@ -1,7 +1,6 @@
 # Android/GLES integration and attribution
 
-Current build guidance: game sources are now in openQ4 under `src/game/` and
-`src/mpgame/`. No companion checkout, pin or source stage is required. The
+Current build guidance: game sources are now in openQ4 under `src/game/`. No companion checkout, pin or source stage is required. The
 commit pairs and stage references below record the earlier port qualification;
 see [the current Android build guide](android-build.md) for today's workflow.
 

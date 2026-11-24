@@ -13,7 +13,7 @@ from game_regression_suite import RegressionTemporaryDirectory
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH_DIR = ROOT / "src/mpgame/mp/match"
+MATCH_DIR = ROOT / "src/game/mp/match"
 HEADER = MATCH_DIR / "MatchAuthentication.h"
 SOURCE = MATCH_DIR / "MatchAuthentication.cpp"
 
@@ -185,22 +185,21 @@ def static_contracts(header: str, source: str) -> None:
             "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchAuthentication.cpp" not in {
+    if "game/mp/match/MatchAuthentication.cpp" not in {
         line.strip() for line in listing
     }:
         raise AssertionError("MatchAuthentication.cpp is absent from the MP source list")
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchAuthentication.h"
+#include "game/mp/match/MatchAuthentication.h"
 
 #include <string.h>
 

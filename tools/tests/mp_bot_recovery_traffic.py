@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main():
-    nav = (ROOT / "src/mpgame/bots/NavMesh.cpp").read_text(encoding="utf-8")
+    nav = (ROOT / "src/game/bots/NavMesh.cpp").read_text(encoding="utf-8")
     body = function(nav, "static bool NavRecoveryTranslation(")
     source = (ROOT / "tools/tests/native/MpBotRecoveryTrafficFixture.cpp").read_text(encoding="utf-8")
     source = source.replace("// PRODUCTION_FUNCTION", body)

@@ -530,8 +530,7 @@ validate_staged_macos_payload() {
     local required_executables=(
         "${install_root}/openQ4-client_${arch}"
         "${install_root}/openQ4-ded_${arch}"
-        "${game_dir}/game-sp_${arch}.dylib"
-        "${game_dir}/game-mp_${arch}.dylib"
+        "${game_dir}/game_${arch}.dylib"
     )
     local required_scripts=(
         "${install_root}/collect_macos_support_info.sh"
@@ -661,14 +660,15 @@ validate_staged_macos_payload() {
         fi
     done < <(find "${install_root}" -maxdepth 1 -type f \( -name 'openQ4-client_*' -o -name 'openQ4-ded_*' \) -print)
 
-    if compgen -G "${game_dir}/game-*.dll" >/dev/null || compgen -G "${game_dir}/game-*.so" >/dev/null; then
+    if compgen -G "${game_dir}/game_*.dll" >/dev/null || compgen -G "${game_dir}/game_*.so" >/dev/null; then
         echo "macOS staged install contains non-dylib game modules." >&2
         exit 1
     fi
 
+    # one game module serves game_sp and game_mp; the game-* sweep below also
+    # rejects the retired split game-sp/game-mp modules of an older build
     local expected_modules=(
-        "${game_dir}/game-sp_${arch}.dylib"
-        "${game_dir}/game-mp_${arch}.dylib"
+        "${game_dir}/game_${arch}.dylib"
     )
     while IFS= read -r path; do
         local matched=0
@@ -683,7 +683,7 @@ validate_staged_macos_payload() {
             echo "macOS staged install contains stale or mismatched game module: ${path}" >&2
             exit 1
         fi
-    done < <(find "${game_dir}" -maxdepth 1 -type f -name 'game-*.dylib' -print)
+    done < <(find "${game_dir}" -maxdepth 1 -type f \( -name 'game_*.dylib' -o -name 'game-*.dylib' \) -print)
 
     if command -v lipo >/dev/null 2>&1; then
         for path in "${required_executables[@]}"; do
@@ -895,8 +895,7 @@ append_staged_binary_arch_report() {
     local required=(
         "${install_root}/openQ4-client_${arch}"
         "${install_root}/openQ4-ded_${arch}"
-        "${game_dir}/game-sp_${arch}.dylib"
-        "${game_dir}/game-mp_${arch}.dylib"
+        "${game_dir}/game_${arch}.dylib"
     )
     local path
 
@@ -1011,7 +1010,7 @@ write_signoff_report() {
         echo "- [ ] Launch openQ4.app from the mounted signed/notarized DMG or final release image and enter a single-player map."
         echo "- [ ] Drag only openQ4.app to /Applications or another user-writable location, launch it there, and enter a single-player map."
         echo "- [ ] Copy the whole package payload to a user-writable location and verify the loose client, dedicated server, and support collector still use the sibling app runtime."
-        echo "- [ ] Confirm the copied app contains baseoq4 data under Contents/Resources and signed SP/MP modules under Contents/Frameworks, with no adjacent baseoq4 duplicate."
+        echo "- [ ] Confirm the copied app contains baseoq4 data under Contents/Resources and the signed game module under Contents/Frameworks, with no adjacent baseoq4 duplicate."
         echo "- [ ] Launch the app executable from Terminal with an unrelated working directory."
         echo "- [ ] Confirm fs_basepath, fs_cdpath, and fs_savepath in logs for Finder/copied package and Terminal launches."
         echo "- [ ] Confirm Gatekeeper assessment for signed/notarized DMGs, or record unsigned/unnotarized approval friction for development archives."
@@ -1020,8 +1019,8 @@ write_signoff_report() {
         echo "- [ ] Verify audio output, volume changes, and at least one device switch or reconnect."
         echo "- [ ] Verify windowed, fullscreen, selected-display, and HiDPI/Retina behavior on attached displays."
         echo "- [ ] Verify the matching OpenGL or Metal bridge package path in actual gameplay, not only at the main menu."
-        echo "- [ ] Launch multiplayer, load the mp/q4dm1 listen-server path, confirm game-mp loads, connect a local client, and exit cleanly."
-        echo "- [ ] Launch the dedicated server binary, load an MP server configuration far enough to initialize game-mp, then shut it down cleanly."
+        echo "- [ ] Launch multiplayer, load the mp/q4dm1 listen-server path, confirm the game module loads as game_mp, connect a local client, and exit cleanly."
+        echo "- [ ] Launch the dedicated server binary, load an MP server configuration far enough to initialize the game module as game_mp, then shut it down cleanly."
         echo "- [ ] Record any input, audio, display, renderer, package, Gatekeeper, or crash issues with logs from this results directory."
     } > "${report_tmp}"
 

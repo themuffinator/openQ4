@@ -213,6 +213,9 @@ public:
 
 	// thinking
 	virtual void			Think( void );
+	// Central competitive-pause hook.  Implementations may rebase their own
+	// absolute gameplay deadlines but must not advance gameplay or emit damage.
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	bool					CheckDormant( void );	// dormant == on the active list, but out of PVS
 	virtual	void			DormantBegin( void );	// called when entity becomes dormant
 	virtual	void			DormantEnd( void );		// called when entity wakes from being dormant
@@ -321,12 +324,12 @@ public:
 // RAVEN BEGIN
 // bdube: added effect functions
 	// effects
-	rvClientEffect*			PlayEffect		( const char* effectName, jointHandle_t joint, const idVec3& originOffset, const idMat3& axisOffset, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	rvClientEffect*			PlayEffect		( const idDecl *effect, jointHandle_t joint, const idVec3& originOffset, const idMat3& axisOffset, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	rvClientEffect*			PlayEffect		( const char* effectName, jointHandle_t joint, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
+	rvClientEffect*			PlayEffect		( const char* effectName, jointHandle_t joint, const idVec3& originOffset, const idMat3& axisOffset, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
+	rvClientEffect*			PlayEffect		( const idDecl *effect, jointHandle_t joint, const idVec3& originOffset, const idMat3& axisOffset, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
+	rvClientEffect*			PlayEffect		( const char* effectName, jointHandle_t joint, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
 
-	rvClientEffect*			PlayEffect		( const char* effectName, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	rvClientEffect*			PlayEffect		( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
+	rvClientEffect*			PlayEffect		( const char* effectName, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
+	rvClientEffect*			PlayEffect		( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
 	void					StopEffect		( const char* effectName, bool destroyParticles = false );
 	void					StopEffect		( const idDecl *effect, bool destroyParticles = false );
 	void					StopAllEffects	( bool destroyParticles = false );
@@ -536,6 +539,8 @@ public:
 	void					ServerSendEvent( int eventId, const idBitMsg *msg, bool saveEvent, int excludeClient ) const;
 	void					ServerSendInstanceEvent( int eventId, const idBitMsg *msg, bool saveEvent, int excludeClient ) const;
 	void					ClientSendEvent( int eventId, const idBitMsg *msg ) const;
+	// openQ4: for a request the player makes once, from the console or a menu
+	void					ClientSendRequestEvent( int eventId, const idBitMsg *msg ) const;
 
 // RAVEN BEGIN
 // bdube: debugging
@@ -557,7 +562,6 @@ public:
 
 protected:
 	renderEntity_t			renderEntity;						// used to present a model to the renderer
-	int						modelDefHandle;						// handle to static renderer model
 	// transient presentation-interpolation samples.  Deliberately not saved: they
 	// are a render-only cache and restoring them could blend across a load.
 	int						presentationPoseTime;				// game time of the newest authoritative sample
@@ -569,6 +573,7 @@ protected:
 	idMat3					presentationPrevAxis;
 	idVec3					presentationCurOrigin;
 	idMat3					presentationCurAxis;
+	int						modelDefHandle;						// handle to static renderer model
 	refSound_t				refSound;							// used to present sound to the audio engine
 	idEntityPtr< idEntity >	forwardDamageEnt;					// damage applied to the invoking object will be forwarded to this entity
 	idEntityPtr< idEntity > bindMaster;							// entity bound to if unequal NULL
@@ -724,18 +729,18 @@ protected:
 // RAVEN BEGIN
 // bdube: added inlines
 ID_INLINE rvClientEffect* idEntity::PlayEffect( const char* effectName, const idVec3& origin, const idMat3& axis, bool loop, const idVec3& endOrigin, 
-												 bool broadcast, effectCategory_t category, const idVec4& effectTint ) { 
-	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), origin, axis, loop, endOrigin, broadcast, category, effectTint );
+												bool broadcast, bool predictBit, effectCategory_t category, const idVec4& effectTint ) { 
+	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), origin, axis, loop, endOrigin, broadcast, predictBit, category, effectTint );
 }
 
 ID_INLINE rvClientEffect* idEntity::PlayEffect( const char* effectName, jointHandle_t jointHandle, bool loop, const idVec3& endOrigin, 
-												bool broadcast, effectCategory_t category, const idVec4& effectTint ) { 
-	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), jointHandle, vec3_origin, mat3_identity, loop, endOrigin, broadcast, category, effectTint );
+												bool broadcast, bool predictBit, effectCategory_t category, const idVec4& effectTint ) { 
+	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), jointHandle, vec3_origin, mat3_identity, loop, endOrigin, broadcast, predictBit, category, effectTint );
 }
 
 ID_INLINE rvClientEffect* idEntity::PlayEffect( const char* effectName, jointHandle_t jointHandle, const idVec3& originOffset, const idMat3& axisOffset, bool loop, const idVec3& endOrigin, 
-												bool broadcast, effectCategory_t category, const idVec4& effectTint ) { 
-	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), jointHandle, originOffset, axisOffset, loop, endOrigin, broadcast, category, effectTint );
+												bool broadcast, bool predictBit, effectCategory_t category, const idVec4& effectTint ) { 
+	return PlayEffect( gameLocal.GetEffect( spawnArgs, effectName ), jointHandle, originOffset, axisOffset, loop, endOrigin, broadcast, predictBit, category, effectTint );
 }
 
 
@@ -797,6 +802,7 @@ public:
 
 	virtual void			ClientPredictionThink( void );
 	virtual void			Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 
 	void					UpdateAnimation( void );
 

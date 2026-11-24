@@ -199,11 +199,11 @@ class ContentPackReleaseTests(unittest.TestCase):
 
     def test_packager_update_archive_is_rootless_and_omits_bulk_packs(self) -> None:
         package = self.work / "openq4-0.20.0-windows-x64"
-        for name in ("openQ4-client_x64.exe", "openQ4-client_x64.pdb", "baseoq4/game-sp_x64.dll",
-                     "baseoq4/game-sp_x64.pdb", *(f"baseoq4/{pack}" for pack in openq4_pak.OPENQ4_PACK_NAMES)):
+        for name in ("openQ4-client_x64.exe", "openQ4-client_x64.pdb", "baseoq4/game_x64.dll",
+                     "baseoq4/game_x64.pdb", *(f"baseoq4/{pack}" for pack in openq4_pak.OPENQ4_PACK_NAMES)):
             write(package / name, name)
         symbols = PACKAGER.move_windows_symbols(package, self.work / "symbols")
-        self.assertEqual({path.as_posix() for path in symbols}, {"openQ4-client_x64.pdb", "baseoq4/game-sp_x64.pdb"})
+        self.assertEqual({path.as_posix() for path in symbols}, {"openQ4-client_x64.pdb", "baseoq4/game_x64.pdb"})
         self.assertFalse(list(package.rglob("*.pdb")), "PDBs leave the player package")
         archive = self.work / "openq4-0.20.0-windows-x64-symbols.zip"
         PACKAGER.create_windows_symbol_archive(package, self.work / "symbols", archive, symbols, "0.20.0", "x64")

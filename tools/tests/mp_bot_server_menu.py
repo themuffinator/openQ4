@@ -195,10 +195,10 @@ def validate_row_widgets() -> None:
         raise AssertionError("A fill target below 2 can never add a bot and would read as a broken setting")
 
     skill_values = [int(value) for value in gui_value(gui_block(source, BOT_ROWS[1][0]), "values", BOT_ROWS[1][0]).split(";")]
-    declared = read(GAME_LIBS_ROOT / "src" / "mpgame" / "gamesys" / "SysCvar.cpp")
+    declared = read(GAME_LIBS_ROOT / "src" / "game" / "gamesys" / "SysCvar.cpp")
     skill_range = re.search(r'idCVar bot_skill\([^;]*?,\s*(\d+)\s*,\s*(\d+)\s*\)', declared, re.DOTALL)
     if skill_range is None:
-        raise AssertionError("bot_skill no longer declares a numeric range in mpgame SysCvar.cpp")
+        raise AssertionError("bot_skill no longer declares a numeric range in game SysCvar.cpp")
     low, high = int(skill_range.group(1)), int(skill_range.group(2))
     if skill_values[0] != low or skill_values[-1] != high:
         raise AssertionError(
@@ -216,11 +216,11 @@ def validate_row_widgets() -> None:
     # given two initial values every time the module swaps in, so each menu
     # declaration carries game_mp's default (the bots' and the other
     # multiplayer settings the menus edit).
-    sources = "".join(read(path) for path in sorted((GAME_LIBS_ROOT / "src" / "mpgame").rglob("*.cpp")))
+    sources = "".join(read(path) for path in sorted((GAME_LIBS_ROOT / "src" / "game").rglob("*.cpp")))
     for name, value, kind in entries:
         found = re.search(rf'idCVar\s+{re.escape(name)}\(\s*"{re.escape(name)}",\s*"([^"]*)"', sources)
         if found is None:
-            raise AssertionError(f"mpgame no longer declares {name}, which the menus declare for it")
+            raise AssertionError(f"the game module no longer declares {name}, which the menus declare for it")
         if found.group(1) != value:
             raise AssertionError(f"Session.cpp declares {name} as {value!r}; game_mp's default is {found.group(1)!r}")
 

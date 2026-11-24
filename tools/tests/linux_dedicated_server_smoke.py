@@ -101,7 +101,7 @@ def main(argv: list[str]) -> int:
     arch = args.arch or host_arch_tag()
     install_root = args.install_root.resolve()
     executable = (args.executable or install_root / f"openQ4-ded_{arch}").resolve()
-    game_module = install_root / "baseoq4" / f"game-mp_{arch}.so"
+    game_module = install_root / "baseoq4" / f"game_{arch}.so"
 
     if not executable.is_file():
         raise RuntimeError(f"dedicated-server executable not found: {executable}")

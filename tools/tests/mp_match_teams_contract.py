@@ -13,7 +13,7 @@ from game_regression_suite import RegressionTemporaryDirectory
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH_DIR = ROOT / "src/mpgame/mp/match"
+MATCH_DIR = ROOT / "src/game/mp/match"
 HEADER = MATCH_DIR / "MatchTeams.h"
 SOURCE = MATCH_DIR / "MatchTeams.cpp"
 SESSION_SOURCE = MATCH_DIR / "MatchSession.cpp"
@@ -109,8 +109,8 @@ def static_contracts(header: str, source: str) -> None:
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchTeams.h"
-#include "mpgame/mp/match/MatchProtocol.h"
+#include "game/mp/match/MatchTeams.h"
+#include "game/mp/match/MatchProtocol.h"
 
 static const mpMatchPhaseMask_t PHASE_LOBBY = MP_MATCH_PHASE_WARMUP |
 	MP_MATCH_PHASE_GAMEREVIEW | MP_MATCH_PHASE_NEXTGAME;
@@ -903,9 +903,8 @@ def source_discovery_contract() -> None:
             os.environ.get("PYTHON", "python"),
             str(lister),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         cwd=ROOT,
         text=True,
@@ -913,7 +912,7 @@ def source_discovery_contract() -> None:
     )
     if listed.returncode != 0:
         raise AssertionError("source discovery failed:\n" + listed.stdout + listed.stderr)
-    if "mpgame/mp/match/MatchTeams.cpp" not in listed.stdout.replace("\\", "/"):
+    if "game/mp/match/MatchTeams.cpp" not in listed.stdout.replace("\\", "/"):
         raise AssertionError("MatchTeams.cpp is not discovered by the GameLib source glob")
 
 

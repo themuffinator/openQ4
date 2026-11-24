@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -929,11 +929,11 @@ int idPush::TryTranslatePushEntity( trace_t &results, idEntity *check, idClipMod
 		// move entity in reverse only colliding with pusher
 		ClipEntityTranslation( results, check, clipModel, NULL, -move );
 		// If the entity is hovering just above a fast-rising pusher, the reverse trace can
-		// miss the contact even though the pusher's final position would overlap it. Keep
-		// this compatibility nudge limited to upward movement; retail lets descending bound
-		// solids move away without turning a late destination overlap into a crush.
+		// miss the contact even though the pusher's final position would overlap it. The
+		// campaign keeps this compatibility nudge limited to upward movement; retail lets
+		// descending bound solids move away without turning a late destination overlap into a crush.
 		if ( results.fraction >= 1.0f ) {
-			if ( ( move * -physics->GetGravityNormal() ) <= 0.0f ) {
+			if ( !gameLocal.isMultiplayer && ( move * -physics->GetGravityNormal() ) <= 0.0f ) {
 				return PUSH_NO;
 			}
 

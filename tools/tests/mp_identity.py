@@ -4,7 +4,7 @@
 
 Compiles tools/tests/native/Ed25519SignTest.cpp (key derivation and signing
 against RFC 8032's vectors) and tools/tests/native/MpIdentityTest.cpp (the
-engine-free core in src/mpgame/mp/Identity.h: per-server keys, the signed
+engine-free core in src/game/mp/Identity.h: per-server keys, the signed
 proof and what it binds, fingerprints, ghost codes, the reconnect store and
 the Elo ratings). Then pins, without game assets, where the game uses it: who
 is challenged, how a proof is checked, identity bans, a leaver's place, the
@@ -70,14 +70,15 @@ def run_native() -> None:
 
 
 def check_cvars() -> None:
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
-    header = read("src/mpgame/gamesys/SysCvar.h")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
+    header = read("src/game/gamesys/SysCvar.h")
 
     def declaration(name: str) -> str:
-        match = re.search(r'^idCVar ' + name + r'\(.*$', cvars, re.M)
-        require(match is not None, f"{name} is declared in the multiplayer game module")
+        matches = re.findall(r'^(?:idCVar|idModeCVar) ' + name + r'\(.*$', cvars, re.M)
+        require(len(matches) == 1 and matches[0].startswith("idCVar "),
+                f"{name} is declared once in the unified game module, with one default for both modes")
         require(f"extern idCVar\t{name};" in header, f"{name} is exported from SysCvar.h")
-        return match.group(0)
+        return matches[0]
 
     identity = declaration("ui_identity")
     # the user's decision of 23 November 2026: on unless the player turns it off
@@ -87,15 +88,17 @@ def check_cvars() -> None:
     require('"300"' in declaration("g_reconnectRestore") and ", 0, 3600 )" in declaration("g_reconnectRestore"),
             "a leaver's place is kept five minutes by default")
     require('"0"' in declaration("g_ranking") and "CVAR_BOOL" in declaration("g_ranking"), "the ranking table is opt-in for the server")
-    require("ui_identity" not in read("src/game/gamesys/SysCvar.cpp"), "game-sp registers no identity cvar")
+    # one game module serves both modes: each identity cvar is registered once, and no second tree mirrors it
+    require(len(re.findall(r'^idCVar ui_identity\(', cvars, re.M)) == 1
+            and not (ROOT / "src/mpgame/gamesys/SysCvar.cpp").exists(), "the game module registers each identity cvar once")
 
 
 def check_protocol() -> None:
-    local = read("src/mpgame/Game_local.h")
+    local = read("src/game/Game_local.h")
     enum = re.search(r"GAME_RELIABLE_MESSAGE_MODERATION,(.*?)GAME_RELIABLE_MESSAGE_COUNT,", local, re.S)
     require(enum is not None and "GAME_RELIABLE_MESSAGE_IDENTITY," in enum.group(1), "the identity message is appended after MP-18's")
     require("RELIABLE_FLOOD_IDENTITY," in local and "RELIABLE_FLOOD_IDENTITY_DELAY" in local, "identity requests have their own flood class")
-    network = read("src/mpgame/Game_network.cpp")
+    network = read("src/game/Game_network.cpp")
     require(network.count("case GAME_RELIABLE_MESSAGE_IDENTITY:") >= 3, "the server, the viewers and the client each handle the message")
     require("CheckClientReliableFlood( clientNum, RELIABLE_FLOOD_IDENTITY, RELIABLE_FLOOD_IDENTITY_DELAY )" in network,
             "the server paces identity requests")
@@ -106,7 +109,7 @@ def check_protocol() -> None:
     require("mpGame.IdentityClientBegin( clientNum, isBot );" in function_body(network, "void idGameLocal::ServerClientBegin("),
             "the challenge goes out when the player has the map")
 
-    host = read("src/mpgame/mp/IdentityHost.cpp")
+    host = read("src/game/mp/IdentityHost.cpp")
     begin = function_body(host, "void idMultiplayerGame::IdentityClientBegin(")
     require("isBot" in begin and "IdentitySendChallenge( clientNum );" in begin, "a player, never a bot, is challenged on begin")
     send = function_body(host, "void idMultiplayerGame::IdentitySendChallenge(")
@@ -120,7 +123,7 @@ def check_protocol() -> None:
     require("MP_ID_RESEND_AT_MS[]		= { 0, 3000, 15000 };" in host and "MP_ID_GHOST_AFTER_MS		= 20000;" in host and
             "IdentityWriteChallenge( i );" in frame and "MP_ID_RESEND_AT_MS[ identityChallengeSends[ i ] ]" in frame,
             "an unanswered challenge is sent again, the same nonce, before the ghost code is told")
-    require("mpGame.IdentityUserInfoChanged( clientNum );" in function_body(read("src/mpgame/Game_local.cpp"), "const idDict* idGameLocal::SetUserInfo("),
+    require("mpGame.IdentityUserInfoChanged( clientNum );" in function_body(read("src/game/Game_local.cpp"), "const idDict* idGameLocal::SetUserInfo("),
             "userinfo that arrives after the map is loaded still brings the challenge")
     receive = function_body(host, "void idMultiplayerGame::ServerReceiveIdentity(")
     proof = receive[receive.index("MP_ID_MSG_PROOF"):receive.index("MP_ID_MSG_GHOST")]
@@ -140,14 +143,19 @@ def check_protocol() -> None:
 
 
 def check_places_and_bans() -> None:
-    mp = read("src/mpgame/MultiplayerGame.cpp")
+    mp = read("src/game/MultiplayerGame.cpp")
     disconnect = function_body(mp, "void idMultiplayerGame::DisconnectClient(")
     require(disconnect.index("IdentityClientDisconnect( clientNum );") < disconnect.index("matchConnectionId[ clientNum ] = 0;"),
             "a leaver's place is kept while the slot still knows them")
-    require("IdentityNewMatch();" in function_body(mp, "void idMultiplayerGame::Reset()"), "a new map forgets kept places")
+    # one Reset serves both modes: its network-play half, ResetMatchSession, runs in the multiplayer mode
+    reset = function_body(mp, "void idMultiplayerGame::Reset()")
+    session = reset.find("const bool matchSession = gameLocal.IsMultiplayerMode();")
+    require(0 < session < reset.find("Clear();") < reset.find("if ( matchSession ) {\n\t\tResetMatchSession();\n\t}")
+            and "IdentityNewMatch();" in function_body(mp, "void idMultiplayerGame::ResetMatchSession( void )"),
+            "a new map forgets kept places")
     require("IdentityMatchEnded();" in function_body(mp, "void idMultiplayerGame::OnMatchEnded("), "the final board rates the match")
-    require("gameLocal.mpGame.IdentityNewMatch();" in read("src/mpgame/mp/GameState.cpp"), "going live forgets the warmup's places")
-    host = read("src/mpgame/mp/IdentityHost.cpp")
+    require("gameLocal.mpGame.IdentityNewMatch();" in read("src/game/mp/GameState.cpp"), "going live forgets the warmup's places")
+    host = read("src/game/mp/IdentityHost.cpp")
     restore = function_body(host, "bool idMultiplayerGame::IdentityRestore(")
     require("GTF_BRACKET" in restore and "identityRestored[ clientNum ]" in restore and "IdentityCasual()" in restore,
             "places are casual, once a connection, and never in a bracket")
@@ -158,7 +166,7 @@ def check_places_and_bans() -> None:
     require("MP_RANKING_STAGED" in ranking and "PromoteFile( MP_RANKING_STAGED, MP_RANKING_FILE" in ranking and "rankingBlocked" in ranking,
             "the ranking table is written whole and atomically, and a file this build cannot read is left alone")
 
-    network = read("src/mpgame/Game_network.cpp")
+    network = read("src/game/Game_network.cpp")
     require("gameLocal.ServerBanClient( clientNum, duration, reason.c_str(), \"console\" );" in function_body(network, "void idGameLocal::Ban_f("),
             "ban <player> bans their range and their identity")
     require("ServerBanClient( targetSlot," in network, "an admin's ban does the same")
@@ -167,21 +175,22 @@ def check_places_and_bans() -> None:
     require("MPModParseIdentity( argv[ 1 ], identity )" in function_body(network, "void idGameLocal::Ban_f("), "ban id:<identity> works")
     require("MPModBanFindTarget(" in function_body(network, "void idGameLocal::Unban_f("), "unban id:<identity> works")
     require("ClientIdentity( i )" in function_body(network, "void idGameLocal::Status_f("), "status shows each player's identity")
-    for tree in ("src/game/Game_network.cpp", "src/mpgame/Game_network.cpp"):
-        source = read(tree)
-        require("MPModBanTarget(" in function_body(source, "const mpBanInfo_t* idGameLocal::GetBanListEntry("),
-                f"{tree}: the menus list an identity ban as id:<identity>")
-        require("MPModBanFindTarget(" in function_body(source, "void idGameLocal::RemoveGuidFromBanList("),
-                f"{tree}: the menus lift an identity ban")
+    # one Game_network.cpp serves both modes (each module carried its own ban-list menu code before the merge)
+    require("MPModBanTarget(" in function_body(network, "const mpBanInfo_t* idGameLocal::GetBanListEntry("),
+            "the menus list an identity ban as id:<identity>")
+    require("MPModBanFindTarget(" in function_body(network, "void idGameLocal::RemoveGuidFromBanList("),
+            "the menus lift an identity ban")
+    require(network.count("const mpBanInfo_t* idGameLocal::GetBanListEntry(") == 1
+            and network.count("void idGameLocal::RemoveGuidFromBanList(") == 1, "the ban-list menu code is defined once")
 
 
 def check_commands_and_text() -> None:
-    commands = read("src/mpgame/gamesys/SysCmds.cpp")
+    commands = read("src/game/gamesys/SysCmds.cpp")
     for name, handler in (("identity", "Identity_f"), ("identityReset", "IdentityReset_f"), ("ghost", "Ghost_f"),
                           ("rankings", "Rankings_f"), ("history", "History_f")):
         require(re.search(rf'AddCommand\(\s*"{name}",\s*idMultiplayerGame::{handler}\b', commands) is not None,
                 f"console command {name} reaches {handler}")
-    host = read("src/mpgame/mp/IdentityHost.cpp")
+    host = read("src/game/mp/IdentityHost.cpp")
     require('idStr::Icmp( args.Argv( 1 ), "confirm" )' in function_body(host, "void idMultiplayerGame::IdentityReset_f("),
             "identityReset asks for confirm before it makes the player new everywhere")
     for language in LANGUAGES:

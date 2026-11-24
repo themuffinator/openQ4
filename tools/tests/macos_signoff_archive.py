@@ -67,7 +67,7 @@ def report_text(bridge: str, *, completed: bool) -> str:
 - [{checkbox}] Launch openQ4.app from the mounted signed/notarized DMG or final release image and enter a single-player map.
 - [{checkbox}] Drag only openQ4.app to /Applications or another user-writable location, launch it there, and enter a single-player map.
 - [{checkbox}] Copy the whole package payload to a user-writable location and verify the loose client, dedicated server, and support collector still use the sibling app runtime.
-- [{checkbox}] Confirm the copied app contains baseoq4 data under Contents/Resources and signed SP/MP modules under Contents/Frameworks, with no adjacent baseoq4 duplicate.
+- [{checkbox}] Confirm the copied app contains baseoq4 data under Contents/Resources and the signed game module under Contents/Frameworks, with no adjacent baseoq4 duplicate.
 - [{checkbox}] Launch the app executable from Terminal with an unrelated working directory.
 - [{checkbox}] Confirm fs_basepath, fs_cdpath, and fs_savepath in logs for Finder/copied package and Terminal launches.
 - [{checkbox}] Confirm Gatekeeper assessment for signed/notarized DMGs, or record unsigned/unnotarized approval friction for development archives.
@@ -76,8 +76,8 @@ def report_text(bridge: str, *, completed: bool) -> str:
 - [{checkbox}] Verify audio output, volume changes, and at least one device switch or reconnect.
 - [{checkbox}] Verify windowed, fullscreen, selected-display, and HiDPI/Retina behavior on attached displays.
 - [{checkbox}] Verify the matching OpenGL or Metal bridge package path in actual gameplay, not only at the main menu.
-- [{checkbox}] Launch multiplayer, load the mp/q4dm1 listen-server path, confirm game-mp loads, connect a local client, and exit cleanly.
-- [{checkbox}] Launch the dedicated server binary, load an MP server configuration far enough to initialize game-mp, then shut it down cleanly.
+- [{checkbox}] Launch multiplayer, load the mp/q4dm1 listen-server path, confirm the game module loads as game_mp, connect a local client, and exit cleanly.
+- [{checkbox}] Launch the dedicated server binary, load an MP server configuration far enough to initialize the game module as game_mp, then shut it down cleanly.
 
 ## macOS Version
 ```text
@@ -133,16 +133,14 @@ Wireless Controller
 ```text
 /Users/test/openq4-work/openQ4/.install/openQ4-client_arm64
 /Users/test/openq4-work/openQ4/.install/openQ4-ded_arm64
-/Users/test/openq4-work/openQ4/.install/baseoq4/game-sp_arm64.dylib
-/Users/test/openq4-work/openQ4/.install/baseoq4/game-mp_arm64.dylib
+/Users/test/openq4-work/openQ4/.install/baseoq4/game_arm64.dylib
 ```
 
 ## Staged Binary Architectures
 ```text
 /Users/test/openq4-work/openQ4/.install/openQ4-client_arm64: arm64
 /Users/test/openq4-work/openQ4/.install/openQ4-ded_arm64: arm64
-/Users/test/openq4-work/openQ4/.install/baseoq4/game-sp_arm64.dylib: arm64
-/Users/test/openq4-work/openQ4/.install/baseoq4/game-mp_arm64.dylib: arm64
+/Users/test/openq4-work/openQ4/.install/baseoq4/game_arm64.dylib: arm64
 ```
 """
 

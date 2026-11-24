@@ -186,7 +186,7 @@ def main():
     if not compiler: raise RuntimeError('C++17 compiler required')
     failures=0
     with tempfile.TemporaryDirectory(prefix='save-render-handles-',dir=ROOT/'.tmp') as directory:
-        for mode in ('game','mpgame'):
+        for mode in ('game',):
             cpp=Path(directory)/(mode+'.cpp'); exe=cpp.with_suffix('.exe')
             cpp.write_text(source(mode),encoding='utf-8')
             subprocess.run([compiler,'-std=c++17',str(cpp),'-o',str(exe)],check=True)

@@ -390,7 +390,7 @@ def capture(args: argparse.Namespace) -> int:
         path.write_text(script, encoding="utf-8")
         cfgs[phase] = {"path": str(path), "sha256": digest(path), "text": script}
     binary_paths = [Path(commands["pending"][0])]
-    binary_paths += [path for pattern in ("renderer-*", "baseoq4/game-*") for path in runtime.glob(pattern)
+    binary_paths += [path for pattern in ("renderer-*", "baseoq4/game_*") for path in runtime.glob(pattern)
                      if path.is_file() and path.suffix.lower() in (".dll", ".so", ".dylib")]
     binaries = {str(path.relative_to(runtime)): digest(path) for path in sorted(binary_paths)}
     sources = source_manifest()

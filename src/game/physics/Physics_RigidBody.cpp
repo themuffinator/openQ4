@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "PhysicsTelemetry.h"
@@ -936,7 +936,6 @@ bool idPhysics_RigidBody::EvaluateLegacy( int timeStepMSec, int endTimeMSec ) {
 // ddynerman: multiple clip worlds
 		clipModel->Link( self, clipModel->GetId(), current.i.position, current.i.orientation );
 // RAVEN END
-
 		const bool movedWithMaster = ( current.i.position != oldOrigin || current.i.orientation != oldAxis );
 		if ( movedWithMaster ) {
 			// Bound rigid bodies do not normally run pusher logic. For scripted
@@ -966,7 +965,6 @@ bool idPhysics_RigidBody::EvaluateLegacy( int timeStepMSec, int endTimeMSec ) {
 				gameLocal.push.ClipPush( pushResults, self, 0, oldOrigin, oldAxis, pushedOrigin, pushedAxis );
 			}
 		}
-
 		current.i.linearMomentum = mass * ( ( current.i.position - oldOrigin ) / timeStep );
 		current.i.angularMomentum = RigidBodyWorldInertiaTensor( current.i.orientation, inertiaTensor ) *
 									( ( current.i.orientation * oldAxis.Transpose() ).ToAngularVelocity() / timeStep );

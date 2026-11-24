@@ -265,7 +265,7 @@ def validate_assetless_renderer_bootstrap() -> None:
 
 
 def validate_assetless_game_bootstrap() -> None:
-    for module in ("game", "mpgame"):
+    for module in ("game",):
         game_local = read_game_libs(f"src/{module}/Game_local.cpp")
         sys_cvar = read_game_libs(f"src/{module}/gamesys/SysCvar.cpp")
         sys_cvar_header = read_game_libs(f"src/{module}/gamesys/SysCvar.h")
@@ -624,14 +624,14 @@ def validate_linux_arm64_release_claim_policy() -> None:
     require(evidence, "stock map with the packaged dedicated server", "Linux ARM64 signoff evidence")
     require(evidence, "Verify keyboard, relative mouse, controller", "Linux ARM64 signoff evidence")
     require(evidence, "SHA-256", "Linux ARM64 signoff evidence")
-    require(evidence, "schema version 2", "Linux ARM64 signoff evidence")
+    require(evidence, "schema version 3", "Linux ARM64 signoff evidence")
     require(
         evidence,
         "human audible playback",
         "Linux ARM64 manual audio evidence boundary",
     )
     for token in (
-        "schema_version = 2",
+        "schema_version = 3",
         'status = "pending"',
         "[review]",
         "[runtime_reports]",
@@ -643,8 +643,7 @@ def validate_linux_arm64_release_claim_policy() -> None:
         'archive = "pending"',
         'client = "pending"',
         'dedicated = "pending"',
-        'game_sp = "pending"',
-        'game_mp = "pending"',
+        'game = "pending"',
         'stock_sp = "pending"',
     ):
         require(evidence_template, token, "Linux ARM64 evidence TOML template")

@@ -1439,9 +1439,9 @@ def main() -> None:
             require(lang_text, string_id, lang_path.name)
 
     sp_cvars = read(GAME_LIBS / "src/game/gamesys/SysCvar.cpp")
-    mp_cvars = read(GAME_LIBS / "src/mpgame/gamesys/SysCvar.cpp")
-    mp_header = read(GAME_LIBS / "src/mpgame/gamesys/SysCvar.h")
-    mp_player = read(GAME_LIBS / "src/mpgame/Player.cpp")
+    mp_cvars = read(GAME_LIBS / "src/game/gamesys/SysCvar.cpp")
+    mp_header = read(GAME_LIBS / "src/game/gamesys/SysCvar.h")
+    mp_player = read(GAME_LIBS / "src/game/Player.cpp")
 
     for text, context in ((sp_cvars, "SP game cvars"), (mp_cvars, "MP game cvars")):
         require(text, 'g_autoSkipCinematics",\t\t"0",\t\t\tCVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL', context)
@@ -1464,11 +1464,14 @@ def main() -> None:
         if sp_statement != mp_statement:
             raise AssertionError(f"SP/MP GUI CVar declarations differ for {name!r}")
 
-    # The modules intentionally retain Quake 4's distinct SP (box) and MP
-    # (cylinder) defaults, but they share an integer type so an in-process
-    # module switch cannot register the same global CVar with two types.
-    sp_default, sp_flags = cvar_signature(sp_cvars, "pm_usecylinder", "SP game cvars")
-    mp_default, mp_flags = cvar_signature(mp_cvars, "pm_usecylinder", "MP game cvars")
+    # One module keeps Quake 4's distinct campaign (box) and network-play
+    # (cylinder) defaults through one idModeCVar declaration (CORE-07), with the
+    # same integer type in both modes.
+    mode_cvar = re.search(
+        r'idModeCVar pm_usecylinder\(\s*"pm_usecylinder",\s*"([^"]*)",\s*([^,]+),\s*"([^"]*)",\s*([^,]+),', mp_cvars)
+    if mode_cvar is None:
+        raise AssertionError("pm_usecylinder is no longer one per-mode declaration")
+    sp_default, sp_flags, mp_default, mp_flags = mode_cvar.groups()
     if (sp_default, mp_default) != ("0", "1"):
         raise AssertionError("pm_usecylinder no longer preserves the stock SP/MP defaults")
     for flags, context in ((sp_flags, "SP"), (mp_flags, "MP")):

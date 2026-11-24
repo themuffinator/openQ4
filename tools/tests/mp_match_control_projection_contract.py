@@ -15,8 +15,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchControlProjection.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchControlProjection.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchControlProjection.h"
+SOURCE = ROOT / "src/game/mp/match/MatchControlProjection.cpp"
 
 SCALAR_STATES = {
     "match_surface_available",
@@ -215,9 +215,8 @@ def static_contracts(header: str, source: str) -> None:
             sys.executable,
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         cwd=ROOT,
         text=True,
@@ -225,7 +224,7 @@ def static_contracts(header: str, source: str) -> None:
     )
     if listed.returncode != 0:
         raise AssertionError("could not inspect MP source discovery:\n" + listed.stderr)
-    if "mpgame/mp/match/MatchControlProjection.cpp" not in listed.stdout.splitlines():
+    if "game/mp/match/MatchControlProjection.cpp" not in listed.stdout.splitlines():
         raise AssertionError("MatchControlProjection.cpp is not compiled into the MP game module")
 
 
@@ -233,7 +232,7 @@ HARNESS = r'''
 #include <string.h>
 
 #define MP_MATCH_CONTROL_PROJECTION_SANITIZER_STANDALONE_TEST 1
-#include "mpgame/mp/match/MatchControlProjection.cpp"
+#include "game/mp/match/MatchControlProjection.cpp"
 
 #define CHECK(condition) do { if (!(condition)) { return __LINE__; } } while (0)
 
@@ -299,10 +298,10 @@ def status_harness(source: str) -> str:
 #include <algorithm>
 #include <string>
 #define MP_MATCH_CONTROL_PROJECTION_SANITIZER_STANDALONE_TEST 1
-#include "mpgame/mp/match/MatchControlProjection.cpp"
-#include "mpgame/mp/match/MatchControlProjection.h"
+#include "game/mp/match/MatchControlProjection.cpp"
+#include "game/mp/match/MatchControlProjection.h"
 #define MP_MATCH_CONTROL_LOCALIZATION_STANDALONE_TEST 1
-#include "mpgame/mp/match/MatchControlLocalization.cpp"
+#include "game/mp/match/MatchControlLocalization.cpp"
 class idStr {
 public:
     static int snPrintf(char *out, int capacity, const char *format, ...) {

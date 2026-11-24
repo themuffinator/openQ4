@@ -14,8 +14,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchEvidence.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchEvidence.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchEvidence.h"
+SOURCE = ROOT / "src/game/mp/match/MatchEvidence.cpp"
 MATCH_DIR = HEADER.parent
 
 
@@ -158,7 +158,7 @@ def static_contracts(header: str, source: str) -> None:
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchEvidence.h"
+#include "game/mp/match/MatchEvidence.h"
 
 #include <stdio.h>
 #include <string.h>

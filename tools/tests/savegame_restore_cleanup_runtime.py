@@ -79,7 +79,7 @@ def main():
     OUT=args.output.resolve(); SOURCE=args.source_save.resolve(); RUNTIME=ROOT/'.install'
     if (ROOT/'.tmp').resolve() not in OUT.parents: parser.error('Output must be a new directory below project .tmp.')
     SAVE=OUT/'save'; GAME=SAVE/'baseoq4'
-    for relative in ('openQ4-client_x64.exe','baseoq4/game-sp_x64.dll','baseoq4/game-mp_x64.dll'):
+    for relative in ('openQ4-client_x64.exe','baseoq4/game_x64.dll'):
         if sha(ROOT/'builddir'/relative)!=sha(RUNTIME/relative): parser.error('Stage the current build before running this probe: '+relative)
     OUT.mkdir(parents=True,exist_ok=False)
     (GAME/'savegames').mkdir(parents=True)
@@ -105,7 +105,7 @@ def main():
     command=[str(executable),*[part for key,value in settings.items() for part in ('+set',key,value)],'+loadGame','Good']
     report=dict(fixture=metadata,source_save=dict(path=str(SOURCE),sha256=sha(SOURCE)),command=command,
         harness_sha256=sha(Path(__file__)),
-        runtime={str(p.relative_to(RUNTIME)):sha(p) for p in [executable,RUNTIME/'baseoq4/game-sp_x64.dll',RUNTIME/'baseoq4/game-mp_x64.dll']},
+        runtime={str(p.relative_to(RUNTIME)):sha(p) for p in [executable,RUNTIME/'baseoq4/game_x64.dll']},
         before={p.name:sha(p) for p in [good,bad]},scope='Current v5 script-checksum rejection after object creation, automatic fresh-map fallback and valid load again. Hidden window; input disabled; engine screenshots only.')
     (OUT/'plan.json').write_text(json.dumps(report,indent=2)+'\n')
     startup=subprocess.STARTUPINFO(); startup.dwFlags|=subprocess.STARTF_USESHOWWINDOW; startup.wShowWindow=subprocess.SW_HIDE

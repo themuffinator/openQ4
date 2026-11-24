@@ -186,7 +186,7 @@ def main() -> int:
     mutation = "--mutation-check" in sys.argv
     with tempfile.TemporaryDirectory(prefix="restore-cleanup-", dir=ROOT / ".tmp") as directory:
         scratch = Path(directory)
-        for mode in ("game", "mpgame"):
+        for mode in ("game",):
             cpp, executable = scratch / (mode + ".cpp"), scratch / (mode + ".exe")
             code = source(mode)
             if mutation:

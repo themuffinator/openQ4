@@ -5,8 +5,8 @@
 // production headers, then against single-reversal mutations of them.
 
 #include "src/framework/async/MvdNavigation.h"
-#include "src/mpgame/mp/MvdMarkers.h"
-#include "src/mpgame/mp/DemoAutoTrack.h"
+#include "src/game/mp/MvdMarkers.h"
+#include "src/game/mp/DemoAutoTrack.h"
 
 #include <cstdio>
 #include <string>

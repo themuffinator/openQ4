@@ -14,7 +14,7 @@ repository; see [the import record](game-source-provenance.md) and
 The per-file import comments and coverage map preserve that provenance.
 
 The recovered tests now use `tools/build/list_sources.py` and canonical
-`src/game`/`src/mpgame`. Fixtures include current directional spectator controls,
+`src/game` (one tree since CORE-07). Fixtures include current directional spectator controls,
 input ownership masks, team-assignment state, bot-aware duel rotation and frozen
 terminal-result identity. The summary fixture expects a neutral draw for a tied
 casual match. A broken Unicode snowman in a historical test expectation is

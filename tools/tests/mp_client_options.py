@@ -66,14 +66,14 @@ def run_native() -> None:
 
 
 def check_cvars() -> None:
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
-    header = read("src/mpgame/gamesys/SysCvar.h")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
+    header = read("src/game/gamesys/SysCvar.h")
 
     def declaration(name: str) -> str:
-        match = re.search(r'^idCVar ' + name + r'\(.*$', cvars, re.M)
-        require(match is not None, f"{name} is declared in the multiplayer game module")
+        matches = re.findall(r'^(?:idCVar|idModeCVar) ' + name + r'\(.*$', cvars, re.M)
+        require(len(matches) == 1, f"{name} is declared once in the unified game module")
         require(f"extern idCVar\t{name};" in header, f"{name} is exported from SysCvar.h")
-        return match.group(0)
+        return matches[0]
 
     timers = declaration("si_itemTimers")
     require("CVAR_SERVERINFO" in timers and '"1"' in timers and ", 0, 2 )" in timers,
@@ -89,15 +89,15 @@ def check_cvars() -> None:
         require("CVAR_ARCHIVE" in text and "CVAR_SERVERINFO" not in text and "CVAR_USERINFO" not in text,
                 f"{name} is the player's own archived display choice")
     require(", 0, 3 )" in declaration("hud_hitSound"), "hud_hitSound offers off, Quake 4 and the two tone sets")
-    # multiplayer only: the single-player module carries none of this
+    # one game module serves both modes: each core exists once, with no second game tree to mirror it into
     for name in ("ChatTokens.h", "WeaponOrder.h", "HitSounds.h", "Locations.h", "TeamInfo.h", "ItemTimers.h"):
-        require((ROOT / "src/mpgame/mp" / name).is_file(), f"src/mpgame/mp/{name} exists")
-        require(not (ROOT / "src/game/mp" / name).exists(), f"{name} is not mirrored into the single-player module")
-    require("hud_hitSound" not in read("src/game/gamesys/SysCvar.cpp"), "game-sp registers no MP-15 cvar")
+        require((ROOT / "src/game/mp" / name).is_file(), f"src/game/mp/{name} exists")
+        require(not (ROOT / "src/mpgame/mp" / name).exists(), f"{name} is not mirrored into a second game tree")
+    require(len(re.findall(r'^idCVar hud_hitSound\(', cvars, re.M)) == 1, "the game module registers each MP-15 cvar once")
 
 
 def check_chat() -> None:
-    cmds = read("src/mpgame/gamesys/SysCmds.cpp")
+    cmds = read("src/game/gamesys/SysCmds.cpp")
     say = function_body(cmds, "static void Cmd_Say( bool team, const idCmdArgs &args )")
     expand = say.find("MPChatExpandForPlayer( gameLocal.GetLocalPlayer(), text.c_str(), args.Argc() > 2, expanded )")
     send = say.find("GAME_RELIABLE_MESSAGE_TCHAT")
@@ -105,7 +105,7 @@ def check_chat() -> None:
     require(0 < expand < send and expand < local, "the say command expands tokens on the sender, before the line is sent")
     require('cvarSystem->GetCVarInteger( "net_serverDedicated" ) == 0' in say[:expand],
             "a dedicated server's console is not expanded for a player it does not have")
-    adapter = read("src/mpgame/mp/ChatTokens.cpp")
+    adapter = read("src/game/mp/ChatTokens.cpp")
     body = function_body(adapter, "int MPChatExpandForPlayer( idPlayer *player, const char *text, bool consoleWords, idStr &expanded )")
     require("player->spectating" in body and "MP_CHAT_TOKEN_TEXT_BYTES" in body,
             "a spectator's line is left alone and an expanded line keeps the chat budget")
@@ -118,7 +118,7 @@ def check_chat() -> None:
 
 
 def check_weapon_order() -> None:
-    player = read("src/mpgame/Player.cpp")
+    player = read("src/game/Player.cpp")
     give = player[player.index("bool idInventory::Give("):]
     give = give[:give.index("\n}\n")]
     switch = give.index("owner->AutoSwitchOnPickup( *idealWeapon, i )")
@@ -137,10 +137,12 @@ def check_weapon_order() -> None:
     role = function_body(player, "int idPlayer::SmartSwitchRole( int slot )")
     require("AmmoIndexForWeaponClass( weap, &ammoRequired )" in role and "MPSmartSwitchRole(" in role,
             "a weapon that needs no ammunition is one smart switching leaves for anything")
-    for module in ("src/game/gamesys/SysCvar.cpp", "src/mpgame/gamesys/SysCvar.cpp"):
-        line = re.search(r'^idCVar ui_autoSwitch\(.*$', read(module), re.M).group(0)
-        require('"2"' in line and "CVAR_INTEGER" in line and "CVAR_USERINFO" in line and ", 0, 2," in line,
-                f"{module}: ui_autoSwitch ships as Smart (2) in the user info, from 0 to 2")
+    # one declaration serves both modes (it was identical in the two modules before the merge)
+    lines = re.findall(r'^(?:idCVar|idModeCVar) ui_autoSwitch\(.*$', read("src/game/gamesys/SysCvar.cpp"), re.M)
+    require(len(lines) == 1 and lines[0].startswith("idCVar "), "ui_autoSwitch is declared once, with one default for both modes")
+    line = lines[0]
+    require('"2"' in line and "CVAR_INTEGER" in line and "CVAR_USERINFO" in line and ", 0, 2," in line,
+            "ui_autoSwitch ships as Smart (2) in the user info, from 0 to 2")
     common = read("src/framework/Common.cpp")
     migrate = function_body(common, "static void Common_MigrateLegacyAutoSwitchDefault( void )")
     require('idStr::Cmp( autoSwitch, "1" ) == 0' in migrate and 'SetCVarInteger( "ui_autoSwitch", 2, CVAR_ARCHIVE )' in migrate
@@ -154,41 +156,43 @@ def check_weapon_order() -> None:
     order = function_body(player, "const mpWeaponOrder_t &idPlayer::GetWeaponOrder( void )")
     require("!IsFakeClient()" in order and 'GetString( "ui_weaponOrder" )' in order and "weaponOrderText.Cmp( text )" in order,
             "the order is read from the player's user info, reparsed when it changes, and bots have none")
+    require("( gameLocal.isMultiplayer && !IsFakeClient() ) ? GetUserInfo() : NULL" in order,
+            "the campaign has no weapon order: single player keeps Quake 4's pickup and fallback choices")
 
 
 def check_hit_sounds() -> None:
-    player = read("src/mpgame/Player.cpp")
+    player = read("src/game/Player.cpp")
     pulse = function_body(player, "void idPlayer::TriggerHitSound( bool armor )")
     require("rvHitSounds::OnPulse( this, armor );" in pulse and "PlayShaderDirectly" not in pulse,
             "the snapshot hit pulse sounds through rvHitSounds and nowhere else")
-    feedback = read("src/mpgame/mp/HitFeedback.cpp")
+    feedback = read("src/game/mp/HitFeedback.cpp")
     receive = function_body(feedback, "void rvDamageNumbers::ClientReceive( const idBitMsg &msg )")
     require("rvHitSounds::OnHitInfo( gameLocal.GetLocalPlayer(), damage, flags );" in receive,
             "the hit-info message names the amount for the tone")
     send = function_body(feedback, "void rvDamageNumbers::ServerSend(")
     require("rvHitSounds::OnHitInfo( attackingPlayer, reported, flags );" in send,
             "a listen server's host hears tones for its own hits")
-    sounds = read("src/mpgame/mp/HitSounds.cpp")
+    sounds = read("src/game/mp/HitSounds.cpp")
     on_info = function_body(sounds, "void rvHitSounds::OnHitInfo( idPlayer *player, int damage, int hitFlags )")
     require("HITFLAG_TEAM | HITFLAG_SELF" in on_info, "team and self hits stay silent, as in Quake 4")
     play = function_body(sounds, "static void HitSoundPlay( idPlayer *player, bool armor, float pitch )")
     require('"snd_armorHit"' in play and '"snd_weaponHit"' in play and "parms.frequencyShift = pitch;" in play,
             "a tone is Quake 4's own hit or armour-hit sound at a pitch: no audio is added")
     require("gameLocal.random" not in sounds, "a cosmetic sound must not draw from the prediction random stream")
-    game = read("src/mpgame/MultiplayerGame.cpp")
+    game = read("src/game/MultiplayerGame.cpp")
     require("rvHitSounds::Frame();" in function_body(game, "void idMultiplayerGame::CommonRun( void )"),
             "an unanswered pulse is settled once a frame on servers and clients")
 
 
 def check_messages() -> None:
-    local = read("src/mpgame/Game_local.h")
+    local = read("src/game/Game_local.h")
     enum = local[local.index("GAME_UNRELIABLE_MESSAGE_EVENT,"):]
     enum = enum[:enum.index("};")]
     names = re.findall(r"GAME_UNRELIABLE_MESSAGE_\w+", enum)
     require(names[-4:] == ["GAME_UNRELIABLE_MESSAGE_HITINFO", "GAME_UNRELIABLE_MESSAGE_TEAMINFO",
                            "GAME_UNRELIABLE_MESSAGE_ITEMTIMERS", "GAME_UNRELIABLE_MESSAGE_COUNT"],
             "the two messages are appended after HITINFO: the ordinals are the wire format")
-    network = read("src/mpgame/Game_network.cpp")
+    network = read("src/game/Game_network.cpp")
     process = function_body(network, "void idGameLocal::ProcessUnreliableMessage( const idBitMsg &msg )")
     require("type >= GAME_UNRELIABLE_MESSAGE_COUNT" in process, "an unknown message type is refused by the enum's own bound")
     require("mpGame.teamInfo.ClientReceive( msg );" in process and "mpGame.itemTimers.ClientReceive( msg );" in process,
@@ -197,7 +201,7 @@ def check_messages() -> None:
     require("QueueUnreliableMessage" not in record and "dest.WriteChar( -1 );" in record,
             "RecordUnreliableMessage reaches recordings only, addressed to every viewer")
 
-    team = read("src/mpgame/mp/TeamInfo.cpp")
+    team = read("src/game/mp/TeamInfo.cpp")
     frame = function_body(team, "void rvTeamInfo::ServerFrame( void )")
     send = function_body(team, "static void TeamInfoSend( int recipient, const mpTeamInfoEntry_t *records, int count )")
     require("gameLocal.QueueUnreliableMessage( recipient, msg );" in send and "TeamInfoSend( recipient, mates, count );" in frame
@@ -223,7 +227,7 @@ def check_messages() -> None:
             "a record is used only while fresh and for the viewer's own side, or by someone who chose to watch; "
             "a server and a demo read the players directly")
 
-    timers = read("src/mpgame/mp/ItemTimers.cpp")
+    timers = read("src/game/mp/ItemTimers.cpp")
     frame = function_body(timers, "void rvItemTimers::ServerFrame( void )")
     admit = frame.find("MPItemTimersAdmit( policy, managed, player->wantSpectate )")
     queue = frame.find("gameLocal.QueueUnreliableMessage( recipient, msg );")
@@ -234,19 +238,19 @@ def check_messages() -> None:
     rows = function_body(timers, "int rvItemTimers::GetRows( itemTimerRow_t *rows, int maxRows ) const")
     require("MPItemTimersAdmit( si_itemTimers.GetInteger(), gameLocal.mpGame.IsManagedMatch(), local->wantSpectate )" in rows,
             "a listen server's host reads the timers under the same policy as everyone else")
-    game = read("src/mpgame/MultiplayerGame.cpp")
+    game = read("src/game/MultiplayerGame.cpp")
     run = function_body(game, "void idMultiplayerGame::Run( void )")
     rebase = function_body(game, "void idMultiplayerGame::RebaseCompetitivePauseFrame( int deltaMsec )")
     require("itemTimers.ShiftMatchTime( deltaMsec );" in rebase,
             "a pause moves the item timers with the respawns they describe")
     require("teamInfo.ServerFrame();" in run and "itemTimers.ServerFrame();" in run, "the server runs both streams each frame")
     require("itemTimers.OnPickup( item, respawnSeconds );" in game and "itemTimers.OnAvailable( item );" in game
-            and "gameLocal.mpGame.itemTimers.OnHeld( this );" in read("src/mpgame/Item.cpp"),
+            and "gameLocal.mpGame.itemTimers.OnHeld( this );" in read("src/game/Item.cpp"),
             "the timers follow every pickup, return and held mega health")
 
 
 def check_cosmetics() -> None:
-    player = read("src/mpgame/Player.cpp")
+    player = read("src/game/Player.cpp")
     strength = function_body(player, "static float Player_VisibilityStrength(")
     require("Min( teamColor ? teamValue : enemyValue, Player_ServerVisibilityLimit() )" in strength
             and strength.index("spectatorView") < strength.index("Player_ServerVisibilityLimit"),
@@ -259,7 +263,7 @@ def check_cosmetics() -> None:
 
 
 def check_hud_state() -> None:
-    game = read("src/mpgame/MultiplayerGame.cpp")
+    game = read("src/game/MultiplayerGame.cpp")
     publish = function_body(game, "void idMultiplayerGame::PublishClientOptions( idUserInterface *_mphud, idPlayer *localPlayer )")
     for key in ("oq4_xhair_ammo", "oq4_it_count", "oq4_it_%d_name", "oq4_it_%d_time", "oq4_it_%d_up", "oq4_local_clock"):
         require(f'"{key}"' in publish, f"{key} is published")

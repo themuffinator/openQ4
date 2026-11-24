@@ -19,14 +19,14 @@ each final Mach-O file with `lipo -archs`.
 Thin builds compile architecture-specific module selection into each engine
 slice:
 
-- the arm64 slice prefers `game-sp_arm64.dylib` or `game-mp_arm64.dylib`;
-- the x86_64 slice prefers `game-sp_x64.dylib` or `game-mp_x64.dylib`.
+- the arm64 slice prefers `game_arm64.dylib`;
+- the x86_64 slice prefers `game_x64.dylib`.
 
-Those names remain authoritative for thin packages. If the preferred thin
-module is absent on macOS, the engine now tries
-`game-sp_universal2.dylib` or `game-mp_universal2.dylib` from the same trusted
-module roots. Self-contained app integrity checks accept the universal2 pair
-only when the architecture-specific pair is unavailable. The loader still
+One module serves both logical modules, `game_sp` and `game_mp`. Those names
+remain authoritative for thin packages. If the preferred thin module is absent
+on macOS, the engine now tries `game_universal2.dylib` from the same trusted
+module roots. Self-contained app integrity checks accept the universal2 module
+only when the architecture-specific module is unavailable. The loader still
 rejects modules outside the executable/package root and does not fall back to
 PK4 or save-path code.
 
@@ -56,7 +56,7 @@ Pull requests no longer run a `macos-universal2` assembly job. Releases are
 arm64-only, so commit validation keeps only the arm64 thin payload and its
 provenance record. The manual candidate lane below builds both slices, records
 the final merged manifest, starts the assetless dedicated server through
-`game-mp_universal2.dylib`, and runs the normal package/signing/symbol
+`game_universal2.dylib`, and runs the normal package/signing/symbol
 validation.
 
 ## Non-publishing Release Candidate

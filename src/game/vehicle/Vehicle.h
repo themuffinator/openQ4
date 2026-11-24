@@ -90,7 +90,7 @@ public:
 	virtual idVec3			GetOrigin			( const idVec3& offset = vec3_zero ) const;
 
 	const idVec3&			GetEyeOrigin		( void ) const;
-	const idMat3&			GetEyeAxis			( void ) const;
+	const idMat3&			GetEyeAxis			( void ) const;	
 	jointHandle_t			GetEyeJoint			( void ) const;
 	rvVehicle*				GetParent			( void ) const;
 	idActor*				GetDriver			( void ) const;

@@ -97,7 +97,7 @@ def validate_rule_references() -> None:
     # The rule table owns most of the range; the three built-in series profiles
     # are declared next to the profiles themselves in MatchSeries.cpp.  Both are
     # checked together so every string in the range has exactly one consumer.
-    match_dir = GAME_ROOT / "src" / "mpgame" / "mp" / "match"
+    match_dir = GAME_ROOT / "src" / "game" / "mp" / "match"
     sources = ("MatchRules.cpp", "MatchSeries.cpp")
     references: list[str] = []
     for source in sources:

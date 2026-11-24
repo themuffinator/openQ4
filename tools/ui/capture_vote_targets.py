@@ -102,11 +102,11 @@ def main():
     verify_runtime_is_current(args.runtime)
     args.output.mkdir(parents=True)
     binaries = [args.runtime / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64'),
-                *sorted(args.runtime.glob('renderer-*')), *sorted((args.runtime / 'baseoq4').glob('game-*'))]
+                *sorted(args.runtime.glob('renderer-*')), *sorted((args.runtime / 'baseoq4').glob('game_*'))]
     binaries = [p for p in binaries if p.is_file()]
     bindings = {str(p.relative_to(args.runtime)): capture.digest(p) for p in binaries}
-    sources = ['src/mpgame/Player.cpp', 'src/mpgame/Player.h', 'src/mpgame/MultiplayerGame.cpp',
-               'src/mpgame/MultiplayerGame.h', 'src/mpgame/Game_network.cpp', 'src/mpgame/gamesys/SysCmds.cpp',
+    sources = ['src/game/Player.cpp', 'src/game/Player.h', 'src/game/MultiplayerGame.cpp',
+               'src/game/MultiplayerGame.h', 'src/game/Game_network.cpp', 'src/game/gamesys/SysCmds.cpp',
                'tools/ui/retained_mp_menus.py',
                'src/ui/UserInterfaceRetained.cpp', 'src/framework/Session_menu.cpp',
                'src/ui/retained/Interaction.cpp', 'src/ui/retained/State.cpp', 'src/ui/retained/Document.cpp',

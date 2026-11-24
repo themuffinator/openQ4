@@ -13,8 +13,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchControlModel.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchControlModel.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchControlModel.h"
+SOURCE = ROOT / "src/game/mp/match/MatchControlModel.cpp"
 
 EXPECTED_TOKENS = [
     "ready_toggle",
@@ -170,17 +170,16 @@ def static_contracts(header: str, source: str) -> None:
             sys.executable,
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         cwd=ROOT,
         text=True,
         capture_output=True,
     )
     if listed.returncode != 0:
-        raise AssertionError("could not inspect mpgame source discovery:\n" + listed.stderr)
-    if "mpgame/mp/match/MatchControlModel.cpp" not in listed.stdout.splitlines():
+        raise AssertionError("could not inspect game source discovery:\n" + listed.stderr)
+    if "game/mp/match/MatchControlModel.cpp" not in listed.stdout.splitlines():
         raise AssertionError("MatchControlModel.cpp is not compiled into the MP game module")
 
 
@@ -190,7 +189,7 @@ HARNESS = r'''
 #include <string.h>
 
 #define MP_MATCH_CONTROL_MODEL_STANDALONE_TEST 1
-#include "mpgame/mp/match/MatchControlModel.cpp"
+#include "game/mp/match/MatchControlModel.cpp"
 
 #define CHECK(condition) do { if (!(condition)) { return __LINE__; } } while (0)
 

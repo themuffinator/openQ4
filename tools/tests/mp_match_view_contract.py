@@ -13,8 +13,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER_PATH = ROOT / "src/mpgame/mp/match/MatchView.h"
-SOURCE_PATH = ROOT / "src/mpgame/mp/match/MatchView.cpp"
+HEADER_PATH = ROOT / "src/game/mp/match/MatchView.h"
+SOURCE_PATH = ROOT / "src/game/mp/match/MatchView.cpp"
 
 
 def read(path: Path) -> str:
@@ -290,15 +290,14 @@ def source_listing_contract() -> None:
             "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchView.cpp" not in {line.strip() for line in listing}:
+    if "game/mp/match/MatchView.cpp" not in {line.strip() for line in listing}:
         raise AssertionError("MatchView.cpp is absent from the canonical MP source list")
 
 
@@ -355,7 +354,7 @@ private:
 };
 
 #define MP_MATCH_VIEW_STANDALONE_TEST 1
-#include "mpgame/mp/match/MatchView.cpp"
+#include "game/mp/match/MatchView.cpp"
 
 mpMatchLocalizationId_t MPMatchProtocolReasonLocalizationId(mpMatchProtocolReason_t reason) {
     return reason == MP_MATCH_PROTOCOL_REASON_NONE ? MP_MATCH_LOCALIZATION_NONE :
@@ -676,7 +675,7 @@ static mpSessionView MaxView() {
     return view;
 }
 
-#include "mpgame/mp/match/MatchSeries.h"
+#include "game/mp/match/MatchSeries.h"
 
 static void ProjectLiveSeriesSelection(const mpSeriesSelectedMap *selection,
         int selectionIndex, mpMatchViewSeriesMap_t &map) {
@@ -1191,7 +1190,7 @@ def executable_contract() -> None:
         temp_dir = Path(temp)
         harness = temp_dir / "match_view_contract.cpp"
         executable = temp_dir / "match_view_contract.exe"
-        live = read(ROOT / "src/mpgame/MultiplayerGame.cpp")
+        live = read(ROOT / "src/game/MultiplayerGame.cpp")
         start = live.index("map.selectedBySide = selection->")
         end = live.index("break;", start)
         executable_source = HARNESS.replace("@LIVE_SERIES_SELECTION@", live[start:end])

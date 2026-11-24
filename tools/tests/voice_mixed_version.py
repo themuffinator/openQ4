@@ -33,6 +33,15 @@ UNKNOWN = re.compile(r'unknown unreliable (?:server )?message')
 REJECTION = re.compile(r'(?i)(not in sync|checksum mismatch|missing|pure|rejected|bad protocol|server uses protocol|disconnect|denied)[^\n]*')
 
 
+def game_module_sha256(runtime: Path) -> str | None:
+    """The module that served multiplayer: game_x64 now, game-mp_x64 in releases before 0.16."""
+    for name in ('game_x64.dll', 'game-mp_x64.dll'):
+        module = runtime / 'baseoq4' / name
+        if module.is_file():
+            return hashlib.sha256(module.read_bytes()).hexdigest()
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--assets', type=Path, required=True)
@@ -220,8 +229,8 @@ def main() -> int:
         checks[f'{name}:clean_exit'] = all(code == 0 for role, code in record['exit_codes'].items() if record['ran_console_loop'][role])
     report = {'passed': all(checks.values()), 'checks': checks, 'scenarios': results, 'old_release': old_version,
               'old_sha256': {f'{version}-{kind}': hashlib.sha256(path.read_bytes()).hexdigest() for (version, kind), path in binaries.items()},
-              'old_game_mp_sha256': hashlib.sha256((old_runtime / 'baseoq4/game-mp_x64.dll').read_bytes()).hexdigest() if os.name == 'nt' else None,
-              'new_game_mp_sha256': hashlib.sha256((runtime / 'baseoq4/game-mp_x64.dll').read_bytes()).hexdigest() if os.name == 'nt' else None,
+              'old_game_mp_sha256': game_module_sha256(old_runtime) if os.name == 'nt' else None,
+              'new_game_mp_sha256': game_module_sha256(runtime) if os.name == 'nt' else None,
               'microphone': False, 'host_input': False,
               'harness_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest()}
     (output / 'result.json').write_text(json.dumps(report, indent=2) + '\n')

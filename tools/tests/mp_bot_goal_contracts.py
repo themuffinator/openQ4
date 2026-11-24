@@ -27,8 +27,8 @@ def reject(haystack: str, needle: str, context: str) -> None:
 
 
 def main() -> None:
-    header = read("src/mpgame/bots/Bot.h")
-    source = read("src/mpgame/bots/Bot.cpp")
+    header = read("src/game/bots/Bot.h")
+    source = read("src/game/bots/Bot.cpp")
 
     # Reaching a hold objective is its own movement state. Control uses the
     # live trigger volume and rescue uses the rules' actual thaw radius.

@@ -4,7 +4,8 @@
 // Copyright 2002-2006 Raven Software
 //----------------------------------------------------------------
 
-#include "../Game_local.h"
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 /*
 ===============================================================================
@@ -436,8 +437,12 @@ void rvClientAFAttachment::InitCopyJoints ( void ) {
 	if ( !body ) {
 		return;
 	}
-	
+
 	bodyAnimator = body->GetAnimator ( );
+
+	// a re-used attachment (an mp head survives a respawn) runs this again, so
+	// start from an empty list rather than appending a second copy of every joint
+	copyJoints.Clear();
 
 	// set up the list of joints to copy to the head
 	for( kv = spawnArgs.MatchPrefix( "copy_joint", NULL ); kv != NULL; kv = spawnArgs.MatchPrefix( "copy_joint", kv ) ) {

@@ -22,10 +22,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MP_CVARS = ROOT / "src/mpgame/gamesys/SysCvar.cpp"
-MP_CVARS_HEADER = ROOT / "src/mpgame/gamesys/SysCvar.h"
-HITFEEDBACK = ROOT / "src/mpgame/mp/HitFeedback.cpp"
-PLAYERVIEW = ROOT / "src/mpgame/PlayerView.cpp"
+MP_CVARS = ROOT / "src/game/gamesys/SysCvar.cpp"
+MP_CVARS_HEADER = ROOT / "src/game/gamesys/SysCvar.h"
+HITFEEDBACK = ROOT / "src/game/mp/HitFeedback.cpp"
+PLAYERVIEW = ROOT / "src/game/PlayerView.cpp"
 SP_TREE = ROOT / "src/game"
 
 SP_FORBIDDEN = (

@@ -12,6 +12,47 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## One game module for single-player and multiplayer, 24 November 2026
+
+- **One game file serves the campaign and multiplayer.** openQ4 built its game
+  code twice, as Quake 4 itself did: `game-sp` for the campaign and The
+  Awakening, `game-mp` for multiplayer. Both now come from one source tree and
+  ship as one file, `baseoq4/game_<arch>` (`game_x64.dll` on Windows). Nothing
+  changes in play: the campaign, multiplayer rules, bots, Arena and The
+  Awakening behave as before, and switching between the campaign and
+  multiplayer works as it did.
+- **Your saves, servers and demos keep working.** Campaign saves (Quake 4 and
+  The Awakening) load as before, and saves made by this build load in the
+  previous one. Servers and players on the previous build and this one join
+  each other. Network demos, including Quake 4 1.4.2's, and MVD recordings
+  play in either build.
+- **Settings are no longer split between two modules.** Every game setting now
+  exists in both modes, so a multiplayer setting changed from the campaign's
+  menus, or a campaign setting changed during multiplayer, is a real setting
+  rather than a placeholder until the other module loads. Five "declared
+  multiple times" warnings the split caused are gone.
+- **Upgrade note:** packages, the Windows installer and local staging remove the
+  old `game-sp_<arch>` and `game-mp_<arch>` files. An in-game update from
+  0.15.0 cannot delete them; they are never loaded and can be deleted by hand.
+  Mods that ship their own game code must rebuild it as one `game_<arch>`
+  module (game API 64); content-only mods are unaffected.
+- For developers: `src/mpgame/` is merged into `src/game/`. Behaviour that
+  differs between the modes is a runtime gate (`gameLocal.isMultiplayer`, or
+  `gameLocal.IsMultiplayerMode()` outside a map), and the few cvars whose
+  defaults differ are `idModeCVar`s. `build_game_sp` and `build_game_mp` are
+  deprecated and ignored. See [unified game module](unified-game-module.md)
+  (CORE-07).
+- Evidence, Windows x64: a clean build; the save and network serializers of
+  every function match their original trees, and two merged constants that would
+  have changed campaign saves are guarded; base and Awakening saves cross-load
+  with the pre-merge build on four maps, and 25 older saves behave as they do in
+  it; the dedicated-server client-demo smoke, both-direction network play
+  against the pre-merge build, the retail 1.4.2 netdemo smoke (64/64), MVDs
+  across builds and a campaign, network play and campaign switch in one
+  process pass. 315 of 326 native tests pass and the remaining 11 fail the same
+  way on the previous tree. Not yet run: Linux, macOS and Android builds, and a
+  human session across both modes.
+
 ## Faster pack reads and cache writes, oversized screenshots and cleaner mirrors, from openPR06, 24 November 2026
 
 Fixes and speed-ups first made in openPR06, the PREY port built on openQ4,

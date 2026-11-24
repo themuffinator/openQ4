@@ -87,12 +87,13 @@ def validate_engine_interface_header_parity() -> None:
     # There is one engine interface. Games must never acquire stale copies.
     for relative_path in ENGINE_INTERFACE_HEADERS:
         assert (ROOT / relative_path).is_file(), relative_path
-    for tree in ('game','mpgame'):
+    for tree in ('game',):
         assert not (ROOT / 'src' / tree / 'framework').exists()
     meson=read('meson.build')
     require(meson,"src_include_dir = include_directories('src')",'shared canonical engine interface')
-    require(meson,'game_idlib_include_dirs = [root_include_dir, src_include_dir]','SP interface includes')
-    require(meson,'game_idlib_mp_include_dirs = [root_include_dir, src_include_dir]','MP interface includes')
+    require(meson,'game_idlib_include_dirs = [root_include_dir, src_include_dir]','game interface includes')
+    # one game module, so no second multiplayer-flavoured interface include set
+    reject(meson,'game_idlib_mp_include_dirs','retired MP interface includes')
 
 
 def validate_companion_ci_revision() -> None:
@@ -107,7 +108,7 @@ def validate_companion_ci_revision() -> None:
 
 def validate_companion_boundary() -> None:
     meson=read('meson.build')
-    for tree in ('game','mpgame'):
+    for tree in ('game',):
         assert (ROOT / 'src' / tree / 'Game_local.h').is_file()
     require(meson,'game_libs_repo_root = meson.project_source_root()','in-tree source ownership')
     reject(meson,'stage_gamelibs.py','direct compiler inputs')
@@ -121,12 +122,10 @@ def validate_companion_macos_contract() -> None:
     meson=read('meson.build')
     modules=read('content/baseoq4/meson.build')
     for token in ("binary_arch = 'arm64'", "binary_arch = 'x64'",
-                  "game_sp_binary_name = 'game-sp_' + binary_arch",
-                  "game_mp_binary_name = 'game-mp_' + binary_arch"):
+                  "game_binary_name = 'game_' + binary_arch"):
         require(meson,token,'in-tree macOS module architecture')
     for token in ("name_suffix: 'dylib'",
-                  "'-Wl,-install_name,@loader_path/' + game_sp_binary_name + '.dylib'",
-                  "'-Wl,-install_name,@loader_path/' + game_mp_binary_name + '.dylib'"):
+                  "'-Wl,-install_name,@loader_path/' + game_binary_name + '.dylib'"):
         require(modules,token,'in-tree macOS module install name')
     require(read('.github/workflows/commit-validation.yml'),'macos-15','in-tree macOS CI coverage')
     require(read('.github/workflows/push-verification.yml'),'macos-15-intel','in-tree macOS Intel CI coverage')
@@ -138,9 +137,10 @@ def validate_companion_macos_contract() -> None:
 
 def validate_game_module_symbol_discipline() -> None:
     """Issue #90: darwin was the only host that let a game module export its
-    whole symbol table, and both modules shared one single-player-flavoured
-    idlib archive even though GAME_MPAPI changes which Game_local.h every idlib
-    translation unit compiles against."""
+    whole symbol table, and the split SP/MP modules once shared one
+    single-player-flavoured idlib archive even though GAME_MPAPI changed which
+    Game_local.h every idlib translation unit compiled against. One game module
+    now links the one game idlib archive, so no second flavour may return."""
 
     engine_meson = read("meson.build")
     module_meson = read("content/baseoq4/meson.build")
@@ -157,23 +157,22 @@ def validate_game_module_symbol_discipline() -> None:
     require(read("src/framework/Common.cpp"), "Sys_DLL_GetProcAddress( gameDLL, MEM_MODULE_STATS_ENTRY_POINT )", "game memory counter lookup is scoped to its module handle")
 
     for token in (
-        "game_idlib_library_mp = static_library(",
-        "'openq4_game_idlib_mp',",
-        "game_common_cpp_args + ['-DGAME_MPAPI'],",
-        "game_idlib_mp_include_dirs",
+        "game_idlib_library = static_library(",
+        "'openq4_game_idlib',",
         "darwin_game_module_export_list = files('tools/build/darwin_game_module.exp')",
         "'-Wl,-exported_symbols_list,' + darwin_game_module_export_list[0].full_path()",
     ):
-        require(engine_meson, token, "engine per-flavour game idlib and darwin export list")
+        require(engine_meson, token, "engine game idlib and darwin export list")
+    for token in ("game_idlib_library_mp", "'openq4_game_idlib_mp',", "game_idlib_mp_include_dirs"):
+        reject(engine_meson, token, "retired multiplayer-flavoured game idlib")
 
-    if module_meson.count("link_with: game_idlib_library_mp,") != 3:
-        raise AssertionError("every multiplayer game module target must link the multiplayer idlib archive")
+    reject(module_meson, "game_idlib_library_mp", "retired multiplayer-flavoured game idlib")
     if module_meson.count("link_with: game_idlib_library,") != 3:
-        raise AssertionError("every single-player game module target must link the single-player idlib archive")
-    if module_meson.count("gnu_symbol_visibility: 'hidden',") != 4:
+        raise AssertionError("every game module target (Windows, darwin, other) must link the game idlib archive")
+    if module_meson.count("gnu_symbol_visibility: 'hidden',") != 2:
         raise AssertionError("darwin and linux game modules must both hide non-exported symbols")
 
-    # The engine and both game flavours share compiler flags and support code.
+    # The engine and the game module share compiler flags and support code.
     reject(engine_meson,"common_defines += ['_DEBUG']",'Clang game/engine layout parity')
     require(engine_meson,'game_common_cpp_args = shared_cpp_args +','shared game/engine flags')
 
@@ -224,8 +223,7 @@ def validate_metadata_contract() -> None:
         "package/app-VERSION.txt",
         "openq4_commit",
         "openq4_game_commit",
-        "game-sp_*.dylib",
-        "game-mp_*.dylib",
+        "game_*.dylib",
     ):
         require(collector, token, "macOS support collector build metadata contract")
 

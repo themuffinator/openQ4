@@ -238,7 +238,7 @@ def main():
              ('ui_autoJoin', '0'), ('r_renderApi', args.renderer), ('sys_consoleWindow', '0'),
              ('r_fullscreenDesktop', '0'), ('com_maxfps', '120'), ('g_autoSkipCinematics', '0')])
     command = launch_command(options, exe, output)
-    modules = list((ROOT/'.install/baseoq4').glob('game-sp_*'))
+    modules = list((ROOT/'.install/baseoq4').glob('game_*'))
     runtime = [exe, *(p for p in modules if p.suffix in ('.dll', '.so', '.dylib')),
                ROOT/'.install/baseoq4/pak0.pk4', ROOT/'.install/baseoq4/pak1.pk4']
     identity = {str(p.relative_to(ROOT)): sha(p) for p in runtime}

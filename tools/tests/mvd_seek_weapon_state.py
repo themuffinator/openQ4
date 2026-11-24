@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> int:
-    source = (ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/Player.cpp").read_text(encoding="utf-8")
     # Keep the production admission/initialization block, stopping before
     # unrelated GUI, combat and drawing adapters. The latter are qualified
     # by mp_mvd_seek_smoke.py against recorded gameplay.

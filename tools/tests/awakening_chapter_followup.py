@@ -232,8 +232,8 @@ def main():
     args.cache=task_path(ROOT/'.tmp/awakening-m03-m04/gl/cache')
     args.output.mkdir(parents=True,exist_ok=True)
     runtime=ROOT/'.install'
-    identity={name:sha256(runtime/name) for name in ('openQ4-client_x64.exe','baseoq4/game-sp_x64.dll','baseoq4/pak0.pk4')}
-    for name in ('openQ4-client_x64.exe','baseoq4/game-sp_x64.dll'):
+    identity={name:sha256(runtime/name) for name in ('openQ4-client_x64.exe','baseoq4/game_x64.dll','baseoq4/pak0.pk4')}
+    for name in ('openQ4-client_x64.exe','baseoq4/game_x64.dll'):
         assert identity[name]==sha256(ROOT/'builddir'/name), 'stage the current build first'
     first,save=run(args,'write')
     results=[first]

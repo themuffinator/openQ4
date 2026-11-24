@@ -107,7 +107,7 @@ def unplanned_pad_replay(runtime: Path, executable: str, basepath: Path, output:
     result.update({"exit_code": code, "elapsed_seconds": round(time.monotonic() - started, 2),
                    "identity": {str(p): file_sha256(p) for p in
                                 (runtime / executable, runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4",
-                                 *[p for p in (runtime / "baseoq4").glob("game-mp*") if p.suffix in (".dll", ".so", ".dylib")])},
+                                 *[p for p in (runtime / "baseoq4").glob("game_*") if p.suffix in (".dll", ".so", ".dylib")])},
                    "scope": "One isolated q4ctf5 bot on walking legs clear of func_jumppad_14 with momentum toward it; "
                             "no enemies. Bounded regression, not match acceptance."})
     (output / "report.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
@@ -190,9 +190,9 @@ def main() -> int:
     command += ["+spawnServer", "mp/q4xdm13" if args.dodge_runout else "mp/q4dm8"]
     (output / "launch.json").write_text(json.dumps(command, indent=2) + "\n", encoding="utf-8")
     paths = [exe, runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4",
-             *[p for p in (runtime / "baseoq4").glob("game-mp*") if p.suffix in (".dll", ".so", ".dylib")],
-             *[ROOT / p for p in ("src/mpgame/bots/NavMesh.cpp", "src/mpgame/bots/Bot.cpp",
-                                 "src/mpgame/bots/Bot.h", "src/mpgame/gamesys/SysCmds.cpp", "src/mpgame/Player.cpp")],
+             *[p for p in (runtime / "baseoq4").glob("game_*") if p.suffix in (".dll", ".so", ".dylib")],
+             *[ROOT / p for p in ("src/game/bots/NavMesh.cpp", "src/game/bots/Bot.cpp",
+                                 "src/game/bots/Bot.h", "src/game/gamesys/SysCmds.cpp", "src/game/Player.cpp")],
              Path(__file__).resolve()]
     identity = {str(path): file_sha256(path) for path in paths}
     started = time.monotonic()

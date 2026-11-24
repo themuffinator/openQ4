@@ -296,18 +296,13 @@ def make_macos_symbol_manifest_bytes(package_name: str, arch: str, version: str,
         "  size=1\n"
         f"  macho_uuid=UUID: 00000000-0000-0000-0000-000000000003 (arm64) openQ4-ded_{arch}\n"
         f"  dsym=dSYMs/openQ4-ded_{arch}.dSYM\n"
-        f"- path=openQ4.app/Contents/Frameworks/game-sp_{arch}.dylib\n"
+        f"- path=openQ4.app/Contents/Frameworks/game_{arch}.dylib\n"
         f"  sha256={'3' * 64}\n"
         "  size=1\n"
-        f"  macho_uuid=UUID: 00000000-0000-0000-0000-000000000004 (arm64) game-sp_{arch}.dylib\n"
-        f"  dsym=dSYMs/game-sp_{arch}.dylib.dSYM\n"
-        f"- path=openQ4.app/Contents/Frameworks/game-mp_{arch}.dylib\n"
-        f"  sha256={'4' * 64}\n"
-        "  size=1\n"
-        f"  macho_uuid=UUID: 00000000-0000-0000-0000-000000000005 (arm64) game-mp_{arch}.dylib\n"
-        f"  dsym=dSYMs/game-mp_{arch}.dylib.dSYM\n"
+        f"  macho_uuid=UUID: 00000000-0000-0000-0000-000000000004 (arm64) game_{arch}.dylib\n"
+        f"  dsym=dSYMs/game_{arch}.dylib.dSYM\n"
         # The Vulkan renderer module is openQ4-built, so it carries a dSYM and
-        # belongs in the manifest exactly like the game modules. libMoltenVK.dylib
+        # belongs in the manifest exactly like the game module. libMoltenVK.dylib
         # ships beside it in Contents/Frameworks but is deliberately absent here:
         # it is a third-party prebuilt with no DWARF, and macos_symbol_targets()
         # excludes it for the same reason.
@@ -344,8 +339,7 @@ def make_macos_archive_entries(
         f"{prefix}{package.MACOS_SUPPORT_INFO_SCRIPT_NAME}": (make_macos_support_info_script_bytes(package), 0o755),
         f"{prefix}openQ4-client_{arch}": (client_bytes, client_mode),
         f"{prefix}openQ4-ded_{arch}": (b"dedicated-binary\n", dedicated_mode),
-        f"{prefix}openQ4.app/Contents/Frameworks/game-sp_{arch}.dylib": (b"sp-module\n", 0o755),
-        f"{prefix}openQ4.app/Contents/Frameworks/game-mp_{arch}.dylib": (b"mp-module\n", 0o755),
+        f"{prefix}openQ4.app/Contents/Frameworks/game_{arch}.dylib": (b"game-module\n", 0o755),
         # The Vulkan renderer module and the MoltenVK runtime it loads are both
         # signed executable code inside Contents/Frameworks, so both carry the
         # same 0o755 archive mode the game modules do.
@@ -420,12 +414,8 @@ def make_macos_symbol_archive_entries(
             b"ded-dsym\n",
             0o644,
         ),
-        f"{prefix}dSYMs/game-sp_{arch}.dylib.dSYM/Contents/Resources/DWARF/game-sp_{arch}.dylib": (
-            b"sp-dsym\n",
-            0o644,
-        ),
-        f"{prefix}dSYMs/game-mp_{arch}.dylib.dSYM/Contents/Resources/DWARF/game-mp_{arch}.dylib": (
-            b"mp-dsym\n",
+        f"{prefix}dSYMs/game_{arch}.dylib.dSYM/Contents/Resources/DWARF/game_{arch}.dylib": (
+            b"game-dsym\n",
             0o644,
         ),
         f"{prefix}dSYMs/renderer-vk_{arch}.dylib.dSYM/Contents/Resources/DWARF/renderer-vk_{arch}.dylib": (
@@ -612,8 +602,7 @@ def validate_macos_app_bundle_validator_runtime() -> None:
         write_test_file(app_contents / "Info.plist", make_macos_plist_bytes(package, version))
         write_test_file(app_contents / "PkgInfo", package.MACOS_PKGINFO_BYTES)
         write_test_file(app_contents / "MacOS" / "openQ4", client_bytes, 0o755)
-        write_test_file(app_contents / "Frameworks" / f"game-sp_{arch}.dylib", b"sp-module\n", 0o755)
-        write_test_file(app_contents / "Frameworks" / f"game-mp_{arch}.dylib", b"mp-module\n", 0o755)
+        write_test_file(app_contents / "Frameworks" / f"game_{arch}.dylib", b"game-module\n", 0o755)
         write_test_file(app_contents / "Frameworks" / f"renderer-vk_{arch}.dylib", b"renderer-vk-module\n", 0o755)
         write_test_file(
             app_contents / "Frameworks" / package.MACOS_MOLTENVK_DYLIB_NAME,
@@ -745,13 +734,8 @@ def validate_macos_app_bundle_validator_runtime() -> None:
         for pak_name in package.OPENQ4_PACK_NAMES:
             write_test_file(missing_icon_package / package.GAME_DIR_NAME / pak_name, b"pk4\n")
         write_test_file(
-            missing_icon_package / package.GAME_DIR_NAME / f"game-sp_{arch}.dylib",
-            b"sp-module\n",
-            0o755,
-        )
-        write_test_file(
-            missing_icon_package / package.GAME_DIR_NAME / f"game-mp_{arch}.dylib",
-            b"mp-module\n",
+            missing_icon_package / package.GAME_DIR_NAME / f"game_{arch}.dylib",
+            b"game-module\n",
             0o755,
         )
         # meson installs the renderer module beside the engine binaries in the
@@ -814,13 +798,8 @@ def validate_macos_self_contained_app_creation_runtime() -> None:
         for pak_name in package.OPENQ4_PACK_NAMES:
             write_test_file(package_root / package.GAME_DIR_NAME / pak_name, pak_name.removesuffix(".pk4").encode() + b"\n")
         write_test_file(
-            package_root / package.GAME_DIR_NAME / f"game-sp_{arch}.dylib",
-            b"sp\n",
-            0o755,
-        )
-        write_test_file(
-            package_root / package.GAME_DIR_NAME / f"game-mp_{arch}.dylib",
-            b"mp\n",
+            package_root / package.GAME_DIR_NAME / f"game_{arch}.dylib",
+            b"game\n",
             0o755,
         )
         # The renderer module is installed into the package root and moved into
@@ -862,8 +841,7 @@ def validate_macos_self_contained_app_creation_runtime() -> None:
             package.MACOS_APP_GAME_DATA_DIR / "mod.json",
             *(package.MACOS_APP_GAME_DATA_DIR / pak_name for pak_name in package.OPENQ4_PACK_NAMES),
             package.MACOS_APP_SPLASH_DIR / "quake4_rt_bitmap_4001.bmp",
-            package.MACOS_APP_FRAMEWORKS_DIR / f"game-sp_{arch}.dylib",
-            package.MACOS_APP_FRAMEWORKS_DIR / f"game-mp_{arch}.dylib",
+            package.MACOS_APP_FRAMEWORKS_DIR / f"game_{arch}.dylib",
             package.MACOS_APP_FRAMEWORKS_DIR / f"renderer-vk_{arch}.dylib",
             package.MACOS_APP_FRAMEWORKS_DIR / package.MACOS_MOLTENVK_DYLIB_NAME,
             package.MACOS_APP_FRAMEWORKS_DIR / package.MACOS_OPENAL_SOFT_DYLIB_NAME,
@@ -1886,7 +1864,7 @@ def validate_macos_archive_validator_runtime() -> None:
                 package_root.name,
                 arch,
                 plist_bytes,
-                extra_entries={f"{package_root.name}/{package.GAME_DIR_NAME}/game-sp_x64.dylib": (b"stale\n", 0o755)},
+                extra_entries={f"{package_root.name}/{package.GAME_DIR_NAME}/game_x64.dylib": (b"stale\n", 0o755)},
             ),
         )
         expect_runtime_error(
@@ -1901,6 +1879,30 @@ def validate_macos_archive_validator_runtime() -> None:
             "macOS archive with stale game module",
         )
 
+        # the split modules an older build shipped are stale code as well
+        bad_retired_module_archive = work / "bad-retired-module.tar.gz"
+        write_test_targz_archive(
+            bad_retired_module_archive,
+            make_macos_archive_entries(
+                package,
+                package_root.name,
+                arch,
+                plist_bytes,
+                extra_entries={f"{package_root.name}/openQ4.app/Contents/Frameworks/game-sp_{arch}.dylib": (b"retired\n", 0o755)},
+            ),
+        )
+        expect_runtime_error(
+            "game-sp_",
+            lambda: package.validate_macos_archive_contents(
+                package_root,
+                bad_retired_module_archive,
+                "tar.gz",
+                arch,
+                version,
+            ),
+            "macOS archive with a retired split game module",
+        )
+
         bad_wrong_platform_module_archive = work / "bad-wrong-platform-module.tar.gz"
         write_test_targz_archive(
             bad_wrong_platform_module_archive,
@@ -1909,7 +1911,7 @@ def validate_macos_archive_validator_runtime() -> None:
                 package_root.name,
                 arch,
                 plist_bytes,
-                extra_entries={f"{package_root.name}/{package.GAME_DIR_NAME}/game-mp_{arch}.dll": (b"wrong\n", 0o755)},
+                extra_entries={f"{package_root.name}/{package.GAME_DIR_NAME}/game_{arch}.dll": (b"wrong\n", 0o755)},
             ),
         )
         expect_runtime_error(
@@ -2284,8 +2286,7 @@ def validate_macos_signing_keeps_standalone_client_signature_runtime() -> None:
         write_test_file(client_binary, b"unsigned-client\n", 0o755)
         write_test_file(package_root / f"openQ4-ded_{arch}", b"dedicated\n", 0o755)
         framework_root = app_root / package.MACOS_APP_FRAMEWORKS_DIR
-        write_test_file(framework_root / f"game-sp_{arch}.dylib", b"sp\n", 0o755)
-        write_test_file(framework_root / f"game-mp_{arch}.dylib", b"mp\n", 0o755)
+        write_test_file(framework_root / f"game_{arch}.dylib", b"game\n", 0o755)
         write_test_file(framework_root / f"renderer-vk_{arch}.dylib", b"renderer-vk\n", 0o755)
         write_test_file(framework_root / package.MACOS_MOLTENVK_DYLIB_NAME, b"moltenvk\n", 0o755)
         write_test_file(framework_root / package.MACOS_OPENAL_SOFT_DYLIB_NAME, b"openal-soft\n", 0o755)
@@ -2331,8 +2332,7 @@ def validate_macos_signing_keeps_standalone_client_signature_runtime() -> None:
         expected_calls = [
             (f"openQ4-client_{arch}", True),
             (f"openQ4-ded_{arch}", True),
-            (f"openQ4.app/Contents/Frameworks/game-sp_{arch}.dylib", False),
-            (f"openQ4.app/Contents/Frameworks/game-mp_{arch}.dylib", False),
+            (f"openQ4.app/Contents/Frameworks/game_{arch}.dylib", False),
             (f"openQ4.app/Contents/Frameworks/renderer-vk_{arch}.dylib", False),
             (f"openQ4.app/Contents/Frameworks/{package.MACOS_MOLTENVK_DYLIB_NAME}", False),
             (f"openQ4.app/Contents/Frameworks/{package.MACOS_OPENAL_SOFT_DYLIB_NAME}", False),
@@ -2404,14 +2404,12 @@ def validate_macos_install_name_normalization_runtime() -> None:
             install_names.clear()
             modules = package.macos_loadable_module_install_names(package_root, arch)
             module_keys = {
-                "game-sp": package.macos_embedded_game_module_paths(package_root, arch)[0],
-                "game-mp": package.macos_embedded_game_module_paths(package_root, arch)[1],
+                "game": package.macos_embedded_game_module_path(package_root, arch),
                 "renderer-vk": package.macos_embedded_renderer_module_path(package_root, arch),
                 "openal-soft": package.macos_embedded_openal_soft_path(package_root),
             }
             explicit_modules = {
-                module_keys["game-sp"]: f"@loader_path/game-sp_{arch}.dylib",
-                module_keys["game-mp"]: f"@loader_path/game-mp_{arch}.dylib",
+                module_keys["game"]: f"@loader_path/game_{arch}.dylib",
                 module_keys["renderer-vk"]: f"@loader_path/renderer-vk_{arch}.dylib",
                 module_keys["openal-soft"]: package.MACOS_OPENAL_SOFT_INSTALL_NAME,
             }
@@ -2448,10 +2446,10 @@ def validate_macos_install_name_normalization_runtime() -> None:
             work / "openq4-v0.2.000-macos-arm64-opengl",
             "arm64",
             {
-                ("game-sp", "arm64"): "/tmp/openq4/.install/baseoq4/game-sp_arm64.dylib",
+                ("game", "arm64"): "/tmp/openq4/.install/baseoq4/game_arm64.dylib",
                 ("renderer-vk", "arm64"): "/tmp/openq4/.install/renderer-vk_arm64.dylib",
             },
-            ("game-sp", "renderer-vk"),
+            ("game", "renderer-vk"),
         )
         run_case(
             work / "openq4-v0.2.000-macos-universal2-metal",
@@ -2544,10 +2542,8 @@ def validate_macos_staged_payload_validator_runtime() -> None:
                 install_root / "licenses" / "openal-soft" / filename,
                 f"openal-soft-{filename}\n".encode(),
             )
-        sp_module = game_dir / f"game-sp_{arch}.dylib"
-        mp_module = game_dir / f"game-mp_{arch}.dylib"
-        write_test_file(sp_module, b"sp\n", 0o755)
-        write_test_file(mp_module, b"mp\n", 0o755)
+        game_module = game_dir / f"game_{arch}.dylib"
+        write_test_file(game_module, b"game\n", 0o755)
 
         validator.validate_macos_staged_metadata(
             ROOT,
@@ -2556,6 +2552,23 @@ def validate_macos_staged_payload_validator_runtime() -> None:
             [client],
             [dedicated],
         )
+
+        # one game module replaced the split game-sp/game-mp modules; an older
+        # build's copy left in the stage is stale code
+        retired_module = game_dir / f"game-sp_{arch}.dylib"
+        write_test_file(retired_module, b"retired\n", 0o755)
+        expect_runtime_error(
+            "stale or mismatched game modules",
+            lambda: validator.validate_macos_staged_metadata(
+                ROOT,
+                install_root,
+                game_dir,
+                [client],
+                [dedicated],
+            ),
+            "macOS staged payload with a retired split game module",
+        )
+        retired_module.unlink()
 
         if validator.host_is_macos():
             fake_lipo_arches[client] = {"x86_64"}
@@ -2663,7 +2676,7 @@ def validate_macos_staged_payload_validator_runtime() -> None:
             write_test_file(support_script, make_validation_support_info_script_bytes(validator), 0o755)
         support_script_target.unlink()
 
-        bad_module = game_dir / f"game-sp_{arch}.so"
+        bad_module = game_dir / f"game_{arch}.so"
         write_test_file(bad_module, b"wrong\n")
         expect_runtime_error(
             "non-dylib game modules",
@@ -2679,7 +2692,7 @@ def validate_macos_staged_payload_validator_runtime() -> None:
         bad_module.unlink()
 
         if os.name != "nt":
-            os.chmod(mp_module, 0o644)
+            os.chmod(game_module, 0o644)
             expect_runtime_error(
                 "not executable",
                 lambda: validator.validate_macos_staged_metadata(
@@ -2691,7 +2704,7 @@ def validate_macos_staged_payload_validator_runtime() -> None:
                 ),
                 "macOS staged payload with non-executable game module",
             )
-            os.chmod(mp_module, 0o755)
+            os.chmod(game_module, 0o755)
 
         bad_dsym = install_root / f"openQ4-client_{arch}.dSYM"
         bad_dsym.mkdir()
@@ -2738,9 +2751,9 @@ def validate_macos_staged_payload_validator_runtime() -> None:
         )
         bad_appledouble.unlink()
 
-        mp_module.unlink()
+        game_module.unlink()
         expect_runtime_error(
-            "architecture-matched game modules",
+            "architecture-matched game module",
             lambda: validator.validate_macos_staged_metadata(
                 ROOT,
                 install_root,
@@ -2748,9 +2761,9 @@ def validate_macos_staged_payload_validator_runtime() -> None:
                 [client],
                 [dedicated],
             ),
-            "macOS staged payload missing matched MP module",
+            "macOS staged payload missing matched game module",
         )
-        write_test_file(mp_module, b"mp\n", 0o755)
+        write_test_file(game_module, b"game\n", 0o755)
 
         openal_runtime.unlink()
         expect_runtime_error(
@@ -2825,8 +2838,7 @@ def validate_meson_contract() -> None:
     require(meson, "'macOS OpenAL provider': macos_openal_provider", "Meson summary")
 
     require(baseoq4_meson, "elif host_system == 'darwin'", "macOS game module source branch")
-    require(baseoq4_meson, "shared_library(\n      game_sp_binary_name,", "macOS SP game module dylib target type")
-    require(baseoq4_meson, "shared_library(\n      game_mp_binary_name,", "macOS MP game module dylib target type")
+    require(baseoq4_meson, "shared_library(\n      game_binary_name,", "macOS game module dylib target type")
     require(baseoq4_meson, "name_suffix: 'dylib'", "macOS game module dylib suffix")
     require(baseoq4_meson, "-Wl,-install_name,@loader_path/", "macOS game module install name")
 
@@ -3133,8 +3145,7 @@ def validate_packaging_and_release_contract() -> None:
     require(package, "\"xcrun\", \"stapler\", \"staple\"", "macOS stapling")
     require(package, "\"spctl\", \"--assess\"", "macOS Gatekeeper assessment")
     require(package, "code signature verification", "macOS code-sign validation")
-    require(package, "game-sp_{arch}.dylib", "macOS archive game module validation")
-    require(package, "game-mp_{arch}.dylib", "macOS archive game module validation")
+    require(package, "{GAME_MODULE_STEM}_{arch}.dylib", "macOS archive game module validation")
     # Since PKG-02 the archive check expects every pack content_packs.json lists
     # (core pak0, light-grid pak1, loadscreen pak2) rather than naming each one.
     require(
@@ -3209,13 +3220,11 @@ def validate_packaging_and_release_contract() -> None:
     require(compat, "Sys_ErrorIfMacOSAppBundlePackageRootIncomplete", "macOS app-only package-root startup diagnostic")
     require(compat, "OpenQ4PackageRootMissingTitle", "macOS app-only package-root localized startup diagnostic")
     require(compat, "Expected adjacent package-root contract: openQ4.app, loose binaries, and baseoq4/ together", "macOS app-only package-root contract diagnostic")
-    require(compat, 'idStr::snPrintf( spModuleEntry, sizeof( spModuleEntry ), "%s/game-sp_%s.dylib", OPENQ4_GAMEDIR, arch )', "macOS app package-root expects baseoq4 SP module")
-    require(compat, 'idStr::snPrintf( mpModuleEntry, sizeof( mpModuleEntry ), "%s/game-mp_%s.dylib", OPENQ4_GAMEDIR, arch )', "macOS app package-root expects baseoq4 MP module")
+    require(compat, 'idStr::snPrintf( moduleEntry, sizeof( moduleEntry ), "%s/game_%s.dylib", OPENQ4_GAMEDIR, arch )', "macOS app package-root expects the baseoq4 game module")
     require(compat, "Sys_RequireMacOSPackageRootDirectory( packageDirectory, OPENQ4_GAMEDIR, missingEntries )", "macOS app package-root requires baseoq4 runtime directory")
     require(compat, "Sys_AppendAlternateMacOSPackageRootGameModuleEntries", "macOS app package-root mismatched module diagnostics")
     require(compat, "Sys_AppendAlternateMacOSPackageRootGameModuleEntries( packageDirectory, BASE_GAMEDIR, expectedArch, foundEntries )", "macOS app package-root reports q4base misplaced dylibs")
-    reject(compat, 'idStr::snPrintf( spModuleEntry, sizeof( spModuleEntry ), "%s/game-sp_%s.dylib", BASE_GAMEDIR, arch )', "macOS app package-root must not expect SP module under q4base")
-    reject(compat, 'idStr::snPrintf( mpModuleEntry, sizeof( mpModuleEntry ), "%s/game-mp_%s.dylib", BASE_GAMEDIR, arch )', "macOS app package-root must not expect MP module under q4base")
+    reject(compat, 'idStr::snPrintf( moduleEntry, sizeof( moduleEntry ), "%s/game_%s.dylib", BASE_GAMEDIR, arch )', "macOS app package-root must not expect the game module under q4base")
     reject(compat, "Sys_RequireMacOSPackageRootDirectory( packageDirectory, BASE_GAMEDIR, missingEntries )", "macOS app package-root must not require q4base as runtime directory")
     require(main, "SDL_MAIN_HANDLED", "macOS SDL3 launch initialization")
     require(main, "static int SDLCALL OpenQ4_Main", "macOS SDL3 launch initialization")
@@ -3237,7 +3246,7 @@ def validate_packaging_and_release_contract() -> None:
     require(validator, "validate_no_macos_symlinks(root, install_root)", "macOS staged symlink validation")
     require(validator, "openQ4.icns", "macOS staged payload validation")
     require(validator, "non-dylib game modules", "macOS staged payload validation")
-    require(validator, "architecture-matched game modules", "macOS staged payload validation")
+    require(validator, "architecture-matched game module", "macOS staged payload validation")
     require(validator, "macOS staged game module is not executable", "macOS staged game module validation")
     require(validator, "MACOS_FORBIDDEN_XATTRS", "macOS staged quarantine validation")
     require(validator, "MACOS_NON_RUNTIME_PATTERNS", "macOS staged debug artifact validation")
@@ -3367,7 +3376,7 @@ def validate_packaging_and_release_contract() -> None:
     require(release, "Missing or invalid macOS app PkgInfo", "manual release macOS app validation")
     require(release, "Missing or non-executable macOS dedicated binary", "manual release macOS app validation")
     require(release, "Missing or non-executable macOS package game module", "manual release macOS app validation")
-    require(release, "sp_module=", "manual release macOS dependency validation")
+    require(release, "game_module=", "manual release macOS dependency validation")
     require(release, "check_macos_binary_architecture", "manual release macOS architecture validation")
     require(release, "lipo -archs", "manual release macOS architecture validation")
     require(release, "check_macos_codesignature", "manual release macOS signature validation")
@@ -3393,14 +3402,13 @@ def validate_packaging_and_release_contract() -> None:
     require(release, "hdiutil imageinfo", "manual release DMG validation")
     require(release, "spctl --assess --type execute", "manual release Gatekeeper validation")
     require(release, "check_macos_install_name", "manual release macOS install-name validation")
-    require(release, "@loader_path/game-sp_${{ matrix.binary_arch }}.dylib", "manual release macOS install-name validation")
+    require(release, "@loader_path/game_${{ matrix.binary_arch }}.dylib", "manual release macOS install-name validation")
     require(release, "@loader_path/renderer-vk_${{ matrix.binary_arch }}.dylib", "manual release renderer install-name validation")
     require(release, "check_macos_binary_dependencies", "manual release macOS dependency validation")
     require(release, 'otool -arch "${macho_arch}" -L', "manual release macOS dependency validation")
     require(release, "unbundled non-system dependency", "manual release macOS dependency validation")
     require(release, "Missing macOS staged payload file", "manual release macOS staged validation")
-    require(release, ".install/baseoq4/game-sp_${{ matrix.binary_arch }}.dylib", "manual release macOS staged validation")
-    require(release, ".install/baseoq4/game-mp_${{ matrix.binary_arch }}.dylib", "manual release macOS staged validation")
+    require(release, ".install/baseoq4/game_${{ matrix.binary_arch }}.dylib", "manual release macOS staged validation")
     require(release, ".install/collect_macos_support_info.sh", "manual release macOS support collector staging")
     require(release, "Missing or non-executable macOS support collector", "manual release macOS support collector validation")
     require(release, "contains_control_chars()", "manual release macOS support collector path-control validation")
@@ -4033,17 +4041,14 @@ def make_macos_layer_mod_json_bytes(required: str = "0.2.000") -> bytes:
 
 
 def make_macos_layer_symbol_records(arch: str) -> bytes:
-    records = []
-    for index, kind in enumerate(("sp", "mp")):
-        module = f"game-{kind}_{arch}.dylib"
-        records.append(
-            f"- path=openQ4.app/Contents/Frameworks/q4xbase/{module}\n"
-            f"  sha256={str(6 + index) * 64}\n"
-            "  size=1\n"
-            f"  macho_uuid=UUID: 00000000-0000-0000-0000-00000000000{7 + index} (arm64) {module}\n"
-            f"  dsym=dSYMs/q4xbase/{module}.dSYM\n"
-        )
-    return "".join(records).encode("utf-8")
+    module = f"game_{arch}.dylib"
+    return (
+        f"- path=openQ4.app/Contents/Frameworks/q4xbase/{module}\n"
+        f"  sha256={'6' * 64}\n"
+        "  size=1\n"
+        f"  macho_uuid=UUID: 00000000-0000-0000-0000-000000000007 (arm64) {module}\n"
+        f"  dsym=dSYMs/q4xbase/{module}.dSYM\n"
+    ).encode("utf-8")
 
 
 def validate_macos_game_layer_bundle_runtime() -> None:
@@ -4061,8 +4066,7 @@ def validate_macos_game_layer_bundle_runtime() -> None:
         write_test_file(package_root / package.GAME_DIR_NAME / "mod.json", b"{}\n")
         for pak_name in package.OPENQ4_PACK_NAMES:
             write_test_file(package_root / package.GAME_DIR_NAME / pak_name, pak_name.removesuffix(".pk4").encode() + b"\n")
-        write_test_file(package_root / package.GAME_DIR_NAME / f"game-sp_{arch}.dylib", b"sp\n", 0o755)
-        write_test_file(package_root / package.GAME_DIR_NAME / f"game-mp_{arch}.dylib", b"mp\n", 0o755)
+        write_test_file(package_root / package.GAME_DIR_NAME / f"game_{arch}.dylib", b"game\n", 0o755)
         write_test_file(package_root / f"renderer-vk_{arch}.dylib", b"renderer-vk\n", 0o755)
 
     def create(**kwargs):
@@ -4097,11 +4101,9 @@ def validate_macos_game_layer_bundle_runtime() -> None:
             raise AssertionError("the unified package must not embed historical campaign modules")
         if any("q4xbase" in path.parts for path in app_root.rglob("*")):
             raise AssertionError("campaign modules or user content leaked into the app bundle")
-        base_modules = [app_root / package.MACOS_APP_FRAMEWORKS_DIR / f"game-{kind}_{arch}.dylib"
-                        for kind in ("sp", "mp")]
-        for module in base_modules:
-            if module not in package.macos_signable_targets(package_root, arch):
-                raise AssertionError(f"unified game module must be signed: {module}")
+        base_module = app_root / package.MACOS_APP_FRAMEWORKS_DIR / f"game_{arch}.dylib"
+        if base_module not in package.macos_signable_targets(package_root, arch):
+            raise AssertionError(f"unified game module must be signed: {base_module}")
         if not (staged_layer / "user-content.pk4").is_file():
             raise AssertionError("packaging must preserve installed campaign content")
 
@@ -4123,7 +4125,7 @@ def validate_macos_game_layer_archive_runtime() -> None:
     contents = f"{prefix}openQ4.app/Contents/"
     base_manifest = make_macos_symbol_manifest_bytes(package_root.name, arch, version, version_tag)
     layer_manifest = base_manifest + make_macos_layer_symbol_records(arch)
-    layer_sp = f"{contents}Frameworks/q4xbase/game-sp_{arch}.dylib"
+    layer_module = f"{contents}Frameworks/q4xbase/game_{arch}.dylib"
     layer_json = f"{contents}Resources/q4xbase/mod.json"
 
     def entries(changes=None, removed=()):
@@ -4133,8 +4135,7 @@ def validate_macos_game_layer_archive_runtime() -> None:
             arch,
             plist_bytes,
             extra_entries={
-                layer_sp: (b"layer-sp\n", 0o755),
-                f"{contents}Frameworks/q4xbase/game-mp_{arch}.dylib": (b"layer-mp\n", 0o755),
+                layer_module: (b"layer-game\n", 0o755),
                 layer_json: (make_macos_layer_mod_json_bytes(), 0o644),
                 f"{prefix}{package.MACOS_SYMBOL_MANIFEST_NAME}": (layer_manifest, 0o644),
             },
@@ -4158,7 +4159,7 @@ def validate_macos_game_layer_archive_runtime() -> None:
         expect_runtime_error("unexpected entries", lambda: check(entries(), ()), "macOS archive with an undeclared layer")
         expect_runtime_error(
             "not executable",
-            lambda: check(entries({layer_sp: (b"layer-sp\n", 0o644)})),
+            lambda: check(entries({layer_module: (b"layer-game\n", 0o644)})),
             "macOS archive with a non-executable layer module",
         )
         expect_runtime_error(
@@ -4173,7 +4174,7 @@ def validate_macos_game_layer_archive_runtime() -> None:
         )
         expect_runtime_error(
             "unexpected entries",
-            lambda: check(entries({f"{contents}Frameworks/q4xbase/game-sp_x64.dylib": (b"stale\n", 0o755)})),
+            lambda: check(entries({f"{contents}Frameworks/q4xbase/game_x64.dylib": (b"stale\n", 0o755)})),
             "macOS archive with a stale layer module",
         )
         expect_runtime_error(
@@ -4188,11 +4189,8 @@ def validate_macos_game_layer_archive_runtime() -> None:
             package, package_root.name, symbol_root_name, arch, version, version_tag
         )
         symbol_entries[f"{symbol_prefix}{package.MACOS_SYMBOL_MANIFEST_NAME}"] = (layer_manifest, 0o644)
-        layer_dsym = f"{symbol_prefix}dSYMs/q4xbase/game-sp_{arch}.dylib.dSYM/Contents/Resources/DWARF/game-sp_{arch}.dylib"
-        symbol_entries[layer_dsym] = (b"layer-sp-dsym\n", 0o644)
-        symbol_entries[
-            f"{symbol_prefix}dSYMs/q4xbase/game-mp_{arch}.dylib.dSYM/Contents/Resources/DWARF/game-mp_{arch}.dylib"
-        ] = (b"layer-mp-dsym\n", 0o644)
+        layer_dsym = f"{symbol_prefix}dSYMs/q4xbase/game_{arch}.dylib.dSYM/Contents/Resources/DWARF/game_{arch}.dylib"
+        symbol_entries[layer_dsym] = (b"layer-game-dsym\n", 0o644)
 
         def check_symbols(archive_entries, game_layers=("q4xbase",)) -> None:
             archive_path = work / f"{symbol_root_name}.tar.xz"
@@ -4222,7 +4220,7 @@ def validate_macos_game_layer_archive_runtime() -> None:
             "macOS dSYM archive without the layer's dSYM",
         )
         with_runtime = dict(symbol_entries)
-        with_runtime[f"{symbol_prefix}openQ4.app/Contents/Frameworks/q4xbase/game-sp_{arch}.dylib"] = (b"code\n", 0o755)
+        with_runtime[f"{symbol_prefix}openQ4.app/Contents/Frameworks/q4xbase/game_{arch}.dylib"] = (b"code\n", 0o755)
         expect_runtime_error(
             "runtime payload entries",
             lambda: check_symbols(with_runtime),

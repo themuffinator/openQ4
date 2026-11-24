@@ -16,7 +16,7 @@ full and simplified GUI windows in the on-foot, Strogg and shared vehicle HUDs.
 The MP windows accept independent `voice_audio_emitter`/`voice_audio_channel`
 and `voice_self_audio_emitter`/`voice_self_audio_channel` state bindings. Until
 the voice backend publishes real streams, these displays have a flat core.
-`src/mpgame/mp/VoiceComms.cpp` currently discards received voice data and never
+`src/game/mp/VoiceComms.cpp` currently discards received voice data and never
 captures/transmits microphone data, and `CommonRun` reports no active talker.
 This change does **not** restore or qualify live microphone voice chat. The
 complete retained talker stack, additive composition and non-Windows/GLES/VR

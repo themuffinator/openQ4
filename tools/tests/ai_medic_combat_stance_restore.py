@@ -30,7 +30,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-TREES = ("game", "mpgame")
+TREES = ("game",)
 
 
 def read(path: Path) -> str:
@@ -114,7 +114,7 @@ def validate_tree(tree: str) -> dict[str, str]:
 
 def main() -> None:
     sp = validate_tree("game")
-    mp = validate_tree("mpgame")
+    mp = validate_tree("game")
     for name in sp:
         if sp[name] != mp[name]:
             raise AssertionError(f"SP and MP rvAIMedic::{name} differ")

@@ -20,8 +20,8 @@ elif host_cpu_family == 'x86'
 elif host_cpu_family == 'aarch64'
   binary_arch = 'arm64'
 endif
-game_sp_binary_name = 'game-sp_' + binary_arch
-game_mp_binary_name = 'game-mp_' + binary_arch
+# One game library serves the campaign (game_sp) and network play (game_mp).
+game_binary_name = 'game_' + binary_arch
 game_module_filename_suffix = '.so'
 if host_system == 'windows'
   game_module_filename_suffix = '.dll'
@@ -241,8 +241,9 @@ endif
 
 build_engine = get_option('build_engine')
 build_games = get_option('build_games')
-build_game_sp = get_option('build_game_sp')
-build_game_mp = get_option('build_game_mp')
+if not get_option('build_game_sp') or not get_option('build_game_mp')
+  warning('build_game_sp and build_game_mp are deprecated and ignored: one game module serves both modes; use build_games.')
+endif
 needs_game_headers = build_engine or build_games
 install_root_dir = meson.project_source_root() / '.install'
 install_game_dir = install_root_dir / 'baseoq4'
@@ -268,15 +269,12 @@ if build_sigmatouch and sigmatouch_controls_root == ''
 endif
 game_libs_repo_root = meson.project_source_root()
 game_libs_source_root = game_libs_repo_root / 'src'
-game_libs_repo_summary = 'in-tree (src/game and src/mpgame)'
+game_libs_repo_summary = 'in-tree (src/game)'
 game_stage_root = meson.project_source_root()
 game_stage_game_root = game_stage_root / 'src' / 'game'
-game_stage_mpgame_root = game_stage_root / 'src' / 'mpgame'
 game_stage_game_include_rel = 'src/game'
-game_stage_mpgame_include_rel = 'src/mpgame'
 bse_source_root = meson.project_source_root() / 'src' / 'bse'
-game_sp_module_defs_file = ''
-game_mp_module_defs_file = ''
+game_module_defs_file = ''
 
 if not build_engine and not build_games
   error('At least one build target must be enabled. Use -Dbuild_engine=true and/or -Dbuild_games=true.')
@@ -402,9 +400,9 @@ if get_option('build_native_tests')
   test('openq4-demo-block-codec', openq4_demo_block_codec_test, timeout: 1200)
 
   openq4_save_dict_under_test = custom_target(
-    'openq4-save-dict-under-test', input: files('src/game/gamesys/SaveGame.cpp', 'src/mpgame/gamesys/SaveGame.cpp'),
+    'openq4-save-dict-under-test', input: files('src/game/gamesys/SaveGame.cpp'),
     output: 'SaveDictUnderTest.inc',
-    command: [py, files('tools/tests/generate_save_dict_test.py'), '@INPUT0@', '@INPUT1@', '@OUTPUT@'],
+    command: [py, files('tools/tests/generate_save_dict_test.py'), '@INPUT0@', '@OUTPUT@'],
   )
   openq4_save_dict_test = executable(
     'openq4-save-dict-test', [files('tools/tests/native/SaveDictTest.cpp'), openq4_save_dict_under_test],
@@ -492,7 +490,7 @@ if get_option('build_native_tests')
 
   openq4_arena_sound_source = custom_target(
     'openq4-arena-sound-source',
-    input: files('src/mpgame/MultiplayerGame.cpp', 'src/sound/snd_world.cpp', 'src/framework/Session.cpp', 'src/framework/Session_menu.cpp'),
+    input: files('src/game/MultiplayerGame.cpp', 'src/sound/snd_world.cpp', 'src/framework/Session.cpp', 'src/framework/Session_menu.cpp'),
     output: 'ArenaSoundPauseTest.cpp',
     command: [py, files('tools/tests/arena_sound_pause.py'), '--generate-native', '@OUTPUT@'],
   )
@@ -612,203 +610,203 @@ if get_option('build_native_tests')
   )
   test('openq4-restore-recovery', restore_recovery_test, timeout: 30)
 
-  foreach game_mode : ['game', 'mpgame']
-    restore_events_source = custom_target(
-      'openq4-restore-events-' + game_mode + '-source',
-      input: files('src' / game_mode / 'gamesys' / 'Event.cpp', 'src/idlib/containers/LinkList.h', 'src/cm/CollisionModel.h'),
-      output: 'RestoreEvents-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_events.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_events_test = executable(
-      'openq4-restore-events-' + game_mode, restore_events_source, cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-events-' + game_mode, restore_events_test, timeout: 30)
-    restore_af_source = custom_target(
-      'openq4-restore-af-' + game_mode + '-source',
-      input: files('src' / game_mode / 'AF.cpp', 'src' / game_mode / 'physics' / 'Physics_AF.cpp'),
-      output: 'RestoreAF-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_af.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_af_test = executable(
-      'openq4-restore-af-' + game_mode, restore_af_source, cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-af-' + game_mode, restore_af_test, timeout: 30)
-    vehicle_hud_source = custom_target(
-      'openq4-vehicle-hud-' + game_mode + '-source',
-      input: files('src' / game_mode / 'vehicle' / 'Vehicle.cpp'),
-      output: 'VehicleHud-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/vehicle_hud.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    vehicle_hud_test = executable(
-      'openq4-vehicle-hud-' + game_mode, vehicle_hud_source, cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-vehicle-hud-' + game_mode, vehicle_hud_test, timeout: 30)
-    restore_animation_source = custom_target(
-      'openq4-restore-animation-' + game_mode + '-source',
-      input: files('src' / game_mode / 'Actor.cpp', 'src' / game_mode / 'IK.cpp',
-                   'src' / game_mode / 'gamesys' / 'State.cpp'),
-      output: 'RestoreAnimation-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_animation.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_animation_test = executable(
-      'openq4-restore-animation-' + game_mode, restore_animation_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-animation-' + game_mode, restore_animation_test, timeout: 30)
-    restore_physics_source = custom_target(
-      'openq4-restore-physics-' + game_mode + '-source',
-      input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp',
-                   'src' / game_mode / 'physics' / 'Physics_Base.cpp',
-                   'src' / game_mode / 'physics' / 'Physics_Static.cpp',
-                   'src' / game_mode / 'physics' / 'Physics_StaticMulti.cpp'),
-      output: 'RestorePhysics-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_physics.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_physics_test = executable(
-      'openq4-restore-physics-' + game_mode, restore_physics_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-physics-' + game_mode, restore_physics_test, timeout: 30)
-    restore_resources_source = custom_target(
-      'openq4-restore-resources-' + game_mode + '-source',
-      input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp',
-                   'src' / game_mode / 'Player.cpp', 'src' / game_mode / 'physics' / 'Clip.cpp',
-                   'src' / game_mode / 'physics' / 'Physics_StaticMulti.cpp',
-                   'src' / game_mode / 'physics' / 'Physics_Particle.cpp',
-                   'src' / game_mode / 'vehicle' / 'VehiclePosition.cpp',
-                   'src' / game_mode / 'vehicle' / 'VehicleParts.cpp'),
-      output: 'RestoreResources-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_resources.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_resources_test = executable(
-      'openq4-restore-resources-' + game_mode, restore_resources_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-resources-' + game_mode, restore_resources_test, timeout: 30)
-    restore_identity_source = custom_target(
-      'openq4-restore-identity-' + game_mode + '-source',
-      input: files('src' / game_mode / 'Entity.cpp', 'src' / game_mode / 'client' / 'ClientEntity.cpp',
-                   'src' / game_mode / 'Game_local.cpp'),
-      output: 'RestoreIdentity-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_identity.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_identity_test = executable(
-      'openq4-restore-identity-' + game_mode, restore_identity_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-identity-' + game_mode, restore_identity_test, timeout: 30)
-    client_registration_source = custom_target(
-      'openq4-client-registration-' + game_mode + '-source',
-      input: files('src' / game_mode / 'Game_local.cpp'),
-      output: 'ClientRegistration-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/client_entity_registration.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    client_registration_test = executable(
-      'openq4-client-registration-' + game_mode, client_registration_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-client-registration-' + game_mode, client_registration_test, timeout: 30)
-    restore_cleanup_source = custom_target(
-      'openq4-restore-cleanup-' + game_mode + '-source',
-      input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp', 'src' / game_mode / 'gamesys' / 'Class.cpp',
-                   'src' / game_mode / 'Game_local.cpp'),
-      output: 'RestoreCleanup-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_cleanup.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_cleanup_test = executable(
-      'openq4-restore-cleanup-' + game_mode, restore_cleanup_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    foreach scenario : ['independent', 'cascade', 'external', 'commit', 'rollback', 'exception']
-      test('openq4-restore-cleanup-' + game_mode + '-' + scenario, restore_cleanup_test, args: [scenario], timeout: 30)
-    endforeach
-    restore_bindings_source = custom_target(
-      'openq4-restore-bindings-' + game_mode + '-source',
-      input: files('src' / game_mode / 'Entity.cpp', 'src' / game_mode / 'gamesys' / 'SaveGame.cpp',
-                   'src' / game_mode / 'Game_local.cpp'),
-      output: 'RestoreBindings-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_bindings.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_bindings_test = executable(
-      'openq4-restore-bindings-' + game_mode, restore_bindings_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-bindings-' + game_mode, restore_bindings_test, timeout: 30)
-    restore_movers_source = custom_target(
-      'openq4-restore-movers-' + game_mode + '-source',
-      input: files('src' / game_mode / 'Mover.cpp', 'src' / game_mode / 'Mover.h',
-                   'src' / game_mode / 'Entity.h', 'src' / game_mode / 'gamesys' / 'SaveGame.cpp'),
-      output: 'RestoreMovers-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_movers.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_movers_test = executable(
-      'openq4-restore-movers-' + game_mode, restore_movers_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-movers-' + game_mode, restore_movers_test, timeout: 30)
-    restore_threads_source = custom_target(
-      'openq4-restore-threads-' + game_mode + '-source',
-      input: files('src' / game_mode / 'Misc.cpp', 'src' / game_mode / 'Game_local.cpp',
-                   'src' / game_mode / 'script' / 'Script_Thread.cpp',
-                   'src' / game_mode / 'script' / 'Script_Interpreter.cpp',
-                   'src' / game_mode / 'gamesys' / 'SaveGame.cpp'),
-      output: 'RestoreThreads-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_threads.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_threads_test = executable(
-      'openq4-restore-threads-' + game_mode, restore_threads_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-threads-' + game_mode, restore_threads_test, timeout: 30)
-    restore_classes_source = custom_target(
-      'openq4-restore-classes-' + game_mode + '-source',
-      input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp', 'src' / game_mode / 'gamesys' / 'Class.h'),
-      output: 'RestoreClasses-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_classes.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_classes_test = executable(
-      'openq4-restore-classes-' + game_mode, restore_classes_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-classes-' + game_mode, restore_classes_test, timeout: 30)
-    restore_gui_source = custom_target(
-      'openq4-restore-gui-' + game_mode + '-source',
-      input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp'),
-      output: 'RestoreGui-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_gui.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_gui_test = executable(
-      'openq4-restore-gui-' + game_mode, restore_gui_source, install: false,
-    )
-    test('openq4-restore-gui-' + game_mode, restore_gui_test, timeout: 30)
-    restore_spawn_refs_source = custom_target(
-      'openq4-restore-spawn-refs-' + game_mode + '-source',
-      input: files('src' / game_mode / 'Game_local.h', 'src' / game_mode / 'client' / 'ClientEntity.h'),
-      output: 'RestoreSpawnRefs-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_spawn_refs.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_spawn_refs_test = executable(
-      'openq4-restore-spawn-refs-' + game_mode, restore_spawn_refs_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    test('openq4-restore-spawn-refs-' + game_mode, restore_spawn_refs_test, timeout: 30)
-    restore_render_handles_source = custom_target(
-      'openq4-restore-render-handles-' + game_mode + '-source',
-      input: files('src' / game_mode / 'Entity.cpp', 'src' / game_mode / 'Actor.cpp',
-                   'src' / game_mode / 'Projectile.cpp', 'src' / game_mode / 'Moveable.cpp',
-                   'src' / game_mode / 'client' / 'ClientModel.cpp', 'src' / game_mode / 'client' / 'ClientMoveable.cpp',
-                   'src' / game_mode / 'vehicle' / 'VehicleParts.cpp', 'src' / game_mode / 'Weapon.cpp',
-                   'src' / game_mode / 'ai' / 'Monster_StroggHover.cpp'),
-      output: 'RestoreRenderHandles-' + game_mode + '.cpp',
-      command: [py, files('tools/tests/savegame_restore_render_handles.py'), '--generate-native', game_mode, '@OUTPUT@'],
-    )
-    restore_render_handles_test = executable(
-      'openq4-restore-render-handles-' + game_mode, restore_render_handles_source,
-      cpp_args: ['-UNDEBUG'], install: false,
-    )
-    foreach scenario : ['entity', 'actor', 'projectile', 'barrel', 'client-model', 'client-moveable', 'vehicle-light', 'weapon-lights', 'hover-light']
-      test('openq4-restore-render-handles-' + game_mode + '-' + scenario, restore_render_handles_test, args: [scenario], timeout: 30)
-    endforeach
+  # save/restore, registration and HUD fixtures generated from the game tree
+  game_mode = 'game'
+  restore_events_source = custom_target(
+    'openq4-restore-events-' + game_mode + '-source',
+    input: files('src' / game_mode / 'gamesys' / 'Event.cpp', 'src/idlib/containers/LinkList.h', 'src/cm/CollisionModel.h'),
+    output: 'RestoreEvents-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_events.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_events_test = executable(
+    'openq4-restore-events-' + game_mode, restore_events_source, cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-events-' + game_mode, restore_events_test, timeout: 30)
+  restore_af_source = custom_target(
+    'openq4-restore-af-' + game_mode + '-source',
+    input: files('src' / game_mode / 'AF.cpp', 'src' / game_mode / 'physics' / 'Physics_AF.cpp'),
+    output: 'RestoreAF-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_af.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_af_test = executable(
+    'openq4-restore-af-' + game_mode, restore_af_source, cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-af-' + game_mode, restore_af_test, timeout: 30)
+  vehicle_hud_source = custom_target(
+    'openq4-vehicle-hud-' + game_mode + '-source',
+    input: files('src' / game_mode / 'vehicle' / 'Vehicle.cpp'),
+    output: 'VehicleHud-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/vehicle_hud.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  vehicle_hud_test = executable(
+    'openq4-vehicle-hud-' + game_mode, vehicle_hud_source, cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-vehicle-hud-' + game_mode, vehicle_hud_test, timeout: 30)
+  restore_animation_source = custom_target(
+    'openq4-restore-animation-' + game_mode + '-source',
+    input: files('src' / game_mode / 'Actor.cpp', 'src' / game_mode / 'IK.cpp',
+                 'src' / game_mode / 'gamesys' / 'State.cpp'),
+    output: 'RestoreAnimation-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_animation.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_animation_test = executable(
+    'openq4-restore-animation-' + game_mode, restore_animation_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-animation-' + game_mode, restore_animation_test, timeout: 30)
+  restore_physics_source = custom_target(
+    'openq4-restore-physics-' + game_mode + '-source',
+    input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp',
+                 'src' / game_mode / 'physics' / 'Physics_Base.cpp',
+                 'src' / game_mode / 'physics' / 'Physics_Static.cpp',
+                 'src' / game_mode / 'physics' / 'Physics_StaticMulti.cpp'),
+    output: 'RestorePhysics-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_physics.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_physics_test = executable(
+    'openq4-restore-physics-' + game_mode, restore_physics_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-physics-' + game_mode, restore_physics_test, timeout: 30)
+  restore_resources_source = custom_target(
+    'openq4-restore-resources-' + game_mode + '-source',
+    input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp',
+                 'src' / game_mode / 'Player.cpp', 'src' / game_mode / 'physics' / 'Clip.cpp',
+                 'src' / game_mode / 'physics' / 'Physics_StaticMulti.cpp',
+                 'src' / game_mode / 'physics' / 'Physics_Particle.cpp',
+                 'src' / game_mode / 'vehicle' / 'VehiclePosition.cpp',
+                 'src' / game_mode / 'vehicle' / 'VehicleParts.cpp'),
+    output: 'RestoreResources-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_resources.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_resources_test = executable(
+    'openq4-restore-resources-' + game_mode, restore_resources_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-resources-' + game_mode, restore_resources_test, timeout: 30)
+  restore_identity_source = custom_target(
+    'openq4-restore-identity-' + game_mode + '-source',
+    input: files('src' / game_mode / 'Entity.cpp', 'src' / game_mode / 'client' / 'ClientEntity.cpp',
+                 'src' / game_mode / 'Game_local.cpp'),
+    output: 'RestoreIdentity-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_identity.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_identity_test = executable(
+    'openq4-restore-identity-' + game_mode, restore_identity_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-identity-' + game_mode, restore_identity_test, timeout: 30)
+  client_registration_source = custom_target(
+    'openq4-client-registration-' + game_mode + '-source',
+    input: files('src' / game_mode / 'Game_local.cpp'),
+    output: 'ClientRegistration-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/client_entity_registration.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  client_registration_test = executable(
+    'openq4-client-registration-' + game_mode, client_registration_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-client-registration-' + game_mode, client_registration_test, timeout: 30)
+  restore_cleanup_source = custom_target(
+    'openq4-restore-cleanup-' + game_mode + '-source',
+    input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp', 'src' / game_mode / 'gamesys' / 'Class.cpp',
+                 'src' / game_mode / 'Game_local.cpp'),
+    output: 'RestoreCleanup-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_cleanup.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_cleanup_test = executable(
+    'openq4-restore-cleanup-' + game_mode, restore_cleanup_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  foreach scenario : ['independent', 'cascade', 'external', 'commit', 'rollback', 'exception']
+    test('openq4-restore-cleanup-' + game_mode + '-' + scenario, restore_cleanup_test, args: [scenario], timeout: 30)
+  endforeach
+  restore_bindings_source = custom_target(
+    'openq4-restore-bindings-' + game_mode + '-source',
+    input: files('src' / game_mode / 'Entity.cpp', 'src' / game_mode / 'gamesys' / 'SaveGame.cpp',
+                 'src' / game_mode / 'Game_local.cpp'),
+    output: 'RestoreBindings-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_bindings.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_bindings_test = executable(
+    'openq4-restore-bindings-' + game_mode, restore_bindings_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-bindings-' + game_mode, restore_bindings_test, timeout: 30)
+  restore_movers_source = custom_target(
+    'openq4-restore-movers-' + game_mode + '-source',
+    input: files('src' / game_mode / 'Mover.cpp', 'src' / game_mode / 'Mover.h',
+                 'src' / game_mode / 'Entity.h', 'src' / game_mode / 'gamesys' / 'SaveGame.cpp'),
+    output: 'RestoreMovers-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_movers.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_movers_test = executable(
+    'openq4-restore-movers-' + game_mode, restore_movers_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-movers-' + game_mode, restore_movers_test, timeout: 30)
+  restore_threads_source = custom_target(
+    'openq4-restore-threads-' + game_mode + '-source',
+    input: files('src' / game_mode / 'Misc.cpp', 'src' / game_mode / 'Game_local.cpp',
+                 'src' / game_mode / 'script' / 'Script_Thread.cpp',
+                 'src' / game_mode / 'script' / 'Script_Interpreter.cpp',
+                 'src' / game_mode / 'gamesys' / 'SaveGame.cpp'),
+    output: 'RestoreThreads-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_threads.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_threads_test = executable(
+    'openq4-restore-threads-' + game_mode, restore_threads_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-threads-' + game_mode, restore_threads_test, timeout: 30)
+  restore_classes_source = custom_target(
+    'openq4-restore-classes-' + game_mode + '-source',
+    input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp', 'src' / game_mode / 'gamesys' / 'Class.h'),
+    output: 'RestoreClasses-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_classes.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_classes_test = executable(
+    'openq4-restore-classes-' + game_mode, restore_classes_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-classes-' + game_mode, restore_classes_test, timeout: 30)
+  restore_gui_source = custom_target(
+    'openq4-restore-gui-' + game_mode + '-source',
+    input: files('src' / game_mode / 'gamesys' / 'SaveGame.cpp'),
+    output: 'RestoreGui-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_gui.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_gui_test = executable(
+    'openq4-restore-gui-' + game_mode, restore_gui_source, install: false,
+  )
+  test('openq4-restore-gui-' + game_mode, restore_gui_test, timeout: 30)
+  restore_spawn_refs_source = custom_target(
+    'openq4-restore-spawn-refs-' + game_mode + '-source',
+    input: files('src' / game_mode / 'Game_local.h', 'src' / game_mode / 'client' / 'ClientEntity.h'),
+    output: 'RestoreSpawnRefs-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_spawn_refs.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_spawn_refs_test = executable(
+    'openq4-restore-spawn-refs-' + game_mode, restore_spawn_refs_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  test('openq4-restore-spawn-refs-' + game_mode, restore_spawn_refs_test, timeout: 30)
+  restore_render_handles_source = custom_target(
+    'openq4-restore-render-handles-' + game_mode + '-source',
+    input: files('src' / game_mode / 'Entity.cpp', 'src' / game_mode / 'Actor.cpp',
+                 'src' / game_mode / 'Projectile.cpp', 'src' / game_mode / 'Moveable.cpp',
+                 'src' / game_mode / 'client' / 'ClientModel.cpp', 'src' / game_mode / 'client' / 'ClientMoveable.cpp',
+                 'src' / game_mode / 'vehicle' / 'VehicleParts.cpp', 'src' / game_mode / 'Weapon.cpp',
+                 'src' / game_mode / 'ai' / 'Monster_StroggHover.cpp'),
+    output: 'RestoreRenderHandles-' + game_mode + '.cpp',
+    command: [py, files('tools/tests/savegame_restore_render_handles.py'), '--generate-native', game_mode, '@OUTPUT@'],
+  )
+  restore_render_handles_test = executable(
+    'openq4-restore-render-handles-' + game_mode, restore_render_handles_source,
+    cpp_args: ['-UNDEBUG'], install: false,
+  )
+  foreach scenario : ['entity', 'actor', 'projectile', 'barrel', 'client-model', 'client-moveable', 'vehicle-light', 'weapon-lights', 'hover-light']
+    test('openq4-restore-render-handles-' + game_mode + '-' + scenario, restore_render_handles_test, args: [scenario], timeout: 30)
   endforeach
 
   openq4_interpolation_test = executable(
@@ -945,24 +943,24 @@ if get_option('build_native_tests')
   )
   test('openq4-compressor', openq4_compressor_test, timeout: 30)
 
-  foreach game_source : ['game', 'mpgame']
-    tactical_include = 'AasTactical-' + game_source + 'UnderTest.inc'
-    tactical_under_test = custom_target(
-      'openq4-aas-tactical-' + game_source + '-under-test',
-      input: files('src' / game_source / 'ai/AAS_tactical.cpp'),
-      output: tactical_include,
-      command: [py, files('tools/tests/generate_aas_tactical_test.py'), '@INPUT@', '@OUTPUT@'],
-      depend_files: files('tools/tests/async_drop_client_contract.py'),
-    )
-    tactical_test = executable(
-      'openq4-aas-tactical-' + game_source + '-test',
-      [files('tools/tests/native/AasTacticalTest.cpp'), tactical_under_test],
-      include_directories: root_include_dir,
-      cpp_args: ['-DAAS_TACTICAL_TEST_INCLUDE="' + tactical_include + '"'],
-      install: false,
-    )
-    test('openq4-aas-tactical-' + game_source, tactical_test, timeout: 30)
-  endforeach
+  # tactical AAS features generated from the game tree
+  game_source = 'game'
+  tactical_include = 'AasTactical-' + game_source + 'UnderTest.inc'
+  tactical_under_test = custom_target(
+    'openq4-aas-tactical-' + game_source + '-under-test',
+    input: files('src' / game_source / 'ai/AAS_tactical.cpp'),
+    output: tactical_include,
+    command: [py, files('tools/tests/generate_aas_tactical_test.py'), '@INPUT@', '@OUTPUT@'],
+    depend_files: files('tools/tests/async_drop_client_contract.py'),
+  )
+  tactical_test = executable(
+    'openq4-aas-tactical-' + game_source + '-test',
+    [files('tools/tests/native/AasTacticalTest.cpp'), tactical_under_test],
+    include_directories: root_include_dir,
+    cpp_args: ['-DAAS_TACTICAL_TEST_INCLUDE="' + tactical_include + '"'],
+    install: false,
+  )
+  test('openq4-aas-tactical-' + game_source, tactical_test, timeout: 30)
 
   openq4_core_safety_test = executable(
     'openq4-core-safety-test',
@@ -2152,13 +2150,10 @@ if build_engine or build_games
 endif
 
 if needs_game_headers
-  foreach game_tree : ['game', 'mpgame']
-    if not fs_mod.is_dir(game_libs_source_root / game_tree)
-      error('Canonical game source directory not found: ' + game_libs_source_root / game_tree)
-    endif
-  endforeach
-  game_sp_module_defs_file = game_stage_game_root / 'Game.def'
-  game_mp_module_defs_file = game_stage_mpgame_root / 'mpgame.def'
+  if not fs_mod.is_dir(game_libs_source_root / 'game')
+    error('Canonical game source directory not found: ' + game_libs_source_root / 'game')
+  endif
+  game_module_defs_file = game_stage_game_root / 'Game.def'
   game_source_inventory = configure_file(
     output: 'openq4_game_sources.json',
     command: [py, files('tools/build/game_source_inventory.py'), meson.project_source_root()],
@@ -2166,8 +2161,8 @@ if needs_game_headers
   )
 endif
 
-# Awakening SP is built into game_sp; q4xbase now supplies content only.
-awakening_summary = 'built into game_sp (user-supplied campaign content)'
+# Awakening SP is built into the game module; q4xbase now supplies content only.
+awakening_summary = 'built into the game module (user-supplied campaign content)'
 
 if build_engine and not fs_mod.is_dir(bse_source_root)
   error('Integrated BSE source directory not found: ' + bse_source_root)
@@ -2331,52 +2326,29 @@ if build_engine
   openq4_engine_sources += [openq4_paks_generated_header, generated_version_header]
 endif
 
-game_sp_sources = []
-game_mp_sources = []
 game_sources = []
+game_module_sources = []
 bse_sources = []
 game_idlib_sources = []
 if build_games
-  game_sp_source_discovery = run_command(
+  game_source_discovery = run_command(
     py,
     meson.project_source_root() / 'tools' / 'build' / 'list_sources.py',
     game_stage_root,
     'src/game',
-    'src/game/Callbacks.cpp',
     'src/game/gamesys/Callbacks.cpp',
     check: true,
   )
-  game_sp_source_paths = game_sp_source_discovery.stdout().strip().split('\n')
-  if game_sp_source_paths.length() == 0
-    error('tools/build/list_sources.py returned no single-player game source files.')
+  game_source_paths = game_source_discovery.stdout().strip().split('\n')
+  if game_source_paths.length() == 0
+    error('tools/build/list_sources.py returned no game source files.')
   endif
 
-  game_sp_absolute_paths = []
-  foreach rel_path : game_sp_source_paths
-    game_sp_absolute_paths += [game_stage_root / rel_path]
+  game_absolute_paths = []
+  foreach rel_path : game_source_paths
+    game_absolute_paths += [game_stage_root / rel_path]
   endforeach
-  game_sp_sources = files(game_sp_absolute_paths)
-
-  game_mp_source_discovery = run_command(
-    py,
-    meson.project_source_root() / 'tools' / 'build' / 'list_sources.py',
-    game_stage_root,
-    'src/mpgame',
-    'src/mpgame/Callbacks.cpp',
-    'src/mpgame/gamesys/Callbacks.cpp',
-    check: true,
-  )
-  game_mp_source_paths = game_mp_source_discovery.stdout().strip().split('\n')
-  if game_mp_source_paths.length() == 0
-    error('tools/build/list_sources.py returned no multiplayer game source files.')
-  endif
-
-  game_mp_absolute_paths = []
-  foreach rel_path : game_mp_source_paths
-    game_mp_absolute_paths += [game_stage_root / rel_path]
-  endforeach
-  game_mp_sources = files(game_mp_absolute_paths)
-  game_sources = game_sp_sources + game_mp_sources
+  game_sources = files(game_absolute_paths)
 
   savegame_compat_header = custom_target(
     'openq4_savegame_compat_generated',
@@ -2396,8 +2368,7 @@ if build_games
     ),
     install: false,
   )
-  game_sp_sources += [savegame_compat_header, generated_version_header]
-  game_mp_sources += [savegame_compat_header, generated_version_header]
+  game_module_sources = game_sources + [savegame_compat_header, generated_version_header]
   if build_engine
     # Session records the canonical game source stamp before tearing down
     # the active map, so the engine target must see the same generated header.
@@ -3185,18 +3156,13 @@ game_include_dirs = [
 ]
 engine_include_dirs = [root_include_dir, src_include_dir]
 game_idlib_include_dirs = [root_include_dir, src_include_dir]
-game_idlib_mp_include_dirs = [root_include_dir, src_include_dir]
 bse_client_include_dirs = [root_include_dir, src_include_dir, src_bse_include_dir]
 
 if needs_game_headers
   staged_game_include_dir = include_directories(game_stage_game_include_rel)
-  staged_mpgame_include_dir = include_directories(game_stage_mpgame_include_rel)
   engine_include_dirs += [staged_game_include_dir]
   game_idlib_include_dirs += [staged_game_include_dir]
-  # the multiplayer idlib flavour resolves precompiled.h's
-  # "../mpgame/Game_local.h" through the staged mpgame tree
-  game_idlib_mp_include_dirs += [staged_mpgame_include_dir, staged_game_include_dir]
-  game_include_dirs += [staged_game_include_dir, staged_mpgame_include_dir]
+  game_include_dirs += [staged_game_include_dir]
   bse_client_include_dirs += [staged_game_include_dir]
 endif
 
@@ -3575,31 +3541,15 @@ elif host_system == 'linux' or host_system == 'android'
 endif
 
 game_idlib_library = disabler()
-game_idlib_library_mp = disabler()
 if build_engine or build_games
-  # One archive per game flavour. src/idlib/precompiled.h includes
-  # mpgame/Game_local.h under -DGAME_MPAPI and game/Game_local.h otherwise, and
-  # every idlib translation unit includes precompiled.h. Linking one
-  # single-player-flavoured archive into both modules therefore put two
-  # different definitions of the same game types into each multiplayer binary,
-  # which is an ODR violation the linker resolves however it likes.
+  # The game module's own idlib archive. Every idlib translation unit includes
+  # precompiled.h, which pulls in game/Game_local.h under GAME_DLL, so it is
+  # compiled with the game module's flags rather than the engine's.
   game_idlib_library = static_library(
     'openq4_game_idlib',
     game_idlib_sources,
     include_directories: game_idlib_include_dirs,
     cpp_args: game_common_cpp_args,
-    c_args: game_common_c_args,
-    cpp_pch: game_idlib_pch_headers,
-    override_options: game_target_override_options,
-    pic: host_system == 'linux' or host_system == 'android',
-    gnu_symbol_visibility: host_system == 'windows' ? 'default' : 'hidden',
-    install: false,
-  )
-  game_idlib_library_mp = static_library(
-    'openq4_game_idlib_mp',
-    game_idlib_sources,
-    include_directories: game_idlib_mp_include_dirs,
-    cpp_args: game_common_cpp_args + ['-DGAME_MPAPI'],
     c_args: game_common_c_args,
     cpp_pch: game_idlib_pch_headers,
     override_options: game_target_override_options,
@@ -3994,43 +3944,22 @@ if build_renderer_vk and build_engine
   endif
 endif
 
-if build_engine or (build_games and (build_game_sp or build_game_mp))
+if build_engine or build_games
   subdir('content/baseoq4')
 endif
 
-if build_games and build_game_sp
+if build_games
   custom_target(
-    'openq4_stage_game_sp_direct_run',
-    input: game_sp_module_target,
-    output: 'stage-game-sp-' + binary_arch + '.stamp',
+    'openq4_stage_game_direct_run',
+    input: game_module_target,
+    output: 'stage-game-' + binary_arch + '.stamp',
     command: [
       py,
       meson.project_source_root() / 'tools' / 'build' / 'stage_direct_run_game_module.py',
       '--source',
       '@INPUT@',
       '--destination',
-      meson.current_build_dir() / 'baseoq4' / (module_filename_prefix + game_sp_binary_name + game_module_filename_suffix),
-      '--stamp',
-      '@OUTPUT@',
-    ],
-    depend_files: files('tools/build/stage_direct_run_game_module.py'),
-    build_always_stale: true,
-    build_by_default: true,
-  )
-endif
-
-if build_games and build_game_mp
-  custom_target(
-    'openq4_stage_game_mp_direct_run',
-    input: game_mp_module_target,
-    output: 'stage-game-mp-' + binary_arch + '.stamp',
-    command: [
-      py,
-      meson.project_source_root() / 'tools' / 'build' / 'stage_direct_run_game_module.py',
-      '--source',
-      '@INPUT@',
-      '--destination',
-      meson.current_build_dir() / 'baseoq4' / (module_filename_prefix + game_mp_binary_name + game_module_filename_suffix),
+      meson.current_build_dir() / 'baseoq4' / (module_filename_prefix + game_binary_name + game_module_filename_suffix),
       '--stamp',
       '@OUTPUT@',
     ],
@@ -4242,10 +4171,7 @@ summary(
     'Integrated BSE source dir': bse_source_root,
     'Build games': build_games,
     'GameLibs source repo': game_libs_repo_summary,
-    'Build game_sp': build_games and build_game_sp,
-    'Build game_mp': build_games and build_game_mp,
-    'game_sp binary': game_sp_binary_name,
-    'game_mp binary': game_mp_binary_name,
+    'Game module binary (game_sp and game_mp modes)': game_binary_name,
     'Awakening SP campaign': awakening_summary,
     'Build Vulkan renderer module': build_renderer_vk and build_engine,
     'Vulkan renderer binary': renderer_vk_binary_name,

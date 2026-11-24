@@ -175,7 +175,7 @@ def main():
     module_root=exe.parent.parent/'Frameworks' if sys.platform=='darwin' else exe.parent/'baseoq4'
     content_root=exe.parent.parent/'Resources/baseoq4' if sys.platform=='darwin' else exe.parent/'baseoq4'
     identities={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest()
-                for p in (exe,module_root/('game-sp_'+arch+suffix),content_root/'pak0.pk4')}
+                for p in (exe,module_root/('game_'+arch+suffix),content_root/'pak0.pk4')}
     report=dict(case=args.case,renderer=args.renderer,command=command,identities=identities)
     (output/'plan.json').write_text(json.dumps(report,indent=2)+'\n')
     startup=None

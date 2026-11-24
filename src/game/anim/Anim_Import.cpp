@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -170,7 +170,9 @@ void idModelExport::LoadMayaDll( void ) {
 	}
 // RAVEN BEGIN
 // jscott: maya needs the source control in the tools dll
-	//common->LoadToolsDLL();
+	if ( gameLocal.IsMultiplayerMode() ) {
+		common->LoadToolsDLL();
+	}
 // RAVEN END
 }
 

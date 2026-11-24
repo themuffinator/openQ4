@@ -1,9 +1,10 @@
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 #include "ai/AI_Manager.h"
+#include "mp/match/MatchDeadline.h"
 
 /*
 ===============================================================================
@@ -240,7 +241,10 @@ const idEventDef EV_TriggerAction( "<triggerAction>", "E" );
 // RAVEN END
 
 CLASS_DECLARATION( idTrigger, idTrigger_Multi )
+	EVENT( EV_FindTargets,		idTrigger_Multi::Event_FindTargets )
+
 	EVENT( EV_Touch,			idTrigger_Multi::Event_Touch )
+	EVENT( EV_SpectatorTouch,	idTrigger_Multi::Event_SpectatorTouch )
 	EVENT( EV_Activate,			idTrigger_Multi::Event_Trigger )
 	EVENT( EV_TriggerAction,	idTrigger_Multi::Event_TriggerAction )
 
@@ -266,6 +270,7 @@ idTrigger_Multi::idTrigger_Multi( void ) {
 	touchClient = false;
 	touchOther = false;
 	touchVehicle = false;
+	touchSpec = false;
 	triggerFirst = false;
 	triggerWithSelf = false;
 	buyZoneTrigger = 0;
@@ -311,6 +316,21 @@ void idTrigger_Multi::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( touchVehicle );
 	savefile->ReadBool( triggerFirst );
 	savefile->ReadBool( triggerWithSelf );
+}
+
+/*
+================
+idTrigger_Multi::IsTeleporter
+
+Returns true if there is a single target, which is a teleporter
+================
+*/
+bool idTrigger_Multi::IsTeleporter( void ) const {
+	if ( targets.Num() != 1 ) {
+		return false;
+	}
+
+	return targets[ 0 ].GetEntity()->IsType( idPlayerStart::GetClassType() );
 }
 
 /*
@@ -382,6 +402,16 @@ void idTrigger_Multi::Spawn( void ) {
 	}
 
 	BecomeActive( TH_THINK );
+}
+
+/*
+================
+idTrigger_Multi::FindTargets
+================
+*/
+void idTrigger_Multi::Event_FindTargets( void ) {
+	FindTargets();
+	touchSpec = !spawnArgs.GetBool( "noSpec", IsTeleporter() ? "0" : "1" );
 }
 
 /*
@@ -506,10 +536,16 @@ void idTrigger_Multi::Event_Trigger( idEntity *activator ) {
 }
 
 
+static bool IsEligibleDeadZoneController( idPlayer *player, bool requiresToken ) {
+	return player != NULL && player->health > 0 && !player->spectating &&
+		!player->wantSpectate && player->team >= TEAM_MARINE && player->team < TEAM_MAX &&
+		( !requiresToken || player->PowerUpActive( POWERUP_DEADZONE ) );
+}
+
 void idTrigger_Multi::HandleControlZoneTrigger()
 {
-	// This only does something in multiplayer
-	if ( !gameLocal.isMultiplayer )
+	// This only does something in multiplayer with gameType == DeadZone
+	if ( !gameLocal.isMultiplayer || gameLocal.isClient || gameLocal.gameType != GAME_DEADZONE )
 		return;
 
 	const int TEAM_DEADLOCK = 2;
@@ -517,30 +553,36 @@ void idTrigger_Multi::HandleControlZoneTrigger()
 	int pCount = 0;
 	int count = 0, controllingTeam = TEAM_NONE;
 	count = playersInTrigger.Num();
+	const bool requiresToken = spawnArgs.GetBool( "requiresDeadZonePowerup", "1" );
+	bool haveController = false;
+	bool contested = false;
 
 	for ( int i = 0; i<count; i++ )
 	{
-		// No token? Ignore em!
-		if ( spawnArgs.GetBool("requiresDeadZonePowerup", "1") && !playersInTrigger[i]->PowerUpActive( POWERUP_DEADZONE ) )
+		// Eligibility can change between touch collection and this update.
+		if ( !IsEligibleDeadZoneController( playersInTrigger[ i ], requiresToken ) )
 			continue;
 
-		if ( spawnArgs.GetBool("requiresDeadZonePowerup", "1") )
-		{
-			pCount++;
-		}
+		// Token-free custom zones still accrue one unit per eligible player.
+		pCount++;
 
 		int team = playersInTrigger[i]->team;
 
-		if ( i == 0 )
+		if ( !haveController ) {
 			controllingTeam = playersInTrigger[i]->team;
+			haveController = true;
+		}
 
 		// Assign the controlling team based on the first player
 		// for zones that accept both.
 		if ( team != controllingTeam )
 		{
-			controllingTeam = TEAM_DEADLOCK;
-			pCount = 0;
+			contested = true;
 		}
+	}
+	if ( contested ) {
+		controllingTeam = TEAM_DEADLOCK;
+		pCount = 0;
 	}
 
 	if ( controllingTeam != controlZoneTrigger-1 && controlZoneTrigger != 3 )
@@ -585,8 +627,7 @@ void idTrigger_Multi::HandleControlZoneTrigger()
 	{
 		idPlayer* player = playersInTrigger[i];
 
-		// No token? Ignore em!
-		if ( spawnArgs.GetBool("requiresDeadZonePowerup", "1") && !player->PowerUpActive( POWERUP_DEADZONE ) )
+		if ( !IsEligibleDeadZoneController( player, requiresToken ) )
 			continue;
 
 		int team = player->team;
@@ -616,13 +657,17 @@ void idTrigger_Multi::Think()
 		HandleControlZoneTrigger();
 }
 
+void idTrigger_Multi::ThinkMatchPaused( int deltaMsec ) {
+	idTrigger::ThinkMatchPaused( deltaMsec );
+	mpMatchShiftOptionalDeadline( nextTriggerTime, deltaMsec );
+}
+
 /*
 ================
 idTrigger_Multi::Event_Touch
 ================
 */
 void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
-
 	if( triggerFirst ) {
 		return;
 	}
@@ -643,6 +688,7 @@ void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
 				return;
 			}
 			if ( static_cast< idPlayer * >( other )->spectating ) {
+				Event_SpectatorTouch( other, trace );
 				return;
 			}
 
@@ -659,8 +705,8 @@ void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
 		    // Control zone handling
 		    if ( controlZoneTrigger > 0 ) {
 			    idPlayer *p = static_cast< idPlayer * >( other );
-				if ( p->PowerUpActive(POWERUP_DEADZONE) || !spawnArgs.GetBool("requiresDeadZonePowerup", "1") )
-					playersInTrigger.Append(p);
+				if ( IsEligibleDeadZoneController( p, spawnArgs.GetBool( "requiresDeadZonePowerup", "1" ) ) )
+					playersInTrigger.AddUnique( p );
 		    }
 
 		} else if ( !touchOther ) {
@@ -697,6 +743,46 @@ void idTrigger_Multi::Event_Touch( idEntity *other, trace_t *trace ) {
 	if ( delay > 0 ) {
 		// don't allow it to trigger again until our delay has passed
 		nextTriggerTime += SEC2MS( delay + random_delay * gameLocal.random.CRandomFloat() );
+		PostEventSec( &EV_TriggerAction, delay, other );
+	} else {
+		TriggerAction( other );
+	}
+}
+
+/*
+================
+idTrigger_Multi::Event_Touch
+================
+*/
+void idTrigger_Multi::Event_SpectatorTouch( idEntity *other, trace_t *trace ) {
+	idPlayer *player;
+
+	if ( !touchSpec ) {
+		return;
+	}
+
+	if ( !other->IsType( idPlayer::GetClassType() ) ) {
+		return;
+	}
+
+	player = static_cast< idPlayer* >( other );
+	if ( !player->spectating ) {
+		return;
+	}
+
+	if ( player->lastSpectateTeleport > (gameLocal.time - 1000) ) {
+		// can't retrigger until the wait is over
+		return;
+	}
+
+	if ( !CheckFacing( other ) ) {
+		return;
+	}
+
+	player->lastSpectateTeleport = gameLocal.time + 1;
+	if ( delay > 0 ) {
+		// don't allow it to trigger again until our delay has passed
+		player->lastSpectateTeleport += SEC2MS( delay + random_delay * gameLocal.random.CRandomFloat() );
 		PostEventSec( &EV_TriggerAction, delay, other );
 	} else {
 		TriggerAction( other );
@@ -835,6 +921,11 @@ void idTrigger_EntityName::Spawn( void ) {
 	if ( !spawnArgs.GetBool( "noTouch" ) ) {
 		GetPhysics()->SetContents( CONTENTS_TRIGGER );
 	}
+}
+
+void idTrigger_EntityName::ThinkMatchPaused( int deltaMsec ) {
+	idTrigger::ThinkMatchPaused( deltaMsec );
+	mpMatchShiftOptionalDeadline( nextTriggerTime, deltaMsec );
 }
 
 /*
@@ -1264,6 +1355,13 @@ void idTrigger_Hurt::Spawn( void ) {
 
 	nextTime = gameLocal.time;
 	Enable();
+}
+
+void idTrigger_Hurt::ThinkMatchPaused( int deltaMsec ) {
+	idTrigger::ThinkMatchPaused( deltaMsec );
+	if ( on ) {
+		mpMatchShiftTimeOrigin( nextTime, deltaMsec );
+	}
 }
 
 /*

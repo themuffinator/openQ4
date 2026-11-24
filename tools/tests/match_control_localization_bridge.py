@@ -17,11 +17,11 @@ ROOT = Path(__file__).resolve().parents[2]
 GAME_ROOT = Path(
     os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT)
 ).resolve()
-MATCH_ROOT = GAME_ROOT / "src/mpgame/mp/match"
+MATCH_ROOT = GAME_ROOT / "src/game/mp/match"
 HEADER = MATCH_ROOT / "MatchControlLocalization.h"
 SOURCE = MATCH_ROOT / "MatchControlLocalization.cpp"
 PROJECTION_SOURCE = MATCH_ROOT / "MatchControlProjection.cpp"
-MULTIPLAYER_SOURCE = GAME_ROOT / "src/mpgame/MultiplayerGame.cpp"
+MULTIPLAYER_SOURCE = GAME_ROOT / "src/game/MultiplayerGame.cpp"
 PROTOCOL_HEADER = MATCH_ROOT / "MatchProtocol.h"
 STRINGS_ROOT = ROOT / "content/baseoq4/pak0/strings"
 MATCH_CONTROL_GUI = ROOT / "content/baseoq4/pak0/guis/matchcontrol.gui"
@@ -492,24 +492,24 @@ def static_contracts(header: str, source: str) -> None:
 
     listed = subprocess.run(
         [sys.executable, str(ROOT / "tools/build/list_sources.py"),
-         str(GAME_ROOT), "src/mpgame", "src/mpgame/Callbacks.cpp",
-         "src/mpgame/gamesys/Callbacks.cpp"],
+         str(GAME_ROOT), "src/game", "src/game/Callbacks.cpp",
+         "src/game/gamesys/Callbacks.cpp"],
         cwd=GAME_ROOT,
         text=True,
         capture_output=True,
     )
     if listed.returncode != 0:
         raise AssertionError("could not inspect MP source discovery:\n" + listed.stderr)
-    if "src/mpgame/mp/match/MatchControlLocalization.cpp" not in listed.stdout.splitlines():
+    if "src/game/mp/match/MatchControlLocalization.cpp" not in listed.stdout.splitlines():
         raise AssertionError("MatchControlLocalization.cpp is not compiled into game_mp")
 
     referenced = set(re.findall(r'"(#str_\d+)"', source))
     referenced.update(("#str_42301", "#str_42302"))
     presentation = (
         read(PROJECTION_SOURCE) + read(MULTIPLAYER_SOURCE) + read(MATCH_CONTROL_GUI)
-        + read(GAME_ROOT / "src/mpgame/mp/match/MatchRules.cpp")
-        + read(GAME_ROOT / "src/mpgame/Player.cpp")
-        + read(GAME_ROOT / "src/mpgame/gamesys/SysCmds.cpp")
+        + read(GAME_ROOT / "src/game/mp/match/MatchRules.cpp")
+        + read(GAME_ROOT / "src/game/Player.cpp")
+        + read(GAME_ROOT / "src/game/gamesys/SysCmds.cpp")
     )
     referenced.update(
         key
@@ -562,7 +562,7 @@ def native_harness() -> str:
 #include <string.h>
 
 #define MP_MATCH_CONTROL_LOCALIZATION_STANDALONE_TEST 1
-#include "mpgame/mp/match/MatchControlLocalization.cpp"
+#include "game/mp/match/MatchControlLocalization.cpp"
 
 #define CHECK_KEY(actual, expected) do { \
 	if ((actual) == 0 || strcmp((actual), (expected)) != 0) return __LINE__; \

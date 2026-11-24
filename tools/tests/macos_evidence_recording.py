@@ -159,7 +159,7 @@ def main() -> int:
             "Xcode 16.4",
             "macOS SDK version",
             "renderer-mp-smoke",
-            "MP loaded `game-mp`, started `mp/q4dm1`",
+            "MP loaded the game module as `game_mp`, started `mp/q4dm1`",
             "Package layout contract",
             "Mounted DMG launch coverage",
             "fs_basepath, fs_cdpath, and fs_savepath",

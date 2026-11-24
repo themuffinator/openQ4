@@ -14,8 +14,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchSeriesReport.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchSeriesReport.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchSeriesReport.h"
+SOURCE = ROOT / "src/game/mp/match/MatchSeriesReport.cpp"
 SOURCE_LISTER = ROOT / "tools/build/list_sources.py"
 
 
@@ -126,7 +126,7 @@ def static_contracts(header: str, source: str) -> None:
             shutil.which("python") or shutil.which("python3") or "python",
             str(SOURCE_LISTER),
             str(ROOT / "src"),
-            "mpgame",
+            "game",
         ],
         cwd=ROOT,
         text=True,
@@ -135,12 +135,12 @@ def static_contracts(header: str, source: str) -> None:
     )
     if listed.returncode != 0:
         raise AssertionError("source discovery failed:\n" + listed.stdout + listed.stderr)
-    if "mpgame/mp/match/MatchSeriesReport.cpp" not in listed.stdout.splitlines():
+    if "game/mp/match/MatchSeriesReport.cpp" not in listed.stdout.splitlines():
         raise AssertionError("Meson recursive source discovery omits MatchSeriesReport.cpp")
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchSeriesReport.h"
+#include "game/mp/match/MatchSeriesReport.h"
 
 #include <stdio.h>
 #include <string.h>

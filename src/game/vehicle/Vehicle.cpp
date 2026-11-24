@@ -4,8 +4,8 @@
 // Copyright 2002-2004 Raven Software
 //----------------------------------------------------------------
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../Effect.h"
@@ -1346,26 +1346,28 @@ void rvVehicle::UpdateHUD ( int position, idUserInterface* gui ) {
 	gui->SetStateInt ( "vehicle_haz", hazardWarningTime != 0 );
 	gui->SetStateInt ( "vehicle_locked", IsLocked ( ) );
 	
-	// openQ4: as The Awakening's game code did, the HUD's view cone (m03's ship
-	// panel) turns with the local player's view, and the vehicle's own screens
-	// show its speed (the speeder bike's speedometer: a quarter of its speed less
-	// four, never below 0). No retail GUI reads either value.
-	idPlayer* localPlayer = gameLocal.GetLocalPlayer ( );
-	if ( localPlayer ) {
-		gui->SetStateFloat ( "playerYaw", localPlayer->firstPersonViewAxis.ToAngles ( ).yaw );
-	}
-	// openQ4: the Remastered HUD prompt names the control that leaves the
-	// vehicle (Exit on the jump key) instead of the stock bracketed line.
-	gui->SetStateString ( "oq4_key_jump", common->KeysFromBinding ( "_moveUp" ) );
-	// openQ4: the heading of whatever carries the vehicle (m03's dropship under
-	// its space cannon), so the Remastered ship panel's view cone turns with
-	// the gun relative to the ship's nose rather than the world.
-	idEntity* carrier = GetBindMaster ( ) ? GetBindMaster ( ) : this;
-	gui->SetStateFloat ( "oq4_shipYaw", carrier->GetPhysics()->GetAxis().ToAngles().yaw );
-	const int speed = Max ( 0, idMath::FtoiFast ( GetPhysics()->GetLinearVelocity().Length() * 0.25f + 0.5f ) - 4 );
-	for ( int i = 0; i < MAX_RENDERENTITY_GUI; i++ ) {
-		if ( renderEntity.gui[ i ] ) {
-			renderEntity.gui[ i ]->SetStateInt ( "vehicle_speed", speed );
+	if ( !gameLocal.isMultiplayer ) {
+		// openQ4: as The Awakening's game code did, the HUD's view cone (m03's ship
+		// panel) turns with the local player's view, and the vehicle's own screens
+		// show its speed (the speeder bike's speedometer: a quarter of its speed less
+		// four, never below 0). No retail GUI reads either value.
+		idPlayer* localPlayer = gameLocal.GetLocalPlayer ( );
+		if ( localPlayer ) {
+			gui->SetStateFloat ( "playerYaw", localPlayer->firstPersonViewAxis.ToAngles ( ).yaw );
+		}
+		// openQ4: the Remastered HUD prompt names the control that leaves the
+		// vehicle (Exit on the jump key) instead of the stock bracketed line.
+		gui->SetStateString ( "oq4_key_jump", common->KeysFromBinding ( "_moveUp" ) );
+		// openQ4: the heading of whatever carries the vehicle (m03's dropship under
+		// its space cannon), so the Remastered ship panel's view cone turns with
+		// the gun relative to the ship's nose rather than the world.
+		idEntity* carrier = GetBindMaster ( ) ? GetBindMaster ( ) : this;
+		gui->SetStateFloat ( "oq4_shipYaw", carrier->GetPhysics()->GetAxis().ToAngles().yaw );
+		const int speed = Max ( 0, idMath::FtoiFast ( GetPhysics()->GetLinearVelocity().Length() * 0.25f + 0.5f ) - 4 );
+		for ( int i = 0; i < MAX_RENDERENTITY_GUI; i++ ) {
+			if ( renderEntity.gui[ i ] ) {
+				renderEntity.gui[ i ]->SetStateInt ( "vehicle_speed", speed );
+			}
 		}
 	}
 

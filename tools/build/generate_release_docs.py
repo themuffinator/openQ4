@@ -1312,7 +1312,7 @@ def generate_release_docs_site(
         Path("LICENSES/DOOM-3-ADDITIONAL-TERMS.txt"),
         Path("LICENSES/DOOM-3-BFG-ADDITIONAL-TERMS.txt"),
         Path("src/game/LICENSE"),
-        Path("src/mpgame/LICENSE"),
+        Path("src/game/LICENSE"),
     ):
         copy_docs_auxiliary_file(source_root, auxiliary, output_root / auxiliary)
     khronos_notice = Path("LICENSES") / "KHRONOS-GLES-MIT.txt"

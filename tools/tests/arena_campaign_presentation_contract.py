@@ -32,12 +32,12 @@ def require_before(haystack: str, first: str, second: str, context: str) -> None
 
 
 def main() -> None:
-    multiplayer = read("src/mpgame/MultiplayerGame.cpp")
-    multiplayer_h = read("src/mpgame/MultiplayerGame.h")
-    player = read("src/mpgame/Player.cpp")
-    game_state = read("src/mpgame/mp/GameState.cpp")
-    round_state = read("src/mpgame/mp/RoundGameState.cpp")
-    round_modes_h = read("src/mpgame/mp/RoundModes.h")
+    multiplayer = read("src/game/MultiplayerGame.cpp")
+    multiplayer_h = read("src/game/MultiplayerGame.h")
+    player = read("src/game/Player.cpp")
+    game_state = read("src/game/mp/GameState.cpp")
+    round_state = read("src/game/mp/RoundGameState.cpp")
+    round_modes_h = read("src/game/mp/RoundModes.h")
 
     # The feature is gated by the framework-owned campaign token. Ordinary MP
     # must keep its existing ready-up, spectator and camera paths.

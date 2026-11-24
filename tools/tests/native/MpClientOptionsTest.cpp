@@ -3,12 +3,12 @@
 // the weapon preference order, hit sounds by damage, landmark place names, team
 // overlay packing and the item-timer policy. Run by tools/tests/mp_client_options.py.
 #define MP_CLIENT_OPTIONS_CORE_ONLY
-#include "../../../src/mpgame/mp/ChatTokens.h"
-#include "../../../src/mpgame/mp/WeaponOrder.h"
-#include "../../../src/mpgame/mp/HitSounds.h"
-#include "../../../src/mpgame/mp/Locations.h"
-#include "../../../src/mpgame/mp/TeamInfo.h"
-#include "../../../src/mpgame/mp/ItemTimers.h"
+#include "../../../src/game/mp/ChatTokens.h"
+#include "../../../src/game/mp/WeaponOrder.h"
+#include "../../../src/game/mp/HitSounds.h"
+#include "../../../src/game/mp/Locations.h"
+#include "../../../src/game/mp/TeamInfo.h"
+#include "../../../src/game/mp/ItemTimers.h"
 
 #include <cstdio>
 #include <cstring>

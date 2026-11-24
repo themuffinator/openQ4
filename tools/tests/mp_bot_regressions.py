@@ -30,10 +30,10 @@ def function(source: str, signature: str) -> str:
 
 
 def main() -> None:
-    bot = (ROOT / "src/mpgame/bots/Bot.cpp").read_text(encoding="utf-8")
-    combat = (ROOT / "src/mpgame/bots/BotCombat.cpp").read_text(encoding="utf-8")
-    network = (ROOT / "src/mpgame/Game_network.cpp").read_text(encoding="utf-8")
-    physics = (ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8")
+    bot = (ROOT / "src/game/bots/Bot.cpp").read_text(encoding="utf-8")
+    combat = (ROOT / "src/game/bots/BotCombat.cpp").read_text(encoding="utf-8")
+    network = (ROOT / "src/game/Game_network.cpp").read_text(encoding="utf-8")
+    physics = (ROOT / "src/game/physics/Physics_Player.cpp").read_text(encoding="utf-8")
     constants = "\n".join(re.findall(r"^static const (?:int|float)\s+BOT_\w+\s*=\s*[0-9][^\n]+", bot, re.M))
     constants += "\n" + "\n".join(re.findall(
         r"^static const (?:int|float)\s+BOTCOMBAT_\w+[^\n]+", combat, re.M))

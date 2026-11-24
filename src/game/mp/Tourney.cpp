@@ -4,7 +4,11 @@
 // Copyright 2002-2004 Raven Software
 //----------------------------------------------------------------
 
-#include "../Game_local.h"
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
+
+#include "Tourney.h"
+
 
 /*
 ===============================================================================
@@ -26,6 +30,20 @@ rvTourneyArena::rvTourneyArena() {
 	nextStateTime = 0;
 	fragLimitTimeout = 0;
 	matchStartTime = 0;
+}
+
+void rvTourneyArena::ShiftMatchTime( int deltaMsec ) {
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+	const int maxInt = 0x7fffffff;
+	int *deadlines[] = { &nextStateTime, &fragLimitTimeout, &matchStartTime };
+	for ( int index = 0; index < 3; ++index ) {
+		int &deadline = *deadlines[ index ];
+		if ( deadline > 0 ) {
+			deadline = deadline > maxInt - deltaMsec ? maxInt : deadline + deltaMsec;
+		}
+	}
 }
 
 /*
@@ -370,22 +388,22 @@ rvTourneyArena::PackState
 ================
 */
 void rvTourneyArena::PackState( idBitMsg& outMsg ) {
-	if( players[ 0 ] ) {
-		outMsg.WriteByte( players[ 0 ]->entityNumber );
+	if ( players[ 0 ] ) {
+		outMsg.WriteChar( players[ 0 ]->entityNumber );
 	} else {
-		outMsg.WriteByte( -1 );
+		outMsg.WriteChar( -1 );
 	}
 	
-	if( players[ 1 ] ) {
-		outMsg.WriteByte( players[ 1 ]->entityNumber );
+	if ( players[ 1 ] ) {
+		outMsg.WriteChar( players[ 1 ]->entityNumber );
 	} else {
-		outMsg.WriteByte( -1 );
+		outMsg.WriteChar( -1 );
 	}
 
-	if( winner ) {
-		outMsg.WriteByte( winner->entityNumber );
+	if ( winner ) {
+		outMsg.WriteChar( winner->entityNumber );
 	} else {
-		outMsg.WriteByte( -1 );
+		outMsg.WriteChar( -1 );
 	}
 	
 	outMsg.WriteByte( arenaState );
@@ -400,23 +418,23 @@ rvTourneyArena::UnpackState
 ================
 */
 void rvTourneyArena::UnpackState( const idBitMsg& inMsg ) {
-	int playerOneNum = inMsg.ReadByte();
-	int playerTwoNum = inMsg.ReadByte();
-	int winnerNum = inMsg.ReadByte();
+	int playerOneNum = inMsg.ReadChar();
+	int playerTwoNum = inMsg.ReadChar();
+	int winnerNum = inMsg.ReadChar();
 
-	if( playerOneNum >= 0 && playerOneNum < MAX_CLIENTS ) {
+	if ( playerOneNum >= 0 && playerOneNum < MAX_CLIENTS ) {
 		players[ 0 ] = (idPlayer*)gameLocal.entities[ playerOneNum ];
 	} else {
 		players[ 0 ] = NULL;
 	}
 
-	if( playerTwoNum >= 0 && playerTwoNum < MAX_CLIENTS ) {
+	if ( playerTwoNum >= 0 && playerTwoNum < MAX_CLIENTS ) {
 		players[ 1 ] = (idPlayer*)gameLocal.entities[ playerTwoNum ];
 	} else {
 		players[ 1 ] = NULL;
 	}
 
-	if( winnerNum >= 0 && winnerNum < MAX_CLIENTS ) {
+	if ( winnerNum >= 0 && winnerNum < MAX_CLIENTS ) {
 		winner = (idPlayer*)gameLocal.entities[ winnerNum ];
 	} else {
 		winner = NULL;

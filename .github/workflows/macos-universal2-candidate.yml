@@ -477,8 +477,7 @@ jobs:
             "${app_exec}"
             "${package_dir}/openQ4-client_universal2"
             "${package_dir}/openQ4-ded_universal2"
-            "${module_dir}/game-sp_universal2.dylib"
-            "${module_dir}/game-mp_universal2.dylib"
+            "${module_dir}/game_universal2.dylib"
           )
           for binary in "${binaries[@]}"; do
             if [ ! -f "${binary}" ]; then
@@ -493,15 +492,13 @@ jobs:
             codesign --verify --strict --verbose=2 "${binary}"
           done
           codesign --verify --deep --strict --verbose=2 "${app_root}"
-          for module in game-sp game-mp; do
-            for macho_arch in arm64 x86_64; do
-              actual_id="$(otool -arch "${macho_arch}" -D "${module_dir}/${module}_universal2.dylib" | sed -n '2p' | tr -d '[:space:]')"
-              expected_id="@loader_path/${module}_universal2.dylib"
-              if [ "${actual_id}" != "${expected_id}" ]; then
-                echo "Universal2 ${module} install name mismatch for ${macho_arch}: ${actual_id:-<empty>}"
-                exit 1
-              fi
-            done
+          for macho_arch in arm64 x86_64; do
+            actual_id="$(otool -arch "${macho_arch}" -D "${module_dir}/game_universal2.dylib" | sed -n '2p' | tr -d '[:space:]')"
+            expected_id="@loader_path/game_universal2.dylib"
+            if [ "${actual_id}" != "${expected_id}" ]; then
+              echo "Universal2 game module install name mismatch for ${macho_arch}: ${actual_id:-<empty>}"
+              exit 1
+            fi
           done
           if [ "${{ inputs.macos_signing_mode }}" = "developer-id" ]; then
             for target in "${app_root}" "${binaries[@]}"; do
@@ -602,7 +599,7 @@ jobs:
           require_smoke_output "RendererDefaultSafety self-test passed"
           require_smoke_output "Filesystem paths:"
           require_smoke_output "fs_cdpath='${package_dir}/openQ4.app/Contents/Resources'"
-          require_smoke_output "Selected game module: logical='game_sp' binary='game-sp_universal2'"
+          require_smoke_output "Selected game module: logical='game_sp' binary='game_universal2'"
           if grep -Eiq '(^|[[:space:]])(FATAL|Sys_Error):' "${smoke_console}" "${smoke_log}"; then
             echo "Universal2 app smoke output contains a fatal startup diagnostic."
             exit 1

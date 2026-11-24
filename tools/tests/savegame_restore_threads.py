@@ -203,7 +203,7 @@ def main():
         raise RuntimeError('C++17 compiler required')
     failures = 0
     with tempfile.TemporaryDirectory(prefix='save-threads-', dir=ROOT/'.tmp') as directory:
-        for mode in ('game', 'mpgame'):
+        for mode in ('game',):
             cpp = Path(directory)/(mode+'.cpp')
             exe = cpp.with_suffix('.exe')
             code = source(mode)

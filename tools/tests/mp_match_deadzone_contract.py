@@ -18,8 +18,8 @@ STUBS = r'''
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
-#include "mpgame/mp/GameTypeIds.h"
-#include "mpgame/mp/MatchPhase.h"
+#include "game/mp/GameTypeIds.h"
+#include "game/mp/MatchPhase.h"
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr,"line %d: %s\n",__LINE__,#x); std::exit(1); } } while (0)
 enum { POWERUP_DEADZONE };
 struct idEntity {};
@@ -127,9 +127,9 @@ int main() {
 
 
 def main() -> None:
-    trigger = (ROOT / "src/mpgame/Trigger.cpp").read_text(encoding="utf-8")
-    mp = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
-    header = (ROOT / "src/mpgame/mp/GameState.h").read_text(encoding="utf-8")
+    trigger = (ROOT / "src/game/Trigger.cpp").read_text(encoding="utf-8")
+    mp = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    header = (ROOT / "src/game/mp/GameState.h").read_text(encoding="utf-8")
     enum_start = header.index("enum dzState_t {")
     dz_enum = header[enum_start:header.index("};", enum_start) + 2]
     bodies = function(trigger, "static bool IsEligibleDeadZoneController(")

@@ -363,7 +363,7 @@ def validate_save_files(home: Path, save_slot: str) -> dict[str, Any]:
 
 def expected_module_marker(game_module: Path, arch: str) -> str:
     return (
-        f"Selected game module: logical='game_sp' binary='game-sp_{arch}' "
+        f"Selected game module: logical='game_sp' binary='game_{arch}' "
         f"path='{game_module}'"
     )
 
@@ -495,7 +495,7 @@ def main(argv: list[str]) -> int:
     basepath = args.basepath.resolve()
     game_libs_repo = args.game_libs_repo.resolve() if args.game_libs_repo else None
     client = (args.client_executable or install_root / f"openQ4-client_{arch}").resolve()
-    game_module = (install_root / "baseoq4" / f"game-sp_{arch}.so").resolve()
+    game_module = (install_root / "baseoq4" / f"game_{arch}.so").resolve()
     mod_manifest = install_root / "baseoq4" / "mod.json"
     openq4_pak0 = install_root / "baseoq4" / "pak0.pk4"
     openq4_pak1 = install_root / "baseoq4" / "pak1.pk4"

@@ -1,9 +1,9 @@
-"""Compile both production dictionary writers against an independent wire oracle."""
+"""Compile the production dictionary writer against an independent wire oracle."""
 from pathlib import Path
 import sys
 
 parts = []
-for mode, path in zip(('sp', 'mp'), sys.argv[1:3]):
+for path in sys.argv[1:2]:
     source = Path(path).read_text(encoding='utf-8')
     for method in ('WriteChecked', 'FlushWriteBuffer', 'Write', 'WriteInt', 'WriteJoint',
                    'WriteShort', 'WriteByte', 'WriteSignedChar', 'WriteFloat', 'WriteBool',
@@ -14,5 +14,5 @@ for mode, path in zip(('sp', 'mp'), sys.argv[1:3]):
         while depth:
             depth += (source[end] == '{') - (source[end] == '}')
             end += 1
-        parts.append(source[start:end].replace('idSaveGame::', f'idSaveGame_{mode}::'))
-Path(sys.argv[3]).write_text('\n'.join(parts) + '\n', encoding='utf-8')
+        parts.append(source[start:end].replace('idSaveGame::', 'idSaveGame_game::'))
+Path(sys.argv[2]).write_text('\n'.join(parts) + '\n', encoding='utf-8')

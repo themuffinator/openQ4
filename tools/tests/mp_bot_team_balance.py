@@ -35,9 +35,9 @@ def require(text: str, needle: str, context: str) -> None:
 
 
 def main() -> None:
-    header = read("src/mpgame/bots/Bot.h")
-    source = read("src/mpgame/bots/Bot.cpp")
-    multiplayer = read("src/mpgame/MultiplayerGame.cpp")
+    header = read("src/game/bots/Bot.h")
+    source = read("src/game/bots/Bot.cpp")
+    multiplayer = read("src/game/MultiplayerGame.cpp")
 
     require(header, "initialTeamAssignmentPending", "rvBot reservation state")
     require(header, "teamAssignmentInstance", "rvBot instance reservation")

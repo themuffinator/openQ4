@@ -32,9 +32,9 @@ def main() -> int:
              setup=["set bot_debug 4", "bot_probeHealth 1 21"]),
     ]
     exe = "openQ4-client_x64.exe" if os.name == "nt" else "openQ4-client_x64"
-    files = [runtime / exe, *[p for p in (runtime / "baseoq4").glob("game-mp*")
+    files = [runtime / exe, *[p for p in (runtime / "baseoq4").glob("game_*")
                              if p.suffix in (".dll", ".so", ".dylib")],
-             ROOT / "src/mpgame/bots/Bot.cpp", ROOT / "src/mpgame/gamesys/SysCmds.cpp"]
+             ROOT / "src/game/bots/Bot.cpp", ROOT / "src/game/gamesys/SysCmds.cpp"]
     identity = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
     completed, log, code = replay_session(runtime, exe, args.basepath.resolve(), output,
                                           "mp/q4ctf5", "CTF", trials, 28973, 180)

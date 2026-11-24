@@ -219,7 +219,7 @@ and machine. Move an independent secure backup before replacing that account or
 machine; GitHub secrets cannot be downloaded as a key backup.
 
 `verify_android_apk.py` also checks the application ID, version/API, non-debug
-manifest, native-library extraction, 16 KiB alignment, all seven libraries,
+manifest, native-library extraction, 16 KiB alignment, all six libraries,
 overlay bytes and license notices. APK publication is blocked if any check or
 any desktop build fails. This packaging validation does not replace device
 installation and gameplay testing.

@@ -102,14 +102,14 @@ def refusal_contract(mode):
 def main():
     if len(sys.argv)==4 and sys.argv[1]=='--generate-native':
         Path(sys.argv[3]).write_text(source(sys.argv[2]),encoding='utf-8'); return 0
-    for mode in ('game','mpgame'):
+    for mode in ('game',):
         refusal_contract(mode)
-    print('client registration: refused spawns are dropped, not fatal (game, mpgame)')
+    print('client registration: refused spawns are dropped, not fatal')
     compiler=next((path for name in ('clang++','g++','c++') if (path:=shutil.which(name))),None)
     if not compiler: raise RuntimeError('C++17 compiler required')
     failures=0
     with tempfile.TemporaryDirectory(prefix='client-register-',dir=ROOT/'.tmp') as directory:
-        for mode in ('game','mpgame'):
+        for mode in ('game',):
             cpp=Path(directory)/(mode+'.cpp'); executable=cpp.with_suffix('.exe')
             cpp.write_text(source(mode),encoding='utf-8')
             subprocess.run([compiler,'-std=c++17',str(cpp),'-o',str(executable)],check=True)

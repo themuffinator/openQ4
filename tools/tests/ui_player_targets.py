@@ -275,7 +275,7 @@ int main(){
 
 
 def main():
-    sources = ['src/mpgame/MultiplayerGame.cpp', 'src/mpgame/Game_network.cpp', 'src/mpgame/Player.cpp',
+    sources = ['src/game/MultiplayerGame.cpp', 'src/game/Game_network.cpp', 'src/game/Player.cpp',
                'tools/tests/ui_player_targets.py']
     digest = lambda p: hashlib.sha256((ROOT / p).read_bytes()).hexdigest()
     bindings = {p: digest(p) for p in sources}

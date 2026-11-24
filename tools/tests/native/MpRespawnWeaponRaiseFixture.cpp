@@ -2,7 +2,7 @@
 // snapshot reader's hitch test, its weapon-change and weapon-entity blocks and its respawn
 // branch, idPlayer::UpdateWeapon's weapon creation, and rvWeapon::PlayAnim with the raise
 // start it takes from the server.  tools/tests/mp_predicted_hitscan_state.py splices them in
-// verbatim from src/mpgame/Player.cpp and src/mpgame/Weapon.cpp.
+// verbatim from src/game/Player.cpp and src/game/Weapon.cpp.
 //
 // The server makes a player's weapon for a new life on the frame after the respawn and
 // raises it at once.  The client must raise its own from that game time, not catch it

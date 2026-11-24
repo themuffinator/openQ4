@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
-import hashlib
 import json
 import os
 import platform
@@ -28,7 +27,13 @@ from linux_metadata import (  # noqa: E402
     desktop_entry_exec as parse_linux_desktop_entry_exec,
     desktop_exec_command as parse_linux_desktop_exec_command,
 )
-from game_layer import PACKAGED_LAYER_GAME_DIRS, LayerError, read_layer_mod_json  # noqa: E402
+from game_layer import (  # noqa: E402
+    GAME_MODULE_STEM,
+    PACKAGED_LAYER_GAME_DIRS,
+    RETIRED_GAME_MODULE_STEMS,
+    LayerError,
+    read_layer_mod_json,
+)
 
 
 PROFILE_DEFAULTS = {
@@ -1063,13 +1068,13 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
 
 def ensure_game_libs_repo(env: dict[str, str]) -> None:
     game_libs_repo = validate_game_libs_repo_path(Path(env["OPENQ4_GAMELIBS_REPO"]))
-    for source_tree, label in (("game", "single-player"), ("mpgame", "multiplayer")):
-        expected = game_libs_repo / "src" / source_tree
-        if not expected.is_dir():
-            raise ValidationError(
-                f"Canonical {label} game source directory was not found. "
-                f"Expected: {expected}"
-            )
+    # one source tree builds the game module for single-player and multiplayer
+    expected = game_libs_repo / "src" / "game"
+    if not expected.is_dir():
+        raise ValidationError(
+            "Canonical game source directory was not found. "
+            f"Expected: {expected}"
+        )
 
 
 def find_any(root: Path, patterns: tuple[str, ...]) -> list[Path]:
@@ -1117,28 +1122,28 @@ def find_staged_game_modules(game_dir: Path, stem: str) -> list[Path]:
     return find_any(game_dir, (f"{stem}_*.dll", f"{stem}_*.so", f"{stem}_*.dylib"))
 
 
-def file_sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def find_retired_game_modules(game_dir: Path) -> list[Path]:
+    return sorted(
+        path
+        for stem in RETIRED_GAME_MODULE_STEMS
+        for path in game_dir.glob(f"{stem}_*")
+        if path.exists() or path.is_symlink()
+    )
 
 
-def validate_distinct_game_modules(root: Path, sp_modules: list[Path], mp_modules: list[Path]) -> None:
-    sp_by_arch = {staged_binary_arch(path, "game-sp"): path for path in sp_modules}
-    mp_by_arch = {staged_binary_arch(path, "game-mp"): path for path in mp_modules}
-    for arch in sorted(set(sp_by_arch).intersection(mp_by_arch)):
-        sp_path = sp_by_arch[arch]
-        mp_path = mp_by_arch[arch]
-        if sp_path.stat().st_size != mp_path.stat().st_size:
-            continue
-        if file_sha256(sp_path) == file_sha256(mp_path):
-            raise ValidationError(
-                "Staged single-player and multiplayer game modules are byte-identical for "
-                f"{arch}: {rel(sp_path, root)} and {rel(mp_path, root)}. "
-                "The MP target must compile the companion src/mpgame source tree."
-            )
+def validate_no_retired_game_modules(root: Path, game_dir: Path) -> None:
+    """Reject the split game-sp/game-mp modules that one game_<arch> module replaced.
+
+    Nothing loads them any more, so a stage or package that still holds them carries
+    an older build's code and symbols. Staging retires them; re-stage to clear them.
+    """
+    retired = find_retired_game_modules(game_dir)
+    if retired:
+        formatted = "\n".join(f"  - {rel(path, root)}" for path in retired)
+        raise ValidationError(
+            "Staged payload still holds retired split game modules (one game_<arch> module "
+            f"replaced game-sp/game-mp); re-stage to retire them:\n{formatted}"
+        )
 
 
 def validate_staged_architecture_set(
@@ -1155,8 +1160,9 @@ def validate_staged_architecture_set(
             f"clients={sorted(client_arches)} dedicated={sorted(dedicated_arches)}"
         )
 
+    validate_no_retired_game_modules(root, game_dir)
     expected_suffix = expected_game_module_suffix()
-    game_modules = find_staged_game_modules(game_dir, "game-sp") + find_staged_game_modules(game_dir, "game-mp")
+    game_modules = find_staged_game_modules(game_dir, GAME_MODULE_STEM)
     wrong_suffix_modules = sorted(path for path in game_modules if path.suffix.lower() != expected_suffix)
     if wrong_suffix_modules:
         formatted = "\n".join(f"  - {rel(path, root)}" for path in wrong_suffix_modules)
@@ -1165,14 +1171,11 @@ def validate_staged_architecture_set(
             f"expected {expected_suffix}:\n{formatted}"
         )
 
-    sp_modules = [path for path in game_modules if path.name.startswith("game-sp_") and path.suffix.lower() == expected_suffix]
-    mp_modules = [path for path in game_modules if path.name.startswith("game-mp_") and path.suffix.lower() == expected_suffix]
-    sp_arches = staged_arches(sp_modules, "game-sp", root, "single-player game module")
-    mp_arches = staged_arches(mp_modules, "game-mp", root, "multiplayer game module")
-    if sp_arches != client_arches or mp_arches != client_arches:
+    module_arches = staged_arches(game_modules, GAME_MODULE_STEM, root, "game module")
+    if module_arches != client_arches:
         raise ValidationError(
             "Staged game module architecture mismatch: "
-            f"engine={sorted(client_arches)} sp={sorted(sp_arches)} mp={sorted(mp_arches)}"
+            f"engine={sorted(client_arches)} game={sorted(module_arches)}"
         )
 
     return client_arches
@@ -1830,34 +1833,27 @@ def validate_macos_staged_metadata(
 
     bad_game_modules = sorted(
         path
-        for pattern in ("game-sp_*.dll", "game-sp_*.so", "game-mp_*.dll", "game-mp_*.so")
+        for pattern in (f"{GAME_MODULE_STEM}_*.dll", f"{GAME_MODULE_STEM}_*.so")
         for path in game_dir.glob(pattern)
     )
     if bad_game_modules:
         formatted = "\n".join(f"  - {rel(path, root)}" for path in bad_game_modules)
         raise ValidationError(f"macOS staged payload contains non-dylib game modules:\n{formatted}")
 
-    missing_game_modules: list[Path] = []
-    for module_name in (f"game-sp_{staged_arch}.dylib", f"game-mp_{staged_arch}.dylib"):
-        module_path = game_dir / module_name
-        if not module_path.is_file():
-            missing_game_modules.append(module_path)
-        elif not is_posix_executable(module_path):
-            raise ValidationError(f"macOS staged game module is not executable: {rel(module_path, root)}")
+    game_module_path = game_dir / f"{GAME_MODULE_STEM}_{staged_arch}.dylib"
+    if not game_module_path.is_file():
+        raise ValidationError(
+            f"macOS staged payload is missing the architecture-matched game module:\n  - {rel(game_module_path, root)}"
+        )
+    if not is_posix_executable(game_module_path):
+        raise ValidationError(f"macOS staged game module is not executable: {rel(game_module_path, root)}")
 
-    if missing_game_modules:
-        formatted = "\n".join(f"  - {rel(path, root)}" for path in missing_game_modules)
-        raise ValidationError(f"macOS staged payload is missing architecture-matched game modules:\n{formatted}")
-
-    expected_game_modules = {
-        game_dir / f"game-sp_{staged_arch}.dylib"
-    } | {
-        game_dir / f"game-mp_{staged_arch}.dylib"
-    }
+    # game-*.dylib also sweeps the retired split game-sp/game-mp modules
     stale_game_modules = sorted(
         path
-        for path in game_dir.glob("game-*.dylib")
-        if path not in expected_game_modules
+        for pattern in (f"{GAME_MODULE_STEM}_*.dylib", f"{GAME_MODULE_STEM}-*.dylib")
+        for path in game_dir.glob(pattern)
+        if path != game_module_path
     )
     if stale_game_modules:
         formatted = "\n".join(f"  - {rel(path, root)}" for path in stale_game_modules)
@@ -1869,8 +1865,7 @@ def validate_macos_staged_metadata(
         [
             install_root / f"openQ4-client_{staged_arch}",
             install_root / f"openQ4-ded_{staged_arch}",
-            game_dir / f"game-sp_{staged_arch}.dylib",
-            game_dir / f"game-mp_{staged_arch}.dylib",
+            game_module_path,
         ] + openal_runtime_binaries,
     )
 
@@ -1894,10 +1889,7 @@ def validate_windows_symbols(root: Path, install_root: Path, game_dir: Path, arc
         for arch in arches
         for name in ("openQ4-client", "openQ4-ded", "openQ4-updater", "renderer-gl", "renderer-vk")
     } | {
-        game_dir / f"game-sp_{arch}.pdb"
-        for arch in arches
-    } | {
-        game_dir / f"game-mp_{arch}.pdb"
+        game_dir / f"{GAME_MODULE_STEM}_{arch}.pdb"
         for arch in arches
     }
 
@@ -1912,8 +1904,9 @@ def validate_windows_symbols(root: Path, install_root: Path, game_dir: Path, arc
         + sorted(install_root.glob("openQ4-updater_*.pdb"))
         + sorted(install_root.glob("renderer-gl_*.pdb"))
         + sorted(install_root.glob("renderer-vk_*.pdb"))
-        + sorted(game_dir.glob("game-sp_*.pdb"))
-        + sorted(game_dir.glob("game-mp_*.pdb"))
+        + sorted(game_dir.glob(f"{GAME_MODULE_STEM}_*.pdb"))
+        # the retired split modules' symbols are stale too
+        + sorted(path for stem in RETIRED_GAME_MODULE_STEMS for path in game_dir.glob(f"{stem}_*.pdb"))
     )
     stale_symbols = [path for path in staged_symbols if path not in required_symbols]
     if stale_symbols:
@@ -1926,14 +1919,14 @@ def validate_staged_game_layers(
     install_root: Path,
     client_candidates: list[Path],
     dedicated_candidates: list[Path],
-) -> list[tuple[Path, list[Path], list[Path]]]:
-    """Check each staged game-library layer (q4xbase) the way baseoq4's modules are checked.
+) -> list[tuple[Path, list[Path]]]:
+    """Check each staged game-library layer (q4xbase) the way baseoq4's module is checked.
 
-    That means both modules, the engine's architecture, distinct SP and MP code, executable
-    dylibs with the right slices on macOS, and .pdb files on Windows. A layer holds only those
-    files and its mod.json. Builds that did not stage the layer skip it.
+    That means its game module, the engine's architecture, executable dylibs with the right
+    slices on macOS, and .pdb files on Windows. A layer holds only those files and its
+    mod.json. Builds that did not stage the layer skip it.
     """
-    layers: list[tuple[Path, list[Path], list[Path]]] = []
+    layers: list[tuple[Path, list[Path]]] = []
     for name in PACKAGED_LAYER_GAME_DIRS:
         layer_dir = install_root / name
         if layer_dir.is_symlink():
@@ -1942,17 +1935,14 @@ def validate_staged_game_layers(
             continue
         if not layer_dir.is_dir():
             raise ValidationError(f"Staged game layer is not a directory: {rel(layer_dir, root)}")
-        layer_sp = find_staged_game_modules(layer_dir, "game-sp")
-        layer_mp = find_staged_game_modules(layer_dir, "game-mp")
-        if not layer_sp or not layer_mp:
-            raise ValidationError(f"Staged {name}/ needs both its game modules: {rel(layer_dir, root)}")
+        modules = find_staged_game_modules(layer_dir, GAME_MODULE_STEM)
+        if not modules:
+            raise ValidationError(f"Staged {name}/ needs its game module: {rel(layer_dir, root)}")
         layer_arches = validate_staged_architecture_set(root, layer_dir, client_candidates, dedicated_candidates)
-        validate_distinct_game_modules(root, layer_sp, layer_mp)
         try:
             read_layer_mod_json(layer_dir / "mod.json")
         except LayerError as exc:
             raise ValidationError(str(exc)) from exc
-        modules = layer_sp + layer_mp
         allowed = {path.name for path in modules} | {"mod.json"}
         if host_is_windows():
             allowed |= {path.with_suffix(".pdb").name for path in modules}
@@ -1968,7 +1958,7 @@ def validate_staged_game_layers(
             for arch in sorted(layer_arches):
                 validate_macos_binary_architectures(root, arch, modules)
         validate_windows_symbols(root, install_root, layer_dir, layer_arches)
-        layers.append((layer_dir, layer_sp, layer_mp))
+        layers.append((layer_dir, modules))
     return layers
 
 
@@ -2002,12 +1992,9 @@ def validate_staged_payload(root: Path, *, dry_run: bool, build_dir: Path | None
         for dedicated in dedicated_candidates:
             require_posix_executable(dedicated, root, "Staged dedicated-server executable")
 
-    sp_modules = find_staged_game_modules(game_dir, "game-sp")
-    mp_modules = find_staged_game_modules(game_dir, "game-mp")
-    if not sp_modules:
-        raise ValidationError("Staged single-player game module was not found under .install/baseoq4/.")
-    if not mp_modules:
-        raise ValidationError("Staged multiplayer game module was not found under .install/baseoq4/.")
+    game_modules = find_staged_game_modules(game_dir, GAME_MODULE_STEM)
+    if not game_modules:
+        raise ValidationError("Staged game module was not found under .install/baseoq4/.")
 
     staged_arches_for_payload = validate_staged_architecture_set(
         root,
@@ -2016,7 +2003,6 @@ def validate_staged_payload(root: Path, *, dry_run: bool, build_dir: Path | None
         dedicated_candidates,
     )
     validate_no_staged_symlinks(root, install_root)
-    validate_distinct_game_modules(root, sp_modules, mp_modules)
     staged_layers = validate_staged_game_layers(root, install_root, client_candidates, dedicated_candidates)
 
     if host_is_linux():
@@ -2030,28 +2016,28 @@ def validate_staged_payload(root: Path, *, dry_run: bool, build_dir: Path | None
             linux_binary_specs.append(
                 (binary_path, staged_binary_arch(binary_path, "openQ4-ded") or "", False)
             )
-        for binary_path in sp_modules:
+        for binary_path in game_modules:
             linux_binary_specs.append(
-                (binary_path, staged_binary_arch(binary_path, "game-sp") or "", True)
+                (binary_path, staged_binary_arch(binary_path, GAME_MODULE_STEM) or "", True)
             )
-        for binary_path in mp_modules:
-            linux_binary_specs.append(
-                (binary_path, staged_binary_arch(binary_path, "game-mp") or "", True)
+        for _, layer_modules in staged_layers:
+            linux_binary_specs.extend(
+                (path, staged_binary_arch(path, GAME_MODULE_STEM) or "", True) for path in layer_modules
             )
-        for _, layer_sp, layer_mp in staged_layers:
-            linux_binary_specs.extend((path, staged_binary_arch(path, "game-sp") or "", True) for path in layer_sp)
-            linux_binary_specs.extend((path, staged_binary_arch(path, "game-mp") or "", True) for path in layer_mp)
         validate_linux_binary_hardening(root, linux_binary_specs)
         validate_linux_client_runtime_dependencies(root, client_candidates)
         dedicated_runtime_specs = [
             (binary_path, staged_binary_arch(binary_path, "openQ4-ded") or "")
             for binary_path in dedicated_candidates
         ] + [
-            (binary_path, staged_binary_arch(binary_path, "game-mp") or "")
-            for binary_path in mp_modules
+            # the dedicated server loads the game module as game_mp
+            (binary_path, staged_binary_arch(binary_path, GAME_MODULE_STEM) or "")
+            for binary_path in game_modules
         ]
         dedicated_runtime_specs.extend(
-            (path, staged_binary_arch(path, "game-mp") or "") for _, _, layer_mp in staged_layers for path in layer_mp
+            (path, staged_binary_arch(path, GAME_MODULE_STEM) or "")
+            for _, layer_modules in staged_layers
+            for path in layer_modules
         )
         validate_linux_dedicated_runtime_dependencies(root, dedicated_runtime_specs)
     if host_is_macos():
@@ -2092,9 +2078,8 @@ def validate_staged_payload(root: Path, *, dry_run: bool, build_dir: Path | None
 
     print(f"Client: {rel(client_candidates[0], root)}", flush=True)
     print(f"Dedicated server: {rel(dedicated_candidates[0], root)}", flush=True)
-    print(f"SP module: {rel(sp_modules[0], root)}", flush=True)
-    print(f"MP module: {rel(mp_modules[0], root)}", flush=True)
-    for layer_dir, _, _ in staged_layers:
+    print(f"Game module: {rel(game_modules[0], root)}", flush=True)
+    for layer_dir, _ in staged_layers:
         print(f"Game layer: {rel(layer_dir, root)}", flush=True)
 
 

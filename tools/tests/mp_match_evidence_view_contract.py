@@ -12,9 +12,9 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchEvidenceView.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchEvidenceView.cpp"
-EVIDENCE_SOURCE = ROOT / "src/mpgame/mp/match/MatchEvidence.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchEvidenceView.h"
+SOURCE = ROOT / "src/game/mp/match/MatchEvidenceView.cpp"
+EVIDENCE_SOURCE = ROOT / "src/game/mp/match/MatchEvidence.cpp"
 
 
 def read(path: Path) -> str:
@@ -82,16 +82,15 @@ def static_contracts(header: str, source: str) -> None:
             shutil.which("python") or "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         cwd=ROOT,
         text=True,
         capture_output=True,
         check=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchEvidenceView.cpp" not in listed:
+    if "game/mp/match/MatchEvidenceView.cpp" not in listed:
         raise AssertionError("Meson source discovery omitted MatchEvidenceView.cpp")
 
 
@@ -166,10 +165,10 @@ private:
 };
 
 #define MP_MATCH_VIEW_STANDALONE_TEST 1
-#include "mpgame/mp/match/MatchView.cpp"
+#include "game/mp/match/MatchView.cpp"
 
 #define private public
-#include "mpgame/mp/match/MatchEvidenceView.h"
+#include "game/mp/match/MatchEvidenceView.h"
 #undef private
 
 mpMatchLocalizationId_t MPMatchProtocolReasonLocalizationId(

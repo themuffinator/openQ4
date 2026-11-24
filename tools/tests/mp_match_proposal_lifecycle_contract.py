@@ -159,7 +159,7 @@ int main() {
 
 
 def main() -> None:
-    multiplayer = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    multiplayer = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     frame = function(multiplayer, "void idMultiplayerGame::BeginCompetitiveFrame")
     retirement = frame.index("RetireUnpassedMatchProposals();")
     if not (frame.index("ProcessPassedMatchProposals();") <
@@ -181,7 +181,7 @@ def main() -> None:
         command = [compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
                    *shlex.split(os.environ.get("CXXFLAGS", "")),
                    "-DMP_PROPOSAL_STANDALONE_TEST", f"-I{ROOT / 'src'}",
-                   str(cpp), str(ROOT / "src/mpgame/mp/match/MatchProposal.cpp"),
+                   str(cpp), str(ROOT / "src/game/mp/match/MatchProposal.cpp"),
                    "-o", str(executable)]
         subprocess.run(command, cwd=ROOT, check=True)
         subprocess.run([str(executable)], cwd=ROOT, check=True)

@@ -15,9 +15,9 @@ ROOT = Path(__file__).resolve().parents[2]
 HARNESS = r'''
 #include <cstdio>
 #include <cstdlib>
-#include "mpgame/mp/match/MatchSession.h"
-#include "mpgame/mp/match/MatchTeams.h"
-#include "mpgame/mp/match/MatchTeamCommunication.h"
+#include "game/mp/match/MatchSession.h"
+#include "game/mp/match/MatchTeams.h"
+#include "game/mp/match/MatchTeamCommunication.h"
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr,"line %d: %s\n",__LINE__,#x); std::exit(1); } } while (0)
 #define ACCEPT(x) CHECK(!(x).WasRejected())
 static void phase(mpMatchSession& s,mpGameState_t next,mpMatchTransitionReason_t why) {
@@ -146,8 +146,8 @@ int main() {
 
 
 def main() -> None:
-    source = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
-    modes = (ROOT / "src/mpgame/mp/RoundModes.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    modes = (ROOT / "src/game/mp/RoundModes.cpp").read_text(encoding="utf-8")
     adapter = function(source, "bool idMultiplayerGame::ApplyRoundTeamAssignment(")
     policy = function(source, "mpMatchTeamsPolicy_t idMultiplayerGame::BuildMatchTeamsPolicy(")
     assert "policy.allowLiveJoin = false" in policy
@@ -165,9 +165,9 @@ def main() -> None:
         cpp, exe = path / "teams.cpp", path / ("teams.exe" if os.name == "nt" else "teams")
         cpp.write_text("#include <initializer_list>\n" + HARNESS, encoding="utf-8")
         command = [compiler, "-std=c++17", "-DMP_MATCH_SESSION_STANDALONE_TEST", "-DMP_MATCH_TEAMS_STANDALONE_TEST",
-                   f"-I{ROOT / 'src'}", str(cpp), str(ROOT / "src/mpgame/mp/match/MatchSession.cpp"),
-                   str(ROOT / "src/mpgame/mp/match/MatchTeams.cpp"),
-                   str(ROOT / "src/mpgame/mp/match/MatchTeamCommunication.cpp"), "-o", str(exe)]
+                   f"-I{ROOT / 'src'}", str(cpp), str(ROOT / "src/game/mp/match/MatchSession.cpp"),
+                   str(ROOT / "src/game/mp/match/MatchTeams.cpp"),
+                   str(ROOT / "src/game/mp/match/MatchTeamCommunication.cpp"), "-o", str(exe)]
         if os.environ.get("MP_MATCH_TEST_SANITIZERS") == "1":
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
         subprocess.run(command, cwd=ROOT, check=True)

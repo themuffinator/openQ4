@@ -175,7 +175,7 @@ def main() -> int:
     (ROOT / ".tmp").mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="restore-physics-", dir=ROOT / ".tmp") as directory:
         scratch = Path(directory)
-        for mode in ("game", "mpgame"):
+        for mode in ("game",):
             cpp, exe = scratch / f"{mode}.cpp", scratch / f"{mode}.exe"
             code = source(mode)
             cases = {"production": code}

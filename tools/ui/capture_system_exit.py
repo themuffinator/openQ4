@@ -494,7 +494,7 @@ def qualify_warnings(log, baseline, mode, renderer):
 
 def binary_hashes(runtime):
     executable=runtime/('openQ4-client_x64.exe' if os.name=='nt' else 'openQ4-client_x64')
-    paths={executable,*runtime.glob('renderer-*'),*(runtime/'baseoq4').glob('game-*')}
+    paths={executable,*runtime.glob('renderer-*'),*(runtime/'baseoq4').glob('game_*')}
     paths.update(path for path in runtime.iterdir() if path.suffix.lower() in ('.dll','.so','.dylib') or '.so.' in path.name)
     return {str(path.relative_to(runtime)):digest(path) for path in sorted(paths) if path.is_file()}
 

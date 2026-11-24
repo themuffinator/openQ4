@@ -1,4 +1,4 @@
-// Native test of src/mpgame/mp/ModerationFile.h (MP-18): banlist.txt read and
+// Native test of src/game/mp/ModerationFile.h (MP-18): banlist.txt read and
 // written through a stand-in for the engine's file system. The header needs only
 // a handful of engine types; the stand-ins below give them the behaviour the
 // reader depends on, and let a test cut a read short or fill the disk.
@@ -154,7 +154,7 @@ int idFile::Printf( const char *fmt, ... ) {
 static MockFileSystem mockFileSystem;
 static MockFileSystem *fileSystem = &mockFileSystem;
 
-#include "../../../src/mpgame/mp/ModerationFile.h"
+#include "../../../src/game/mp/ModerationFile.h"
 
 //----------------------------------------------------------------
 

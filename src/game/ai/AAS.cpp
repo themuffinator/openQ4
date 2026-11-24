@@ -1,5 +1,5 @@
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 // RAVEN BEGIN
 #include "../Game_local.h"
@@ -60,10 +60,18 @@ bool idAASLocal::Init( const idStr &mapName, unsigned int mapFileCRC ) {
 
 		file = AASFileManager->LoadAAS( mapName, mapFileCRC );
 		if ( !file ) {
-			// DWarning is silent unless com_developer is set, so a map whose
-			// navigation data failed to load looked completely normal while
-			// every AI that needed it silently stopped pathing
-			common->Warning( "Couldn't load AAS file: '%s' - AI that uses it cannot navigate", mapName.c_str() );
+			if ( gameLocal.IsMultiplayerMode() ) {
+				// openQ4: multiplayer bots path over the runtime navigation mesh
+				// (bots/NavMesh.cpp), and nothing else in this module navigates with
+				// AAS, so the stock MP maps, which ship none, lose nothing here. The
+				// single-player module keeps this as a warning.
+				common->DPrintf( "No AAS file '%s'; multiplayer bots use the runtime navigation mesh\n", mapName.c_str() );
+			} else {
+				// DWarning is silent unless com_developer is set, so a map whose
+				// navigation data failed to load looked completely normal while
+				// every AI that needed it silently stopped pathing
+				common->Warning( "Couldn't load AAS file: '%s' - AI that uses it cannot navigate", mapName.c_str() );
+			}
 			return false;
 		}
 // RAVEN BEGIN
@@ -127,7 +135,7 @@ size_t idAASLocal::StatsSummary( void ) const {
 			+ ( areaCacheIndexSize * sizeof( idRoutingCache * ) ) 
 			+ ( portalCacheIndexSize * sizeof( idRoutingCache * ) );
 
-	return(  size );
+	return( size );
 }
 // RAVEN END
 

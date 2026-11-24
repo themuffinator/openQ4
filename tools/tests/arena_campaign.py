@@ -1908,17 +1908,17 @@ def validate_engine_hooks() -> None:
 
 
 def validate_game_hooks() -> None:
-    sys_cvar = GAME_LIBS_ROOT / "src" / "mpgame" / "gamesys" / "SysCvar.cpp"
-    multiplayer = GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp"
-    multiplayer_header = GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.h"
-    network_runtime = GAME_LIBS_ROOT / "src" / "mpgame" / "Game_network.cpp"
+    sys_cvar = GAME_LIBS_ROOT / "src" / "game" / "gamesys" / "SysCvar.cpp"
+    multiplayer = GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp"
+    multiplayer_header = GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.h"
+    network_runtime = GAME_LIBS_ROOT / "src" / "game" / "Game_network.cpp"
     sp_multiplayer = GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp"
     sp_network_runtime = GAME_LIBS_ROOT / "src" / "game" / "Game_network.cpp"
-    bot_runtime = GAME_LIBS_ROOT / "src" / "mpgame" / "bots" / "Bot.cpp"
-    duel_runtime = GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "Duel.cpp"
-    state_runtime = GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "GameState.cpp"
-    round_runtime = GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "RoundGameState.cpp"
-    round_modes = GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "RoundModes.cpp"
+    bot_runtime = GAME_LIBS_ROOT / "src" / "game" / "bots" / "Bot.cpp"
+    duel_runtime = GAME_LIBS_ROOT / "src" / "game" / "mp" / "Duel.cpp"
+    state_runtime = GAME_LIBS_ROOT / "src" / "game" / "mp" / "GameState.cpp"
+    round_runtime = GAME_LIBS_ROOT / "src" / "game" / "mp" / "RoundGameState.cpp"
+    round_modes = GAME_LIBS_ROOT / "src" / "game" / "mp" / "RoundModes.cpp"
     if not (
         sys_cvar.is_file()
         and multiplayer.is_file()
@@ -2691,7 +2691,7 @@ def validate_result_contract() -> None:
     """
 
     arena = read(ROOT / "src" / "framework" / "ArenaCampaign.cpp")
-    game = read(GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp")
+    game = read(GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp")
 
     engine_outcomes = dict(
         re.findall(r"(ARENA_OUTCOME_\w+)\s*=\s*(\d+)", arena)
@@ -2732,10 +2732,10 @@ def validate_result_contract() -> None:
         "Arena award mask",
     )
     stat_header = read(
-        GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "stats" / "StatManager.h"
+        GAME_LIBS_ROOT / "src" / "game" / "mp" / "stats" / "StatManager.h"
     )
     stat_manager_source = read(
-        GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "stats" / "StatManager.cpp"
+        GAME_LIBS_ROOT / "src" / "game" / "mp" / "stats" / "StatManager.cpp"
     )
     award_enum = re.search(r"enum endGameAward_t \{(.*?)\}", stat_header, re.DOTALL)
     if award_enum is None:
@@ -2852,7 +2852,7 @@ def validate_result_contract() -> None:
     )
     require(free_look, "GAMEREVIEW", "free look belongs to the final tableau only")
     require(free_look, "ArenaCampaignLocksPlayers()", "free look is a locked-phase concession")
-    player_source = read(GAME_LIBS_ROOT / "src" / "mpgame" / "Player.cpp")
+    player_source = read(GAME_LIBS_ROOT / "src" / "game" / "Player.cpp")
     update_view = function_body(player_source, "void idPlayer::UpdateViewAngles( void )")
     require(update_view, "ArenaCampaignAllowsFreeLook()", "Arena free look must reach view angles")
     require(
@@ -3041,10 +3041,10 @@ def validate_ceremony_flow() -> None:
     stats, then hand off to the framework.
     """
 
-    game = read(GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp")
-    header = read(GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.h")
-    state = read(GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "GameState.cpp")
-    game_local = read(GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.cpp")
+    game = read(GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp")
+    header = read(GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.h")
+    state = read(GAME_LIBS_ROOT / "src" / "game" / "mp" / "GameState.cpp")
+    game_local = read(GAME_LIBS_ROOT / "src" / "game" / "Game_local.cpp")
 
     # The ceremony is host-local on purpose. An Arena match is one human on a
     # listen server with no remote clients, so adding mpGameState_t values (wire
@@ -3060,7 +3060,7 @@ def validate_ceremony_flow() -> None:
         "ARENA_CEREMONY_DONE",
     ):
         require(header, phase, "Arena ceremony phases")
-    match_phase = read(GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "MatchPhase.h")
+    match_phase = read(GAME_LIBS_ROOT / "src" / "game" / "mp" / "MatchPhase.h")
     if "ARENA" in match_phase:
         raise AssertionError(
             "the Arena ceremony must stay host-local; mpGameState_t values are replicated wire bytes"
@@ -3138,7 +3138,7 @@ def validate_ceremony_flow() -> None:
         "spawn-in must not double up the round modes' own Fight",
     )
 
-    player_source = read(GAME_LIBS_ROOT / "src" / "mpgame" / "Player.cpp")
+    player_source = read(GAME_LIBS_ROOT / "src" / "game" / "Player.cpp")
 
     # Impulses drive reload and weapon selection in multiplayer; default.cfg
     # binds them. The stale Raven assert fired on every one of those.
@@ -3186,8 +3186,8 @@ def validate_ceremony_flow() -> None:
         "the result ceremony must arm on IsArenaCampaignMatch, not the raw token",
     )
 
-    round_modes = read(GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "RoundModes.cpp")
-    round_state = read(GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "RoundGameState.cpp")
+    round_modes = read(GAME_LIBS_ROOT / "src" / "game" / "mp" / "RoundModes.cpp")
+    round_state = read(GAME_LIBS_ROOT / "src" / "game" / "mp" / "RoundGameState.cpp")
     mp_hud = read(ROOT / "content" / "baseoq4" / "pak0" / "guis" / "mphud.gui")
 
     # Freeze Tag: an unattended thaw is the timer giving up, usually because the
@@ -3317,12 +3317,12 @@ def validate_ceremony_presentation() -> None:
     match end to end without device input).
     """
 
-    game = read(GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp")
-    header = read(GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.h")
-    state = read(GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "GameState.cpp")
-    game_local = read(GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.cpp")
-    player = read(GAME_LIBS_ROOT / "src" / "mpgame" / "Player.cpp")
-    sys_cmds = read(GAME_LIBS_ROOT / "src" / "mpgame" / "gamesys" / "SysCmds.cpp")
+    game = read(GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp")
+    header = read(GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.h")
+    state = read(GAME_LIBS_ROOT / "src" / "game" / "mp" / "GameState.cpp")
+    game_local = read(GAME_LIBS_ROOT / "src" / "game" / "Game_local.cpp")
+    player = read(GAME_LIBS_ROOT / "src" / "game" / "Player.cpp")
+    sys_cmds = read(GAME_LIBS_ROOT / "src" / "game" / "gamesys" / "SysCmds.cpp")
     arena = read(ROOT / "src" / "framework" / "ArenaCampaign.cpp")
     mp_hud = read(ROOT / "content" / "baseoq4" / "pak0" / "guis" / "mphud.gui")
     summary = read(ROOT / "content" / "baseoq4" / "pak0" / "guis" / "summary.gui")
@@ -3458,8 +3458,8 @@ def validate_pause_menu() -> None:
 
     import json
 
-    game = read(GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp")
-    header = read(GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.h")
+    game = read(GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp")
+    header = read(GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.h")
     arena = read(ROOT / "src" / "framework" / "ArenaCampaign.cpp")
     arena_header = read(ROOT / "src" / "framework" / "ArenaCampaign.h")
     session_menu = read(ROOT / "src" / "framework" / "Session_menu.cpp")
@@ -3490,7 +3490,7 @@ def validate_pause_menu() -> None:
     require(gui_commands, "if ( !IsArenaPauseMenuOpen() ) {", "arenaPause commands act only on the open pause menu")
     # Escape still belongs to the ceremony once a result is pending, and the
     # world pause still reads the menu-over-match state the pause menu sets.
-    game_local = read(GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.cpp")
+    game_local = read(GAME_LIBS_ROOT / "src" / "game" / "Game_local.cpp")
     require(game_local, "if ( mpGame.ArenaCampaignOwnsEscape() ) return ESC_IGNORE;", "the ceremony keeps Escape")
     pauses = function_body(game, "bool idMultiplayerGame::ArenaCampaignPausesWorld( void ) const")
     require(pauses, 'cvarSystem->GetCVarBool( "ui_arenaMenuOpen" )', "the pause menu pauses the match")

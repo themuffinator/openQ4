@@ -108,7 +108,7 @@ def validate_registration_and_sizing() -> None:
 
 
 def validate_game_registration() -> None:
-    for tree in ("game", "mpgame"):
+    for tree in ("game",):
         local = GAME_LIBS_ROOT / "src" / tree / "Game_local.cpp"
         if not local.is_file():
             continue
@@ -119,14 +119,14 @@ def validate_game_registration() -> None:
         require(source, 'MATCH( "icon " )', f"{tree} Game_local.cpp")
         require(source, "uiManager->RegisterIcon", f"{tree} Game_local.cpp")
 
-    death = GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp"
+    death = GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp"
     if not death.is_file():
         return
 
     receive = body_of(
         read(death),
         "void idMultiplayerGame::ReceiveDeathMessage(",
-        "mpgame MultiplayerGame.cpp",
+        "game MultiplayerGame.cpp",
     )
     # Weapon deaths take a w%02d icon, everything at or above MAX_WEAPONS takes a
     # dm%d one; both halves are registered from def/player.def.

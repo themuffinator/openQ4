@@ -44,6 +44,7 @@ extern idRenderWorld *				gameRenderWorld;
 // classes used by idGameLocal
 class idEntity;
 class idActor;
+class idPhysics;
 class idPlayer;
 class idCamera;
 class idWorldspawn;
@@ -159,6 +160,99 @@ void gameDebugLogDamage( const char *source, idEntity *victim, idEntity *inflict
 	const idDict *damageDef, const char *damageDefName, const idVec3 &dir, float damageScale, int location,
 	int damage, int armorSave, int healthBefore, int healthAfter, int methodOfDeath );
 
+//============================================================================
+
+typedef enum {
+	CHANNEL_DEST_NONE,
+	CHANNEL_DEST_RELIABLE_SERVER,
+	CHANNEL_DEST_RELIABLE_REPEATER,
+
+	CHANNEL_DEST_COUNT
+} channelDestType_t;
+
+class idMessageSender {
+public:
+	virtual channelDestType_t GetChannelType( void ) const = 0;
+	virtual void Send( const idBitMsg &msg ) const = 0;
+};
+
+class idNullMessageSender : public idMessageSender {
+public:
+	virtual channelDestType_t GetChannelType( void ) const { return CHANNEL_DEST_NONE; }
+	virtual void Send( const idBitMsg &msg ) const { return; };
+};
+
+class idServerReliableMessageSender : public idMessageSender {
+public:
+	virtual channelDestType_t GetChannelType( void ) const { return CHANNEL_DEST_RELIABLE_SERVER; }
+	virtual void Send( const idBitMsg &msg ) const {
+// jmarshall - engine reliable sends no longer take an inhibitRepeater flag
+		if ( excludeClient != -1 ) {
+			networkSystem->ServerSendReliableMessageExcluding( excludeClient, msg );
+		} else {
+			networkSystem->ServerSendReliableMessage( clientNum, msg );
+		}
+// jmarshall end
+	};
+	const idMessageSender &To( int _clientNum, bool _inhibitRepeater = false ) {
+		clientNum = _clientNum;
+		excludeClient = -1;
+		inhibitRepeater = _inhibitRepeater;
+		return *this;
+	}
+	const idMessageSender &NotTo( int _excludeClient, bool _inhibitRepeater = false ) {
+		clientNum = -1;
+		excludeClient = _excludeClient;
+		inhibitRepeater = _inhibitRepeater;
+		return *this;
+	}
+
+private:
+	int clientNum;
+	int excludeClient;
+	bool inhibitRepeater;
+};
+
+class idRepeaterReliableMessageSender : public idMessageSender {
+public:
+	virtual channelDestType_t GetChannelType( void ) const { return CHANNEL_DEST_RELIABLE_REPEATER; }
+	virtual void Send( const idBitMsg &msg ) const {
+// jmarshall - engine has no repeater reliable channel
+		//if ( excludeClient != -1 ) {
+		//	networkSystem->RepeaterSendReliableMessageExcluding( excludeClient, msg, inhibitHeader, repeaterClient );
+		//} else {
+		//	networkSystem->RepeaterSendReliableMessage( repeaterClient, msg, inhibitHeader, clientNum );
+		//}
+// jmarshall end
+	};
+	const idMessageSender &To( int _clientNum, int asClient = -1, bool _inhibitHeader = false ) {
+		repeaterClient = _clientNum;
+		clientNum = asClient;
+		excludeClient = -1;
+		inhibitHeader = _inhibitHeader;
+		return *this;
+	}
+	const idMessageSender &ExcludingTo( int _excludeClient, int _clientNum, bool _inhibitHeader = false ) {
+		repeaterClient = _clientNum;
+		clientNum = -1;
+		excludeClient = _excludeClient;
+		inhibitHeader = _inhibitHeader;
+		return *this;
+	}
+
+private:
+	int repeaterClient;		// viewer number on repeater
+	int clientNum;			// clientNum of real player to address exclusively to
+	int excludeClient;		// clientNum of real player to exclude
+	bool inhibitHeader;
+};
+
+extern idNullMessageSender nullSender;
+extern idServerReliableMessageSender serverReliableSender;
+extern idRepeaterReliableMessageSender repeaterReliableSender;
+
+//============================================================================
+
 #include "gamesys/Event.h"
 // RAVEN BEGIN
 // bdube: added
@@ -183,6 +277,7 @@ void gameDebugLogDamage( const char *source, idEntity *victim, idEntity *inflict
 
 #include "FreeView.h"
 
+#include "Lagometer.h"
 #include "HitMarker.h"
 #include "gamesys/AnimatedCrosshair.h"
 
@@ -218,6 +313,10 @@ typedef struct entityNetEvent_s {
 	int						spawnId;
 	int						event;
 	int						time;
+	// openQ4: which client sent this event, or -1 when the server/client
+	// generated it locally.  The spawnId arrives on the wire, so the server
+	// drain needs to know who claimed it before it dispatches the event.
+	int						sender;
 	int						paramsSize;
 	byte					paramsBuf[MAX_EVENT_PARAM_SIZE];
 	struct entityNetEvent_s	*next;
@@ -244,49 +343,75 @@ enum {
 	GAME_RELIABLE_MESSAGE_STARTSTATE,
 	GAME_RELIABLE_MESSAGE_MENU,
 	GAME_RELIABLE_MESSAGE_EVENT,
-// RAVEN BEGIN
-// bdube: effect
 	GAME_RELIABLE_MESSAGE_ITEMACQUIRESOUND,
-// ddynerman: death messages
 	GAME_RELIABLE_MESSAGE_DEATH,
-// ddynerman: game state
 	GAME_RELIABLE_MESSAGE_GAMESTATE,
-// ddynerman: game stat
 	GAME_RELIABLE_MESSAGE_STAT,
-// asalmon: game stats for xenon
 	GAME_RELIABLE_MESSAGE_ALL_STATS,
-// ddynerman: ingame awards
 	GAME_RELIABLE_MESSAGE_INGAMEAWARD,
-// ddynerman: instances
 	GAME_RELIABLE_MESSAGE_SET_INSTANCE,
-// shouchard:  for voicechat
 	GAME_RELIABLE_MESSAGE_VOICECHAT_MUTING,
-// shouchard:  for server admin
 	GAME_RELIABLE_MESSAGE_SERVER_ADMIN,
-// shouchard:  for voting
 	GAME_RELIABLE_MESSAGE_CALLPACKEDVOTE,
 	GAME_RELIABLE_MESSAGE_STARTPACKEDVOTE,
-// mekberg: get ban list for server
 	GAME_RELIABLE_MESSAGE_GETADMINBANLIST,
-	GAME_RELIABLE_MESSAGE_PRINT
-// jscott: for voice comms
-// TTimo: implemented or not by the OS, the network protocol should not be affected
-	,
+	GAME_RELIABLE_MESSAGE_PRINT,
 	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT,
 	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_ECHO,
 	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_TEST,
 	GAME_RELIABLE_MESSAGE_VOICEDATA_CLIENT_ECHO_TEST,
-	GAME_RELIABLE_MESSAGE_CHEAT_GIVE,
-	GAME_RELIABLE_MESSAGE_CHEAT_GOD,
-	GAME_RELIABLE_MESSAGE_CHEAT_NOCLIP
-// RAVEN END	
+	GAME_RELIABLE_MESSAGE_GETVOTEMAPS,
+	// unreliable message sent over the reliable channel
+	// used as a debug solution when making sure some missing things are not due to packet drop
+	GAME_RELIABLE_MESSAGE_UNRELIABLE_MESSAGE,
+	// server acknowledges events from client, in response to specific GAME_RELIABLE_MESSAGE_EVENT situations
+	GAME_RELIABLE_MESSAGE_EVENT_ACK,
+	// openQ4: localized centre-screen notice, server driven.  Append only -
+	// these ordinals are the wire format.
+	GAME_RELIABLE_MESSAGE_CENTERPRINT,
+	// openQ4: authoritative ready state, client to server
+	GAME_RELIABLE_MESSAGE_READY,
+	// openQ4: bounded typed competitive match-management transport.  Append
+	// only: demos and mixed client/server builds carry these numeric values.
+	GAME_RELIABLE_MESSAGE_MATCH_REQUEST,
+	GAME_RELIABLE_MESSAGE_MATCH_RESULT,
+	GAME_RELIABLE_MESSAGE_MATCH_VIEW,
+	GAME_RELIABLE_MESSAGE_MATCH_AUTH_CHALLENGE,
+	// openQ4: server driven announcer cue.  The announcer queue is client local,
+	// so a cue that only server-side game logic knows about needs its own channel.
+	GAME_RELIABLE_MESSAGE_ANNOUNCER,
+	// Round turnover resets world entities while retaining the live match state.
+	// Keep distinct from RESTART, which may change the gametype and session.
+	GAME_RELIABLE_MESSAGE_ROUNDRESTART,
+	// openQ4: a player's request to the map database, client to server: the
+	// map queue (mymap) and the end-of-match pick (mappick).
+	GAME_RELIABLE_MESSAGE_MAPDB,
+	// openQ4 (MP-18): a logged-in admin's request to kick, mute or ban a
+	// connected player, client to server (mp/Moderation.h).
+	GAME_RELIABLE_MESSAGE_MODERATION,
+	// openQ4 (MP-17): player identity (mp/Identity.h). Server to client, the
+	// challenge, sent only to a client whose userinfo has ui_identity 1, so an
+	// older client never sees it; client to server, the signed proof or a
+	// returning player's ghost code.
+	GAME_RELIABLE_MESSAGE_IDENTITY,
+	// Insert future wire messages before this sentinel; never serialize COUNT.
+	GAME_RELIABLE_MESSAGE_COUNT,
 };
 
 enum {
 	GAME_UNRELIABLE_MESSAGE_EVENT,
 	GAME_UNRELIABLE_MESSAGE_EFFECT,
 	GAME_UNRELIABLE_MESSAGE_HITSCAN,
-	GAME_UNRELIABLE_MESSAGE_VOICEDATA_SERVER
+	GAME_UNRELIABLE_MESSAGE_VOICEDATA_SERVER,
+	// openQ4: attacker only hit feedback.  Append only - these ordinals are
+	// the wire format.
+	GAME_UNRELIABLE_MESSAGE_HITINFO,
+	// openQ4 (MP-15): a team member's team mates (mp/TeamInfo.h) and the item
+	// timers the server's policy admits the recipient to (mp/ItemTimers.h)
+	GAME_UNRELIABLE_MESSAGE_TEAMINFO,
+	GAME_UNRELIABLE_MESSAGE_ITEMTIMERS,
+
+	GAME_UNRELIABLE_MESSAGE_COUNT
 };
 
 enum {
@@ -296,6 +421,54 @@ enum {
 
 	GAME_UNRELIABLE_RECORD_COUNT
 };
+
+// openQ4: flood control classes for the client->server reliable messages that
+// each cause a server wide rebroadcast or a large reliable send.  One client
+// spamming them fills every other client's reliable queue and the engine then
+// disconnects the victims, so they are throttled at ingest.  Purely server
+// side bookkeeping - no wire format is involved.
+typedef enum {
+	RELIABLE_FLOOD_CHAT,
+	// say and say_team are separate buckets: players bind both, and pressing one
+	// of each inside the window must not silently swallow the second line.
+	RELIABLE_FLOOD_TCHAT,
+	RELIABLE_FLOOD_VCHAT,
+	RELIABLE_FLOOD_VOTEMAPS,
+	// not a send throttle - this one paces the "your events are being dropped"
+	// log line so a flooding client cannot drive the server's disk writes
+	RELIABLE_FLOOD_EVENT,
+	// emotes are forwarded to every client in the sender's instance
+	RELIABLE_FLOOD_EMOTE,
+	// a queued map is announced to every client
+	RELIABLE_FLOOD_MAPDB,
+	// an admin's request writes the admin log and can rewrite the ban list
+	RELIABLE_FLOOD_MODERATION,
+	// MP-17: a proof costs the server a signature check
+	RELIABLE_FLOOD_IDENTITY,
+
+	RELIABLE_FLOOD_NUM
+} reliableFloodClass_t;
+
+// Minimum spacing in milliseconds between accepted messages of each class.
+// A human types a chat line about once a second; these only bite on floods.
+const int RELIABLE_FLOOD_CHAT_DELAY		= 500;
+const int RELIABLE_FLOOD_VCHAT_DELAY	= 500;
+const int RELIABLE_FLOOD_VOTEMAPS_DELAY	= 2000;
+const int RELIABLE_FLOOD_EVENT_DELAY	= 5000;
+const int RELIABLE_FLOOD_EMOTE_DELAY	= 500;
+const int RELIABLE_FLOOD_MAPDB_DELAY	= 1000;
+const int RELIABLE_FLOOD_MODERATION_DELAY	= 500;
+const int RELIABLE_FLOOD_IDENTITY_DELAY	= 250;
+
+// "has never sent one of these".  It cannot be 0: gameLocal.time starts at 0 on
+// every map load, so a zero stamp reads as "sent just now" and swallows each
+// client's first message of the map.  For the vote map list that drop is
+// permanent - idMultiplayerGame::RequestVoteMaps only ever asks once.
+const int RELIABLE_FLOOD_NEVER			= -1000000;
+
+// openQ4: how many events one client may have pending in the shared event
+// queue at once, so a single sender cannot dominate it.
+const int MAX_CLIENT_QUEUED_EVENTS		= 32;
 
 typedef enum {
 	GAMESTATE_UNINITIALIZED,		// prior to Init being called
@@ -310,6 +483,16 @@ typedef struct {
 	idPlayerStart	*ent;
 	int				dist;
 } spawnSpot_t;
+
+typedef struct {
+	bool connected;
+	bool active;
+	bool priv;
+	bool nopvs;
+	userOrigin_t origin;
+	int pvsArea;
+	idDict info;
+} viewer_t;
 
 //============================================================================
 class idEventQueue {
@@ -343,6 +526,14 @@ private:
 };
 
 //============================================================================
+
+// openQ4: the network protocol minor whose snapshot layout this game writes, and the one
+// older layout it still reads from a multiview demo (idGameLocal::LegacySnapshotFormat)
+const int GAME_SNAPSHOT_PROTOCOL			= 42;
+const int GAME_SNAPSHOT_PROTOCOL_LEGACY		= 41;
+// openQ4 MP-22: retail Quake 4 1.4.2 (network protocol 2.85), whose network demos
+// play with the 1.4.2 layouts (idGameLocal::RetailSnapshotFormat)
+const int GAME_SNAPSHOT_PROTOCOL_RETAIL		= 85;
 
 ID_INLINE int PackEntitySpawnId( const int entitySpawnId, const int entityNumber ) {
 	const unsigned int packed = ( static_cast<unsigned int>( entitySpawnId ) << GENTITYNUM_BITS ) |
@@ -449,15 +640,20 @@ struct rvmGameRender_t {
 
 //============================================================================
 // ddynerman: moved MultiplayerGame.h down here, so it can use more stuff in Game_local (idEntityPtr)
-#include "mp/Buying.h"
-#include "mp/Tourney.h"
+#include "mp/DemoAutoTrack.h"
 #include "MultiplayerGame.h"
+// openQ4: gametype descriptor table; drives the IsTeamGame/IsFlagGameType family below
+#include "mp/GameTypes.h"
+// openQ4: the multiplayer map database: every list of maps, the rotation, the
+// player queue and the end-of-match pick
+#include "mp/MapDatabaseHost.h"
 
 //============================================================================
 
 class idGameLocal : public idGame {
 public:
 	idDict					serverInfo;				// all the tunable parameters, like numclients, etc
+	idDict					repeaterInfo;			// serverInfo + repeater specific stuff
 	int						numClients;				// pulled from serverInfo and verified
 	idDict					userInfo[MAX_CLIENTS];	// client specific settings
 	const usercmd_t			*usercmds;				// client input commands
@@ -488,6 +684,11 @@ public:
 	
 	int							entityRegisterTime;
 // RAVEN END
+
+	int						maxViewers; // currently allocated
+	int						maxViewer; // highest numbered active viewer + 1
+
+	viewer_t				(*viewers);
 
 	// can be used to automatically effect every material in the world that references globalParms
 	float					globalShaderParms[ MAX_GLOBAL_SHADER_PARMS ];	
@@ -557,6 +758,14 @@ public:
 
 	gameType_t				gameType;
 	bool					isMultiplayer;			// set if the game is run in multiplayer mode
+
+	// openQ4 (CORE-07): the mode the engine loaded this module for (gameImport_t::mode),
+	// game_mp for network play and game_sp for the campaign. It is fixed until the
+	// module unloads and is set before any cvar registers. isMultiplayer instead says
+	// whether the current map is a network game; it is false in the menus.
+	bool					IsMultiplayerMode( void ) const { return moduleMode == GAME_MODULE_MULTIPLAYER; }
+	void					SetModuleMode( gameModuleMode_t mode ) { moduleMode = mode; }
+	bool					classicRuleset;			// openQ4: si_ruleset 1, latched at map load (mp/ClassicRules.h)
 	bool					isServer;				// set if the game is run for a dedicated or listen server
 	bool					isClient;				// set if the game is run for a client
 // openQ4: physics mode committed at map load from g_enhancedPhysics; multiplayer
@@ -565,26 +774,29 @@ public:
 	bool					mpInteractionsGenerated; // true once interactions are generated after the first game frame
 													// discriminates between the RunFrame path and the ClientPrediction path
 													// NOTE: on a listen server, isClient is false
-// RAVEN BEGIN
-// ddynerman: set if we're a server and not dedicated
+	bool					isRepeater;				// set if the game is repeating
 	bool					isListenServer;			
-// RAVEN END
+	bool					isTVClient;
 	int						localClientNum;			// number of the local client. MP: -1 on a dedicated, MAX_CLIENTS when playing a server demo
 	idLinkList<idEntity>	snapshotEntities;		// entities from the last snapshot
 	int						realClientTime;			// real client time
+	int						clientSnapshotTime;		// openQ4: game time of the last snapshot read, the server's clock as this client has it
 	bool					isNewFrame;				// true if this is a new game frame, not a rerun due to prediction
+	// openQ4: replay passes run since the last snapshot, and the count for the chain the last
+	// snapshot closed.  net_mpPredictDebug sets a remote's re-simulated tics against it to report
+	// how old that remote is on this screen - the pose age lag compensation rewinds by.
+	int						clientReplayTics;
+	int						lastChainReplayTics;
 	int						entityDefBits;			// bits required to store an entity def number
+	int						clientAckSequence;		// holds frame number updated through GAME_RELIABLE_MESSAGE_EVENT_ACK server->client messages
 
 	static const char *		sufaceTypeNames[ MAX_SURFACE_TYPES ];	// text names for surface types
 
 	idEntityPtr<idEntity>	lastGUIEnt;				// last entity with a GUI, used by Cmd_NextGUI_f
 	int						lastGUI;				// last GUI on the lastGUIEnt
 
-// RAVEN BEGIN
-// bdube: added
 	int						editors;				// Mirrored editors flags from common determine which editors are running
 	bool					isLastPredictFrame;		// on an MP server or in SP game this means 'last catchup frame' rather than predict
-// RAVEN END
 
 // RAVEN BEGIN
 // rjohnson: entity usage stats
@@ -601,6 +813,8 @@ public:
 
 	int filterMod;
 	idList<idStr> modList;
+
+	int						nextLagoCheck;
 
 	// ---------------------- Public idGame Interface -------------------
 
@@ -623,7 +837,7 @@ public:
 	virtual bool			IsClientActive( int clientNum );
 	virtual void			SetServerInfo( const idDict &serverInfo );
 
-	virtual const idDict *	RepeaterSetUserInfo( int clientNum, const idDict &userInfo ) { assert(false); return NULL; }
+	virtual const idDict *	RepeaterSetUserInfo( int clientNum, const idDict &userInfo );
 
 	virtual const idDict &	GetPersistentPlayerInfo( int clientNum );
 	virtual void			SetPersistentPlayerInfo( int clientNum, const idDict &playerInfo );
@@ -636,12 +850,10 @@ public:
 // RAVEN END
 	virtual void			MapShutdown( void );
 	virtual void			CacheDictionaryMedia( const idDict *dict );
-	virtual void			SpawnPlayer( int clientNum, bool isBot, const char* botName);
-// RAVEN BEGIN
+	virtual void			SpawnPlayer( int clientNum, bool isBot = false, const char* botName = "" );
 	virtual gameReturn_t	RunFrame( const usercmd_t *clientCmds, int activeEditors, bool lastCatchupFrame, int serverGameFrame );
 	virtual	void			MenuFrame( void );
-// RAVEN END
-	virtual void			RepeaterFrame( const userOrigin_t *clientOrigins, bool lastCatchupFrame, int spoolTime = 0 ) {};
+	virtual void			RepeaterFrame( const userOrigin_t *clientOrigins, bool lastCatchupFrame, int serverGameFrame );
 	virtual bool			Draw( int clientNum, bool menuPaused = false );
 	void					PreparePlayerSceneForRender( idPlayer *player, bool menuPaused = false );
 	void					CheckAutoExecAfterMapLoad( void );
@@ -653,59 +865,28 @@ public:
 	virtual void			HandleMainMenuCommands( const char *menuCommand, idUserInterface *gui );
 	virtual allowReply_t	ServerAllowClient( int clientId, int numClients, const char *IP, const char *guid, const char *password, const char *privatePassword, char reason[MAX_STRING_CHARS] );
 	virtual void			ServerClientConnect( int clientNum, const char *guid );
-	virtual void			ServerClientBegin( int clientNum, bool isBot, const char* botName);
+	virtual void			ServerClientBegin( int clientNum, bool isBot = false, const char* botName = "" );
+	virtual void			GetRandomBotName( int clientNum, idStr& name );
 	virtual void			ServerClientDisconnect( int clientNum );
 	virtual void			ServerWriteInitialReliableMessages( int clientNum );
-	virtual allowReply_t	RepeaterAllowClient( int clientId, int numClients, const char *IP, const char *guid, bool repeater, const char *password, const char *privatePassword, char reason[MAX_STRING_CHARS] ) { idStr::Copynz( reason, "#str_107239" /* zinx - FIXME - not banned... */, MAX_STRING_CHARS ); return ALLOW_NO; };
-	virtual void			RepeaterClientConnect( int clientNum ) {assert(false);};
-	virtual void			RepeaterClientBegin( int clientNum ) {assert(false);};
-	virtual void			RepeaterClientDisconnect( int clientNum ) {assert(false);};
-	virtual void			RepeaterWriteInitialReliableMessages( int clientNum ) {assert(false);};	
+	virtual allowReply_t	RepeaterAllowClient( int clientId, int numClients, const char *IP, const char *guid, bool repeater, const char *password, const char *privatePassword, char reason[MAX_STRING_CHARS] );
+	virtual void			RepeaterClientConnect( int clientNum );
+	virtual void			RepeaterClientBegin( int clientNum );
+	virtual void			RepeaterClientDisconnect( int clientNum );
+	virtual void			RepeaterWriteInitialReliableMessages( int clientNum );
+	virtual void			WriteSnapshot( snapshot_t *&clientSnapshot, entityState_t *entityStates[MAX_GENTITIES], int PVS[ENTITY_PVS_SIZE], idMsgQueue &unreliable, int sequence, idBitMsg &msg, int transmitEntity, int transmitEntity2, int instance, bool doPVS, const idBounds &pvs_bounds, int lastSnapshotFrame, bool pvsExemptAllPlayers = false, int pvsExemptTeam = TEAM_NONE, bool writeEntityInstances = false );
+	bool					SnapshotExemptFromPVS( const idEntity *ent, bool exemptAllPlayers, int exemptTeam ) const;
 
-// jmarshall
-	virtual void			GetRandomBotName(int clientNum, idStr& name);
-	virtual int				TravelTimeToGoal(const idVec3& origin, const idVec3& goal, int travelFlags = 0);
+// jmarshall: what SP Item.cpp reads an item's modelindex from (bot_itemtable)
 	virtual int				GetBotItemEntry(const char* name);
 
-	void					AddBot(const char* botName);
-
-	idAAS* GetBotAAS(void)
-	{
-		if (NumAAS() == 0)
-			return nullptr;
-
-		return GetAAS(0);
-	}
-
-	void					RegisterBot(rvmBot* bot)
-	{
-		registeredBots.AddUnique(bot);
-	}
-	void					UnRegisterBot(rvmBot* bot)
-	{
-		registeredBots.Remove(bot);
-	}
-
-	float					SysScriptTime(void) const
-	{
-		return MS2SEC(realClientTime);
-	}
-	float					SysScriptFrameTime(void) const
-	{
-		return MS2SEC(time - previousTime);
-	}
-
-	void	Trace(trace_t& results, const idVec3& start, const idVec3& end, int contentMask, int passEntity);
-// jmarshall end
-
-// RAVEN BEGIN
-// jnewquist: Use dword array to match pvs array so we don't have endianness problems.
 	virtual void			ServerWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, int lastSnapshotFrame );
-// RAVEN END
 	virtual bool			ServerApplySnapshot( int clientNum, int sequence );
 	virtual void			ServerProcessReliableMessage( int clientNum, const idBitMsg &msg );
-	virtual bool			RepeaterApplySnapshot( int clientNum, int sequence ) { assert(false); return false; }
-	virtual void			RepeaterProcessReliableMessage( int clientNum, const idBitMsg &msg ) { assert(false); }
+	virtual void			ServerReceiveVoice( int clientNum, const idBitMsg &msg );
+	virtual void			ClientReceiveVoice( const idBitMsg &msg );
+	virtual bool			RepeaterApplySnapshot( int clientNum, int sequence );
+	virtual void			RepeaterProcessReliableMessage( int clientNum, const idBitMsg &msg );
 	virtual bool			ClientReadSnapshot( int clientNum, int snapshotSequence, const int gameFrame, const int gameTime, const int dupeUsercmds, const int aheadOfServer, const idBitMsg &msg, bool readEntityInstances = false );
 	virtual bool			ClientApplySnapshot( int clientNum, int sequence );
 	virtual void			ClientProcessReliableMessage( int clientNum, const idBitMsg &msg );
@@ -778,7 +959,7 @@ public:
 // RAVEN END
 
 	virtual void			SetDemoState( demoState_t state, bool serverDemo, bool timeDemo );
-	virtual void			SetRepeaterState( bool isRepeater, bool serverIsRepeater ) {if (isRepeater || serverIsRepeater) Warning("Repeater does not work for single player.");};
+	virtual void			SetRepeaterState( bool isRepeater, bool serverIsRepeater );
 	virtual void			WriteNetworkInfo( idFile* file, int clientNum );
 	virtual void			ReadNetworkInfo( int gameTime, idFile* file, int clientNum );
 	virtual bool			ValidateDemoProtocol( int minor_ref, int minor );
@@ -788,16 +969,17 @@ public:
 
 	virtual void			ServerWriteServerDemoSnapshot( int sequence, idBitMsg &msg, int lastSnapshotFrame, bool fullWorldInstances );
 	virtual bool			ClientReadServerDemoSnapshot( int sequence, const int gameFrame, const int gameTime, const idBitMsg &msg, bool fullWorldInstances );
-	// MVD keyframes are a multiplayer feature; this module records none.
-	virtual bool			ServerWriteServerDemoBaseline( int sequence, idFile *file ) { return false; }
-	virtual bool			ClientReadServerDemoBaseline( int sequence, idFile *file ) { return false; }
+	virtual bool			ServerWriteServerDemoBaseline( int sequence, idFile *file );
+	virtual bool			ClientReadServerDemoBaseline( int sequence, idFile *file );
 
-	virtual void			RepeaterWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, const userOrigin_t &pvs_origin, int lastSnapshotFrame ) {assert(false);};
-	virtual void			RepeaterEndSnapshots( void ) {};
-	virtual void			ClientReadRepeaterSnapshot( int sequence, const int gameFrame, const int gameTime, const int aheadOfServer, const idBitMsg &msg ) {assert(false);};
+	virtual void			RepeaterWriteSnapshot( int clientNum, int sequence, idBitMsg &msg, dword *clientInPVS, int numPVSClients, const userOrigin_t &pvs_origin, int lastSnapshotFrame );
+	virtual void			RepeaterEndSnapshots( void );
+	virtual void			ClientReadRepeaterSnapshot( int sequence, const int gameFrame, const int gameTime, const int aheadOfServer, const idBitMsg &msg );
 
-	virtual int				GetDemoFollowClient( void ) { return serverDemo ? followPlayer : -1; }
-	virtual bool			SetDemoFollowClient( int clientNum ) { return false; }
+	virtual int				GetDemoFollowClient( void ) { return IsServerDemoPlaying() ? followPlayer : -1; }
+	// openQ4: what an auto-tracking camera weighs about a player; shared by demo playback and live spectators
+	void					FillAutoTrackPlayer( const idPlayer *candidate, int slot, mpAutoTrackPlayer &row );
+	virtual bool			SetDemoFollowClient( int clientNum );
 
 	virtual void			GetBotInput( int clientNum, usercmd_t &userCmd ) { Error( "Bot input requested\n" ); };
 
@@ -874,6 +1056,18 @@ public:
 
 	const idDeclEntityDef *	FindEntityDef( const char *name, bool makeDefault = true ) const;
 	const idDict *			FindEntityDefDict( const char *name, bool makeDefault = true ) const;
+	void					ClearEntityDefCache( void ) const;
+
+private:
+	// openQ4: multiplayer FindEntityDef answers for the map, found or not
+	struct entityDefCacheEntry_t {
+		idStr					name;
+		const idDeclEntityDef *	decl;
+	};
+	mutable idHashIndex		entityDefCacheHash;
+	mutable idList<entityDefCacheEntry_t> entityDefCache;
+
+public:
 
 	void					RegisterEntity( idEntity *ent );
 	void					UnregisterEntity( idEntity *ent );
@@ -1029,10 +1223,29 @@ public:
 	void					CheckPlayerWhizzBy	( idVec3 start, idVec3 end, idEntity* hitEnt, idEntity *attacker );
 // bdube: added hitscan
 // twhitaker: added additionalIgnore parameter
-	idEntity*				HitScan				( const idDict& hitscanDef, const idVec3& origin, const idVec3& dir, const idVec3& fxOrigin, idEntity* owner = NULL, bool noFX = false, float damageScale = 1.0f, idEntity * additionalIgnore = NULL, int *areas = NULL );
+// openQ4: effects - which of the shot's visuals this call draws.  A client draws its own
+// shot as it predicts it, without the impacts on actors (HITSCAN_EFFECTS_PREDICTED); the
+// server's copy of that shot then draws only those (HITSCAN_EFFECTS_CONFIRMED).
+	enum hitscanEffects_t {
+		HITSCAN_EFFECTS_ALL,
+		HITSCAN_EFFECTS_PREDICTED,
+		HITSCAN_EFFECTS_CONFIRMED
+	};
+	idEntity*				HitScan				( const idDict& hitscanDef, const idVec3& origin, const idVec3& dir, const idVec3& fxOrigin, idEntity* owner = NULL, bool noFX = false, float damageScale = 1.0f, idEntity * additionalIgnore = NULL, int *areas = NULL, hitscanEffects_t effects = HITSCAN_EFFECTS_ALL );
+// openQ4 BEGIN
+	// A multiplayer client's own predicted hit-scan shots, waiting for the server's copy.
+	// Each predicted shot is noted once; a copy that finds a note drew its path and wall
+	// impacts already.  Notes expire on the wall clock, so a shot the server never fired
+	// cannot swallow a later one, and a map change needs no reset.
+	void					NotePredictedHitscan( int hitscanDefIndex );
+	bool					ConsumePredictedHitscan( int hitscanDefIndex );
+	// Spread for one multiplayer hit-scan shot.  The server and the shooting client run the
+	// shot on the same game frame, so both derive the same pellets from these two values.
+	static int				HitscanSpreadSeed	( int shooterEntityNumber, int shotTime );
+// openQ4 END
 // bdube: added effect calls
-	virtual rvClientEffect*	PlayEffect			( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
-	rvClientEffect*			PlayEffect			( const idDict& args, const char* effectName, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
+	virtual rvClientEffect*	PlayEffect			( const idDecl *effect, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictedBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
+	rvClientEffect*			PlayEffect			( const idDict& args, const char* effectName, const idVec3& origin, const idMat3& axis, bool loop = false, const idVec3& endOrigin = vec3_origin, bool broadcast = false, bool predictedBit = false, effectCategory_t category = EC_IGNORE, const idVec4& effectTint = vec4_one );
 	const idDecl			*GetEffect			( const idDict& args, const char* effectName, const rvDeclMatType* materialType = NULL );
 
 // openQ4 BEGIN
@@ -1041,13 +1254,15 @@ public:
 	int						LiquidContentsAtPoint	( const idVec3 &point, const idEntity *passEntity );
 	idVec3					LiquidBoundaryBetween	( const idVec3 &inside, const idVec3 &outside, int liquidContents, const idEntity *passEntity );
 	const char *			LiquidTypeName			( int liquidContents ) const;
-	void					PlayLiquidImpact		( int liquidContents, const idVec3 &point, const idVec3 &normal, idEntity *ent, const idDict *callerArgs );
+	void					PlayLiquidImpact		( int liquidContents, const idVec3 &point, const idVec3 &normal, idEntity *ent, const idDict *callerArgs, bool broadcast = true );
 	int						LiquidLevelForEntity	( idEntity *ent, int &liquidType );
 	void					PlayLiquidSoundOn		( idEntity *ent, const char *key, const s_channelType channel );
 	void					PlayLiquidEffectAt		( const char *key, const idVec3 &origin );
 	bool					PlayLiquidTrail			( int liquidContents, const idVec3 &start, const idVec3 &end );
 	bool					PlayLiquidTrailToExit	( int liquidContents, const idVec3 &start, const idVec3 &end, const idEntity *passEntity );
 // openQ4 END
+
+	void					UpdateRepeaterInfo( bool transmit = false );
 
 	idList<idEntity*>		ambientLights; // lights that cast ambient
 
@@ -1100,8 +1315,14 @@ public:
 	virtual const char*		GetLongGametypeName( const char* gametype );
 	virtual void			ReceiveRemoteConsoleOutput( const char* output );
 
-	bool					IsFlagGameType( void ) { return ( gameType == GAME_CTF || gameType == GAME_1F_CTF || gameType == GAME_ARENA_CTF || gameType == GAME_ARENA_1F_CTF ); }
-	bool					IsTeamGameType( void ) { return ( gameType == GAME_TDM || gameType == GAME_CTF || gameType == GAME_ARENA_CTF || gameType == GAME_DEADZONE ); }
+	// openQ4: these were three overlapping hard-coded lists that disagreed with
+	// each other (One Flag CTF counted as a team game in one and not the other).
+	// They now read the single gametype descriptor table.
+	bool					IsClassicRuleset( void ) const { return isMultiplayer && classicRuleset; }
+	bool					IsFlagGameType( void ) { return MPGameTypeHasAny( gameType, GTF_FLAG ); }
+	bool					IsTeamGameType( void ) { return MPGameTypeHasAny( gameType, GTF_TEAM ); }
+	bool					IsRoundGameType( void ) { return MPGameTypeHasAny( gameType, GTF_ROUND ); }
+	bool					IsGameTypeFlagged( int mask ) { return MPGameTypeHasAny( gameType, mask ); }
 	bool					IsTeamPowerups( void );
 
 	// twhitaker: needed this for difficulty settings
@@ -1128,11 +1349,25 @@ public:
 
 	void					QueueUnreliableMessage( int clientNum, const idBitMsg &msg );
 	void					SendUnreliableMessage( const idBitMsg &msg, const int clientNum );
+	// openQ4: puts a message in a recording (and a repeater's stream) for whoever
+	// plays it back, without sending it to any client now
+	void					RecordUnreliableMessage( const idBitMsg &msg );
+	// note: listen server client is always excluded
 	// note: local client on dedicated server is always excluded
 	void					SendUnreliableMessagePVS( const idBitMsg &msg, const idEntity *instanceEnt, int area1 = -1, int area2 = -1 );
 
+	void					RepeaterAppendUnreliableMessage( int icl, const idBitMsg &msg, const idBitMsg *header = NULL );
+	void					RepeaterUnreliableMessage( const idBitMsg &msg, const int clientNum, const idBitMsg *header = NULL );
+	void					RepeaterUnreliableMessagePVS( const idBitMsg &msg, const int *areas, int numAreas, const idBitMsg *header = NULL );
+
 	demoState_t				GetDemoState( void ) const { return demoState; }
 	bool					IsServerDemo( void ) const { return serverDemo; }
+	bool					IsServerDemoPlaying( void ) const { return (demoState == DEMO_PLAYING && serverDemo) || serverIsRepeater; }
+	// openQ4: an MVD seek is replaying records without running frames (the
+	// engine's read-only mvd_seeking).
+	bool					IsServerDemoSeeking( void ) const { return IsServerDemoPlaying() && cvarSystem->GetCVarBool( "mvd_seeking" ); }
+	bool					IsServerDemoRecording( void ) const { return demoState == DEMO_RECORDING && serverDemo; }
+	bool					IsRepeaterDemoPlaying( void ) const { return (demoState == DEMO_PLAYING && !serverDemo) && serverIsRepeater; }
 	bool					IsTimeDemo( void ) const { return timeDemo; }
 	int						GetDemoFollowClient( void ) const { return serverDemo ? followPlayer : -1; }
 	idUserInterface			*GetDemoHud( void );
@@ -1152,11 +1387,14 @@ public:
 	static const idDecl*	ReadDecl( const idBitMsgDelta &msg, declType_t type );
 
 	idPlayerStart			*RandomSpawn( void );
+	int						NumSpawnSpots( void ) const { return spawnSpots.Num(); }	// openQ4: RandomSpawn needs one
 
 	int						GetStartingIndexForInstance( int instanceID );
 	void					ClientSetStartingIndex( int i ) { clientInstanceFirstFreeIndex = i; }
 	void					ServerSetMinSpawnIndex( void );
 	void					ServerSetEntityIndexWatermark( int instanceID );
+
+	idLagometer				lagometer;
 
 // RAVEN BEGIN
 // ddynerman: multiple instance for MP
@@ -1172,6 +1410,7 @@ private:
 	idStr					mapFileName;			// name of the map, empty string if no map loaded
 	idMapFile *				mapFile;				// will be NULL during the game unless in-game editing is used
 	bool					mapCycleLoaded;
+	int						incompatibleMaps;
 
 	int						spawnCount;
 	bool					isMapEntity[ MAX_GENTITIES ]; // it's handy to know which entities are part of the map
@@ -1226,6 +1465,15 @@ private:
 	entityState_t *			clientEntityStates[MAX_CLIENTS+1][MAX_GENTITIES];	// MAX_CLIENTS slot is for server demo recordings
 	int						clientPVS[MAX_CLIENTS+1][ENTITY_PVS_SIZE];
 	snapshot_t *			clientSnapshots[MAX_CLIENTS+1];
+
+	idList<int>				privateViewerIds, nopvsViewerIds;
+
+	entityState_t *			(*viewerEntityStates)[MAX_GENTITIES];	// MAX_CLIENTS slot is for server demo recordings
+	int						(*viewerPVS)[ENTITY_PVS_SIZE];
+	snapshot_t *			(*viewerSnapshots);
+
+	idMsgQueue				(*viewerUnreliableMessages);
+
 // RAVEN BEGIN
 // jnewquist: Mark memory tags for idBlockAlloc
 	idBlockAlloc<entityState_t,256,MA_ENTITY> entityStateAllocator;
@@ -1233,6 +1481,11 @@ private:
 // RAVEN END
 
 	idEventQueue			eventQueue;
+
+	// openQ4: gameLocal.time at which each client's last accepted message of a
+	// given flood class arrived.  Reset on connect and disconnect so a slot
+	// reused by a new player does not inherit a cooldown.
+	int						clientReliableFloodTime[ MAX_CLIENTS ][ RELIABLE_FLOOD_NUM ];
 
 	idList<idPlayerStart*>	spawnSpots;
 // RAVEN BEGIN
@@ -1248,6 +1501,7 @@ private:
 	idHashTable<int>		mapMediaPrecacheSeen;
 	int						mapMediaPrecacheRequests;
 	int						mapMediaPrecacheSkips;
+	gameModuleMode_t		moduleMode;
 	bool					moduleIdLibInitialized;
 	bool					moduleShutdownStarted;
 	bool					moduleShutdownFinalized;
@@ -1259,32 +1513,12 @@ private:
 	rvmGameRender_t			gameRender;
 // jmarshall end
 
-	byte					lagometer[ LAGO_IMG_HEIGHT ][ LAGO_IMG_WIDTH ][ 4 ];
-
-	enum { MP_LAGCOMP_HISTORY = 64 };
-
-	struct mpLagCompFrame_t {
-		int					time;
-		idVec3				origin;
-		idMat3				axis;
-		bool				valid;
-	};
-
-	struct mpLagCompRestore_t {
-		idPlayer *			player;
-		idVec3				originalOrigin;
-		idMat3				originalAxis;
-		idVec3				rewoundOrigin;
-	};
-
-	mpLagCompFrame_t		mpLagCompHistory[MAX_CLIENTS][MP_LAGCOMP_HISTORY];
-	int						mpLagCompHistoryHead;
-
 	idMsgQueue				unreliableMessages[ MAX_CLIENTS+1 ];	// MAX_CLIENTS slot for server demo recording
 
 	demoState_t				demoState;
 	bool					serverDemo;
 	bool					timeDemo;
+	bool					serverIsRepeater;
 
 	// demo interaction usercmds
 	usercmd_t				usercmd, oldUsercmd;
@@ -1292,6 +1526,9 @@ private:
 	idUserInterface			*demo_hud;
 	idUserInterface			*demo_mphud;
 	idUserInterface			*demo_cursor;
+	bool					serverDemoInstances;	// the last server demo snapshot carried entity instances
+	mpDemoAutoTrack			demoAutoTrack;			// openQ4: playback camera auto-tracking
+	void					UpdateDemoAutoTrack( idPlayer *viewer, const usercmd_t &cmd );
 
 	int						demo_protocol;	// keep track of the protocol of the demo we're replaying
 
@@ -1321,11 +1558,20 @@ private:
 	void					InitAsyncNetwork( void );
 	void					ShutdownAsyncNetwork( void );
 	void					InitLocalClient( int clientNum );
+	void					FreeSnapshotsOlderThanSequence( snapshot_t *&clientSnapshot, int sequence );
 	void					FreeSnapshotsOlderThanSequence( int clientNum, int sequence );
+	bool					ApplySnapshot( snapshot_t *&clientSnapshot, entityState_t *entityStates[MAX_GENTITIES], int PVS[ENTITY_PVS_SIZE], int sequence );
 	bool					ApplySnapshot( int clientNum, int sequence );
 	void					WriteGameStateToSnapshot( idBitMsgDelta &msg ) const;
 	void					ReadGameStateFromSnapshot( const idBitMsgDelta &msg );
 	void					NetworkEventWarning( const entityNetEvent_t *event, const char *fmt, ... ) id_attribute((format(printf,3,4)));
+// openQ4: client->server reliable message abuse guards
+	int						CountQueuedClientEvents( int clientNum );
+public:
+	// also asked by idPlayer for the client events it forwards
+	bool					CheckClientReliableFlood( int clientNum, int floodClass, int delayMS );
+private:
+	void					ResetClientReliableFlood( int clientNum );
 	void					ServerProcessEntityNetworkEventQueue( void );
 	void					ClientProcessEntityNetworkEventQueue( void );
 	void					ClientShowSnapshot( int clientNum ) const;
@@ -1345,50 +1591,164 @@ private:
 	bool					ValidateServerSettings( const char *map, const char *gametype );
 
 	void					Tokenize( idStrList &out, const char *in );
-	void					ResetMPLagCompensationHistory( void );
-	void					CaptureMPLagCompensationFrame( void );
-	bool					SelectMPLagCompensationFrame( int clientNum, int targetTime, mpLagCompFrame_t &outFrame ) const;
-	bool					ComputeMPLagCompensationRewind( const idPlayer *shooter, int &rewindMS ) const;
-	bool					BeginMPLagCompensation( const idPlayer *shooter, mpLagCompRestore_t restoreState[MAX_CLIENTS], int &restoreCount );
-	void					EndMPLagCompensation( mpLagCompRestore_t restoreState[MAX_CLIENTS], int restoreCount );
 
 // RAVEN BEGIN
 // ddynerman: multiple clip worlds
 	void					ShutdownInstances( void );
 // shouchard:  ban list support (lives in game_network.cpp)
 
-	void					UpdateLagometer( int aheadOfServer, int dupeUsercmds );
-
 	void					ClientReadUnreliableMessages( const idBitMsg &msg );
 	void					ProcessUnreliableMessage( const idBitMsg &msg );
 
 	void					UpdateClientsPVS( void );
 
-	bool					IsDemoReplayInAreas( int area1, int area2 );
+	bool					IsDemoReplayInAreas( const int areas[2], int numAreas );
+
+	void					ReallocViewers( int newMaxViewers );
 
 	void					BuildModList( void );
 
 public:
+	// openQ4: server side hitscan lag compensation, ported from the single
+	// player tree where it was unreachable (only game-mp loads in multiplayer).
+	// Public because the weapons that run their own traces - the lightning gun
+	// and the gauntlet - have to bracket them with Begin/End themselves.
+	enum { MP_PREDICTED_HITSCANS = 16 };
+
+	struct mpPredictedHitscan_t {
+		int					hitscanDefIndex;
+		int					noteMsec;			// Sys_Milliseconds when predicted, 0 = free
+	};
+
+	mpPredictedHitscan_t	mpPredictedHitscans[MP_PREDICTED_HITSCANS];
+
+	enum { MP_LAGCOMP_HISTORY = 64 };
+
+	struct mpLagCompFrame_t {
+		int					time;
+		idVec3				origin;
+		idMat3				axis;
+		bool				valid;
+	};
+
+	struct mpLagCompRestore_t {
+		idPlayer *			player;
+		idPhysics *			physics;		// the physics object rewound, so a
+											// ragdoll swap inside the bracket
+											// cannot be "restored" onto the corpse
+		idVec3				originalOrigin;
+		idMat3				originalAxis;
+		idVec3				rewoundOrigin;
+	};
+
+	// How old the remote players on one client's screen are, and therefore how far a shot
+	// from it is rewound.  Every term is bounded on the server: lead is the client's
+	// reported prediction lead, ceiling the round trip the server measured plus slack,
+	// extrapolation the part of the lead the client advertises it draws ahead for itself.
+	struct mpLagCompEstimate_t {
+		int					leadMS;				// reported prediction lead, sanitized
+		int					measuredMS;			// server-measured round trip, 0 if unknown
+		int					advertisedTics;		// net_mpRemoteExtrapolation from user info
+		int					extrapolationMS;	// min( lead, advertised tics )
+		int					poseAgeMS;			// min( lead + one frame, ceiling ) - extrapolation
+	};
+
+	mpLagCompFrame_t		mpLagCompHistory[MAX_CLIENTS][MP_LAGCOMP_HISTORY];
+	int						mpLagCompHistoryHead;
+
+	void					ResetMPLagCompensationHistory( void );
+	void					InvalidateMPLagCompensationHistory( int clientNum );
+	void					CaptureMPLagCompensationFrame( void );
+	bool					SelectMPLagCompensationFrame( int clientNum, int targetTime, mpLagCompFrame_t &outFrame ) const;
+	void					EstimateMPLagCompensation( int clientNum, mpLagCompEstimate_t &estimate ) const;
+	bool					ComputeMPLagCompensationRewind( const idPlayer *shooter, int &rewindMS, mpLagCompEstimate_t *estimate = NULL ) const;
+	bool					BeginMPLagCompensation( const idPlayer *shooter, mpLagCompRestore_t restoreState[MAX_CLIENTS], int &restoreCount );
+	void					EndMPLagCompensation( mpLagCompRestore_t restoreState[MAX_CLIENTS], int restoreCount );
+	bool					ResolveMPLagCompensationHit( const idEntity *hit, mpLagCompRestore_t restoreState[MAX_CLIENTS], int &restoreCount, trace_t &tr, idVec3 *extraPoint );
+	idVec3					MPLagCompensationOffset( const idEntity *hit, const mpLagCompRestore_t restoreState[MAX_CLIENTS], int restoreCount ) const;
+	int						AdvertisedRemoteExtrapolationTics( int clientNum ) const;
+	int						RemoteExtrapolationMS( int clientNum, int leadMS ) const;
+	void					UpdateAdvertisedRemoteExtrapolation( void );
+
+	// openQ4 MP-18: bans are address ranges with an expiry and a reason, kept in
+	// banlist.txt (mp/Moderation.h, mp/ModerationFile.h)
 	void					LoadBanList();
 	void					SaveBanList();
 	void					FlushBanList();
-	bool					IsGuidBanned( const char *guid );
+	const mpModBan_t *		FindBan( const mpModAddress_t &address );
+	int						AddBan( const mpModAddress_t &address, int prefixBits, mpModTime_t durationSeconds, const char *name, const char *reason );
+	bool					RemoveBan( int index );
+	// the menus name a ban by its range text, where Quake 4 passed a GUID
 	void					RemoveGuidFromBanList( const char *guid );
 	void					AddGuidToBanList( const char *guid );
 	virtual void			RegisterClientGuid( int clientNum, const char *guid );
 
 	int						GetBanListCount();
-	const mpBanInfo_t*		GetBanListEntry( int entry );	// returns client name
+	const mpModBan_t *		GetBan( int entry );
+	const mpBanInfo_t*		GetBanListEntry( int entry );	// the row as the menus read it
 	const char*				GetGuidByClientNum( int clientNum );	// returns GUID
-	int						GetClientNumByGuid( const char* );		// returns clientNum
 
-// mekberg: get and send ban list
-	void					ServerSendBanList( int clientNum );
+	// a connected client's address; family 0 for a bot or the listen server's own player
+	const mpModAddress_t &	GetClientModAddress( int clientNum ) const;
+	void					ModerationClientConnect( int clientNum );
+	void					ModerationClientDisconnect( int clientNum );
+	bool					ModerationRefuseBanned( const char *endpoint );
+	int						ServerBan( const mpModAddress_t &address, int prefixBits, mpModTime_t durationSeconds, const char *name, const char *reason, const char *by );
+	// openQ4 MP-17: a ban on a player identity, which removes whoever holds it;
+	// and a connected player's ban, by the range they hold and their identity
+	int						ServerBanIdentity( const char *identity, mpModTime_t durationSeconds, const char *name, const char *reason, const char *by );
+	int						ServerBanClient( int clientNum, mpModTime_t durationSeconds, const char *reason, const char *by );
+	const mpModBan_t *		FindIdentityBan( const char *identity );
+	bool					IsClientTextMuted( int clientNum );
+	bool					SetClientTextMute( int clientNum, bool mute, mpModTime_t durationSeconds, const char *by );
+	bool					ModerationAllowChat( int clientNum, bool fromNetwork );
+	void					ModerationWriteLog( mpModLogLine_t &line );
+	void					ModerationLogClient( const char *event, const char *by, int clientNum, const char *reason, mpModTime_t seconds );
+	void					ModerationLogBan( const char *event, const char *by, const mpModBan_t &ban );
+	static void				Ban_f( const idCmdArgs &args );
+	static void				Unban_f( const idCmdArgs &args );
+	static void				BanList_f( const idCmdArgs &args );
+	static void				Mute_f( const idCmdArgs &args );
+	// admins (net_serverAdminPassword): the typed request a logged-in client sends
+	void					ServerModerationRequest( int clientNum, const idBitMsg &msg );
+	bool					ClientModerationRequest( int verb, int clientNum, mpModTime_t seconds, const char *reason );
+	static void				Admin_f( const idCmdArgs &args );
+	static void				ClientKick_f( const idCmdArgs &args );
+	static void				Status_f( const idCmdArgs &args );
+	// graceful shutdown: tell the players, let the match end or a time run out, stop
+	void					ScheduleServerShutdown( bool afterMatch, mpModTime_t seconds, const char *reason, const char *by );
+	bool					CancelServerShutdown( const char *by );
+	bool					RunServerShutdown( bool matchEnded );
+	void					ServerShutdownMapEnded( void );
+	void					ModerationLogShutdown( const char *event, const char *by, const char *when, mpModTime_t seconds );
+	static void				Shutdown_f( const idCmdArgs &args );
 
 // jscott: made public
 	pvsHandle_t				GetClientPVS( idPlayer *player, pvsType_t type );
 
 	int						GetCurrentDemoProtocol( void ) { return demo_protocol; }
+	// openQ4: the snapshot being read was recorded before network protocol 2.42 (a
+	// multiview demo made with 2.41), so its players, projectiles and entity tags have
+	// the older layout. Nothing is ever written in it.
+	// openQ4 MP-22: a retail Quake 4 1.4.2 network demo reads the same way, as 1.4.2's
+	// layout is the 2.41 one where 2.42 changed it.
+	bool					LegacySnapshotFormat( void ) const {
+		return demoState == DEMO_PLAYING &&
+			( ( serverDemo && demo_protocol == GAME_SNAPSHOT_PROTOCOL_LEGACY ) || demo_protocol == GAME_SNAPSHOT_PROTOCOL_RETAIL );
+	}
+	// openQ4 MP-22: a retail Quake 4 1.4.2 network demo is playing. Its game data has
+	// 1.4.2's layout, without what openQ4 added (classic rules, weapon mods, vote and
+	// game-state fields), and its decls carry the recording's own numbering.
+	bool					RetailSnapshotFormat( void ) const { return demoState == DEMO_PLAYING && demo_protocol == GAME_SNAPSHOT_PROTOCOL_RETAIL; }
+	// the decl a network index names, as openQ4's index; -1 for none
+	int						NetworkDeclIndex( declType_t type, int index ) const {
+		return RetailSnapshotFormat() ? networkSystem->RetailDemoDeclIndex( type, index ) : index;
+	}
+	// how many decls of a type the network numbering covers
+	int						NetworkDeclCount( declType_t type ) const {
+		return RetailSnapshotFormat() ? networkSystem->RetailDemoDeclCount( type ) : declManager->GetNumDecls( type );
+	}
+
 // jmarshall
 	void					RenderScene(const renderView_t* view, idRenderWorld* renderWorld, idCamera* portalSky, int renderFlags = RF_NORMAL);
 	// openQ4 VR-05: the temporal history the next scene renders with: 0, or 1
@@ -1402,22 +1762,33 @@ private:
 // jmarshall end
 private:
 	char					clientGuids[ MAX_CLIENTS ][ CLIENT_GUID_LENGTH ];
-	// openQ4 MP-18: banlist.txt as the multiplayer module keeps it (../mpgame/mp/Moderation.h)
 	mpModBanList_t *		modBans;				// NULL until the list is first needed
 	idStrList				modBanKeptLines;		// lines of banlist.txt that are not bans this build reads
 	bool					banListLoaded;
 	bool					banListChanged;
+	mpModAddress_t			clientModAddress[ MAX_CLIENTS ];
+	mpModTime_t				modTextMuteUntil[ MAX_CLIENTS ];	// 0 not muted, -1 until lifted, else when it ends
+	mpModMuteList_t			modMutes;				// mutes by address, so a reconnect keeps one
+	mpModFlood_t			modChatFlood[ MAX_CLIENTS ];
+	int						modNoticeTime[ MAX_CLIENTS ];	// game time of the next "you are muted" notice
+	int						modActorClient;			// the admin whose request is being carried out, or -1
+	// the name and clan tag a muted player is held to; both empty until the first
+	// name the server accepts from a connection whose mute came with its address
+	idStr					modMutedName[ MAX_CLIENTS ];
+	idStr					modMutedClan[ MAX_CLIENTS ];
+	mpModTime_t				modRefusalWindowStart;	// the minute in which refused connections are being counted
+	int						modRefusalWindowCount;	// how many of them reached the admin log in it
+	bool					modBanFileWarned;		// said once that an unusable banlist.txt is not written over
+	int						modShutdownRun;			// the server (net_serverRunId) a waiting shutdown was asked of
+	int						modShutdownMode;		// MOD_SHUTDOWN_* in Game_network.cpp
+	mpModTime_t				modShutdownAt;			// when a timed shutdown stops the server
+	int						modShutdownNextNotice;	// seconds left at which players are told again; -1 none
+	int						modShutdownStopTime;	// game time the stop command runs, once the goodbye is sent
+	idStr					modShutdownReason;
 // RAVEN END
 
-// jmarshall
-	void					AlertBots(idPlayer* player, idVec3 alert_position);
-
-	const idDeclEntityDef* botItemTable;;
-
-	idList<rvmBot*> registeredBots;
-
-	idAAS* bot_aas;
-// jmarshall end
+// jmarshall: the bot_itemtable GetBotItemEntry reads (NULL: nothing loads it now)
+	const idDeclEntityDef* botItemTable;
 };
 
 //============================================================================
@@ -1442,16 +1813,22 @@ extern idAnimManager		*animationLib;
 
 ID_INLINE void idGameLocal::WriteDecl( idBitMsg &msg, const idDecl *decl ) {
 	assert( decl );
-// jmarshall - changed to a warning.
 	if ( decl->IsImplicit() ) {
-		gameLocal.Warning( "WriteDecl: %s decl %s ( index %d ) is implicit", declManager->GetDeclNameFromType( decl->GetType() ), decl->GetName(), decl->Index() );
+		if ( gameLocal.IsMultiplayerMode() ) {
+			gameLocal.Error( "WriteDecl: %s decl %s ( index %d ) is implicit", declManager->GetDeclNameFromType( decl->GetType() ), decl->GetName(), decl->Index() );
+		} else {
+			gameLocal.Warning( "WriteDecl: %s decl %s ( index %d ) is implicit", declManager->GetDeclNameFromType( decl->GetType() ), decl->GetName(), decl->Index() );
+		}
 	}
-// jmarshall end
 	msg.WriteLong( decl->Index() );
 }
 
 ID_INLINE const idDecl* idGameLocal::ReadDecl( const idBitMsg &msg, declType_t type ) {
-	int index = msg.ReadLong();
+	// openQ4 MP-22: a retail recording's own numbering while one plays
+	int index = gameLocal.NetworkDeclIndex( type, msg.ReadLong() );
+	if ( index < 0 || index >= declManager->GetNumDecls( type ) ) {
+		gameLocal.Error( "ReadDecl: no %s decl at network index %d", declManager->GetDeclNameFromType( type ), index );
+	}
 	const idDecl *decl = declManager->DeclByIndex( type, index );
 	if ( !decl ) {
 		gameLocal.Error( "ReadDecl: NULL %s decl at index %d", declManager->GetDeclNameFromType( type ), index );
@@ -1471,7 +1848,11 @@ ID_INLINE void idGameLocal::WriteDecl( idBitMsgDelta &msg, const idDecl *decl ) 
 }
 
 ID_INLINE const idDecl* idGameLocal::ReadDecl( const idBitMsgDelta &msg, declType_t type ) {
-	int index = msg.ReadLong();
+	// openQ4 MP-22: a retail recording's own numbering while one plays
+	int index = gameLocal.NetworkDeclIndex( type, msg.ReadLong() );
+	if ( index < 0 || index >= declManager->GetNumDecls( type ) ) {
+		gameLocal.Error( "ReadDecl: no %s decl at network index %d", declManager->GetDeclNameFromType( type ), index );
+	}
 	const idDecl *decl = declManager->DeclByIndex( type, index );
 	if ( !decl ) {
 		gameLocal.Error( "ReadDecl: NULL %s decl at index %d", declManager->GetDeclNameFromType( type ), index );
@@ -1518,7 +1899,9 @@ const float DEFAULT_GRAVITY_MP		= 800.0f;
 #define DEFAULT_MP_GRAVITY_STRING	"800"
 const idVec3 DEFAULT_GRAVITY_VEC3( 0, 0, -DEFAULT_GRAVITY );
 
-const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 1.0f );
+// openQ4: the campaign lets a cinematic be skipped after 1 s; game_mp kept the
+// stock 2 s.  Read per load mode so both modules keep their delay.
+#define CINEMATIC_SKIP_DELAY		( gameLocal.IsMultiplayerMode() ? SEC2MS( 2.0f ) : SEC2MS( 1.0f ) )
 
 //============================================================================
 
@@ -1590,8 +1973,12 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 1.0f );
 // RAVEN BEGIN
 // nmckenzie: Reduce dependencies.
 #include "mp/CTF.h"
+#include "mp/ClassicRules.h"
 #include "mp/stats/StatManager.h"
 #include "mp/Tourney.h"
+#include "bots/NavMesh.h"
+#include "bots/BotCharacter.h"
+#include "bots/Bot.h"
 #include "Instance.h"
 // RAVEN END
 #include "anim/Anim_Testmodel.h"
@@ -1611,14 +1998,12 @@ const int	CINEMATIC_SKIP_DELAY	= SEC2MS( 1.0f );
 #define PACIFIER_UPDATE
 #endif
 
-// RAVEN BEGIN
-// bdube: inlines
-ID_INLINE rvClientEffect* idGameLocal::PlayEffect( const idDict& args, const char* effectName, const idVec3& origin, const idMat3& axis, bool loop, const idVec3& endOrigin, bool broadcast, effectCategory_t category, const idVec4& effectTint ) {
-	return PlayEffect ( GetEffect ( args, effectName ), origin, axis, loop, endOrigin, broadcast, false, category, effectTint );
+ID_INLINE rvClientEffect* idGameLocal::PlayEffect( const idDict& args, const char* effectName, const idVec3& origin, const idMat3& axis, bool loop, const idVec3& endOrigin, bool broadcast, bool predictBit, effectCategory_t category, const idVec4& effectTint ) {
+	return PlayEffect( GetEffect( args, effectName ), origin, axis, loop, endOrigin, broadcast, predictBit, category, effectTint );
 }
 
 ID_INLINE bool idGameLocal::IsTeamGame( void ) const {
-	return ( isMultiplayer && ( gameType == GAME_CTF || gameType == GAME_TDM || gameType == GAME_1F_CTF || gameType == GAME_ARENA_CTF || gameType == GAME_DEADZONE ) );
+	return ( isMultiplayer && MPGameTypeHasAny( gameType, GTF_TEAM ) );
 }
 
 ID_INLINE int idGameLocal::GetNumMapEntities( void ) const {
@@ -1643,7 +2028,6 @@ ID_INLINE void idGameLocal::ReceiveRemoteConsoleOutput( const char* output ) {
 	}
 }
 
-// abahr:
 template< class type >
 type* idGameLocal::SpawnSafeEntityDef( const char* entityDefName, const idDict* additionalArgs ) {
 	idEntity* entity = SpawnEntityDef( entityDefName, additionalArgs );
@@ -1658,7 +2042,6 @@ type* idGameLocal::SpawnSafeEntityDef( const char* entityDefName, const idDict* 
 	
 	return static_cast<type*>( entity );
 }
-// RAVEN END
 
 template< class type >
 ID_INLINE idEntityPtr<type>::idEntityPtr() {
@@ -1698,9 +2081,6 @@ ID_INLINE idEntityPtr<type> &idEntityPtr<type>::operator=( type *ent ) {
 
 template< class type >
 ID_INLINE bool idEntityPtr<type>::SetSpawnId( int id ) {
-	if ( id == spawnId ) {
-		return false;
-	}
 	if ( UnpackEntitySpawnId( id ) == gameLocal.spawnIds[ id & ( ( 1 << GENTITYNUM_BITS ) - 1 ) ] ) {
 		spawnId = id;
 		return true;
@@ -1741,7 +2121,5 @@ ID_INLINE idEntityPtr<type>::operator type * ( void ) const {
 // RAVEN END
 
 #include "../idlib/containers/ListGame.h"
-
-#include "bots/Bot.h"
 
 #endif	/* !__GAME_LOCAL_H__ */

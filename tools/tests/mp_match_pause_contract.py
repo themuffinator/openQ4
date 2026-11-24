@@ -58,11 +58,11 @@ def require_before(text: str, first: str, second: str, context: str) -> None:
 
 
 def central_frame_contracts() -> None:
-    game_local = read("src/mpgame/Game_local.cpp")
-    game_network = read("src/mpgame/Game_network.cpp")
-    multiplayer = read("src/mpgame/MultiplayerGame.cpp")
-    events = read("src/mpgame/gamesys/Event.cpp")
-    entity = read("src/mpgame/Entity.cpp")
+    game_local = read("src/game/Game_local.cpp")
+    game_network = read("src/game/Game_network.cpp")
+    multiplayer = read("src/game/MultiplayerGame.cpp")
+    events = read("src/game/gamesys/Event.cpp")
+    entity = read("src/game/Entity.cpp")
 
     frame = body(game_local, "gameReturn_t idGameLocal::RunFrame")
     require_before(
@@ -137,7 +137,7 @@ def central_frame_contracts() -> None:
         "server pause predicate reads the post-boundary overlay",
     )
 
-    session = read("src/mpgame/mp/match/MatchSession.cpp")
+    session = read("src/game/mp/match/MatchSession.cpp")
     running_clock = body(session, "bool mpMatchSession::IsMatchClockRunning")
     require(running_clock, "pause.state == MP_MATCH_PAUSE_RUNNING", "frozen match clock")
     reject(
@@ -267,20 +267,20 @@ def central_frame_contracts() -> None:
 
 
 def owned_deadline_contracts() -> None:
-    projectile = read("src/mpgame/Projectile.cpp")
-    mover = read("src/mpgame/Mover.cpp")
-    moveable = read("src/mpgame/Moveable.cpp")
-    actor = read("src/mpgame/Actor.cpp")
-    item = read("src/mpgame/Item.cpp")
-    trigger = read("src/mpgame/Trigger.cpp")
-    light = read("src/mpgame/Light.cpp")
-    state = read("src/mpgame/gamesys/State.cpp")
-    player = read("src/mpgame/Player.cpp")
-    weapon = read("src/mpgame/Weapon.cpp")
-    game_state = read("src/mpgame/mp/GameState.cpp")
-    round_state = read("src/mpgame/mp/RoundGameState.cpp")
-    tourney = read("src/mpgame/mp/Tourney.cpp")
-    round_modes = read("src/mpgame/mp/RoundModes.cpp")
+    projectile = read("src/game/Projectile.cpp")
+    mover = read("src/game/Mover.cpp")
+    moveable = read("src/game/Moveable.cpp")
+    actor = read("src/game/Actor.cpp")
+    item = read("src/game/Item.cpp")
+    trigger = read("src/game/Trigger.cpp")
+    light = read("src/game/Light.cpp")
+    state = read("src/game/gamesys/State.cpp")
+    player = read("src/game/Player.cpp")
+    weapon = read("src/game/Weapon.cpp")
+    game_state = read("src/game/mp/GameState.cpp")
+    round_state = read("src/game/mp/RoundGameState.cpp")
+    tourney = read("src/game/mp/Tourney.cpp")
+    round_modes = read("src/game/mp/RoundModes.cpp")
 
     projectile_pause = body(projectile, "void idProjectile::ThinkMatchPaused")
     for token in (
@@ -413,7 +413,7 @@ int main() {
                 compiler,
                 "/nologo",
                 "/EHsc",
-                f"/I{ROOT / 'src/mpgame'}",
+                f"/I{ROOT / 'src/game'}",
                 str(source),
                 f"/Fe:{executable}",
             ]
@@ -425,7 +425,7 @@ int main() {
                 "-Wall",
                 "-Wextra",
                 "-pedantic",
-                f"-I{ROOT / 'src/mpgame'}",
+                f"-I{ROOT / 'src/game'}",
                 str(source),
                 "-o",
                 str(executable),
@@ -436,7 +436,7 @@ int main() {
 
 def compile_prediction_clock_harness() -> None:
     """Execute the production clock/rebase delta through snapshot corrections."""
-    prediction = body(read("src/mpgame/Game_network.cpp"),
+    prediction = body(read("src/game/Game_network.cpp"),
                       "gameReturn_t idGameLocal::ClientPrediction")
     clock = prediction.split("// update the real client time and the new frame flag", 1)[1]
     clock = clock.split("if ( clientNum == MAX_CLIENTS )", 1)[0]
@@ -496,7 +496,7 @@ int main() {
 
 
 MATCH_CLOCK_HARNESS = r'''
-#include "mpgame/mp/match/MatchSession.h"
+#include "game/mp/match/MatchSession.h"
 
 #define CHECK( condition ) do { if ( !( condition ) ) { return __LINE__; } } while ( 0 )
 #define STEP( session ) do { const int failedLine = StepFrame( session ); \
@@ -674,7 +674,7 @@ def compile_match_clock_harness() -> None:
             "-DMP_MATCH_SESSION_STANDALONE_TEST",
             f"-I{ROOT / 'src'}",
             str(source),
-            str(ROOT / "src/mpgame/mp/match/MatchSession.cpp"),
+            str(ROOT / "src/game/mp/match/MatchSession.cpp"),
             "-o",
             str(executable),
         ]

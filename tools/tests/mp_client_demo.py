@@ -177,9 +177,9 @@ def check_deck_and_library() -> None:
             "a client recording stamps markers on its own clock")
     require("idAsyncNetwork::multiViewDemo.IsClientRecording()" in read("src/framework/async/NetworkSystem.cpp"),
             "the game's markers reach a client recording")
-    require("PublishMVDMarkers();" in body(read("src/mpgame/MultiplayerGame.cpp"), "void idMultiplayerGame::ClientRun( void ) {"),
+    require("PublishMVDMarkers();" in body(read("src/game/MultiplayerGame.cpp"), "void idMultiplayerGame::ClientRun( void ) {"),
             "a client's game finds the match's changes for its recording")
-    require("SERVER_MVD_MARKER_KILL" in read("src/mpgame/Game_network.cpp").split("case GAME_RELIABLE_MESSAGE_DEATH")[1][:3000],
+    require("SERVER_MVD_MARKER_KILL" in read("src/game/Game_network.cpp").split("case GAME_RELIABLE_MESSAGE_DEATH")[1][:3000],
             "a client recording marks each kill it hears of")
     require("WriteSummaryRecord()" in body(mvd, "bool idMultiViewDemo::StopRecording( const char *reason, bool finalize,") and "MVD_RECORD_SUMMARY" in body(mvd, "bool idMultiViewDemo::WriteSummaryRecord() {"),
             "a finished recording names everyone seen in its summary")

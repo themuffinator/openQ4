@@ -18,7 +18,7 @@ STUBS = r'''
 #define BIT(x) (1 << (x))
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr,"line %d: %s\n",__LINE__,#x); std::exit(1); } } while (0)
 class idDict;
-#include "mpgame/mp/GameTypes.h"
+#include "game/mp/GameTypes.h"
 struct idVec3 {};
 enum { POWERUP_QUADDAMAGE };
 struct idPlayer {
@@ -68,8 +68,8 @@ int main() {
 
 
 def main() -> None:
-    player = (ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8")
-    types = (ROOT / "src/mpgame/mp/GameTypes.cpp").read_text(encoding="utf-8")
+    player = (ROOT / "src/game/Player.cpp").read_text(encoding="utf-8")
+    types = (ROOT / "src/game/mp/GameTypes.cpp").read_text(encoding="utf-8")
     begin = types.index("static const mpGameTypeInfo_t mpGameTypeInfoTable[]")
     end = types.index("\n/*", types.index("const int mpNumGameTypeInfo", begin))
     definitions = types[begin:end] + "\n".join(function(types, signature) for signature in (

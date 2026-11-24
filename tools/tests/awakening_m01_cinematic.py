@@ -171,7 +171,7 @@ def main():
     else:
         command += ['+map', 'game/m01_stranarus_trench1']
     identity = {}
-    for path in [exe, runtime/'baseoq4/game-sp_x64.dll', runtime/'baseoq4/pak0.pk4']:
+    for path in [exe, runtime/'baseoq4/game_x64.dll', runtime/'baseoq4/pak0.pk4']:
         identity[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
     startup = subprocess.STARTUPINFO()
     startup.dwFlags |= subprocess.STARTF_USESHOWWINDOW

@@ -24,7 +24,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
-from game_layer import PACKAGED_LAYER_GAME_DIRS, RETIRED_LAYER_GAME_DIRS  # noqa: E402
+from game_layer import GAME_MODULE_STEM, PACKAGED_LAYER_GAME_DIRS, RETIRED_LAYER_GAME_DIRS  # noqa: E402
 
 
 THIN_MANIFEST_NAME = "OPENQ4-MACOS-THIN.json"
@@ -83,22 +83,25 @@ REQUIRED_SHARED_PATHS = (
 # Code files that lipo merges into one universal2 artifact. renderer-vk is the
 # macOS Vulkan renderer module; renderer-gl is not built on darwin, so it has no
 # entry here (the stale-code sweep below still rejects one if it ever appears).
-CODE_KEYS = ("client", "dedicated", "game-sp", "game-mp", "renderer-vk", "openal-soft")
+# One game module serves both logical modules (game_sp and game_mp).
+CODE_KEYS = ("client", "dedicated", GAME_MODULE_STEM, "renderer-vk", "openal-soft")
 # Loadable modules carry a @loader_path install name and one required export.
 MODULE_ENTRY_POINT_EXPORTS = {
-    "game-sp": "GetGameAPI",
-    "game-mp": "GetGameAPI",
+    GAME_MODULE_STEM: "GetGameAPI",
     "renderer-vk": "GetRenderAPI",
 }
 # A game-library layer (game_layer.PACKAGED_LAYER_GAME_DIRS, q4xbase) stages its own game
-# modules beside baseoq4's. They are optional code keys, "q4xbase/game-sp" and
-# "q4xbase/game-mp": a layer is staged whole (both modules and its mod.json, which is shared
-# payload like baseoq4's) in both thin slices, or in neither.
-LAYER_MODULE_STEMS = ("game-sp", "game-mp")
+# module beside baseoq4's. It is an optional code key, "q4xbase/game": a layer is staged
+# whole (its module and its mod.json, which is shared payload like baseoq4's) in both thin
+# slices, or in neither.
+LAYER_MODULE_STEMS = (GAME_MODULE_STEM,)
+# Thin-tree code files the stale sweep recognises as game modules: the current
+# game_<arch> and the retired split game-sp_<arch>/game-mp_<arch> modules.
+GAME_MODULE_FILE_RE = r"game(?:-sp|-mp)?_[A-Za-z0-9]+\.dylib"
 
 
 def module_stem(code_key: str) -> str:
-    """The module kind a code key names: "q4xbase/game-sp" is a game-sp module."""
+    """The module kind a code key names: "q4xbase/game" is a game module."""
     return code_key.rsplit("/", 1)[-1]
 
 
@@ -132,8 +135,7 @@ def thin_code_paths(arch: str) -> dict[str, Path]:
     return {
         "client": Path(f"openQ4-client_{arch}"),
         "dedicated": Path(f"openQ4-ded_{arch}"),
-        "game-sp": Path("baseoq4") / f"game-sp_{arch}.dylib",
-        "game-mp": Path("baseoq4") / f"game-mp_{arch}.dylib",
+        GAME_MODULE_STEM: Path("baseoq4") / f"{GAME_MODULE_STEM}_{arch}.dylib",
         # meson installs the renderer module beside the engine binaries in the
         # install root; package_nightly.py is what relocates it into
         # openQ4.app/Contents/Frameworks.
@@ -144,13 +146,12 @@ def thin_code_paths(arch: str) -> dict[str, Path]:
 
 def universal_code_paths() -> dict[str, Path]:
     # A fused package carries ONE file per code key, so every per-arch name
-    # collapses onto the same "universal2" arch token the game modules already
-    # use (openQ4-client_universal2, game-sp_universal2.dylib, ...).
+    # collapses onto the same "universal2" arch token the game module already
+    # uses (openQ4-client_universal2, game_universal2.dylib, ...).
     return {
         "client": Path("openQ4-client_universal2"),
         "dedicated": Path("openQ4-ded_universal2"),
-        "game-sp": Path("baseoq4") / "game-sp_universal2.dylib",
-        "game-mp": Path("baseoq4") / "game-mp_universal2.dylib",
+        GAME_MODULE_STEM: Path("baseoq4") / f"{GAME_MODULE_STEM}_{UNIVERSAL_ARCH}.dylib",
         "renderer-vk": Path("renderer-vk_universal2.dylib"),
         "openal-soft": OPENAL_SOFT_RELATIVE_PATH,
     }
@@ -159,7 +160,7 @@ def universal_code_paths() -> dict[str, Path]:
 def expected_install_name(code_key: str, arch: str) -> str:
     if code_key == "openal-soft":
         return OPENAL_SOFT_INSTALL_NAME
-    # a layer's modules keep their own file name as ID, as meson links them
+    # a layer's module keeps its own file name as ID, as meson links it
     stem = module_stem(code_key)
     if stem not in MODULE_ENTRY_POINT_EXPORTS:
         return ""
@@ -365,7 +366,7 @@ def dependencies(path: Path, *, macho_arch: str | None = None, own_install_name:
 def require_module_entry_export(path: Path, *, macho_arch: str, code_key: str) -> None:
     """Check the one entry point the loader resolves for this module kind.
 
-    game-sp/game-mp export GetGameAPI; the renderer module exports GetRenderAPI
+    The game module exports GetGameAPI; the renderer module exports GetRenderAPI
     and nothing else (tools/build/macos_renderer_module.exp). Checking the wrong
     symbol would silently accept a module the engine can never bind.
     """
@@ -453,11 +454,11 @@ def classify_staged_tree(root: Path, arch: str) -> tuple[dict[str, dict[str, obj
         # darwin cannot slip through unnoticed.
         if (
             (path.parent == root and re.fullmatch(r"openQ4-(?:client|ded)_[A-Za-z0-9]+", path.name))
-            or (path.parent == root / "baseoq4" and re.fullmatch(r"game-(?:sp|mp)_[A-Za-z0-9]+\.dylib", path.name))
+            or (path.parent == root / "baseoq4" and re.fullmatch(GAME_MODULE_FILE_RE, path.name))
             or (
                 path.parent.parent == root
                 and path.parent.name in (*PACKAGED_LAYER_GAME_DIRS, *RETIRED_LAYER_GAME_DIRS)
-                and re.fullmatch(r"game-(?:sp|mp)_[A-Za-z0-9]+\.dylib", path.name)
+                and re.fullmatch(GAME_MODULE_FILE_RE, path.name)
             )
             or (path.parent == root and re.fullmatch(r"renderer-(?:gl|vk)_[A-Za-z0-9]+\.dylib", path.name))
         ) and relative not in expected_code_names:

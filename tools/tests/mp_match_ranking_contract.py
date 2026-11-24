@@ -29,8 +29,8 @@ STUBS = r'''
 #define ID_INLINE inline
 #include "idlib/containers/List.h"
 #include "idlib/containers/Pair.h"
-#include "mpgame/mp/MatchPhase.h"
-#include "mpgame/mp/GameTypeIds.h"
+#include "game/mp/MatchPhase.h"
+#include "game/mp/GameTypeIds.h"
 static unsigned arrayAllocations = 0;
 void *operator new[](std::size_t size) {
     ++arrayAllocations;
@@ -398,11 +398,11 @@ int main() {
 
 
 def main() -> None:
-    mp = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
-    header = (ROOT / "src/mpgame/MultiplayerGame.h").read_text(encoding="utf-8")
-    states = (ROOT / "src/mpgame/mp/GameState.cpp").read_text(encoding="utf-8")
-    duel_header = (ROOT / "src/mpgame/mp/Duel.h").read_text(encoding="utf-8")
-    duel = (ROOT / "src/mpgame/mp/Duel.cpp").read_text(encoding="utf-8")
+    mp = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    header = (ROOT / "src/game/MultiplayerGame.h").read_text(encoding="utf-8")
+    states = (ROOT / "src/game/mp/GameState.cpp").read_text(encoding="utf-8")
+    duel_header = (ROOT / "src/game/mp/Duel.h").read_text(encoding="utf-8")
+    duel = (ROOT / "src/game/mp/Duel.cpp").read_text(encoding="utf-8")
     enum_end = header.index("} playerRankMode_t;") + len("} playerRankMode_t;")
     enum_start = header.rindex("typedef enum", 0, enum_end)
     evidence = function(mp, "void idMultiplayerGame::RecordMatchEvidenceResult(")

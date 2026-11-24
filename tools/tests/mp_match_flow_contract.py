@@ -34,8 +34,8 @@ STUBS = r'''
 #include <string>
 #include <map>
 #include <vector>
-#include "mpgame/mp/match/MatchSession.h"
-#include "mpgame/mp/GameTypeIds.h"
+#include "game/mp/match/MatchSession.h"
+#include "game/mp/GameTypeIds.h"
 #define CHECK(x) do { if (!(x)) { std::fprintf(stderr, "line %d: %s\n", __LINE__, #x); std::exit(1); } } while (0)
 template<class T> T Max(T a, T b) { return std::max(a,b); }
 enum { MSG_FRAGLIMIT, MSG_CAPTURELIMIT, MSG_TIMELIMIT, MSG_HOLYSHIT };
@@ -420,8 +420,8 @@ int main() {
 
 
 def main() -> None:
-    mp = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
-    states = (ROOT / "src/mpgame/mp/GameState.cpp").read_text(encoding="utf-8")
+    mp = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    states = (ROOT / "src/game/mp/GameState.cpp").read_text(encoding="utf-8")
     run = function(mp, "void idMultiplayerGame::Run( void )")
     assert run.index("ReconcileGameplayPhaseAfterMatchMutation();") < run.index("gameState->Run();")
     sync = function(mp, "void idMultiplayerGame::SynchronizeMatchParticipant(")
@@ -458,7 +458,7 @@ def main() -> None:
                           + "\n".join(functions) + TESTS, encoding="utf-8")
         command = [compiler, "-std=c++17", "-Wno-switch", "-DMP_MATCH_SESSION_STANDALONE_TEST",
                    f"-I{ROOT / 'src'}", str(source),
-                   str(ROOT / "src/mpgame/mp/match/MatchSession.cpp"), "-o", str(exe)]
+                   str(ROOT / "src/game/mp/match/MatchSession.cpp"), "-o", str(exe)]
         if os.environ.get("MP_MATCH_TEST_SANITIZERS") == "1":
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer"]
         subprocess.run(command, cwd=ROOT, check=True)

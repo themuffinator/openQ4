@@ -126,7 +126,7 @@ Sys_EXEPath
 
 There is no executable: the engine is a shared library loaded by the app. The
 only thing the engine uses this for is locating its sibling modules
-(renderer-gles, game-sp), which live in the APK's native library directory, so
+(renderer-gles, game), which live in the APK's native library directory, so
 report a fake binary inside that directory and every StripFilename() consumer
 lands on the right place.
 ==============
@@ -165,7 +165,7 @@ bool Sys_GetPackageRootDirectory( char *packageRoot, int packageRootSize ) {
 Sys_GetGameModuleRootDirectory
 
 The native library directory, which is where the loader must find
-libgame-sp_arm64.so and librenderer-gles_arm64.so.
+libgame_arm64.so and librenderer-gles_arm64.so.
 ==============
 */
 bool Sys_GetGameModuleRootDirectory( char *moduleRoot, int moduleRootSize ) {

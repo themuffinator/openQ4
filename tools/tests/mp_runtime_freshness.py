@@ -31,7 +31,7 @@ def main() -> None:
         executable = "openQ4-client_x64.exe" if os.name == "nt" else "openQ4-client_x64"
         for parent in (runtime, build):
             (parent / "baseoq4").mkdir()
-            for name in (executable, "custom-client", "baseoq4/game-mp.test"):
+            for name in (executable, "custom-client", "baseoq4/game_x64.test"):
                 path = parent / name
                 path.write_bytes(b"independent test fixture")
                 os.utime(path, (1000, 1000))
@@ -52,9 +52,9 @@ def main() -> None:
             # Keep the existing timestamp tolerance and module checks intact.
             os.utime(runtime / executable, (1009, 1009))
             smoke.verify_runtime_is_current(runtime)
-            os.utime(build / "baseoq4/game-mp.test", (1010, 1010))
-            expect_stale(runtime, None, "game-mp.test")
-            os.utime(runtime / "baseoq4/game-mp.test", (1010, 1010))
+            os.utime(build / "baseoq4/game_x64.test", (1010, 1010))
+            expect_stale(runtime, None, "game_x64.test")
+            os.utime(runtime / "baseoq4/game_x64.test", (1010, 1010))
             smoke.verify_runtime_is_current(runtime)
 
             # A newer local build must not reject a different worktree's

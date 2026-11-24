@@ -16,21 +16,23 @@ option(
   'build_games',
   type: 'boolean',
   value: true,
-  description: 'Build game modules (game-sp_<arch>/game-mp_<arch>) from canonical in-tree src/game and src/mpgame sources.',
+  description: 'Build the game module (game_<arch>), which serves single-player and multiplayer, from the canonical in-tree src/game sources.',
 )
 
 option(
   'build_game_sp',
   type: 'boolean',
   value: true,
-  description: 'Build the single-player game module (game-sp_<arch>).',
+  deprecated: true,
+  description: 'Deprecated and ignored: one game module (game_<arch>) serves both modes; use build_games.',
 )
 
 option(
   'build_game_mp',
   type: 'boolean',
   value: true,
-  description: 'Build the multiplayer game module (game-mp_<arch>).',
+  deprecated: true,
+  description: 'Deprecated and ignored: one game module (game_<arch>) serves both modes; use build_games.',
 )
 
 option(
@@ -38,7 +40,7 @@ option(
   type: 'feature',
   value: 'auto',
   deprecated: true,
-  description: 'Deprecated: Awakening single-player support is built into game_sp; this option no longer selects external modules.',
+  description: 'Deprecated: Awakening single-player support is built into the game module; this option no longer selects external modules.',
 )
 
 option(

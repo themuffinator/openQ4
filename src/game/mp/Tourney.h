@@ -4,7 +4,8 @@
 // Copyright 2002-2004 Raven Software
 //----------------------------------------------------------------
 
-#pragma once
+#ifndef __TOURNEY_H__
+#define __TOURNEY_H__
 
 #include "../Game_local.h"
 
@@ -50,6 +51,7 @@ public:
 	idPlayer*		GetWinner( void ) { return winner; }
 	void			UpdateState( void );
 	void			NewState( arenaState_t newState );
+	void			ShiftMatchTime( int deltaMsec );
 	
 	idPlayer**		GetPlayers( void );
 
@@ -151,3 +153,5 @@ private:
 	idUserInterface*	tourneyGUI;
 	idUserInterface*	tourneyScoreboard;
 };
+
+#endif

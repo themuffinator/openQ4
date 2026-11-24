@@ -46,8 +46,9 @@ public:
 	void				SetPlayerOnly( bool set ) { playerOnly = set; }
 						// make the force field only push monsters
 	void				SetMonsterOnly( bool set ) { monsterOnly = set; }
-						// clip model describing the extents of the force field
+	// clip model describing the extents of the force field
 	void				SetClipModel( idClipModel *clipModel );
+	const idClipModel *	GetClipModel( void ) const { return clipModel; }
 
 // RAVEN BEGIN
 // ddynerman: owner information

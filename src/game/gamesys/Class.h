@@ -64,14 +64,14 @@ public:
 	int			type;
 	intptr_t	value;
 
-	idEventArg() { type = D_EVENT_INTEGER; value = 0; };
-	idEventArg(int data) { type = D_EVENT_INTEGER; value = data; };
-	idEventArg(float data) { type = D_EVENT_FLOAT; value = *reinterpret_cast<int*>(&data); };
-	idEventArg(const idVec3& data) { type = D_EVENT_VECTOR; value = reinterpret_cast<intptr_t>(&data); };
-	idEventArg(const idStr& data) { type = D_EVENT_STRING; value = reinterpret_cast<intptr_t>(data.c_str()); };
-	idEventArg(const char* data) { type = D_EVENT_STRING; value = reinterpret_cast<intptr_t>(data); };
-	idEventArg(const class idEntity* data) { type = D_EVENT_ENTITY; value = reinterpret_cast<intptr_t>(data); };
-	idEventArg(const trace_t* data) { type = D_EVENT_TRACE; value = reinterpret_cast<intptr_t>(data); };
+	idEventArg()								{ type = D_EVENT_INTEGER; value = 0; };
+	idEventArg( int data )						{ type = D_EVENT_INTEGER; value = data; };
+	idEventArg( float data )					{ type = D_EVENT_FLOAT; value = *reinterpret_cast<int *>( &data ); };
+	idEventArg( const idVec3 &data )			{ type = D_EVENT_VECTOR; value = reinterpret_cast<intptr_t>( &data ); };
+	idEventArg( const idStr &data )				{ type = D_EVENT_STRING; value = reinterpret_cast<intptr_t>( data.c_str() ); };
+	idEventArg( const char *data )				{ type = D_EVENT_STRING; value = reinterpret_cast<intptr_t>( data ); };
+	idEventArg( const class idEntity *data )	{ type = D_EVENT_ENTITY; value = reinterpret_cast<intptr_t>( data ); };
+	idEventArg( const trace_t *data )			{ type = D_EVENT_TRACE; value = reinterpret_cast<intptr_t>( data ); };
 
 // jmarshall - this can't be called from doomscript!
 #if defined(_WIN64) || defined(__x86_64__) || defined(__aarch64__)
@@ -322,7 +322,7 @@ on abstract classes only.
 	}																								\
 	idEventFunc<nameofclass> nameofclass::eventCallbacks[] = {
 
-#else // CLASS_STATES_DECLARATION
+#else
 
 // RAVEN BEGIN
 // bdube: added states
@@ -387,11 +387,6 @@ public:
 // jnewquist: Use accessor for static class type 
 	bool						IsType( const idTypeInfo *c ) const { return IsType(*c); }
 // RAVEN END
-
-// jmarshall
-	virtual void			StateThreadChanged(void) { };
-// jmarshall end
-
 	const char *				GetClassname( void ) const;
 	const char *				GetSuperclass( void ) const;
 	void						FindUninitializedMemory( void );

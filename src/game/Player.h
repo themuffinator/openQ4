@@ -1,10 +1,13 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 07/07/2004
 
 #ifndef __GAME_PLAYER_H__
 #define __GAME_PLAYER_H__
+
+#include "PlayerAirReadout.h"
+#include "mp/WeaponOrder.h"
 
 /*
 ===============================================================================
@@ -54,9 +57,9 @@ const int	DEATH_VOLUME				= 15;			// volume at death
 
 const int	SAVING_THROW_TIME			= 5000;			// maximum one "saving throw" every five seconds
 
-const int	ASYNC_PLAYER_INV_AMMO_BITS = idMath::BitsForInteger( 999 );	// 10 bits to cover the range [0, 999]
+// grep max_ammo_* in the multiplayer settings, all less than 512 (2^9)
+const int	ASYNC_PLAYER_INV_AMMO_BITS = 9;
 const int	ASYNC_PLAYER_INV_CLIP_BITS = -7;							// -7 bits to cover the range [-1, 60]
-const int	ASYNC_PLAYER_INV_WPMOD_BITS = 3;							// 3 bits (max of 3 mods per gun)
 // NOTE: protocol 69 used 6 bits, but that's only used for client -> server traffic, so doesn't affect backwards protocol replay compat
 const int	IMPULSE_NUMBER_OF_BITS		= 8;							// allows for 2<<X impulses
 
@@ -147,9 +150,19 @@ enum {
 	POWERUP_TEAM_AMMO_REGEN,
 	POWERUP_TEAM_HEALTH_REGEN,
 	POWERUP_TEAM_DAMAGE_MOD,
-	
+
+	// Quake 4: The Awakening's powerups, appended so every type above keeps its
+	// number (content numbers them its own way: idPlayer::PowerupForContentType)
+	POWERUP_ADRENALINE,
+	POWERUP_FC_ARMOR_REGEN,
+
 	POWERUP_MAX
 };
+
+// openQ4 (CORE-07): a campaign save holds one end time per powerup the
+// single-player module numbered, which stopped at POWERUP_TEAM_DAMAGE_MOD. The
+// Awakening powerups appended after it are multiplayer-only and never saved.
+const int POWERUP_SAVED_COUNT = POWERUP_TEAM_DAMAGE_MOD + 1;
 
 enum {
 	PMOD_SPEED = 0,
@@ -193,6 +206,9 @@ typedef enum {
 	IBS_CANNOT_AFFORD = 3,
 } itemBuyStatus_t;
 
+// the weapon mod bits the player snapshot carries (MAX_WEAPONMODS of them)
+const int	WEAPON_MODS_SNAPSHOT_MASK = ( 1 << MAX_WEAPONMODS ) - 1;
+
 const int	ASYNC_PLAYER_TOURNEY_STATUS_BITS = idMath::BitsForInteger( PTS_NUM_STATES );
 
 class idInventory {
@@ -205,6 +221,7 @@ public:
 // RITUAL END
 	int						powerups;
 	int						armor;
+	int						armorTier;			// openQ4: Classic ruleset armour tier (classicArmorTier_t), meaningful while armor > 0
 	int						maxarmor;
 	int						ammo[ MAX_AMMO ];
 	int						clip[ MAX_WEAPONS ];
@@ -237,6 +254,7 @@ public:
 	void					Clear( void );
 	void					GivePowerUp( idPlayer* player, int powerup, int msec );
 	void					ClearPowerUps( void );
+	void					ShiftMatchTime( int deltaMsec );
 	void					GetPersistantData( idDict &dict );
 	void					RestoreInventory( idPlayer *owner, const idDict &dict );
 	bool					Give( idPlayer *owner, const idDict &spawnArgs, const char *statname, const char *value, int *idealWeapon, bool updateHud, bool dropped = false, bool checkOnly = false );
@@ -294,8 +312,20 @@ public:
  		EVENT_POWERUP,
  		EVENT_SPECTATE,
 		EVENT_EMOTE,
+		EVENT_JUMP,
+		EVENT_SPECTATOR_FOLLOW,
+		EVENT_AIR_READOUT,
  		EVENT_MAXEVENTS
  	};
+
+	enum spectatorFollow_t {
+		SPECTATOR_FOLLOW_NEXT,
+		SPECTATOR_FOLLOW_PREV,
+		SPECTATOR_FOLLOW_FREE,
+		SPECTATOR_FOLLOW_PLAYER,
+		SPECTATOR_FOLLOW_AUTO,		// the slot field carries an MP_AUTOTRACK_* mode
+		SPECTATOR_FOLLOW_CASTER		// the slot field carries 1 to take the caster view, 0 to give it up
+	};
 
 	friend class idThread;
 
@@ -350,6 +380,10 @@ public:
 	idInventory				inventory;
 
 	rvWeapon*						weapon;
+	// openQ4 (MP-15): ui_weaponOrder as parsed, and the text it was parsed from
+	mpWeaponOrder_t			weaponOrder;
+	idStr					weaponOrderText;
+	bool					weaponOrderParsed;
 	idEntityPtr<rvViewWeapon>		weaponViewModel;
 	idEntityPtr<idAnimatedEntity>	weaponWorldModel;
 	const idDeclEntityDef*			weaponDef;
@@ -372,6 +406,22 @@ public:
 	int						nextHealthPulse;	// time when health will tick down
 	int						nextAmmoRegenPulse[ MAX_AMMO ];	// time when ammo will regenerate
 	int						nextArmorPulse;		// time when armor will tick down
+	int						adrenalineHealthDrain;	// health Adrenaline takes back each pulse (MP only, not saved)
+	// openQ4: Classic ruleset (mp/ClassicRules.h). MP only, not saved.
+	int						classicMegaDecayTime;	// next mega health drain; 0 when no mega health is draining
+	int						classicHookState;		// classicHookState_t, server authoritative, in the snapshot
+	idVec3					classicHookOrigin;		// where the hook is now: in flight, or the point it holds
+	idVec3					classicHookStart;		// where it was thrown from; flight is a function of time
+	idVec3					classicHookDir;
+	int						classicHookFireTime;
+	int						classicHookReleaseTime;
+	idEntityPtr<idEntity>	classicHookAnchor;		// server: the mover the hook bit into, NULL for the world
+	idVec3					classicHookAnchorLocal;	// server: the bite in the anchor's own frame
+	bool					classicHookReelSound;	// presentation: the reel loop is playing
+	renderEntity_t			classicHookCable;
+	int						classicHookCableHandle;
+	renderEntity_t			classicHookHead;
+	int						classicHookHeadHandle;
 	bool					hiddenWeapon;		// if the weapon is hidden ( in noWeapons maps )
 
 	// mp stuff
@@ -381,20 +431,23 @@ public:
 	bool					forceScoreBoard;
 	bool					forceRespawn;
 	int						forceScoreBoardTime;
-// RITUAL BEGIN
-// squirrel: added DeadZone multiplayer mode
 	bool					allowedToRespawn;
-// squirrel: Mode-agnostic buymenus
 	bool					inBuyZone;
 	bool					inBuyZonePrev;
-// RITUAL END
 	bool					spectating;
 	bool					lastHitToggle;
 	bool					lastArmorHit;
+	int						lastHitFrame;			// game frame of the last hit sound feedback
+	bool					lastHitArmor;
+	int						hitFeedbackCount;		// server: hits that sounded, carried in this player's snapshots
+	int						netHitFeedbackCount;	// client: the last count read, -1 before the first
+	int						netHitFeedbackTime;		// client: game time of that read
 	bool					forcedReady;
 	int						lastArenaChange;
 	
 	bool					wantSpectate;			// from userInfo
+	int						inactivityLastInputTime;	// openQ4 MP-12 g_inactivity: the last frame with a changed command
+	bool					inactivityWarned;
 	bool					initialJoinPending;		// waiting at the connect-time join screen
 	bool					initialJoinSpectateApplied;
 	bool					initialJoinMenuPending;
@@ -419,13 +472,22 @@ public:
 	int						minRespawnTime;			// can respawn when time > this, force after g_forcerespawn
 	int						maxRespawnTime;			// force respawn after this time
 
+	// Loadout held before warmup armed the player, and whether it did.
+	int						warmupArsenalRestoreWeapons;
+	bool					warmupArsenalGranted;
+
+	// openQ4: hit feedback staged this server frame, so a hitscan burst reports
+	// one accumulated number instead of one per pellet.
+	idEntityPtr<idPlayer>	hitFeedbackVictim;
+	int						hitFeedbackWeapon;
+	int						hitFeedbackDamage;
+	int						hitFeedbackFlags;
+
 	// the first person view values are always calculated, even
 	// if a third person view is used
 	idVec3					firstPersonViewOrigin;
 	idMat3					firstPersonViewAxis;
 	int						presentationViewTime;
-	// openQ4 VR: the body crouched by the button, until it stands again
-	mutable bool			vrButtonCrouch;
 	// openQ4 VR: in a vehicle seat, where the tracking space faces (the seat's
 	// own deltaViewAngles yaw, which binding to the vehicle disturbs), and the
 	// vehicle's yaw last frame, while its turns carry the view
@@ -435,10 +497,15 @@ public:
 	// openQ4 VR: a seat restored from a save faces the vehicle's eye once the
 	// headset's frame is known again (UpdateVRVehicleFrame)
 	bool					vrVehicleSeatPending;
-	// openQ4 VR: the horizontal world step room scale walked the body, and the
-	// game time of the tic it walked in (UpdateVRRoomScale). The tracking space
-	// took the whole step at once, so an eye interpolated towards that tic's
-	// sample carries what it has not covered yet. Draw-only: never saved.
+	// openQ4 VR: where the body stood at the last reported tic (room scale)
+	idVec3					vrRoomScaleOrigin;
+	bool					vrRoomScaleOriginValid;
+	// openQ4 VR: the horizontal world step room scale took with a tic, and that
+	// tic's game time. Single player: the step room scale walked the body
+	// (UpdateVRRoomScale). Multiplayer: the step the tracking space took with a
+	// reported tic's walk (ReportVRRoomScaleWalk); the comfort vignette leaves
+	// its speed out. An eye interpolated towards that tic's sample carries what
+	// it has not covered yet. Draw-only: never saved or sent.
 	idVec3					vrRoomScaleStep;
 	int						vrRoomScaleStepTime;
 	// openQ4 VR: the body the player sees in the headset (vr_body, VRBody.h): a
@@ -460,12 +527,12 @@ public:
 	bool					vrBodyViewArm[ VR_NUM_HANDS ];	// the view weapon draws this arm's forearm and hand
 	idVec3					vrBodyElbow[ VR_NUM_HANDS ];	// in the body's own space
 	idVec3					vrBodyWrist[ VR_NUM_HANDS ];
-	// in an exposed seat (a turret, a gun on a tram) the body is the seat's own
-	// animation, its neck under the head: the arms stay on the controls
+	// in an exposed seat the body is the seat's own animation, its neck under
+	// the head: the arms stay on the controls
 	bool					vrBodySeated;
 	// openQ4 VR: the third-person model's heading under a tracked aim, which
 	// holds still while the gun points near straight up or down
-	// (VR_ModelYawFollow). Never saved.
+	// (VR_ModelYawFollow). Never sent.
 	float					vrModelYaw;
 	bool					vrModelYawValid;
 	// openQ4: with no weapon in hand the body stands with its arms at its
@@ -479,7 +546,17 @@ public:
 	float					unarmedArmsLeaveWeight;	// as the unarmed pose began to blend out
 	bool					unarmedWorldModelHidden;	// the hidden weapon's world model was hidden here
 	int						unarmedIdleRestartTime;		// when Torso_IdleThink last swapped the stand, -1 before
+	// openQ4 VR: the facing the server last sent this client (deltaViewAngles
+	// yaw). The server sets a facing from the weapon hand's usercmd; when it
+	// changes the client turns its body so the head faces there instead.
+	float					vrSnapshotDeltaYaw;
+	bool					vrSnapshotDeltaYawValid;
 
+	// openQ4 VR: the body crouched by the button, until it stands again
+	mutable bool			vrButtonCrouch;
+	// openQ4 VR: the Arena's presentation camera built the last render view
+	// (entrance, intro, spawn-in, tableau): an authored shot, shown flat
+	bool					vrPresentationCamera;
 	bool					presentationCanInterpolate;
 	idVec3					presentationPrevViewOrigin;
 	idMat3					presentationPrevViewAxis;
@@ -525,17 +602,11 @@ public:
 	bool					vsMsgState;
 
 	int						lastPickupTime;
-//RAVEN BEGIN
-// asalmon: the eneny the player is most likely currently aiming at
-#ifdef _XBOX
-	idEntityPtr<idActor>	bestEnemy;
-#endif
-//RAVEN END
 
-// RITUAL BEGIN
-// squirrel: Mode-agnostic buymenus
 	float					buyMenuCash;
-// RITUAL END
+
+	float					handicap; // multiplier for damage/health
+	float					spectatorSpeedScale;	// openQ4: ui_spectatorSpeed, clamped; scales pm_spectatespeed
 
 public:
 	CLASS_PROTOTYPE( idPlayer );
@@ -545,16 +616,20 @@ public:
 
 	void					Spawn( void );
 	void					Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
+	void					CheckInactivity( const usercmd_t &oldCmd );
 
 							// the entity whose interactive GUI the crosshair is on, or NULL
 	idEntity *				GetFocusGuiEntity( void ) const { return focusUI != NULL ? focusEnt.GetEntity() : NULL; }
-	bool					GetFocusGuiPoint( idVec3 &point ) const { if ( focusType != FOCUS_GUI || focusUI == NULL ) return false; point = focusGuiPoint; return true; }
 
 	// save games
 	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
 	void					Restore( idRestoreGame *savefile );					// unarchives object from save game file
 
 	static const char*		GetSpawnClassname ( void );
+	static void				PrecacheSpawnDecls( void );
+	static void				PrecacheMultiplayerSpawn( void );
+	static void				PrecachePlayerModel( const rvDeclPlayerModel *model );
 
 	virtual void			Hide( void );
 	virtual void			Show( void );
@@ -566,7 +641,7 @@ public:
 	void					SetupWeaponEntity( void );
 	bool					SelectSpawnPoint( idVec3 &origin, idAngles &angles );
 	void					SpawnFromSpawnSpot( void );
-	virtual void			SpawnToPoint( const idVec3	&spawn_origin, const idAngles &spawn_angles );
+	void					SpawnToPoint( const idVec3	&spawn_origin, const idAngles &spawn_angles );
 	void					SetClipModel( bool forceSpectatorBBox = false );	// spectator mode uses a different bbox size
 
 	void					SavePersistantInfo( void );
@@ -576,15 +651,13 @@ public:
 
  	bool					UserInfoChanged( void );
 	idDict *				GetUserInfo( void );
-// RAVEN BEGIN
-// shouchard:  BalanceTDM->BalanceTeam (now used for CTF as well as TDM)
 	bool					BalanceTeam( void );
-// RAVEN END
 	void					CacheWeapons( void );
 // jmarshall
 	bool					IsShooting(void);
 	float					GetViewHeight(void);
 // jmarshall end
+
  	bool					HandleESC( void );
    	void					EnterCinematic( void );
    	void					ExitCinematic( void );
@@ -639,11 +712,13 @@ public:
 	void					UpdatePresentationLook( void );
 	void					ApplyPresentationLookToView( idVec3 &origin, idMat3 &axis ) const;
 	void					ApplyPresentationLookToEyeAttachment( const idVec3 &eyeOrigin, const idMat3 &eyeAxis, idVec3 &origin, idMat3 &axis ) const;
-
+	
 	void					DrawShadow( renderEntity_t *headRenderEnt );
 	void					UpdateMultiplayerVisibilityEffects( renderEntity_t *headRenderEnt );
 	void					UpdateZoomGuiViewState( void );
 	void					DrawHUD( idUserInterface *hud );
+	void					DrawInput();
+
 	void					StartRadioChatter ( void );
 	void					StopRadioChatter ( void );
 
@@ -658,6 +733,10 @@ public:
 	// player's first-person view and a headset presents it; trackingYaw
 	// places the tracking space in the world.
 	bool					GetVRView( vrFrameState_t &frame, float &trackingYaw ) const;
+	// The weapon hand's aim turned from the head's heading, degrees (local
+	// player aiming with a tracked hand).
+	bool					GetVRHandFromHead( float &handFromHead ) const;
+	// True while the view weapon follows the weapon-hand controller.
 	// True while the weapon follows the weapon-hand controller.
 	bool					IsVRHandAiming( void ) const;
 	// The view weapon at the weapon hand: from the interpolated eye for
@@ -667,10 +746,11 @@ public:
 	bool					GetVRAimOrigin( idVec3 &origin ) const;
 	// Where this frame's shot from the weapon hand lands, for the aim
 	// marker. False when nothing is aimed by hand.
+	// Where this frame's shot lands, for the weapon hand's aim marker. False
+	// when nothing is aimed by hand.
 	bool					GetVRAimMarker( vrAimMarker_t &marker ) const;
 	// Room scale: walks the body after the tracked head (vr_roomScale).
 	void					UpdateVRRoomScale( void );
-	idVec3					VRRoomScaleLag( float fraction ) const;
 	// In a vehicle: the stick drives it the way it faces, and its turns
 	// carry the tracked view unless it steers after the driver's turret.
 	void					UpdateVRVehicleFrame( void );
@@ -713,12 +793,26 @@ public:
 	bool					GetVRHandPose( int hand, idVec3 &palm, idMat3 &aimAxis ) const;
 	// The tracked head in the world this tic. False outside a headset view.
 	bool					GetVRHeadOrigin( idVec3 &origin ) const;
+	// Room scale: report a new tic's predicted progress to the tracking space.
+	void					ReportVRRoomScaleWalk( void );
+	idVec3					VRRoomScaleLag( float fraction ) const;
+	bool					VRRoomScaleStepping( void ) const;
+	void					UpdateEyeHeight( bool snap );
  	void					OffsetThirdPersonView( float angle, float range, float height, bool clip );
+	// openQ4: how the local view shows this player when it is not through their
+	// eyes: a spectator's third-person or chase follow view, or the death camera.
+	enum followCamera_t {
+		FOLLOW_CAMERA_FIRST = 0,
+		FOLLOW_CAMERA_THIRD,
+		FOLLOW_CAMERA_CHASE,
+		FOLLOW_CAMERA_DEATH
+	};
+	followCamera_t			FollowCameraMode( void ) const;
+	void					OffsetChaseCameraView( const idAngles &look, float range, float height );
 // RAVEN BEGIN
 // jnewquist: option to avoid clipping against world
-	void					OffsetThirdPersonVehicleView	( bool clip );
-// RAVEN END
-	bool					OffsetThirdPersonTargetView		( void );
+	void					OffsetThirdPersonVehicleView( bool clip );
+	bool					OffsetThirdPersonTargetView( void );
 
 	bool					Give( const char *statname, const char *value, bool dropped = false, bool updateHud = true );
 	bool					GiveItem( idItem *item, bool updateHud = true );
@@ -767,10 +861,13 @@ public:
 
 	// Helper methods to retrieving dictionaries
 	void                    DebugWeaponWheel( const idCmdArgs &args );
+	void                    DebugQuickChat( const idCmdArgs &args );
 	void                    DebugStatusBar( const idCmdArgs &args );
 	float                   GetWeaponWheelBlend() const;
 	const idDeclEntityDef*	GetWeaponDef				( int weaponIndex );
 	const idDeclEntityDef*	GetPowerupDef				( int powerupIndex );
+	static const char*		GetPowerupDefName			( int powerup );
+	static int				PowerupForContentType		( int contentType );
 
 	// Weapons
 	bool					GiveWeaponMods				( int mods );
@@ -784,20 +881,11 @@ public:
 	idEntity*				ResetFlag					( const char* itemClass, const idDict& customArgs ) const;
 	void					RespawnFlags				( void );
 	void					DropWeapon					( void );
+	void					GiveFixedLoadout			( const char *weaponDef );
 
-// RAVEN BEGIN
-// abahr:
 	bool					WeaponIsEnabled				( void ) const { return weaponEnabled; }
 	void					ShowCrosshair				( void );
 	void					HideCrosshair				( void );
-// RAVEN END
-
-//RAVEN BEGIN
-//asalmon: switch weapon based on d-pad combo
-#ifdef _XBOX
-	void					ScheduleWeaponSwitch		(int weapon);
-#endif
-//RAVEN BEGIN
 
 	void					Reload						( void );
 	void					NextWeapon					( void );
@@ -818,11 +906,17 @@ public:
 	void					ToggleFlashlight			( void );
  	bool					CanShowWeaponViewmodel		( void ) const;
 
+	void					TriggerHitSound				( bool armor );
+
+	// openQ4: server side hit feedback, accumulated across a frame
+	void					AccumulateHitFeedback		( idPlayer *victim, int weapon, int damage, int hitFlags );
+	void					FlushHitFeedback			( void );
+	void					FlushHitFeedbackState		( void );
+
 	virtual bool			HandleSingleGuiCommand( idEntity *entityGui, idLexer *src );
 	bool					GuiActive( void ) { return focusType == FOCUS_GUI; }
+	bool					GetFocusGuiPoint( idVec3 &point ) const { if ( focusType != FOCUS_GUI || focusUI == NULL ) return false; point = focusGuiPoint; return true; }
 
-// RITUAL BEGIN
-// squirrel: Mode-agnostic buymenus
 	void					GenerateImpulseForBuyAttempt( const char* itemName );
 	bool					AttemptToBuyItem( const char* itemName );
 	bool					AttemptToBuyTeamPowerup( const char* itemName );
@@ -830,9 +924,27 @@ public:
 	bool					CanBuy( void );
 	int						CanSelectWeapon				( const char* weaponName );
 	int						GetItemCost(const char* itemName);
-// RITUAL END
 	void					PerformImpulse( int impulse );
 	void					Spectate( bool spectate, bool force = false );
+	// openQ4: Classic ruleset
+	void					StartClassicMegaHealth( void );
+	void					UpdateClassicMegaHealth( void );
+	bool					ClassicMegaHealthActive( void ) const { return classicMegaDecayTime != 0; }
+	void					UpdateClassicHook( void );
+	void					ResetClassicHook( bool playSound );
+	void					PresentClassicHook( void );
+	idVec3					ClassicHookFlightPoint( int time ) const;
+	bool					UpdateClassicHookAnchor( void );
+	int						GetClassicHookState( void ) const { return classicHookState; }
+	const idVec3 &			GetClassicHookOrigin( void ) const { return classicHookOrigin; }
+	void					FreeClassicHookPresentation( void );
+	void					SpectateFreeFly( bool force );	// force is also used by offline demo controls
+	void					RequestSpectatorFollow( spectatorFollow_t operation, int targetSlot = -1 );
+	// openQ4: live auto-follow. The server keeps one chooser per spectator and
+	// moves the camera only to players CanSpectatorFollow allows that spectator.
+	int						GetSpectatorAutoFollow( void ) const { return spectatorAutoFollow; }
+	float					GetSpectatorSpeedScale( void ) const { return spectatorSpeedScale; }
+	static void				NoteSpectatorAutoFollowKill( int attackerSlot, int victimSlot );
  	void					ToggleObjectives ( void );
  	void					ToggleScoreboard( void );
 	void					RouteGuiMouse( idUserInterface *gui );
@@ -846,7 +958,7 @@ public:
 	void					SetPrivateCameraView( idCamera *camView );
 	idCamera *				GetPrivateCameraView( void ) const { return privateCameraView; }
 	void					StartFxFov( float duration  );
- 	void					UpdateHudWeapon( int displayWeapon=-1 );
+ 	void					UpdateHudWeapon( int displayWeapon = -1 );
 	// openQ4: a weapon key that changed nothing (the Remastered strip's refusal).
 	bool					WeaponKeyRefused( int num );
 	void					RefuseWeaponSelection( int num );
@@ -855,6 +967,7 @@ public:
 #endif
 	void					UpdateHudStats( idUserInterface *hud );
  	void					UpdateHudAmmo( idUserInterface *hud );
+ 	void					UpdateHudPowerUps( idUserInterface *hud );
  	void					ShowTip( const char *title, const char *tip, bool autoHide );
  	void					HideTip( void );
  	bool					IsTipVisible( void ) { return tipUp; };
@@ -870,7 +983,7 @@ public:
 	virtual void			ClientPredictionThink( void );
 	virtual void			WriteToSnapshot( idBitMsgDelta &msg ) const;
 	virtual void			ReadFromSnapshot( const idBitMsgDelta &msg );
-	void					WritePlayerStateToSnapshot( idBitMsgDelta &msg ) const;
+	void					WritePlayerStateToSnapshot( int lastSnapshotFrame, idBitMsgDelta &msg ) const;
 	void					ReadPlayerStateFromSnapshot( const idBitMsgDelta &msg );
 
 	virtual bool			ClientStale( void );
@@ -886,6 +999,9 @@ public:
 	
 	bool					IsBeingTalkedTo	( void );
  	bool					IsReady			( void );
+	// openQ4: the reliable ready message sets this straight from the server
+	bool					GetReady		( void ) const { return ready; }
+	void					SetReady		( bool value ) { ready = value; }
  	bool					IsRespawning	( void );
  	bool					IsInTeleport	( void );
 	bool					IsZoomed		( void );
@@ -925,6 +1041,7 @@ public:
  	float					GetInfluenceRadius( void ) { return influenceRadius; };
 
 	// server side work for in/out of spectate. takes care of spawning it into the world as well
+	void					RevokeWarmupArsenal( void );
 	void					ServerSpectate( bool spectate );
 
 	// for very specific usage. != GetPhysics()
@@ -934,12 +1051,19 @@ public:
  	bool					IsLeader( void );
 
  	void					UpdateModelSetup( bool forceReload = false );
+	void					UpdateSounds(const rvDeclPlayerModel *modelDecl);
 
 	bool					OnLadder( void ) const;
 
 	rvViewWeapon*			GetWeaponViewModel	( void ) const;
 	idAnimatedEntity*		GetWeaponWorldModel ( void ) const;
 	int						GetCurrentWeapon	( void ) const;
+	// openQ4 (MP-15): mp/WeaponOrder.h
+	const mpWeaponOrder_t &	GetWeaponOrder		( void );
+	int						GetIdealWeapon		( void ) const { return idealWeapon; }
+	// openQ4: ui_autoSwitch, with Smart switching (mp/WeaponOrder.h)
+	bool					AutoSwitchOnPickup	( int held, int picked );
+	int						SmartSwitchRole		( int slot );
 
 	bool					IsGibbed			( void ) const;
 	const idVec3&			GetGibDir			( void ) const;
@@ -1006,12 +1130,25 @@ public:
 // RITUAL BEGIN
 // squirrel: added DeadZone multiplayer
 	itemBuyStatus_t			ItemBuyStatus( const char* itemName );
+	void					WriteWeaponModsToSnapshot( idBitMsgDelta &msg ) const;
+	void					ReadWeaponModsFromSnapshot( const idBitMsgDelta &msg, int weaponMods[ MAX_WEAPONS ] );
 	bool					CanBuyItem( const char* itemName );
 	void					GiveCash( float cashDeltaAmount );
 	void					ClampCash( float minCash, float maxCash );
 	void					SetCash( float newCashAmount );
 	void					ResetCash();
 // RITUAL END
+
+	bool					IsFakeClient( void ) const { return entityNumber == ENTITYNUM_NONE; }
+	bool					IsLocalClient( void ) const { return entityNumber == gameLocal.localClientNum || IsFakeClient(); }
+	bool					IsSpectatedClient( void ) const;
+	bool					IsWaitingForPredictAck( void ) const;
+
+	// openQ4: the air reservoir, out of pm_airTics; a bot reads it before it dives.
+	int						GetAirTics( void ) const { return airTics; }
+	int						GetAirReadoutPercent( void ) const;
+	int						GetAirReadoutServerTime( void ) const { return airReadout.serverTime; }
+	void					WriteAirReadoutMessage( idBitMsg &msg, bool reliable ) const;
 
 protected:
 	void					SetupHead( const char* modelKeyName = "", idVec3 headOffset = idVec3(0, 0, 0) );
@@ -1021,6 +1158,7 @@ private:
 
 	jointHandle_t			hipJoint;
 	jointHandle_t			chestJoint;
+	jointHandle_t			neckLeanJoint;
 
 	idPhysics_Player		physicsObj;			// player physics
 
@@ -1051,24 +1189,18 @@ private:
 	float					softFallDelta;
 	float					noFallDelta;
 
-// RITUAL BEGIN
-// squirrel: Mode-agnostic buymenus
 	int						carryOverCurrentWeapon;
-// RITUAL END
 	int						currentWeapon;
 	int						idealWeapon;
+	int						clientIdealWeaponPredictFrame;	// for weapon switch prediction
 	int						previousWeapon;
 	int						weaponSwitchTime;
 	bool					weaponEnabled;
  	bool					showWeaponViewModel;
 
 	rvClientEntityPtr<rvClientAFAttachment>	clientHead;
-// RAVEN BEGIN
-// mekberg: allow disabling of objectives during non-cinematic time periods
 	bool					objectivesEnabled;
-// jshepard: false when player is looking at an npc or gui
 	bool					flagCanFire;
-// RAVEN END
 
 	bool					flashlightOn;
 	bool					zoomed;
@@ -1093,6 +1225,8 @@ private:
 
 	bool					airless;
 	int						airTics;				// set to pm_airTics at start, drops in vacuum
+	mpAirReadoutState		airReadout;
+	mpAirPublishClock		airPublishClock;
 	int						lastAirDamage;
 
 // openQ4 BEGIN
@@ -1168,8 +1302,9 @@ private:
 	int						oldMouseX;
 	int						oldMouseY;
 #include "gamesys/WeaponWheelState.h"
+#include "QuickChatState.h"
 #include "gamesys/StatusBarState.h"
-	// the local player's crosshair and hit marker views, built as it spawns
+	// the local player's crosshair, hit marker and damage number views, built as it spawns
 	void					PrecacheHudPresentation( void );
 
 	bool					tipUp;
@@ -1184,6 +1319,13 @@ private:
 	int						lastDamageLocation;
 
 	int						predictedFrame;
+	// Extra replay tics this remote has already been re-simulated for in the current
+	// chain.  Client-only transient state; deliberately not saved.
+	int						remotePredictedTics;
+	// The same re-simulated tics counted for net_mpPredictDebug from one snapshot to the
+	// next. remotePredictedTics is reset by PredictionErrorDecay on every presented frame,
+	// so it no longer holds the chain's count when the next snapshot arrives.
+	int						remoteChainResimulatedTics;
 	idVec3					predictedOrigin;
 	idAngles				predictedAngles;
 	bool					predictedUpdated;
@@ -1192,26 +1334,50 @@ private:
 	int						predictionErrorTime;
 
 	// mp
- 	bool					ready;					// from userInfo
+ 	bool					ready;					// authoritative ready state
+	// openQ4: ui_ready is throttled to one change every five seconds, so the
+	// console ready commands go over their own reliable message instead.  This
+	// shadow copy lets UserInfoChanged tell a genuine ui_ready edit from a
+	// stale userinfo resend that would otherwise undo the reliable update.
+	bool					readyUserInfo;
  	bool					respawning;				// set to true while in SpawnToPoint for telefrag checks
  	bool					leader;					// for sudden death situations
  	bool					weaponCatchup;			// raise up the weapon silently ( state catchups )
+	// openQ4: client only - the game time the server's weapon for this life began its
+	// raise, which the client's weapon for it raises from; -1 when there is none to follow
+	int						netWeaponRaiseTime;
 	int						startupLoadoutDepth;
 	bool					isTelefragged;			// proper obituaries
 	
 	int						lastSpectateChange;
+	// openQ4: the entity a followed slot held when this spectator started
+	// following it.  UpdateSpectating releases the camera when the slot's entity
+	// changes, so a reused slot never inherits a follow by number alone.
+	int						spectatorFollowSlot;
+	int						spectatorFollowSpawnId;
+	int						spectatorAutoFollow;		// MP_AUTOTRACK_*; server only
+	mpDemoAutoTrack			spectatorAutoTrack;
  	int						lastTeleFX;
  	unsigned int			lastSnapshotSequence;	// track state hitches on clients
+	// openQ4: client only - the game time of the last snapshot read for this player, which
+	// says whether the spawn's knockback can still be read as the spawn's clock (Init()
+	// leaves it alone, as a respawn must keep it)
+	int						lastSnapshotTime;
  	
 	int						aimClientNum;			// player num in aim
 
-	idPlayer*				lastImpulsePlayer;		// the last player who gave me an impulse, may be null
+	// openQ4: an entity pointer, so it reads as NULL once that player has left.
+	// It was a raw pointer kept for a second after a knock, and a death in that
+	// second credited the kill through it: freed memory if they had disconnected.
+	idEntityPtr<idPlayer>	lastImpulsePlayer;		// the last player who gave me an impulse, may be null
 	
 	int						arena;					// current arena for tourney gameplay
 
 	int						connectTime;
 	unsigned int			mutedPlayers;			// bitfield set to which clients this player wants muted
 	unsigned int			friendPlayers;			// bitfield set to which clients this player has marked as friends
+	int						mutedPlayerIdentities[MAX_CLIENTS] = {};
+	int						friendPlayerIdentities[MAX_CLIENTS] = {};
 	
 	int						voiceDest[MAX_CONCURRENT_VOICES];
 	int						voiceDestTimes[MAX_CONCURRENT_VOICES];
@@ -1254,7 +1420,25 @@ private:
 
 	const idDeclEntityDef*	itemCosts;
 
+	idVec3					leanVelocity;
+
+	// hack to avoid jittery legs
+	int						ignoreOnGroundUntilFrame;
+	bool					prevOnGround;
+
+	// lean props
+	float					leanMaxSpeed;
+	float					leanBlendRatio;
+	float					leanMaxLateralAngle;
+	float					leanMaxForwardAngle;
+	float					leanHeadRatio;
+	float					leanHipRatio;
+
+	// flags when server is processing entity events, for acknowledge replies
+	bool					serverReceiveEvent;
+
 	bool					WantSmoothing( void ) const;
+	bool					AllowsFullRemotePrediction( void ) const;
 	void					PredictionErrorDecay( void );
 
 	bool					CanZoom(void);
@@ -1270,8 +1454,11 @@ private:
 	void					Weapon_GUI( void );
 	void					Weapon_Vehicle ( void );
 	void					Weapon_Usable ( void );
-	void					SpectateFreeFly( bool force );	// ignore the timeout to force when followed spec is no longer valid
-	void					SpectateCycle( void );
+	void					SpectateCycle( int direction = 1 );
+	bool					CycleSpectatorFollow( int direction );
+	void					ServerSpectatorFollow( int operation, int targetSlot, int targetSpawnId );
+	void					SetSpectatorAutoFollow( int mode );
+	void					UpdateSpectatorAutoFollow( void );
 	idAngles				GunTurningOffset( void );
 	idVec3					GunAcceleratingOffset( void );
 
@@ -1299,14 +1486,10 @@ private:
 	void					SetLiquidBubbles			( bool active, const char *liquid );
 	void					SpawnLiquidTestVolume		( void );
 // openQ4 END
-// RAVEN BEGIN
-// abahr
 	void					UpdateGravity				( void );
-// nrausch: common handling for objective screen toggle	
 	void					HandleObjectiveInput		( void );
 	void					HandleCheats				( void );
 	void					ClearCheatState				( void );
-// RAVEN END
 	void					UpdateViewAngles			( void );
 	bool					UpdateBenchmarkViewSweep	( void );
 	void					UpdatePowerUps				( void );
@@ -1314,7 +1497,6 @@ private:
 	void					UpdateFocus					( void );
  	void					UpdateLocation				( void );
 	void					UpdateObjectiveInfo			( void );
-//	void					UpdateDatabaseInfo			( void );
 	void					UpdateIntentDir				( void );	
 
 	void					LoadDeferredModel			( void );
@@ -1323,6 +1505,14 @@ private:
 	void					UpdateFocusCharacter		( idEntity* newEnt );
 	void					SetFocus					( playerFocus_t type, int focusTime, idEntity* ent, idUserInterface* ui );
 
+	void					UpdateDeathShader			( bool state_hitch );
+	
+//	void					InitWeapon					( void );
+
+	bool					IsLegsIdle					( bool crouching ) const;
+
+	void					CheckAckReply				( void ) const;
+	
 	void					Event_GetButtons			( void );
 	void					Event_GetMove				( void );
 	void					Event_GetViewAngles			( void );
@@ -1370,15 +1560,10 @@ private:
 	//  mekberg: don't supress showing new objectives anymore
 	void					Event_AllowNewObjectives	( void );
 
-	// twhitaker: death shader
-	void					UpdateDeathShader			( bool state_hitch );
-	
 	bool doInitWeapon;
 	void					InitWeapon			( void );
 	// RAVEN END
 
-	bool					IsLegsIdle						( bool crouching ) const;
-	
 	stateResult_t			State_Wait_Alive				( const stateParms_t& parms );
 	stateResult_t			State_Wait_ReloadAnim			( const stateParms_t& parms );
 	
@@ -1521,10 +1706,6 @@ ID_INLINE bool idPlayer::IsPlayerMuted( idPlayer* player ) const {
 	return player != NULL && IsPlayerMuted( player->entityNumber );
 }
 
-ID_INLINE bool idPlayer::IsPlayerMuted( int clientNum ) const {
-	return clientNum >= 0 && clientNum < MAX_CLIENTS && ( mutedPlayers & ( 1u << clientNum ) ) != 0;
-}
-
 ID_INLINE void idPlayer::MutePlayer( idPlayer* player, bool mute ) {
 	if ( player == NULL ) {
 		return;
@@ -1532,24 +1713,8 @@ ID_INLINE void idPlayer::MutePlayer( idPlayer* player, bool mute ) {
 	MutePlayer( player->entityNumber, mute );
 }
 
-ID_INLINE void idPlayer::MutePlayer( int clientNum, bool mute ) {
-	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
-		return;
-	}
-	const unsigned int clientMask = 1u << clientNum;
-	if( mute ) {
-		mutedPlayers |= clientMask;
-	} else {
-		mutedPlayers &= ~clientMask;
-	}
-}
-
 ID_INLINE bool idPlayer::IsFriend( idPlayer* player ) const {
 	return player != NULL && IsFriend( player->entityNumber );
-}
-
-ID_INLINE bool idPlayer::IsFriend( int clientNum ) const {
-	return clientNum >= 0 && clientNum < MAX_CLIENTS && ( friendPlayers & ( 1u << clientNum ) ) != 0;
 }
 
 ID_INLINE void idPlayer::SetFriend( idPlayer* player, bool isFriend ) {
@@ -1557,18 +1722,6 @@ ID_INLINE void idPlayer::SetFriend( idPlayer* player, bool isFriend ) {
 		return;
 	}
 	SetFriend( player->entityNumber, isFriend );
-}
-
-ID_INLINE void idPlayer::SetFriend( int clientNum, bool isFriend ) {
-	if ( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
-		return;
-	}
-	const unsigned int clientMask = 1u << clientNum;
-	if( isFriend ) {
-		friendPlayers |= clientMask;
-	} else {
-		friendPlayers &= ~clientMask;
-	}
 }
 
 ID_INLINE int idPlayer::GetConnectTime( void ) const {
@@ -1593,6 +1746,10 @@ ID_INLINE int idPlayer::GetArena( void ) const {
 
 ID_INLINE bool idPlayer::CanFire( void ) const {
 	return flagCanFire;
+}
+
+ID_INLINE bool idPlayer::IsWaitingForPredictAck( void ) const {
+	return ( clientIdealWeaponPredictFrame != -1 );
 }
 
 #endif /* !__GAME_PLAYER_H__ */

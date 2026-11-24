@@ -1,3 +1,6 @@
+#include "../idlib/precompiled.h"
+#pragma hdrstop
+
 #include "Game_local.h"
 #include "Effect.h"
 #include "client/ClientEffect.h"
@@ -106,12 +109,12 @@ void rvEffect::Think( void ) {
 rvEffect::Save
 ================
 */
-void rvEffect::Save( idSaveGame *savefile ) const {
-	savefile->WriteBool( loop );
-	savefile->WriteBool( lookAtTarget );
-	savefile->WriteString( effect->GetName() );
-	savefile->WriteVec3( endOrigin );
-	clientEffect.Save( savefile );
+void rvEffect::Save ( idSaveGame *savefile ) const {
+	savefile->WriteBool ( loop );
+	savefile->WriteBool ( lookAtTarget );
+	savefile->WriteString ( effect->GetName() );
+	savefile->WriteVec3 ( endOrigin );
+	clientEffect.Save ( savefile );
 }
 
 /*
@@ -119,15 +122,15 @@ void rvEffect::Save( idSaveGame *savefile ) const {
 rvEffect::Restore
 ================
 */
-void rvEffect::Restore( idRestoreGame *savefile ) {
+void rvEffect::Restore ( idRestoreGame *savefile ) {
 	idStr	name;
 
-	savefile->ReadBool( loop );
-	savefile->ReadBool( lookAtTarget );
-	savefile->ReadString( name );
+	savefile->ReadBool ( loop );
+	savefile->ReadBool ( lookAtTarget );
+	savefile->ReadString ( name );
 	effect = declManager->FindType( DECL_EFFECT, name );
-	savefile->ReadVec3( endOrigin );
-	clientEffect.Restore( savefile );
+	savefile->ReadVec3 ( endOrigin );
+	clientEffect.Restore ( savefile );
 }
 
 /*
@@ -342,8 +345,17 @@ rvEffect::Event_Activate
 =================
 */
 void rvEffect::Event_Activate( idEntity *activator ) {
+	// openQ4 (MP): triggered func_fx entities are "play" requests. Restart active effects so
+	// one-shot segments (including spawners) are re-fired on each activation. SP keeps the
+	// retail toggle.
+	const bool triggered = gameLocal.isMultiplayer && spawnArgs.GetBool( "triggered", "0" );
 	if( !clientEntities.IsListEmpty ( ) ) {
-		Event_Stop ( );
+		if( triggered ) {
+			Event_Stop ( );
+			Event_Start ( );
+		} else {
+			Event_Stop ( );
+		}
 	} else {
 		Event_Start ( );
 	}

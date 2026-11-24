@@ -130,7 +130,7 @@ def main() -> None:
         raise RuntimeError("C++17 compiler required")
     with tempfile.TemporaryDirectory(prefix="restore-identity-", dir=ROOT / ".tmp") as directory:
         scratch = Path(directory)
-        for mode in sys.argv[1:] or ("game", "mpgame"):
+        for mode in sys.argv[1:] or ("game",):
             cpp, executable = scratch / (mode + ".cpp"), scratch / (mode + ".exe")
             cpp.write_text(source(mode), encoding="utf-8")
             subprocess.run([compiler, "-std=c++17", str(cpp), "-o", str(executable)], check=True)

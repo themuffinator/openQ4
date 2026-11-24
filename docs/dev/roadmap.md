@@ -25,8 +25,8 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 15 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **46 / 167 (27.5%)** | **121 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-10 and PAD-01 through PAD-10, not partial substeps. |
-| Estimated category progress | **21 categories: 3 at 100%, 16 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
+| Formally closed roadmap tasks | **46 / 168 (27.4%)** | **122 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-10 and PAD-01 through PAD-10, not partial substeps. |
+| Estimated category progress | **21 categories: 2 at 100%, 17 partial, 2 at 0%** | Governance (GOV) and developer map tools (TOOL) are complete; engine loading (CORE) reopened on 24 November 2026 for the unified game module (CORE-07); the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
@@ -70,7 +70,7 @@ exact; the estimate column is deliberately approximate.
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
-| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **100%** | 6 / 6 | None; macOS evidence stays with the platform gate. |
+| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **95%** | 6 / 7 | CORE-07: the unified game module on Linux, macOS and Android, and a human session across both modes. |
 | [Developer map tools](#tool-completion-checkpoints) — TOOL | **100%** | 4 / 4 | None; macOS evidence stays with the platform gate. |
 | [Release qualification](#release-qualification-and-completion-rules) — REL | **55%** | 0 / 4 | Packages and runs for the platforms other than Windows x64, human/device reviews, hardware lifecycle cases, signing and the promotion decision. |
 | [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
@@ -3410,7 +3410,7 @@ Its structure determines the work:
   the signed app, so the renderer and both game modules link statically.
 
 Every item follows the project rules: Meson stays the primary build, SDL3 stays
-the platform layer, game-library changes land in `src/game` and `src/mpgame`,
+the platform layer, game-library changes land in `src/game`,
 displayed text goes through the language tables, and the port's author is
 credited in `AGENTS.md`, `README.md` and the release notes when code lands.
 
@@ -8037,9 +8037,11 @@ fixes and the UI visual editor have their own items.
 
 ### CORE completion checkpoints
 
-**Estimate: 100%; 6/6 tasks closed.** CORE-01, CORE-02 (not promoted), CORE-03,
-CORE-04, CORE-05 and CORE-06 are closed. macOS, a preview platform, is qualified
-through its own evidence gate rather than CORE-01.
+**Estimate: 95%; 6/7 tasks closed.** CORE-01, CORE-02 (not promoted), CORE-03,
+CORE-04, CORE-05 and CORE-06 are closed. CORE-07, one game module for
+single-player and multiplayer, is implemented and qualified on Windows x64.
+macOS, a preview platform, is qualified through its own evidence gate rather
+than CORE-01.
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
@@ -8049,6 +8051,7 @@ through its own evidence gate rather than CORE-01.
 | CORE-04 — Closed | Strict strings; configure warnings fixed (RmlUi's not reproduced); diagnostics reviewed; collision contents decoding fixed; MSVC ASan gameplay (dedicated tour, SP combat, compilers, malformed and fuzzed AAS data) with no report; T-junction ASan/UBSan fixture. | — |
 | CORE-05 — Closed | `hub2` sliver and silhouette repairs; #209's maps profiled and compiling in minutes with byte-identical output; collision contents decoded as retail; rebuilt maps load, render and navigate (AI take cover) in SP with compile memory recorded. | — |
 | CORE-06 — Closed | Tactical features generated as Quake 4 does (98.8% of 7,422 retail features reproduced exactly); `runAASTactical`; rebuilt `airdefense1` AI takes cover as on retail data; malformed data dropped or rejected, fuzzed. | — |
+| CORE-07 — Open | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64; campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. | Linux, macOS and Android builds and smokes; a human session across both modes; then the follow-ups below. |
 
 ### CORE task evidence and acceptance
 
@@ -8203,6 +8206,29 @@ through its own evidence gate rather than CORE-01.
   on retail data. The loader rejects truncated or negative sections and drops
   inconsistent spans or indexes with a warning; 30 seeded mutations all load
   safely. Pinch and vantage come only from `info_tactical_feature`, as in Quake 4.
+- [ ] **CORE-07 — P1, implementation and qualification: one game module.**
+  Merge the single-player (`src/game/`) and multiplayer (`src/mpgame/`) game
+  trees into one tree and one library that the engine loads for either mode,
+  without changing either mode's behaviour, campaign saves, the network
+  protocol or any demo format. Contract and evidence:
+  [unified game module](unified-game-module.md).
+  Progress, 24 November: implemented. `src/game/` is the only game tree and
+  builds `game_<arch>`; the engine passes the mode in `gameImport_t` (API 64)
+  and still reloads the library when the next session needs the other mode.
+  Real differences are runtime gates (`gameLocal.isMultiplayer`,
+  `gameLocal.IsMultiplayerMode()`, `idModeCVar`). Every save and message
+  serializer matches its original tree; two merged constants that would have
+  changed campaign saves are guarded. On Windows x64: base and Awakening saves
+  cross-load with the pre-merge build, older saves behave as before, both
+  builds join each other in network play, retail 1.4.2 network demos and
+  cross-build MVDs play, and one process switches campaign, network play and
+  campaign again. Packaging, staging, CI and the test suite expect the single
+  module; staging and the Windows installer remove the retired
+  `game-sp`/`game-mp` files.
+  Remaining: the unified module built and smoke-tested on Linux, macOS and
+  Android; a human session across both modes. Follow-ups once closed: keep one
+  loaded library across a mode change, and remove the engine's workarounds for
+  the split (the multiplayer menu cvars it declares for the campaign module).
 
 ### TOOL completion checkpoints
 

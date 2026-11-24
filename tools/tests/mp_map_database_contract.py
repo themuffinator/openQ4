@@ -22,7 +22,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MP = ROOT / "src/mpgame"
+MP = ROOT / "src/game"
 HEADER = MP / "mp/MapDatabase.h"
 SOURCE = MP / "mp/MapDatabase.cpp"
 HOST_HEADER = MP / "mp/MapDatabaseHost.h"
@@ -279,7 +279,7 @@ def validate_documents() -> None:
 
 
 HARNESS = r'''
-#include "mpgame/mp/MapDatabase.h"
+#include "game/mp/MapDatabase.h"
 #include <string.h>
 #include <stdio.h>
 

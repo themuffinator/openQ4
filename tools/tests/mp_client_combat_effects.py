@@ -88,13 +88,13 @@ def validate_rate_limiter() -> None:
 
 
 def validate_client_connected_area() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
     local = read(mp / "Game_local.cpp")
     connected = body_of(
-        local, "bool idGameLocal::InPlayerConnectedArea( idEntity *ent ) const", "mpgame Game_local.cpp"
+        local, "bool idGameLocal::InPlayerConnectedArea( idEntity *ent ) const", "game Game_local.cpp"
     )
     # playerConnectedAreas is only built by SetupPlayerPVS, which only RunFrame calls.
     if re.search(r"playerConnectedAreas\.i == -1\s*\)\s*\{\s*return false;", connected):
@@ -106,7 +106,7 @@ def validate_client_connected_area() -> None:
 
 
 def validate_receive_paths() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -116,10 +116,10 @@ def validate_receive_paths() -> None:
     receive = body_of(
         entity,
         "bool idEntity::ClientReceiveEvent( int event, int time, const idBitMsg &msg )",
-        "mpgame Entity.cpp",
+        "game Entity.cpp",
     )
     unreliable = body_of(
-        network, "void idGameLocal::ProcessUnreliableMessage( const idBitMsg &msg )", "mpgame Game_network.cpp"
+        network, "void idGameLocal::ProcessUnreliableMessage( const idBitMsg &msg )", "game Game_network.cpp"
     )
 
     for name, block in (
@@ -139,20 +139,20 @@ def validate_receive_paths() -> None:
     # A decl that failed to resolve off the wire must not reach rvClientEffect.
     for count, name in ((2, "EVENT_PLAYEFFECT/EVENT_PLAYEFFECT_JOINT"),):
         if receive.count("if ( !effect ) {") + receive.count("if ( !effect ||") < count:
-            raise AssertionError(f"{name} in mpgame Entity.cpp does not reject a NULL decl")
+            raise AssertionError(f"{name} in game Entity.cpp does not reject a NULL decl")
     if "if ( !decl ||" not in unreliable and "if ( !decl ) {" not in unreliable:
         raise AssertionError(
-            "GAME_UNRELIABLE_MESSAGE_EFFECT in mpgame Game_network.cpp does not reject a NULL decl"
+            "GAME_UNRELIABLE_MESSAGE_EFFECT in game Game_network.cpp does not reject a NULL decl"
         )
 
 
 def validate_hitscan_attack_def() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
     weapon = read(mp / "Weapon.cpp")
-    init = body_of(weapon, "void rvWeapon::InitDefs( void )", "mpgame Weapon.cpp")
+    init = body_of(weapon, "void rvWeapon::InitDefs( void )", "game Weapon.cpp")
     # rvWeapon::Hitscan transmits one index for both fire modes, so a weapon whose
     # only hitscan is the alt one still has to publish a resolvable decl index.
     if init.count("hitscanAttackDef = def->Index();") < 2:
@@ -190,7 +190,7 @@ def validate_network_clock() -> None:
                 "idAsyncServer's gameTime"
             )
 
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 

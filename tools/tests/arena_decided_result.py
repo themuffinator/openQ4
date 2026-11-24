@@ -36,8 +36,8 @@ SOURCES = {
     "arena_header": ROOT / "src" / "framework" / "ArenaCampaign.h",
     "session": ROOT / "src" / "framework" / "Session.cpp",
     "common": ROOT / "src" / "framework" / "Common.cpp",
-    "mp": GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp",
-    "mp_header": GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.h",
+    "mp": GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp",
+    "mp_header": GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.h",
 }
 
 

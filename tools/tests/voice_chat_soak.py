@@ -625,7 +625,7 @@ def main() -> int:
         'start_free_commit_gb': round((free_commit or 0) / 2**30, 2), 'commit_limit_gb': round((commit_limit or 0) / 2**30, 2),
         'engine_sha256': hashlib.sha256(exe.read_bytes()).hexdigest(),
         'server_sha256': hashlib.sha256(server_exe.read_bytes()).hexdigest(),
-        'game_sha256': hashlib.sha256((runtime / 'baseoq4/game-mp_x64.dll').read_bytes()).hexdigest() if os.name == 'nt' else None,
+        'game_sha256': hashlib.sha256((runtime / 'baseoq4/game_x64.dll').read_bytes()).hexdigest() if os.name == 'nt' else None,
         'harness_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
     }
     (output / 'result.json').write_text(json.dumps(report, indent=2) + '\n')

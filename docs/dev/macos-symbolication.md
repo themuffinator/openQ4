@@ -29,8 +29,7 @@ The dSYM archive must cover each Mach-O target that can appear in a crash log:
 - `openQ4.app/Contents/MacOS/openQ4`
 - `openQ4-client_arm64`
 - `openQ4-ded_arm64`
-- `openQ4.app/Contents/Frameworks/game-sp_arm64.dylib`
-- `openQ4.app/Contents/Frameworks/game-mp_arm64.dylib`
+- `openQ4.app/Contents/Frameworks/game_arm64.dylib`
 
 No additional Mach-O helper tools are shipped in the current package layout. If
 one is added later, add it to `tools/build/package_nightly.py`,

@@ -4,7 +4,7 @@
 // - src/ui/RetainedHud.cpp: the level's catalog (Catalog, SharedCatalog, PrefetchCatalog),
 //   idRetainedHud::Impl and idRetainedHud::Prepare, and the UI manager's GeneratedHud and
 //   PrecacheHudPrimitives;
-// - src/mpgame/Player.cpp and src/game/Player.cpp: idPlayer::PrecacheHudPresentation.
+// - src/game/Player.cpp and src/game/Player.cpp: idPlayer::PrecacheHudPresentation.
 //
 // Every retained HUD (each stock HUD GUI, and each source the game draws itself, such as
 // native/damage-numbers) builds its view from guis/hud/artwork.rui, 8 MB of vector art.
@@ -224,14 +224,16 @@ static const int DAMAGENUMBERS_OFF = 0;
 struct rvAnimatedCrosshair {
 	static bool Enabled( void ) { return animatedCrosshair && retainedInterface; }
 };
-struct { int localClientNum = 0; } gameLocal;
+struct { int localClientNum = 0; bool isMultiplayer = false; } gameLocal;
 
+// One game module serves both modes (CORE-07): each namespace compiles the same
+// production function, and Spawn sets the mode it runs in.
 namespace mpgame {
-struct idPlayer { int entityNumber = 0; void PrecacheHudPresentation( void ); };
+struct idPlayer { static const bool multiplayer = true; int entityNumber = 0; void PrecacheHudPresentation( void ); };
 // PRODUCTION_MP_PRESENTATION
 }
 namespace spgame {
-struct idPlayer { int entityNumber = 0; void PrecacheHudPresentation( void ); };
+struct idPlayer { static const bool multiplayer = false; int entityNumber = 0; void PrecacheHudPresentation( void ); };
 // PRODUCTION_SP_PRESENTATION
 }
 
@@ -360,6 +362,7 @@ static void CheckManager() {
 template <typename Player> static std::vector<std::string> Spawn( int entity, int local ) {
 	precached.clear();
 	gameLocal.localClientNum = local;
+	gameLocal.isMultiplayer = Player::multiplayer;
 	Player player;
 	player.entityNumber = entity;
 	player.PrecacheHudPresentation();

@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "AAS_local.h"
 #include "../Game_local.h"		// for print and error

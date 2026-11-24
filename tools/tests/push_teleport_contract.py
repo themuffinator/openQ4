@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOTS = ("src/game", "src/mpgame")
+SOURCE_ROOTS = ("src/game",)
 TEST_PATH = "tools/tests/push_teleport_contract.py"
 LIVE_PUSH_MARKER = "#else /* !NEW_PUSH */"
 CLIP_TRANSLATIONAL_PUSH = "float idPush::ClipTranslationalPush( trace_t &results, idEntity *pusher, const int flags,"
@@ -97,9 +97,9 @@ def check_source_root(source_root: str) -> str:
 
 
 def main() -> None:
-    bodies = {source_root: check_source_root(source_root) for source_root in SOURCE_ROOTS}
-    if bodies[SOURCE_ROOTS[0]] != bodies[SOURCE_ROOTS[1]]:
-        raise AssertionError("SP/MP drift in idPush::ClipTranslationalPush")
+    # one game tree since CORE-07: there is no second copy to drift from
+    for source_root in SOURCE_ROOTS:
+        check_source_root(source_root)
 
     # Suite membership and CI execution are checked by game_regression_suite.py.
     print("push_teleport_contract: ok")

@@ -36,18 +36,16 @@ typedef struct playerPState_s {
 	idVec3					velocity;
 	idVec3					localOrigin;
 	idVec3					pushVelocity;	
-// RAVEN BEGIN
-// bdube: added
 	idVec3					lastPushVelocity;
-// RAVEN END	
 	float					stepUp;
 	int						movementType;
 	int						movementFlags;
 	int						movementTime;
-// RAVEN BEGIN
-// bdube: crouch slide 
 	int						crouchSlideTime;
-// RAVEN END
+	// openQ4: Classic ruleset (mp/ClassicRules.h); only on the wire on Classic maps
+	int						classicJumpTime;		// ms left in which another jump is a double jump
+	int						classicGrapple;			// the hook is fixed at classicGrapplePoint
+	idVec3					classicGrapplePoint;
 } playerPState_t;
 
 class idPhysics_Player : public idPhysics_Actor {
@@ -71,9 +69,20 @@ public:
 	void					SetMaxStepHeight( const float newMaxStepHeight );
 	float					GetMaxStepHeight( void ) const;
 	void					SetMaxJumpHeight( const float newMaxJumpHeight );
+	// openQ4: Classic ruleset grappling hook; the server fixes and frees it
+	void					SetClassicGrapple( const idVec3 &point );
+	void					ClearClassicGrapple( void );
+	bool					HasClassicGrapple( void ) const { return current.classicGrapple != 0; }
 	void					SetMovementType( const pmtype_t type );
 	void					SetPlayerInput( const usercmd_t &cmd, const idAngles &newViewAngles );
 	void					SetKnockBack( const int knockBackTime );
+	// Isolated diagnostic replay: replace inherited movement timers exactly.
+	void					RestoreKnockBack( const int knockBackTime );
+	int						GetKnockBack( void ) const;
+	float					GetMoveSpeed( void ) const;
+	// Shared with the bot trajectory proof; uses the same slide cvars.
+	// forceLength: 0 uses cvars, 1 maintains speed, 2 maintains horizontal speed.
+	static idVec3			AdjustVertically( const idVec3 &normal, const idVec3 &in, int forceLength = 0 );
 	void					SetDebugLevel( bool set );
 							// feed back from last physics frame
 	waterLevel_t			GetWaterLevel( void ) const;
@@ -85,7 +94,9 @@ public:
 	// openQ4 VR room scale: walks the body a horizontal distance after the
 	// tracked head; returns the distance it covered.
 	idVec3					VRWalk( const idVec3 &delta );
+	bool					IsJumping( void ) const;
 	bool					OnLadder( void ) const;
+	bool					OnGround( void ) const;
 	const idVec3 &			PlayerGetOrigin( void ) const;	// != GetOrigin
 
 public:	// common physics interface
@@ -122,11 +133,8 @@ public:	// common physics interface
 	bool					DecodeSnapshotState( const idBitMsgDelta &msg, playerPState_t &decoded ) const;
 	void					ApplySnapshotState( const playerPState_t &decoded );
 
-// RAVEN BEGIN
-// kfuller: Added
 	bool					IsNoclip( void ) const;
 	bool					IsDead( void ) const;
-// RAVEN END
 
 	void					SetClipModelNoLink( idClipModel *clip );
 
@@ -182,11 +190,10 @@ private:
 	void					NoclipMove( void );
 	void					SpectatorMove( void );
 	void					LadderMove( void );
+	bool					ClassicGrapplePulling( void ) const;
+	void					ClassicGrappleMove( void );
 	void					CorrectAllSolid( trace_t &trace, int contents );
-// RAVEN BEGIN
-// MrE: check stuck
 	void					CheckGround( bool checkStuck );
-// RAVEN END
 	void					CheckDuck( void );
 	void					CheckLadder( void );
 	bool					CheckJump( void );
@@ -205,6 +212,10 @@ ID_INLINE bool idPhysics_Player::IsNoclip( void ) const {
 
 ID_INLINE bool idPhysics_Player::IsDead( void ) const {
 	return current.movementType == PM_DEAD;
+}
+
+ID_INLINE bool idPhysics_Player::OnGround( void ) const {
+	return groundPlane;
 }
 
 #endif /* !__PHYSICS_PLAYER_H__ */

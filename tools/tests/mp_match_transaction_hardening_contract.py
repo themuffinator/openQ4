@@ -8,12 +8,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MULTIPLAYER_HEADER = ROOT / "src/mpgame/MultiplayerGame.h"
-MULTIPLAYER_SOURCE = ROOT / "src/mpgame/MultiplayerGame.cpp"
-EVIDENCE_SOURCE = ROOT / "src/mpgame/mp/match/MatchEvidence.cpp"
-EVIDENCE_STORAGE_SOURCE = ROOT / "src/mpgame/mp/match/MatchEvidenceStorage.cpp"
-OPERATIONS_HEADER = ROOT / "src/mpgame/mp/match/MatchOperations.h"
-OPERATIONS_SOURCE = ROOT / "src/mpgame/mp/match/MatchOperations.cpp"
+MULTIPLAYER_HEADER = ROOT / "src/game/MultiplayerGame.h"
+MULTIPLAYER_SOURCE = ROOT / "src/game/MultiplayerGame.cpp"
+EVIDENCE_SOURCE = ROOT / "src/game/mp/match/MatchEvidence.cpp"
+EVIDENCE_STORAGE_SOURCE = ROOT / "src/game/mp/match/MatchEvidenceStorage.cpp"
+OPERATIONS_HEADER = ROOT / "src/game/mp/match/MatchOperations.h"
+OPERATIONS_SOURCE = ROOT / "src/game/mp/match/MatchOperations.cpp"
 
 
 def require(text: str, token: str, context: str) -> None:

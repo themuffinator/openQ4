@@ -4,8 +4,8 @@
 // Copyright 2002-2004 Raven Software
 //----------------------------------------------------------------
 
-
-
+#include "../../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../../Game_local.h"
 #include "StatManager.h"
@@ -317,10 +317,17 @@ rvStatFlagCapture *rvStatAllocator::AllocStatFlagCapture( int t, int p, int f, i
 ===============================================================================
 */
 
+// openQ4: how often the in-game stat window gets rebuilt while the stats key is held.  A rebuild
+// writes ~100 gui state keys and forces a redraw, which is far too expensive to do every frame.
+const int STAT_WINDOW_UPDATE_INTERVAL = 250;
+
 // shouchard:  stat manager start with 1 meg; we'll tune as we get better data
 rvStatManager::rvStatManager() {
 	memset( localInGameAwards, 0, sizeof( int ) * (int)IGA_NUM_AWARDS );
 	inGameAwardHudTime = 0;
+	statWindowUpdateTime = 0;
+	statWindowSpectator = -1;
+	statWindowVisible = false;
 }
 
 void rvStatManager::Init( void ) {
@@ -332,6 +339,9 @@ void rvStatManager::Init( void ) {
 	cmdSystem->AddCommand( "ShowInGameStats", showStats_f, CMD_FL_SYSTEM, "show in game stats." );
 	memset( localInGameAwards, 0, sizeof( int ) * (int)IGA_NUM_AWARDS );
 	inGameAwardHudTime = 0;
+	statWindowUpdateTime = 0;
+	statWindowSpectator = -1;
+	statWindowVisible = false;
 }
 
 void rvStatManager::Shutdown( void ) {
@@ -435,11 +445,15 @@ void rvStatManager::WeaponFired( const idPlayer* player, int weapon, int num ) {
 	
 	comboKillState_t cks = comboKillState[ player->entityNumber ];
 	comboKillState[ player->entityNumber ] = CKS_NONE;
-	if ( player->GetWeaponIndex( "weapon_rocketlauncher" ) == weapon ) {
+	// openQ4: ask what this weapon is, once. Each shot used to search every
+	// weapon slot by name, twice - up to 32 formatted dictionary lookups - and
+	// the search answers slot 0 for a name the player's def does not have.
+	const char *weaponClass = player->spawnArgs.GetString( va( "def_weapon%d", weapon ), "" );
+	if ( !idStr::Icmp( weaponClass, "weapon_rocketlauncher" ) ) {
 		if ( cks == CKS_NONE ) {
 			comboKillState[ player->entityNumber ] = CKS_ROCKET_FIRED;
 		}
-	} else if ( player->GetWeaponIndex( "weapon_railgun" ) == weapon ) {
+	} else if ( !idStr::Icmp( weaponClass, "weapon_railgun" ) ) {
 		// apparently it processes hits before it does the fire....
 		if ( cks == CKS_RAIL_HIT ) {
 			comboKillState[ player->entityNumber ] = CKS_RAIL_FIRED;
@@ -590,12 +604,12 @@ void rvStatManager::ReceiveInGameAward( const idBitMsg& msg ) {
 	idPlayer* player = gameLocal.GetLocalPlayer();
 	idPlayer* remote = gameLocal.GetClientByNum(client);
 	bool justSound = false;
-	if( client != gameLocal.localClientNum ) {
+	if ( client != gameLocal.localClientNum ) {
 		justSound = true;
 	}
 
 	if ( ( gameLocal.time - inGameAwardHudTime ) < 3000 || awardQueue.Num() > 0 ) {
-		if ( gameLocal.GetDemoFollowClient() == client || ( player && player->GetInstance() == remote->GetInstance() ) ) {
+		if ( gameLocal.GetDemoFollowClient() == client || ( player != NULL && remote != NULL && player->GetInstance() == remote->GetInstance() ) ) {
 			rvPair<int,bool> awardPair(award, justSound);
 			awardQueue.StackAdd(awardPair);
 			return;
@@ -637,7 +651,7 @@ void rvStatManager::ReceiveInGameAward( const idBitMsg& msg ) {
 			player->StartSound( va( "snd_award_%s", inGameAwardInfo[ award ].name ), SND_CHANNEL_ANY, 0, false, NULL );
 		}
 	}
-	else if ( player && remote && (player->GetInstance() == remote->GetInstance())  && (award == IGA_HOLY_SHIT || award == IGA_CAPTURE)) {
+	else if ( player && remote && ( player->GetInstance() == remote->GetInstance() ) && (award == IGA_HOLY_SHIT || award == IGA_CAPTURE || award == IGA_HUMILIATION )) {
 			player->StartSound( va( "snd_award_%s", inGameAwardInfo[ award ].name ), SND_CHANNEL_ANY, 0, false, NULL );
 	}
 	inGameAwardHudTime = gameLocal.time;
@@ -759,6 +773,14 @@ int rvStatManager::GetSelectedClientNum( int* selectionIndexOut, int* selectionT
 	return statWindow.GetSelectedClientNum( selectionIndexOut, selectionTeamOut );
 }
 
+int rvStatManager::ResolveSelection( int selectionIndex, int selectionTeam ) const {
+	return statWindow.ResolveSelection( selectionIndex, selectionTeam );
+}
+
+void rvStatManager::RequestPlayerStat( int clientNum ) {
+	statWindow.RequestStats( clientNum );
+}
+
 void rvStatManager::UpdateInGameHud( idUserInterface* statHud, bool visible ) {
 	idPlayer* player = NULL;
 
@@ -769,13 +791,26 @@ void rvStatManager::UpdateInGameHud( idUserInterface* statHud, bool visible ) {
 
 	if( !visible ) {
 		statHud->SetStateInt( "stat_visible", 0 );
+		statWindowVisible = false;
 		return;
 	} else {
 		statHud->SetStateInt( "stat_visible", 1 );
 	}
 
 	if( player ) {
-		statWindow.SetupStatWindow( statHud, player->spectating );
+		// openQ4: rebuilding the whole window every render frame is pure overhead - refresh on a
+		// fixed interval instead, but repaint immediately when the window opens or when the player
+		// we're following changes, so the window never lags a selection change
+		int followed = player->spectating ? player->spectator : player->entityNumber;
+		int delta = gameLocal.time - statWindowUpdateTime;
+
+		if( !statWindowVisible || followed != statWindowSpectator || delta < 0 || delta >= STAT_WINDOW_UPDATE_INTERVAL ) {
+			statWindowUpdateTime = gameLocal.time;
+			statWindowSpectator = followed;
+			statWindow.SetupStatWindow( statHud, player->spectating );
+		}
+
+		statWindowVisible = true;
 	}
 }
 
@@ -805,6 +840,13 @@ void rvStatManager::ReceiveStat( const idBitMsg& msg ) {
 	}
 	
 	int client = msg.ReadByte();
+
+	// openQ4: the client num comes straight off the wire - a hostile or truncated message would
+	// otherwise write a whole rvPlayerStat past the end of playerStats[]
+	if( client < 0 || client >= MAX_CLIENTS ) {
+		gameLocal.Warning( "rvStatManager::ReceiveStat() - Stats received for invalid client num '%d'\n", client );
+		return;
+	}
 
 	playerStats[ client ].UnpackStats( msg );
 	playerStats[ client ].lastUpdateTime = gameLocal.time;
@@ -1103,6 +1145,11 @@ void rvStatManager::GetAccuracyLeaders( int accuracyLeaders[ MAX_WEAPONS ] ) {
 
 		rvPlayerStat* playerStats = GetPlayerStat( i );
 
+		// openQ4: GetPlayerStat() may return NULL for an out-of-range slot
+		if( playerStats == NULL ) {
+			continue;
+		}
+
 		for( int j = 0; j < MAX_WEAPONS; j++ ) {
 			if( playerStats->weaponShots[ j ] == 0 ) {
 				continue;
@@ -1112,7 +1159,7 @@ void rvStatManager::GetAccuracyLeaders( int accuracyLeaders[ MAX_WEAPONS ] ) {
 			float leaderAccuracy = -1.0f;
 			if( accuracyLeaders[ j ] != -1 ) {
 				rvPlayerStat* leaderStats = GetPlayerStat( accuracyLeaders[ j ] );
-				if( leaderStats->weaponShots[ j ] != 0 ) {
+				if( leaderStats != NULL && leaderStats->weaponShots[ j ] != 0 ) {
 					leaderAccuracy = (float)leaderStats->weaponHits[ j ] / (float)leaderStats->weaponShots[ j ];
 				}
 			}
@@ -1170,6 +1217,14 @@ rvStat* rvStatManager::GetLastClientStat( int clientNum, statType_t type, int ti
 				return statQueue[ i ].First();
 			}
 		}
+
+		// openQ4: stop at this client's connect marker - anything older belongs to the previous
+		// owner of the slot, and crediting it would hand the new occupant their awards.  This is
+		// exactly what rvStatManager::ClientConnect() appends the marker for.
+		if( clientNum != -1 && statQueue[ i ].First()->GetType() == ST_CLIENT_CONNECT
+			&& statQueue[ i ].First()->GetPlayerClientNum() == clientNum ) {
+			return NULL;
+		}
 	}
 
 	return NULL;
@@ -1190,6 +1245,14 @@ void rvStatManager::GetLastClientStats( int clientNum, statType_t type, int time
 					return;
 				}
 			}
+		}
+
+		// openQ4: stop at this client's connect marker - anything older belongs to the previous
+		// owner of the slot, and crediting it would hand the new occupant their awards.  This is
+		// exactly what rvStatManager::ClientConnect() appends the marker for.
+		if( clientNum != -1 && statQueue[ i ].First()->GetType() == ST_CLIENT_CONNECT
+			&& statQueue[ i ].First()->GetPlayerClientNum() == clientNum ) {
+			return;
 		}
 	}
 
@@ -1238,6 +1301,12 @@ void rvStatManager::SetupEndGameHud( idUserInterface* statHud ) {
 }
 
 rvPlayerStat* rvStatManager::GetPlayerStat( int clientNum ) {
+	// openQ4: callers hand us gui selections and network supplied client nums, so refuse
+	// out-of-range slots rather than handing back a pointer outside playerStats[]
+	if( clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return NULL;
+	}
+
 	return &playerStats[ clientNum ];
 }
 

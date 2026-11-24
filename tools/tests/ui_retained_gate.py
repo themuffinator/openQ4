@@ -4352,20 +4352,22 @@ def check_server_card(compiler: str, directory: Path) -> None:
         'PublishRetainedLoadingServer( mapSpawnData.serverInfo );')
     assert 'if ( retainedLoading ) {\n\t\t\t\tPublishRetainedLoadingServer( mapSpawnData.serverInfo );' in loading.replace('\r\n', '\n')
     # game_mp names the mode and its limits from its own table, with the
-    # rules the scoreboard uses, and the message is server info.
-    mp = (ROOT / 'src/mpgame/Game_local.cpp').read_text(encoding='utf-8')
-    verb = mp[mp.index('if ( !idStr::Icmp( menuCommand, "retainedLoadingServer" ) ) {'):]
+    # rules the scoreboard uses, and the message is server info. The one game
+    # module answers only in its multiplayer mode: game_sp never did.
+    mp = (ROOT / 'src/game/Game_local.cpp').read_text(encoding='utf-8')
+    verb = mp[mp.index('if ( IsMultiplayerMode() && !idStr::Icmp( menuCommand, "retainedLoadingServer" ) ) {'):]
     verb = verb[:verb.index('} else if ( !idStr::Icmp( menuCommand, "initCreateServerSettings" ) ) {')]
     for token in ('MPGameTypeByName( query.GetString( "si_gameType" ) )', 'MPResolveMatchLimitFor( query, info->type, limitLabel, limitValue );',
                   'MPGameTypeHasAny( info->type, GTF_TEAM )', 'common->GetLocalizedString( info->localizedName )',
                   'gui->SetStateBool( "server_answered", true );'):
         assert token in verb, token
-    rules = (ROOT / 'src/mpgame/MultiplayerGame.cpp').read_text(encoding='utf-8')
+    rules = (ROOT / 'src/game/MultiplayerGame.cpp').read_text(encoding='utf-8')
     assert 'MPResolveMatchLimitFor( gameLocal.serverInfo, gameLocal.gameType, limitLabel, limitValue );' in \
         function_body(rules, 'static void MPResolveMatchLimit(')
-    for module in ('src/mpgame/gamesys/SysCvar.cpp', 'src/game/gamesys/SysCvar.cpp'):
-        cvars = (ROOT / module).read_text(encoding='utf-8')
-        assert re.search(r'idCVar si_motd\(\s+"si_motd",\s+"",\s+CVAR_GAME \| CVAR_SERVERINFO \| PC_CVAR_ARCHIVE', cvars), module
+    # Declared once for both modes, as a plain idCVar: no mode-specific default or flags.
+    cvars = (ROOT / 'src/game/gamesys/SysCvar.cpp').read_text(encoding='utf-8')
+    assert len(re.findall(r'\bsi_motd\(', cvars)) == 1 and \
+        re.search(r'\bidCVar si_motd\(\s+"si_motd",\s+"",\s+CVAR_GAME \| CVAR_SERVERINFO \| PC_CVAR_ARCHIVE', cvars), 'si_motd'
 
 
 HOLD = r"""
@@ -4874,8 +4876,8 @@ def check_retained_match(menu: str) -> None:
     import retained_mp_menus as cards
     tokens = tuple(re.findall(r'"([a-z_]+)"', re.search(r'RETAINED_MP_MATCH_TOKENS\[\] = \{([^}]*)\};', menu).group(1)))
     assert tokens == cards.MATCH_TOKENS, 'the session and the Match page name its actions alike'
-    mp_game = (ROOT / 'src/mpgame/MultiplayerGame.cpp').read_text(encoding='utf-8')
-    model = (ROOT / 'src/mpgame/mp/match/MatchControlModel.cpp').read_text(encoding='utf-8')
+    mp_game = (ROOT / 'src/game/MultiplayerGame.cpp').read_text(encoding='utf-8')
+    model = (ROOT / 'src/game/mp/match/MatchControlModel.cpp').read_text(encoding='utf-8')
     handler = function_body(mp_game, 'bool idMultiplayerGame::HandleMatchControlCommand(')
     for token in tokens:
         assert f'"{token}"' in mp_game or f'"{token}"' in model, f'Match Control has no "{token}" command'
@@ -4890,7 +4892,7 @@ def check_retained_match(menu: str) -> None:
         [name for name, *_ in cards.MATCH_TEAM_ACTIONS + cards.MATCH_PROPOSAL_ACTIONS + cards.MATCH_RULE_ACTIONS +
          cards.MATCH_SERIES_ACTIONS], names
     prefixes = {name: prefix for name, prefix, _label, _state in operations}
-    projection = (ROOT / 'src/mpgame/mp/match/MatchControlProjection.cpp').read_text(encoding='utf-8')
+    projection = (ROOT / 'src/game/mp/match/MatchControlProjection.cpp').read_text(encoding='utf-8')
     named = {'ready': ('match_ready_action', '#str_41714'), 'team_lock': ('match_team_lock_action', '#str_41735'),
              'broadcaster': ('match_broadcaster_action', '#str_41796')}
     for name, _token, accessible, _body in cards.MATCH_ACTIONS:
@@ -4903,7 +4905,7 @@ def check_retained_match(menu: str) -> None:
             assert f'"{named[name][1]}" : "{accessible}"' in projection, name
             assert {accessible, named[name][1]} <= set(cards.MATCH_STATUS_LABELS + cards.MATCH_TEAM_LABELS), name
             assert f'gui.SetStateString( "{named[name][0]}"' in projection, name
-    header = (ROOT / 'src/mpgame/MultiplayerGame.h').read_text(encoding='utf-8')
+    header = (ROOT / 'src/game/MultiplayerGame.h').read_text(encoding='utf-8')
     assert int(re.search(r'RETAINED_MATCH_STATUS_LINES = (\d+);', header).group(1)) == cards.MATCH_STATUS_LINES
     # The lists: the session's stock lists and tokens are the game's own
     # selection commands, in the card's order; a row index spans the longest
@@ -4913,7 +4915,7 @@ def check_retained_match(menu: str) -> None:
     assert [list_name for list_name, _token in lists] == [f'match_{key}_rows' for key in cards.MATCH_LISTS], lists
     for list_name, token in lists:
         assert f'{{ "{token}", "{list_name}_sel_0",' in handler, (list_name, token)
-    model_header = (ROOT / 'src/mpgame/mp/match/MatchControlModel.h').read_text(encoding='utf-8')
+    model_header = (ROOT / 'src/game/mp/match/MatchControlModel.h').read_text(encoding='utf-8')
     longest = max(int(value) for value in re.findall(r'MP_MATCH_CONTROL_MAX_\w+_ROWS = (\d+);', model_header))
     assert int(re.search(r'RETAINED_MP_MATCH_ROWS = (\d+);', menu).group(1)) == longest == 128
     assert int(re.search(r'RETAINED_MATCH_TEAM_ROWS = (\d+);', header).group(1)) == cards.MATCH_TEAM_ROWS
@@ -4923,7 +4925,7 @@ def check_retained_match(menu: str) -> None:
         int(re.search(r'MP_MATCH_CONTROL_MAX_PROPOSAL_TEMPLATE_ROWS = (\d+);', model_header).group(1))
     assert int(re.search(r'RETAINED_MATCH_PROFILE_ROWS = (\d+);', header).group(1)) == cards.MATCH_PROFILE_ROWS == \
         int(re.search(r'MP_MATCH_CONTROL_MAX_PROFILE_ROWS = (\d+);', model_header).group(1))
-    rules_header = (ROOT / 'src/mpgame/mp/match/MatchRules.h').read_text(encoding='utf-8')
+    rules_header = (ROOT / 'src/game/mp/match/MatchRules.h').read_text(encoding='utf-8')
     fields = re.search(r'typedef enum \{\s*MP_RULE_GAME_TYPE = 0,(.*?)MP_RULE_FIELD_COUNT', rules_header, re.S).group(1)
     assert int(re.search(r'RETAINED_MATCH_RULE_ROWS = (\d+);', header).group(1)) == cards.MATCH_RULE_ROWS == 1 + fields.count('MP_RULE_')
     # The ballot target in the stock choice's own words, which the game reads;
@@ -4934,7 +4936,7 @@ def check_retained_match(menu: str) -> None:
     assert 'choices\t"#str_41794"' in stock_page and 'values\t"global;side"' in stock_page
     assert 'strcmp( scope, "global" ) == 0' in handler and 'strcmp( scope, "side" ) == 0' in handler
     assert [key for key, _value in cards.MATCH_SCOPES] == ['#str_41738', '#str_41739']
-    rules = (ROOT / 'src/mpgame/mp/match/MatchRules.cpp').read_text(encoding='utf-8')
+    rules = (ROOT / 'src/game/mp/match/MatchRules.cpp').read_text(encoding='utf-8')
     maxima = [int(value) for value in re.findall(r'MP_RULE_FIELD\( MP_RULE_\w+, "\w+", MP_RULE_TYPE_\w+,\s*-?\d+, (\d+),', rules)]
     assert len(maxima) >= 20 and max(maxima) == cards.MATCH_RULE_VALUE_MAX == int(re.search(r'RETAINED_MP_MATCH_RULE_VALUE_MAX = (\d+);', menu).group(1))
     assert 'number > (rule ? 10000 : 999)' in (ROOT / 'src/ui/UserInterfaceRetained.cpp').read_text(encoding='utf-8')
@@ -4943,7 +4945,7 @@ def check_retained_match(menu: str) -> None:
     # The reasons the generator fits into each section's reason column are
     # every reason a row can show: the protocol's, by its own key or its
     # localization id, the wait for a view and the unknown value.
-    localization_source = (ROOT / 'src/mpgame/mp/match/MatchControlLocalization.cpp').read_text(encoding='utf-8')
+    localization_source = (ROOT / 'src/game/mp/match/MatchControlLocalization.cpp').read_text(encoding='utf-8')
     reason_keys = re.findall(r'"(#str_\d+)"', function_body(localization_source, 'const char *MPMatchControlProtocolReasonKey('))
     localized_reasons = re.findall(r'case MP_MATCH_LOCALIZATION_REASON_\w+: return "(#str_\d+)";', localization_source)
     assert reason_keys == localized_reasons and set(reason_keys) | {'#str_41774', '#str_42301'} == set(cards.MATCH_REASON_KEYS), reason_keys
@@ -4961,7 +4963,7 @@ def check_retained_match(menu: str) -> None:
     # Series and Evidence: the map pool, history and recent evidence, as many
     # rows as the card holds (past them the stock page); the history and the
     # evidence only to read, with no selection of their own on either side.
-    view_header = (ROOT / 'src/mpgame/mp/match/MatchView.h').read_text(encoding='utf-8')
+    view_header = (ROOT / 'src/game/mp/match/MatchView.h').read_text(encoding='utf-8')
     assert 'MP_MATCH_CONTROL_MAX_SERIES_MAP_ROWS = MP_MATCH_VIEW_MAX_SERIES_MAP_POOL;' in model_header
     assert int(re.search(r'RETAINED_MATCH_SERIES_MAP_ROWS = (\d+);', header).group(1)) == cards.MATCH_SERIES_MAP_ROWS <= \
         int(re.search(r'MP_MATCH_VIEW_MAX_SERIES_MAP_POOL = (\d+);', view_header).group(1))
@@ -4977,15 +4979,15 @@ def check_retained_match(menu: str) -> None:
     assert 'values\t"best_of_one;best_of_three;best_of_five"' in stock_page
     for word in ('best_of_one', 'best_of_three', 'best_of_five'):
         assert f'strcmp( profile, "{word}" ) == 0' in handler, word
-    profile_keys = function_body((ROOT / 'src/mpgame/mp/match/MatchControlLocalization.cpp').read_text(encoding='utf-8'),
+    profile_keys = function_body((ROOT / 'src/game/mp/match/MatchControlLocalization.cpp').read_text(encoding='utf-8'),
                                  'const char *MPMatchControlSeriesProfileKey(')
     for (key, _value), profile in zip(cards.MATCH_SERIES_PROFILES, ('BEST_OF_ONE', 'BEST_OF_THREE', 'BEST_OF_FIVE')):
         assert f'case MP_SERIES_PROFILE_{profile}: return "{key}";' in profile_keys, (key, profile)
     # The role choice: the protocol's roster roles, 1 to 4, by the projection's
     # own names for them; the game reads the stock choice's value.
     assert int(re.search(r'RETAINED_MP_MATCH_ROLES = (\d+);', menu).group(1)) == len(cards.MATCH_ROLES)
-    protocol_header = (ROOT / 'src/mpgame/mp/match/MatchProtocol.h').read_text(encoding='utf-8')
-    localization = (ROOT / 'src/mpgame/mp/match/MatchControlLocalization.cpp').read_text(encoding='utf-8')
+    protocol_header = (ROOT / 'src/game/mp/match/MatchProtocol.h').read_text(encoding='utf-8')
+    localization = (ROOT / 'src/game/mp/match/MatchControlLocalization.cpp').read_text(encoding='utf-8')
     role_keys = function_body(localization, 'const char *MPMatchControlProtocolRosterRoleKey(')
     for key, value in cards.MATCH_ROLES:
         role = re.search(rf'MP_MATCH_PROTOCOL_ROSTER_ROLE_(\w+) = {value}', protocol_header).group(1)
@@ -5001,7 +5003,7 @@ def check_retained_match(menu: str) -> None:
     assert '\tif ( !RetainedMenuWelcome() ) {\n\t\tPublishRetainedMatch( card, changed );' in publisher, 'only the Escape card has a Match page'
     # Each prefix is a protocol operation the projection decides; the page asks
     # first exactly where its descriptor carries a confirmation.
-    protocol = (ROOT / 'src/mpgame/mp/match/MatchProtocol.cpp').read_text(encoding='utf-8')
+    protocol = (ROOT / 'src/game/mp/match/MatchProtocol.cpp').read_text(encoding='utf-8')
     descriptors = dict(re.findall(r'\{ MP_MATCH_OP_\w+, "(\w+)",\s+MP_MATCH_LOCALIZATION_OPERATION_\w+,\s+(MP_MATCH_LOCALIZATION_\w+),', protocol))
     assert len(descriptors) == protocol.count('{ MP_MATCH_OP_'), 'every protocol descriptor reads'
     stock = (ROOT / 'content/baseoq4/pak0/guis/matchcontrol.gui').read_text(encoding='utf-8')
@@ -5334,7 +5336,7 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     # The game answers the protocol the session expects, and its menu stops
     # drawing while covered.
     protocol = int(re.search(r'static const int RETAINED_MP_PROTOCOL = (\d+);', menu).group(1))
-    mp_game = (ROOT / 'src/mpgame/MultiplayerGame.cpp').read_text(encoding='utf-8', errors='replace')
+    mp_game = (ROOT / 'src/game/MultiplayerGame.cpp').read_text(encoding='utf-8', errors='replace')
     assert f'static const int RETAINED_MENU_PROTOCOL = {protocol};' in mp_game
     cover = function_body(mp_game, 'void idMultiplayerGame::SetRetainedMenuCover(')
     assert 'card->SetStateInt( "mp.protocol", RETAINED_MENU_PROTOCOL );' in cover
@@ -5349,12 +5351,13 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     assert 'if ( !retainedMenuCovered ) {\n\t\t\t\tmainGui->Redraw( gameLocal.time );' in draw.replace('\r\n', '\n')
     assert 'if ( !retainedMenuCovered ) {\n\t\t\t\tbuyMenu->Redraw(gameLocal.time);' in draw.replace('\r\n', '\n')
     assert 'retainedMenuCovered = false;' in function_body(mp_game, 'void idMultiplayerGame::DisableMenu(')
-    mp_local = (ROOT / 'src/mpgame/Game_local.cpp').read_text(encoding='utf-8', errors='replace')
+    mp_local = (ROOT / 'src/game/Game_local.cpp').read_text(encoding='utf-8', errors='replace')
     for verb, call in (('retainedMultiplayerVariant', 'gui->SetStateBool( "mp.welcome", mpGame.RetainedMenuWelcome() );'),
                        ('retainedMultiplayerCover', 'mpGame.SetRetainedMenuCover( true, gui );'),
                        ('retainedMultiplayerUncover', 'mpGame.SetRetainedMenuCover( false, gui );'),
                        ('retainedMultiplayerState', 'mpGame.PublishRetainedMenu( gui );')):
-        answer = mp_local[mp_local.index(f'!idStr::Icmp( menuCommand, "{verb}" )'):]
+        # game_mp's verbs: the one game module answers them in that mode only.
+        answer = mp_local[mp_local.index(f'( IsMultiplayerMode() && !idStr::Icmp( menuCommand, "{verb}" ) ) {{'):]
         assert call in answer[:answer.index('} else if')], verb
     # The frame pump updates the card before its no-GUI return, input reaches
     # the card after the home screen's, and the card draws in the menu's place.
@@ -5407,7 +5410,7 @@ def check_retained_multiplayer(menu: str, session: str) -> None:
     # The Team page's slots: the session bounds the slot, the game derives its
     # action again from the player's state, and the document offers as many.
     slots = int(re.search(r'static const int RETAINED_MP_TEAM_SLOTS = (\d+);', menu).group(1))
-    header = (ROOT / 'src/mpgame/MultiplayerGame.h').read_text(encoding='utf-8', errors='replace')
+    header = (ROOT / 'src/game/MultiplayerGame.h').read_text(encoding='utf-8', errors='replace')
     assert f'static const int RETAINED_TEAM_SLOTS = {slots};' in header
     assert slots == retained_mp_menus.TEAM_SLOTS and all(f'team_slot_{slot}' in document['events'] for slot in range(slots))
     command = function_body(mp_game, 'bool idMultiplayerGame::HandleRetainedMenuCommand(')
@@ -5934,7 +5937,8 @@ def main() -> int:
     # The Strogg pause: the session asks the game the command the game answers.
     game = (ROOT / 'src/game/Game_local.cpp').read_text(encoding='utf-8')
     assert 'game->HandleMainMenuCommands( "retainedPauseFamily", guiMainMenu );' in function_body(menu, 'bool idSessionLocal::RetainedPauseIsStrogg(')
-    family = game[game.index('!idStr::Icmp( menuCommand, "retainedPauseFamily" )'):]
+    # Only game_sp answered it; the one game module keeps it to that mode.
+    family = game[game.index('( !IsMultiplayerMode() && !idStr::Icmp( menuCommand, "retainedPauseFamily" ) ) {'):]
     family = family[:family.index('}')]
     assert 'gui->SetStateBool( "pause_strogg", player != NULL && player->spawnArgs.GetBool( "strogg" ) );' in family
     assert 'retainedPauseStrogg = -1;' in function_body(menu, 'void idSessionLocal::PrepareRetainedLevel(')
@@ -5974,7 +5978,7 @@ def main() -> int:
     keep = function_body(adapter, 'bool idUserInterfaceRetained::KeepForLevelLoad(')
     assert keep.index('std::memcmp(data,source.data(),source.size()) == 0') < keep.index('impl->Quarantine(false,true,true);') < \
         keep.index('PrecacheImages(impl->document.Model().root);')
-    images = game[game.index('!idStr::Icmp( menuCommand, "retainedLevelImages" )'):]
+    images = game[game.index('( !IsMultiplayerMode() && !idStr::Icmp( menuCommand, "retainedLevelImages" ) ) {'):]
     assert 'ent->IsType( idObjective::GetClassType() )' in images[:images.index('gui->SetStateInt( "level_image_count", images );')]
     assert 'player->inventory.objectiveNames[ i ].screenshot' in images[:images.index('gui->SetStateInt( "level_image_count", images );')]
     draw = session[session.index('} else if ( mapSpawned ) {'):]
@@ -6143,7 +6147,7 @@ def main() -> int:
                 assert action['operation'] == 'session.menu' and action['arguments']['command'] in allowlist, relative
     # Only the scoped, preference-gated optical overlay adapter in game code
     # may choose retained documents. Legacy content never names one.
-    for folder in (ROOT / 'content', ROOT / 'src/game', ROOT / 'src/mpgame'):
+    for folder in (ROOT / 'content', ROOT / 'src/game'):
         if not folder.exists():
             continue
         for path in folder.rglob('*'):

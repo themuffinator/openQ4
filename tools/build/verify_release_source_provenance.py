@@ -172,7 +172,7 @@ def verify_release_source_provenance(
         commit = require_full_git_sha(expected_project_commit or "", "expected openQ4 commit")
         project_root = require_repository(project_root, "openQ4 repository")
         verify_repository_commit(project_root, commit, "openQ4")
-        for relative in ("src/game/LICENSE", "src/mpgame/LICENSE", "LICENSES/QUAKE-4-SDK-EULA.rtf", "LICENSING.md"):
+        for relative in ("src/game/LICENSE", "src/game/LICENSE", "LICENSES/QUAKE-4-SDK-EULA.rtf", "LICENSING.md"):
             path = project_root / relative
             if path.is_symlink() or not path.is_file():
                 raise RuntimeError(f"missing canonical game licensing: {relative}")

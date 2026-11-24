@@ -1,927 +1,743 @@
+//----------------------------------------------------------------
 // Bot.h
 //
-
-class rvmBotAIBotActionBase;
-
-// These need to match items.def
-#define INVENTORY_ARMOR				1
-#define INVENTORY_GAUNTLET			4
-#define INVENTORY_SHOTGUN			5
-#define INVENTORY_MACHINEGUN		6
-#define INVENTORY_GRENADELAUNCHER	7
-#define INVENTORY_ROCKETLAUNCHER	8
-#define INVENTORY_LIGHTNING			9
-#define INVENTORY_RAILGUN			10
-#define INVENTORY_PLASMAGUN			11
-#define INVENTORY_BFG10K			13
-#define INVENTORY_GRAPPLINGHOOK		14
-#define INVENTORY_NAILGUN			15
-#define INVENTORY_PROXLAUNCHER		16
-#define INVENTORY_CHAINGUN			17
-#define INVENTORY_SHELLS			18
-#define INVENTORY_BULLETS			19
-#define INVENTORY_GRENADES			20
-#define INVENTORY_CELLS				21
-#define INVENTORY_LIGHTNINGAMMO		22
-#define INVENTORY_ROCKETS			23
-#define INVENTORY_SLUGS				24
-#define INVENTORY_BFGAMMO			25
-#define INVENTORY_NAILS				26
-#define INVENTORY_MINES				27
-#define INVENTORY_BELT			28
-#define INVENTORY_HEALTH			29
-#define INVENTORY_TELEPORTER		30
-#define INVENTORY_MEDKIT			31
-#define INVENTORY_KAMIKAZE			32
-#define INVENTORY_PORTAL			33
-#define INVENTORY_INVULNERABILITY	34
-#define INVENTORY_QUAD				35
-#define INVENTORY_ENVIRONMENTSUIT	36
-#define INVENTORY_HASTE				37
-#define INVENTORY_INVISIBILITY		38
-#define INVENTORY_REGEN				39
-#define INVENTORY_FLIGHT			40
-#define INVENTORY_SCOUT				41
-#define INVENTORY_GUARD				42
-#define INVENTORY_DOUBLER			43
-#define INVENTORY_AMMOREGEN			44
-#define INVENTORY_REDFLAG			45
-#define INVENTORY_BLUEFLAG			46
-#define INVENTORY_NEUTRALFLAG		47
-#define INVENTORY_REDCUBE			48
-#define INVENTORY_BLUECUBE			49
-#define INVENTORY_DOUBLESHOTGUN		50
-
-#define MODELINDEX_DEFAULT			0
-#define MODELINDEX_ARMORSHARD		1
-#define MODELINDEX_ARMORCOMBAT		2
-#define MODELINDEX_ARMORBODY		3
-#define MODELINDEX_HEALTHSMALL		4
-#define MODELINDEX_HEALTH			5
-#define MODELINDEX_HEALTHLARGE		6
-#define MODELINDEX_HEALTHMEGA		7
-#define MODELINDEX_GAUNTLET			8
-#define MODELINDEX_SHOTGUN			9
-#define MODELINDEX_MACHINEGUN		10
-#define MODELINDEX_GRENADELAUNCHER	11
-#define MODELINDEX_ROCKETLAUNCHER	12
-#define MODELINDEX_LIGHTNING		13
-#define MODELINDEX_RAILGUN			14
-#define MODELINDEX_PLASMAGUN		15
-#define MODELINDEX_BFG10K			16
-#define MODELINDEX_GRAPPLINGHOOK	17
-#define MODELINDEX_SHELLS			18
-#define MODELINDEX_BULLETS			19
-#define MODELINDEX_GRENADES			20
-#define MODELINDEX_CELLS			21
-#define MODELINDEX_LIGHTNINGAMMO	22
-#define MODELINDEX_ROCKETS			23
-#define MODELINDEX_SLUGS			24
-#define MODELINDEX_BFGAMMO			25
-#define MODELINDEX_TELEPORTER		26
-#define MODELINDEX_MEDKIT			27
-#define MODELINDEX_QUAD				28
-#define MODELINDEX_ENVIRONMENTSUIT	29
-#define MODELINDEX_HASTE			30
-#define MODELINDEX_INVISIBILITY		31
-#define MODELINDEX_REGEN			32
-#define MODELINDEX_FLIGHT			33
-#define MODELINDEX_REDFLAG			34
-#define MODELINDEX_BLUEFLAG			35
-#define MODELINDEX_KAMIKAZE			36
-#define MODELINDEX_PORTAL			37
-#define MODELINDEX_INVULNERABILITY	38
-#define MODELINDEX_NAILS			39
-#define MODELINDEX_MINES			40
-#define MODELINDEX_BELT				41
-#define MODELINDEX_SCOUT			42
-#define MODELINDEX_GUARD			43
-#define MODELINDEX_DOUBLER			44
-#define MODELINDEX_AMMOREGEN		45
-#define MODELINDEX_NEUTRALFLAG		46
-#define MODELINDEX_REDCUBE			47
-#define MODELINDEX_BLUECUBE			48
-#define MODELINDEX_NAILGUN			49
-#define MODELINDEX_PROXLAUNCHER		50
-#define MODELINDEX_CHAINGUN			51
-#define MODELINDEX_POINTABLUE		52
-#define MODELINDEX_POINTBBLUE		53
-#define MODELINDEX_POINTARED		54
-#define MODELINDEX_POINTBRED		55
-#define MODELINDEX_POINTAWHITE		56
-#define MODELINDEX_POINTBWHITE		57
-#define MODELINDEX_POINTWHITE		58
-#define MODELINDEX_POINTRED			59
-#define MODELINDEX_POINTBLUE		60
-#define WEAPONINDEX_GAUNTLET			1
-#define WEAPONINDEX_MACHINEGUN			2
-#define WEAPONINDEX_SHOTGUN				3
-#define WEAPONINDEX_GRENADE_LAUNCHER	4
-#define WEAPONINDEX_ROCKET_LAUNCHER		5
-#define WEAPONINDEX_LIGHTNING			6
-#define WEAPONINDEX_RAILGUN				7
-#define WEAPONINDEX_PLASMAGUN			8
-#define WEAPONINDEX_BFG					9
-#define WEAPONINDEX_GRAPPLING_HOOK		10
-#define WEAPONINDEX_NAILGUN				11
-#define WEAPONINDEX_PROXLAUNCHER		12
-#define WEAPONINDEX_CHAINGUN			13
-
-//enemy stuff
-#define ENEMY_HORIZONTAL_DIST		200
-#define ENEMY_HEIGHT				201
-
-#define MAX_AVOIDGOALS			256
-#define MAX_GOALSTACK			8
-
-#define GFL_NONE				0
-#define GFL_ITEM				1
-#define GFL_ROAM				2
-#define GFL_DROPPED				4
-
-#define BLERR_NOERROR					0	//no error
-#define BLERR_LIBRARYNOTSETUP			1	//library not setup
-#define BLERR_INVALIDENTITYNUMBER		2	//invalid entity number
-#define BLERR_NOAASFILE					3	//no AAS file available
-#define BLERR_CANNOTOPENAASFILE			4	//cannot open AAS file
-#define BLERR_WRONGAASFILEID			5	//incorrect AAS file id
-#define BLERR_WRONGAASFILEVERSION		6	//incorrect AAS file version
-#define BLERR_CANNOTREADAASLUMP			7	//cannot read AAS file lump
-#define BLERR_CANNOTLOADICHAT			8	//cannot load initial chats
-#define BLERR_CANNOTLOADITEMWEIGHTS		9	//cannot load item weights
-#define BLERR_CANNOTLOADITEMCONFIG		10	//cannot load item config
-#define BLERR_CANNOTLOADWEAPONWEIGHTS	11	//cannot load weapon weights
-#define BLERR_CANNOTLOADWEAPONCONFIG	12	//cannot load weapon config
-
-#define WT_BALANCE			1
-#define MAX_WEIGHTS			128
-
-//fuzzy seperator
-struct fuzzyseperator_t
-{
-	fuzzyseperator_t()
-	{
-		Reset();
-	}
-
-	void Reset()
-	{
-		inUse = false;
-		index = 0;
-		value = 0;
-		type = 0;
-		weight = 0;
-		minweight = 0.0f;
-		maxweight = 0.0f;
-		child = nullptr;
-		next = nullptr;
-	}
-
-	bool inUse;
-	int index;
-	int value;
-	int type;
-	float weight;
-	float minweight;
-	float maxweight;
-	fuzzyseperator_t* child;
-	fuzzyseperator_t* next;
-};
-
-//fuzzy weight
-struct weight_t
-{
-	weight_t()
-	{
-		Reset();
-	}
-
-	void Reset()
-	{
-		name.Clear();
-		firstseperator = nullptr;
-	}
-
-	idStr name;
-	fuzzyseperator_t* firstseperator;
-};
-
-//weight configuration
-struct weightconfig_t
-{
-	weightconfig_t()
-	{
-		Reset();
-	}
-
-	void Reset()
-	{
-		inUse = false;
-		numweights = 0;
-		filename.Clear();
-
-		for( int i = 0; i < MAX_WEIGHTS; i++ )
-		{
-			weights[i].Reset();
-		}
-	}
-
-	bool inUse;
-	int numweights;
-	weight_t weights[MAX_WEIGHTS];
-	idStr filename;
-};
-
-// ------------------------------------------------------------------------------------
-
-#define BOTFILESBASEFOLDER		"botfiles"
-//debug line colors
-#define LINECOLOR_NONE			-1
-#define LINECOLOR_RED			1//0xf2f2f0f0L
-#define LINECOLOR_GREEN			2//0xd0d1d2d3L
-#define LINECOLOR_BLUE			3//0xf3f3f1f1L
-#define LINECOLOR_YELLOW		4//0xdcdddedfL
-#define LINECOLOR_ORANGE		5//0xe0e1e2e3L
-
-//Print types
-#define PRT_MESSAGE				1
-#define PRT_WARNING				2
-#define PRT_ERROR				3
-#define PRT_FATAL				4
-#define PRT_EXIT				5
-
-//console message types
-#define CMS_NORMAL				0
-#define CMS_CHAT				1
-
-//action flags
-#define ACTION_ATTACK			0x0000001
-#define ACTION_USE				0x0000002
-#define ACTION_RESPAWN			0x0000008
-#define ACTION_JUMP				0x0000010
-#define ACTION_MOVEUP			0x0000020
-#define ACTION_CROUCH			0x0000080
-#define ACTION_MOVEDOWN			0x0000100
-#define ACTION_MOVEFORWARD		0x0000200
-#define ACTION_MOVEBACK			0x0000800
-#define ACTION_MOVELEFT			0x0001000
-#define ACTION_MOVERIGHT		0x0002000
-#define ACTION_DELAYEDJUMP		0x0008000
-#define ACTION_TALK				0x0010000
-#define ACTION_GESTURE			0x0020000
-#define ACTION_WALK				0x0080000
-#define ACTION_AFFIRMATIVE		0x0100000
-#define ACTION_NEGATIVE			0x0200000
-#define ACTION_GETFLAG			0x0800000
-#define ACTION_GUARDBASE		0x1000000
-#define ACTION_PATROL			0x2000000
-#define ACTION_FOLLOWME			0x8000000
-
-
-//#define DEBUG
-#define CTF
-
-#define MAX_ITEMS					256
-//bot flags
-#define BFL_STRAFERIGHT				1	//strafe to the right
-#define BFL_ATTACKED				2	//bot has attacked last ai frame
-#define BFL_ATTACKJUMPED			4	//bot jumped during attack last frame
-#define BFL_AIMATENEMY				8	//bot aimed at the enemy this frame
-#define BFL_AVOIDRIGHT				16	//avoid obstacles by going to the right
-#define BFL_IDEALVIEWSET			32	//bot has ideal view angles set
-#define BFL_FIGHTSUICIDAL			64	//bot is in a suicidal fight
-//long term goal types
-#define LTG_TEAMHELP				1	//help a team mate
-#define LTG_TEAMACCOMPANY			2	//accompany a team mate
-#define LTG_DEFENDKEYAREA			3	//defend a key area
-#define LTG_GETFLAG					4	//get the enemy flag
-#define LTG_RUSHBASE				5	//rush to the base
-#define LTG_RETURNFLAG				6	//return the flag
-#define LTG_CAMP					7	//camp somewhere
-#define LTG_CAMPORDER				8	//ordered to camp somewhere
-#define LTG_PATROL					9	//patrol
-#define LTG_GETITEM					10	//get an item
-#define LTG_KILL					11	//kill someone
-#define LTG_HARVEST					12	//harvest skulls
-#define LTG_ATTACKENEMYBASE			13	//attack the enemy base
-#define LTG_MAKELOVE_UNDER			14
-#define LTG_MAKELOVE_ONTOP			15
-//some goal dedication times
-#define TEAM_HELP_TIME				60	//1 minute teamplay help time
-#define TEAM_ACCOMPANY_TIME			600	//10 minutes teamplay accompany time
-#define TEAM_DEFENDKEYAREA_TIME		600	//10 minutes ctf defend base time
-#define TEAM_CAMP_TIME				600	//10 minutes camping time
-#define TEAM_PATROL_TIME			600	//10 minutes patrolling time
-#define TEAM_LEAD_TIME				600	//10 minutes taking the lead
-#define TEAM_GETITEM_TIME			60	//1 minute
-#define	TEAM_KILL_SOMEONE			180	//3 minute to kill someone
-#define TEAM_ATTACKENEMYBASE_TIME	600	//10 minutes
-#define TEAM_HARVEST_TIME			120	//2 minutes
-#define CTF_GETFLAG_TIME			600	//10 minutes ctf get flag time
-#define CTF_RUSHBASE_TIME			120	//2 minutes ctf rush base time
-#define CTF_RETURNFLAG_TIME			180	//3 minutes to return the flag
-#define CTF_ROAM_TIME				60	//1 minute ctf roam time
-//patrol flags
-#define PATROL_LOOP					1
-#define PATROL_REVERSE				2
-#define PATROL_BACK					4
-//teamplay task preference
-#define TEAMTP_DEFENDER				1
-#define TEAMTP_ATTACKER				2
-//CTF strategy
-#define CTFS_AGRESSIVE				1
-//copied from the aas file header
-#define PRESENCE_NONE				1
-#define PRESENCE_NORMAL				2
-#define PRESENCE_CROUCH				4
+// Multiplayer bots for openQ4.
 //
-#define MAX_PROXMINES				64
-
-
-#define MAX_CHARACTERISTICS		80
-
-#define CT_INTEGER				1
-#define CT_FLOAT				2
-#define CT_STRING				3
-
-#define DEFAULT_CHARACTER		"bots/default_c.c"
-
-#define MAX_AVOIDGOALS			256
-#define MAX_GOALSTACK			8
-
-#define GFL_NONE				0
-#define GFL_ITEM				1
-#define GFL_ROAM				2
-#define GFL_DROPPED				4
-#define MAX_EPAIRKEY		128
-
-//characteristic value
-struct cvalue
-{
-	cvalue()
-	{
-		integer = 0;
-		_float = 0.0f;
-		string = "";
-	}
-
-	int integer;
-	float _float;
-	idStr string;
-};
-
-//a characteristic
-struct bot_characteristic_t
-{
-	bot_characteristic_t()
-	{
-		type = 0;
-	}
-
-	char type;						//characteristic type
-	cvalue value;				//characteristic value
-};
-
-//a bot character
-struct bot_character_t
-{
-	bot_character_t()
-	{
-		filename = "";
-		inUse = false;
-		skill = 0.0f;
-	}
-
-	idStr filename;
-	bool inUse;
-	float skill;
-	bot_characteristic_t c[MAX_CHARACTERISTICS];
-};
-
-//the bot input, will be converted to an usercmd_t
-//the bot input, will be converted to an usercmd_t
-struct bot_input_t
-{
-	bot_input_t()
-	{
-		Reset();
-	}
-
-	void Reset()
-	{
-		thinktime = 0;
-		dir.Zero();
-		speed = 0;
-		viewangles.Zero();
-		actionflags = 0;
-		weapon = 0;
-		lastWeaponNum = 0;
-		respawn = false;
-	}
-
-	float thinktime;		//time since last output (in seconds)
-	idVec3 dir;				//movement direction
-	float speed;			//speed in the range [0, 400]
-	idAngles viewangles;		//the view angles
-	int actionflags;		//one of the ACTION_? flags
-	int weapon;				//weapon to use
-	int lastWeaponNum;
-	bool respawn;
-};
-
-#if 0
-//entity state
-typedef struct bot_entitystate_s
-{
-	int		type;			// entity type
-	int		flags;			// entity flags
-	vec3_t	origin;			// origin of the entity
-	vec3_t	angles;			// angles of the model
-	vec3_t	old_origin;		// for lerping
-	vec3_t	mins;			// bounding box minimums
-	vec3_t	maxs;			// bounding box maximums
-	int		groundent;		// ground entity
-	int		solid;			// solid type
-	int		modelindex;		// model used
-	int		modelindex2;	// weapons, CTF flags, etc
-	int		frame;			// model frame number
-	int		event;			// impulse events -- muzzle flashes, footsteps, etc
-	int		eventParm;		// even parameter
-	int		powerups;		// bit flags
-	int		weapon;			// determines weapon and flash model, etc
-	int		legsAnim;		// mask off ANIM_TOGGLEBIT
-	int		torsoAnim;		// mask off ANIM_TOGGLEBIT
-} bot_entitystate_t;
-
-//check points
-typedef struct bot_waypoint_s
-{
-	int			inuse;
-	char		name[32];
-	bot_goal_t	goal;
-	struct		bot_waypoint_s* next, * prev;
-} bot_waypoint_t;
-
-//bot settings
-typedef struct bot_settings_s
-{
-	char characterfile[MAX_QPATH];
-	float skill;
-	char team[MAX_QPATH];
-} bot_settings_t;
-
-#define MAX_ACTIVATESTACK		8
-#define MAX_ACTIVATEAREAS		32
-
-typedef struct bot_activategoal_s
-{
-	int inuse;
-	bot_goal_t goal;						//goal to activate (buttons etc.)
-	float time;								//time to activate something
-	float start_time;						//time starting to activate something
-	float justused_time;					//time the goal was used
-	int shoot;								//true if bot has to shoot to activate
-	int weapon;								//weapon to be used for activation
-	vec3_t target;							//target to shoot at to activate something
-	vec3_t origin;							//origin of the blocking entity to activate
-	int areas[MAX_ACTIVATEAREAS];			//routing areas disabled by blocking entity
-	int numareas;							//number of disabled routing areas
-	int areasdisabled;						//true if the areas are disabled for the routing
-	struct bot_activategoal_s* next;		//next activate goal on stack
-} bot_activategoal_t;
-
-//bot state
-typedef struct bot_state_s
-{
-	int inuse;										//true if this state is used by a bot client
-	int botthink_residual;							//residual for the bot thinks
-	int client;										//client number of the bot
-	int entitynum;									//entity number of the bot
-	playerState_t cur_ps;							//current player state
-	int last_eFlags;								//last ps flags
-	usercmd_t lastucmd;								//usercmd from last frame
-	int entityeventTime[1024];						//last entity event time
-	//
-	bot_settings_t settings;						//several bot settings
-	int ( *ainode )( struct bot_state_s* bs );			//current AI node
-	float thinktime;								//time the bot thinks this frame
-	vec3_t origin;									//origin of the bot
-	vec3_t velocity;								//velocity of the bot
-	int presencetype;								//presence type of the bot
-	vec3_t eye;										//eye coordinates of the bot
-	int areanum;									//the number of the area the bot is in
-	int inventory[MAX_ITEMS];						//string with items amounts the bot has
-	int tfl;										//the travel flags the bot uses
-	int flags;										//several flags
-	int respawn_wait;								//wait until respawned
-	int lasthealth;									//health value previous frame
-	int lastkilledplayer;							//last killed player
-	int lastkilledby;								//player that last killed this bot
-	int botdeathtype;								//the death type of the bot
-	int enemydeathtype;								//the death type of the enemy
-	int botsuicide;									//true when the bot suicides
-	int enemysuicide;								//true when the enemy of the bot suicides
-	int setupcount;									//true when the bot has just been setup
-	int map_restart;									//true when the map is being restarted
-	int entergamechat;								//true when the bot used an enter game chat
-	int num_deaths;									//number of time this bot died
-	int num_kills;									//number of kills of this bot
-	int revenge_enemy;								//the revenge enemy
-	int revenge_kills;								//number of kills the enemy made
-	int lastframe_health;							//health value the last frame
-	int lasthitcount;								//number of hits last frame
-	int chatto;										//chat to all or team
-	float walker;									//walker charactertic
-	float ltime;									//local bot time
-	float entergame_time;							//time the bot entered the game
-	float ltg_time;									//long term goal time
-	float nbg_time;									//nearby goal time
-	float respawn_time;								//time the bot takes to respawn
-	float respawnchat_time;							//time the bot started a chat during respawn
-	float chase_time;								//time the bot will chase the enemy
-	float enemyvisible_time;						//time the enemy was last visible
-	float check_time;								//time to check for nearby items
-	float stand_time;								//time the bot is standing still
-	float lastchat_time;							//time the bot last selected a chat
-	float kamikaze_time;							//time to check for kamikaze usage
-	float invulnerability_time;						//time to check for invulnerability usage
-	float standfindenemy_time;						//time to find enemy while standing
-	float attackstrafe_time;						//time the bot is strafing in one dir
-	float attackcrouch_time;						//time the bot will stop crouching
-	float attackchase_time;							//time the bot chases during actual attack
-	float attackjump_time;							//time the bot jumped during attack
-	float enemysight_time;							//time before reacting to enemy
-	float enemydeath_time;							//time the enemy died
-	float enemyposition_time;						//time the position and velocity of the enemy were stored
-	float defendaway_time;							//time away while defending
-	float defendaway_range;							//max travel time away from defend area
-	float rushbaseaway_time;						//time away from rushing to the base
-	float attackaway_time;							//time away from attacking the enemy base
-	float harvestaway_time;							//time away from harvesting
-	float ctfroam_time;								//time the bot is roaming in ctf
-	float killedenemy_time;							//time the bot killed the enemy
-	float arrive_time;								//time arrived (at companion)
-	float lastair_time;								//last time the bot had air
-	float teleport_time;							//last time the bot teleported
-	float camp_time;								//last time camped
-	float camp_range;								//camp range
-	float weaponchange_time;						//time the bot started changing weapons
-	float firethrottlewait_time;					//amount of time to wait
-	float firethrottleshoot_time;					//amount of time to shoot
-	float notblocked_time;							//last time the bot was not blocked
-	float blockedbyavoidspot_time;					//time blocked by an avoid spot
-	float predictobstacles_time;					//last time the bot predicted obstacles
-	int predictobstacles_goalareanum;				//last goal areanum the bot predicted obstacles for
-	vec3_t aimtarget;
-	vec3_t enemyvelocity;							//enemy velocity 0.5 secs ago during battle
-	vec3_t enemyorigin;								//enemy origin 0.5 secs ago during battle
-	//
-	int kamikazebody;								//kamikaze body
-	int proxmines[MAX_PROXMINES];
-	int numproxmines;
-	//
-	bot_character_t* character;						//the bot character
-	int ms;											//move state of the bot
-	int gs;											//goal state of the bot
-	int cs;											//chat state of the bot
-	int ws;											//weapon state of the bot
-	//
-	int enemy;										//enemy entity number
-	int lastenemyareanum;							//last reachability area the enemy was in
-	vec3_t lastenemyorigin;							//last origin of the enemy in the reachability area
-	int weaponnum;									//current weapon number
-	vec3_t viewangles;								//current view angles
-	vec3_t ideal_viewangles;						//ideal view angles
-	vec3_t viewanglespeed;
-	//
-	int ltgtype;									//long term goal type
-	// team goals
-	int teammate;									//team mate involved in this team goal
-	int decisionmaker;								//player who decided to go for this goal
-	int ordered;									//true if ordered to do something
-	float order_time;								//time ordered to do something
-	int owndecision_time;							//time the bot made it's own decision
-	bot_goal_t teamgoal;							//the team goal
-	bot_goal_t altroutegoal;						//alternative route goal
-	float reachedaltroutegoal_time;					//time the bot reached the alt route goal
-	float teammessage_time;							//time to message team mates what the bot is doing
-	float teamgoal_time;							//time to stop helping team mate
-	float teammatevisible_time;						//last time the team mate was NOT visible
-	int teamtaskpreference;							//team task preference
-	// last ordered team goal
-	int lastgoal_decisionmaker;
-	int lastgoal_ltgtype;
-	int lastgoal_teammate;
-	bot_goal_t lastgoal_teamgoal;
-	// for leading team mates
-	int lead_teammate;								//team mate the bot is leading
-	bot_goal_t lead_teamgoal;						//team goal while leading
-	float lead_time;								//time leading someone
-	float leadvisible_time;							//last time the team mate was visible
-	float leadmessage_time;							//last time a messaged was sent to the team mate
-	float leadbackup_time;							//time backing up towards team mate
-	//
-	char teamleader[32];							//netname of the team leader
-	float askteamleader_time;						//time asked for team leader
-	float becometeamleader_time;					//time the bot will become the team leader
-	float teamgiveorders_time;						//time to give team orders
-	float lastflagcapture_time;						//last time a flag was captured
-	int numteammates;								//number of team mates
-	int redflagstatus;								//0 = at base, 1 = not at base
-	int blueflagstatus;								//0 = at base, 1 = not at base
-	int neutralflagstatus;							//0 = at base, 1 = our team has flag, 2 = enemy team has flag, 3 = enemy team dropped the flag
-	int flagstatuschanged;							//flag status changed
-	int forceorders;								//true if forced to give orders
-	int flagcarrier;								//team mate carrying the enemy flag
-	int ctfstrategy;								//ctf strategy
-	char subteam[32];								//sub team name
-	float formation_dist;							//formation team mate intervening space
-	char formation_teammate[16];					//netname of the team mate the bot uses for relative positioning
-	float formation_angle;							//angle relative to the formation team mate
-	vec3_t formation_dir;							//the direction the formation is moving in
-	vec3_t formation_origin;						//origin the bot uses for relative positioning
-	bot_goal_t formation_goal;						//formation goal
-
-	bot_activategoal_t* activatestack;				//first activate goal on the stack
-	bot_activategoal_t activategoalheap[MAX_ACTIVATESTACK];	//activate goal heap
-
-	bot_waypoint_t* checkpoints;					//check points
-	bot_waypoint_t* patrolpoints;					//patrol points
-	bot_waypoint_t* curpatrolpoint;					//current patrol point the bot is going for
-	int patrolflags;								//patrol flags
-
-// jmarshall
-	bot_goal_t  currentgoal;
-
-	vec3_t		currentMoveGoal;
-	vec3_t		movement_waypoints[NAV_MAX_PATHSTEPS];
-	int			numMovementWaypoints;
-	int			currentWaypoint;
-
-	vec3_t		last_origin;
-	vec3_t		very_short_term_origin;
-
-	int			stuck_time;
-
-	vec3_t		last_enemy_visible_position;
-	vec3_t		random_move_position;
-	// jmarshall end
-
-	bot_input_t input;
-} bot_state_t;
-
-void BotUpdateInput( bot_state_t* bs, int time, int elapsed_time );
-qboolean BotIsDead( bot_state_t* bs );
-
-void AIEnter_Respawn( bot_state_t* bs, char* s );
-
-extern float floattime;
-#define FloatTime() floattime
-
-
-float Characteristic_BFloat( bot_character_t* ch, int index, float min, float max );
-void Characteristic_String( bot_character_t* ch, int index, char* buf, int size );
-
-bot_character_t* BotLoadCharacterFromFile( char* charfile, int skill );
-
-void BotInitLevelItems( void );
-
-void BotChooseWeapon( bot_state_t* bs );
-
-inline float AAS_Time()
-{
-	return floattime;
-}
-
-unsigned short int BotTravelTime( vec3_t start, vec3_t end );
-#endif
-
-#define MAX_BOT_INVENTORY 256
-
-typedef enum
-{
-	NULLMOVEFLAG = -1,
-	MOVE_PRONE,
-	MOVE_CROUCH,
-	MOVE_WALK,
-	MOVE_RUN2,
-	MOVE_SPRINT,
-	MOVE_JUMP,
-} botMoveFlags_t;
-
+// A bot is not an entity.  It occupies a real client slot, spawns a real
+// idPlayer, and is driven by writing the user command the engine would have
+// received from a remote player.  Everything downstream - movement physics,
+// weapons, scoring, the scoreboard, game type rules - therefore treats it as
+// an ordinary player with no special cases.
 //
-// rvmBotUtil
+// Navigation comes from rvNavMesh, which is generated from the collision world
+// at map load, so bots work on any map without an offline compile step.
 //
-class rvmBotUtil
-{
+// This file is only concerned with HOW a bot sees, moves, aims and shoots.
+// HOW WELL and IN WHAT MANNER it does any of that is not code: it is resolved
+// into one flat botTraits_t per bot per spawn by rvBotCharacterManager, out of
+// a skill curve, a play style and a named character, all of which are content
+// files in the pak.  See BotCharacter.h.
+//----------------------------------------------------------------
+
+#ifndef __GAME_MP_BOT_H__
+#define __GAME_MP_BOT_H__
+
+#include "BotFrameProfile.h"
+
+// rvBot holds a botTraits_t by value and a character pointer, so the contract
+// header has to be complete here rather than forward declared.  Game_local.h
+// includes it immediately before this file too; the include guard makes saying
+// so twice free, and it keeps Bot.h readable on its own.
+#include "BotCharacter.h"
+
+class idPlayer;
+class idItem;
+
+//----------------------------------------------------------------
+// What the bot is currently trying to do.  Combat overrides navigation for
+// aiming and firing but not for movement: a bot still routes to a goal while
+// shooting at whatever it can see.
+//----------------------------------------------------------------
+typedef enum {
+	BOTGOAL_NONE,
+	BOTGOAL_ROAM,				// no reason to be anywhere in particular
+	BOTGOAL_ITEM,				// heading for a pickup
+	BOTGOAL_ENEMY,				// closing on a player
+	BOTGOAL_OBJECTIVE			// flag, carrier, rescue, or control point
+} botGoalType_t;
+
+//----------------------------------------------------------------
+// The ways a bot can get a combat decision wrong.  One is picked at a time on
+// a roll against botTraits_t::mistakeChance and lasts mistakeMsec.
+//
+// These are deliberately things a player does under pressure, not handicaps.
+// A bot that simply aimed worse would read as broken; a bot that loses its
+// target for half a second, or pulls the trigger before the sight has stopped
+// moving, reads as beatable.
+//----------------------------------------------------------------
+typedef enum {
+	BOTMISTAKE_NONE,
+	BOTMISTAKE_LOSETRACK,		// the believed target position stops being updated
+	BOTMISTAKE_MISTIMEDSHOT,	// fires without waiting for the aim to settle
+	BOTMISTAKE_WRONGWEAPON,		// keeps whatever is in hand instead of switching
+	BOTMISTAKE_LATEDODGE,		// takes twice as long to start dodging incoming fire
+	BOTMISTAKE_NUM
+} botMistake_t;
+
+//----------------------------------------------------------------
+// rvBot
+//----------------------------------------------------------------
+// openQ4: rvBot::UpdateHook
+typedef enum {
+	BOTHOOK_NONE,
+	BOTHOOK_AIM,				// turning to the bite
+	BOTHOOK_THROWN,				// the hook is in flight
+	BOTHOOK_REEL				// held and pulling
+} botHookPhase_t;
+
+// why the hook is out
+typedef enum {
+	BOTHOOK_SHORTCUT,			// a corner further along the route
+	BOTHOOK_RESCUE,				// a fall with nowhere safe to land
+	BOTHOOK_UNSTICK				// route progress that stopped
+} botHookReason_t;
+
+class rvBot {
 public:
-	static float random()
-	{
-		return ( ( rand() & 0x7fff ) / ( ( float )0x7fff ) );
-	}
+							rvBot( void );
 
-	static float crandom()
-	{
-		return ( 2.0 * ( random() - 0.5 ) );
-	}
+	// skillOverride is the optional per-bot level from "addbot <name> <skill>".
+	// -1 means "follow bot_skill", which is what every other caller wants.
+	void					Init( int clientNum, const char *name, int skillOverride = -1,
+							  bool requireExactCharacter = false );
+	void					Shutdown( void );
+
+	// Re-point this bot at the character of the same name in a freshly parsed
+	// roster.  Every pointer handed out before a reload dangles, so this has to
+	// run for every live bot before anything reads a personality again.
+	void					RebindCharacter( void );
+
+	bool					IsActive( void ) const { return active; }
+	int						GetClientNum( void ) const { return clientNum; }
+	const char *			GetName( void ) const { return name.c_str(); }
+
+	const rvBotCharacter *	GetCharacter( void ) const { return character; }
+	const botTraits_t &		GetTraits( void ) const { return traits; }
+
+	// The integer level the personality was resolved from - bot_skill, or this
+	// bot's own override - and the fractional level it actually plays at once
+	// bot_skillVariance has had its say.  Both are reported by botlist so what
+	// the operator reads is what the bot is using.
+	int						GetSkillLevel( void ) const { return skillLevel; }
+	float					GetEffectiveSkill( void ) const { return effectiveSkill; }
+
+	// Fill in this bot's identity so any userinfo update keeps it in the game
+	// instead of dropping it back to the join menu.
+	void					FillUserInfo( idDict &info );
+
+	// One server frame.  Writes the client's user command in place.
+	void					Think( usercmd_t &cmd );
+	void					OnKnockback( const idVec3 &kick );
+	void					RefreshKnockbackMove( usercmd_t &cmd );
+
+	// Called when the player entity behind this bot respawns.
+	void					OnSpawn( void );
+
+	// -- chat, all server side and all driven from rvBotManager --
+	//
+	// Queued rather than sent: a bot that answers a frag on the frame it landed
+	// reads as a script.  A pending line is dropped if the bot leaves.
+	void					QueueChat( rvBotChatEvent event, const char *other, const char *weapon, const char *item );
+	// Answers an order in team chat.  No chatiness roll: the commander has to
+	// know the order landed.  The shared flood throttle still applies.
+	void					QueueOrderAck( const char *commander );
+	bool					TryQueueReply( const idStr &normalizedText, bool sourceIsBot, bool addressed,
+									   const char *other, bool teamOnly );
+	void					SayFarewell( void );
+
+	void					OnKilledEnemy( idPlayer *victim, int methodOfDeath );
+	void					OnKilledBy( idPlayer *killer, int methodOfDeath );
+	void					OnDamaged( idPlayer *attacker, int damage, const idVec3 &dir );
+	void					OnMatchStart( void );
+	void					OnMatchEnd( bool won );
+
+	// Move every absolute deadline forward by one frozen competitive-pause
+	// frame.  gameLocal.time advances through a pause; this bot does not think.
+	void					ShiftMatchTime( int deltaMsec );
+
+	// Read-only coordination state used by rvBotManager to keep a whole team
+	// from reserving the same pickup or support target.
+	idEntity *				GetGoalEntity( void ) const { return goalEntity.GetEntity(); }
+	int						GetGoalType( void ) const { return goalType; }
+
+private:
+	friend class rvBotManager;
+
+	// Resolves the personality.  Called once per spawn, never per frame, so a
+	// mid-match bot_skill edit lands on the next respawn instead of retuning a
+	// bot in the middle of a fight it is already losing.
+	void					ResolveTraits( void );
+
+	idPlayer *				GetPlayer( void ) const;
+
+	void					UpdateEnemy( idPlayer *self );
+	void					UpdateGoal( idPlayer *self );
+	void					UpdateMovement( idPlayer *self, usercmd_t &cmd );
+	bool					HoldForPad( idPlayer *self, idVec3 &moveDir );
+	void					AdoptPadLaunch( idPlayer *self );
+	// Diagnostic only: the fixed full air input bot_probeAir replays, then braking once grounded.
+	void					ProbeAirControl( idPlayer *self, usercmd_t &cmd );
+	void					ReportProbeGrounding( idPlayer *self );
+	void					TryDodgeJump( idPlayer *self, const idVec3 &direction, usercmd_t &cmd );
+	bool					HoldDodgeJump( idPlayer *self, usercmd_t &cmd );
+	void					ResetDodgeJump( void );
+	void					UpdateAim( idPlayer *self, usercmd_t &cmd );
+	// The view with nothing to shoot at: well along the route rather than at
+	// the next corner, and sweeping the room while standing watch.
+	idVec3					IdleAimPoint( idPlayer *self, const idVec3 &eye );
+	void					UpdateWeapon( idPlayer *self );
+	void					UpdateFire( idPlayer *self, usercmd_t &cmd );
+	void					UpdateChat( idPlayer *self );
+	// Spends buy-menu credits where the rules allow it: a real weapon first,
+	// then armour, then ammunition, then a second gun or a team powerup.
+	void					UpdateBuying( idPlayer *self );
+
+	// Everything that happens the moment a target registers: the reaction
+	// deadline, the peripheral penalty, the mistake roll and the belief reset.
+	void					AcquireEnemy( idPlayer *self, idPlayer *foe, bool fresh );
+
+	void					RollMistake( void );
+	bool					MistakeActive( int mistake ) const;
+
+	// Live MP-resolved projectile launch data.  Hitscan/melee return zero speed;
+	// arcing projectiles return both speed and gravity for ballistic aim.
+	float					ProjectileSpeed( idPlayer *self ) const;
+	idVec3					ProjectileGravity( idPlayer *self ) const;
+	bool					BurstAllows( idPlayer *self );
+
+	float					TargetScore( idPlayer *other, float distSqr ) const;
+	idVec3					EnemyPursuitOrigin( void ) const;
+	bool					WantsHealth( idPlayer *self ) const;
+	bool					AtObjectiveHoldPosition( idPlayer *self ) const;
+	bool					HoldAllowsMove( idPlayer *self, const idVec3 &direction ) const;
+	bool					IsDodging( idPlayer *self ) const;
+	void					TrackDamage( idPlayer *self );
+	// threatDirection is the direction of travel of what is coming (a round's
+	// velocity, or the damage direction); threatPoint, when known, is where it
+	// passes closest or lands, and the dodge goes away from it.
+	void					ScheduleDodge( const idVec3 &threatDirection, const idVec3 *threatPoint = NULL );
+	// The dodge step for this frame: perpendicular to the threat, or the
+	// strafe side around the current enemy when the threat has no direction.
+	bool					DodgeDirection( idPlayer *self, idVec3 &direction ) const;
+	// Flips the combat strafe side on the personality's rhythm.
+	void					UpdateStrafeRhythm( void );
+
+	bool					CanSee( idPlayer *self, idEntity *other, idVec3 *visiblePoint = NULL ) const;
+	bool					IsEnemy( idPlayer *self, idPlayer *other ) const;
+
+	// Hearing.  A noise locates an enemy approximately and turns the bot toward
+	// it; it never grants a shot, which still needs a sighting and pays the
+	// full reaction for it.
+	void					UpdateHearing( idPlayer *self );
+	int						EnemyLastKnownTime( void ) const;
+
+	// How the bot's whole loadout and condition compares with this opponent's,
+	// 1 for an even trade.  Drives fight-or-flight, not aim.
+	float					CombatAdvantage( idPlayer *self, idPlayer *foe ) const;
+	float					BestWeaponPower( idPlayer *self ) const;
+	// Breaking off: hurt below the retreat line, or outmatched by the current
+	// opponent.  The bot still fights while it withdraws toward health.
+	bool					Withdrawing( idPlayer *self ) const;
+
+	bool					Repath( idPlayer *self, const idVec3 &goal, bool preserveProgress = false );
+	bool					AdvancePath( idPlayer *self );
+	// Standing on a floor the current leg does not cross - knocked off it,
+	// carried away by a pad, or fallen past a landing - or beside it where the
+	// walk to the corner no longer exists.  The route is then wrong, not slow,
+	// and is replaced at once.
+	bool					OffRoute( idPlayer *self, float &offHeight );
+	idEntity *				PickItemGoal( idPlayer *self, rvNavPath &goalPath, float &goalUtility );
+	float					ItemUtility( idPlayer *self, idItem *item ) const;
+	// Milliseconds until a taken item returns as far as this bot knows, 0 when
+	// it is available now, -1 when the bot has no idea.
+	int						ItemPendingMsec( const idItem *item ) const;
+	// A patrol destination with its proven route: the item spots that matter
+	// and the last place an enemy was known, weighted against recent visits.
+	bool					PickRoamGoal( idPlayer *self, idVec3 &roam, rvNavPath &roamPath );
+	void					RememberRoamPoint( const idVec3 &point );
+	float					RoamNovelty( const idVec3 &point ) const;
+	float					PathDistanceRemaining( const idVec3 &origin ) const;
+	void					AbandonGoal( int forMsec );
+	bool					RecoverToNavMesh( idPlayer *self, usercmd_t &cmd );
+	bool					IsAvoided( const idEntity *ent ) const;
+	void					Avoid( idEntity *ent, int forMsec );
+	void					ResetTraversal( void );
+	bool					GuardLandingHealth( idPlayer *self, usercmd_t &cmd );
+	bool					AlignJumpDropApproach( idPlayer *self, usercmd_t &cmd );
+	bool					HandleJumpTakeoff( idPlayer *self, usercmd_t &cmd );
+	bool					GuardLandingContinuation( idPlayer *self, usercmd_t &cmd );
+	bool					RecoverInAir( idPlayer *self, usercmd_t &cmd );
+
+	// openQ4: the Classic ruleset's grappling hook as a route shortcut.  True
+	// while the hook owns movement: thrown and pulling, the bot gives no input.
+	bool					UpdateHook( idPlayer *self, usercmd_t &cmd );
+	bool					FindHookBite( idPlayer *self, const idVec3 &landing, const idVec3 &along, idVec3 &bite ) const;
+	bool					FindHookShortcut( idPlayer *self, bool relaxed, idVec3 &bite, idVec3 &landing ) const;
+	bool					FindHookRescue( idPlayer *self, idVec3 &bite, idVec3 &landing ) const;
+	void					StartHook( idPlayer *self, int reason );
+	void					EndHook( int cooldownMsec );
+
+	void					ApplyMove( const idVec3 &moveDir, usercmd_t &cmd ) const;
+	void					PressJump( usercmd_t &cmd ) const;
+
+// openQ4 BEGIN
+	// Liquid handling. The navmesh is generated against solids only, so liquid volumes are
+	// invisible to routing and all of this has to work locally, off point queries.
+	int						LiquidAtFeet( void ) const;
+	int						LiquidAtEye( void ) const;
+	void					UpdateLiquidMovement( idPlayer *self, usercmd_t &cmd );
+	idVec3					AvoidLiquidHazard( const idVec3 &moveDir ) const;
+// openQ4 END
+
+	int						clientNum;
+	idStr					name;
+	bool					active;
+	bool					initialTeamAssignmentPending;	// ignore inherited slot userinfo once
+	int						teamAssignment;		// pre-spawn reservation, TEAM_NONE when unset
+	int						teamAssignmentInstance;
+
+	// -- personality --
+	const rvBotCharacter *	character;			// NULL with bot_characters 0, or an empty roster
+	botTraits_t				traits;
+	int						skillOverride;		// per-bot level from addbot, -1 for bot_skill
+	int						skillLevel;			// integer level the traits were resolved from
+	float					effectiveSkill;		// that level after bot_skillVariance
+
+	// -- navigation --
+	rvNavPath				path;
+	int						pathCorner;
+	int						pathTime;			// when the current route was built
+	idVec3					goalOrigin;
+	idEntityPtr<idEntity>	goalEntity;
+	int						goalType;
+	int						goalGiveUpTime;		// abandon a goal that is not working out
+	float					goalUtility;			// benefit used for hysteresis and coordination
+	int						goalCommitUntil;		// do not chatter between similar choices
+	float					goalBestDistance;		// route progress extends a sensible deadline
+	int						goalProgressTime;
+	int						objectiveKind;			// botObjectiveKind_t for objective refreshes
+	bool					objectiveHoldPosition;
+	int						repathFailures;
+	int						enemyPathTime;		// last attempt to route to an enemy, successful or not
+	int						nextGoalSelectTime;	// throttles the full goal scan
+	int						holdUntil;			// a patient bot standing still on a finished wander
+	int						noRouteSince;		// pathTime is route age, not recovery age
+
+	// A non-walk link is an action, not an ordinary proximity corner.  The bot
+	// approaches its source, commits to the action, and only advances after it
+	// has actually reached the destination side.
+	int						traversalCorner;
+	idVec3					traversalStartOrigin;
+	int						traversalStartTime;
+	bool					traversalEntered;
+	bool					traversalStarted;
+	int						landingCheckPathTime;
+	int						landingCheckCorner;
+	float					landingCheckLimit;
+
+	// A voluntary hop is proved for one world-space input. Aim and firing may
+	// change in flight, but the movement must keep that input until touchdown.
+	bool					dodgeHopActive;
+	bool					dodgeHopAirborne;
+	int						dodgeHopStartTime;
+	int						dodgeHopCheckTime;
+	idVec3					dodgeHopDirection;
+	float					dodgeHopWishSpeed;
+
+	// Off-mesh recovery target, cached because finding it is a wide search.
+	idVec3					recoverTarget;
+	int						recoverSearchTime;
+	bool					recoverValid;
+
+	// With nowhere known to head for, the bot picks a heading and keeps it for
+	// a while.  Turning a fixed amount every frame is a per-frame rate, and it
+	// only ever walks the bot in a circle it cannot escape.
+	int						recoverWanderUntil;
+	float					recoverWanderYaw;
+
+	// Goals that did not work out, so the bot does not ping-pong between two
+	// items it cannot take.  One slot would only ever remember the last one.
+	static const int		MAX_AVOID_GOALS = 8;
+	struct avoidGoal_s {
+		idEntityPtr<idEntity>	ent;
+		int						until;
+	}						avoidGoals[MAX_AVOID_GOALS];
+	int						avoidNext;
+
+	// -- stuck detection --
+	// Progress is measured against the route, not against displacement: a bot
+	// that is moving but not getting closer to its corner is stuck, and one
+	// that is standing still already fails the same test.  There is deliberately
+	// no "has it physically moved" member here - it read as a second signal and
+	// was never anything of the kind.
+	int						stuckTime;
+	int						unstickUntil;
+	float					unstickSide;
+	int						stuckChecks;
+	int						stuckPathCorner;
+	float					stuckCornerDistance;
+	int						offRouteProofTime;	// when OffRoute last asked the navmesh about the leg from where the bot stands
+	int						combatSteeringTime;	// last frame combat footwork altered the route direction
+	int						jumpRetries;		// run-ups taken at the current route's failed jump
+	int						jumpRetryPathTime;	// pathTime of the route jumpRetries counts for
+	int						climbCheckTime;		// since when the bot has pressed toward climbCheckTarget, 0 for not
+	idVec3					climbCheckTarget;	// the corner above it, or the volume it is stepping into
+	float					climbCheckDistance;	// how far off that target was then
+	int						padHoldSince;		// since when the bot has waited at a pad for its corridor to clear
+	// The pad this bot is about to enter - its route's next action, within
+	// hold reach - published for the other bots' corridor priority: two bots
+	// released from opposite pads in the same frame met over q4ctf5's void.
+	int						padApproachEntity;	// entity number, -1 for none
+	int						padApproachSince;	// when the bot came within reach of it
+	int						padApproachTime;	// last frame the approach was confirmed
+	idVec3					padApproachLaunch;	// the final walking corner before the pad
+	idVec3					padApproachLanding;	// the pad corner's landing
+	// Set only by the local-cheat traversal probes; cleared by OnSpawn.
+	bool					probeWatch;			// report the probed bot's first grounding
+	bool					probeAirActive;		// bot_probeAir owns the input instead of the controller
+	idVec3					probeAirDirection;	// its fixed horizontal input, zero for none
+	int						probeStartTime;
+	bool					probeAirborneSeen;	// the probed bot has left the ground since the probe
+	int						airRecoverReported;	// last airborne-recovery start logged, so one line per fall
+	bool					airRecoverSliding;	// proven input before the knock leaves the floor
+	bool					airRecovering;		// braking a knocked fall until it has stopped on the ground
+	int						knockbackTime;		// last applied knockback, which alone can start that brake
+	int						knockbackFrameTime;	// the frame knockbackFrameKick sums
+	idVec3					knockbackFrameKick;	// every kick of that frame, a shotgun's pellets together
+	int						airborneSince;		// when the current flight left the ground, 0 on the ground
+	bool					airborneVoluntary;	// that flight began with the bot's own jump press
+	int						jumpPressTime;		// last grounded frame the bot pressed jump
+	idVec3					airRecoverWish;		// the air input that brake holds, zero for none
+	int						airRecoverPlanTime;	// when it was last chosen
+	int						airRecoverLanded;	// when that fall touched down, 0 while still airborne
+
+	// -- combat --
+	idEntityPtr<idPlayer>	enemy;
+	int						enemyAcquiredTime;
+	int						enemyLastSeenTime;
+	idVec3					enemyLastSeenOrigin;	// last known position: seen, or heard approximately
+	idVec3					enemyLastSeenVelocity;
+	idVec3					enemyVisiblePoint;
+	int						enemyLastHeardTime;	// last noise that located the current enemy
+	int						nextHearingTime;
+	bool					targetPickBest;		// this engagement's targetSelection roll
+	bool					aimAtFeet;			// this engagement's splash-aim roll
+	idEntityPtr<idPlayer>	lastAttacker;
+	int						lastAttackerTime;
+
+	// -- strategy --
+	// Where recent wanders ended, so patrols cover the map instead of
+	// shuttling between the two best item spots.
+	static const int		ROAM_HISTORY = 6;
+	idVec3					roamHistory[ROAM_HISTORY];
+	int						roamHistoryTime[ROAM_HISTORY];
+	int						roamHistoryNext;
+	int						goalSelectedTime;	// when the current goal was committed
+	bool					goalItemPending;	// waiting out a timed respawn at the item
+	bool					outmatched;			// decision-tick verdict of CombatAdvantage
+	bool					selfStrong;			// armed, healthy or powered up enough to take on a powered target
+
+	// -- aim --
+	// The bot aims at where it BELIEVES the target is, which trails where the
+	// target actually is by aimTrackTimeConst, less the share of its perceived
+	// motion aimAnticipation carries forward.  aimPoint is that belief plus
+	// the projectile lead, and it is what both the view and the fire cone are
+	// measured against - if the two disagreed the bot would aim at the lead
+	// point and then refuse to shoot because the centre was outside the cone.
+	idAngles				aimAngles;
+	idAngles				aimRate;			// degrees/second, the slew's own velocity
+	idVec3					aimBelief;
+	bool					aimBeliefValid;
+	idVec3					aimPerceivedVelocity;	// the target's velocity as the bot has registered it
+	idVec3					aimPoint;
+	bool					aimPointValid;
+	idAngles				aimTrackAngles;		// last frame's angles to the aim point
+	bool					aimTrackValid;
+	idAngles				aimTargetRate;		// degrees/second, low passed: how fast the aim point crosses the view
+	float					aimAngVel;			// degrees/second, low passed
+	float					aimLeadRoll;		// this burst's lead error multiplier
+	float					tremorPhase[4];		// seeded from clientNum so no two bots shake in step
+
+	// Where the view rests with nothing to shoot at.  UpdateMovement says when
+	// the bot is standing watch - a finished wander, a timed item - and the
+	// sweep starts from the facing it stopped with.
+	bool					idleScan;
+	int						scanStartTime;		// 0 while not sweeping
+	float					scanBaseYaw;
+
+	// -- trigger --
+	int						enemyFireTime;		// reaction deadline, set once per acquisition
+	int						onTargetTime;		// how long the aim has sat inside the cone
+	int						burstEndTime;
+	int						burstRestTime;
+	int						nextSingleShotTime;
+	bool					wasFiring;			// so bot_debugAim logs the shot, not the frame
+
+	// -- mistakes --
+	int						mistake;
+	int						mistakeEndTime;
+	int						nextMistakeTime;
+
+	// -- dodging --
+	int						damageStamp;		// last idPlayer::lastDmgTime this bot reacted to
+	int						dodgeStartTime;
+	int						dodgeEndTime;
+	int						nextThreatScanTime;
+
+	// -- grappling hook (Classic ruleset) --
+	int						hookPhase;			// botHookPhase_t
+	int						hookPhaseTime;
+	int						nextHookScanTime;
+	idVec3					hookBite;			// where the hook is meant to hold
+	idVec3					hookLanding;		// the route corner the shortcut ends over
+	float					hookBestDistance;	// closest the pull has brought the chest to the bite
+	int						hookProgressTime;
+	int						hookReason;			// botHookReason_t
+	int						hookUnstickRequest;	// when the stuck watch last saw no progress, 0 for none
+	int						nextHookRescueTime;
+	idVec3					hookLastGround;		// the last floor the bot stood on, for a rescue
+	bool					hookLastGroundValid;
+	float					strafeSide;
+	int						strafeFlipTime;
+	bool					dodgeJump;
+	idVec3					dodgeDirection;		// world-space step chosen for the pending dodge, zero for "strafe"
+
+	// -- chat --
+	idStr					chatPending;
+	bool					chatTeamOnly;
+	bool					chatPendingIsReply;
+	int						chatSendTime;
+	int						killStreak;
+	int						revengeTarget;		// client number owed a debt, -1 for none
+	bool					announcedEntry;
+
+	int						nextWeaponTime;
+	int						lastWeaponSwitchTime;
+	int						nextBuyTime;		// throttles buy-menu decisions
+	int						nextRejoinTime;		// throttles the leave-spectate request
+	int						nextStatusTime;		// bot_debug 2 throttle
+	int						nextAimDebugTime;	// bot_debugAim 2 throttle
 };
 
-#include "Bot_char.h"
-#include "Bot_weights.h"
-#include "Bot_weapons.h"
-#include "Bot_goal.h"
-
-struct bot_state_t
-{
-	bot_state_t()
-	{
-		character = NULL;
-		gs = 0;
-		ws = 0;
-		Reset();
-	}
-	void Reset()
-	{		
-		attackerEntity = NULL;
-		client = 0;
-		entitynum = 0;
-		setupcount = 0;
-		entergame_time = 0;
-		weaponnum = 0;
-		lasthealth = 0;
-		ltg_time = 0;
-		weaponchange_time = 0;
-		enemy = -1;
-		enemyvisible_time = 0;
-		enemysuicide = 0;
-		enemysight_time = 0;
-		check_time = 0;
-		nbg_time = 0;
-		enemydeath_time = 0;
-		teleport_time = 0;
-		flags = 0;
-		firethrottlewait_time = 0;
-		attackchase_time = 0;
-		attackcrouch_time = 0;
-		attackstrafe_time = 0;
-		attackjump_time = 0;
-		firethrottleshoot_time = 0;
-		chase_time = 0;
-		thinktime = 0;
-		aggressiveAttackTime = 0.0f;
-		useRandomPosition = false;
-		aimtarget.Zero();
-		lastenemyorigin.Zero();
-		origin.Zero();
-		enemyorigin.Zero();
-		random_move_position.Zero();
-		last_enemy_visible_position.Zero();
-		viewangles.Zero();
-		eye.Zero();
-		memset( &inventory[0], 0, sizeof( inventory ) );
-	}
-
-	bot_character_t* character;
-	int gs;
-	int ws;
-	int enemy;
-	int client;
-	idEntity* attackerEntity;
-	int lasthealth;
-	int entitynum;
-	int setupcount;
-	int ltg_time;
-	int flags;
-	int weaponnum;
-	bool useRandomPosition;
-	float thinktime;
-	float chase_time;
-	float attackjump_time;
-	float attackcrouch_time;
-	float attackstrafe_time;
-	float attackchase_time;
-	float firethrottlewait_time;
-	float firethrottleshoot_time;
-	float nbg_time;									//nearby goal time
-	float entergame_time;
-	float weaponchange_time;
-	float check_time;
-	float teleport_time;
-	float enemyvisible_time;						//time the enemy was last visible
-	int enemysuicide;								//true when the enemy of the bot suicides
-	float enemysight_time;							//time before reacting to enemy
-	float enemydeath_time;							//time the enemy died
-	float aggressiveAttackTime;
-	idVec3 origin;
-	idVec3 aimtarget;
-	idVec3 random_move_position;
-	idVec3 last_enemy_visible_position;
-	idAngles viewangles;
-	idVec3 enemyorigin;
-	idVec3 eye;
-	idVec3 lastenemyorigin;
-	int inventory[MAX_BOT_INVENTORY];
-	bot_goal_t	currentGoal;
-	bot_input_t	botinput;
-};
-
-#include "Bot_chat.h"
-
-#define Bot_Time() ((float)gameLocal.time / 1000.0f)
-
+//----------------------------------------------------------------
+// rvBotManager
 //
-// rvmBot
-//
-class rvmBot : public idPlayer
-{
+// Owns the bot slots and is the only thing the rest of the game talks to.
+//----------------------------------------------------------------
+//----------------------------------------------------------------
+// A standing order a human team-mate gave in team chat: "kane defend",
+// "everyone follow me", "sorg and bagby hold here".  Orders are gameplay, not
+// chat flavour, so they work with bot chat switched off; the objective planner
+// reads them before it shares roles out, and team-mates allocate around them.
+//----------------------------------------------------------------
+typedef enum {
+	BOTORDER_NONE,				// free play, or what "dismissed" restores
+	BOTORDER_ATTACK,			// take the enemy flag; outside CTF, play the map
+	BOTORDER_DEFEND,			// hold the base, or the spot the order was given at
+	BOTORDER_FOLLOW				// stay with the player who gave it
+} botOrderKind_t;
+
+typedef struct botOrder_s {
+	int						kind;				// botOrderKind_t
+	int						commander;			// client number of the player who gave it
+	int						commanderSpawnId;	// gameLocal.spawnIds: a reused slot is someone else
+	int						team;				// the bot's team when ordered; a team change ends it
+	idEntityPtr<idEntity>	anchor;				// a spot defence's hold centre, NULL for the base
+	int						issuedTime;
+} botOrder_t;
+
+class rvBotManager {
 public:
-	friend class rvmBotAI;
+							rvBotManager( void );
 
-	CLASS_PROTOTYPE( rvmBot );
+	void					Init( void );
+	void					Shutdown( void );
 
-	rvmBot();
-	~rvmBot();
+	// Called once per server frame from idGameLocal::RunFrame, before any
+	// entity thinks, so the bots' commands are in place when players read them.
+	void					Think( void );
+	void					FinishFrameProfile( void );
 
-	void			Spawn( void );
-	virtual void	Think( void ) override;
-	virtual void	SpawnToPoint( const idVec3& spawn_origin, const idAngles& spawn_angles ) override;
-	virtual	void	Damage( idEntity* inflictor, idEntity* attacker, const idVec3& dir, const char* damageDefName, const float damageScale, const int location ) override;
-	virtual void	InflictedDamageEvent(idEntity* target) override;
-	virtual void	StateThreadChanged(void) override;
-	virtual bool	IsBot(void) override { return true; }
+	// Console entry points.  skillLevel is the optional per-bot override from
+	// "addbot <name> <skill>"; -1 means follow bot_skill.
+	bool					AddBot( const char *name, int skillLevel = -1,
+								bool requireExactCharacter = false );
+	bool					RemoveBot( const char *name );
+	void					RemoveAll( void );
+	void					ListBots( bool weaponDetail = false ) const;
+	// Local cheat diagnostic: one bot, or two untargetable pad-traffic bots,
+	// plus the local observer. An optional pad entry replays its walking approach;
+	// climb restores a pending ordinary hop window without forcing its input.
+	bool					ProbeTraversal( int clientNum, const idVec3 &origin, const idVec3 &velocity,
+											const idVec3 &landing, navTravelType_t travel, idEntity *pad = NULL, bool dodge = false,
+									const idVec3 *airDirection = NULL, const idVec3 *entryOrigin = NULL,
+									const idVec3 *nextJump = NULL, bool naturalWalk = false, bool padTraffic = false,
+									bool recover = false, bool climb = false );
+	// The health, and knockback time, the next traversal probe gives its bot;
+	// 0 for unchanged.
+	bool					SetProbeHealth( int clientNum, int health, int knockbackMsec = 0, const idVec3 &kick = vec3_origin, int armor = -1 );
 
-	void			SetEnemy( idPlayer* player, idVec3 origin );
+	// Re-bind every live bot after the character roster has been reparsed.
+	// botreload must call this before the next frame runs, or every bot is
+	// reading a freed character.
+	void					RebindCharacters( void );
 
-	void			BotInputFrame( void );
-	void			Bot_ResetUcmd( usercmd_t& ucmd );
-	
+	// Lifecycle hooks.
+	void					OnSpawnPlayer( int clientNum, bool isBot, const char *botName );
+	void					OnClientDisconnect( int clientNum );
+	void					OnMapShutdown( void );
+	// Called from idPlayer::SpawnToPoint for every spawn, including the
+	// teleports a round or match restart makes without killing anyone.
+	void					OnPlayerRespawned( int clientNum );
 
-	static void		PresenceTypeBoundingBox( int presencetype, idVec3& mins, idVec3& maxs );
+	// Match hooks, all server side.  OnMatchStart/OnMatchEnd belong on the
+	// GAMEON and GAMEREVIEW transitions in rvGameState::NewState; OnPlayerDeath
+	// belongs beside statManager->Kill in idMultiplayerGame::PlayerDeath, which
+	// is after scoring has been committed, so a bot reacting there already sees
+	// the post-frag board.
+	void					OnMatchStart( void );
+	void					OnMatchEnd( void );
+	void					OnPlayerDeath( idPlayer *dead, idPlayer *killer, int methodOfDeath );
+
+	// Called once per frozen frame from
+	// idMultiplayerGame::RebaseCompetitivePauseFrame.  idGameLocal::RunFrame
+	// keeps advancing gameLocal.time through a competitive pause while it skips
+	// rvBotManager::Think, so without this every bot resumes with every deadline
+	// already expired: reactions forgiven, goals abandoned, stuck checks fired.
+	void					ShiftMatchTime( int deltaMsec );
+	void					OnPlayerDamaged( idPlayer *victim, idEntity *attacker, int damage, const idVec3 &dir );
+	// Called from idPlayer::Damage whenever knockback is applied to a bot,
+	// including impulses that friendly fire or armour leave without damage.
+	void					OnPlayerKnockback( idPlayer *victim, const idVec3 &kick );
+	void					RefreshKnockbackMove( idPlayer *player, usercmd_t &cmd );
+
+	// Called once for an accepted typed-chat line on the server.  It chooses at
+	// most one visible bot to answer and lets that bot's character content,
+	// chatiness, delay and the shared flood throttle decide whether it speaks.
+	void					OnChatMessage( int sourceClientNum, bool teamOnly, const char *visibleText );
+
+	// The order this bot is under, or NULL for free play.  An order whose bot
+	// changed team, or a follow order whose commander left, reads as none.
+	const botOrder_t *		GetOrder( int clientNum ) const;
+
+	// The navmesh node a player stands on, re-snapped only once it has moved
+	// a cell or two, so role allocation can compare route bounds for the
+	// whole team every decision without a ring of probes per player.
+	int						ClientNavNode( int clientNum ) const;
+
+	bool					IsBot( int clientNum ) const;
+	// The pad a bot is about to enter, with when it came within reach and the
+	// flight it will make, or false when it is approaching none this frame.
+	bool					PadApproachOf( int clientNum, int &padEntityNum, int &since,
+										   idVec3 &launch, idVec3 &landing ) const;
+	int						NumBots( void ) const;
+	int						GoalClaimCount( const rvBot *requester, const idEntity *goal ) const;
+	// The objective role a bot is executing right now, BOTOBJ_NONE for anything
+	// else, and the entity it serves.  Role allocation reads these to give an
+	// incumbent a margin, so roles do not swap with every step anyone takes.
+	int						ObjectiveKindOf( int clientNum ) const;
+	const idEntity *		ObjectiveEntityOf( int clientNum ) const;
+
+	// Time slicing.  A full goal decision prices pickups and routes, and when
+	// several bots' decision ticks land on one server frame that frame pays for
+	// all of them.  Each frame grants a few decisions; a bot refused one simply
+	// decides on the next frame, a sixtieth of a second later.
+	bool					ClaimDecision( void );
+	void					FillUserInfo( int clientNum, idDict &info );
+
+	// Every idItem the map has spawned, hidden or not, refreshed once per
+	// server frame before any bot thinks.  A decision tick reads this instead
+	// of walking the whole spawned-entity list again for every bot.
+	const idList<idItem *> &	GetItems( void ) const { return items; }
+
+	// Item timing.  Called from idItem::Pickup when a respawn is scheduled.
+	// Only bots that witness the pickup - the taker, anyone within earshot,
+	// or everyone for a globally announced powerup - learn the timer, and each
+	// keeps it with its own itemTiming accuracy.
+	void					OnItemPickup( idItem *item, idPlayer *player, float respawnSeconds );
+	// Absolute respawn time as clientNum believes it, or 0 when it has no timer.
+	int						KnownItemRespawn( const idItem *item, int clientNum ) const;
+	// When the item was last taken and by whom; -1 for nobody since map load.
+	int						ItemPickupTime( const idItem *item ) const;
+
+	// The loudest recent noise each player made this server frame, for hearing.
+	typedef struct botNoise_s {
+		idVec3				origin;
+		float				range;			// audible distance for an average listener
+		int					time;			// gameLocal.time it was last made, 0 for never
+	} botNoise_t;
+	const botNoise_t &		GetNoise( int clientNum ) const { return noises[clientNum]; }
+
+	// Selects the least-populated side in the bot's gameplay instance.  The
+	// count includes active bot reservations whose idPlayer has not spawned yet.
+	int						BalancedTeamForBot( int clientNum, int &balanceInstance ) const;
+
+	// Builds the navmesh if it has not been built for this map yet.  Returns
+	// false when the map has no walkable ground the bots can use.
+	bool					EnsureNavMesh( void );
+
 private:
-	void			BotSendChatMessage(botChat_t chat, const char *targetName);
+	void					CheckMinPlayers( void );
+	// The bot autofill should remove now, or -1 to wait: from the larger team,
+	// dead or queued before alive, and never a seated duel or a live round
+	// player in the middle of what they are playing.
+	int						PickBotToRemove( void ) const;
+	bool					RemoveBotAt( int clientNum );
+	void					UpdateLeaderChat( void );
+	void					ResetReplyCooldowns( void );
+	// Parses "<names or everyone> <order>" from a human in team chat and gives
+	// the order.  True when the line was an order, which is then not small talk.
+	bool					HandleTeamOrder( int sourceClientNum, bool teamOnly, const idStr &normalizedText );
+	void					ClearOrder( int clientNum );
+	const char *			PickBotName( void ) const;
+	void					RefreshWorldCache( void );
+	void					UpdateProfile( double thinkTicks );
 
-	void			BotInputToUserCommand( bot_input_t* bi, usercmd_t* ucmd, int time );
+	rvBot					bots[MAX_CLIENTS];
+	bool					navBuilt;
+	bool					navFailed;
+	int						nextMinPlayerCheck;
 
-	void			BotMoveToGoalOrigin( idVec3 goalOrigin );
+	idList<idItem *>		items;
 
-	void			ServerThink( void );
-	void			BotUpdateInventory( void );
+	int						probeHealth;			// pending bot_probeHealth value
+	int						probeKnockback;		// and its knockback milliseconds
+	int						probeArmor;			// optional exact armour; -1 preserves spawn inventory
+	idVec3					probeKick;			// already included in the probe velocity; reaction only
+	int						decisionFrame;			// gameLocal.framenum the count belongs to
+	int						decisionsThisFrame;
 
-	bool			HasWeapon( int index )
-	{
-		return inventory.weapons & ( 1 << index );
-	}
-private:
-	bot_state_t		bs;
-	bool			hasSpawned;
+	// Indexed by entity number; itemTimerSpawnId ties an entry to one spawn of
+	// that entity so a reused slot never inherits a stale timer.
+	int						itemTimerSpawnId[MAX_GENTITIES];
+	int						itemPickupAt[MAX_GENTITIES];
+	int						itemRespawnAt[MAX_GENTITIES];
+	unsigned int			itemTimerKnownBy[MAX_GENTITIES];	// bit per client
 
-private:
-	int				weapon_machinegun;
-	int				weapon_shotgun;
-	int				weapon_plasmagun;
-	int				weapon_rocketlauncher;
-protected:
-	bool			BotIsDead(bot_state_t* bs);
-	bool			BotReachedGoal(bot_state_t* bs, bot_goal_t* goal);
-	int				BotGetItemLongTermGoal(bot_state_t* bs, int tfl, bot_goal_t* goal);
-	void			BotChooseWeapon(bot_state_t* bs);
-	int				BotFindEnemy(bot_state_t* bs, int curenemy);
-	bool			EntityIsDead(idEntity* entity);
-	float			BotEntityVisible(int viewer, idVec3 eye, idAngles viewangles, float fov, int ent);
-	float			BotEntityVisibleTest(int viewer, idVec3 eye, idAngles viewangles, float fov, int ent, bool allowHeightTest);
-	void			BotUpdateBattleInventory(bot_state_t* bs, int enemy);
-	float			BotAggression(bot_state_t* bs);
-	int				BotWantsToRetreat(bot_state_t* bs);
-	void			BotBattleUseItems(bot_state_t* bs);
-	void			BotAimAtEnemy(bot_state_t* bs);
-	void			BotCheckAttack(bot_state_t* bs);
-	bool			BotWantsToChase(bot_state_t* bs);
-	int				BotNearbyGoal(bot_state_t* bs, int tfl, bot_goal_t* ltg, float range);
-	void			BotGetRandomPointNearPosition(idVec3 point, idVec3& randomPoint, float radius);
-	int				BotMoveInRandomDirection(bot_state_t* bs);
-	void			BotMoveToGoal(bot_state_t* bs, bot_goal_t* goal);
+	botNoise_t				noises[MAX_CLIENTS];
+	void					RecordNoise( int clientNum, const idVec3 &origin, float range );
+	void					ResetAwareness( void );
 
-	void			MoveToCoverPoint(void);
+	// bot_profile accumulators.  Wall-clock measurement only; nothing here
+	// feeds a decision.
+	double					profileThinkTicks;
+	double					profileFrameTicks;
+	int						profileFrameNumber;
+	double					profileMaxTicks;
+	int						profileFrames;
+	rvBotFrameProfile		profileDistribution;
+	int						nextProfileTime;
 
-	static int	WP_MACHINEGUN;
-	static int	WP_SHOTGUN;
-	static int	WP_PLASMAGUN;
-	static int	WP_ROCKET_LAUNCHER;
-public:
-	stateResult_t	state_Chase(const stateParms_t& parms);
-	stateResult_t	state_BattleFight(const stateParms_t& parms);
-	stateResult_t	state_BattleNBG(const stateParms_t& parms);
-	stateResult_t	state_Retreat(const stateParms_t& parms);
-	stateResult_t	state_Respawn(const stateParms_t& parms);
-	stateResult_t	state_SeekNBG(const stateParms_t& parms);
-	stateResult_t	state_SeekLTG(const stateParms_t& parms);
-	stateResult_t	state_Attacked(const stateParms_t& parms);
+	// AddBot allocates the client slot and the engine calls straight back into
+	// OnSpawnPlayer, which is where the bot is actually built - so a per-bot
+	// skill has to be parked here for the length of that call.
+	int						pendingSkill;
+	bool					pendingExactCharacter;
 
-	CLASS_STATES_PROTOTYPE(rvmBot);
-private:
-	idAAS*			aas;
+	// Who is winning.  idMultiplayerGame::UpdateLeader is declared and never
+	// defined and the lead announcements in CommonRun are written for the local
+	// player only, so there is no server side hook to hang lead chat on.
+	int						leaderClientNum;
+	int						nextLeaderCheck;
+	int						nextReplySourceTime[MAX_CLIENTS];
+
+	botOrder_t				orders[MAX_CLIENTS];
+
+	mutable int				clientNode[MAX_CLIENTS];
+	mutable idVec3			clientNodeOrigin[MAX_CLIENTS];
+	mutable int				clientNodeTime[MAX_CLIENTS];
 };
 
+extern rvBotManager			botManager;
 
-extern idCVar bot_skill;
-
+#endif /* !__GAME_MP_BOT_H__ */

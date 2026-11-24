@@ -4,8 +4,8 @@
 // Copyright 2002-2004 Raven Software
 //----------------------------------------------------------------
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "ClientEffect.h"
@@ -43,7 +43,6 @@ void rvClientEffect::Init ( const idDecl *effect ) {
 	renderEffect.startTime	= -1.0f;
 	renderEffect.inConnectedArea = true;
 	renderEffect.referenceSoundHandle = -1;
-	// Keep effect color/brightness sane even on paths that defer/skip Play().
 	renderEffect.shaderParms[SHADERPARM_RED] = 1.0f;
 	renderEffect.shaderParms[SHADERPARM_GREEN] = 1.0f;
 	renderEffect.shaderParms[SHADERPARM_BLUE] = 1.0f;
@@ -403,8 +402,6 @@ rvClientEffect::Restore
 void rvClientEffect::Restore( idRestoreGame *savefile ) {
 	savefile->ReadRenderEffect( renderEffect );
 	effectDefHandle = -1;
-	// Keep the saved emitter: the sound world restores it at the same index, and the
-	// restarted effect replaces its restored loops instead of doubling them.
 	savefile->ReadJoint( endOriginJoint );
 }
 

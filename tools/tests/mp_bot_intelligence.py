@@ -865,12 +865,12 @@ def validate_tactical_coherence(bot: str, header: str) -> None:
 
 def main() -> int:
     try:
-        bot = read_game("src/mpgame/bots/Bot.cpp")
-        header = read_game("src/mpgame/bots/Bot.h")
-        player = read_game("src/mpgame/Player.cpp")
-        combat = read_game("src/mpgame/bots/BotCombat.cpp")
-        objective_header = read_game("src/mpgame/bots/BotObjective.h")
-        objective = read_game("src/mpgame/bots/BotObjective.cpp")
+        bot = read_game("src/game/bots/Bot.cpp")
+        header = read_game("src/game/bots/Bot.h")
+        player = read_game("src/game/Player.cpp")
+        combat = read_game("src/game/bots/BotCombat.cpp")
+        objective_header = read_game("src/game/bots/BotObjective.h")
+        objective = read_game("src/game/bots/BotObjective.cpp")
 
         validate_perception_and_damage(bot, header, player, combat)
         validate_dodging_and_projectiles(bot, header, combat)

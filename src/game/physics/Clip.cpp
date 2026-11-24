@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -253,7 +253,9 @@ void idClipModel::ReplaceTraceModel( int index, const idTraceModel &trm, const i
 	entry->refCount = 1;
 	entry->hash = 0xffffffff;
 	entry->material = material;
-	if ( entry->collisionModel ) {
+
+	if(entry->collisionModel)
+	{
 		collisionModelManager->FreeModel( entry->collisionModel );
 	}
 	entry->collisionModel = collisionModelManager->ModelFromTrm( gameLocal.GetMapName(), va( "traceModel%d", index ), trm, material );
@@ -410,8 +412,6 @@ void idClipModel::FreeModel( void ) {
 	renderModelHandle = -1;
 }
 
-// RAVEN BEGIN
-// ddynerman: SD's clip sector code
 /*
 ================
 idClipModel::UpdateDynamicContents
@@ -420,7 +420,6 @@ idClipModel::UpdateDynamicContents
 void idClipModel::UpdateDynamicContents( void ) {
 	idClip::UpdateDynamicContents( this );
 }
-// RAVEN END
 
 /*
 ================
@@ -429,9 +428,7 @@ idClipModel::LoadModel
 */
 bool idClipModel::LoadModel( const char *name ) {
 	FreeModel();
-// jmarshall: added precache flag
-	collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), name, false );
-// jmarshall end
+	collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), name );
 	if ( collisionModel != NULL ) {
 		collisionModel->GetBounds( bounds );
 		collisionModel->GetContents( contents );
@@ -559,9 +556,7 @@ idClipModel::idClipModel( const idClipModel *model ) {
 	contents = model->contents;
 	collisionModel = NULL;
 	if ( model->collisionModel != NULL ) {
-// jmarshall - added precache flag
-		collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), model->collisionModel->GetName(), false );
-// jmarshall end
+		collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), model->collisionModel->GetName() );
 	}
 	traceModelIndex = -1;
 	if ( model->traceModelIndex != -1 ) {
@@ -667,9 +662,7 @@ void idClipModel::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt( contents );
 	savefile->ReadString( collisionModelName );
 	if ( collisionModelName.Length() ) {
-// jmarshall - added precache flag
-		collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), collisionModelName, false );
-// jmarshall end
+		collisionModel = collisionModelManager->LoadModel( gameLocal.GetMapName(), collisionModelName );
 	} else {
 		collisionModel = NULL;
 	}
@@ -679,8 +672,8 @@ void idClipModel::Restore( idRestoreGame *savefile ) {
 			gameLocal.Warning( "idClipModel::Restore: invalid trace model index %d (cache size %d)", traceModelIndex, traceModelCache.Num() );
 			traceModelIndex = -1;
 		} else {
-			traceModelCache[ traceModelIndex ]->refCount++;
-		}
+		traceModelCache[traceModelIndex]->refCount++;
+	}
 	}
 	savefile->ReadInt( renderModelHandle );
 	savefile->ReadBool( linked );
@@ -969,9 +962,7 @@ void idClip::Init( void ) {
 	idVec3 size, maxSector = vec3_origin;
 
 	// get world map bounds
-// jmarshall - added precache flag
-	world = collisionModelManager->LoadModel( gameLocal.GetMapName(), WORLD_MODEL_NAME, false );
-// jmarshall end
+	world = collisionModelManager->LoadModel( gameLocal.GetMapName(), WORLD_MODEL_NAME );
 	world->GetBounds( worldBounds );
 
 	// create world sectors
@@ -1338,6 +1329,18 @@ int idClip::PointContents(const idVec3 p)
 }
 
 /*
+============
+idClip::RoundedSectorCoords
+
+openQ4: the multiplayer mode keeps Raven's rounded clip sector coordinates;
+the campaign floors and ceils them (see CoordsForBounds).
+============
+*/
+bool idClip::RoundedSectorCoords( void ) {
+	return gameLocal.IsMultiplayerMode();
+}
+
+/*
 ====================
 idClip::GetClipSectorsStaticContents
 ====================
@@ -1398,6 +1401,9 @@ int idClip::GetTraceClipModels( const idBounds &bounds, int contentMask, const i
 
 	// Some entities may carry placeholder clip models with bounds/contents but no
 	// collision or trace model backing. They can never collide, so skip them here.
+	// openQ4: on a client an idActor combat model is built from modelDefHandle before the
+	// entity is first presented, and prediction frames link it without a render handle, so
+	// it reaches Contents/Rotation as a NULL collision model and fatals the client.
 	for ( i = 0; i < num; i++ ) {
 		cm = clipModelList[ i ];
 		if ( cm == NULL ) {
@@ -1633,20 +1639,20 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 
 	if ( !passEntity || passEntity->entityNumber != ENTITYNUM_WORLD ) {
 		if ( world ) {
-			// test world
-			idClip::numTranslations++;
-			collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
-			results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
-			if ( results.fraction == 0.0f ) {
-				EndClipProfile( CPT_TRANSLATION );
-				return true;		// blocked immediately by the world
-			}
-		} else {
-			memset( &results, 0, sizeof( results ) );
-			results.fraction = 1.0f;
-			results.endpos = end;
-			results.endAxis = trmAxis;
+		// test world
+		idClip::numTranslations++;
+		collisionModelManager->Translation( &results, start, end, trm, trmAxis, contentMask, world, vec3_origin, mat3_default );
+		results.c.entityNum = results.fraction != 1.0f ? ENTITYNUM_WORLD : ENTITYNUM_NONE;
+		if ( results.fraction == 0.0f ) {
+			EndClipProfile( CPT_TRANSLATION );
+			return true;		// blocked immediately by the world
 		}
+	} else {
+		memset( &results, 0, sizeof( results ) );
+		results.fraction = 1.0f;
+		results.endpos = end;
+		results.endAxis = trmAxis;
+	}
 	} else {
 		memset( &results, 0, sizeof( results ) );
 		results.fraction = 1.0f;
@@ -1662,10 +1668,7 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 		radius = trm->bounds.GetRadius();
 	}
 
-// RAVEN BEGIN
-// nmckenzie: we have cases where both a guy and his target need to be ignored by a translation
 	num = GetTraceClipModels( traceBounds, contentMask, passEntity, clipModelList, passEntity2 );
-// RAVEN END
 
 	for ( i = 0; i < num; i++ ) {
 		touch = clipModelList[i];
@@ -1695,15 +1698,11 @@ bool idClip::Translation( trace_t &results, const idVec3 &start, const idVec3 &e
 			results.c.entityNum = touch->entity->entityNumber;
 			results.c.id = touch->id;
 
-// RAVEN BEGIN
-// jscott: for material types
 			results.c.materialType = trace.c.materialType;
 
-// mekberg: copy contents
 			if ( touch->IsTraceModel( ) ) {
 				results.c.contents = touch->GetContents( );
 			}
-// RAVEN END
 
 			if ( results.fraction == 0.0f ) {
 				break;

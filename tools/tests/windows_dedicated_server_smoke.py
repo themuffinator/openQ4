@@ -268,7 +268,7 @@ def main(argv: list[str]) -> int:
         raise RuntimeError(f"arm64 binaries cannot start on this {host_arch} host")
     install_root = args.install_root.resolve()
     executable = (args.executable or install_root / f"openQ4-ded_{arch}.exe").resolve()
-    game_module = install_root / "baseoq4" / f"game-mp_{arch}.dll"
+    game_module = install_root / "baseoq4" / f"game_{arch}.dll"
     # The server imports OpenAL32.dll directly, so the loader needs a matching
     # one beside the executable before any engine code runs.
     openal_runtime = executable.parent / "OpenAL32.dll"

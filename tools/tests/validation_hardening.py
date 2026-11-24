@@ -166,14 +166,16 @@ def validate_source_and_build_dir_guards() -> None:
 def validate_game_libs_repo_guards() -> None:
     game_libs_target = WORK / "openQ4-game-real"
     game_libs_link = WORK / "openQ4-game-link"
-    write_file(game_libs_target / "src" / "game" / "Game_local.cpp")
+    game_libs_target.mkdir(parents=True, exist_ok=True)
 
     expect_validation_error(
         lambda: VALIDATOR.ensure_game_libs_repo({"OPENQ4_GAMELIBS_REPO": str(game_libs_target)}),
-        "multiplayer game source directory was not found",
-        "missing multiplayer GameLibs source tree",
+        "game source directory was not found",
+        "missing GameLibs source tree",
     )
-    write_file(game_libs_target / "src" / "mpgame" / "Game_local.cpp")
+    # one src/game tree builds the game module for both modes; no src/game is needed
+    write_file(game_libs_target / "src" / "game" / "Game_local.cpp")
+    VALIDATOR.ensure_game_libs_repo({"OPENQ4_GAMELIBS_REPO": str(game_libs_target)})
 
     try:
         os.symlink(game_libs_target, game_libs_link, target_is_directory=True)
@@ -331,8 +333,7 @@ def validate_game_module_suffix_guard() -> None:
     dedicated = install_root / "openQ4-ded_x64.exe"
     write_file(client)
     write_file(dedicated)
-    write_file(game_dir / "game-sp_x64.so")
-    write_file(game_dir / "game-mp_x64.dll")
+    write_file(game_dir / "game_x64.so")
 
     with_host_flags(
         True,
@@ -354,8 +355,7 @@ def validate_game_module_architecture_match() -> None:
     dedicated = install_root / "openQ4-ded_x64.exe"
     write_file(client)
     write_file(dedicated)
-    write_file(game_dir / "game-sp_x64.dll")
-    write_file(game_dir / "game-mp_arm64.dll")
+    write_file(game_dir / "game_arm64.dll")
 
     with_host_flags(
         True,
@@ -368,8 +368,8 @@ def validate_game_module_architecture_match() -> None:
         ),
     )
 
-    (game_dir / "game-mp_arm64.dll").unlink()
-    write_file(game_dir / "game-mp_x64.dll")
+    (game_dir / "game_arm64.dll").unlink()
+    write_file(game_dir / "game_x64.dll")
 
     def assert_valid_arch_set() -> None:
         arches = VALIDATOR.validate_staged_architecture_set(root, game_dir, [client], [dedicated])
@@ -379,22 +379,40 @@ def validate_game_module_architecture_match() -> None:
     with_host_flags(True, False, False, assert_valid_arch_set)
 
 
-def validate_game_module_distinctness_guard() -> None:
-    root = WORK / "module-distinctness"
-    game_dir = root / ".install" / "baseoq4"
-    sp_module = game_dir / "game-sp_x64.so"
-    mp_module = game_dir / "game-mp_x64.so"
-    write_file(sp_module, b"same-module\n")
-    write_file(mp_module, b"same-module\n")
+def validate_retired_game_module_guard() -> None:
+    """One game_<arch> module replaced game-sp/game-mp; a stage holding the old pair is stale."""
+    root = WORK / "module-retired"
+    install_root = root / ".install"
+    game_dir = install_root / "baseoq4"
+    client = install_root / "openQ4-client_x64.exe"
+    dedicated = install_root / "openQ4-ded_x64.exe"
+    write_file(client)
+    write_file(dedicated)
+    write_file(game_dir / "game_x64.dll")
+    retired = (game_dir / "game-sp_x64.dll", game_dir / "game-mp_x64.pdb")
+    for path in retired:
+        write_file(path)
 
-    expect_validation_error(
-        lambda: VALIDATOR.validate_distinct_game_modules(root, [sp_module], [mp_module]),
-        "byte-identical",
-        "SP/MP game module distinctness",
+    with_host_flags(
+        True,
+        False,
+        False,
+        lambda: expect_validation_error(
+            lambda: VALIDATOR.validate_staged_architecture_set(root, game_dir, [client], [dedicated]),
+            "retired split game modules",
+            "retired game-sp/game-mp modules",
+        ),
     )
 
-    write_file(mp_module, b"mp-module!!\n")
-    VALIDATOR.validate_distinct_game_modules(root, [sp_module], [mp_module])
+    for path in retired:
+        path.unlink()
+
+    def assert_single_module_stage() -> None:
+        arches = VALIDATOR.validate_staged_architecture_set(root, game_dir, [client], [dedicated])
+        if arches != {"x64"}:
+            raise AssertionError(f"a stage with only game_x64.dll was misread: {arches!r}")
+
+    with_host_flags(True, False, False, assert_single_module_stage)
 
 
 def validate_linux_runtime_dependency_guards() -> None:
@@ -403,8 +421,8 @@ def validate_linux_runtime_dependency_guards() -> None:
     client_arm64 = root / ".install" / "openQ4-client_arm64"
     dedicated_x64 = root / ".install" / "openQ4-ded_x64"
     dedicated_arm64 = root / ".install" / "openQ4-ded_arm64"
-    mp_x64 = root / ".install" / "baseoq4" / "game-mp_x64.so"
-    mp_arm64 = root / ".install" / "baseoq4" / "game-mp_arm64.so"
+    mp_x64 = root / ".install" / "baseoq4" / "game_x64.so"
+    mp_arm64 = root / ".install" / "baseoq4" / "game_arm64.so"
     original_readelf_output = VALIDATOR.readelf_output
     dynamic_section = ""
 
@@ -555,8 +573,7 @@ def validate_windows_pdb_architecture_match() -> None:
         install_root / "openQ4-ded_x64.pdb",
         install_root / "openQ4-updater_x64.pdb",
         install_root / "renderer-gl_x64.pdb",
-        game_dir / "game-sp_x64.pdb",
-        game_dir / "game-mp_x64.pdb",
+        game_dir / "game_x64.pdb",
     ):
         write_file(path)
 
@@ -674,7 +691,7 @@ def validate_validation_wiring() -> None:
         "validate_no_staged_symlinks",
         "validate_no_staged_casefold_path_collisions",
         "validate_staged_architecture_set",
-        "validate_distinct_game_modules",
+        "validate_no_retired_game_modules",
         "validate_linux_client_runtime_dependencies",
         "validate_linux_dedicated_runtime_dependencies",
         "validate_windows_symbols",
@@ -1285,7 +1302,7 @@ def main() -> None:
         validate_engine_architecture_mismatch()
         validate_game_module_suffix_guard()
         validate_game_module_architecture_match()
-        validate_game_module_distinctness_guard()
+        validate_retired_game_module_guard()
         validate_linux_runtime_dependency_guards()
         validate_windows_pdb_architecture_match()
         validate_python_test_failure_aggregation()

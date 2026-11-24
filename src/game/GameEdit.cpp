@@ -1,6 +1,6 @@
 		
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 // RAVEN BEGIN
@@ -485,11 +485,14 @@ bool idEditEntities::SelectEntity( const idVec3 &origin, const idVec3 &dir, cons
 	AddSelectedEntity( ent );
 	gameLocal.Printf( "entity #%d: %s '%s'\n", ent->entityNumber, ent->GetClassname(), ent->name.c_str() );
 
-	//if ( gameLocal.editors & EDITOR_ENTVIEW ) {
-	//	common->InitTool ( EDITOR_ENTVIEW, &ent->spawnArgs );
-	//} else {
-	//	ent->ShowEditingDialog();
-	//}
+	// jmarshall: SP disabled the entity editing dialog; MP keeps it
+	if ( gameLocal.IsMultiplayerMode() ) {
+		if ( gameLocal.editors & EDITOR_ENTVIEW ) {
+			common->InitTool ( EDITOR_ENTVIEW, &ent->spawnArgs );
+		} else {
+			ent->ShowEditingDialog();
+		}
+	}
 
 	return true;
 // RAVEN END
@@ -1301,7 +1304,7 @@ idGameEdit::LightSetParms
 ================
 */
 void idGameEdit::LightSetParms ( idEntity* ent, int maxLevel, int currentLevel, float radius ) {	
-	intptr_t	 data;
+	intptr_t data;
 	idLight* light;
 	
 	// Switch to a light entity

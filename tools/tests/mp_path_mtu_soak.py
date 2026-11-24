@@ -106,7 +106,7 @@ def main() -> int:
     paths = {
         "engine": runtime / f"openQ4-client_x64{SUFFIX}",
         "dedicated": runtime / f"openQ4-ded_x64{SUFFIX}",
-        "game_mp": runtime / "baseoq4" / ("game-mp_x64" + (".dll" if os.name == "nt" else ".so")),
+        "game_mp": runtime / "baseoq4" / ("game_x64" + (".dll" if os.name == "nt" else ".so")),
         "pak0": runtime / "baseoq4/pak0.pk4", "pak1": runtime / "baseoq4/pak1.pk4",
     }
     if any(not path.is_file() for path in paths.values()) or not (assets / "q4base").is_dir():

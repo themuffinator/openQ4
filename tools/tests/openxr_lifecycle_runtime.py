@@ -158,7 +158,7 @@ def main() -> int:
         environment["OPENQ4_XR_TEST_FAULT"] = args.fault
     if vulkan:
         environment["OPENQ4_XR_TEST_SCRIPT"] = str(output / "xr_script.txt")
-    sources = ["src/sys/openxr/OpenXRSystem.cpp", "src/game/PlayerView.cpp", "src/mpgame/PlayerView.cpp",
+    sources = ["src/sys/openxr/OpenXRSystem.cpp", "src/game/PlayerView.cpp", "src/game/PlayerView.cpp",
                "src/renderer/RenderSystem_vr.cpp", "src/renderer/OpenGL/gl_VRPresentation.cpp",
                "src/renderer/Vulkan/vk_VRPresentation.cpp", "src/renderer/Vulkan/vk_GuiExecutor.cpp",
                "tools/tests/openxr/OpenXRTestRuntime.cpp",
@@ -170,7 +170,7 @@ def main() -> int:
               "command": command, "test_runtime": str(runtime_library), "captures": {}, "failures": [],
               "runtime_sha256": {(str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)): digest(path) for path in
                                  [executable, runtime_library, runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4",
-                                  *sorted((runtime / "baseoq4").glob("game-*.dll" if os.name == "nt" else "game-*.so"))]},
+                                  *sorted((runtime / "baseoq4").glob("game_*.dll" if os.name == "nt" else "game_*.so"))]},
               "input": "all test-runtime controller actions inactive; physical input disabled; no input injection",
               "capture": f"engine screenshot{'' if not vulkan else ' plus test-runtime eye captures'}; "
                          f"hidden 640x480 {args.render_api} window; simulated XR, no physical-headset claim"}

@@ -11,13 +11,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchDisclosurePolicy.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchDisclosurePolicy.cpp"
-VIEW_SOURCE = ROOT / "src/mpgame/mp/match/MatchView.cpp"
-SESSION_SOURCE = ROOT / "src/mpgame/mp/match/MatchSession.cpp"
-MULTIPLAYER_SOURCE = ROOT / "src/mpgame/MultiplayerGame.cpp"
-PLAYER_SOURCE = ROOT / "src/mpgame/Player.cpp"
-GAME_STATE_SOURCE = ROOT / "src/mpgame/mp/GameState.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchDisclosurePolicy.h"
+SOURCE = ROOT / "src/game/mp/match/MatchDisclosurePolicy.cpp"
+VIEW_SOURCE = ROOT / "src/game/mp/match/MatchView.cpp"
+SESSION_SOURCE = ROOT / "src/game/mp/match/MatchSession.cpp"
+MULTIPLAYER_SOURCE = ROOT / "src/game/MultiplayerGame.cpp"
+PLAYER_SOURCE = ROOT / "src/game/Player.cpp"
+GAME_STATE_SOURCE = ROOT / "src/game/mp/GameState.cpp"
 
 
 def read(path: Path) -> str:
@@ -366,15 +366,14 @@ def source_listing_contract() -> None:
             "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchDisclosurePolicy.cpp" not in {
+    if "game/mp/match/MatchDisclosurePolicy.cpp" not in {
         line.strip() for line in listing
     }:
         raise AssertionError(
@@ -434,8 +433,8 @@ private:
 };
 
 #define MP_MATCH_VIEW_STANDALONE_TEST 1
-#include "mpgame/mp/match/MatchView.cpp"
-#include "mpgame/mp/match/MatchDisclosurePolicy.h"
+#include "game/mp/match/MatchView.cpp"
+#include "game/mp/match/MatchDisclosurePolicy.h"
 
 mpMatchLocalizationId_t MPMatchProtocolReasonLocalizationId(mpMatchProtocolReason_t reason) {
     return reason == MP_MATCH_PROTOCOL_REASON_NONE ? MP_MATCH_LOCALIZATION_NONE :

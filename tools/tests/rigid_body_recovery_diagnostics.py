@@ -14,7 +14,7 @@ GAME_LIBS_ROOT = Path(
 ).resolve()
 RIGID_BODY_SOURCES = (
     "src/game/physics/Physics_RigidBody.cpp",
-    "src/mpgame/physics/Physics_RigidBody.cpp",
+    "src/game/physics/Physics_RigidBody.cpp",
 )
 
 DROP_DIAGNOSTIC = (

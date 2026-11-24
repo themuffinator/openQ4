@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -1070,19 +1070,22 @@ bool idInterpreter::Execute( void ) {
 
 // RAVEN BEGIN
 // bdube: if the debugger is running then we need to check to see if any breakpoints have beeng hit
-// jmarshall - reval
-		//if ( gameLocal.editors & EDITOR_DEBUGGER ) {
-		//	common->DebuggerCheckBreakpoint ( this, &gameLocal.program, instructionPointer );
-		//} else if ( g_debugScript.GetBool ( ) ) {
-		//	static int lastLineNumber = -1;
-		//	if ( lastLineNumber != gameLocal.program.GetStatement ( instructionPointer ).linenumber ) {				
-		//		gameLocal.Printf ( "%s (%d)\n", 
-		//			gameLocal.program.GetFilename ( gameLocal.program.GetStatement ( instructionPointer ).file ),
-		//			gameLocal.program.GetStatement ( instructionPointer ).linenumber
-		//			);
-		//		lastLineNumber = gameLocal.program.GetStatement ( instructionPointer ).linenumber;
-		//	}
-		//}
+		// openQ4: game_sp left the debugger check and g_debugScript trace commented
+		// out (jmarshall); game_mp kept them.
+		if ( gameLocal.IsMultiplayerMode() ) {
+			if ( gameLocal.editors & EDITOR_DEBUGGER ) {
+				common->DebuggerCheckBreakpoint ( this, &gameLocal.program, instructionPointer );
+			} else if ( g_debugScript.GetBool ( ) ) {
+				static int lastLineNumber = -1;
+				if ( lastLineNumber != gameLocal.program.GetStatement ( instructionPointer ).linenumber ) {				
+					gameLocal.Printf ( "%s (%d)\n", 
+						gameLocal.program.GetFilename ( gameLocal.program.GetStatement ( instructionPointer ).file ),
+						gameLocal.program.GetStatement ( instructionPointer ).linenumber
+						);
+					lastLineNumber = gameLocal.program.GetStatement ( instructionPointer ).linenumber;
+				}
+			}
+		}
 // RAVEN END
 
 		switch( st->op ) {

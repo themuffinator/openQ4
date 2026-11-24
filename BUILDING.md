@@ -64,8 +64,8 @@ Alternatively, open `tools/build/openq4_devcmd.cmd` first to initialise the Visu
 
 ## In-tree Game Sources
 
-The engine, single-player (`src/game/`) and multiplayer (`src/mpgame/`) sources
-are maintained and built in this checkout. Clone **openQ4 only**; the retired
+The engine and game (`src/game/`) sources are maintained and built in this
+checkout; the one game module they build serves single-player and multiplayer. Clone **openQ4 only**; the retired
 `openQ4-game` and `openQ4-game-awakening` checkouts are no longer build inputs.
 Their source histories are preserved in the import commit. See the
 [import record](docs/dev/game-source-provenance.md) and [licensing scope](LICENSING.md).
@@ -129,9 +129,9 @@ Pass any of these with `-D<option>=<value>` on the `meson setup` command line:
 | Option | Default | Description |
 |--------|---------|-------------|
 | `build_engine` | `true` | Build `openQ4-client_<arch>` and `openQ4-ded_<arch>` |
-| `build_games` | `true` | Build game modules |
-| `build_game_sp` | `true` | Build single-player game module |
-| `build_game_mp` | `true` | Build multiplayer game module |
+| `build_games` | `true` | Build the game module `game_<arch>`, which serves single-player and multiplayer |
+| `build_game_sp` | `true` | Deprecated and ignored: one game module serves both modes; use `build_games` |
+| `build_game_mp` | `true` | Deprecated and ignored: one game module serves both modes; use `build_games` |
 | `platform_backend` | `sdl3` | `sdl3` or `legacy_win32` on Windows, `sdl3` or `native` on Linux/macOS; macOS `native` is comparison-only and not a release backend |
 | `linux_x11` | `auto` | Linux SDL3 X11/XWayland driver and optional engine X11 helpers: `enabled`/`disabled` force bundled SDL with that selection; `auto` may use system SDL; `disabled` is Wayland/EGL-only |
 | `macos_graphics_bridge` | `opengl` | macOS-only graphics bridge: `opengl` or `metal`; `metal` requires `platform_backend=sdl3` and keeps rendering on the OpenGL compatibility path |
@@ -152,7 +152,7 @@ The Python checks are independent and run concurrently, as many at once as the m
 
 GitHub Actions runs the same validation entrypoints on pushes to `main`, pull requests, and manual dispatches. Pushes to `main` run the faster push profile across Linux x64, Linux ARM64, macOS ARM64, macOS Intel x64 (OpenGL bridge only), Windows x64, and Windows ARM64. A branch push does not run Push Verification, because its pull request runs Commit Validation on the same commit; dispatch Push Verification manually for a branch without a pull request. Pull requests/manual dispatches run the full PR profile on Windows x64, Windows ARM64, Linux ARM64, and macOS ARM64. The Validation Script Smoke job runs the validator's Python checks on Linux in two parallel halves. Separate jobs repeat them beside the builds on Windows x64 (two halves) and macOS ARM64, for the MSVC STL, libc++ and arm64 behavior their native harnesses depend on; every build job passes `--skip-python-tests`, and none waits for a check job. The SYSTEM page's native tests repeat in every shipped language; those non-English repeats form the `locales` Meson suite, which one Linux x64 job per workflow runs and the others skip with `--skip-test-suite locales`. Both Windows lanes start the staged dedicated server without game data through `tools/tests/windows_dedicated_server_smoke.py`, but no job starts a Windows client; the staged Linux ARM64 client also runs an assetless no-map renderer startup smoke under a virtual X display. Native Wayland PR jobs run assetless lifecycle, fullscreen/window, input-capture, and display cases under headless Weston on both x64 and ARM64. They verify that preferred libdecor is actually loaded, that the opt-out prevents it from loading, and that the Wayland-only build has no direct X11/GLX dependency. Staged Linux package validation rejects direct PipeWire dependencies from clients and permits only core C/C++/POSIX/compiler runtimes for the x64 and ARM64 dedicated executable plus its loaded MP module. These hosted ARM64 cases prove build/package and window/compositor/input startup, not audio or real SP/MP gameplay.
 
-Manual releases default to `linux_arm64_support_tier=preview`. Selecting `first-class` is a hard gate: the workflow requires accepted physical ARM64 native-Wayland SP/MP, stock-map dedicated-server, audio, input, display, and package evidence in [the Linux ARM64 signoff record](docs/dev/linux-arm64-signoff-evidence.md). The accepted TOML must come from an immutable `linux_arm64_evidence_ref` and match the triggering openQ4 SHA, in-tree game SHA (the same engine commit), release version/tags, exact first-class archive name, archive SHA-256, and all four runtime ELF SHA-256 values. Removing the preview label without that candidate-bound record fails before the release matrix builds.
+Manual releases default to `linux_arm64_support_tier=preview`. Selecting `first-class` is a hard gate: the workflow requires accepted physical ARM64 native-Wayland SP/MP, stock-map dedicated-server, audio, input, display, and package evidence in [the Linux ARM64 signoff record](docs/dev/linux-arm64-signoff-evidence.md). The accepted TOML must come from an immutable `linux_arm64_evidence_ref` and match the triggering openQ4 SHA, in-tree game SHA (the same engine commit), release version/tags, exact first-class archive name, archive SHA-256, and all three runtime ELF SHA-256 values. Removing the preview label without that candidate-bound record fails before the release matrix builds.
 
 Pull requests also run Linux Sanitizer Validation on x64 with ASan+UBSan enabled. The lane builds the engine and staged game-module code without precompiled headers, stages the instrumented runtime separately from release dependency validation, then runs an assetless SDL3 window/fullscreen lifecycle smoke through native Wayland under headless Weston and Mesa software rendering. Sanitizer failures stop the smoke immediately, and its logs are retained with the build diagnostics.
 
@@ -250,7 +250,7 @@ The Python checks run before Meson setup, and a few native UI checks compile the
 
 ### PR Validation
 
-Use this before opening or updating a pull request. It performs a clean release-style debug build in `.tmp/validation/pr-builddir`, stages `.install/`, and verifies the staged runtime payload contains the expected engine executables, SP/MP game modules, required `baseoq4` files, Windows diagnostic symbols when applicable, and no root-level build-only linker artifacts.
+Use this before opening or updating a pull request. It performs a clean release-style debug build in `.tmp/validation/pr-builddir`, stages `.install/`, and verifies the staged runtime payload contains the expected engine executables, the game module, required `baseoq4` files, Windows diagnostic symbols when applicable, and no root-level build-only linker artifacts.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/validation/validate_pr.ps1
@@ -395,7 +395,7 @@ assetless runtime probe enabled for the normal diagnostic run. This is a
 lane.
 
 The workflow builds both OpenGL and Metal bridge configurations with ASan+UBSan,
-stages the instrumented client, dedicated server, and SP/MP modules, verifies
+stages the instrumented client, dedicated server, and game module, verifies
 their arm64 slices and sanitizer references, and runs
 `renderer-default-safety-selftest` without stock Quake 4 assets. It uses the
 equivalent Meson options:
@@ -592,7 +592,7 @@ Package the default SDL3 backend with OpenGL plus Wayland/EGL support, and keep 
 - Wayland decoration preference: `OPENQ4_WAYLAND_PREFER_LIBDECOR=1` when a compositor behaves better with libdecor.
 - Wayland window-operation diagnostics: `OPENQ4_WAYLAND_SYNC_WINDOW_OPS=1`; use only for troubleshooting because some compositors can block during window animations.
 
-The game sources compile directly from `src/game/` and `src/mpgame/`.
+The game sources compile directly from `src/game/`.
 `builddir/openq4_game_sources.json` records source hashes and the engine Git
 identity; both receipt source fields now identify that same commit. Keep this
 inventory with CI evidence, rather than copying source trees into runtime packages.
@@ -639,8 +639,7 @@ bash tools/build/meson_setup.sh install -C builddir --no-rebuild --skip-subproje
 | `baseoq4/pak1.pk4` | Compiled openQ4 light-grid pack (clients only) |
 | `baseoq4/pak2.pk4` | Compiled openQ4 loadscreen pack (clients only) |
 | `baseoq4/mod.json` | openQ4 game-directory manifest |
-| `baseoq4/game-sp_<arch>[.dll/.so/.dylib]` | Single-player game module |
-| `baseoq4/game-mp_<arch>[.dll/.so/.dylib]` | Multiplayer game module |
+| `baseoq4/game_<arch>[.dll/.so/.dylib]` | Game module, loaded for single-player (`game_sp`) and multiplayer (`game_mp`) |
 
 - BSE (Basic Set of Effects) is linked directly into `openQ4-client_<arch>`; the dedicated server keeps a disabled/stub path.
 - `content/baseoq4/pak0/`, `pak1/` and `pak2/` are compiled into deterministic `pak0.pk4`, `pak1.pk4` and `pak2.pk4` before the engine is built, as listed in `tools/build/content_packs.json`; their sources are checked out without end-of-line conversion so every platform packs the same bytes; the generated pack checksums are embedded into the executable so startup can reject missing or modified openQ4 runtime packs. A pack that passes is recorded under `fs_cachepath` and hashed again only when its file changes, so the first launch after a build or an install step hashes the packs it rewrote and later launches skip them ([runtime pack verification](docs/dev/runtime-pack-verification.md)).
@@ -664,10 +663,8 @@ After running the install step, `.install/` is the staged distributable package 
     ├── pak1.pk4                         # Compiled openQ4 light grids (clients only)
     ├── pak2.pk4                         # Compiled openQ4 loadscreens (clients only)
     ├── mod.json                         # openQ4 game-directory manifest
-    ├── game-sp_<arch>[.dll/.so/.dylib]   # Single-player module
-    ├── game-sp_<arch>.pdb                # (Windows) SP diagnostic symbols
-    ├── game-mp_<arch>[.dll/.so/.dylib]   # Multiplayer module
-    └── game-mp_<arch>.pdb                # (Windows) MP diagnostic symbols
+    ├── game_<arch>[.dll/.so/.dylib]      # Game module (single-player and multiplayer)
+    └── game_<arch>.pdb                   # (Windows) game-module diagnostic symbols
 ```
 
 > [!NOTE]
@@ -677,8 +674,8 @@ Repo-authored runtime overrides live under `content/baseoq4/pak0/`, `pak1/` and 
 
 For macOS release artifacts, `tools/build/package_nightly.py` transforms that
 staging layout into a self-contained `openQ4.app`: `mod.json` and the PK4s move
-to `Contents/Resources/baseoq4`, while the Mach-O SP/MP modules move flat into
-`Contents/Frameworks` so they can be signed as nested code before the outer
+to `Contents/Resources/baseoq4`, while the Mach-O game module moves flat into
+`Contents/Frameworks` so it can be signed as nested code before the outer
 app. The packaged loose client and dedicated server discover those sibling app
 roots; the large staged payload is not duplicated beside the bundle.
 
@@ -710,7 +707,7 @@ Manual releases must be dispatched from the `main` branch. The metadata job free
 
 **Release workflow speed.** The Linux and macOS packagers write each tar once and feed every compressor from that stream; `.tar.xz` uses `xz -T0` with a fixed 24 MiB block size (reproducible whatever the core count), and `.tar.gz` uses gzip level 6 with an empty name and time in its header. Python's single-threaded lzma is only the fallback when no `xz` exists: it ran at about 1 to 2 MB/s on the already-compressed content packs, so the 0.15.0 Linux packaging steps took 6 to 10 minutes for a 1.5% saving. Debug-symbol archives use `XZ_OPT=-T0` too. The prepared Windows OpenAL Soft install is cached under the hash of `tools/build/prepare_windows_openal.ps1`, with push verification on `main` keeping the cache warm. Already-compressed archives upload as workflow artifacts without recompression, the publish job checks every archive in one decompression pass on parallel threads and runs both update proofs at once, and the Discord job checks out only `.github/scripts`.
 
-Linux release validation brackets every binary mutation. The normal staged ELF/package gate runs before debug-symbol separation; immediately after `objcopy`, the workflow revalidates the stripped client, dedicated server, and distinct SP/MP modules for native architecture, PIE/RELRO/NOW/non-executable-stack hardening, the closed `GetGameAPI` module ABI, safe/resolvable `DT_NEEDED` dependencies, retained build IDs, and matching `.gnu_debuglink` filename/CRC data against the detached files. After packaging, the workflow extracts the exact `.tar.xz` and `.tar.gz` upload candidates into a bounded isolated temporary directory and repeats those ELF, dependency, build-ID, and debuglink checks on the extracted bytes before artifact upload.
+Linux release validation brackets every binary mutation. The normal staged ELF/package gate runs before debug-symbol separation; immediately after `objcopy`, the workflow revalidates the stripped client, dedicated server, and game module for native architecture, PIE/RELRO/NOW/non-executable-stack hardening, the closed `GetGameAPI` module ABI, safe/resolvable `DT_NEEDED` dependencies, retained build IDs, and matching `.gnu_debuglink` filename/CRC data against the detached files. After packaging, the workflow extracts the exact `.tar.xz` and `.tar.gz` upload candidates into a bounded isolated temporary directory and repeats those ELF, dependency, build-ID, and debuglink checks on the extracted bytes before artifact upload.
 
 Linux release builds also force the bundled SDL configuration with both native Wayland and X11/XWayland enabled. After debug-symbol separation, the workflow launches the exact stripped staged client assetlessly under headless Weston with `DISPLAY` removed and SDL forced to Wayland, then under Xvfb with SDL forced to X11. After AppImage construction, the exact upload candidate repeats those two bounded lifecycle probes through AppRun. Both gates require the requested SDL driver, SDL3 renderer/window startup, renderer diagnostics, normal process exit, and SDL3 OpenGL teardown; failed runs publish the Weston, Xvfb, engine, stdout/stderr, and matrix-report diagnostics. This hosted assetless release gate improves package regression coverage but does not change the documented Linux ARM64 preview tier or replace physical-hardware gameplay, audio, input, display, and package signoff.
 

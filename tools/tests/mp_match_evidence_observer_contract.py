@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH_DIR = ROOT / "src/mpgame/mp/match"
+MATCH_DIR = ROOT / "src/game/mp/match"
 HEADER = MATCH_DIR / "MatchEvidenceObserver.h"
 SOURCE = MATCH_DIR / "MatchEvidenceObserver.cpp"
 EVIDENCE_SOURCE = MATCH_DIR / "MatchEvidence.cpp"
@@ -76,7 +76,7 @@ def static_contracts(header: str, source: str, evidence_source: str) -> None:
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchEvidenceObserver.h"
+#include "game/mp/match/MatchEvidenceObserver.h"
 
 #include <cstddef>
 #include <cstdlib>

@@ -1,14 +1,14 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
 
 // simple types.  function types are dynamically allocated
 idTypeDef	type_void( ev_void, &def_void, "void", 0, NULL );
-idTypeDef	type_scriptevent( ev_scriptevent, &def_scriptevent, "scriptevent", sizeof(intptr_t), NULL );
-idTypeDef	type_namespace( ev_namespace, &def_namespace, "namespace", sizeof(intptr_t), NULL );
+idTypeDef	type_scriptevent( ev_scriptevent, &def_scriptevent, "scriptevent", sizeof( intptr_t ), NULL );
+idTypeDef	type_namespace( ev_namespace, &def_namespace, "namespace", sizeof( intptr_t ), NULL );
 // RAVEN BEGIN
 // abahr
 rvTypeDefString	type_string( ev_string, &def_string, "string", MAX_STRING_LEN, NULL );
@@ -17,12 +17,12 @@ rvTypeDefVec3	type_vector( ev_vector, &def_vector, "vector", sizeof( idVec3 ), N
 rvTypeDefEntity	type_entity( ev_entity, &def_entity, "entity", sizeof( int ), NULL );						// stored as entity number
 // RAVEN END
 idTypeDef	type_field( ev_field, &def_field, "field", sizeof( int ), NULL );
-idTypeDef	type_function( ev_function, &def_function, "function", sizeof(intptr_t), &type_void );
+idTypeDef	type_function( ev_function, &def_function, "function", sizeof( intptr_t ), &type_void );
 idTypeDef	type_virtualfunction( ev_virtualfunction, &def_virtualfunction, "virtual function", sizeof( int ), NULL );
-idTypeDef	type_pointer( ev_pointer, &def_pointer, "pointer", sizeof(intptr_t), NULL );
+idTypeDef	type_pointer( ev_pointer, &def_pointer, "pointer", sizeof( intptr_t ), NULL );
 idTypeDef	type_object( ev_object, &def_object, "object", sizeof( int ), NULL );						// stored as entity number
-idTypeDef	type_jumpoffset( ev_jumpoffset, &def_jumpoffset, "<jump>", sizeof( int ), NULL );			// only used for jump opcodes
-idTypeDef	type_argsize( ev_argsize, &def_argsize, "<argsize>", sizeof( int ), NULL );					// only used for function call and thread opcodes
+idTypeDef	type_jumpoffset( ev_jumpoffset, &def_jumpoffset, "<jump>", sizeof( int ), NULL );		// only used for jump opcodes
+idTypeDef	type_argsize( ev_argsize, &def_argsize, "<argsize>", sizeof( int ), NULL );				// only used for function call and thread opcodes
 // RAVEN BEGIN
 // abahr
 rvTypeDefBool	type_boolean( ev_boolean, &def_boolean, "boolean", sizeof( int ), NULL );
@@ -1519,6 +1519,7 @@ idVarDef *idProgram::AllocDef( idTypeDef *type, const char *name, idVarDef *scop
 	def->scope		= scope;
 	def->numUsers	= 1;
 	def->num		= varDefs.Append( def );
+	def->compileStamp = compileStamp;
 
 	// add the def to the list with defs with this name and set the name pointer
 	AddDefToNameList( def, name );
@@ -2152,7 +2153,7 @@ size_t idProgram::ScriptSummary( const idCmdArgs &args ) {
 idProgram::CompileText
 ================
 */
-bool idProgram::CompileText( const char *source, const char *text, bool console ) {
+bool idProgram::CompileText( const char *source, const char *text, bool console, bool fatal ) {
 	idCompiler	compiler;
 	int			i;
 	idVarDef	*def;
@@ -2160,9 +2161,8 @@ bool idProgram::CompileText( const char *source, const char *text, bool console 
 
 // RAVEN BEGIN
 // bdube: Make sure the file hasnt already been loaded
-	// File includes are idempotent; console snippets are not. Every invocation
-	// of the `script` command uses the source name "console" and creates a new
-	// function. Reusing the file cache silently discarded every later command.
+	// Every console snippet defines a new function, even though its source
+	// name is reused. Only file includes may be skipped by this cache.
 	if ( !console && -1 != fileList.FindIndex ( idStr(source) ) ) {
 		return true;
 	}
@@ -2171,6 +2171,8 @@ bool idProgram::CompileText( const char *source, const char *text, bool console 
 	// use a full os path for GetFilenum since it calls OSPathToRelativePath to convert filenames from the parser
 	ospath = fileSystem->RelativePathToOSPath( source );
 	filenum = GetFilenum( ospath );
+
+	++compileStamp;
 
 	try {
 		compiler.CompileFile( text, filename, console );
@@ -2187,7 +2189,17 @@ bool idProgram::CompileText( const char *source, const char *text, bool console 
 	}
 	
 	catch( idCompileError &err ) {
-		if ( console ) {
+		// attempt to recover by deleting anything new in the script
+		for( i = 0; i < varDefs.Num(); i++ ) {
+			def = varDefs[ i ];
+
+			if ( def->compileStamp == compileStamp ) {
+				FreeDef( def, def->scope );
+				i--;
+			}
+		}
+
+		if ( console || !fatal ) {
 			gameLocal.Printf( "%s\n", err.error );
 			return false;
 		} else {
@@ -2231,18 +2243,22 @@ idProgram::CompileFile
 */
 #include "../awakening/MissionScripts.inl"
 
-void idProgram::CompileFile( const char *filename ) {
+bool idProgram::CompileFile( const char *filename, bool fatal ) {
 	char *src;
 	bool result;
 	idStr missionSource;
+	// openQ4: The Awakening's corrected mission scripts (each loader refuses
+	// multiplayer and an inactive expansion)
 	if ( Awakening_LoadMissionScript( filename, missionSource ) ) {
-		result = CompileText( filename, missionSource, false );
+		result = CompileText( filename, missionSource, false, fatal );
 	} else {
-		if ( fileSystem->ReadFile( filename, ( void ** )&src, NULL ) < 0 ) {
-			gameLocal.Error( "Couldn't load %s\n", filename );
-		}
-		result = CompileText( filename, src, false );
-		fileSystem->FreeFile( src );
+	if ( fileSystem->ReadFile( filename, ( void ** )&src, NULL ) < 0 ) {
+		gameLocal.Error( "Couldn't load %s\n", filename );
+	}
+
+	result = CompileText( filename, src, false, fatal );
+
+	fileSystem->FreeFile( src );
 	}
 
 	if ( g_disasm.GetBool() ) {
@@ -2250,8 +2266,15 @@ void idProgram::CompileFile( const char *filename ) {
 	}
 
 	if ( !result ) {
-		gameLocal.Error( "Compile failed in file %s.", filename );
+		if ( fatal ) {
+			gameLocal.Error( "Compile failed in file %s.", filename );
+		} else {
+			gameLocal.Warning( "Compile failed in file %s.", filename );
+		}
+		return false;
 	}
+
+	return true;
 }
 
 /*
@@ -2298,6 +2321,8 @@ void idProgram::FreeData( void ) {
 	top_files		= 0;
 
 	filename = "";
+
+	compileStamp	= 0;
 }
 
 /*

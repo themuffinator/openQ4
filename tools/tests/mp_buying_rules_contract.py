@@ -72,7 +72,7 @@ RETAIL_IMPULSES = {"weapon_shotgun": 100, "weapon_hyperblaster": 102, "weapon_gr
 
 
 def check_catalog() -> list:
-    buying = read("src/mpgame/mp/Buying.cpp")
+    buying = read("src/game/mp/Buying.cpp")
     items = catalog(buying)
     assert len(items) == 20, len(items)
     names = [row["item"] for row in items]
@@ -116,7 +116,7 @@ def check_catalog() -> list:
 
 
 def check_rules_cvar() -> None:
-    for tree in ("game", "mpgame"):
+    for tree in ("game",):
         cvars = read(f"src/{tree}/gamesys/SysCvar.cpp")
         assert re.search(r'idCVar si_buyingRules\(\s*"si_buyingRules",\s*"0",\s*CVAR_GAME \| CVAR_SERVERINFO \| CVAR_ARCHIVE \| CVAR_INTEGER,'
                          r'[^;]*, 0, 1 \);', cvars), tree
@@ -127,14 +127,14 @@ def check_match_rules() -> None:
     """The match rules allow buying wherever a game type does (GTF_BUYING): a
     narrower mask rejected a buying CTF server's casual rules and its match
     never left warmup."""
-    rules = read("src/mpgame/mp/match/MatchRules.cpp")
+    rules = read("src/game/mp/match/MatchRules.cpp")
     mask = rules[rules.index("static const uint32_t MP_RULE_MODES_BUYING ="):]
     mask = mask[:mask.index(";")]
     allowed = set(re.findall(r"MP_RULE_GAME_BIT\( (GAME_\w+) \)", mask))
     if "MP_RULE_MODES_CAPTURE" in mask:
         capture = rules[rules.index("static const uint32_t MP_RULE_MODES_CAPTURE ="):]
         allowed |= set(re.findall(r"MP_RULE_GAME_BIT\( (GAME_\w+) \)", capture[:capture.index(";")]))
-    types = read("src/mpgame/mp/GameTypes.cpp")
+    types = read("src/game/mp/GameTypes.cpp")
     buying = set()
     for row in re.findall(r"\{[^{}]*?\b(GAME_\w+)\b[^{}]*?GTF_BUYING[^{}]*?\}", types, re.S):
         buying.add(row)
@@ -143,11 +143,11 @@ def check_match_rules() -> None:
 
 
 def check_player() -> None:
-    player = read("src/mpgame/Player.cpp")
+    player = read("src/game/Player.cpp")
     status = function_body(player, "itemBuyStatus_t idPlayer::ItemBuyStatus( const char* itemName )")
     assert status.index("mpBuyingManager.IsItemSold( itemName )") < status.index('!idStr::Cmpn( itemName, "wpmod_", 6 )')
     assert "HasItemPrice" not in player and "idBuyItemPrice" not in player and "buyItemsByImpulse" not in player
-    assert "idBuyItemPrice" not in read("src/mpgame/Player.h")
+    assert "idBuyItemPrice" not in read("src/game/Player.h")
     cost = function_body(player, "int idPlayer::GetItemCost( const char* itemName )")
     assert "mpBuyingManager.GetItemPrice( itemName )" in cost
     # Bought mods ride with the weapons a buying mode carries over a death.
@@ -167,17 +167,17 @@ def check_player() -> None:
     modwrite = function_body(player, "void idPlayer::WriteWeaponModsToSnapshot( idBitMsgDelta &msg ) const")
     assert "msg.WriteBits( moddedWeapons, MAX_WEAPONS );" in modwrite
     assert "msg.WriteBits( inventory.weaponMods[ i ] & WEAPON_MODS_SNAPSHOT_MASK, MAX_WEAPONMODS );" in modwrite
-    assert "const int	WEAPON_MODS_SNAPSHOT_MASK = ( 1 << MAX_WEAPONMODS ) - 1;" in read("src/mpgame/Player.h")
+    assert "const int	WEAPON_MODS_SNAPSHOT_MASK = ( 1 << MAX_WEAPONMODS ) - 1;" in read("src/game/Player.h")
     # Bots buy the mod for the gun in hand where the rules sell mods.
-    bots = function_body(read("src/mpgame/bots/Bot.cpp"), "void rvBot::UpdateBuying( idPlayer *self )")
+    bots = function_body(read("src/game/bots/Bot.cpp"), "void rvBot::UpdateBuying( idPlayer *self )")
     assert "entry.category != BUY_CATEGORY_MODS" in bots and "self->SlotForWeapon( modDict->GetString( \"weapon\" ) ) == self->GetCurrentWeapon()" in bots
-    weapon = function_body(read("src/mpgame/Weapon.cpp"), "void rvWeapon::Init( idPlayer* _owner, const idDeclEntityDef* def, int _weaponIndex, bool _isStrogg )")
+    weapon = function_body(read("src/game/Weapon.cpp"), "void rvWeapon::Init( idPlayer* _owner, const idDeclEntityDef* def, int _weaponIndex, bool _isStrogg )")
     assert 'if ( mods && gameLocal.isMultiplayer && weaponDef->dict.GetInt( "clipSize" ) == 0 ) {' in weapon
     assert weapon.index("spawnArgs.Copy ( *modDict );") < weapon.index('spawnArgs.SetInt( "clipSize", 0 );')
 
 
 def check_votes() -> None:
-    mp = read("src/mpgame/MultiplayerGame.cpp")
+    mp = read("src/game/MultiplayerGame.cpp")
     assert "voteData.m_buying < BUYING_MODE_OFF || voteData.m_buying >= BUYING_MODE_COUNT" in mp
     assert "voteData.m_buying == MP_BuyingModeFromCVars()" in mp
     assert mp.count("outMsg.WriteByte( idMath::ClampInt( BUYING_MODE_OFF, BUYING_MODE_COUNT - 1, voteData.m_buying ) );") == 3
@@ -191,13 +191,13 @@ def check_votes() -> None:
     assert 'publish( va( "mp.vote.buying%d", i ), common->GetLocalizedString( MP_BuyingModeName( i ) ) );' in mp
     assert 'publish( va( "mp.admin.buying%d", i ), common->GetLocalizedString( MP_BuyingModeName( i ) ) );' in mp
     assert "MP_BuyingModeFromOnOff( mainGui->GetStateInt( \"buying\" ), currentBuying )" in mp
-    assert "int			buying;			// buyingMode_t" in read("src/mpgame/MultiplayerGame.h")
-    network = read("src/mpgame/Game_network.cpp")
+    assert "int			buying;			// buyingMode_t" in read("src/game/MultiplayerGame.h")
+    network = read("src/game/Game_network.cpp")
     assert "( voteData.m_buying < BUYING_MODE_OFF || voteData.m_buying >= BUYING_MODE_COUNT ) ||" in network
 
 
 def check_card(items: list) -> None:
-    mp = read("src/mpgame/MultiplayerGame.cpp")
+    mp = read("src/game/MultiplayerGame.cpp")
     cover = function_body(mp, "void idMultiplayerGame::SetRetainedMenuCover( bool covered, idUserInterface *card )")
     assert "( currentMenu == 4 && buyMenu != NULL )" in cover
     publish = function_body(mp, "void idMultiplayerGame::PublishRetainedMenu( idUserInterface *card )")

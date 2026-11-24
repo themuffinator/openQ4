@@ -1,5 +1,5 @@
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../Weapon.h"
@@ -678,7 +678,7 @@ stateResult_t rvWeaponNailgun::State_Fire( const stateParms_t& parms ) {
 			return SRESULT_STAGE ( STAGE_FIRE );
 			
 		case STAGE_FIRE:
-			if ( !wsfl.attack || wsfl.reload || wsfl.lowerWeapon || AmmoInClip ( ) <= 0 ) {
+			if ( !wsfl.attack || wsfl.reload || wsfl.lowerWeapon || ( gameLocal.isMultiplayer ? AmmoInClip ( ) == 0 : AmmoInClip ( ) <= 0 ) ) {
 				return SRESULT_STAGE ( STAGE_DONE );
 			}
 			if ( mods & NAILGUN_MOD_ROF_AMMO ) {
@@ -705,7 +705,7 @@ stateResult_t rvWeaponNailgun::State_Fire( const stateParms_t& parms ) {
 			return SRESULT_STAGE ( STAGE_FIREWAIT );
 
 		case STAGE_FIREWAIT:
-			if ( !wsfl.attack || wsfl.reload || wsfl.lowerWeapon || AmmoInClip ( ) <= 0 ) {
+			if ( !wsfl.attack || wsfl.reload || wsfl.lowerWeapon || ( gameLocal.isMultiplayer ? AmmoInClip ( ) == 0 : AmmoInClip ( ) <= 0 ) ) {
 				return SRESULT_STAGE ( STAGE_DONE );
 			}
 			if ( gameLocal.time >= nextAttackTime ) {

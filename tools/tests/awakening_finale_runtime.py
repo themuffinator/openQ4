@@ -303,7 +303,7 @@ def main():
     module_root = exe.parent.parent/'Frameworks' if sys.platform == 'darwin' else exe.parent/'baseoq4'
     arch = 'arm64' if platform.machine().lower() in ('arm64', 'aarch64') else 'x64'
     suffix = '.dll' if os.name == 'nt' else '.dylib' if sys.platform == 'darwin' else '.so'
-    module = module_root/f'game-sp_{arch}{suffix}'
+    module = module_root/f'game_{arch}{suffix}'
     binaries = [exe, module,
                 *sorted(exe.parent.glob('renderer-*'))]
     identity = lambda: {p.name: hashlib.sha256(p.read_bytes()).hexdigest()

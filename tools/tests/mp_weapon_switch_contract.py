@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GAME_LIBS_ROOT = Path(os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT)).resolve()
 
 # Both game trees are forks of the same source and both are shipped.
-GAME_TREES = ("mpgame", "game")
+GAME_TREES = ("game", "game")
 
 
 def read(path: Path) -> str:
@@ -128,7 +128,7 @@ def validate_no_fire_while_switching() -> None:
 
 def validate_client_switch_masks_attack() -> None:
     """The client half of the same agreement, which the server half is matched to."""
-    tree = GAME_LIBS_ROOT / "src" / "mpgame"
+    tree = GAME_LIBS_ROOT / "src" / "game"
     if not tree.is_dir():
         return
 
@@ -137,7 +137,7 @@ def validate_client_switch_masks_attack() -> None:
         "void idPlayer::LocalClientPredictionThink( void ) {",
         "void idPlayer::NonLocalClientPredictionThink( void ) {",
     ):
-        body = body_of(player, signature, "mpgame Player.cpp")
+        body = body_of(player, signature, "game Player.cpp")
         index = body.find("idealWeapon != currentWeapon")
         if index == -1 or "usercmd.buttons &= ~BUTTON_ATTACK;" not in body[index : index + 200]:
             raise AssertionError(

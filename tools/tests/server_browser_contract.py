@@ -537,7 +537,7 @@ def main() -> None:
             raise AssertionError(f"Browser labels missing from {language}: {sorted(missing)}")
     # The limit the browser's details name for each public game type is the
     # one the game's descriptor table ends the match on.
-    types = (ROOT / "src/mpgame/mp/GameTypes.cpp").read_text(encoding="utf-8")
+    types = (ROOT / "src/game/mp/GameTypes.cpp").read_text(encoding="utf-8")
     table = types[types.index("mpGameTypeInfoTable[] = {"):types.index("};", types.index("mpGameTypeInfoTable[] = {"))]
     expected = {}
     for name, flags, public in re.findall(r'\{\s*GAME_\w+,\s*"([^"]+)",[^{}]*?\n\s*([A-Z_| ]+?),\s*(?:\n\s*)?MP_GAMESTATE_\w+,\s*(true|false)\s*\}', table):

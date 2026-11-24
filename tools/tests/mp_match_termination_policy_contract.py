@@ -13,10 +13,10 @@ from mp_match_disclosure_policy_contract import function_body
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchTerminationPolicy.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchTerminationPolicy.cpp"
-MULTIPLAYER = ROOT / "src/mpgame/MultiplayerGame.cpp"
-GAME_STATE = ROOT / "src/mpgame/mp/GameState.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchTerminationPolicy.h"
+SOURCE = ROOT / "src/game/mp/match/MatchTerminationPolicy.cpp"
+MULTIPLAYER = ROOT / "src/game/MultiplayerGame.cpp"
+GAME_STATE = ROOT / "src/game/mp/GameState.cpp"
 
 
 def require(text: str, token: str, context: str) -> None:
@@ -191,7 +191,7 @@ def static_contracts() -> None:
 
 
 PROBE = r'''
-#include "src/mpgame/mp/match/MatchTerminationPolicy.h"
+#include "src/game/mp/match/MatchTerminationPolicy.h"
 
 #include <stdio.h>
 
@@ -252,8 +252,8 @@ int main(void) {
 
 
 EFFECTS_PROBE = r'''
-#include "src/mpgame/mp/match/MatchSeries.h"
-#include "src/mpgame/mp/match/MatchSession.h"
+#include "src/game/mp/match/MatchSeries.h"
+#include "src/game/mp/match/MatchSession.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -472,7 +472,7 @@ def effects_executable_contract(compiler: str, temporary: Path) -> None:
     probe = temporary / "effects.cpp"
     probe.write_text(harness, encoding="utf-8")
     executable = temporary / "effects.exe"
-    session_source = ROOT / "src/mpgame/mp/match/MatchSession.cpp"
+    session_source = ROOT / "src/game/mp/match/MatchSession.cpp"
     if Path(compiler).name.lower() in ("cl", "cl.exe"):
         command = [compiler, "/nologo", "/std:c++17", "/EHsc",
                    "/DMP_MATCH_SESSION_STANDALONE_TEST", f"/I{ROOT}",

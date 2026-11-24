@@ -753,7 +753,7 @@ under UI-05; this default correction does not accept `FLOW-043`.
   backend's talker list.
 - Hit markers: section 14.7 specifies white ticks for a hit and
   `status.error` for a kill over 150 ms; the shipped markers
-  (`src/mpgame/HitMarker.cpp`) are tiered, red for a hit and white for a kill,
+  (`src/game/HitMarker.cpp`) are tiered, red for a hit and white for a kill,
   over 180-420 ms. One of the two needs a decision.
 - Subtitles (section 14.8) do not exist yet.
 - The implant overlay (`FLOW-062`) has engine captures through the level's

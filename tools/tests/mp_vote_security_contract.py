@@ -87,10 +87,10 @@ def case_block(function: str, label: str, next_label: str) -> str:
 
 
 def main() -> None:
-    multiplayer = read("src/mpgame/MultiplayerGame.cpp")
-    multiplayer_h = read("src/mpgame/MultiplayerGame.h")
-    network = read("src/mpgame/Game_network.cpp")
-    cvars = read("src/mpgame/gamesys/SysCvar.cpp")
+    multiplayer = read("src/game/MultiplayerGame.cpp")
+    multiplayer_h = read("src/game/MultiplayerGame.h")
+    network = read("src/game/Game_network.cpp")
+    cvars = read("src/game/gamesys/SysCvar.cpp")
     # The GUI lives in the engine repository, which this repository's CI does
     # not check out. Skip only the engine-side assertions when it is absent,
     # the way the other cross-repository contracts here do.

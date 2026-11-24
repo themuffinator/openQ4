@@ -224,7 +224,7 @@ def main():
     (ROOT/'.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='restore-af-', dir=ROOT/'.tmp') as directory:
         scratch = Path(directory)
-        for mode in ('game','mpgame'):
+        for mode in ('game',):
             code = source(mode)
             cases = {'production':code}
             if '--mutation-check' in sys.argv:

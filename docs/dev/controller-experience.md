@@ -20,7 +20,7 @@ the real-hardware checklist is [controller qualification](controller-qualificati
 | Stick and gyro look in the usercmd and the late look | `src/framework/UsercmdGen.cpp` | `presentation_hf_contract.py`, `sp_turbo_weapon_wheel.py` |
 | Context actions, layouts, separate resets | `src/framework/KeyInput.cpp` | `controller_runtime.py --scenario layout` |
 | Rumble mix, trigger pulses, side-biased hits | `src/sys/sys_local.cpp` | `controller_runtime.py --scenario feedback` |
-| Aim assistance targets, controller light and trigger feel | `src/game/Player.cpp`, `src/mpgame/Player.cpp` | `controller_runtime.py --scenario assist` |
+| Aim assistance targets, controller light and trigger feel | `src/game/Player.cpp` | `controller_runtime.py --scenario assist` |
 | The on-screen keyboard's layouts | `src/framework/OnScreenKeyboard.h` | `openq4-on-screen-keyboard` |
 | The on-screen keyboard: its document, when it shows, what its keys type | `tools/ui/retained_keyboard.py`, `Session_menu.cpp` (`UpdateOnScreenKeyboard`), `UI_RetainedFieldInput` | `openq4-ui-on-screen-keyboard`, `controller_runtime.py --scenario keyboard` |
 | The test panel, rumble test and first-connection notices | `tools/ui/retained_controller_test.py`, `Session_menu.cpp` (`UpdateControllerTestPanel`), `Sys_GetControllerTestState` | `openq4-ui-retained-controls`, `controller_runtime.py --scenario testpanel` |

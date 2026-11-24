@@ -22,9 +22,9 @@ Quake 4 keyed its ban list to a client GUID. No openQ4 client sends one
 
 | Piece | Where |
 | --- | --- |
-| Engine-free core: address and range parsing (IPv4, IPv6, mapped IPv4, prefixes), the ban list and its file lines, address mutes, the chat flood window, the name policy, admin-log lines | `src/mpgame/mp/Moderation.h` |
-| `banlist.txt` reader and writer, shared by both game modules | `src/mpgame/mp/ModerationFile.h` |
-| Enforcement, the commands and the admin log | `src/mpgame/Game_network.cpp` (the block that held Quake 4's ban list) |
+| Engine-free core: address and range parsing (IPv4, IPv6, mapped IPv4, prefixes), the ban list and its file lines, address mutes, the chat flood window, the name policy, admin-log lines | `src/game/mp/Moderation.h` |
+| `banlist.txt` reader and writer, shared by both game modules | `src/game/mp/ModerationFile.h` |
+| Enforcement, the commands and the admin log | `src/game/Game_network.cpp` (the block that held Quake 4's ban list) |
 | A client's address for the game module; the per-address connection limit | `src/framework/async/NetworkSystem.cpp`, `AsyncServer.cpp` |
 
 ### Bans

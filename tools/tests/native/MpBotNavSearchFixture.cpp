@@ -1,5 +1,5 @@
 // Random-graph proofs for the bot navmesh search core.  The rvNavMesh methods
-// under test are spliced in verbatim from src/mpgame/bots/NavMesh.cpp by
+// under test are spliced in verbatim from src/game/bots/NavMesh.cpp by
 // mp_bot_navmesh_search.py; this file supplies a minimal class with the same
 // members and checks the methods against brute force on generated graphs.
 #include <algorithm>

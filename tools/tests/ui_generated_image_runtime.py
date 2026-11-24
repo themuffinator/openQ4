@@ -72,7 +72,7 @@ def main() -> int:
             "runtime_sha256":{},"samples":{},"failures":[]}
     for path in sorted(runtime.glob("*")):
         if path.is_file() and path.suffix in (".exe",".dll"): report["runtime_sha256"][path.name]=digest(path)
-    for path in sorted((runtime / "baseoq4").glob("game-*")):
+    for path in sorted((runtime / "baseoq4").glob("game_*")):
         if path.is_file(): report["runtime_sha256"]["baseoq4/"+path.name]=digest(path)
     with (output / "console.log").open("w",encoding="utf-8") as stream:
         process=subprocess.Popen(command,cwd=runtime,stdout=stream,stderr=subprocess.STDOUT)

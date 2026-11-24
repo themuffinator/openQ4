@@ -2,7 +2,7 @@
 """Execute the live match event stream and replay it through the sample overlay.
 
 tools/tests/native/LiveEventsFixture.cpp compiles the production header
-src/mpgame/mp/LiveEvents.h alone: line building over hostile names, the state
+src/game/mp/LiveEvents.h alone: line building over hostile names, the state
 diff, kills and overflow. It then writes a sample match as a stream. This test
 parses every line of that stream as JSON against the schema in
 docs/dev/mp-live-event-stream.md, replays it through tools/overlay/match_overlay.py
@@ -28,7 +28,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = "src/mpgame/mp/LiveEvents.h"
+HEADER = "src/game/mp/LiveEvents.h"
 FIXTURE = ROOT / "tools/tests/native/LiveEventsFixture.cpp"
 OVERLAY = ROOT / "tools/overlay/match_overlay.py"
 
@@ -71,17 +71,19 @@ MUTATIONS = (
 )
 
 SOURCE_CONTRACTS = (
-    ("src/mpgame/MultiplayerGame.cpp", (
+    ("src/game/MultiplayerGame.cpp", (
         "\t// openQ4: servers and clients both publish the match they are in\n\tliveEvents.Update();",
         "\tif( !gameLocal.isClient ) {\n\t\tliveEvents.Kill( attacker, victim, methodOfDeath, quadKill );",
         "\tif ( !gameLocal.isServer ) {\n\t\tliveEvents.Kill( attacker, victim, methodOfDeath, quadKill );",
-        "\tliveEvents.Close();\n\tClear();\n\tstatManager->Shutdown();",
-        "\t// the next map starts its own event stream\n\tliveEvents.Close();\n\tClear();",
+        # network play closes the stream at shutdown and at each new map; the
+        # campaign mode never opens one (CORE-07)
+        "\t\tliveEvents.Close();\n\t}\n\tClear();\n\tstatManager->Shutdown();",
+        "\t\t// the next map starts its own event stream\n\t\tliveEvents.Close();\n\t}\n\tClear();",
     )),
-    ("src/mpgame/MultiplayerGame.h", (
+    ("src/game/MultiplayerGame.h", (
         "mpLiveEventStream liveEvents;",
     )),
-    ("src/mpgame/mp/LiveEventStream.cpp", (
+    ("src/game/mp/LiveEventStream.cpp", (
         'idCVar g_matchEventStream( "g_matchEventStream", "0", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NOCHEAT,',
         'static const char *const MP_LIVE_EVENT_FILE = "match-events/live.ndjson";',
         # the live file is started again; the match log (MP-18, g_matchLog) is appended
@@ -240,7 +242,7 @@ def main() -> None:
             if token not in text:
                 raise SystemExit(f"mp_live_event_stream_contract: {relative} is missing {token!r}")
     # The stream carries scoreboard state only: no position, vitals or timers.
-    stream = (ROOT / "src/mpgame/mp/LiveEventStream.cpp").read_text(encoding="utf-8")
+    stream = (ROOT / "src/game/mp/LiveEventStream.cpp").read_text(encoding="utf-8")
     capture = body(stream, "void mpLiveEventStream::Capture(")
     for private in ("health", "armor", "GetPhysics", "GetOrigin", "viewAngles", "ammo", "weapon", "itemTim", "matchSession"):
         if private in capture:

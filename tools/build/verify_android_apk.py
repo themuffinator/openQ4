@@ -112,7 +112,7 @@ def libraries_for_abi(abi: str) -> set[str]:
     arch = android_abi(abi).module_arch
     return {
         'libquake4.so', 'libSDL3.so', f'librenderer-gles_{arch}.so',
-        f'libgame-sp_{arch}.so', f'libgame-mp_{arch}.so', 'libopenal.so', 'libc++_shared.so',
+        f'libgame_{arch}.so', 'libopenal.so', 'libc++_shared.so',
     }
 
 
@@ -151,7 +151,7 @@ def verify_payload(apk: Path, stage: Path, version: str, variant: str = 'phone',
     if (stage / 'lib' / XR_TEST_RUNTIME).exists():
         raise ValueError('The OpenXR test runtime must never be staged for a distributable APK')
     if {path.name for path in (stage / 'lib').iterdir()} != libraries:
-        raise ValueError(f'Stage must contain exactly the seven matching {abi} native libraries')
+        raise ValueError(f'Stage must contain exactly the six matching {abi} native libraries')
     for name in libraries:
         path = stage / 'lib' / name
         validate_library(path, 24, abi)
@@ -197,7 +197,7 @@ def verify_payload(apk: Path, stage: Path, version: str, variant: str = 'phone',
         if any(name.rsplit('/', 1)[-1] == XR_TEST_RUNTIME for name in native):
             raise ValueError('APK must never carry the OpenXR test runtime')
         if native != {name for name in expected if name.startswith('lib/')}:
-            raise ValueError(f'APK must contain exactly the seven matching {abi} native libraries')
+            raise ValueError(f'APK must contain exactly the six matching {abi} native libraries')
         assets = {name for name in names if name.startswith('assets/') and not name.endswith('/')}
         if assets != {name for name in expected if name.startswith('assets/')} | set(fonts) | {
                 'assets/openq4-package-version.txt', 'assets/openq4-package-manifest.txt'}:

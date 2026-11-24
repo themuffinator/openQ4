@@ -4,8 +4,8 @@ Invisible entities that affect other entities or the world when activated.
 
 */
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 #include "Projectile.h"
@@ -635,7 +635,13 @@ void idTarget_Give::Event_Activate( idEntity *activator ) {
 	}
 
 	static int giveNum = 0;
-	idPlayer *player = gameLocal.GetLocalPlayer();
+	// Spawn-point targets carry the player that used the spawn as their
+	// activator.  Prefer that player so target_give works for every client on
+	// both listen and dedicated multiplayer servers; the local-player fallback
+	// preserves legacy script and onSpawn uses that do not provide an activator.
+	idPlayer *player = activator && activator->IsType( idPlayer::GetClassType() )
+		? static_cast<idPlayer *>( activator )
+		: gameLocal.GetLocalPlayer();
 	if ( player ) {
 		const bool quietStartupGive = spawnArgs.GetBool( "onSpawn" ) || player->IsApplyingStartupLoadout();
 		const idKeyValue *kv = spawnArgs.MatchPrefix( "item", NULL );

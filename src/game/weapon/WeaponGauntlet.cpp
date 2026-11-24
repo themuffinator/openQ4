@@ -1,5 +1,5 @@
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../Weapon.h"
@@ -213,7 +213,17 @@ void rvWeaponGauntlet::Attack ( void ) {
 
 	trace_t		tr;
 	idEntity*	ent;
-	
+	// openQ4: the gauntlet traces itself instead of going through idGameLocal::HitScan, so it
+	// needs its own lag compensation bracket.  Only the trace is rewound, and the restore runs
+	// immediately after it, so none of the early returns below can escape it.
+	idGameLocal::mpLagCompRestore_t	lagCompRestore[ MAX_CLIENTS ];
+	int			lagCompRestoreCount = 0;
+	bool		lagCompApplied = false;
+
+	if ( gameLocal.isServer && gameLocal.isMultiplayer && owner ) {
+		lagCompApplied = gameLocal.BeginMPLagCompensation( owner, lagCompRestore, lagCompRestoreCount );
+	}
+
 	// Cast a ray out to the lock range
 // RAVEN BEGIN
 // ddynerman: multiple clip worlds
@@ -222,6 +232,14 @@ void rvWeaponGauntlet::Attack ( void ) {
 							playerViewOrigin + playerViewAxis[0] * range, 
 							MASK_SHOT_RENDERMODEL, owner );
 // RAVEN END
+
+	if ( lagCompApplied ) {
+		if ( tr.fraction < 1.0f ) {
+			gameLocal.ResolveMPLagCompensationHit( gameLocal.entities[tr.c.entityNum], lagCompRestore, lagCompRestoreCount, tr, NULL );
+		}
+		gameLocal.EndMPLagCompensation( lagCompRestore, lagCompRestoreCount );
+	}
+
 	owner->WeaponFireFeedback( &weaponDef->dict );
 
 	if ( tr.fraction >= 1.0f ) {
@@ -277,7 +295,8 @@ void rvWeaponGauntlet::Attack ( void ) {
 	}
 	
 	idVec3 impactOrigin = tr.endpos;
-	if ( tr.fraction < 1.0f ) {
+	if ( tr.fraction < 1.0f && !gameLocal.isMultiplayer ) {
+		// openQ4: single player seats the impact effect on the struck surface
 		impactOrigin = tr.c.point - ( tr.c.normal * tr.c.point - tr.c.dist ) * tr.c.normal;
 		impactOrigin += tr.c.normal * 0.5f;
 	}
@@ -310,7 +329,14 @@ void rvWeaponGauntlet::Attack ( void ) {
 		} else {
 			PlayLoopSound( LOOP_NONE );
 		}
-		nextAttackTime = gameLocal.time + fireRate;
+		if ( gameLocal.isMultiplayer ) {
+			// openQ4: the gauntlet was the only weapon scheduling its next tick off a bare
+			// fireRate, so Haste never sped up its damage rate even though the melee damage
+			// powerup was already honoured above.
+			nextAttackTime = gameLocal.time + (fireRate * owner->PowerUpModifier ( PMOD_FIRERATE ));
+		} else {
+			nextAttackTime = gameLocal.time + fireRate;
+		}
 	}
 }
 
@@ -383,18 +409,17 @@ stateResult_t rvWeaponGauntlet::State_Raise( const stateParms_t& parms ) {
 		RAISE_WAIT,
 	};	
 	switch ( parms.stage ) {
-		case RAISE_INIT:			
-			SetStatus ( WP_RISING );
+		case RAISE_INIT:
+			SetStatus( WP_RISING );
 			PlayAnim( ANIMCHANNEL_ALL, "raise", parms.blendFrames );
-			return SRESULT_STAGE(RAISE_WAIT);
-			
+			return SRESULT_STAGE( RAISE_WAIT );			
 		case RAISE_WAIT:
-			if ( AnimDone ( ANIMCHANNEL_ALL, 4 ) ) {
-				SetState ( "Idle", 4 );
+			if ( AnimDone( ANIMCHANNEL_ALL, 4 ) ) {
+				SetState( "Idle", 4 );
 				return SRESULT_DONE;
 			}
 			if ( wsfl.lowerWeapon ) {
-				SetState ( "Lower", 4 );
+				SetState( "Lower", 4 );
 				return SRESULT_DONE;
 			}
 			return SRESULT_WAIT;
@@ -407,7 +432,7 @@ stateResult_t rvWeaponGauntlet::State_Raise( const stateParms_t& parms ) {
 rvWeaponGauntlet::State_Lower
 ================
 */
-stateResult_t rvWeaponGauntlet::State_Lower ( const stateParms_t& parms ) {
+stateResult_t rvWeaponGauntlet::State_Lower( const stateParms_t& parms ) {
 	enum {
 		LOWER_INIT,
 		LOWER_WAIT,
@@ -441,25 +466,25 @@ stateResult_t rvWeaponGauntlet::State_Lower ( const stateParms_t& parms ) {
 rvWeaponGauntlet::State_Idle
 ================
 */
-stateResult_t rvWeaponGauntlet::State_Idle ( const stateParms_t& parms ) {	
+stateResult_t rvWeaponGauntlet::State_Idle( const stateParms_t& parms ) {
 	enum {
 		IDLE_INIT,
 		IDLE_WAIT,
 	};	
 	switch ( parms.stage ) {
 		case IDLE_INIT:			
-			SetStatus ( WP_READY );
-			StopBlade ( );
+			SetStatus( WP_READY );
+			StopBlade();
 			PlayCycle( ANIMCHANNEL_ALL, "idle", parms.blendFrames );
-			return SRESULT_STAGE ( IDLE_WAIT );
+			return SRESULT_STAGE( IDLE_WAIT );
 			
 		case IDLE_WAIT:
 			if ( wsfl.lowerWeapon ) {
-				SetState ( "Lower", 4 );
+				SetState( "Lower", 4 );
 				return SRESULT_DONE;
 			}
 			if ( wsfl.attack ) {
-				SetState ( "Fire", 2 );
+				SetState( "Fire", 2 );
 				return SRESULT_DONE;
 			}
 			return SRESULT_WAIT;
@@ -472,7 +497,7 @@ stateResult_t rvWeaponGauntlet::State_Idle ( const stateParms_t& parms ) {
 rvWeaponGauntlet::State_Fire
 ================
 */
-stateResult_t rvWeaponGauntlet::State_Fire ( const stateParms_t& parms ) {
+stateResult_t rvWeaponGauntlet::State_Fire( const stateParms_t& parms ) {
 	enum {
 		STAGE_START,
 		STAGE_START_WAIT,
@@ -483,41 +508,47 @@ stateResult_t rvWeaponGauntlet::State_Fire ( const stateParms_t& parms ) {
 	};	
 	switch ( parms.stage ) {
 		case STAGE_START:	
-			PlayAnim ( ANIMCHANNEL_ALL, "attack_start", parms.blendFrames );
-			StartBlade ( );
+			PlayAnim( ANIMCHANNEL_ALL, "attack_start", parms.blendFrames );
+			StartBlade();
 			loopSound = LOOP_NONE;
-			return SRESULT_STAGE(STAGE_START_WAIT);
+			if ( gameLocal.isMultiplayer ) {
+				// #32 - no gauntlet spin up
+				//return SRESULT_STAGE( STAGE_START_WAIT );
+				return SRESULT_STAGE( STAGE_LOOP );
+			} else {
+				return SRESULT_STAGE(STAGE_START_WAIT);
+			}
 		
 		case STAGE_START_WAIT:
 			if ( !wsfl.attack ) {
-				return SRESULT_STAGE ( STAGE_END );
+				return SRESULT_STAGE( STAGE_END );
 			}
-			if ( AnimDone ( ANIMCHANNEL_ALL, parms.blendFrames ) ) {
-				return SRESULT_STAGE ( STAGE_LOOP );
+			if ( AnimDone( ANIMCHANNEL_ALL, parms.blendFrames ) ) {
+				return SRESULT_STAGE( STAGE_LOOP );
 			}
 			return SRESULT_WAIT;
 			
 		case STAGE_LOOP:
-			PlayCycle ( ANIMCHANNEL_ALL, "attack_loop", parms.blendFrames );
+			PlayCycle( ANIMCHANNEL_ALL, "attack_loop", parms.blendFrames );
 			StartSound( "snd_spin_loop", SND_CHANNEL_WEAPON, 0, false, 0 );
 			return SRESULT_STAGE(STAGE_LOOP_WAIT);
 			
 		case STAGE_LOOP_WAIT:
 			if ( !wsfl.attack || wsfl.lowerWeapon ) {
-				return SRESULT_STAGE ( STAGE_END );
+				return SRESULT_STAGE( STAGE_END );
 			}
-			Attack ( );
+			Attack();
 			return SRESULT_WAIT;
 		
 		case STAGE_END:
-			PlayAnim ( ANIMCHANNEL_ALL, "attack_end", parms.blendFrames );
-			StopBlade ( );
+			PlayAnim( ANIMCHANNEL_ALL, "attack_end", parms.blendFrames );
+			StopBlade();
 			StartSound( "snd_spin_down", SND_CHANNEL_WEAPON, 0, false, 0 );
-			return SRESULT_STAGE ( STAGE_END_WAIT );
+			return SRESULT_STAGE( STAGE_END_WAIT );
 		
 		case STAGE_END_WAIT:
-			if ( wsfl.attack || AnimDone ( ANIMCHANNEL_ALL, parms.blendFrames ) ) {
-				PostState ( "Idle", parms.blendFrames );
+			if ( wsfl.attack || AnimDone( ANIMCHANNEL_ALL, parms.blendFrames ) ) {
+				PostState( "Idle", parms.blendFrames );
 				return SRESULT_DONE;
 			}
 			return SRESULT_WAIT;

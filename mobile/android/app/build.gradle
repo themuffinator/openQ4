@@ -41,7 +41,7 @@ if (xrTestRuntime != null) {
 }
 def moduleArch = emulator ? 'x64' : 'arm64'
 def nativeLibraries = ['libquake4.so', 'libSDL3.so', "librenderer-gles_${moduleArch}.so",
-                       "libgame-sp_${moduleArch}.so", "libgame-mp_${moduleArch}.so",
+                       "libgame_${moduleArch}.so",
                        'libopenal.so', 'libc++_shared.so'].collect { it.toString() }.toSet()
 def nativeStage = file(providers.gradleProperty('openq4Stage').getOrElse("../../../.install/android/${abi}"))
 def nativeMetadataFile = new File(nativeStage, 'android-build.json')

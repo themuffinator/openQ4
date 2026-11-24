@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Execute the SP/MP trace-list filter that drops clip models with no collision geometry.
+"""Execute the game module's trace-list filter that drops clip models with no collision geometry.
 
 A client links an idActor combat model built from modelDefHandle == -1 before
 the entity is first presented (prediction frames skip Present). That clip model
 has no collision model, trace model or render handle, and handing it to
-collisionModelManager->Contents or Rotation is a FatalError. Both game trees must
-drop such models in idClip::GetTraceClipModels, whether or not a pass entity is
-given, and every query loop must keep skipping the NULL slots it leaves.
+collisionModelManager->Contents or Rotation is a FatalError. Both modes of the
+game module (game_sp and game_mp) must drop such models in
+idClip::GetTraceClipModels, whether or not a pass entity is given, and every
+query loop must keep skipping the NULL slots it leaves.
 """
 from __future__ import annotations
 import argparse
@@ -42,28 +43,27 @@ def main():
     if not compiler:
         raise RuntimeError('clang++ or g++ required')
     fixture = (ROOT/'tools/tests/native/ClipEmptyModelBehavior.cpp').read_text()
-    implementations = []
-    identities = {}
-    for tree in ('game', 'mpgame'):
-        source_path = ROOT/'src'/tree/'physics/Clip.cpp'
-        header_path = ROOT/'src'/tree/'physics/Clip.h'
-        source = source_path.read_text(encoding='utf-8-sig')
-        header = header_path.read_text(encoding='utf-8-sig')
-        methods = [
-            definition(header, 'ID_INLINE bool idClipModel::HasCollisionModel(', str(header_path)),
-            definition(source, 'int idClip::GetTraceClipModels(', str(source_path)),
-        ]
-        implementations.append(methods)
-        for path in (source_path, header_path):
-            identities[str(path.relative_to(ROOT))] = hashlib.sha256(path.read_bytes()).hexdigest()
-        # Every query loop over the filtered list must skip the slots it clears.
-        loads = re.findall(r'touch = clipModelList\[\s*i\s*\];', source)
-        guarded = re.findall(r'touch = clipModelList\[\s*i\s*\];\s*if \( !touch \) \{\s*continue;', source)
-        assert loads and len(loads) == len(guarded), f'{source_path}: a clip query loop lost its NULL guard'
-    assert [without_comments(m) for m in implementations[0]] == \
-        [without_comments(m) for m in implementations[1]], 'SP/MP empty clip model filter diverged'
+    # One game module serves game_sp and game_mp: both modes run this filter.
+    source_path = ROOT/'src/game/physics/Clip.cpp'
+    header_path = ROOT/'src/game/physics/Clip.h'
+    source = source_path.read_text(encoding='utf-8-sig')
+    header = header_path.read_text(encoding='utf-8-sig')
+    methods = [
+        definition(header, 'ID_INLINE bool idClipModel::HasCollisionModel(', str(header_path)),
+        definition(source, 'int idClip::GetTraceClipModels(', str(source_path)),
+    ]
+    identities = {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+                  for path in (source_path, header_path)}
+    # Every query loop over the filtered list must skip the slots it clears.
+    loads = re.findall(r'touch = clipModelList\[\s*i\s*\];', source)
+    guarded = re.findall(r'touch = clipModelList\[\s*i\s*\];\s*if \( !touch \) \{\s*continue;', source)
+    assert loads and len(loads) == len(guarded), f'{source_path}: a clip query loop lost its NULL guard'
+    # The filter may not depend on the mode: a client in game_mp links the
+    # same empty combat models the campaign can.
+    assert 'isMultiplayer' not in without_comments(methods[1]) and \
+        'IsMultiplayerMode' not in without_comments(methods[1]), 'the empty clip model filter became mode-gated'
     projection = output/'behavior.cpp'
-    projection.write_text(fixture.replace('// @PRODUCTION_METHODS@', '\n\n'.join(implementations[1])))
+    projection.write_text(fixture.replace('// @PRODUCTION_METHODS@', '\n\n'.join(methods)))
     binary = output/('behavior.exe' if os.name == 'nt' else 'behavior')
     env = {**os.environ, 'TMP': str(output), 'TEMP': str(output), 'TMPDIR': str(output)}
     build = subprocess.run([compiler, '-std=c++17', '-Wall', '-Wextra', '-Werror',

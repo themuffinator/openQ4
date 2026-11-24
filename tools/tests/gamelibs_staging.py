@@ -34,7 +34,7 @@ BYTECODE_FIXTURES = (
     "src/sys/linux/pk4/__pycache__/id_utils.cpython-314.pyc",
     "src/sys/linux/pk4/id_utils.pyc",
     "src/game/__pycache__/Game_local.cpython-314.pyc",
-    "src/mpgame/generated.pyo",
+    "src/game/generated.pyo",
 )
 
 
@@ -80,10 +80,10 @@ def make_minimal_workspace(work: Path) -> tuple[Path, Path, Path]:
     for relative_path, contents in SUPPORT_FIXTURES.items():
         write_file(project_root / "src" / relative_path, contents)
     write_file(project_root / "src" / TRACKED_PYTHON_FIXTURE, "# tracked Python source\n")
+    # one src/game tree builds the one game module
     write_file(gamelibs_root / "src" / "game" / "Game_local.cpp", "// game\n")
+    write_file(gamelibs_root / "src" / "game" / "Player.cpp", "// player\n")
     write_file(gamelibs_root / "src" / "game" / "gamesys" / "SysCvar.cpp", "// cvar\n")
-    write_file(gamelibs_root / "src" / "mpgame" / "Game_local.cpp", "// mpgame\n")
-    write_file(gamelibs_root / "src" / "mpgame" / "gamesys" / "SysCvar.cpp", "// mp cvar\n")
     for relative_path in BYTECODE_FIXTURES:
         destination_root = project_root if relative_path.startswith("src/sys/") else gamelibs_root
         bytecode_path = destination_root / relative_path
@@ -107,12 +107,14 @@ def validate_manifest(stage_root: Path) -> None:
     paths = {entry["path"]: entry["sha256"] for entry in files}
     expected_paths = (
         "src/game/Game_local.cpp",
+        "src/game/Player.cpp",
         "src/game/gamesys/SysCvar.cpp",
-        "src/mpgame/Game_local.cpp",
-        "src/mpgame/gamesys/SysCvar.cpp",
         *(f"src/{relative_path}" for relative_path in SUPPORT_FIXTURES),
         f"src/{TRACKED_PYTHON_FIXTURE}",
     )
+    # the game tree and the support directories, and nothing else
+    if set(paths) != set(expected_paths):
+        raise AssertionError(f"stage manifest records unexpected files: {sorted(set(paths) ^ set(expected_paths))}")
     for rel in expected_paths:
         staged = stage_root / rel
         if not staged.is_file():
@@ -126,12 +128,23 @@ def validate_manifest(stage_root: Path) -> None:
 
 def validate_successful_stage(work: Path) -> None:
     project_root, gamelibs_root, stage_root = make_minimal_workspace(work)
+    # a GameLibs checkout from the split-module era still carries src/mpgame;
+    # it is not part of the one game module, so it is never staged
+    write_file(gamelibs_root / "src" / "mpgame" / "Game_local.cpp", "// retired multiplayer tree\n")
     result = run_stage(project_root, gamelibs_root, stage_root)
     if result.returncode != 0:
         raise AssertionError(f"stage_gamelibs.py failed unexpectedly: {result.stderr}")
     if result.stdout.strip() != stage_root.resolve().as_posix():
         raise AssertionError("stage_gamelibs.py stdout should be the resolved stage root only")
     validate_manifest(stage_root)
+    if (stage_root / "src" / "mpgame").exists():
+        raise AssertionError("stage_gamelibs.py staged the retired src/mpgame tree")
+
+    # the game tree is the one GameLibs input the stager cannot do without
+    shutil.rmtree(gamelibs_root / "src" / "game")
+    result = run_stage(project_root, gamelibs_root, stage_root)
+    if result.returncode == 0 or "game source directory not found" not in result.stderr:
+        raise AssertionError(f"stage_gamelibs.py accepted a GameLibs root without src/game: {result.stderr}")
 
 
 def staged_mtimes(stage_root: Path) -> dict[str, int]:
@@ -182,6 +195,8 @@ def validate_incremental_restage(work: Path) -> None:
             os.utime(path, ns=(old, old))
     write_file(stage_root / "src" / "game" / "Stray.cpp", "// no source\n")
     (stage_root / "src" / "stray" / "empty").mkdir(parents=True)
+    # what a stage from the split-module era still holds
+    write_file(stage_root / "src" / "mpgame" / "gamesys" / "SysCvar.cpp", "// retired multiplayer tree\n")
 
     restage()
     rewritten = sorted(rel for rel, mtime in staged_mtimes(stage_root).items() if mtime != old)
@@ -189,12 +204,14 @@ def validate_incremental_restage(work: Path) -> None:
         raise AssertionError(f"restaging unchanged sources rewrote staged files: {rewritten}")
     if (stage_root / "src" / "game" / "Stray.cpp").exists() or (stage_root / "src" / "stray").exists():
         raise AssertionError("restaging kept a file or directory that no source provides")
+    if (stage_root / "src" / "mpgame").exists():
+        raise AssertionError("restaging kept the retired src/mpgame tree of an older stage")
 
     edited = gamelibs_root / "src" / "game" / "Game_local.cpp"
     write_file(edited, "// game, edited\n")
     # older than the staged copy, so the fresh mtime cannot come from the source
     os.utime(edited, ns=(old - 1_000_000_000, old - 1_000_000_000))
-    (gamelibs_root / "src" / "mpgame" / "gamesys" / "SysCvar.cpp").unlink()
+    (gamelibs_root / "src" / "game" / "gamesys" / "SysCvar.cpp").unlink()
     hashes = restage()
     mtimes = staged_mtimes(stage_root)
     staged_edit = stage_root / "src" / "game" / "Game_local.cpp"
@@ -205,7 +222,9 @@ def validate_incremental_restage(work: Path) -> None:
     rewritten = sorted(rel for rel, mtime in mtimes.items() if mtime != old and rel != "src/game/Game_local.cpp")
     if rewritten:
         raise AssertionError(f"restaging one edited source rewrote others: {rewritten}")
-    if "src/mpgame/gamesys/SysCvar.cpp" in hashes or (stage_root / "src" / "mpgame" / "gamesys").exists():
+    if "src/game/Player.cpp" not in mtimes:
+        raise AssertionError("restaging dropped an unchanged game source beside an edited one")
+    if "src/game/gamesys/SysCvar.cpp" in hashes or (stage_root / "src" / "game" / "gamesys").exists():
         raise AssertionError("a deleted source stayed in the stage or its manifest")
 
     # A link inside the stage is removed, never written through.
@@ -370,10 +389,9 @@ def validate_posix_wrapper_refresh(work: Path) -> None:
     shutil.copy2(ROOT / "tools" / "build" / "gamelibs_stage_path.py", wrapper.parent)
 
     baseline_mtime_ns = 1_700_000_000_000_000_000
-    for module_name in ("game", "mpgame"):
-        for source in (gamelibs_root / "src" / module_name).rglob("*"):
-            if source.is_file():
-                os.utime(source, ns=(baseline_mtime_ns, baseline_mtime_ns))
+    for source in (gamelibs_root / "src" / "game").rglob("*"):
+        if source.is_file():
+            os.utime(source, ns=(baseline_mtime_ns, baseline_mtime_ns))
 
     result = run_stage(project_root, gamelibs_root, stage_root)
     if result.returncode != 0:
@@ -383,10 +401,9 @@ def validate_posix_wrapper_refresh(work: Path) -> None:
     # staged manifest still proves the files are identical, so the wrapper
     # must not needlessly reconfigure Meson.
     stale_stage_mtime_ns = baseline_mtime_ns - 2_000_000_000
-    for module_name in ("game", "mpgame"):
-        for staged_file in (stage_root / "src" / module_name).rglob("*"):
-            if staged_file.is_file():
-                os.utime(staged_file, ns=(stale_stage_mtime_ns, stale_stage_mtime_ns))
+    for staged_file in (stage_root / "src" / "game").rglob("*"):
+        if staged_file.is_file():
+            os.utime(staged_file, ns=(stale_stage_mtime_ns, stale_stage_mtime_ns))
 
     build_dir = project_root / "builddir"
     write_file(
@@ -451,33 +468,27 @@ def validate_posix_wrapper_refresh(work: Path) -> None:
     if any(line.startswith("setup --reconfigure ") for line in run_wrapper()):
         raise AssertionError("fresh GameLibs stage caused an unnecessary Meson reconfigure")
 
-    for module_name in ("game", "mpgame"):
-        staged_files = [
-            path
-            for staged_module in ("game", "mpgame")
-            for path in (stage_root / "src" / staged_module).rglob("*")
-            if path.is_file()
-        ]
-        rounded_now_ns = (time.time_ns() // 1_000_000_000) * 1_000_000_000
-        for staged_file in staged_files:
+    rounded_now_ns = (time.time_ns() // 1_000_000_000) * 1_000_000_000
+    for staged_file in (stage_root / "src" / "game").rglob("*"):
+        if staged_file.is_file():
             os.utime(staged_file, ns=(rounded_now_ns, rounded_now_ns))
 
-        source = gamelibs_root / "src" / module_name / "Game_local.cpp"
-        original = source.read_text(encoding="utf-8")
-        write_file(source, original.replace(module_name, module_name.upper(), 1))
+    source = gamelibs_root / "src" / "game" / "Game_local.cpp"
+    original = source.read_text(encoding="utf-8")
+    write_file(source, original.replace("game", "GAME", 1))
 
-        invocations = run_wrapper()
-        if not any(line.startswith("setup --reconfigure ") for line in invocations):
-            raise AssertionError(f"{module_name} source edit did not trigger a Meson reconfigure")
-
-        result = run_stage(project_root, gamelibs_root, stage_root)
-        if result.returncode != 0:
-            raise AssertionError(f"GameLibs restage failed after {module_name} edit: {result.stderr}")
-
-    (gamelibs_root / "src" / "mpgame" / "gamesys" / "SysCvar.cpp").unlink()
     invocations = run_wrapper()
     if not any(line.startswith("setup --reconfigure ") for line in invocations):
-        raise AssertionError("mpgame source deletion did not trigger a Meson reconfigure")
+        raise AssertionError("game source edit did not trigger a Meson reconfigure")
+
+    result = run_stage(project_root, gamelibs_root, stage_root)
+    if result.returncode != 0:
+        raise AssertionError(f"GameLibs restage failed after the game edit: {result.stderr}")
+
+    (gamelibs_root / "src" / "game" / "gamesys" / "SysCvar.cpp").unlink()
+    invocations = run_wrapper()
+    if not any(line.startswith("setup --reconfigure ") for line in invocations):
+        raise AssertionError("game source deletion did not trigger a Meson reconfigure")
 
 
 def validate_windows_wrapper_refresh(work: Path) -> None:
@@ -606,12 +617,12 @@ Write-Output $refreshNeeded.ToString().ToLowerInvariant()
     if refresh_needed():
         raise AssertionError("generated Python bytecode change requested a Windows refresh")
 
-    deleted_source = gamelibs_root / "src" / "mpgame" / "gamesys" / "SysCvar.cpp"
+    deleted_source = gamelibs_root / "src" / "game" / "gamesys" / "SysCvar.cpp"
     deleted_source.unlink()
     if not refresh_needed():
         raise AssertionError("Windows GameLibs source deletion did not trigger a Meson reconfigure")
 
-    write_file(deleted_source, "// mp cvar\n")
+    write_file(deleted_source, "// cvar\n")
     restage()
     source = gamelibs_root / "src" / "game" / "Game_local.cpp"
     rename_intermediate = source.with_name("Game_local.rename-test")
@@ -722,15 +733,19 @@ def validate_canonical_inventory(work: Path) -> None:
     from game_source_inventory import inventory
     root = work / "project"
     write_file(root / "src/game/Game.cpp", "version 1\n")
+    # one src/game tree builds the game module; a leftover src/mpgame is not part of it
     write_file(root / "src/mpgame/Game.cpp", "multiplayer\n")
     first = inventory(root)
     write_file(root / "src/game/Game.cpp", "version 2\n")
     second = inventory(root)
     assert first["sourceDigest"] != second["sourceDigest"]
-    assert first["fileCount"] == second["fileCount"] == 2
+    assert first["fileCount"] == second["fileCount"] == 1
+    assert [entry["path"] for entry in second["files"]] == ["src/game/Game.cpp"]
+    write_file(root / "src/mpgame/Game.cpp", "multiplayer, edited\n")
+    assert inventory(root) == second
     write_file(root / "src/game/awakening/New.cpp", "campaign extension\n")
     third = inventory(root)
-    assert third["fileCount"] == 3 and third != second
+    assert third["fileCount"] == 2 and third != second
     (root / "src/game/awakening/New.cpp").unlink()
     assert inventory(root) == second
     try:

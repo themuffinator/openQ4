@@ -2,7 +2,7 @@
 // Exercises the engine-free core of server moderation (MP-18): addresses and
 // ranges, the ban list and its file lines, text mutes, the chat flood window,
 // the name policy and the admin log's lines. Run by tools/tests/mp_moderation.py.
-#include "../../../src/mpgame/mp/Moderation.h"
+#include "../../../src/game/mp/Moderation.h"
 #include "../../../src/idlib/PrivateCommand.h"
 
 #include <cstdio>

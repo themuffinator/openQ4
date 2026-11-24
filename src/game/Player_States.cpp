@@ -1,5 +1,5 @@
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 
@@ -53,10 +53,10 @@ idPlayer::State_Torso_Idle
 */
 stateResult_t idPlayer::State_Torso_Idle ( const stateParms_t& parms ) {
 	if ( SRESULT_WAIT == TorsoIdleTransitions ( parms ) ) {
-		// openQ4: with no weapon in hand the body stands upright, its arms
-		// at its sides (UpdateUnarmedBody); every stock torso idle, the bare
-		// "idle" too, holds a gun
-		PlayCycle ( ANIMCHANNEL_TORSO, WantsUnarmedBody() ? "af_pose" : "idle", parms.blendFrames  );
+		// openQ4: with no weapon in hand the campaign's body stands upright, its
+		// arms at its sides (UpdateUnarmedBody); every stock torso idle, the bare
+		// "idle" too, holds a gun. Multiplayer keeps the stock idle.
+		PlayCycle ( ANIMCHANNEL_TORSO, ( !gameLocal.isMultiplayer && WantsUnarmedBody() ) ? "af_pose" : "idle", parms.blendFrames  );
 		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_IdleThink", parms.blendFrames );
 	}
 	return SRESULT_DONE;
@@ -74,8 +74,8 @@ stateResult_t idPlayer::State_Torso_IdleThink ( const stateParms_t& parms ) {
 	// openQ4: the arms drop when the weapon goes, and come up when it
 	// returns. Only here: Torso_Idle runs the transitions above before it
 	// starts its cycle, and would restart itself for ever. At most twice a
-	// second, in case the channel does not take the new cycle.
-	if ( WantsUnarmedBody() != TorsoPlaysUnarmed()
+	// second, in case the channel does not take the new cycle. Campaign only.
+	if ( !gameLocal.isMultiplayer && WantsUnarmedBody() != TorsoPlaysUnarmed()
 			&& ( unarmedIdleRestartTime < 0 || gameLocal.time - unarmedIdleRestartTime >= 500 || gameLocal.time < unarmedIdleRestartTime ) ) {
 		unarmedIdleRestartTime = gameLocal.time;
 		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Idle", 4 );
@@ -168,16 +168,20 @@ idPlayer::State_Torso_LowerWeapon
 ================
 */
 stateResult_t idPlayer::State_Torso_LowerWeapon ( const stateParms_t& parms ) {	
-	// openQ4: a weapon without a lowering anim (the blaster) left the torso
-	// waiting on its idle cycle for good; it now waits in Torso_Lowered, which
-	// lets the arms drop once the weapon has gone from the hand
-	if ( !HasAnim ( ANIMCHANNEL_TORSO, "lower" ) ) {
-		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Lowered", 0 );
-		return SRESULT_DONE;
+	if ( !gameLocal.isMultiplayer ) {
+		// openQ4: a weapon without a lowering anim (the blaster) left the torso
+		// waiting on its idle cycle for good; it now waits in Torso_Lowered, which
+		// lets the arms drop once the weapon has gone from the hand
+		if ( !HasAnim ( ANIMCHANNEL_TORSO, "lower" ) ) {
+			PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Lowered", 0 );
+			return SRESULT_DONE;
+		}
 	}
 	PlayAnim( ANIMCHANNEL_TORSO, "lower", parms.blendFrames );
 	PostAnimState ( ANIMCHANNEL_TORSO, "Wait_TorsoAnim", 3 );
-	PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Lowered", 0 );
+	if ( !gameLocal.isMultiplayer ) {
+		PostAnimState ( ANIMCHANNEL_TORSO, "Torso_Lowered", 0 );
+	}
 	return SRESULT_DONE;
 }
 
@@ -467,8 +471,8 @@ stateResult_t idPlayer::State_Torso_Emote ( const stateParms_t& parms ) {
 idPlayer::IsLegsIdle
 ================
 */
-bool idPlayer::IsLegsIdle ( bool crouching ) const {
-	return ( (pfl.crouch == crouching) && pfl.onGround && (pfl.forward==pfl.backward) && (pfl.strafeLeft==pfl.strafeRight) );
+bool idPlayer::IsLegsIdle( bool crouching ) const {
+	return ( ( pfl.crouch == crouching ) && pfl.onGround && ( pfl.forward == pfl.backward ) && ( pfl.strafeLeft == pfl.strafeRight ) );
 }
 
 /*
@@ -476,7 +480,7 @@ bool idPlayer::IsLegsIdle ( bool crouching ) const {
 idPlayer::State_Legs_Idle
 ================
 */
-stateResult_t idPlayer::State_Legs_Idle ( const stateParms_t& parms ) {
+stateResult_t idPlayer::State_Legs_Idle( const stateParms_t& parms ) {
 	enum {
 		STAGE_INIT,
 		STAGE_WAIT
@@ -484,24 +488,40 @@ stateResult_t idPlayer::State_Legs_Idle ( const stateParms_t& parms ) {
 	switch ( parms.stage ) {
 		case STAGE_INIT:
 			if ( pfl.crouch ) {
-				PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Crouch", parms.blendFrames );
+				PostAnimState( ANIMCHANNEL_LEGS, "Legs_Crouch", parms.blendFrames );
 				return SRESULT_DONE;
 			}
-			IdleAnim ( ANIMCHANNEL_LEGS, "idle", parms.blendFrames );
-			return SRESULT_STAGE ( STAGE_WAIT );
+			IdleAnim( ANIMCHANNEL_LEGS, "idle", parms.blendFrames );
+			return SRESULT_STAGE( STAGE_WAIT );
 		
 		case STAGE_WAIT:
+			if ( gameLocal.isMultiplayer ) {
+				// #34 - have a delay while idle before going to something else if a ground flag change happens
+				// this makes the legs animation stay in idle state when the ground flag value flip-flops fast
+				if ( prevOnGround != pfl.onGround ) {
+					// when explicitely jumping, don't impose any delay
+					bool explicitJump = ( !pfl.onGround && usercmd.upmove > 0 );
+					if ( !explicitJump ) {
+						ignoreOnGroundUntilFrame = gameLocal.framenum + 5;
+					}
+					prevOnGround = pfl.onGround;
+				}
+				if ( gameLocal.framenum <= ignoreOnGroundUntilFrame ) {
+					return SRESULT_WAIT;
+				}
+
+			}
 			// If now crouching go back to idle so we can transition to crouch 
 			if ( pfl.crouch ) {
- 				PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Crouch", 4 );
+ 				PostAnimState( ANIMCHANNEL_LEGS, "Legs_Crouch", 4 );
 				return SRESULT_DONE;
 			} else if ( pfl.jump ) {
-				PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Jump", 4 );
+				PostAnimState( ANIMCHANNEL_LEGS, "Legs_Jump", 4 );
 				return SRESULT_DONE;
 			} else if ( !pfl.onGround ) {
-				PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Fall", 4 );
+				PostAnimState( ANIMCHANNEL_LEGS, "Legs_Fall", 4 );
 				return SRESULT_DONE;
-			}else if ( pfl.forward && !pfl.backward ) {
+			} else if ( pfl.forward && !pfl.backward ) {
 				if( usercmd.buttons & BUTTON_RUN ) {
  					PlayCycle( ANIMCHANNEL_LEGS, "run_forward", parms.blendFrames );
 					PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Run_Forward", parms.blendFrames );
@@ -512,7 +532,7 @@ stateResult_t idPlayer::State_Legs_Idle ( const stateParms_t& parms ) {
 				
 				return SRESULT_DONE;
 			} else if ( pfl.backward && !pfl.forward ) {
-				if( usercmd.buttons & BUTTON_RUN ) {
+				if ( usercmd.buttons & BUTTON_RUN ) {
 					PlayCycle( ANIMCHANNEL_LEGS, "run_backwards", parms.blendFrames );
 					PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Run_Backward", parms.blendFrames );
 				} else {
@@ -522,7 +542,7 @@ stateResult_t idPlayer::State_Legs_Idle ( const stateParms_t& parms ) {
 			
 				return SRESULT_DONE;
 			} else if ( pfl.strafeLeft && !pfl.strafeRight ) {
-				if( usercmd.buttons & BUTTON_RUN ) {
+				if ( usercmd.buttons & BUTTON_RUN ) {
 					PlayCycle( ANIMCHANNEL_LEGS, "run_strafe_left", parms.blendFrames );
 					PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Run_Left", parms.blendFrames );
 				} else {
@@ -532,7 +552,7 @@ stateResult_t idPlayer::State_Legs_Idle ( const stateParms_t& parms ) {
 				
 				return SRESULT_DONE;
 			} else if ( pfl.strafeRight && !pfl.strafeLeft ) {
-				if( usercmd.buttons & BUTTON_RUN ) {
+				if ( usercmd.buttons & BUTTON_RUN ) {
 					PlayCycle( ANIMCHANNEL_LEGS, "run_strafe_right", parms.blendFrames );
 					PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Run_Right", parms.blendFrames );
 				} else {
@@ -553,7 +573,7 @@ stateResult_t idPlayer::State_Legs_Idle ( const stateParms_t& parms ) {
 idPlayer::State_Legs_Crouch_Idle
 ================
 */
-stateResult_t idPlayer::State_Legs_Crouch_Idle ( const stateParms_t& parms ) {
+stateResult_t idPlayer::State_Legs_Crouch_Idle( const stateParms_t& parms ) {
 	enum {
 		STAGE_INIT,
 		STAGE_WAIT
@@ -862,7 +882,11 @@ stateResult_t idPlayer::State_Legs_Jump ( const stateParms_t& parms ) {
 				return SRESULT_DONE;
 			}
 			if ( AnimDone ( ANIMCHANNEL_LEGS, 4 ) ) {
-				PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Fall", 4 );
+				if ( gameLocal.isMultiplayer && pfl.crouch ) {	// openQ4: game_mp (stock Raven MP) crouches when the jump anim ends
+					PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Crouch", 4 );
+				} else {
+					PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Fall", 4 );
+				}
 				return SRESULT_DONE;
 			}			
 			return SRESULT_WAIT;
@@ -891,6 +915,10 @@ stateResult_t idPlayer::State_Legs_Fall ( const stateParms_t& parms ) {
 		case STAGE_WAIT:
 			if ( pfl.onGround ) {
 				PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Land", 2 );
+				return SRESULT_DONE;
+			}
+			if ( gameLocal.isMultiplayer && pfl.crouch ) {	// openQ4: game_mp's (stock Raven MP) crouch while falling
+				PostAnimState ( ANIMCHANNEL_LEGS, "Legs_Crouch", 2 );
 				return SRESULT_DONE;
 			}
 			return SRESULT_WAIT;

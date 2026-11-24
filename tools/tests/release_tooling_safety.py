@@ -374,8 +374,7 @@ def validate_version_header_build_refresh_contract() -> None:
         "build_always_stale: true",
         "build_by_default: true",
         "openq4_engine_sources += [openq4_paks_generated_header, generated_version_header]",
-        "game_sp_sources += [savegame_compat_header, generated_version_header]",
-        "game_mp_sources += [savegame_compat_header, generated_version_header]",
+        "game_module_sources = game_sources + [savegame_compat_header, generated_version_header]",
         "openq4_dedicated_sources += [openq4_paks_generated_header, generated_version_header]",
     ):
         if token not in meson_text:
@@ -398,7 +397,7 @@ def validate_version_header_build_refresh_contract() -> None:
         "src/framework/licensee.h",
         "src/idlib/precompiled.h",
         "src/game/Game_local.h",
-        "src/mpgame/Game_local.h",
+        "src/game/Game_local.h",
     ):
         includes = [
             line for line in (ROOT / shared).read_text(encoding="latin-1").splitlines()
@@ -796,8 +795,7 @@ def validate_windows_installer_payload_requirements() -> None:
         "baseoq4/pak0.pk4",
         "baseoq4/pak1.pk4",
         "baseoq4/pak2.pk4",
-        "baseoq4/game-sp_x64.pdb",
-        "baseoq4/game-mp_x64.pdb",
+        "baseoq4/game_x64.pdb",
     ]
     for relative in required:
         write_file(package_dir / relative)
@@ -810,16 +808,10 @@ def validate_windows_installer_payload_requirements() -> None:
     write_file(package_dir / "OpenAL32.dll")
     expect_file_not_found(
         lambda: INSTALLER.validate_package_dir(package_dir, "x64"),
-        "game-sp_x64.dll",
-        "installer missing game module DLLs",
+        "game_x64.dll",
+        "installer missing game module DLL",
     )
-    write_file(package_dir / "baseoq4" / "game-sp_x64.dll")
-    expect_file_not_found(
-        lambda: INSTALLER.validate_package_dir(package_dir, "x64"),
-        "game-mp_x64.dll",
-        "installer missing multiplayer module DLL",
-    )
-    write_file(package_dir / "baseoq4" / "game-mp_x64.dll")
+    write_file(package_dir / "baseoq4" / "game_x64.dll")
     INSTALLER.validate_package_dir(package_dir, "x64")
 
 
@@ -841,10 +833,8 @@ def validate_windows_installer_symlink_guards() -> None:
         "baseoq4/pak0.pk4",
         "baseoq4/pak1.pk4",
         "baseoq4/pak2.pk4",
-        "baseoq4/game-sp_x64.dll",
-        "baseoq4/game-sp_x64.pdb",
-        "baseoq4/game-mp_x64.dll",
-        "baseoq4/game-mp_x64.pdb",
+        "baseoq4/game_x64.dll",
+        "baseoq4/game_x64.pdb",
     ]
     for relative in required:
         write_file(package_dir / relative)
@@ -1118,7 +1108,7 @@ def validate_manual_release_linux_staged_gate() -> None:
 
     for token in (
         "validate_staged_architecture_set(",
-        "validate_distinct_game_modules(root, sp_modules, mp_modules)",
+        "validate_no_retired_game_modules(root, game_dir)",
         "validate_linux_binary_hardening(root, linux_binary_specs)",
         'fields[4] in {"GLOBAL", "WEAK", "UNIQUE"}',
         'fields[5] in {"DEFAULT", "PROTECTED"}',
@@ -1169,11 +1159,11 @@ def validate_manual_release_linux_post_mutation_gates() -> None:
     for token in (
         "validate_linux_runtime_payload(runtime_root, args.arch)",
         "staged_validator.validate_staged_architecture_set(",
-        "staged_validator.validate_distinct_game_modules(",
+        "for stem in (GAME_MODULE_STEM, *RETIRED_GAME_MODULE_STEMS):",
         "staged_validator.validate_linux_binary_hardening(",
         "staged_validator.validate_linux_client_runtime_dependencies(runtime_root, clients)",
         "staged_validator.validate_linux_dedicated_runtime_dependencies(",
-        "[(dedicated[0], arch), (mp_modules[0], arch)]",
+        "[(dedicated[0], arch), (game_modules[0], arch)]",
         "validate_linux_dependency_contract(runtime_root, binary_specs)",
         '[ldd, "-r", str(binary_path)]',
         'for tag in ("RPATH", "RUNPATH", "TEXTREL")',
@@ -1807,6 +1797,7 @@ def validate_release_game_layer_helpers() -> None:
     baseline = LINUX_RELEASE_ARTIFACTS.expected_runtime_binaries(runtime_root, "x64")
     layer_dir = runtime_root / "q4xbase"
     write_file(layer_dir / "game-sp_x64.so")
+    write_file(layer_dir / "game_x64.so")
     write_file(layer_dir / "mod.json", '{"layer":"awakening"}\n')
     assert LINUX_RELEASE_ARTIFACTS.packaged_layer_dirs(runtime_root) == []
     assert LINUX_RELEASE_ARTIFACTS.expected_runtime_binaries(runtime_root, "x64") == baseline

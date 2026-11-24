@@ -1,4 +1,4 @@
-#include "src/mpgame/bots/BotFrameProfile.h"
+#include "src/game/bots/BotFrameProfile.h"
 #include <cstdio>
 #include <cstdlib>
 #include <limits>

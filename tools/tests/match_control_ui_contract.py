@@ -18,11 +18,11 @@ STRINGS_ROOT = ROOT / "content" / "baseoq4" / "pak0" / "strings"
 MP_MENU = GUI_ROOT / "mpmain.gui"
 MATCH_GUI = GUI_ROOT / "matchcontrol.gui"
 CONTRACT_DOC = ROOT / "docs" / "dev" / "match-control-ui-contract.md"
-PROTOCOL_HEADER = GAME_ROOT / "src" / "mpgame" / "mp" / "match" / "MatchProtocol.h"
-PROTOCOL_SOURCE = GAME_ROOT / "src" / "mpgame" / "mp" / "match" / "MatchProtocol.cpp"
-OPERATIONS_SOURCE = GAME_ROOT / "src" / "mpgame" / "mp" / "match" / "MatchOperations.cpp"
-SERIES_SOURCE = GAME_ROOT / "src" / "mpgame" / "mp" / "match" / "MatchSeries.cpp"
-MULTIPLAYER_SOURCE = GAME_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp"
+PROTOCOL_HEADER = GAME_ROOT / "src" / "game" / "mp" / "match" / "MatchProtocol.h"
+PROTOCOL_SOURCE = GAME_ROOT / "src" / "game" / "mp" / "match" / "MatchProtocol.cpp"
+OPERATIONS_SOURCE = GAME_ROOT / "src" / "game" / "mp" / "match" / "MatchOperations.cpp"
+SERIES_SOURCE = GAME_ROOT / "src" / "game" / "mp" / "match" / "MatchSeries.cpp"
+MULTIPLAYER_SOURCE = GAME_ROOT / "src" / "game" / "MultiplayerGame.cpp"
 LANGUAGES = (
     "english_openq4.lang",
     "german_openq4.lang",

@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../gamesys/ScriptedDepthOfField.h"
@@ -1278,11 +1278,19 @@ void idThread::Event_RandomInt( float range ) const {
 
 // rjohnson: new blur special effect
 void idThread::Event_SetSpecialEffect( int Effect, int Enabled ) {
-	gameLocal.SetSpecialEffect( (ESpecialEffectType)Effect, Enabled != 0 );
+	if ( gameLocal.IsMultiplayerMode() ) {
+		renderSystem->SetSpecialEffect( (ESpecialEffectType)Effect, !!Enabled );
+	} else {
+		gameLocal.SetSpecialEffect( (ESpecialEffectType)Effect, Enabled != 0 );
+	}
 }
 
 void idThread::Event_SetSpecialEffectParm( int Effect, int Parm, float Value ) {
-	gameLocal.SetSpecialEffectParm( (ESpecialEffectType)Effect, Parm, Value );
+	if ( gameLocal.IsMultiplayerMode() ) {
+		renderSystem->SetSpecialEffectParm( (ESpecialEffectType)Effect, Parm, Value );
+	} else {
+		gameLocal.SetSpecialEffectParm( (ESpecialEffectType)Effect, Parm, Value );
+	}
 }
 
 // RAVEN END
@@ -2316,11 +2324,15 @@ void idThread::Event_SetMatSort( const char *name, const char *val ) const {
 	if ( mat ) {
 		int srt = SS_DECAL;
 		if ( idStr::Icmp( val, "SS_MIN" ) == 0 ) {
-			//srt = SS_MIN;		
+			if ( gameLocal.IsMultiplayerMode() ) {
+				srt = SS_MIN;		
+			}
 		} else if ( idStr::Icmp( val, "SS_SUBVIEW" ) == 0 ) {
 			srt = SS_SUBVIEW;		
 		} else if ( idStr::Icmp( val, "SS_PREGUI" ) == 0 ) {
-			//srt = SS_PREGUI;		
+			if ( gameLocal.IsMultiplayerMode() ) {
+				srt = SS_PREGUI;		
+			}
 		} else if ( idStr::Icmp( val, "SS_GUI" ) == 0 ) {
 			srt = SS_GUI;		
 		} else if ( idStr::Icmp( val, "SS_BAD" ) == 0 ) {

@@ -240,7 +240,7 @@ int main() {
 
 
 def main() -> None:
-    source = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     functions = [function(source, signature) for signature in (
         "static bool IsValidVotePlayerSlot(", "static bool IsCurrentPlayerTarget(",
         "static bool ParseBoundedVoteInteger(", "static bool ParseVotePlayerSlot(",

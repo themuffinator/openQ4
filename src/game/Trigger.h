@@ -66,6 +66,7 @@ public:
 	void				Save( idSaveGame *savefile ) const;
 	void				Restore( idRestoreGame *savefile );
 	virtual void		Think( void );
+	virtual void		ThinkMatchPaused( int deltaMsec );
 
 private:
 	float				wait;
@@ -78,6 +79,7 @@ private:
 	bool				touchClient;
 	bool				touchOther;
 	bool				touchVehicle;
+	bool				touchSpec;
 	bool				triggerFirst;
 	bool				triggerWithSelf;
 	int					buyZoneTrigger;
@@ -86,8 +88,11 @@ private:
 
 	idList<idPlayer*>	playersInTrigger;
 
+	bool				IsTeleporter( void ) const;
 	bool				CheckFacing( idEntity *activator );
 	void				HandleControlZoneTrigger();
+
+	void				Event_FindTargets( void );
 
 // RAVEN BEGIN
 // kfuller: want trigger_relays entities to be able to respond to earthquakes
@@ -98,6 +103,7 @@ private:
 	void				Event_TriggerAction( idEntity *activator );
 	void				Event_Trigger( idEntity *activator );
 	void				Event_Touch( idEntity *other, trace_t *trace );
+	void				Event_SpectatorTouch( idEntity *other, trace_t *trace );
 };
 
 
@@ -119,6 +125,7 @@ public:
 	void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );
+	virtual void		ThinkMatchPaused( int deltaMsec );
 
 private:
 	float				wait;
@@ -217,6 +224,7 @@ public:
 	void				Restore( idRestoreGame *savefile );
 
 	void				Spawn( void );
+	virtual void		ThinkMatchPaused( int deltaMsec );
 
 private:
 	bool				on;

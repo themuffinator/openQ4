@@ -14,7 +14,7 @@ sudo apt-get install -y --no-install-recommends "${packages[@]}"
 python3 -m pip install meson ninja
 ```
 
-The engine checkout contains the canonical SP/MP sources in `src/game/` and `src/mpgame/`. Meson compiles them directly and writes their source inventory to the build directory. No companion checkout or source staging is required; `-Dbuild_engine=false` supports a standalone game-module build using the same sources and headers.
+The engine checkout contains the canonical game sources in `src/game/`, which build the one game module for single-player and multiplayer. Meson compiles them directly and writes their source inventory to the build directory. No companion checkout or source staging is required; `-Dbuild_engine=false` supports a standalone game-module build using the same sources and headers.
 
 ## Configure and compile
 
@@ -41,10 +41,9 @@ Expected outputs are:
 
 - `builddir-arm64-cross/openQ4-client_arm64`
 - `builddir-arm64-cross/openQ4-ded_arm64`
-- `builddir-arm64-cross/baseoq4/game-sp_arm64.so`
-- `builddir-arm64-cross/baseoq4/game-mp_arm64.so`
+- `builddir-arm64-cross/baseoq4/game_arm64.so`
 
-The reference workflow performs a real build of all four outputs rather than a configure-only check. It requires AArch64 ELF64 identity for every artifact, PIE for the client and dedicated server, RELRO plus BIND_NOW and a non-executable stack for all four, no X11 dependency in the Wayland-only client, and no direct OpenAL, OpenGL/GLX, SDL, PipeWire, Wayland, or X11/Xext dependency in the dedicated server. It also requires different SP/MP module bytes and exactly one defined `GLOBAL`/`DEFAULT` `GetGameAPI` export from each module. Use `readelf -h`, `readelf -lW`, `readelf -dW`, and `readelf --wide --dyn-syms` for the same local checks.
+The reference workflow performs a real build of all three outputs rather than a configure-only check. It requires AArch64 ELF64 identity for every artifact, PIE for the client and dedicated server, RELRO plus BIND_NOW and a non-executable stack for all three, no X11 dependency in the Wayland-only client, and no direct OpenAL, OpenGL/GLX, SDL, PipeWire, Wayland, or X11/Xext dependency in the dedicated server. It also requires exactly one defined `GLOBAL`/`DEFAULT` `GetGameAPI` export from the game module, which serves single-player and multiplayer. Use `readelf -h`, `readelf -lW`, `readelf -dW`, and `readelf --wide --dyn-syms` for the same local checks.
 
 Native ARM64 jobs in Push Verification and Commit Validation build every change. The cross build adds only the x64-hosted toolchain path, which depends on the build description far more than on the sources, so it runs when a `meson.build`, `meson_options.txt`, a subproject, `tools/cross/`, the Meson wrapper, the validator or the workflow itself changes, every Monday, and on manual dispatch.
 

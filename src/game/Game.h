@@ -748,7 +748,18 @@ extern rvGameLog *				gameLog;
 //     controller's light and trigger feel (PAD-08)
 // 63: idNetworkSystem appends RetailDemoDeclIndex and RetailDemoDeclCount: the
 //     decl numbering of a retail Quake 4 1.4.2 network demo (MP-22)
-const int GAME_API_VERSION		= 63;
+// 64: one game library serves the campaign and network play; gameImport_t
+//     appends the mode the engine loads it for (CORE-07)
+const int GAME_API_VERSION		= 64;
+
+// openQ4 (CORE-07): what the engine loads the game library for. The logical
+// module names game_sp and game_mp (com_activeGameModule) are these two modes of
+// the same library. A load serves one mode until the engine unloads it, which it
+// does whenever the next session needs the other mode.
+enum gameModuleMode_t {
+	GAME_MODULE_SINGLEPLAYER = 0,	// game_sp: the campaign and the main menu
+	GAME_MODULE_MULTIPLAYER = 1		// game_mp: network play, servers and network demos
+};
 
 struct gameImport_t {
 
@@ -782,6 +793,7 @@ struct gameImport_t {
 
 	idVRSystem *				vrSystem;				// tracked head/controller poses (never NULL)
 	idUsercmdGen *				usercmdGen;				// late-look input sampling (draw pass only)
+	gameModuleMode_t			mode;					// campaign or network play (API 64)
 };
 
 struct gameExport_t {

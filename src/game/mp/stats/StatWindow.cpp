@@ -4,13 +4,18 @@
 // Copyright 2002-2005 Raven Software
 //----------------------------------------------------------------
 
-
-
+#include "../../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../../Game_local.h"
 
 #include "StatWindow.h"
 #include "StatManager.h"
+
+// openQ4: how long a stat request is considered outstanding before we're willing to re-send it.
+// lastUpdateTime only moves when the reply arrives, so without this a high framerate client
+// re-sends the request once per frame for a full round trip.
+const int STAT_REQUEST_RESEND_DELAY = 1000;
 
 /*
 ================
@@ -19,6 +24,10 @@ rvStatWindow::rvStatWindow()
 */
 rvStatWindow::rvStatWindow() {
 	statHud = NULL;
+
+	for( int i = 0; i < MAX_CLIENTS; i++ ) {
+		lastStatRequestTime[ i ] = -STAT_REQUEST_RESEND_DELAY;
+	}
 }
 
 /*
@@ -185,13 +194,15 @@ void rvStatWindow::SetupStatWindow( idUserInterface* hud, bool useSpectator ) {
 	statHud->SetStateInt( "playerteam", gameLocal.GetLocalPlayer()->team );
 
 	statHud->StateChanged ( gameLocal.time );
-	statHud->Redraw( gameLocal.time );
 
 	// we shouldn't ever draw a hud unless we're in-game
-	assert( selectionIndex >= 0 && selectionTeam >= 0 );
-
-	
-	statManager->SelectStatWindow( selectionIndex, selectionTeam );
+	if ( selectionIndex >= 0 && selectionTeam >= 0 ) {
+		// openQ4: SelectPlayer() finishes with its own StateChanged/Redraw pair, so redrawing
+		// here as well drew the whole window twice on every call
+		statManager->SelectStatWindow( selectionIndex, selectionTeam );
+	} else {
+		statHud->Redraw( gameLocal.time );
+	}
 }
 
 /*
@@ -252,14 +263,17 @@ void rvStatWindow::SelectPlayer( int clientNum ) {
 	rvPlayerStat* clientStat = statManager->GetPlayerStat( clientNum );
 
 	if( gameLocal.isClient && ( clientStat == NULL || ( gameLocal.time - clientStat->lastUpdateTime ) > 5000 ) ) {
-		// get new stats
-		idBitMsg	outMsg;
-		byte		msgBuf[ 128 ];
+		RequestStats( clientNum );
 
-		outMsg.Init( msgBuf, sizeof( msgBuf ) );
-		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_STAT );
-		outMsg.WriteByte( clientNum );
-		networkSystem->ClientSendReliableMessage( outMsg );
+		// openQ4: nothing new to paint yet, and deliberately no repaint here - SetupStatWindow()
+		// has already pushed its list changes with StateChanged, and idPlayer::DrawHUD redraws
+		// the mp hud every frame regardless
+		return;
+	}
+
+	// openQ4: GetPlayerStat() returns NULL for slots outside playerStats[]
+	if( clientStat == NULL ) {
+		ClearWindow();
 		return;
 	}
 
@@ -323,6 +337,67 @@ void rvStatWindow::SelectPlayer( int clientNum ) {
 
 	statHud->StateChanged ( gameLocal.time );
 	statHud->Redraw( gameLocal.time );
+}
+
+/*
+================
+rvStatWindow::RequestStats()
+
+Asks the server for a client's stats
+================
+*/
+void rvStatWindow::RequestStats( int clientNum ) {
+	if( !gameLocal.isClient || clientNum < 0 || clientNum >= MAX_CLIENTS ) {
+		return;
+	}
+
+	// openQ4: only one request per client may be in flight - the reply is what advances
+	// lastUpdateTime, so re-asking every frame just makes the server answer the same
+	// question dozens of times.  A negative delta means the level time restarted.
+	int requestDelta = gameLocal.time - lastStatRequestTime[ clientNum ];
+
+	if( requestDelta < 0 || requestDelta >= STAT_REQUEST_RESEND_DELAY ) {
+		// get new stats
+		idBitMsg	outMsg;
+		byte		msgBuf[ 128 ];
+
+		lastStatRequestTime[ clientNum ] = gameLocal.time;
+
+		outMsg.Init( msgBuf, sizeof( msgBuf ) );
+		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_STAT );
+		outMsg.WriteByte( clientNum );
+		networkSystem->ClientSendReliableMessage( outMsg );
+	}
+}
+
+/*
+================
+rvStatWindow::ClientNumFromSelection()
+
+Parses a selection index and team into a clientNum
+================
+*/
+int rvStatWindow::ResolveSelection( int selectionIndex, int selectionTeam ) const {
+	const idList<idPlayer*> *list = NULL;
+
+	if( gameLocal.IsTeamGame() ) {
+		if( selectionTeam == TEAM_MARINE ) {
+			list = &marinePlayers;
+		} else if( selectionTeam == TEAM_STROGG ) {
+			list = &stroggPlayers;
+		} else {
+			list = &spectators;
+		}
+	} else {
+		list = ( selectionTeam == TEAM_MAX ) ? &spectators : &players;
+	}
+
+	if( selectionIndex < 0 || selectionIndex >= list->Num() ) {
+		return -1;
+	}
+
+	const idPlayer *player = (*list)[ selectionIndex ];
+	return player ? player->entityNumber : -1;
 }
 
 /*

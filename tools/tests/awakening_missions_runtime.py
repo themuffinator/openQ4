@@ -136,7 +136,7 @@ def main():
     module_suffix = '.dll' if sys.platform == 'win32' else '.dylib' if sys.platform == 'darwin' else '.so'
     module_root = exe.parent.parent/'Frameworks' if sys.platform == 'darwin' else exe.parent/'baseoq4'
     content_root = exe.parent.parent/'Resources/baseoq4' if sys.platform == 'darwin' else exe.parent/'baseoq4'
-    module = module_root/('game-sp_'+arch+module_suffix)
+    module = module_root/('game_'+arch+module_suffix)
     command = launch_command(options, exe, output)
     identity = {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in
                 (exe, module, content_root/'pak0.pk4')}

@@ -674,7 +674,7 @@ def validate_bind_menu_and_spectator_consumers() -> None:
             raise AssertionError(f"{localized_string} must retain its explicit two-line readiness layout")
 
     checked_tree = False
-    for tree in ("mpgame", "game"):
+    for tree in ("game", "game"):
         multiplayer = GAME_LIBS_ROOT / "src" / tree / "MultiplayerGame.cpp"
         if not multiplayer.is_file():
             continue
@@ -745,7 +745,7 @@ def validate_ready_binding_contract() -> None:
         ) is None:
             raise AssertionError(f"The controls-menu {widget} row must edit stock {impulse}")
 
-    multiplayer_path = GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp"
+    multiplayer_path = GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp"
     multiplayer = read(multiplayer_path)
     toggle_ready = body_of(
         multiplayer,

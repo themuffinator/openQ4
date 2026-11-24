@@ -339,14 +339,14 @@ int main() {
 
 
 def build_harness() -> str:
-    source = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     for signature in ("idMultiplayerGame::idMultiplayerGame()", "void idMultiplayerGame::Clear()",
                       "bool idMultiplayerGame::BeginMatchSession"):
         assert "ClearMatchTerminalResult();" in function_body(source, signature), signature
     assert "MP_MATCH_VIEW_MAX_MESSAGE_BYTES + 1 <= MAX_GAME_MESSAGE_SIZE" in source
     harness = QUEUE_HARNESS.split("static void WinnerStays()", 1)[0]
     harness = harness.replace("static const int GAME_DUEL = 9, GAME_DM = 0;", "")
-    harness = harness.replace("#include <cassert>", '#include "mpgame/mp/match/MatchEvidence.h"\n#include <cstring>\n#include <cassert>')
+    harness = harness.replace("#include <cassert>", '#include "game/mp/match/MatchEvidence.h"\n#include <cstring>\n#include <cassert>')
     harness = harness.replace("struct GameLocal {", "struct idPlayer { int entityNumber; };\nstruct GameLocal {")
     harness = harness.replace("struct GameLocal {", '''struct GameLocal {
     struct UserInfo { const char *name = "Winner"; const char *GetString(const char *) const { return name; } } userInfo[MAX_CLIENTS];
@@ -374,7 +374,7 @@ def build_harness() -> str:
         harness = harness.replace(token, function_body(source, signature))
     rules = (MATCH / "MatchRules.cpp").read_text(encoding="utf-8")
     rules = re.sub(r'^#(?:include|pragma).*$', '', rules, flags=re.MULTILINE)
-    types = (ROOT / "src/mpgame/mp/GameTypes.cpp").read_text(encoding="utf-8")
+    types = (ROOT / "src/game/mp/GameTypes.cpp").read_text(encoding="utf-8")
     begin = types.index("static const mpGameTypeInfo_t mpGameTypeInfoTable[]")
     end = types.index("\n/*", types.index("const int mpNumGameTypeInfo", begin))
     definitions = types[begin:end] + "\n".join(function(types, signature) for signature in (
@@ -385,10 +385,10 @@ def build_harness() -> str:
 #include <string>
 #include <cctype>
 template<class T> static T Min(T a, T b) { return a < b ? a : b; }
-#include "mpgame/mp/match/MatchRules.h"
+#include "game/mp/match/MatchRules.h"
 #define BIT(x) (1 << (x))
 struct idDict;
-#include "mpgame/mp/GameTypes.h"
+#include "game/mp/GameTypes.h"
 class idStr : public std::string {
 public:
     using std::string::string; using std::string::operator=;

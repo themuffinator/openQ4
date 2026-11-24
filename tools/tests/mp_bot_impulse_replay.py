@@ -397,7 +397,7 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
     """Run trials one after another with one isolated bot; returns (completed, clean log, exit code)."""
     from mp_round_remote_smoke import verify_runtime_is_current
     verify_runtime_is_current(runtime, executable)
-    identity_paths = [runtime / executable, *sorted((runtime / "baseoq4").glob("game-mp*"))]
+    identity_paths = [runtime / executable, *sorted((runtime / "baseoq4").glob("game_*"))]
     identity_paths = [path for path in identity_paths if path.is_file() and path.suffix not in (".pdb", ".lib", ".exp")]
     def identity():
         return {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in identity_paths}
@@ -514,7 +514,7 @@ def replay_session(runtime: Path, executable: str, basepath: Path, output: Path,
 
 
 def replay_identity(runtime: Path, executable: str) -> dict[str, str]:
-    paths = [runtime / executable, *sorted((runtime / "baseoq4").glob("game-mp*")),
+    paths = [runtime / executable, *sorted((runtime / "baseoq4").glob("game_*")),
              *sorted(runtime.glob("renderer-*")), runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4"]
     return {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in paths
             if p.is_file() and p.suffix not in (".pdb", ".lib", ".exp")}

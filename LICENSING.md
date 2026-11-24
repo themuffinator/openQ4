@@ -6,7 +6,7 @@ not make every component GPL-licensed or permit relicensing SDK-derived code.
 | Component | Terms |
 | --- | --- |
 | Engine and engine-authored support code | [GNU GPL version 3](LICENSE), retained per-file notices and the applicable [Doom 3](LICENSES/DOOM-3-ADDITIONAL-TERMS.txt) or [Doom 3 BFG](LICENSES/DOOM-3-BFG-ADDITIONAL-TERMS.txt) Additional Terms |
-| SDK-derived game libraries in `src/game/` and `src/mpgame/`, including the independently implemented Awakening additions | [Quake 4 SDK Limited Use License Agreement](LICENSES/QUAKE-4-SDK-EULA.rtf), with original notices and any explicit per-file third-party terms preserved |
+| SDK-derived game library in `src/game/`, including the independently implemented Awakening additions | [Quake 4 SDK Limited Use License Agreement](LICENSES/QUAKE-4-SDK-EULA.rtf), with original notices and any explicit per-file third-party terms preserved |
 | Recovered game regression scripts/probes identified in [the coverage map](docs/dev/game-test-coverage.json) and marked with import comments | The same [Quake 4 SDK EULA](LICENSES/QUAKE-4-SDK-EULA.rtf) as their source repository; not relicensed as engine code |
 | Third-party dependencies | Their own retained licences; see [dependency notices](LICENSES/) and the individual source trees |
 | Retail Quake 4 and Awakening content | Not included or relicensed; users supply their own content |

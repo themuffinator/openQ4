@@ -24,9 +24,9 @@ def require(text: str, token: str, context: str) -> None:
 
 
 def main() -> None:
-    header = read("src/mpgame/mp/GameTypes.h")
-    table = read("src/mpgame/mp/GameTypes.cpp")
-    multiplayer = read("src/mpgame/MultiplayerGame.cpp")
+    header = read("src/game/mp/GameTypes.h")
+    table = read("src/game/mp/GameTypes.cpp")
+    multiplayer = read("src/game/MultiplayerGame.cpp")
 
     for token in (
         "mpGameStateFactory_t",

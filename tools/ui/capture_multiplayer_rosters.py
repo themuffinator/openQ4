@@ -129,12 +129,12 @@ def main():
     verify_runtime_is_current(args.runtime)
     args.output.mkdir(parents=True)
     executable = args.runtime / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64')
-    binaries = [executable, *sorted(args.runtime.glob('renderer-*')), *sorted((args.runtime / 'baseoq4').glob('game-*'))]
+    binaries = [executable, *sorted(args.runtime.glob('renderer-*')), *sorted((args.runtime / 'baseoq4').glob('game_*'))]
     binaries = [p for p in binaries if p.is_file()]
     bindings = {str(p.relative_to(args.runtime)): capture.digest(p) for p in binaries}
     documents = {f'guis/menu/{doc}.rui' for _, doc, _, _ in VIEWS}
     source_paths = [*(ROOT / 'content/baseoq4/pak0' / doc for doc in sorted(documents)),
-                    ROOT / 'src/mpgame/MultiplayerGame.h', ROOT / 'src/mpgame/MultiplayerGame.cpp', Path(__file__).resolve()]
+                    ROOT / 'src/game/MultiplayerGame.h', ROOT / 'src/game/MultiplayerGame.cpp', Path(__file__).resolve()]
     sources = {str(p.relative_to(ROOT)): capture.digest(p) for p in source_paths}
     with zipfile.ZipFile(args.runtime / 'baseoq4/pak0.pk4') as pack:
         if any(pack.read(doc).replace(b'\r\n', b'\n') != (ROOT / 'content/baseoq4/pak0' / doc).read_bytes().replace(b'\r\n', b'\n')

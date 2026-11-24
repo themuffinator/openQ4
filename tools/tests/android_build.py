@@ -215,7 +215,7 @@ class AndroidBuildTests(unittest.TestCase):
             notice.write_bytes(files['licenses/MD4.txt'])
             for name, replacement, message in (
                 ('lib/arm64-v8a/libquake4.so', b'old binary', 'differs from validated stage'),
-                ('lib/arm64-v8a/libgame-sp_arm64.so', None, 'seven matching'),
+                ('lib/arm64-v8a/libgame_arm64.so', None, 'six matching'),
                 ('assets/baseoq4/pak0.pk4', b'old data', 'differs from validated stage'),
                 ('assets/licenses/openal-soft/COPYING', None, 'asset set differs'),
                 ('assets/licenses/QUAKE-4-SDK-EULA.rtf', None, 'asset set differs'),
@@ -257,11 +257,11 @@ class AndroidBuildTests(unittest.TestCase):
                 verify_android_apk.verify_payload(apk, stage, '0.14.000')
             for name, value in (
                 ('lib/x86_64/libopenxr_loader.so', android_library(machine=62)),
-                ('lib/x86_64/libgame-sp_arm64.so', android_library()),
+                ('lib/x86_64/libgame_arm64.so', android_library()),
                 ('lib/arm64-v8a/libquake4.so', android_library()),
             ):
                 write_apk(apk, dict(entries, **{name: value}))
-                with self.assertRaisesRegex(ValueError, 'seven matching'):
+                with self.assertRaisesRegex(ValueError, 'six matching'):
                     verify_android_apk.verify_payload(apk, stage, '0.14.000', 'emulator')
             write_apk(apk, entries)
             # Correct filenames are not evidence of the target instruction set.
@@ -661,9 +661,8 @@ class AndroidBuildTests(unittest.TestCase):
             scripts.mkdir(parents=True)
             for filename in ("meson_setup.ps1", "game_source_inventory.py"):
                 shutil.copy2(ROOT / "tools/build" / filename, scripts / filename)
-            for module in ("game", "mpgame"):
-                (game / "src" / module).mkdir(parents=True)
-                (game / "src" / module / "Game_local.cpp").write_text("// game\n", encoding="utf-8")
+            (game / "src/game").mkdir(parents=True)
+            (game / "src/game/Game_local.cpp").write_text("// game\n", encoding="utf-8")
             (build / "meson-private").mkdir(parents=True)
             (build / "meson-info").mkdir()
             (build / "meson-private/coredata.dat").touch()
@@ -710,7 +709,7 @@ class AndroidBuildTests(unittest.TestCase):
                 [sys.executable, str(scripts / 'game_source_inventory.py'), str(project)],
                 check=True, capture_output=True, text=True).stdout)["sourceDigest"])
             # A new source file changes what Meson compiles, so it reconfigures.
-            (game / "src/mpgame/Added.cpp").write_text("// new game file\n", encoding="utf-8")
+            (game / "src/game/Added.cpp").write_text("// new game file\n", encoding="utf-8")
             self.assertEqual([call[0] for call in invoke()], ["setup", "compile"])
 
     def test_ndk_target_and_missing_tools(self) -> None:

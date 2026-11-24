@@ -16,7 +16,7 @@ framework, UTM, VMware Fusion, Parallels, or a hosted Mac provider.
 - Guest user recommendation: `codex`
 - Guest workspace: `~/openq4-work/`
 - Guest source checkout: `~/openq4-work/openQ4`
-- Guest game sources: `~/openq4-work/openQ4/src/game` and `src/mpgame`
+- Guest game sources: `~/openq4-work/openQ4/src/game`
 - Guest Quake 4 assets: `~/openq4-work/Quake4`
 - Guest results: `~/openq4-work/results/`
 

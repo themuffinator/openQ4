@@ -113,7 +113,7 @@ def main() -> int:
               "capture_method": "engine screenshot command",
               "source": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "runtime_sha256": {}, "samples": {}, "world_samples": {}, "failures": []}
-    for path in (executable, runtime / "baseoq4/game-mp_x64.dll", runtime / "baseoq4/game-mp_x64.so",
+    for path in (executable, runtime / "baseoq4/game_x64.dll", runtime / "baseoq4/game_x64.so",
                  runtime / "baseoq4/pak0.pk4", runtime / "baseoq4/pak1.pk4"):
         if path.is_file():
             with path.open("rb") as source:

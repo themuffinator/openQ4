@@ -1,12 +1,13 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
+#include "mp/match/MatchDeadline.h"
 
 
 /*
@@ -305,6 +306,12 @@ idItem::idItem() {
 	effectIdle = NULL;
 	simpleItem = false;
 	pickedUp = false;
+	pickedUpByClientNum = -1;
+	classicMegaHolder = NULL;
+	classicMegaRespawn = 0.0f;
+	presentedOrigin.Zero();
+	presentedAxis.Identity();
+	visualsPresented = false;
 }
 
 /*
@@ -508,7 +515,7 @@ bool idItem::GetPhysicsToVisualTransform( idVec3 &origin, idMat3 &axis ) {
 			// dedicated server for instance
 			axis = mat3_identity;
 		}
-		origin = idVec3( 0.0f, 0.0f, 32.0f );
+		origin = idVec3( 0.0f, 0.0f, simpleItemScale / 2.0f );
 		return true;
 	}
 
@@ -558,14 +565,44 @@ void idItem::Think( void ) {
 		UpdateTrigger();
 	}
 
-	if ( gameLocal.IsMultiplayer() && g_skipItemShadowsMP.GetBool() ) {
-		renderEntity.suppressShadowInViewID = gameLocal.localClientNum + 1;
-	} else {
-		renderEntity.suppressShadowInViewID = 0;
+	// openQ4: Classic mega health comes back a while after its holder is done with it
+	if ( pickedUp && classicMegaRespawn > 0.0f && !gameLocal.isClient ) {
+		idPlayer *holder = classicMegaHolder.GetEntity();
+		if ( holder == NULL || holder->spectating || holder->health <= 0 || !holder->ClassicMegaHealthActive() ) {
+			const float respawn = classicMegaRespawn;
+			classicMegaHolder = NULL;
+			classicMegaRespawn = 0.0f;
+			BecomeInactive( TH_THINK );
+			const char *sfx = spawnArgs.GetString( "fx_Respawn" );
+			if ( sfx && *sfx ) {
+				PostEventSec( &EV_RespawnFx, Max( 0.0f, respawn - 0.5f ) );
+			}
+			PostEventSec( &EV_RespawnItem, respawn );
+			gameLocal.mpGame.ObserveCompetitiveItemPickup( this, respawn );
+		}
+		return;
 	}
 
+	const int suppressShadowInViewID = ( gameLocal.IsMultiplayer() && g_skipItemShadowsMP.GetBool() ) ? gameLocal.localClientNum + 1 : 0;
+	const bool shadowChanged = renderEntity.suppressShadowInViewID != suppressShadowInViewID;
+	renderEntity.suppressShadowInViewID = suppressShadowInViewID;
+
 	if( !(simpleItem && pickedUp) ) {
-		UpdateVisuals();
+		// openQ4: an item whose model does not move (every item on a dedicated
+		// server, which draws no spin or bob) updated its model every tic all the
+		// same, which also threw away its PVS areas, and every client's snapshot
+		// then worked them out again for every item on the map. Update it when
+		// it moves; Hide, Show, a skin and a respawn update it themselves.
+		// SP keeps updating it every think, as it always has.
+		const idVec3 &origin = GetPhysics()->GetOrigin();
+		const idMat3 &axis = GetPhysics()->GetAxis();
+		const bool visualMoves = !gameLocal.isMultiplayer || simpleItem || ( spin && !( gameLocal.isServer && !gameLocal.isListenServer ) );
+		if ( visualMoves || shadowChanged || !visualsPresented || origin != presentedOrigin || axis != presentedAxis ) {
+			UpdateVisuals();
+			presentedOrigin = origin;
+			presentedAxis = axis;
+			visualsPresented = true;
+		}
 		Present();
 	}
 }
@@ -664,10 +701,6 @@ void idItem::Spawn( void ) {
 // mwhitlock: Dynamic memory consolidation
 	RV_PUSH_HEAP_MEM(this);
 // RAVEN END
-
-// jmarshall
-	modelindex = gameLocal.GetBotItemEntry(spawnArgs.GetString("modelindex"));
-// jmarshall end
 
 	physicsObj.SetClipModel( new idClipModel( GetPhysics()->GetClipModel() ), 1.0f );
 
@@ -789,6 +822,7 @@ void idItem::Spawn( void ) {
 	
 	GetPhysics( )->SetClipMask( GetPhysics( )->GetClipMask( ) | CONTENTS_ITEMCLIP );
 	pickedUp = false;
+	pickedUpByClientNum = -1;
 }
 
 /*
@@ -959,6 +993,10 @@ bool idItem::Pickup( idPlayer *player ) {
 
 	pickedUp = true;
 
+	if ( player != NULL && player->entityNumber >= 0 && player->entityNumber < MAX_CLIENTS ) {
+		pickedUpByClientNum = player->entityNumber;
+	}
+
 	// allow SetSkin or Hide() to get called regardless of simpleitem mode
 	if( simpleItem ) {
 		FreeModelDef();
@@ -987,12 +1025,41 @@ bool idItem::Pickup( idPlayer *player ) {
 		}
 	}
 
-	if ( respawn && !dropped && !no_respawn ) {
+	// openQ4: the server's weapon respawn time, and Weapons Frenzy, which brings
+	// weapons and ammo back in a quarter of the time. Decided before the bots
+	// and the item timers hear about the pickup, so they see the real delay.
+	if ( gameLocal.isMultiplayer && respawn > 0.0f && !dropped ) {
+		const bool weaponItem = ( spawnArgs.FindKey( "weaponclass" ) != NULL );
+		const bool ammoItem = ( idStr::FindText( spawnArgs.GetString( "classname" ), "ammo_" ) == 0 );
+		if ( weaponItem && rvMPModifiers::WeaponRespawnSeconds() > 0.0f ) {
+			respawn = rvMPModifiers::WeaponRespawnSeconds();
+		}
+		if ( ( weaponItem || ammoItem ) && gameLocal.mpGame.HasModifier( MPMOD_FRENZY ) ) {
+			respawn = Min( respawn, Max( MP_FRENZY_RESPAWN_FLOOR, respawn * MP_FRENZY_RESPAWN_SCALE ) );
+		}
+	}
+
+	// openQ4: bots time the pickups they witness, the way a player does.
+	if ( gameLocal.isMultiplayer && gameLocal.isServer ) {
+		botManager.OnItemPickup( this, player, ( respawn && !dropped && !no_respawn ) ? respawn : 0.0f );
+	}
+
+	// openQ4: Classic mega health starts draining now and holds its respawn until the
+	// holder is back at the normal limit; Think starts the clock from there.
+	if ( respawn && !dropped && !no_respawn && gameLocal.IsClassicRuleset() && spawnArgs.FindKey( "inv_megahealth" ) ) {
+		player->StartClassicMegaHealth();
+		classicMegaHolder = player;
+		classicMegaRespawn = respawn;
+		// openQ4 (MP-15): taken, and its timer waits with it
+		gameLocal.mpGame.itemTimers.OnHeld( this );
+		BecomeActive( TH_THINK );
+	} else if ( respawn && !dropped && !no_respawn ) {
 		const char *sfx = spawnArgs.GetString( "fx_Respawn" );
 		if ( sfx && *sfx ) {
 			PostEventSec( &EV_RespawnFx, respawn - 0.5f );
 		}
 		PostEventSec( &EV_RespawnItem, respawn );
+		gameLocal.mpGame.ObserveCompetitiveItemPickup( this, respawn );
 	} else if ( !spawnArgs.GetBool( "inv_objective" ) && !no_respawn ) {
 		// give some time for the pickup sound to play
 		// FIXME: Play on the owner
@@ -1099,6 +1166,7 @@ void idItem::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 			// g_simpleItems might force a hide even with a pickup skin
 			if ( pickupSkin ) {
 				SetSkin( skin );
+				srvReady = 1;
 			} else {
 				SetSkin( skin );
 				Show();
@@ -1108,6 +1176,7 @@ void idItem::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 				UpdateVisuals();			
 			}
 			pickedUp = false;
+	pickedUpByClientNum = -1;
 
 			if ( effectIdle.GetEntity( ) ) {
 				UpdateModelTransform();
@@ -1119,6 +1188,7 @@ void idItem::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		} else {
 			if ( pickupSkin ) {
 				SetSkin( pickupSkin );
+				srvReady = 0;
 			} else {
 				Hide();
 			}
@@ -1203,6 +1273,16 @@ void idItem::Event_DropToFloor( void ) {
 
 /*
 ================
+idItem::TouchesPickup
+================
+*/
+bool idItem::TouchesPickup( const idBounds &bounds ) const {
+	return canPickUp && !pickedUp && !IsHidden() && trigger &&
+		( trigger->GetContents() & CONTENTS_TRIGGER ) != 0 && bounds.IntersectsBounds( trigger->GetAbsBounds() );
+}
+
+/*
+================
 idItem::Event_Touch
 ================
 */
@@ -1266,6 +1346,7 @@ void idItem::Event_Respawn( void ) {
 	}
 
 	pickedUp = false;
+	pickedUpByClientNum = -1;
 
 	inViewTime = -1000;
 	lastCycle = -1;
@@ -1279,6 +1360,7 @@ void idItem::Event_Respawn( void ) {
 		UpdateModelTransform();
 		PlayEffect( "fx_idle", renderEntity.origin, renderEntity.axis, true );
 	}
+	gameLocal.mpGame.ObserveCompetitiveItemAvailable( this );
 }
 
 /*
@@ -1301,6 +1383,13 @@ void idItem::Event_RespawnFx( void ) {
 
 	if( !simpleItem ) {
 		gameLocal.PlayEffect( spawnArgs, "fx_respawn", GetPhysics()->GetOrigin(), idVec3(0,0,1).ToMat3(), false, vec3_origin );
+	} else {
+		// zinx - HACK - hardcoded sound to avoid new defs for 1.4.  Please ensure it remains precached.
+		// FIXME - put the sound in the defs
+		if ( !idStr::Icmp( spawnArgs.GetString( "fx_respawn" ), "effects/mp/itemrespawn.fx" ) ) {
+			const idSoundShader *shader = declManager->FindSound( "mp_item_respawn" );
+			StartSoundShader( shader, SND_CHANNEL_ITEM, 0, false, NULL );
+		}
 	}
 }
 
@@ -1367,7 +1456,12 @@ void idItemPowerup::Spawn( void ) {
 		time = -1;
 	}
 
-	type = spawnArgs.GetInt( "type", "0" );
+	if ( gameLocal.isMultiplayer ) {
+		// content numbers its powerups its own way (the Awakening renumbered them)
+		type = idPlayer::PowerupForContentType( spawnArgs.GetInt( "type", "0" ) );
+	} else {
+		type = spawnArgs.GetInt( "type", "0" );
+	}
 	
 	// If the powerup was dropped then make it dissapear using its remaining time.
 	if ( spawnArgs.GetBool( "dropped" ) && time != -1 ) {
@@ -1462,6 +1556,11 @@ void idItemPowerup::Think( void ) {
 	if( i >= gameLocal.numClients ) {
 		PostEventMS( &EV_RespawnItem, 0 );
 	}
+}
+
+void idItemPowerup::ThinkMatchPaused( int deltaMsec ) {
+	idItem::ThinkMatchPaused( deltaMsec );
+	mpMatchShiftOptionalDeadline( droppedTime, deltaMsec );
 }
 
 /*
@@ -2212,6 +2311,7 @@ void rvItemCTFFlag::Spawn () {
 		}
 		case TEAM_MAX: {
 			powerup = POWERUP_CTF_ONEFLAG;
+			gameLocal.mpGame.SetFlagEntity( this, TEAM_MAX );
 			break;
 		}
 		default:
@@ -2300,7 +2400,10 @@ bool rvItemCTFFlag::GiveToPlayer( idPlayer* player, bool updateHud ) {
 	if ( canPickup ) {
 		// If the flag was dropped, return it		
 		if ( dropped ) {
-			gameLocal.mpGame.AddPlayerTeamScore( player, 2 );
+			// openQ4: the Classic ruleset pays Threewave CTF's recovery bonus
+			if ( !rvClassicRules::AwardFlagReturn( player ) ) {
+				gameLocal.mpGame.AddPlayerTeamScore( player, 2 );
+			}
 			statManager->FlagReturned( player );
 			ResetFlag ( teamPowerup );
 // RITUAL BEGIN
@@ -2371,7 +2474,10 @@ bool rvItemCTFFlag::Pickup( idPlayer *player ) {
 
 	gameLocal.mpGame.SetFlagEntity( NULL, team );
 
-	gameLocal.mpGame.AddPlayerTeamScore( player, 1 );
+	// openQ4: Threewave CTF gives nothing for lifting the flag
+	if ( !rvClassicRules::AwardFlagPickup( player ) ) {
+		gameLocal.mpGame.AddPlayerTeamScore( player, 1 );
+	}
 
 	if( gameLocal.gameType == GAME_CTF || gameLocal.gameType == GAME_ARENA_CTF ) { 
 		((rvCTFGameState*)gameLocal.mpGame.GetGameState())->SetFlagState( team, FS_TAKEN );

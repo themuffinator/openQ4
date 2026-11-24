@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH_DIR = ROOT / "src/mpgame/mp/match"
+MATCH_DIR = ROOT / "src/game/mp/match"
 HEADER = MATCH_DIR / "MatchEvidenceStorage.h"
 SOURCE = MATCH_DIR / "MatchEvidenceStorage.cpp"
 EVIDENCE_SOURCE = MATCH_DIR / "MatchEvidence.cpp"
@@ -241,26 +241,25 @@ def static_contracts(header: str, source: str, adapter_header: str,
             "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchEvidenceStorage.cpp" not in {
+    if "game/mp/match/MatchEvidenceStorage.cpp" not in {
         line.strip() for line in listing
     }:
         raise AssertionError("MatchEvidenceStorage.cpp is absent from the MP source list")
-    if "mpgame/mp/match/MatchEvidenceFileSystem.cpp" not in {
+    if "game/mp/match/MatchEvidenceFileSystem.cpp" not in {
         line.strip() for line in listing
     }:
         raise AssertionError("MatchEvidenceFileSystem.cpp is absent from the MP source list")
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchEvidenceStorage.h"
+#include "game/mp/match/MatchEvidenceStorage.h"
 
 #include <string.h>
 

@@ -50,8 +50,8 @@ struct idMath {
     static int ClampInt(int a,int b,int v) { return std::max(a,std::min(b,v)); }
     static int Ftoi(float v) { return int(v); }
 };
-#include "mpgame/mp/GameTypes.h"
-#include "mpgame/mp/match/MatchRules.h"
+#include "game/mp/GameTypes.h"
+#include "game/mp/match/MatchRules.h"
 struct CVar {
     std::string value="casual";
     const char* GetString() const { return value.c_str(); }
@@ -106,17 +106,17 @@ int main() {
 
 
 def main() -> None:
-    mp = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
-    rules = (ROOT / "src/mpgame/mp/match/MatchRules.cpp").read_text(encoding="utf-8")
+    mp = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    rules = (ROOT / "src/game/mp/match/MatchRules.cpp").read_text(encoding="utf-8")
     rules = re.sub(r"^#(?:include|pragma).*$", "", rules, flags=re.MULTILINE)
-    types = (ROOT / "src/mpgame/mp/GameTypes.cpp").read_text(encoding="utf-8")
+    types = (ROOT / "src/game/mp/GameTypes.cpp").read_text(encoding="utf-8")
     begin = types.index("static const mpGameTypeInfo_t mpGameTypeInfoTable[]")
     end = types.index("\n/*", types.index("const int mpNumGameTypeInfo", begin))
     definitions = types[begin:end] + "\n".join(function(types, signature) for signature in (
         "const mpGameTypeInfo_t *MPGameType(", "int MPGameTypeFlags(",
         "const char *MPGameTypeName(", "bool MPGameTypeIsSelectable(", "bool MPGameTypeHasAny(",
     ))
-    cvars = (ROOT / "src/mpgame/gamesys/SysCvar.cpp").read_text(encoding="utf-8")
+    cvars = (ROOT / "src/game/gamesys/SysCvar.cpp").read_text(encoding="utf-8")
     defaults = re.findall(r'idCVar\s+\w+\s*\(\s*"(si_[^"]+)"\s*,\s*"([^"]*)"', cvars)
     setters = "\n".join(f'gameLocal.serverInfo.Set("{key}","{value}");' for key, value in defaults)
     program = (STUBS + definitions + rules + function(mp, "bool idMultiplayerGame::InitializeCompetitiveRules(") +

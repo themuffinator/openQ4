@@ -26,9 +26,9 @@ def main() -> int:
                    kick=[36.745, 477.541, 143.544], health=7, damage=63, knock_msec=200)
     trials = [t for t in trials_for(impulse) if t["name"] in ("air11", "controller", "preController")]
     exe = "openQ4-client_x64.exe" if os.name == "nt" else "openQ4-client_x64"
-    files = [runtime / exe, *[p for p in (runtime / "baseoq4").glob("game-mp*")
+    files = [runtime / exe, *[p for p in (runtime / "baseoq4").glob("game_*")
                              if p.suffix in (".dll", ".so", ".dylib")],
-             ROOT / "src/mpgame/bots/Bot.cpp", ROOT / "src/mpgame/bots/NavMesh.cpp"]
+             ROOT / "src/game/bots/Bot.cpp", ROOT / "src/game/bots/NavMesh.cpp"]
     identity = {str(p): hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
     completed, log, code = replay_session(runtime, exe, args.basepath.resolve(), output,
                                            "mp/q4ctf5", "CTF", trials, 28973, 180)

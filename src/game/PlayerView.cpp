@@ -1,10 +1,10 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 07/07/2004
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 #include "gamesys/ScriptedDepthOfField.h"
@@ -19,6 +19,47 @@
 const int IMPULSE_DELAY = 150;
 static idCVar ui_retainedPauseCache( "ui_retainedPauseCache", "1", CVAR_GUI | CVAR_BOOL | CVAR_NOCHEAT,
 	"reuse the paused single-player scene while keeping HUD and menu presentation live" );
+
+/*
+======================
+GetAspectCorrectScreenRect
+======================
+*/
+static void GetAspectCorrectScreenRect( float &x, float &y, float &w, float &h ) {
+	const float baseAspect = ( float )SCREEN_WIDTH / ( float )SCREEN_HEIGHT;
+	const float currentAspect = idMath::ClampFloat( 0.1f, 10.0f, gameLocal.GetScreenAspectRatio() );
+
+	if ( currentAspect >= baseAspect ) {
+		w = SCREEN_HEIGHT * currentAspect;
+		h = SCREEN_HEIGHT;
+		x = ( SCREEN_WIDTH - w ) * 0.5f;
+		y = 0.0f;
+	} else {
+		w = SCREEN_WIDTH;
+		h = SCREEN_WIDTH / currentAspect;
+		x = 0.0f;
+		y = ( SCREEN_HEIGHT - h ) * 0.5f;
+	}
+}
+
+/*
+======================
+DrawAspectCorrectFullscreenMaterial
+======================
+*/
+static void DrawAspectCorrectFullscreenMaterial( const idMaterial *material ) {
+	float x;
+	float y;
+	float w;
+	float h;
+
+	if ( material == NULL ) {
+		return;
+	}
+
+	GetAspectCorrectScreenRect( x, y, w, h );
+	renderSystem->DrawStretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, material );
+}
 /*
 ==============
 idPlayerView::idPlayerView
@@ -210,7 +251,6 @@ void idPlayerView::SetPlayerEntity( idPlayer *playerEnt ) {
 		tunnelMaterial = declManager->FindMaterial( dict->GetString("mtr_tunnel") );
 		armorMaterial = declManager->FindMaterial( dict->GetString("mtr_armourEffect") );
 		bloodSprayMaterial = declManager->FindMaterial( dict->GetString("mtr_bloodspray") );
-		lagoMaterial = declManager->FindMaterial( LAGO_MATERIAL, false );
 	}
 }
 
@@ -265,7 +305,6 @@ which will determine the head kick direction
 // RAVEN BEGIN
 // jnewquist: Controller rumble
 void idPlayerView::DamageImpulse( idVec3 localKickDir, const idDict *damageDef, int damage, const char *damageDefName ) {
-
 	//
 	// double vision effect
 	//
@@ -444,8 +483,10 @@ but having it localized here lets the material be pre-looked up etc.
 ==================
 */
 void idPlayerView::AddBloodSpray( float duration ) {
-	(void)duration;
-/*
+	// openQ4: single player draws no blood spray
+	if ( !gameLocal.isMultiplayer ) {
+		return;
+	}
 	if ( duration <= 0 || bloodSprayMaterial == NULL || g_skipViewEffects.GetBool() ) {
 		return;
 	}
@@ -480,7 +521,6 @@ void idPlayerView::AddBloodSpray( float duration ) {
 	blob->t1 = t1;
 	blob->s2 = s2;
 	blob->t2 = t2;
-*/
 }
 
 /*
@@ -651,22 +691,24 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view, i
 	const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
 
 	if ( !( RF_GUI_ONLY & renderFlags ) ) {
+		idPresentationRendererScope rendererScope;
 		// The wheel's scene focus is part of how this view renders. The scene
 		// pass is often RF_NO_GUI, with the wheel drawn by a later GUI-only pass.
 		RequestViewDepthOfField( !pm_thirdPerson.GetBool() && !g_skipViewEffects.GetBool(),
 			*view, ScriptedDepthOfField::Evaluate( view->vieworg, view->viewaxis ) );
-// jmarshall
 		// jscott: portal sky rendering with KRABS
-		//idCamera *portalSky = gameLocal.GetPortalSky();
-		//if( portalSky ) {
-		//	renderView_t portalSkyView = *view;
-		//	portalSky->GetViewParms( &portalSkyView );
-		//	gameRenderWorld->RenderScene( &portalSkyView );
-		//}
-		//gameRenderWorld->RenderScene( view );
-
-		gameLocal.RenderScene(view, gameRenderWorld, gameLocal.GetPortalSky(), renderFlags);
-// jmarshall end
+		if ( gameLocal.isMultiplayer ) {
+			idCamera *portalSky = gameLocal.GetPortalSky();
+			if ( portalSky ) {
+				renderView_t portalSkyView = *view;
+				portalSky->GetViewParms( &portalSkyView );
+				gameRenderWorld->RenderScene( &portalSkyView, ( renderFlags & ( ~RF_PRIMARY_VIEW ) ) | RF_DEFER_COMMAND_SUBMIT | RF_PORTAL_SKY );
+			}
+			gameRenderWorld->RenderScene( view, renderFlags | RF_PENUMBRA_MAP );
+		} else {
+			// single player renders through the game's scene targets and post-process chain
+			gameLocal.RenderScene( view, gameRenderWorld, gameLocal.GetPortalSky(), renderFlags );
+		}
 	}
 
 	if ( RF_NO_GUI & renderFlags ) {
@@ -678,8 +720,10 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view, i
 	if ( !pm_thirdPerson.GetBool() && !g_skipViewEffects.GetBool() ) {
 		// Soften the scene before damage indicators, HUD and wheel artwork.
 		DrawRetainedViewEffects( true );
-		renderSystem->SetUseUIViewportFor2D( false );
+		if ( !gameLocal.isMultiplayer ) {
+			renderSystem->SetUseUIViewportFor2D( false );
 
+		}
 		for ( int i = 0 ; i < MAX_SCREEN_BLOBS ; i++ ) {
 			screenBlob_t	*blob = &screenBlobs[i];
 			if ( blob->finishTime <= gameLocal.time ) {
@@ -701,13 +745,26 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view, i
 		// Render tunnel vision
 		if ( gameLocal.time < tvFinishTime ) {
 			renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, tvScale * ((float)(tvFinishTime - gameLocal.time) / (float)(tvFinishTime - tvStartTime)) );
-			renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, tunnelMaterial );
+			if ( gameLocal.isMultiplayer ) {
+				DrawAspectCorrectFullscreenMaterial( tunnelMaterial );
+			} else {
+				renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, tunnelMaterial );
+			}
 		}
 
-		renderSystem->SetUseUIViewportFor2D( true );
+		// openQ4: damage numbers project against the view that was just
+		// submitted, so they have to be drawn after the scene and before the
+		// HUD proper takes the foreground
+		if ( gameLocal.isMultiplayer ) {
+			gameLocal.mpGame.damageNumbers.Draw( view );
+		}
+
+		if ( !gameLocal.isMultiplayer ) {
+			renderSystem->SetUseUIViewportFor2D( true );
+		}
 		player->DrawHUD( hud );
 
-			
+
 /*
 		// tunnel vision
 		float	health = 0.0f;
@@ -746,14 +803,20 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view, i
 
 	// test a single material drawn over everything
 	if ( g_testPostProcess.GetString()[0] ) {
-		renderSystem->SetUseUIViewportFor2D( false );
+		if ( !gameLocal.isMultiplayer ) {
+			renderSystem->SetUseUIViewportFor2D( false );
+		}
 		const idMaterial *mtr = declManager->FindMaterial( g_testPostProcess.GetString(), false );
 		if ( !mtr ) {
 			common->Printf( "Material not found.\n" );
 			g_testPostProcess.SetString( "" );
 		} else {
 			renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
-			renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, mtr );
+			if ( gameLocal.isMultiplayer ) {
+				DrawAspectCorrectFullscreenMaterial( mtr );
+			} else {
+				renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, mtr );
+			}
 		}
 	}
 
@@ -800,11 +863,18 @@ void idPlayerView::DoubleVision( idUserInterface *hud, const renderView_t *view,
 	// carry red tint if in berserk mode
 	idVec4 color(1, 1, 1, 1);
 
-	renderSystem->SetUseUIViewportFor2D( false );
+	if ( !gameLocal.isMultiplayer ) {
+		renderSystem->SetUseUIViewportFor2D( false );
+	}
 	renderSystem->SetColor4( color.x, color.y, color.z, 1.0f );
+// RAVEN BEGIN
+// jnewquist: Call DrawStretchCopy, which will flip the texcoords for D3D
+// jmarshall - DrawStretchCopy was removed from the engine interface; DrawStretchPic matches the GL path.
 	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, shift, 1, 1, 0, dvMaterial );
 	renderSystem->DrawStretchPic( 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 1, 1-shift, 0, dvMaterialBlend );
 	renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
+// jmarshall end
+// RAVEN END
 }
 
 /*
@@ -1019,9 +1089,15 @@ void idPlayerView::ScreenFade() {
 	}
 
 	if ( fadeColor[ 3 ] != 0.0f ) {
-		renderSystem->SetUseUIViewportFor2D( false );
+		if ( !gameLocal.isMultiplayer ) {
+			renderSystem->SetUseUIViewportFor2D( false );
+		}
 		renderSystem->SetColor4( fadeColor[ 0 ], fadeColor[ 1 ], fadeColor[ 2 ], fadeColor[ 3 ] );
-		renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
+		if ( gameLocal.isMultiplayer ) {
+			DrawAspectCorrectFullscreenMaterial( declManager->FindMaterial( "_white" ) );
+		} else {
+			renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
+		}
 	}
 
 	renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
@@ -1046,9 +1122,15 @@ void idPlayerView::InfluenceVision( idUserInterface *hud, const renderView_t *vi
 	}
 	if ( player->GetInfluenceMaterial() ) {
 		SingleView( hud, view );
-		renderSystem->SetUseUIViewportFor2D( false );
+		if ( !gameLocal.isMultiplayer ) {
+			renderSystem->SetUseUIViewportFor2D( false );
+		}
 		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, pct );
-		renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, player->GetInfluenceMaterial() );
+		if ( gameLocal.isMultiplayer ) {
+			DrawAspectCorrectFullscreenMaterial( player->GetInfluenceMaterial() );
+		} else {
+			renderSystem->DrawStretchPic( 0.0f, 0.0f, 640.0f, 480.0f, 0.0f, 0.0f, 1.0f, 1.0f, player->GetInfluenceMaterial() );
+		}
 	} else if ( player->GetInfluenceEntity() == NULL ) {
 		SingleView( hud, view, RF_NO_GUI );
 		renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
@@ -1067,15 +1149,17 @@ idPlayerView::VRView
 
 The world once per headset eye, each from its tracked pose with its own
 off-axis frustum; full-screen effects that tint the world (fades, the liquid
-wash) go into the eyes, while the HUD, screen blobs and objectives go to the
-virtual screen, which the headset composites as a layer in front of them.
-Double vision and influence effects are flat-screen effects and stand down.
+wash) go into the eyes, while the HUD, screen blobs, objectives and damage
+numbers go to the virtual screen, which the headset composites as a layer in
+front of them. Double vision and influence effects are flat-screen effects
+and stand down.
 ===================
 */
 void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const vrFrameState_t &vrFrame, float trackingYaw ) {
 	// a vehicle's turret follows the head, so its HUD sights hang on the line
-	// of sight, as in head aim, wherever the weapon hand points
-	cvarSystem->SetCVarBool( "vr_hudOnSight", player->IsInVehicle() );
+	// of sight, as in head aim, wherever the weapon hand points; multiplayer
+	// has no vehicle in stereo, and a single player seat must not leave it there
+	cvarSystem->SetCVarBool( "vr_hudOnSight", !gameLocal.isMultiplayer && player->IsInVehicle() );
 
 	idVec3 eyeOrigin;
 	idMat3 eyeAxis;
@@ -1095,7 +1179,7 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 		headForward = headAxis[0];
 	}
 
-	// where the weapon hand's shot lands, marked in each eye over its 3D pass
+	// where the shot lands, marked in each eye over its 3D pass
 	vrAimMarker_t aimMarker;
 	const bool drawAimMarker = vrFrame.aimLaser != VR_AIM_LASER_OFF && player->GetVRAimMarker( aimMarker );
 	const idMaterial *aimMaterial = drawAimMarker ? declManager->FindMaterial( "_white" ) : NULL;
@@ -1106,7 +1190,8 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 	// cut across the magnified view
 	const int aimLaser = ( zoomScale < 1.0f && vrFrame.aimLaser == VR_AIM_LASER_BEAM ) ? VR_AIM_LASER_DOT : vrFrame.aimLaser;
 	// the edges of each eye darken while the stick moves or turns the player
-	const float vignette = VRComfortVignette( vrFrame, trackingYaw );
+	// (multiplayer measures the turn on the body yaw)
+	const float vignette = VRComfortVignette( vrFrame, gameLocal.isMultiplayer ? vrFrame.bodyYaw : trackingYaw );
 	const idMaterial *vignetteMaterial = vignette > 0.01f ? declManager->FindMaterial( "_white" ) : NULL;
 	// vr_debug 2 logs every frame: where the drawn head stands in the world,
 	// which a room-scale walk must not move, and the vignette over it
@@ -1202,7 +1287,10 @@ player's velocity, which a room-scale step leaves alone), a vehicle's speed,
 and turning the head did not do (the rate of the tracking yaw: smooth turning,
 and the turns of a vehicle that carries the view). A change of more than 15
 degrees in one frame is a snap turn or a recentre, a cut rather than motion,
-and is ignored.
+and is ignored. Multiplayer passes the body yaw as the tracking yaw and walks
+the body after a room-scale step through the usercmd, which gives it the
+stick's velocity: while the tracking space takes such a step its horizontal
+speed is the player's own walk and leaves the edges open; a fall still counts.
 ===================
 */
 float idPlayerView::VRComfortVignette( const vrFrameState_t &vrFrame, float trackingYaw ) {
@@ -1218,10 +1306,18 @@ float idPlayerView::VRComfortVignette( const vrFrameState_t &vrFrame, float trac
 	}
 	vrComfortYaw = trackingYaw;
 	vrComfortTime = now;
-	const rvVehicle *vehicle = player->IsInVehicle() ? player->GetVehicleController().GetVehicle() : NULL;
-	const idPhysics *motion = vehicle != NULL ? vehicle->GetPhysics() : player->GetPhysics();
+	float speed;
+	if ( gameLocal.isMultiplayer ) {
+		const idPhysics *physics = player->GetPhysics();
+		const idVec3 &velocity = physics->GetLinearVelocity();
+		speed = player->VRRoomScaleStepping() ? idMath::Fabs( velocity * physics->GetGravityNormal() ) : velocity.Length();
+	} else {
+		const rvVehicle *vehicle = player->IsInVehicle() ? player->GetVehicleController().GetVehicle() : NULL;
+		const idPhysics *motion = vehicle != NULL ? vehicle->GetPhysics() : player->GetPhysics();
+		speed = motion->GetLinearVelocity().Length();
+	}
 	// a paused game moves nobody: the speed it stopped at would hold the edges dark
-	const float target = ( setting > 0.0f && !gameLocal.IsPresentationMenuPaused() ) ? VR_ComfortMotion( motion->GetLinearVelocity().Length(), turnRate ) : 0.0f;
+	const float target = ( setting > 0.0f && ( gameLocal.isMultiplayer || !gameLocal.IsPresentationMenuPaused() ) ) ? VR_ComfortMotion( speed, turnRate ) : 0.0f;
 	vrComfort = VR_ComfortEase( vrComfort, target, seconds );
 	return vrComfort * setting;
 }
@@ -1303,23 +1399,25 @@ void idPlayerView::RenderPlayerView( idUserInterface *hud, bool menuPaused ) {
 	if ( !view ) {
 		return;
 	}
-
-	renderView_t *mutableView = player->GetRenderView();
-	if ( mutableView ) {
-		idCamera *camera = player->GetPrivateCameraView();
-		if ( !camera ) {
-			camera = gameLocal.GetCamera();
-		}
-
-		if ( camera ) {
-			camera->GetViewParms( mutableView );
-			Awakening_M01CameraFeedback( mutableView );
-		} else {
-			gameLocal.CalcFov( player->CalcFov( true ), mutableView->fov_x, mutableView->fov_y );
-		}
-		view = mutableView;
-	}
 	
+	if ( !gameLocal.isMultiplayer ) {
+		renderView_t *mutableView = player->GetRenderView();
+		if ( mutableView ) {
+			idCamera *camera = player->GetPrivateCameraView();
+			if ( !camera ) {
+				camera = gameLocal.GetCamera();
+			}
+
+			if ( camera ) {
+				camera->GetViewParms( mutableView );
+				Awakening_M01CameraFeedback( mutableView );
+			} else {
+				gameLocal.CalcFov( player->CalcFov( true ), mutableView->fov_x, mutableView->fov_y );
+			}
+			view = mutableView;
+		}
+	
+	}
 	bool guiRendered = false;
 
 	// place the sound origin for the player
@@ -1341,12 +1439,18 @@ void idPlayerView::RenderPlayerView( idUserInterface *hud, bool menuPaused ) {
 		pauseSceneValid = false;
 		LiquidOverlay( eyeLiquidContents, false );
 		VRView( hud, view, vrFrame, vrTrackingYaw );
+		if ( net_clientLagOMeter.GetBool() && gameLocal.isClient && !( gameLocal.GetDemoState() == DEMO_PLAYING && ( gameLocal.IsServerDemoPlaying() || gameLocal.IsTimeDemo() ) ) ) {
+			gameLocal.lagometer.Draw();
+		}
 		return;
 	}
 
 	// a stereoscopic display: one 3D pass per eye, the 2D over both
 	if ( StereoView( hud, view, eyeLiquidContents ) ) {
 		pauseSceneValid = false;
+		if ( net_clientLagOMeter.GetBool() && gameLocal.isClient && !( gameLocal.GetDemoState() == DEMO_PLAYING && ( gameLocal.IsServerDemoPlaying() || gameLocal.IsTimeDemo() ) ) ) {
+			gameLocal.lagometer.Draw();
+		}
 		return;
 	}
 // openQ4 END
@@ -1383,11 +1487,9 @@ void idPlayerView::RenderPlayerView( idUserInterface *hud, bool menuPaused ) {
 		ScreenFade();
 	}
 
-	if ( net_clientLagOMeter.GetBool() && lagoMaterial && gameLocal.isClient && !( gameLocal.GetDemoState() == DEMO_PLAYING && ( gameLocal.IsServerDemo() || gameLocal.IsTimeDemo() ) ) ) {
-		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
-		renderSystem->DrawStretchPic( 10.0f, 380.0f, 64.0f, 64.0f, 0.0f, 0.0f, 1.0f, 1.0f, lagoMaterial );
+	if ( net_clientLagOMeter.GetBool() && gameLocal.isClient && !( gameLocal.GetDemoState() == DEMO_PLAYING && ( gameLocal.IsServerDemoPlaying() || gameLocal.IsTimeDemo() ) ) ) {
+		gameLocal.lagometer.Draw();
 	}
-
 }
 
 // RAVEN END

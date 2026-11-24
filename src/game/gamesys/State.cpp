@@ -1,7 +1,8 @@
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
+#include "../mp/match/MatchDeadline.h"
 
 const int HISTORY_COUNT = 50;
 
@@ -204,6 +205,28 @@ void rvStateThread::Clear ( bool ignoreStateCalls ) {
 
 /*
 =====================
+rvStateThread::ShiftMatchTime
+
+Queued state calls store the engine-time origin used by their delay test.
+Both queues must move together or an interrupted weapon/actor state can skip
+its remaining delay as soon as gameplay resumes.
+=====================
+*/
+void rvStateThread::ShiftMatchTime( int deltaMsec ) {
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+
+	for ( stateCall_t *call = states.Next(); call != NULL; call = call->node.Next() ) {
+		mpMatchShiftOptionalDeadline( call->parms.time, deltaMsec );
+	}
+	for ( stateCall_t *call = interrupted.Next(); call != NULL; call = call->node.Next() ) {
+		mpMatchShiftOptionalDeadline( call->parms.time, deltaMsec );
+	}
+}
+
+/*
+=====================
 rvStateThread::Execute
 =====================
 */
@@ -296,10 +319,6 @@ stateResult_t rvStateThread::Execute ( void ) {
 				gameLocal.Error ( "rvStateThread: error reported by state '%s (%d)'", stateName, stateStage );
 				fl.executing = false;
 				return SRESULT_ERROR;				
-		}
-
-		if (lastResult == SRESULT_DONE) {
-			owner->StateThreadChanged();
 		}
 
 		// Dont remove the node if it was interrupted or cleared in the last process

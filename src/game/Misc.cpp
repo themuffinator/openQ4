@@ -4,10 +4,11 @@ Various utility objects and functions.
 
 */
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
+#include "mp/match/MatchDeadline.h"
 
 // RAVEN BEGIN
 // nmckenzie: added ai
@@ -111,10 +112,7 @@ bool idPlayerStart::ClientReceiveEvent( int event, int time, const idBitMsg &msg
 			float z = msg.ReadFloat();
 
 			idVec3 prevOrigin( x, y, z );
-// RAVEN BEGIN
-// jnewquist: Use accessor for static class type 
 			if ( player != NULL && player->IsType( idPlayer::GetClassType() ) ) {
-// RAVEN END
 				Event_TeleportEntity( player, false, prevOrigin );
 			}
 			return true;
@@ -183,7 +181,7 @@ void idPlayerStart::TeleportPlayer( idPlayer *player ) {
 	const char *viewName = spawnArgs.GetString( "visualView", "" );
 	idEntity *ent = viewName ? gameLocal.FindEntity( viewName ) : NULL;
 
-	if ( f && ent ) {
+	if ( f && ent && !player->spectating ) {
 		// place in private camera view for some time
 		// the entity needs to teleport to where the camera view is to have the PVS right
 		player->Teleport( ent->GetPhysics()->GetOrigin(), ang_zero, this );
@@ -199,7 +197,7 @@ void idPlayerStart::TeleportPlayer( idPlayer *player ) {
 
 		// multiplayer hijacked this entity, so only push the player in multiplayer
 		if ( gameLocal.isMultiplayer ) {
-			//push
+			// push
 			idVec3 impulse( pushVel, 0, 0 );
 			impulse *= GetPhysics( )->GetAxis ( );
 			player->ApplyImpulse( gameLocal.world, 0, player->GetPhysics( )->GetOrigin( ), impulse );
@@ -263,13 +261,13 @@ void idPlayerStart::Event_TeleportEntity( idEntity* activator, bool predicted, i
 		} else {
 			idVec3 oldOrigin;
 			
-			if( gameLocal.isServer || prevOrigin == vec3_zero ) {
+			if ( gameLocal.isServer || prevOrigin == vec3_zero ) {
 				oldOrigin = activator->GetPhysics()->GetOrigin();
 			} else {
 				oldOrigin = prevOrigin;
 			}
 
-			if ( gameLocal.isServer ) {
+			if ( gameLocal.isServer && !player->spectating ) {
 				idBitMsg	msg;
 				byte		msgBuf[MAX_EVENT_PARAM_SIZE];
 
@@ -284,7 +282,7 @@ void idPlayerStart::Event_TeleportEntity( idEntity* activator, bool predicted, i
 
 			TeleportPlayer( player );
 
-			if( gameLocal.isMultiplayer ) {
+			if ( gameLocal.isMultiplayer ) {
 				gameLocal.PlayEffect( player->spawnArgs, "fx_teleport_enter", oldOrigin, idVec3(0,0,1).ToMat3(), false, vec3_origin );
 				gameLocal.PlayEffect( player->spawnArgs, "fx_teleport", player->GetPhysics()->GetOrigin(), idVec3(0,0,1).ToMat3(), false, vec3_origin );
 			}
@@ -622,6 +620,13 @@ void idDamagable::Spawn( void ) {
 	} else {
 		GetPhysics()->SetContents( CONTENTS_SOLID );
 	}
+}
+
+void idDamagable::ThinkMatchPaused( int deltaMsec ) {
+	idEntity::ThinkMatchPaused( deltaMsec );
+	mpMatchShiftOptionalDeadline( invincibleTime, deltaMsec );
+	mpMatchShiftOptionalDeadline( stageEndTime, deltaMsec );
+	mpMatchShiftOptionalDeadline( nextTriggerTime, deltaMsec );
 }
 
 /*
@@ -1267,6 +1272,25 @@ void idForceField::Spawn( void ) {
 }
 
 /*
+================
+idForceField::GetForceFieldBounds
+
+The brush clip belongs to idForce_Field after Spawn, not to the entity physics
+object.  Navigation and other systems that need the live activation volume
+must query the model that actually evaluates contacts.
+================
+*/
+bool idForceField::GetForceFieldBounds( idBounds &bounds ) const {
+	const idClipModel *clipModel = forceField.GetClipModel();
+	if ( !clipModel ) {
+		return false;
+	}
+
+	bounds = clipModel->GetAbsBounds();
+	return true;
+}
+
+/*
 ===============
 idForceField::Event_Toggle
 ================
@@ -1355,7 +1379,8 @@ void rvJumpPad::Think( void ) {
 		// If force has been applied to an entity and jump pad effect hasnt been played for a bit
 		// then play it now.
 		if ( forceField.GetLastApplyTime ( ) - lastEffectTime > JUMPPAD_EFFECT_DELAY ) {
-			const idVec3 fxOrigin = JumpPadEffectOrigin(this);
+			// openQ4: SP plays the jump effect at the pad's centre; MP keeps the retail origin
+			const idVec3 fxOrigin = gameLocal.isMultiplayer ? renderEntity.origin : JumpPadEffectOrigin(this);
 
 			// start locally
 			StartSound( "snd_jump", SND_CHANNEL_ITEM, 0, false, NULL );
@@ -1448,7 +1473,8 @@ rvJumpPad::ClientReceiveEvent
 bool rvJumpPad::ClientReceiveEvent( int event, int time, const idBitMsg &msg ) {
 	switch ( event ) {
 	case EVENT_JUMPFX: {
-		const idVec3 fxOrigin = JumpPadEffectOrigin(this);
+		// openQ4: SP plays the jump effect at the pad's centre; MP keeps the retail origin
+		const idVec3 fxOrigin = gameLocal.isMultiplayer ? renderEntity.origin : JumpPadEffectOrigin(this);
 
 		if ( spawnArgs.GetString( "fx_jump" )[ 0 ] ) {
 			PlayEffect( "fx_jump", fxOrigin, effectAxis, false, vec3_origin, false );

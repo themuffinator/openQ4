@@ -167,8 +167,7 @@ jobs:
           binaries=(
             .install/openQ4-client_arm64
             .install/openQ4-ded_arm64
-            .install/baseoq4/game-sp_arm64.dylib
-            .install/baseoq4/game-mp_arm64.dylib
+            .install/baseoq4/game_arm64.dylib
           )
           for binary in "${binaries[@]}"; do
             if [[ -L "${binary}" || ! -x "${binary}" ]]; then

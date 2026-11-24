@@ -1,5 +1,5 @@
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../../sys/AutoVersion.h"
@@ -20,16 +20,11 @@ All game cvars should be defined here.
 // ddynerman: our gameplay modes
 // RITUAL BEGIN
 // squirrel: added DeadZone multiplayer mode
-// openQ4: the main menu runs under this module and carries its multiplayer
-// mode to game_mp in si_gameType, and a value outside this list falls back
-// to its first, singleplayer. So the list mirrors game_mp's
-// (src/mpgame/mp/GameTypes.cpp); game_type_module_selection.py checks it.
-const char *si_gameTypeArgs[]		= { "singleplayer", "DM", "Tourney", "Team DM", "CTF", "One Flag CTF", "Arena CTF",
-										"Arena One Flag CTF", "DeadZone", "Duel", "Clan Arena", "Freeze Tag", "Red Rover", NULL };
-const int si_numGameTypeArgs = sizeof( si_gameTypeArgs ) / sizeof( si_gameTypeArgs[0] );
 // RITUAL END
 // RAVEN END
-const char *si_readyArgs[]			= { "Not Ready", "Ready", NULL }; 
+// openQ4: si_gameTypeArgs now lives beside the gametype descriptor table in
+// mp/GameTypes.cpp so the token list and the table cannot drift apart.
+const char *si_readyArgs[]			= { "Not Ready", "Ready", NULL };
 const char *si_spectateArgs[]		= { "Play", "Spectate", NULL };
 
 // RAVEN BEGIN
@@ -45,7 +40,6 @@ struct gameVersion_s {
 idCVar g_version(					"g_version",				gameVersion.string,	CVAR_GAME | CVAR_ROM, "game version" );
 
 // noset vars
-idCVar gamename(					"gamename",					GAME_VERSION,	CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM, "" );
 idCVar gamedate(					"gamedate",					__DATE__,		CVAR_GAME | CVAR_ROM, "" );
 
 // server info
@@ -61,14 +55,76 @@ idCVar si_motd(						"si_motd",					"",					CVAR_GAME | CVAR_SERVERINFO | PC_CVA
 idCVar si_isBuyingEnabled(			"si_isBuyingEnabled",			"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "enable buying in current mode" );
 idCVar si_dropWeaponsInBuyingModes(	"si_dropWeaponsInBuyingModes",	"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "dead players drop weapons, even in Buying game modes" );
 // openQ4: the rules a buying server sells by: 0 Quake 4 (retail), 1 The Awakening (mp/Buying.h)
+// openQ4 (PAD-03): the most controller aim assistance this server allows its
+// players. The player's own in_aimAssist is clamped to it, competitive
+// rulesets allow none whatever it says, and bots never use it.
+idCVar si_aimAssist(				"si_aimAssist",					"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "controller stick aim assistance allowed on this server: 0 none, 1 low, 2 standard, 3 high; never under a competitive ruleset", 0, 3 );
 idCVar si_buyingRules(				"si_buyingRules",				"0",		CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "buying rules when si_isBuyingEnabled is set: 0 Quake 4, 1 The Awakening", 0, 1 );
 // RITUAL END
-// openQ4: game_mp's Instagib switch. Declared here too, with game_mp's default and
-// help, so the create-server menu can set it while game_sp is the loaded module.
+// RAVEN BEGIN
+// ddynerman: new gametype strings
+// openQ4 (CORE-07): network play archives the next game type and map; the campaign does not.
+idModeCVar si_gameType(				"si_gameType",				si_gameTypeArgs[ 0 ],	CVAR_GAME | CVAR_SERVERINFO, si_gameTypeArgs[ 0 ], CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, "validated game type token; completion lists only implemented public modes", si_gameTypeArgs, idCmdSystem::ArgCompletion_String<si_gameTypeArgs> );
+idModeCVar si_map(					"si_map",					"mp/q4dm1",				CVAR_GAME | CVAR_SERVERINFO, "mp/q4dm1", CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, "map to be played next on server", idCmdSystem::ArgCompletion_MapName );
+idModeCVar si_mapCycle(				"si_mapCycle",				"",						CVAR_GAME | CVAR_SERVERINFO, "", CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, "map cycle list semicolon delimited" );
+idCVar si_arenaCampaign(				"si_arenaCampaign",			"0",					CVAR_GAME | CVAR_SERVERINFO | CVAR_INTEGER, "single-player arena campaign match token, 0 for a normal multiplayer match", 0, 20 );
+// openQ4's competitive framework intentionally exposes one profile selector
+// and one read-only canonical identity instead of a second forest of live
+// match cvars.  Legacy si_* values are imported/mirrored only at boundaries.
+idCVar g_matchProfile(				"g_matchProfile",			"casual",				CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, "typed match-rules profile token" );
+idCVar si_matchRules(				"si_matchRules",			"",					CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM, "committed match-rules profile, schema and digest" );
+idCVar si_managedMatch(			"si_managedMatch",		"0",					CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM | CVAR_BOOL, "committed managed-match state for client participation" );
+// openQ4 (MP-18): private, and declared in the engine as well (AsyncNetwork.cpp) so that it is private before this module loads
+idCVar g_refPassword(				"g_refPassword",			"",					CVAR_GAME | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private one-shot server-only referee credential; converted to a verifier and cleared at session start" );
+idCVar g_matchEvidence(				"g_matchEvidence",			"2",					CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_INTEGER, "competitive match evidence: 0 off, 1 final reports, 2 journal and reports", 0, 2 );
+idCVar g_matchSeriesRecoveryId(		"g_matchSeriesRecoveryId",	"0",					CVAR_GAME | PC_CVAR_ARCHIVE, "server-owned active competition-series recovery identity" );
+// bdube: raise player limit
+idCVar si_maxPlayers(				"si_maxPlayers",			"12",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "max number of players allowed on the server", 1, 16 );
+// ddynerman: min players to start
+idCVar si_minPlayers(				"si_minPlayers",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "min number of players to start a game (only when warmup is enabled)", 1, 16 );
+// ddynerman: CTF
+idCVar si_captureLimit(				"si_captureLimit",			"5",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "score limit for CTF", 1, MP_PLAYER_MAXFRAGS );
+// shouchard:  for tourney
+idCVar si_tourneyLimit(				"si_tourneyLimit",			"3",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "number of times a tourney will be run before cycling maps", 1, MP_PLAYER_MAXFRAGS );
+// openQ4: defaults to on.  Quake Live's warmup is a ready-up phase, and with
+// this off idPlayer::IsReady is unconditionally true so warmup ends the moment
+// two players connect - which is not what anyone wants from a match.
+idCVar si_useReady(					"si_useReady",				"1",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "require players to ready before starting a match" );
+idCVar si_allowVoting(				"si_allowVoting",			"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "enable or disable server option voting" );
+// ddynerman: disable hitscan tint
+idCVar si_allowHitscanTint(			"si_allowHitscanTint",		"2",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "use hitscan tint (e.g. rail color) 0 - no tinting allowed, 1 - player hitscan tinting allowed in DM and NO hitscan tinting in team games, 2 - player hitscan tinting allowed in DM and use team-color hitscan tints in team games" );
+idCVar si_privatePlayers(			"si_privatePlayers",		"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "number of private player slots reserved on the server.  subtracts from si_maxPlayers, so a server with si_maxPlayers 16 and 4 private player slots will only allow 12 public players to connect - see g_privatePassword, privatePassword", 0, 16 );
+idCVar g_privatePassword(			"g_privatePassword",		"",				CVAR_GAME | PC_CVAR_ARCHIVE, "server-side password to access reserved client slots, clients set privatePassword" );
+idCVar privatePassword(				"privatePassword",			"",				CVAR_GAME | CVAR_NOCHEAT, "client password used to access a servers private player slots" );
+idCVar si_numPrivatePlayers(		"si_numPrivatePlayers",		"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM, "number of private slots currently in use" );
+idCVar si_suddenDeathRestart(		"si_suddenDeathRestart",	"1",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE, "toggles whether or not to respawn players/items when team games enter sudden death" );
+// RAVEN END
+
+// openQ4 BEGIN
+// Match progression carried over from Quake Live.  Units are stated in every
+// description because Quake Live mixed minutes, seconds and milliseconds
+// across this same set of rules.
+idCVar si_scoreLimit(				"si_scoreLimit",			"150",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "score limit for objective modes scored by accumulation (Domination, Attack Defend), 0 for no limit", 0, 9999 );
+idCVar si_roundLimit(				"si_roundLimit",			"8",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "rounds a team must win to take a round based match, 0 for no limit", 0, 99 );
+idCVar si_roundTimeLimit(			"si_roundTimeLimit",		"180",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "length of a single round in seconds, 0 for no limit", 0, 3600 );
+idCVar si_roundWarmupDelay(			"si_roundWarmupDelay",		"10",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "countdown before each round starts, in seconds", 0, 60 );
+idCVar si_roundEndDelay(			"si_roundEndDelay",			"4",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "pause after a round is decided before the next one is set up, in seconds", 1, 30 );
+idCVar si_mercyLimit(				"si_mercyLimit",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "end a team match early once one team leads by this many points, 0 to disable", 0, 999 );
+idCVar si_overtime(					"si_overtime",				"120",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "length of each overtime period in seconds; 0 falls back to Quake 4 sudden death", 0, 3600 );
+idCVar si_suddenDeathRespawnDelay(	"si_suddenDeathRespawnDelay","3",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "respawn delay in seconds while a match is in overtime, 0 to respawn normally", 0, 60 );
+idCVar si_suddenDeathRespawnIncrease("si_suddenDeathRespawnIncrease","1",		CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds added to the overtime respawn delay for every minute of overtime", 0, 60 );
+idCVar si_suddenDeathRespawnMax(	"si_suddenDeathRespawnMax",	"10",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "upper bound on the overtime respawn delay, in seconds", 0, 60 );
+idCVar si_forfeit(					"si_forfeit",				"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "end a team match early when one team is left with no players" );
+
+// Warmup and ready-up
+idCVar si_warmupReadyPercentage(	"si_warmupReadyPercentage",	"0.51",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_FLOAT, "fraction of eligible players that must ready up before the countdown starts", 0.0f, 1.0f );
+idCVar si_teamSizeMin(				"si_teamSizeMin",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "players required on a team before a team match may leave warmup", 1, 16 );
+idCVar si_teamForcePresent(			"si_teamForcePresent",		"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "require both teams to meet si_teamSizeMin, rather than just one" );
+idCVar si_warmupWeapons(			"si_warmupWeapons",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "hand out every weapon on the map during warmup" );
 idCVar si_instagib(					"si_instagib",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Instagib: everyone carries only an unlimited railgun and the gauntlet, any hit from another player kills, falls do no harm and the map's pickups are removed; a change restarts the match" );
-// openQ4 MP-14: game_mp's modifier and preset settings (mp/Modifiers.h). Declared
-// here too, word for word, so the create-server menu can set them while game_sp
-// is the loaded module.
+// openQ4 MP-14: the modifier layer (mp/Modifiers.h) and presets (mp/Presets.h).
+// The switches are latched with the game type when a map loads or restarts;
+// the scales and the weapon respawn time are read live on the server.
 idCVar si_quadHog(					"si_quadHog",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Quad Hog, in Deathmatch: one Quad Damage is in play, its carrier keeps it until killed, and only the carrier's frags and the frag on the carrier score; a change restarts the match" );
 idCVar si_vampiric(					"si_vampiric",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Vampiric Damage: damage dealt to an enemy heals the attacker, and the map's health pickups are removed; a change restarts the match" );
 idCVar si_weaponsFrenzy(			"si_weaponsFrenzy",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "Weapons Frenzy: weapon and ammo pickups come back in a quarter of their time and carried ammo regenerates; a change restarts the match" );
@@ -79,38 +135,52 @@ idCVar si_knockback(				"si_knockback",				"100",			CVAR_GAME | CVAR_SERVERINFO 
 idCVar si_fallDamage(				"si_fallDamage",			"100",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "falling damage, as a percentage of normal; 0 turns it off", 0, 999 );
 idCVar si_weaponRespawn(			"si_weaponRespawn",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds before a picked-up weapon comes back; 0 for each weapon's own time", 0, 999 );
 idCVar si_preset(					"si_preset",				"",				CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, "the preset the server last applied with the preset command; cleared at the next map or restart once the settings no longer match it" );
-// RAVEN BEGIN
-// ddynerman: new gametype strings
-idCVar si_gameType(					"si_gameType",				si_gameTypeArgs[ 0 ],	CVAR_GAME | CVAR_SERVERINFO, "game type - singleplayer, or the multiplayer mode the menu carries to game_mp", si_gameTypeArgs, idCmdSystem::ArgCompletion_String<si_gameTypeArgs> );
-idCVar si_map(						"si_map",					"mp/q4dm1",				CVAR_GAME | CVAR_SERVERINFO, "map to be played next on server", idCmdSystem::ArgCompletion_MapName );
-idCVar si_mapCycle(					"si_mapCycle",				"",						CVAR_GAME | CVAR_SERVERINFO, "map cycle list semicolon delimited" );
-// bdube: raise player limit
-idCVar si_maxPlayers(				"si_maxPlayers",			"12",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "max number of players allowed on the server", 1, 16 );
-// ddynerman: min players to start
-idCVar si_minPlayers(				"si_minPlayers",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "min number of players to start a game (only when warmup is enabled)", 1, 16 );
-// ddynerman: CTF
-idCVar si_captureLimit(				"si_captureLimit",			"5",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "score limit for CTF", 1, MP_PLAYER_MAXFRAGS );
-// shouchard:  for tourney
-idCVar si_tourneyLimit(				"si_tourneyLimit",			"3",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "number of times a tourney will be run before cycling maps", 1, MP_PLAYER_MAXFRAGS );
-idCVar si_useReady(					"si_useReady",				"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "require players to ready before starting a match" );
-idCVar si_allowVoting(				"si_allowVoting",			"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_BOOL, "enable or disable server option voting" );
-// ddynerman: disable hitscan tint
-idCVar si_allowHitscanTint(			"si_allowHitscanTint",		"2",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "use hitscan tint (e.g. rail color) 0 - no tinting allowed, 1 - player hitscan tinting allowed in DM and NO hitscan tinting in team games, 2 - player hitscan tinting allowed in DM and use team-color hitscan tints in team games" );
-idCVar si_privatePlayers(			"si_privatePlayers",		"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "number of private player slots reserved on the server.  subtracts from si_maxPlayers, so a server with si_maxPlayers 16 and 4 private player slots will only allow 12 public players to connect - see g_privatePassword, privatePassword", 0, 16 );
-idCVar g_privatePassword(			"g_privatePassword",		"",				CVAR_GAME | PC_CVAR_ARCHIVE, "server-side password to access reserved client slots, clients set privatePassword" );
-idCVar privatePassword(				"privatePassword",			"",				CVAR_GAME | CVAR_NOCHEAT, "client password used to access a servers private player slots" );
-idCVar si_numPrivatePlayers(		"si_numPrivatePlayers",		"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM, "number of private slots currently in use" );
-idCVar si_suddenDeathRestart(		"si_suddenDeathRestart",	"1",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE, "toggles whether or not to respawn players/items when team games enter sudden death" );
-// RAVEN END
+idCVar si_modifiers(				"si_modifiers",				"",				CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM, "the modifiers latched for the current map, as the server browser and the loading screen read them" );
+idCVar g_vampiricPercent(			"g_vampiricPercent",		"50",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "share of the damage dealt that heals the attacker under Vampiric Damage, in percent", 1, 100 );
+idCVar si_warmupScoring(			"si_warmupScoring",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "count frags scored during warmup" );
+idCVar si_autoShuffle(				"si_autoShuffle",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "shuffle teams automatically during warmup when they are lopsided" );
+idCVar si_shuffleDelay(				"si_shuffleDelay",			"5",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "countdown before an automatic team shuffle runs, in seconds", 1, 60 );
+
+// Freeze Tag
+idCVar si_freezeThawTime(			"si_freezeThawTime",		"2",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds a team mate must stand by a frozen player to thaw them", 1, 30 );
+idCVar si_freezeThawRadius(			"si_freezeThawRadius",		"96",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "how close a team mate must be to thaw a frozen player, in world units", 16, 512 );
+idCVar si_freezeThawThroughSurface(	"si_freezeThawThroughSurface","0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "allow thawing a team mate through world geometry, rather than requiring line of sight" );
+idCVar si_freezeAutoThawTime(		"si_freezeAutoThawTime",	"120",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds after which a frozen player thaws with no help, 0 to disable", 0, 600 );
+idCVar si_freezeWorldDeathDelay(	"si_freezeWorldDeathDelay",	"5",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds before a player frozen by the world rather than an enemy comes back on their own, 0 to disable", 0, 60 );
+
+// Overload and Harvester
+idCVar si_obeliskHealth(			"si_obeliskHealth",			"2500",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "hit points of a team obelisk", 100, 10000 );
+idCVar si_obeliskRegen(				"si_obeliskRegen",			"15",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "hit points an obelisk regenerates each second, 0 to disable", 0, 500 );
+idCVar si_obeliskRespawn(			"si_obeliskRespawn",		"10",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds before a destroyed obelisk comes back", 1, 120 );
+idCVar si_skullTimeout(				"si_skullTimeout",			"30",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds a dropped Harvester skull survives before despawning", 5, 300 );
+
+// Domination
+idCVar si_domCaptureTime(			"si_domCaptureTime",		"7",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds of standing on a control point needed to take it", 1, 60 );
+idCVar si_domScoreRate(				"si_domScoreRate",			"5",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "seconds between score ticks for each control point held", 1, 60 );
+
+// Hit feedback.  Server side permission only - what an attacker actually sees
+// is theirs to choose through the hud_damageNumber* settings below.
+idCVar g_hitFeedback(				"g_hitFeedback",			"2",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "attacker hit feedback permitted by this server: 0 none, 1 announce the hit without the amount, 2 include the damage amount", 0, 2 );
+// openQ4 (MP-15): who may see when the powerups, mega health and armour return on a casual server.
+// Enforced where the list is sent (mp/ItemTimers.cpp); a managed match keeps its own disclosure policy.
+idCVar si_itemTimers(				"si_itemTimers",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "item respawn timers on a casual server: 0 nobody, 1 spectators only, 2 everyone including the players", 0, 2 );
+// openQ4 (MP-15): what a server lets its players do to how others look. Both are read by every
+// client from the server info; cl_player_brightskin_*, cl_player_rimlight_*, cl_player_outline_* and
+// g_force*Model stay the player's choice inside these limits.
+idCVar si_maxBrightskin(			"si_maxBrightskin",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_FLOAT, "strongest brightskin, rimlight and outline a player may put on other players: 0 none, 1 no limit", 0.0f, 1.0f );
+idCVar si_forcedModels(				"si_forcedModels",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "allow players to replace other players' models locally (g_forceModel, g_forceMarineModel, g_forceStroggModel)" );
+// openQ4 END
 idCVar si_fragLimit(				"si_fragLimit",				"10",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "frag limit", 0, MP_PLAYER_MAXFRAGS );
 idCVar si_timeLimit(				"si_timeLimit",				"10",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "time limit in minutes", 0, 60 );
 idCVar si_teamDamage(				"si_teamDamage",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "enable team damage" );
 idCVar si_warmup(					"si_warmup",				"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "do pre-game warmup" );
 idCVar si_usePass(					"si_usePass",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "enable client password checking" );
 #ifdef _MPBETA
-	idCVar si_pure(					"si_pure",					"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL | CVAR_ROM, "server is pure and does not allow modified data" );
+	// openQ4 (CORE-07): the campaign keeps its unpure default, network play retail's pure one
+	idModeCVar si_pure(				"si_pure",					"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL | CVAR_ROM, "1", CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL | CVAR_ROM, "server is pure and does not allow modified data" );
 #else
-	idCVar si_pure(					"si_pure",					"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL, "server is pure and does not allow modified data" );
+	// openQ4 (CORE-07): the campaign keeps its unpure default, network play retail's pure one
+	idModeCVar si_pure(				"si_pure",					"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL, "1", CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL, "server is pure and does not allow modified data" );
 #endif // _MPBETA
 idCVar si_spectators(				"si_spectators",			"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "allow spectators or require all clients to play" );
 idCVar si_shuffle(					"si_shuffle",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "shuffle teams after each round" );
@@ -124,7 +194,8 @@ idCVar si_entityFilter(				"si_entityFilter",			"",				CVAR_GAME | CVAR_SERVERIN
 idCVar si_countDown(				"si_countDown",				"10",			CVAR_GAME | CVAR_SERVERINFO | CVAR_INTEGER, "pregame countdown in seconds", 4, 3600 );
 // MCG: added "weapon stay" option
 idCVar si_weaponStay(				"si_weaponStay",			"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL, "cannot pick up weapons you already have (get no ammo from them)" );
-// openQ4: registered here too so the front end keeps the multiplayer ruleset while game-sp is loaded
+// openQ4: Classic ruleset (mp/ClassicRules.h). Latched at map load; a server-info rescan that changes it
+// (serverMapRestart, a vote) reloads the map fully, and a plain set waits for the next load.
 idCVar si_ruleset(					"si_ruleset",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "multiplayer ruleset: 0 Quake 4, 1 Classic (Quake 2 inspired: tiered armour, blaster start, double jump, Threewave CTF scoring and grappling hook)", 0, 1 );
 idCVar si_classicGrapple(			"si_classicGrapple",		"1",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "grappling hook under the Classic ruleset: 0 off, 1 flag modes only, 2 every mode", 0, 2 );
 // RAVEN END
@@ -138,6 +209,21 @@ idCVar si_buyModeMinCredits(		"si_buyModeMinCredits",			"0",			CVAR_GAME | CVAR_
 idCVar si_controlTime(				"si_controlTime",				"120",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "Time required to hold the dead zone", 1, 999 );
 // RITUAL END
 
+idCVar si_fps(						"si_fps",						"60",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "Server framerate/game tick rate", 30, 90 );
+
+idCVar ri_useViewerPass(			"ri_useViewerPass",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "use g_viewerPassword for viewers/repeaters" );
+idCVar g_viewerPassword(			"g_viewerPassword",				"",				CVAR_GAME | CVAR_ARCHIVE, "password for viewers/repeaters" );
+
+idCVar ri_privateViewers(			"ri_privateViewers",			"0",			CVAR_GAME | CVAR_REPEATERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "number of private viewer slots" );
+idCVar g_privateViewerPassword(		"g_privateViewerPassword",		"",				CVAR_GAME | CVAR_ARCHIVE, "privatePassword for private viewer slots" );
+idCVar g_repeaterPassword(			"g_repeaterPassword",			"",				CVAR_GAME | CVAR_ARCHIVE, "privatePassword for repeaters" );
+
+idCVar ri_numViewers(				"ri_numViewers",				"0",			CVAR_GAME | CVAR_REPEATERINFO | CVAR_INTEGER | CVAR_ROM, "number of viewer slots in use" );
+idCVar ri_numPrivateViewers(		"ri_numPrivateViewers",			"0",			CVAR_GAME | CVAR_REPEATERINFO | CVAR_INTEGER | CVAR_ROM, "number of private viewer slots in use" );
+
+idCVar ri_name(						"ri_name",						"",				CVAR_GAME | CVAR_ARCHIVE, "override the server's si_name with this for relays" );
+
+idCVar g_noTVChat(					"g_noTVChat",					"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "Server enable/disable flag for viewer chat on Q4TV" );
 
 // user info
 idCVar ui_name(						"ui_name",					"Player",		CVAR_GAME | CVAR_USERINFO | PC_CVAR_ARCHIVE | CVAR_CASE_SENSITIVE | CVAR_SPECIAL_CONCAT, "player name" );
@@ -149,24 +235,75 @@ idCVar ui_model_backup(				"ui_model_backup",			"",	CVAR_GAME | CVAR_USERINFO, "
 idCVar ui_model_marine(				"ui_model_marine",			"",	CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE, "player model used on marine team in team games, blank uses default model" );
 idCVar ui_model_strogg(				"ui_model_strogg",			"",	CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE, "player model used on strogg team in team games, blank uses default model" );
 idCVar ui_clan(						"ui_clan",					"",	CVAR_GAME | CVAR_USERINFO | PC_CVAR_ARCHIVE | CVAR_CASE_SENSITIVE | CVAR_SPECIAL_CONCAT, "player clan" );
-idCVar ui_handicap(					"ui_handicap",				"100",	CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "player handicap percentage", 1, 100 );
 idCVar ui_hitscanTint(				"ui_hitscanTint",			"120.0 0.6 1.0",	CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE, "a tint applied to select hitscan effects.  Specified as a value in HSV color space. Hue [0.0-360.0] Saturation [0.0-1.0] Value [0.75-1.0]" );
 // RAVEN END
 idCVar ui_autoSwitch(				"ui_autoSwitch",			"2",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "switch to a weapon when picking it up: 0 never, 1 always (Quake 4), 2 smart: in multiplayer only from the gauntlet, the machinegun or an empty weapon (single player switches only to weapons not yet carried)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+// openQ4 (MP-15): mp/WeaponOrder.h. Travels in the user info because the server makes both decisions.
+idCVar ui_weaponOrder(				"ui_weaponOrder",			"",				CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE, "weapons you would rather hold, best first, by name, short name or slot (\"rg rl lg hb ng gl sg mg\"): a pickup switches only to a weapon ranked above the one in hand, and an empty weapon falls back to the best ranked one with ammunition; blank leaves pickups to ui_autoSwitch and the fallback to Quake 4" );
 idCVar ui_autoReload(				"ui_autoReload",			"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "auto reload weapon" );
 idCVar ui_showGun(					"ui_showGun",				"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "show gun" );
 idCVar ui_ready(					"ui_ready",				si_readyArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO, "player is ready to start playing", idCmdSystem::ArgCompletion_String<si_readyArgs> );
 idCVar ui_spectate(					"ui_spectate",		si_spectateArgs[ 0 ],	CVAR_GAME | CVAR_USERINFO, "play or spectate", idCmdSystem::ArgCompletion_String<si_spectateArgs> );
 idCVar ui_autoJoin(					"ui_autoJoin",				"0",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "automatically join multiplayer servers instead of opening the initial join screen" );
+// openQ4: the free spectator camera is predicted, so both ends read the speed from userinfo
+idCVar ui_spectatorSpeed(			"ui_spectatorSpeed",		"100",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_INTEGER, "free spectator camera speed as a percentage of the server's pm_spectatespeed (25 to 300)", 25, 300 );
 idCVar ui_joined(					"ui_joined",				"0",			CVAR_GAME | CVAR_USERINFO | CVAR_BOOL, "internal multiplayer initial join choice state" );
 idCVar ui_chat(						"ui_chat",					"0",			CVAR_GAME | CVAR_USERINFO | CVAR_BOOL | CVAR_ROM | CVAR_CHEAT, "player is chatting" );
+idCVar ui_handicap(					"ui_handicap",				"100",			CVAR_GAME | CVAR_USERINFO | CVAR_INTEGER | CVAR_ARCHIVE, "player damage output handicap" );
 
-// voice chat user settings (referenced by multiplayer GUI)
+// Voice-chat user settings are bound directly by the stock multiplayer GUI.
+// Keep these declarations identical to game-sp so game-mp also owns them when
+// it is the first (or only) module loaded by the unified client.
 idCVar s_voiceChatSend(				"s_voiceChatSend",			"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "allow sending voice chat" );
 idCVar s_voiceChatReceive(			"s_voiceChatReceive",		"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "allow receiving voice chat" );
 idCVar s_voiceChatEcho(				"s_voiceChatEcho",			"0",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "echo microphone back to speakers" );
 idCVar s_voiceVolume(				"s_voiceVolume",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT, "voice chat receive volume", 0.0f, 1.0f );
 idCVar s_micInputLevel(				"s_micInputLevel",			"5",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT, "microphone input level", 0.0f, 10.0f );
+
+idCVar hud_showSpeed(				"hud_showSpeed",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "Show player's movement speed, measured in Units Per Second." );
+idCVar hud_showInput(				"hud_showInput",			"0",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "When set to 1, shows the players movement controls on the HUD");
+idCVar hud_inputPosition(			"hud_inputPosition",		"580 90",		CVAR_GAME | CVAR_ARCHIVE, "Input display position (x y)");
+idCVar hud_inputColor(				"hud_inputColor",			"1 0 0",		CVAR_GAME | CVAR_ARCHIVE, "Input display color (r g b, range 0 to 1)");
+
+// openQ4 BEGIN
+// Floating damage numbers, ported from Quake Live's damage plums.  Purely a
+// display choice: the server decides only whether it is allowed at all, through
+// g_hitFeedback.
+//
+// This is a multiplayer feature: only the multiplayer code (mp/HitFeedback.cpp)
+// reads these.  The unified game module registers them in both modes; the
+// campaign never draws a plum.
+//
+// Ships at 1 - the plum only ever describes damage the local player themselves
+// dealt to an opponent, so it tells you nothing you did not earn, and reading a
+// fight without it is strictly harder.  2 additionally shows team mates and
+// self damage, which is diagnostic rather than competitive.
+idCVar hud_damageNumbers(			"hud_damageNumbers",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "floating damage numbers over the players you hit: 0 off, 1 opponents only, 2 all damage you deal including team mates and yourself", 0, 2 );
+idCVar hud_damageNumberStyle(		"hud_damageNumberStyle",	"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "damage number colouring: 1 white through red across the damage range, 2 one colour per damage band, 3 one colour per weapon", 1, 3 );
+idCVar hud_damageNumberScale(		"hud_damageNumberScale",	"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT, "damage number size multiplier", 0.25f, 4.0f );
+
+// Crosshair hit marker.  Four angled marks bloom out of the crosshair and fade
+// on every hit the player lands, sized by how much the hit was worth.  It
+// replaces stock Quake 4's crosshair recolour, which hud_crosshairHitFlash can
+// bring back; turning the marker off restores that flash on its own so a player
+// is never left with no hit cue at all.
+// Fresh profiles keep stock hit feedback; existing archived choices are kept.
+idCVar hud_hitMarker(				"hud_hitMarker",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "crosshair hit marker on hits you land" );
+idCVar hud_hitMarkerScale(			"hud_hitMarkerScale",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT, "hit marker size multiplier, on top of g_crosshairSize", 0.25f, 4.0f );
+idCVar hud_crosshairHitFlash(		"hud_crosshairHitFlash",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "recolour the crosshair on a hit, as stock Quake 4 does; implied when hud_hitMarker is off" );
+// openQ4: the weapon's own crosshair design drawn live.  Its pieces assemble as
+// the weapon is raised, kick with each shot, close as it charges, wait while it
+// cycles and stand down while it reloads, and hit feedback docks into the design.
+// Retained interface only: the stock interface keeps the still picture.
+idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "animated crosshair: the weapon's crosshair drawn live, answering shots, charge, reload and hits; needs ui_retained 1" );
+// openQ4 (MP-15): competitive HUD options. Multiplayer only, like the hit feedback above.
+idCVar hud_hitSound(				"hud_hitSound",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "sound on hits you land: 0 off, 1 Quake 4, 2 four tones falling with the damage dealt, 3 four tones rising with it; the tones need a server that reports amounts (g_hitFeedback 2)", 0, 3 );
+idCVar hud_crosshairAmmo(			"hud_crosshairAmmo",		"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show the ammunition of the weapon in hand beside the crosshair" );
+idCVar hud_crosshairNames(			"hud_crosshairNames",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "name the player under the crosshair: 0 off, 1 everyone, 2 team mates only; a team mate also shows health and armour", 0, 2 );
+idCVar hud_itemTimers(				"hud_itemTimers",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show item respawn timers when the server sends them to you (si_itemTimers)" );
+idCVar hud_teamLocations(			"hud_teamLocations",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "name where each team mate is in the team list" );
+idCVar hud_localClock(				"hud_localClock",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "show the time of day beside the match clock: 0 off, 1 24-hour, 2 12-hour", 0, 2 );
+// openQ4 END
 
 // change anytime vars
 idCVar developer(					"developer",				"0",			CVAR_GAME | CVAR_BOOL, "" );
@@ -184,6 +321,7 @@ idCVar g_autoSkipCinematics(		"g_autoSkipCinematics",		"0",			CVAR_GAME | PC_CVA
 idCVar g_objectivesToggle(			"g_objectivesToggle",		"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "the objectives display: 0 shows it while the scores button is held, 1 opens and closes it with each press" );
 idCVar g_allowAssetlessStartup(		"g_allowAssetlessStartup",	"0",			CVAR_GAME | CVAR_BOOL, "allow renderer validation startup without shipped game decls" );
 idCVar g_corpseRemoveDelaySP(		"g_corpseRemoveDelaySP",	"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "seconds before single-player corpses begin disappearing (0 = stock timing, -1 = never)", -1, 6000 );
+idCVar g_corpseRemoveDelayMP(		"g_corpseRemoveDelayMP",	"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "seconds before multiplayer corpses begin disappearing (0 = stock timing, -1 = never)", -1, 6000 );
 idCVar g_corpseSink(				"g_corpseSink",				"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_INTEGER, "corpse sink mode (0 = off, 1 = ragdoll sink, 2 = no-ragdoll sink)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 
 idCVar g_muzzleFlash(				"g_muzzleFlash",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show muzzle flashes" );
@@ -201,11 +339,15 @@ idCVar g_gravity(					"g_gravity",		DEFAULT_GRAVITY_STRING, CVAR_GAME | CVAR_FLO
 idCVar g_mp_gravity(				"g_mp_gravity",		DEFAULT_MP_GRAVITY_STRING, CVAR_GAME | CVAR_FLOAT, "multiplayer gravity" );
 idCVar g_skipFX(					"g_skipFX",					"0",			CVAR_GAME | CVAR_BOOL, "" );
 idCVar g_skipParticles(				"g_skipParticles",			"0",			CVAR_GAME | CVAR_BOOL, "" );
+
 idCVar g_nailTrail(					"g_nailTrail",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show smoke trails on nail projectiles" );
 idCVar g_grenadeTrail(				"g_grenadeTrail",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show smoke trails on grenade projectiles" );
 idCVar g_rocketTrail(				"g_rocketTrail",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show smoke trails on rocket projectiles" );
 idCVar g_railTrail(					"g_railTrail",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show spiral fx on rail trail" );
 idCVar g_napalmTrail(				"g_napalmTrail",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "show fiery trails on napalm projectiles" );
+
+idCVar g_predictedProjectiles(		"g_predictedProjectiles",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "predict projectiles on the client" );
+idCVar g_projectilePredictionDebug(	"g_projectilePredictionDebug",	"0",		CVAR_GAME | CVAR_INTEGER, "report a projectile's dead-reckon offset against its authoritative trajectory, in milliseconds" );
 
 idCVar g_disasm(					"g_disasm",					"0",			CVAR_GAME | CVAR_BOOL, "disassemble script into base/script/disasm.txt on the local drive when script is compiled" );
 idCVar g_debugBounds(				"g_debugBounds",			"0",			CVAR_GAME | CVAR_BOOL, "checks for models with bounds > 2048" );
@@ -433,6 +575,7 @@ idCVar af_enhancedBounce(			"af_enhancedBounce",		"0",			CVAR_GAME | CVAR_BOOL |
 idCVar af_enhancedInheritTime(		"af_enhancedInheritTime",	"32",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: ms of animation a new ragdoll takes its joint velocities from (when its def sets no velocityTime)", 0, 500 );
 idCVar af_enhancedMaxInheritSpeed(	"af_enhancedMaxInheritSpeed","400",			CVAR_GAME | CVAR_FLOAT | CVAR_CHEAT, "enhanced physics: cap on the speed a new ragdoll body inherits" );
 idCVar af_enhancedDebug(			"af_enhancedDebug",			"0",			CVAR_GAME | CVAR_INTEGER | CVAR_CHEAT, "enhanced physics: articulated-figure diagnostics (1 print the energy guard, 2 also disable it, 4 print exact-solver fallbacks, 8 print every contact after the solve)" );
+idCVar si_enhancedPhysics(			"si_enhancedPhysics",		"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_ROM | CVAR_BOOL, "physics mode the server committed for the current map; clients and demo playback follow it" );
 
 idCVar rb_showTimings(				"rb_showTimings",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid body cpu usage" );
 idCVar rb_showBodies(				"rb_showBodies",			"0",			CVAR_GAME | CVAR_BOOL, "show rigid bodies" );
@@ -457,10 +600,10 @@ idCVar pm_walkspeed(				"pm_walkspeed",				"80",			CVAR_GAME | CVAR_NETWORKSYNC 
 idCVar pm_noclipspeed(				"pm_noclipspeed",			"270",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_FLOAT | CVAR_NORESET, "speed the player can move while in noclip" );
 idCVar pm_spectatespeed(			"pm_spectatespeed",			"450",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_FLOAT | CVAR_NORESET, "speed the player can move while spectating" );
 idCVar pm_spectatebbox(				"pm_spectatebbox",			"32",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_FLOAT | CVAR_NORESET, "size of the spectator bounding box" );
-// game-mp extends this setting with custom side counts. Keep an integer type
-// in both modules so in-process SP/MP switching never gives the shared CVar two
-// types; SP deliberately retains the retail default and boolean interpretation.
-idCVar pm_usecylinder(				"pm_usecylinder",			"0",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER | CVAR_NORESET, "use a cylinder approximation instead of a bounding box for player collision detection" );
+// The campaign keeps the retail bounding box and reads this as a boolean;
+// network play defaults to a cylinder, archives the choice and reads >= 3 as a
+// custom number of sides (CORE-07: one declaration, a default per mode).
+idModeCVar pm_usecylinder(			"pm_usecylinder",			"0",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER | CVAR_NORESET, "1", CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER | CVAR_NORESET | CVAR_ARCHIVE, "use a cylinder approximation instead of a bounding box for player collision detection (>= 3 - custom number of sides)" );
 idCVar pm_minviewpitch(				"pm_minviewpitch",			"-89",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_FLOAT | CVAR_NORESET, "amount player's view can look up (negative values are up)" );
 idCVar pm_maxviewpitch(				"pm_maxviewpitch",			"89",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_FLOAT | CVAR_NORESET, "amount player's view can look down" );
 idCVar pm_stamina(					"pm_stamina",				"24",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_FLOAT | CVAR_NORESET, "length of time player can run" );
@@ -492,6 +635,12 @@ idCVar pm_thirdPersonAngle(			"pm_thirdPersonAngle",		"0",			CVAR_GAME | CVAR_FL
 idCVar pm_thirdPersonClip(			"pm_thirdPersonClip",		"1",			CVAR_GAME | CVAR_BOOL, "clip third person view into world space" );
 idCVar pm_thirdPerson(				"pm_thirdPerson",			"0",			CVAR_GAME | CVAR_BOOL, "enables third person view" );
 idCVar pm_thirdPersonDeath(			"pm_thirdPersonDeath",		"0",			CVAR_GAME | CVAR_BOOL, "enables third person view when player dies" );
+// openQ4: spectator follow views. Presentation only: the server sends a following
+// spectator the same snapshot whichever view draws it.
+idCVar g_spectatorFollowView(		"g_spectatorFollowView",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER | CVAR_NOCHEAT, "how a spectator sees the player they follow (0 = first person, 1 = third person, 2 = chase camera steered by the spectator)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar g_chaseCameraRange(			"g_chaseCameraRange",		"96",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NOCHEAT, "distance of the third-person follow, chase and death cameras from the player", 32.0f, 256.0f );
+idCVar g_chaseCameraHeight(			"g_chaseCameraHeight",		"12",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NOCHEAT, "height of the third-person follow, chase and death cameras above the player's eyes", -16.0f, 96.0f );
+idCVar g_deathCamera(				"g_deathCamera",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL | CVAR_NOCHEAT, "in multiplayer, watch your own death from the chase camera, facing your killer" );
 idCVar pm_modelView(				"pm_modelView",				"0",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER, "draws camera from POV of player model (1 = always, 2 = when dead)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar pm_airTics(					"pm_air",					"1800",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER, "how many 60Hz frames the player can spend in a vacuum before taking damage" );
 
@@ -578,6 +727,7 @@ idCVar g_presentationClockCapture(	"g_presentationClockCapture",	"0",		CVAR_GAME
 idCVar g_flashlightBeam(			"g_flashlightBeam",			"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "visible flashlight beams on characters' guns: 1 = a beam that widens to the flashlight's reach and stops at the first surface in its way, 0 = the original thin effect, which passes through walls" );
 idCVar g_dynamicLightShadows(		"g_dynamicLightShadows",	"-1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_INTEGER, "weapon lights request shadows (gun flashlight, muzzle flashes, projectile and explosion lights, and the lights in weapon and monster effects): -1 = auto (the flashlight wherever shadows are drawn, the rest at the highest machine spec: Quality, Ultra and Maximum), 0 = never, 1 = always", -1, 1 );
 
+// Mirrors the single-player gate in src/game/gamesys/SysCvar.cpp.
 bool G_DynamicLightShadowsEnabled( void ) {
 	const int mode = g_dynamicLightShadows.GetInteger();
 	if ( mode < 0 ) {
@@ -588,12 +738,9 @@ bool G_DynamicLightShadowsEnabled( void ) {
 	return mode != 0;
 }
 
-// The flashlight is one projected light that follows the player, not a crowd
-// of short-lived projectile lights, so auto asks for its shadow on every
-// preset. Shadow-mapped presets draw it as a single projected map; the stencil
-// presets draw the volumes retail drew at its top machine spec. Presets that
-// draw no shadows at all (r_shadows 0) skip it in the renderer, and the flag
-// does not need refreshing when the preset changes.
+// The flashlight is one projected light per player, not a crowd of
+// short-lived projectile lights, so auto asks for its shadow on every preset;
+// presets that draw no shadows (r_shadows 0) skip it in the renderer.
 bool G_FlashlightShadowsEnabled( void ) {
 	// auto (-1) and always (1) both ask for it
 	return g_dynamicLightShadows.GetInteger() != 0;
@@ -621,20 +768,22 @@ idCVar g_showProjectilePct(			"g_showProjectilePct",		"0",			CVAR_GAME | PC_CVAR
 // dluetscher: changed to g_brassTime
 idCVar g_brassTime(					"g_brassTime",				"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "amount of time brass should stay in the world before dissapearing, set to 0 to disable brass" );
 // RAVEN END
-idCVar g_gun_x(						"g_gunX",					"1",			CVAR_GAME | CVAR_FLOAT, "" );
-idCVar g_gun_y(						"g_gunY",					"0",			CVAR_GAME | CVAR_FLOAT, "" );
-idCVar g_gun_z(						"g_gunZ",					"-1",			CVAR_GAME | CVAR_FLOAT, "" );
-idCVar g_weaponMuzzleKick(			"g_weaponMuzzleKick",	"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "view weapon kicks back when it fires; 0 holds the view model still" );
-idCVar g_viewKick(					"g_viewKick",				"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "scales the camera kick and shake when you fire; 0 keeps the view still, aim still follows the crosshair", 0.0f, 1.0f );
-idCVar g_screenShake(				"g_screenShake",			"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "scales single-player screen shake from explosions, machinery and vehicles; 0 turns it off", 0.0f, 1.0f );
+idCVar g_gun_x(						"g_gunX",					"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "" );
+idCVar g_gun_y(						"g_gunY",					"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "" );
+idCVar g_gun_z(						"g_gunZ",					"-1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "" );
 idCVar cl_gun_x(					"cl_gun_x",					"0",			PC_CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NOCHEAT, "client first-person weapon right offset" );
 idCVar cl_gun_y(					"cl_gun_y",					"0",			PC_CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NOCHEAT, "client first-person weapon forward offset" );
 idCVar cl_gun_z(					"cl_gun_z",					"0",			PC_CVAR_ARCHIVE | CVAR_FLOAT | CVAR_NOCHEAT, "client first-person weapon up offset" );
+idCVar g_weaponFovEffect(			"g_weaponFovEffect",		"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "Adjusts the position of the weapon model with increased fov" );
+idCVar g_weaponMuzzleKick(			"g_weaponMuzzleKick",	"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "view weapon kicks back when it fires; 0 holds the view model still" );
+idCVar g_viewKick(					"g_viewKick",				"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "scales the camera kick and shake when you fire; 0 keeps the view still, aim still follows the crosshair", 0.0f, 1.0f );
+idCVar g_screenShake(				"g_screenShake",			"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_FLOAT, "scales single-player screen shake from explosions, machinery and vehicles; 0 turns it off", 0.0f, 1.0f );
+
 idCVar g_viewNodalX(				"g_viewNodalX",				"0",			CVAR_GAME | CVAR_FLOAT, "" );
 idCVar g_viewNodalZ(				"g_viewNodalZ",				"0",			CVAR_GAME | CVAR_FLOAT, "" );
 // RAVEN BEGIN
 // jshepard: fov as a float for smoother transitions?
-idCVar g_fov(						"g_fov",					"90",			CVAR_GAME | CVAR_FLOAT | CVAR_NOCHEAT, "" );
+idCVar g_fov(						"g_fov",					"90",			CVAR_GAME | CVAR_FLOAT | CVAR_NOCHEAT | PC_CVAR_ARCHIVE, "" );
 // RAVEN END
 idCVar g_skipViewEffects(			"g_skipViewEffects",		"0",			CVAR_GAME | CVAR_BOOL, "skip damage and other view effects" );
 idCVar g_mpWeaponAngleScale(		"g_mpWeaponAngleScale",		"0",			CVAR_GAME | CVAR_FLOAT, "Control the weapon sway in MP" );
@@ -649,23 +798,6 @@ idCVar g_crosshairColor(			"g_crosshairColor",			"1 1 1 1", CVAR_GAME | CVAR_ARC
 idCVar g_crosshairCustom(			"g_crosshairCustom",		"0",			CVAR_GAME | PC_CVAR_ARCHIVE, "sets the custom combat crosshair" );
 idCVar g_crosshairCustomFile(		"g_crosshairCustomFile",	"0",			CVAR_GAME | PC_CVAR_ARCHIVE, "stores the custom crosshair's filename" );
 idCVar g_crosshairCharInfoFar(		"g_crosshairCharInfoFar",	"1",			CVAR_GAME | CVAR_BOOL, "instead of a green crosshair from far away, full character info always draws" );
-// openQ4 BEGIN
-// Crosshair hit marker.  Four angled marks bloom out of the crosshair and fade
-// on every hit the player lands, sized by how much the hit was worth.  It
-// replaces stock Quake 4's crosshair recolour, which hud_crosshairHitFlash can
-// bring back; turning the marker off restores that flash on its own so a player
-// is never left with no hit cue at all.  Kept in step with the multiplayer
-// module so the setting means the same thing in both.
-// Fresh profiles keep stock hit feedback; existing archived choices are kept.
-idCVar hud_hitMarker(				"hud_hitMarker",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "crosshair hit marker on hits you land" );
-idCVar hud_hitMarkerScale(			"hud_hitMarkerScale",		"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT, "hit marker size multiplier, on top of g_crosshairSize", 0.25f, 4.0f );
-idCVar hud_crosshairHitFlash(		"hud_crosshairHitFlash",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "recolour the crosshair on a hit, as stock Quake 4 does; implied when hud_hitMarker is off" );
-// openQ4: the weapon's own crosshair design drawn live.  Its pieces assemble as
-// the weapon is raised, kick with each shot, close as it charges, wait while it
-// cycles and stand down while it reloads, and hit feedback docks into the design.
-// Retained interface only: the stock interface keeps the still picture.
-idCVar hud_crosshairAnimated(		"hud_crosshairAnimated",	"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "animated crosshair: the weapon's crosshair drawn live, answering shots, charge, reload and hits; needs ui_retained 1" );
-// openQ4 END
 // bdube: database entries
 idCVar g_showHudPopups(				"g_showHudPopups",			"1",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "displays objective and database popups on the hud" );
 idCVar g_showRange(					"g_showRange",				"0",			CVAR_GAME | CVAR_CHEAT | CVAR_BOOL, "shows the range from the player to the first collision under the players crosshair" );
@@ -751,16 +883,6 @@ idCVar password(					"password",					"",				CVAR_GAME | CVAR_NOCHEAT, "client pa
 idCVar g_gameReviewPause(			"g_gameReviewPause",		"30",			CVAR_GAME | CVAR_NETWORKSYNC | CVAR_INTEGER | PC_CVAR_ARCHIVE, "scores review time in seconds (at end game)", 2, 3600 );
 // RAVEN END
 idCVar net_clientPredictGUI(		"net_clientPredictGUI",		"1",			CVAR_GAME | CVAR_BOOL, "test guis in networking without prediction" );
-idCVar net_mpLagCompensation(		"net_mpLagCompensation",	"1",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "enable server-side multiplayer lag compensation for hitscan traces" );
-idCVar net_mpLagCompMaxMS(			"net_mpLagCompMaxMS",		"200",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "maximum rewind window in milliseconds for multiplayer lag compensation", 0, 1000 );
-idCVar net_mpLagCompBiasMS(			"net_mpLagCompBiasMS",		"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "additional rewind bias in milliseconds applied to multiplayer lag compensation", -200, 200 );
-idCVar net_mpLagCompDebug(			"net_mpLagCompDebug",		"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "multiplayer lag compensation debug output (0=off, 1=summary, 2=verbose)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
-// openQ4: this fork is game_sp and never runs multiplayer, so this declaration is dead.  The
-// live one is in src/mpgame/gamesys/SysCvar.cpp; the default is kept in step with it so the
-// two forks cannot be read as disagreeing.
-idCVar net_mpPredictMode(			"net_mpPredictMode",		"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "multiplayer remote-client prediction mode (0=legacy limited, 1=enhanced per-frame)" , 0, 1, idCmdSystem::ArgCompletion_Integer<0,1> );
-idCVar net_menulanserver(			"net_menulanserver",		"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "treat menu server list as LAN only" );
-idCVar net_serverMenuDedicated(	"net_serverMenuDedicated",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "menu dedicated server toggle" );
 
 idCVar si_voteFlags(				"si_voteFlags",				"0",			CVAR_GAME | CVAR_SERVERINFO | CVAR_INTEGER | PC_CVAR_ARCHIVE, "vote flags. bit mask of votes not allowed on this server\n"
 																					"bit  0 (+1)    restart now\n"
@@ -771,9 +893,61 @@ idCVar si_voteFlags(				"si_voteFlags",				"0",			CVAR_GAME | CVAR_SERVERINFO | 
 																					"bit  5 (+32)   change map\n"
 																					"bit  6 (+64)   change gametype\n"
 																					"bit  7 (+128)  time limit\n"
-																					"bit  8 (+256)  tourney limit\n"
-																					"bit  9 (+512)  capture limit\n"
-																					"bit 10 (+1024) frag limit" );
+																	"bit  8 (+256)  tourney limit\n"
+																	"bit  9 (+512)  capture limit\n"
+																	"bit 10 (+1024) frag limit\n"
+																	"bit 11 (+2048) control time\n"
+																	"bit 12 (+4096) next map\n"
+																	"bit 13 (+8192) round limit\n"
+																	"bit 14 (+16384) ruleset\n"
+																	"bit 15 (+32768) instagib\n"
+																	"bit 16 (+65536) overtime\n"
+																	"bit 17 (+131072) coin toss\n"
+																	"bit 18 (+262144) random map\n"
+																	"bit 19 (+524288) ready all\n"
+																	"bit 20 (+1048576) mute player\n"
+																	"bit 21 (+2097152) modifiers\n"
+																	"bit 22 (+4194304) spectator chat\n"
+																	"bit 23 (+8388608) preset\n"
+																	"bit 24 (+16777216) weapon arena" );
+// openQ4 MP-12: casual vote policy. The defaults reproduce the inherited rule
+// (a strict majority of the frozen electorate, no per-map limit, players only).
+idCVar g_votePercent(				"g_votePercent",			"51",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "percentage of the players eligible when a vote starts that must vote yes for it to pass", 1, 100 );
+idCVar g_voteLimit(					"g_voteLimit",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "most votes one player may call on a map; 0 for no limit", 0, 100 );
+idCVar si_spectatorVote(			"si_spectatorVote",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_BOOL, "let spectators call and cast votes" );
+// openQ4 MP-12: casual team timeouts. A managed profile brings its own budget;
+// these give an ordinary team server one too, called from the console with
+// timeout and ended with timein.
+idCVar si_timeouts(					"si_timeouts",				"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "team timeouts each side may call in a casual team match; 0 for none", 0, 10 );
+idCVar si_timeoutLength(			"si_timeoutLength",			"60",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "length of a casual team timeout in seconds", 10, 600 );
+// openQ4 MP-12: casual roster and attendance policies
+idCVar si_spectatorLock(			"si_spectatorLock",			"0",			CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE | CVAR_INTEGER, "during live play: 1 spectators cannot join the game, 2 players cannot leave it either; 0 off", 0, 2 );
+idCVar g_inactivity(				"g_inactivity",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a playing human may send no input before being moved to spectators (dropped when spectators are off); 0 off", 0, 3600 );
+idCVar g_pauseOnDisconnect(			"g_pauseOnDisconnect",		"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a casual team match pauses when a playing human disconnects, so they can reconnect; 0 off", 0, 300 );
+// openQ4 MP-18: server moderation (mp/Moderation.h). The flood window is Quake II's
+// flood_msgs, flood_persecond and flood_waitdelay with its defaults.
+idCVar g_chatFloodMessages(		"g_chatFloodMessages",		"4",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "chat lines one player may send within g_chatFloodSeconds before being silenced for g_chatFloodWait; 0 for no limit", 0, 16 );
+idCVar g_chatFloodSeconds(			"g_chatFloodSeconds",		"4",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "length in seconds of the window g_chatFloodMessages counts", 1, 60 );
+idCVar g_chatFloodWait(				"g_chatFloodWait",			"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a player who passed the chat flood window stays silenced", 0, 600 );
+idCVar g_adminLog(					"g_adminLog",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "write kicks, bans, mutes, chat floods and refused connections to logs/admin.ndjson in the save folder" );
+idCVar g_voteMuteMinutes(			"g_voteMuteMinutes",		"10",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "minutes a player stays silenced after a mute vote passes; 0 until unmute or a server restart", 0, 1440 );
+// openQ4 MP-17: player identity. ui_identity travels in the player's userinfo,
+// so a server challenges only a game that answers; the user chose on
+// 23 November 2026 to have it on unless the player turns it off.
+idCVar ui_identity(					"ui_identity",				"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "prove to each server that you are the same player as before, with a key kept only on this computer and different for every server; 0 sends no identity" );
+idCVar g_identity(					"g_identity",				"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "ask each player whose game offers one for their identity on this server; status shows it, ban id:<identity> bans it, and returning players and the ranking table use it" );
+idCVar g_reconnectRestore(			"g_reconnectRestore",		"300",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "seconds a player who leaves a casual match keeps their team and score for when they return, by identity or by the ghost code they were told; 0 forgets them at once", 0, 3600 );
+// openQ4 MP-12: the intermission. Off by default: a casual server keeps Quake 4's
+// quiet scoreboard until its operator turns this on.
+// openQ4 MP-22: what is done for every match. Words: demo (record it), ss (a
+// screenshot of the result), stats (stats/<match>.json). The server's is in its
+// server info, so players can see that their matches are recorded.
+idCVar ui_autoAction(				"ui_autoAction",			"",				CVAR_GAME | CVAR_ARCHIVE | CVAR_NOCHEAT, "for every match you play: demo records it, ss takes a screenshot of the result, stats writes stats/<match>.json; e.g. \"demo ss stats\"" );
+idCVar si_autoAction(				"si_autoAction",			"",				CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NOCHEAT, "for every match the server runs: demo records a multi-view demo, stats writes stats/<match>.json" );
+idCVar g_intermissionAnnounce(		"g_intermissionAnnounce",	"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "while the final scoreboard is up, name the next map and read out each player's awards" );
+idCVar g_ranking(					"g_ranking",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "keep a local ranking table (ranking.txt): an Elo rating for each identity and game type, updated when a casual match ends; rankings lists it" );
+idCVar g_adminMaxBanMinutes(		"g_adminMaxBanMinutes",		"1440",			CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "the longest ban, in minutes, a logged-in admin may give a connected player; 0 lets admins ban nobody", 0, 525600 );
+idCVar g_reservedNames(				"g_reservedNames",			"admin;console;referee",	CVAR_GAME | CVAR_ARCHIVE, "player names nobody may take, separated by ';', whatever their case or colours; a player who asks for one gets it with '_' added" );
 
 idCVar g_mapCycle(					"g_mapCycle",				"mapcycle",		CVAR_GAME | CVAR_ARCHIVE, "map cycling script for multiplayer games - see mapcycle.scriptcfg" );
 
@@ -796,16 +970,149 @@ idCVar g_perfTest_aiNoObstacleAvoid(		"g_perfTest_aiNoObstacleAvoid",		"0",			CV
 idCVar g_perfTest_aiUndying(				"g_perfTest_aiUndying",				"0",			CVAR_GAME | CVAR_BOOL, "makes all AI undying" );
 idCVar g_perfTest_aiNoVisTrace(				"g_perfTest_aiNoVisTrace",			"0",			CVAR_GAME | CVAR_BOOL, "ai does no vis traces" );
 idCVar g_perfTest_noJointTransform(			"g_perfTest_noJointTransform",		"0",			CVAR_GAME | CVAR_BOOL, "all joint transforms return origin" );
+idCVar g_precachePlayerModels(			"g_precachePlayerModels",			"1",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "load every player model with a multiplayer map, so a player or bot arriving with a model nobody has used yet does not hitch the match; 0 loads only this player's and the defaults" );
 idCVar g_perfTest_noPlayerFocus(			"g_perfTest_noPlayerFocus",			"0",			CVAR_GAME | CVAR_BOOL, "doesn't do player focus traces/logic" );
 idCVar g_perfTest_noProjectiles(			"g_perfTest_noProjectiles",			"0",			CVAR_GAME | CVAR_BOOL, "all projectiles are removed instantly" );
 
 idCVar g_clientProjectileCollision(			"g_clientProjectileCollision",		"1",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "allow the client to predict collisions" );
 
-idCVar net_serverDownload(			"net_serverDownload",		"0",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "enable server download redirects. 0: off 1: client exits and opens si_serverURL in web browser 2: client downloads pak files from an URL and connects again. See net_serverDl* cvars for configuration" );
-idCVar net_serverDlBaseURL(			"net_serverDlBaseURL",		"",				CVAR_GAME | CVAR_ARCHIVE, "base URL for the download redirection" );
-idCVar net_serverDlTable(			"net_serverDlTable",		"",				CVAR_GAME | CVAR_ARCHIVE, "pak names for which download is provided, seperated by ; - use a * to mark all paks" );
+idCVar net_serverDownload(					"net_serverDownload",				"0",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "enable server download redirects. 0: off 1: client exits and opens si_serverURL in web browser 2: client downloads pak files from an URL and connects again 3: client downloads pak files from built-in http server and connects again. See net_serverDl* cvars for configuration" );
+idCVar net_serverDlBaseURL(					"net_serverDlBaseURL",				"",				CVAR_GAME | CVAR_ARCHIVE, "base URL for the download redirection.  also overrides the URL when net_serverDownload is set to 3 (built-in HTTP server)." );
+idCVar net_serverDlTable(					"net_serverDlTable",				"",				CVAR_GAME | CVAR_ARCHIVE, "pak names for which download is provided, seperated by ; - use a * to mark all paks" );
 
-idCVar si_serverURL(				"si_serverURL",				"",				CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE, "server information page" );
+// Stock mainmenu.gui binds these directly while configuring a server. Mirror
+// the game-sp declarations so a direct game-mp launch never creates typeless
+// placeholder CVars from GUI state.
+idCVar net_menulanserver(					"net_menulanserver",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "treat menu server list as LAN only" );
+idCVar net_serverMenuDedicated(				"net_serverMenuDedicated",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "menu dedicated server toggle" );
 
+idCVar si_serverURL(						"si_serverURL",						"",				CVAR_GAME | CVAR_SERVERINFO | CVAR_ARCHIVE, "server information page" );
 
-idCVar net_warnStale( "net_warnStale", "1", CVAR_INTEGER | CVAR_GAME | CVAR_NOCHEAT, "Warn stale entity occurences on network client - == 1: only on ClientStale call, > 1 all times" );
+idCVar g_repeaterReliableOnly(				"g_repeaterReliableOnly",			"1",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "send unreliable messages reliably. 1: to repeaters 2: to repeaters and viewers" );
+
+idCVar net_warnStale(						"net_warnStale",					"1",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "Warn stale entity occurences on network client - == 1: only on ClientStale call, > 1 all times" );
+
+idCVar pm_slidevelocity(					"pm_slidevelocity",					"1",			CVAR_GAME | CVAR_BOOL | CVAR_NETWORKSYNC, "what to do with velocity when hitting a surface at an angle. 0: use horizontal speed, 1: keep some of the impact speed to push along the slide" );
+idCVar pm_powerslide(						"pm_powerslide",					"0.09",			CVAR_GAME | CVAR_FLOAT | CVAR_NETWORKSYNC, "adjust the push when pm_slidevelocity == 1, set power < 1 -> more speed, > 1 -> closer to pm_slidevelocity 0", 0, 4 );
+
+idCVar g_playerLean(						"g_playerLean",						"1",			CVAR_GAME | CVAR_FLOAT | CVAR_ARCHIVE, "scale down or disable client-side player lean" );
+
+idCVar net_clientPredictWeaponSwitch(		"net_clientPredictWeaponSwitch",	"1",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "predict weapon switches locally (most noticeable on high ping servers)" );
+
+// openQ4: server side hitscan lag compensation.  Same names, flags and ranges as the
+// single player tree it was ported from - but NOT the same default: the SP copy is
+// dead code (game-sp never runs multiplayer) and still declares "1".
+// This one ships OFF.  The machinery is complete and guarded.  A client in mode 1
+// extrapolates remote players forward from the relayed user commands rather than
+// interpolating between snapshots; it advertises that (net_mpRemoteExtrapolation)
+// and the rewind takes it off, so the two corrections no longer double-count.
+// Turning it on still changes hit registration for everybody on the server, so it
+// stays an opt-in until it has been measured against real ping distributions.
+// openQ4: a remote player's Move() is gated on gameLocal.isNewFrame below, so a client
+// integrates a remote exactly once per client frame while every snapshot hard-resets that
+// remote's physics.  Its simulated state therefore sits permanently about the client's own
+// lead behind the server - a positional error of order ping, at the crosshair.  Mode 1
+// re-simulates remote players on the engine's replay passes as well, using the usercmds the
+// server already relays.  NOT CVAR_NETWORKSYNC: it changes only what a client simulates
+// locally, and a server must not be able to force per-frame cost onto a client.
+// (src/game/gamesys/SysCvar.cpp carries a copy of this cvar; the single-player fork never
+// runs multiplayer, so THIS is the live declaration.)
+idCVar demo_autoTrack(						"demo_autoTrack",					"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "multi-view demo camera auto-tracking (0=off, 1=follow the killer, 2=follow the action); choosing a camera by hand turns it off", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar demo_autoTrackTeam(					"demo_autoTrackTeam",				"any",			CVAR_GAME | CVAR_NOCHEAT, "team multi-view demo auto-tracking follows: any, marine or strogg" );
+idCVar net_mpPredictMode(					"net_mpPredictMode",				"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "multiplayer remote-client prediction mode (0=legacy limited, 1=enhanced per-frame)", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1> );
+// Ceiling on the extra replay tics one remote may be simulated for in a single chain.
+// net_clientMaxPrediction lets the engine hand over as many as 62 after a stall, for every
+// visible player at once.
+idCVar net_mpPredictMaxFrames(				"net_mpPredictMaxFrames",		"16",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "maximum extra replay tics a remote player may be re-simulated for per chain", 1, 64 );
+idCVar net_mpPredictDebug(					"net_mpPredictDebug",			"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "report how far a client's predicted remote-player position was from the server's for the same frame", 0, 1 );
+// What a client tells the server it extrapolates remote players by, in tics: 0 in legacy mode,
+// net_mpPredictMaxFrames in mode 1.  Lag compensation takes it off that client's rewind
+// (idGameLocal::RemoteExtrapolationMS), so the two corrections no longer stack.  Read-only and
+// re-derived from the two cvars above every client frame, so a server that echoes a different
+// value back in the user info changes nothing about what this client simulates.
+idCVar net_mpRemoteExtrapolation(			"net_mpRemoteExtrapolation",		"0",			CVAR_GAME | CVAR_INTEGER | CVAR_USERINFO | CVAR_ROM, "remote-player extrapolation this client advertises to the server, in tics (derived from net_mpPredictMode and net_mpPredictMaxFrames)" );
+idCVar net_mpLagCompensation(				"net_mpLagCompensation",			"0",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "enable server-side multiplayer lag compensation for hitscan traces" );
+idCVar net_mpLagCompMaxMS(					"net_mpLagCompMaxMS",				"200",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "maximum rewind window in milliseconds for multiplayer lag compensation", 0, 1000 );
+idCVar net_mpLagCompBiasMS(					"net_mpLagCompBiasMS",				"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "additional rewind bias in milliseconds applied to multiplayer lag compensation", -200, 200 );
+// How much further back than the measured round trip a rewind may reach.  The shooter's own
+// claim is what the rewind follows; this is only the ceiling that keeps a client which
+// misreports, or which delays its ping replies, from choosing its own rewind.
+idCVar net_mpLagCompSlackMS(				"net_mpLagCompSlackMS",				"48",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "how far past the measured round trip a lag-compensation rewind may reach", 0, 200 );
+idCVar net_mpLagCompDebug(					"net_mpLagCompDebug",				"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "multiplayer lag compensation debug output (0=off, 1=summary, 2=verbose)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+// A client's own hit-scan shots (machinegun, shotgun, railgun) are drawn on the frame it
+// predicts the shot, from the gun it draws, instead of a round trip later from where the
+// server had the gun.  The server's copy of that shot then adds only the impacts on players,
+// which stay the server's verdict.  Client-side presentation only; 0 restores the echo.
+idCVar net_mpPredictHitscan(				"net_mpPredictHitscan",				"1",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "draw this client's own hit-scan tracers and wall impacts when it predicts the shot instead of when the server's copy arrives" );
+idCVar net_mpHitscanDebug(					"net_mpHitscanDebug",				"0",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "log hit-scan shots: the server's, the ones this client predicts, and the server's copies it receives, with how far each started from the gun and aim drawn at the time" );
+
+// Multiplayer bots.  Navigation is generated at map load from the collision
+// world, so none of this needs per-map authoring.
+idCVar bot_enable(							"bot_enable",						"1",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "allow bots to be added to multiplayer matches" );
+idCVar bot_minPlayers(						"bot_minPlayers",					"0",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "keep the match topped up to this many players with bots, 0 disables" );
+idCVar bot_skill(							"bot_skill",						"3",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "bot difficulty, 1 (easiest) to 5 (hardest)", 1, 5 );
+idCVar bot_debug(							"bot_debug",						"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "log bot decisions: 1 navigation events, 2 adds periodic bot status, 3 adds edge and traversal traces, 4 adds live predictions and recovery rejections, 5 adds recovery contacts" );
+idCVar bot_debugNav(						"bot_debugNav",						"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "draw the navmesh (1) and bot routes (2) near the local player" );
+idCVar bot_navCellSize(						"bot_navCellSize",					"24",			CVAR_GAME | CVAR_FLOAT | CVAR_NOCHEAT, "navmesh sampling resolution in world units; smaller finds more ground and costs more to build", 8, 64 );
+idCVar bot_pause(							"bot_pause",						"0",			CVAR_GAME | CVAR_BOOL | CVAR_NOCHEAT, "freeze all bot input" );
+idCVar bot_grapple(						"bot_grapple",						"1",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "let bots use the Classic ruleset's grappling hook as a route shortcut where the server allows the hook" );
+
+// Bot personalities.  Skill is the baseline curve; a character file layers a
+// play style and a voice on top of it, so two bots at the same skill still play
+// and talk differently.
+idCVar bot_characters(						"bot_characters",					"1",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "give bots named characters with their own play style and voice; 0 leaves them on the plain skill curve" );
+idCVar bot_forceCharacter(					"bot_forceCharacter",				"",				CVAR_GAME, "put every bot on this one character, by name; for tuning a single personality" );
+idCVar bot_skillVariance(					"bot_skillVariance",				"0",			CVAR_GAME | CVAR_FLOAT | CVAR_ARCHIVE, "spread bot skill this many levels either side of bot_skill, so a match is not all one difficulty", 0, 2 );
+idCVar bot_chat(							"bot_chat",							"1",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "bot chat: 0 silent, 1 normal, 2 chatty", 0, 2 );
+idCVar bot_chatDelay(						"bot_chatDelay",					"600",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "initial thinking pause before a bot starts typing, in milliseconds" );
+idCVar bot_chatCPM(							"bot_chatCPM",						"900",			CVAR_GAME | CVAR_INTEGER | CVAR_ARCHIVE, "base bot typing speed in visible characters per minute", 60, 6000 );
+idCVar bot_debugAim(						"bot_debugAim",						"0",			CVAR_GAME | CVAR_INTEGER, "log the aim and fire decisions behind every shot, for tuning skill levels" );
+idCVar bot_profile(						"bot_profile",						"0",			CVAR_GAME | CVAR_INTEGER | CVAR_NOCHEAT, "print bot CPU and navigation query statistics every N seconds, 0 disables", 0, 600 );
+
+/*
+===============================================================================
+
+	idModeCVar
+
+===============================================================================
+*/
+
+idModeCVar *idModeCVar::modeCVars = NULL;
+
+idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, const char *mpValue, int mpFlags,
+						const char *description, argCompletion_t valueCompletion ) :
+	idCVar( name, spValue, spFlags, description, valueCompletion ),
+	mpValue( mpValue ),
+	mpFlags( mpFlags ),
+	nextModeCVar( modeCVars ) {
+	modeCVars = this;
+}
+
+idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, const char *mpValue, int mpFlags,
+						const char *description, const char **valueStrings, argCompletion_t valueCompletion ) :
+	idCVar( name, spValue, spFlags, description, valueStrings, valueCompletion ),
+	mpValue( mpValue ),
+	mpFlags( mpFlags ),
+	nextModeCVar( modeCVars ) {
+	modeCVars = this;
+}
+
+/*
+================
+idModeCVar::ApplyModuleMode
+
+The constructor declared the single-player default and flags. A multiplayer
+load swaps in its own before idCVar::RegisterStaticVars hands the declarations
+to the cvar system, which keeps a value the player has set and takes these as
+the reset value.
+================
+*/
+void idModeCVar::ApplyModuleMode( bool multiplayer ) {
+	if ( !multiplayer ) {
+		return;
+	}
+	for ( idModeCVar *cvar = modeCVars; cvar != NULL; cvar = cvar->nextModeCVar ) {
+		cvar->value = cvar->mpValue;
+		cvar->flags = cvar->mpFlags | CVAR_STATIC;
+	}
+}

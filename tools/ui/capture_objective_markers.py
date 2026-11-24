@@ -120,7 +120,7 @@ def main():
                    'working_tree': subprocess.check_output(['git', 'status', '--short'], cwd=ROOT, text=True),
                    'runtime': {str(path.relative_to(args.runtime)): capture.digest(path)
                                for path in [args.runtime / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64'),
-                                            *sorted((args.runtime / 'baseoq4').glob('game-mp_*'))]
+                                            *sorted((args.runtime / 'baseoq4').glob('game_*'))]
                                if path.is_file()}, 'results': results}
         (args.output / 'report.json').write_text(json.dumps(payload, indent=2) + '\n', encoding='utf-8')
     return 0 if all(result['passed'] for result in results) else 1

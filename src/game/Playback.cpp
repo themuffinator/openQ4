@@ -1,5 +1,5 @@
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 #include "ai/AI.h"
@@ -38,18 +38,18 @@ rvGamePlayback::rvGamePlayback( void )
 	mStartTime = gameLocal.time;
 	mOldFlags = 0;
 	mClipModel = new idClipModel( traceModel );
-// jmarshall - not used in retail workflow
-	//if( !g_currentPlayback.GetInteger() )
-	//{
-	//	newName = declManager->GetNewName( DECL_PLAYBACK, "playbacks/untitled" );
-	//	mPlayback = ( rvDeclPlayback * )declManager->CreateNewDecl( DECL_PLAYBACK, newName, newName + ".playback" );
-	//	mPlayback->ReplaceSourceFileText();
-	//	mPlayback->Invalidate();
-	//
-	//	g_currentPlayback.SetInteger( mPlayback->Index() );
-	//}
-	//else
-// jmarshall end
+// jmarshall - not used in retail workflow: SP always records into the current
+// playback; MP still creates an untitled one when none is selected
+	if( gameLocal.IsMultiplayerMode() && !g_currentPlayback.GetInteger() )
+	{
+		newName = declManager->GetNewName( DECL_PLAYBACK, "playbacks/untitled" );
+		mPlayback = ( rvDeclPlayback * )declManager->CreateNewDecl( DECL_PLAYBACK, newName, newName + ".playback" );
+		mPlayback->ReplaceSourceFileText();
+		mPlayback->Invalidate();
+
+		g_currentPlayback.SetInteger( mPlayback->Index() );
+	}
+	else
 	{
 		mPlayback = ( rvDeclPlayback * )declManager->PlaybackByIndex( g_currentPlayback.GetInteger() );
 	}

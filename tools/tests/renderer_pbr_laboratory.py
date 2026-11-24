@@ -2690,7 +2690,7 @@ def main() -> int:
         raise RuntimeError('PBR map must be compiled after its source was generated')
     binaries = sorted(set([*args.runtime_root.glob('openQ4-client*'),*args.runtime_root.glob('renderer-*'),
                            *args.runtime_root.glob('*.dll'),*args.runtime_root.glob('*.so*'),
-                           *args.runtime_root.glob('*.dylib'),*args.runtime_root.glob('baseoq4/game-*'),
+                           *args.runtime_root.glob('*.dylib'),*args.runtime_root.glob('baseoq4/game_*'),
                            *args.runtime_root.glob('baseoq4/*.pk4')]))
     provenance = {str(p.relative_to(args.runtime_root)):digest(p) for p in binaries if p.is_file() and p.suffix not in ('.pdb','.lib','.exp')}
     report = {'schema':2, 'basepath':str(args.basepath), 'fixture':manifest, 'runtimeSHA256':provenance, 'compiledMapSHA256':digest(compiled_map), 'results':[], 'complete':False, 'harnessSHA256':digest(Path(__file__))}

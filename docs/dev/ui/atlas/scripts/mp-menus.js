@@ -576,7 +576,7 @@ const PAGES = {
   buy: [0, 1, 2, 3].map(k => (g, W) => buyPage(g, W, k)),
 };
 
-/* The buy card (retained_mp_buy.py): the catalog (buyCatalog in src/mpgame/mp/Buying.cpp) under The Awakening's
+/* The buy card (retained_mp_buy.py): the catalog (buyCatalog in src/game/mp/Buying.cpp) under The Awakening's
    prices; 32 dp plates on a 36 dp pitch in a 520 dp column, the detail of the hot plate beside it. */
 const CREDITS = 2400;
 const CATALOG = [

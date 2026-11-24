@@ -1,5 +1,5 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 9/30/2004
 
@@ -142,6 +142,7 @@ public:
 	// Virtual overrides
 	void				Spawn						( void );
 	virtual void		Think						( void );
+	void				ShiftMatchTime				( int deltaMsec );
 	virtual void		CleanupWeapon				( void ) {}
 	virtual void		WriteToSnapshot				( idBitMsgDelta &msg ) const;
 	virtual void		ReadFromSnapshot			( const idBitMsgDelta &msg );
@@ -151,8 +152,9 @@ public:
 	virtual void		Attack						( bool altFire, int num_attacks, float spread, float fuseOffset, float power );
 	virtual void		GetDebugInfo				( debugInfoProc_t proc, void* userData );
 	virtual void		SpectatorCycle				( void ) { }
-	// openQ4: true for every weapon now, matching src/mpgame/Weapon.h.  Only consulted
-	// under gameLocal.isMultiplayer, so this tree is unaffected.  See idPlayer::FireWeapon.
+	// openQ4: true for every weapon now.  A multiplayer client drops BUTTON_ATTACK for
+	// the whole of a weapon change, so a weapon that still fires server-side during that
+	// window spends ammo and spawns shots nobody rendered.  See idPlayer::FireWeapon.
 	virtual bool		NoFireWhileSwitching		( void ) const { return true; }
 
 	void				Save						( idSaveGame *savefile ) const;
@@ -205,11 +207,16 @@ public:
 	void				NetReload					( void );
 	void				NetEndReload				( void );
 	void				NetCatchup					( void );
+	// openQ4: a client weapon made for a new life raises from the game time the server's
+	// weapon began its raise, so both reach ready, and fire, on the same frames
+	void				SetNetRaiseStartTime		( int time );
 
 	// Ammo
 	static int			GetAmmoIndexForName			( const char *ammoname );
 	static const char*	GetAmmoNameForIndex			( int index );
 	int					GetAmmoType					( void ) const;
+	// openQ4: what the owner can carry for this weapon
+	int					GetMaxAmmo					( void ) const { return maxAmmo; }
 	int					AmmoAvailable				( void ) const;
 	int					AmmoInClip					( void ) const;
 	void				ResetAmmoClip				( void );
@@ -225,6 +232,13 @@ public:
 	bool				PerformAttack				( idVec3& muzzleOrigin, idMat3& muzzleAxis, float dmgPower );
 	void				LaunchProjectiles			( idDict& dict, const idVec3& muzzleOrigin, const idMat3& muzzleAxis, int num_projectiles, float spread, float fuseOffset, float power );
 	void				Hitscan						( const idDict& dict, const idVec3& muzzleOrigin, const idMat3& muzzleAxis, int num_hitscans, float spread, float power );
+// openQ4 BEGIN
+	// True on the frame a multiplayer client first predicts its own hit-scan shot.
+	bool				PredictsOwnHitscan			( void ) const;
+	// net_mpHitscanDebug: one line per shot, with the gap from the gun and aim this weapon
+	// holds now when it belongs to the local player.
+	void				LogHitscanDebug				( const char *kind, int hitscanDefIndex, const idVec3 &fxOrigin, const idVec3 &dir, int seed, const idEntity *hit ) const;
+// openQ4 END
 	void				AlertMonsters				( void );
 
 	// Mods
@@ -417,6 +431,8 @@ public:
 
  	// multiplayer
  	int								clipPredictTime;
+	// openQ4: game time the next raise starts from, -1 for now (SetNetRaiseStartTime)
+	int								netRaiseStartTime;
 
 	// these are the player render view parms, which include bobbing
 	idVec3							playerViewOrigin;

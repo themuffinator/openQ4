@@ -120,18 +120,13 @@ def symbol_manifest_text(
             "  size=1",
             "  macho_uuid=UUID: 00000000-0000-0000-0000-000000000003 (arm64) openQ4-ded_arm64",
             "  dsym=dSYMs/openQ4-ded_arm64.dSYM",
-            "- path=openQ4.app/Contents/Frameworks/game-sp_arm64.dylib",
+            "- path=openQ4.app/Contents/Frameworks/game_arm64.dylib",
             "  sha256=" + "3" * 64,
             "  size=1",
-            "  macho_uuid=UUID: 00000000-0000-0000-0000-000000000004 (arm64) game-sp_arm64.dylib",
-            "  dsym=dSYMs/game-sp_arm64.dylib.dSYM",
-            "- path=openQ4.app/Contents/Frameworks/game-mp_arm64.dylib",
-            "  sha256=" + "4" * 64,
-            "  size=1",
-            "  macho_uuid=UUID: 00000000-0000-0000-0000-000000000005 (arm64) game-mp_arm64.dylib",
-            "  dsym=dSYMs/game-mp_arm64.dylib.dSYM",
+            "  macho_uuid=UUID: 00000000-0000-0000-0000-000000000004 (arm64) game_arm64.dylib",
+            "  dsym=dSYMs/game_arm64.dylib.dSYM",
             # The Vulkan renderer module is openQ4-built and therefore carries a
-            # dSYM, so it is a manifest binary exactly like the game modules.
+            # dSYM, so it is a manifest binary exactly like the game module.
             # libMoltenVK.dylib ships next to it in Contents/Frameworks but is
             # deliberately NOT listed: it is a third-party prebuilt with no DWARF,
             # and macos_symbol_targets() excludes it for that reason.
@@ -176,8 +171,7 @@ def create_symbol_archive(
         f"{root_name}/dSYMs/openQ4.app.dSYM/Contents/Resources/DWARF/openQ4": b"dsym\n",
         f"{root_name}/dSYMs/openQ4-client_arm64.dSYM/Contents/Resources/DWARF/openQ4-client_arm64": b"dsym\n",
         f"{root_name}/dSYMs/openQ4-ded_arm64.dSYM/Contents/Resources/DWARF/openQ4-ded_arm64": b"dsym\n",
-        f"{root_name}/dSYMs/game-sp_arm64.dylib.dSYM/Contents/Resources/DWARF/game-sp_arm64.dylib": b"dsym\n",
-        f"{root_name}/dSYMs/game-mp_arm64.dylib.dSYM/Contents/Resources/DWARF/game-mp_arm64.dylib": b"dsym\n",
+        f"{root_name}/dSYMs/game_arm64.dylib.dSYM/Contents/Resources/DWARF/game_arm64.dylib": b"dsym\n",
         f"{root_name}/dSYMs/renderer-vk_arm64.dylib.dSYM/Contents/Resources/DWARF/renderer-vk_arm64.dylib": b"dsym\n",
         # No libMoltenVK.dylib.dSYM: MoltenVK is third-party, has no debug symbols
         # to ship, and package_nightly.py never stages one here.
@@ -208,8 +202,9 @@ def validate_packager_contract() -> None:
         'Path("openQ4.app") / "Contents" / "MacOS" / "openQ4"',
         f'Path(f"{{PRODUCT_NAME}}-client_{{arch}}")',
         f'Path(f"{{PRODUCT_NAME}}-ded_{{arch}}")',
-        'Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"game-sp_{arch}.dylib"',
-        'Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"game-mp_{arch}.dylib"',
+        "game_module = macos_embedded_game_module_path(package_root, arch)",
+        'Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / game_module.name',
+        'Path("dSYMs") / f"{game_module.name}.dSYM"',
         'Path("openQ4.app") / MACOS_APP_FRAMEWORKS_DIR / f"renderer-vk_{arch}.dylib"',
         "dwarfdump",
         "dsymutil",
@@ -505,7 +500,7 @@ def validate_symbol_archive_fixture() -> None:
         missing_binary_archive = work / "openq4-0.6.5-macos-arm64-opengl-symbols-missing-binary.tar.xz"
         missing_binary_root_name = create_symbol_archive(
             missing_binary_archive,
-            manifest_replacements=(("- path=openQ4.app/Contents/Frameworks/game-mp_arm64.dylib", "- path=openQ4.app/Contents/Frameworks/game-extra_arm64.dylib"),),
+            manifest_replacements=(("- path=openQ4.app/Contents/Frameworks/game_arm64.dylib", "- path=openQ4.app/Contents/Frameworks/game-extra_arm64.dylib"),),
         )
         expect_runtime_error(
             "missing binary entries",
@@ -526,8 +521,8 @@ def validate_symbol_archive_fixture() -> None:
             unexpected_binary_archive,
             manifest_replacements=(
                 (
-                    "  dsym=dSYMs/game-mp_arm64.dylib.dSYM",
-                    "  dsym=dSYMs/game-mp_arm64.dylib.dSYM\n"
+                    "  dsym=dSYMs/game_arm64.dylib.dSYM",
+                    "  dsym=dSYMs/game_arm64.dylib.dSYM\n"
                     "- path=baseoq4/game-extra_arm64.dylib\n"
                     f"  sha256={'5' * 64}\n"
                     "  size=1\n"
@@ -845,8 +840,7 @@ def validate_docs_and_support_collector() -> None:
         "`openQ4.app/Contents/MacOS/openQ4`",
         "`openQ4-client_arm64`",
         "`openQ4-ded_arm64`",
-        "`openQ4.app/Contents/Frameworks/game-sp_arm64.dylib`",
-        "`openQ4.app/Contents/Frameworks/game-mp_arm64.dylib`",
+        "`openQ4.app/Contents/Frameworks/game_arm64.dylib`",
         "`SYMBOLS.txt`",
         "SHA-256",
         "`dwarfdump --uuid`",

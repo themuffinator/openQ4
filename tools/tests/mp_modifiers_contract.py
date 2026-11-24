@@ -21,7 +21,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MP = ROOT / "src/mpgame"
+MP = ROOT / "src/game"
 STRINGS = ROOT / "content/baseoq4/pak0/strings"
 LANGUAGES = ("english", "brazilian", "czech", "french", "german", "hungarian", "italian", "polish", "russian",
              "spanish", "turkish", "ukrainian")

@@ -1,12 +1,13 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
+#include "mp/match/MatchDeadline.h"
 
 
 #if !defined(__GAME_PROJECTILE_H__)
@@ -447,15 +448,16 @@ idActor::idActor( void )
 	leftEyeJoint		= INVALID_JOINT;
 	rightEyeJoint		= INVALID_JOINT;
 	soundJoint			= INVALID_JOINT;
+	eyeOffsetJoint		= INVALID_JOINT;
+	chestOffsetJoint	= INVALID_JOINT;
+	neckJoint			= INVALID_JOINT;
+	headJoint			= INVALID_JOINT;
 
 	deltaViewAngles.Zero();
 
 	painTime			= 0;
 	inDamageEvent		= false;
-// RAVEN BEGIN
-// bdube: reversed var
 	disablePain			= true;
-// RAVEN END
 	allowEyeFocus		= false;
 	
 	blink_anim			= NULL;
@@ -489,9 +491,6 @@ idActor::idActor( void )
 	deathPushForce.Zero();
 	deathPushJoint	= INVALID_JOINT;
 	
-	eyeOffsetJoint = INVALID_JOINT;
-	chestOffsetJoint = INVALID_JOINT;
-
 	lightningEffects = 0;
 	lightningNextTime = 0;
 }
@@ -1225,7 +1224,7 @@ void idActor::SetupBody( void ) {
 	// Cache the head entity pointer and determine which animator to use
 	idAFAttachment *headEnt = head.GetEntity();
 	if ( headEnt ) {
-		headAnimator = headEnt->GetAnimator ( );
+		headAnimator = headEnt->GetAnimator();
 	} else {
 		headAnimator = GetAnimator( );
 	}
@@ -1243,15 +1242,15 @@ void idActor::SetupBody( void ) {
 	rightEyeJoint = headAnimator->GetJointHandle( jointname );
 				
 	// If head height is specified, just use that
-	if ( spawnArgs.GetFloat ( "eye_height", "0", height ) ) {
-		SetEyeHeight ( height );
+	if ( spawnArgs.GetFloat( "eye_height", "0", height ) ) {
+		SetEyeHeight( height );
 	} else { 
 		// See if there is an eye offset joint specified, if not just use the left eye joint
-		if ( !headEnt || !headEnt->spawnArgs.GetString ( "joint_eyeOffset", "", &jointname ) ) {		
+		if ( !headEnt || !headEnt->spawnArgs.GetString( "joint_eyeOffset", "", &jointname ) ) {		
 			jointname = spawnArgs.GetString( "joint_eyeOffset" );
 		}
 		// Get the eye offset joint
-		eyeOffsetJoint = headAnimator->GetJointHandle ( jointname );
+		eyeOffsetJoint = headAnimator->GetJointHandle( jointname );
 		if ( eyeOffsetJoint == INVALID_JOINT ) {
 			// openQ4: the Awakening's Tank and Retch name eye joints their meshes
 			// spell differently, which left their eyes at their feet
@@ -1260,24 +1259,24 @@ void idActor::SetupBody( void ) {
 	}
 
 	// If eye height is specified, just use that
-	if ( spawnArgs.GetFloat ( "chest_height", "0", height ) ) {
-		SetChestHeight ( height );
+	if ( spawnArgs.GetFloat( "chest_height", "0", height ) ) {
+		SetChestHeight( height );
 	} else { 
 		// See if there is an eye offset joint specified, if not just use the left eye joint
-		spawnArgs.GetString ( "joint_chestOffset", "", &jointname );
+		spawnArgs.GetString( "joint_chestOffset", "", &jointname );
 		// Get the chest offset joint
-		chestOffsetJoint = animator.GetJointHandle ( jointname );
+		chestOffsetJoint = animator.GetJointHandle( jointname );
 	}
 
 	// Get the neck joint
-	spawnArgs.GetString ( "joint_look_neck", "", &jointname );
-	neckJoint = animator.GetJointHandle ( jointname );
+	spawnArgs.GetString( "joint_look_neck", "", &jointname );
+	neckJoint = animator.GetJointHandle( jointname );
 
 	// Get the head joint
-	spawnArgs.GetString ( "joint_look_head", "", &jointname );
-	headJoint = animator.GetJointHandle ( jointname );
+	spawnArgs.GetString( "joint_look_head", "", &jointname );
+	headJoint = animator.GetJointHandle( jointname );
 
-	headAnim.Init ( this, &animator, ANIMCHANNEL_HEAD );
+	headAnim.Init( this, &animator, ANIMCHANNEL_HEAD );
 	torsoAnim.Init( this, &animator, ANIMCHANNEL_TORSO );
 	legsAnim.Init( this, &animator, ANIMCHANNEL_LEGS );
 }
@@ -1298,6 +1297,28 @@ bool idActor::PointVisible(const idVec3& point) const
 
 	gameLocal.clip[0]->TracePoint(results, start, end, MASK_OPAQUE, this);
 	return (results.fraction >= 1.0f);
+}
+
+/*
+=====================
+idActor::ThinkMatchPaused
+=====================
+*/
+void idActor::ThinkMatchPaused( int deltaMsec ) {
+	idAFEntity_Gibbable::ThinkMatchPaused( deltaMsec );
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+
+	mpMatchShiftOptionalDeadline( lightningNextTime, deltaMsec );
+	mpMatchShiftOptionalDeadline( pain_debounce_time, deltaMsec );
+	mpMatchShiftOptionalDeadline( blink_time, deltaMsec );
+	mpMatchShiftOptionalDeadline( painTime, deltaMsec );
+	mpMatchShiftOptionalDeadline( deathPushTime, deltaMsec );
+	stateThread.ShiftMatchTime( deltaMsec );
+	headAnim.GetStateThread().ShiftMatchTime( deltaMsec );
+	torsoAnim.GetStateThread().ShiftMatchTime( deltaMsec );
+	legsAnim.GetStateThread().ShiftMatchTime( deltaMsec );
 }
 
 /*
@@ -1515,7 +1536,7 @@ idVec3 idActor::GetEyePosition( void ) const {
 idActor::GetChestPosition
 =====================
 */
-idVec3 idActor::GetChestPosition ( void ) const {
+idVec3 idActor::GetChestPosition( void ) const {
 	return GetPhysics()->GetOrigin() + chestOffset * viewAxis;
 }
 
@@ -2320,7 +2341,7 @@ bool idActor::UpdateAnimationControllers( void ) {
 	if ( eyeOffsetJoint != INVALID_JOINT ) {
 		headEnt->GetJointWorldTransform( eyeOffsetJoint, gameLocal.time, eyeOffset, axis );
 		eyeOffset = (eyeOffset - GetPhysics()->GetOrigin()) * viewAxis.Transpose( );
-	}	
+	}
 
 	if ( DebugFilter( ai_debugMove ) ) { // RED = Eye Pos & orientation
 		gameRenderWorld->DebugArrow( colorRed, GetEyePosition(), GetEyePosition() + viewAxis[ 0 ] * 32.0f, 4, gameLocal.msec );
@@ -2596,8 +2617,8 @@ void idActor::GetAASLocation( idAAS *aas, idVec3 &pos, int &areaNum ) const {
 idActor::StopAnimState
 =====================
 */
-void idActor::StopAnimState ( int channel ) {
-	GetAnimState ( channel ).Shutdown ( );
+void idActor::StopAnimState( int channel ) {
+	GetAnimState( channel ).Shutdown ( );
 }
 
 /*
@@ -2605,8 +2626,8 @@ void idActor::StopAnimState ( int channel ) {
 idActor::PostAnimState
 =====================
 */
-void idActor::PostAnimState ( int channel, const char* statename, int blendFrames, int delay, int flags ) {
-	GetAnimState ( channel ).PostState ( statename, blendFrames, delay, flags );
+void idActor::PostAnimState( int channel, const char* statename, int blendFrames, int delay, int flags ) {
+	GetAnimState( channel ).PostState( statename, blendFrames, delay, flags );
 }
 
 /*
@@ -2617,23 +2638,23 @@ idActor::SetAnimState
 void idActor::SetAnimState( int channel, const char *statename, int blendFrames, int flags ) {
 	switch ( channel ) {
 		case ANIMCHANNEL_HEAD :
-			headAnim.GetStateThread().Clear ( );
+			headAnim.GetStateThread().Clear();
 			break;
 			
 		case ANIMCHANNEL_TORSO :
-			torsoAnim.GetStateThread().Clear ( );
+			torsoAnim.GetStateThread().Clear();
 			legsAnim.Enable( blendFrames );
 			break;
 
 		case ANIMCHANNEL_LEGS :
-			legsAnim.GetStateThread().Clear ( );
+			legsAnim.GetStateThread().Clear();
 			torsoAnim.Enable( blendFrames );
 			break;
 	}		
 
-	OnStateChange ( channel );
+	OnStateChange( channel );
 	
-	PostAnimState ( channel, statename, blendFrames, flags );
+	PostAnimState( channel, statename, blendFrames, flags );
 }
 
 /*
@@ -2983,9 +3004,9 @@ void idActor::Damage( idEntity *inflictor, idEntity *attacker, const idVec3 &dir
 			health = 1;
 			if ( !ai->IsFrozenSolid() ) {
 				ai->FreezeSolid( location );
-			}
-			return;
 		}
+		return;
+	}
 		if ( health <= 0 ) {
 
 			//allow for quick burning
@@ -3436,7 +3457,7 @@ bool idActor::EnterVehicle ( idEntity* ent ) {
 idActor::FootStep
 =====================
 */
-void idActor::FootStep ( void ) {
+void idActor::FootStep( void ) {
 	const char*				sound;
 	const rvDeclMatType*	materialType;
 

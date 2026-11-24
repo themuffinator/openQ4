@@ -182,7 +182,7 @@ def main():
     failures=0
     mutation='--mutation-check' in sys.argv
     with tempfile.TemporaryDirectory(prefix='save-spawn-refs-', dir=ROOT/'.tmp') as directory:
-        for mode in ('game','mpgame'):
+        for mode in ('game',):
             cpp=Path(directory)/(mode+'.cpp'); executable=cpp.with_suffix('.exe')
             code=source(mode)
             if mutation:

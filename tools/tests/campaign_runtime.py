@@ -175,7 +175,7 @@ def main() -> int:
     report = {"schema": 1, "phase": args.phase, "renderer": args.renderer,
               "executable_sha256": sha256(args.exe),
               "module_sha256": {path.name: sha256(path) for path in
-                                sorted((args.exe.parent / "baseoq4").glob("game-sp_*"))
+                                sorted((args.exe.parent / "baseoq4").glob("game_*"))
                                 if path.suffix.lower() in (".dll", ".so", ".dylib")},
               "complete": False, "results": results}
     def write_report():

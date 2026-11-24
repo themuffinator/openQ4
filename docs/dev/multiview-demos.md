@@ -855,7 +855,7 @@ matches.
 
 **Autoaction.** `ui_autoAction` (a player) and `si_autoAction` (a server, in
 its server info) take the words `demo`, `ss` and `stats`
-(`src/mpgame/mp/AutoAction.h`, with `MPBuildMatchBasename`:
+(`src/game/mp/AutoAction.h`, with `MPBuildMatchBasename`:
 `YYYYMMDD-HHMMSS_<mode>_<map>[_<player>]`). The player's side starts on the
 local game's live edge (`rvGameState::GameStateChanged`, never during demo
 playback) by buffering `record "<name>"`, quoted because the tokenizer splits

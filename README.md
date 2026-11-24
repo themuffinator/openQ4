@@ -200,7 +200,7 @@ These guides describe 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**
 
 The openQ4 engine is licensed under the [GNU General Public License v3.0](LICENSE). Files that keep Doom 3 or Doom 3 BFG Edition headers also keep their upstream notices and Additional Terms; the [source-provenance inventory](docs/dev/source-provenance.md) records their scope and lineage.
 
-The game code in [`src/game`](src/game/) and [`src/mpgame`](src/mpgame/) is derived from the Quake 4 SDK and remains under [id Software's SDK EULA](LICENSES/QUAKE-4-SDK-EULA.rtf). [LICENSING.md](LICENSING.md) explains each component's terms, including the open question about distributing them linked together. Quake 4's assets remain the property of id Software and ZeniMax Media.
+The game code in [`src/game`](src/game/) is derived from the Quake 4 SDK and remains under [id Software's SDK EULA](LICENSES/QUAKE-4-SDK-EULA.rtf). [LICENSING.md](LICENSING.md) explains each component's terms, including the open question about distributing them linked together. Quake 4's assets remain the property of id Software and ZeniMax Media.
 
 openQ4 is an independent project and is not affiliated with, endorsed by or sponsored by id Software, Raven Software, Bethesda or ZeniMax Media.
 

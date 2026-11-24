@@ -32,7 +32,7 @@ def validate_loader_fallback() -> None:
     for token in (
         "openQ4_BuildGameModuleBinaryNameForArch",
         "OPENQ4_MODULE_ARCH_TAG",
-        'openQ4_BuildGameModuleBinaryNameForArch( gameModuleBaseName, "universal2"',
+        'openQ4_BuildGameModuleBinaryNameForArch( "universal2", universalGameModuleBinary );',
         "fileSystem->FindDLL( universalGameModuleBinary, dllPath, true )",
         "selectedModuleBinary = universalGameModuleBinary",
         "#if defined( MACOS_X ) || defined( __APPLE__ )",
@@ -46,23 +46,25 @@ def validate_loader_fallback() -> None:
     if not preferred_lookup < fallback_guard < universal_lookup < fatal_guard:
         raise AssertionError("universal2 lookup must follow thin lookup and precede the fatal missing-module guard")
 
-    reject(load, 'openQ4_BuildGameModuleBinaryNameForArch( gameModuleBaseName, "universal2" );', "incomplete universal2 name construction")
+    # one module serves both logical modules, so the name no longer depends on the mode
+    reject(load, "openQ4_BuildGameModuleBinaryNameForArch( gameModuleBaseName", "mode-specific game module name construction")
 
 
 def validate_bundle_integrity_fallback() -> None:
     compat = read("src/sys/macos/macos_compat.mm")
-    start = compat.index("static void Sys_CollectMacOSGameModulePairIssues")
+    start = compat.index("static void Sys_CollectMacOSGameModuleIssues")
     end = compat.index("static bool Sys_MacOSAppBundleHasEmbeddedRuntimeMarker", start)
     contract = compat[start:end]
 
     for token in (
-        "Sys_CollectMacOSGameModulePairIssues",
+        "Sys_CollectMacOSGameModuleIssues",
+        '"game_%s.dylib", arch',
         "Sys_MacOSPackageRuntimeArchSuffix()",
-        'Sys_CollectMacOSGameModulePairIssues( frameworkDirectory, "universal2"',
+        'Sys_CollectMacOSGameModuleIssues( frameworkDirectory, "universal2"',
         "architectureModuleIssues.Length() == 0",
         "universalModuleIssues.Length() == 0",
-        "architecture-specific module pair unavailable",
-        "universal2 module pair unavailable",
+        "architecture-specific game module unavailable",
+        "universal2 game module unavailable",
         "Sys_RequireMacOSPackageRootExecutable",
     ):
         require(contract, token, "self-contained app universal2 integrity fallback")
@@ -125,8 +127,7 @@ def validate_docs_and_wiring() -> None:
     for token in (
         "# macOS Universal2 Design",
         "tools/build/assemble_macos_universal2.py",
-        "game-sp_universal2.dylib",
-        "game-mp_universal2.dylib",
+        "game_universal2.dylib",
         "lipo -create",
         "exact slice set `arm64 x86_64`",
         "sign nested modules inside-out",

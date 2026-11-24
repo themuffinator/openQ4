@@ -14,7 +14,7 @@ guide is [Buying in multiplayer](../user/buying.md).
 | Quake 4 | 1 | 0 |
 | The Awakening | 1 | 1 |
 
-`buyingMode_t` in `src/mpgame/mp/Buying.h` is this three-way choice. Create
+`buyingMode_t` in `src/game/mp/Buying.h` is this three-way choice. Create
 Server's **Buying** row (`createBuying`, 0 to 2, `Session_RetainedCreateValue`),
 the retained Vote and Admin pages (`RVF_BUYING`, a choice of
 `mp.vote.buying<n>` / `mp.admin.buying<n>`), the packed vote's `m_buying` byte,
@@ -32,7 +32,7 @@ DeadZone, so a casual CTF server with buying on had its imported rules rejected
 
 ## The catalog and the rules
 
-`buyCatalog` in `src/mpgame/mp/Buying.cpp` lists every item either set of
+`buyCatalog` in `src/game/mp/Buying.cpp` lists every item either set of
 rules sells, in the buy card's order, with its buy impulse, page, whether retail
 sells it, the Awakening's price and its name and detail strings. It is the one
 source for prices (`riBuyingManager::GetItemPrice`), availability

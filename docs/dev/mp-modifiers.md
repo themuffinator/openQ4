@@ -15,7 +15,7 @@ any mode, so the question changed from whether to how. The decision recorded
 here:
 
 - **One layer, not one switch per feature.** Every modifier is a row in
-  `mpModifierTable` (`src/mpgame/mp/Modifiers.cpp`), asked for by one
+  `mpModifierTable` (`src/game/mp/Modifiers.cpp`), asked for by one
   server-info cvar and latched with the others. Instagib is a row of it.
 - **Typed data, never executable configuration.** A preset is a list of
   allow-listed settings, built in or read from `presets/<name>.cfg`. Nothing a
@@ -104,7 +104,7 @@ resolved anything, so a changed value triggers one `rescanSI`.
 
 ## Presets
 
-`mpPresetTable` (`src/mpgame/mp/Presets.cpp`) is the built-in list. Row 0,
+`mpPresetTable` (`src/game/mp/Presets.cpp`) is the built-in list. Row 0,
 `standard`, holds every composition setting at its cvar default, and every
 other preset is applied over it. `rvMPPresets::Apply` writes the settings and
 `si_preset`; the caller restarts.

@@ -14,7 +14,7 @@ from game_regression_suite import discover as discover_game_regressions
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH_DIR = ROOT / "src/mpgame/mp/match"
+MATCH_DIR = ROOT / "src/game/mp/match"
 HEADER = MATCH_DIR / "MatchSeriesReportFileSystem.h"
 SOURCE = MATCH_DIR / "MatchSeriesReportFileSystem.cpp"
 STORAGE_HEADER = MATCH_DIR / "MatchSeriesReportStorage.h"
@@ -191,16 +191,15 @@ def main() -> None:
             shutil.which("python") or shutil.which("python3") or "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         cwd=ROOT,
         check=True,
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    if "mpgame/mp/match/MatchSeriesReportFileSystem.cpp" not in {
+    if "game/mp/match/MatchSeriesReportFileSystem.cpp" not in {
         line.strip() for line in listing
     }:
         raise AssertionError("series report filesystem adapter absent from MP sources")

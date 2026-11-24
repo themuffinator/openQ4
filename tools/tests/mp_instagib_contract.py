@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MP = ROOT / "src/mpgame"
+MP = ROOT / "src/game"
 LANGUAGES = ("english", "brazilian", "czech", "french", "german", "hungarian", "italian", "polish", "russian",
              "spanish", "turkish", "ukrainian")
 

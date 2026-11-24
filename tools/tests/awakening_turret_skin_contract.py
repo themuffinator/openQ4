@@ -82,10 +82,16 @@ def decl_bodies(text: str) -> dict[str, str]:
 def check_find_entity_def() -> None:
     source = read(ROOT / "src/game/Game_local.cpp")
     body = function_body(source, "const idDeclEntityDef *idGameLocal::FindEntityDef(", "Game_local.cpp")
+    # One FindEntityDef serves both modes: a network game returns from its own cached "_mp"
+    # lookup below; everything above that, a campaign map or the multiplayer mode's menus,
+    # takes the plain name, and only the campaign mode under q4xbase asks for "_q4x_openq4".
+    plain = body.find("if ( !isMultiplayer || name == NULL || name[ 0 ] == '\\0' ) {")
+    plain_end = body.find("return static_cast<const idDeclEntityDef *>( decl );\n\t}", plain)
     mp = body.find('"%s_mp"')
     q4x = body.find('"%s_q4x_openq4"')
-    assert mp >= 0 and q4x > mp, "multiplayer keeps its _mp redirect; the Awakening one is single player only"
-    assert re.search(r'else if \(.*FS_AwakeningActive\(\) \)', body), "the _q4x_openq4 redirect is scoped to the Awakening"
+    assert 0 <= plain < q4x < plain_end < mp, "multiplayer keeps its _mp redirect; the Awakening one is single player only"
+    assert re.search(r'if \( !IsMultiplayerMode\(\) &&.*FS_AwakeningActive\(\) \)', body[plain:plain_end]), \
+        "the _q4x_openq4 redirect is scoped to the Awakening in the campaign mode"
     assert body.count("FindType( DECL_ENTITYDEF, name, makeDefault )") == 1, "the plain name stays the fallback"
 
 

@@ -859,11 +859,12 @@ def check_layout(runtime: Path) -> list[str]:
         if not (runtime / name).is_file():
             problems.append(f"missing {name}")
     base = runtime / "baseoq4"
-    for name in (f"game-sp_{arch}{suffix}", f"game-mp_{arch}{suffix}"):
-        if not (base / name).is_file():
-            problems.append(f"missing baseoq4/{name}")
-    for module in sorted(base.glob("game-*")) if base.is_dir() else []:
-        if module.name not in (f"game-sp_{arch}{suffix}", f"game-mp_{arch}{suffix}") and module.suffix == suffix:
+    game_module = f"game_{arch}{suffix}"
+    if not (base / game_module).is_file():
+        problems.append(f"missing baseoq4/{game_module}")
+    # game-* also catches the retired split game-sp/game-mp modules of an older build
+    for module in sorted([*base.glob("game_*"), *base.glob("game-*")]) if base.is_dir() else []:
+        if module.name != game_module and module.suffix == suffix:
             problems.append(f"stale or foreign game module baseoq4/{module.name}")
     for engine in sorted(runtime.glob("openQ4-*")):
         if engine.suffix.lower() in (".exe", "") and engine.is_file() and engine.name not in (
@@ -883,7 +884,7 @@ def check_layout(runtime: Path) -> list[str]:
     if sys.platform == "win32":
         machines = {"x64": 0x8664, "arm64": 0xAA64}
         for path in [runtime / client_name(arch), runtime / ded_name(arch), *runtime.glob(f"renderer-*_{arch}.dll"),
-                     *base.glob(f"game-*_{arch}.dll"), runtime / "OpenAL32.dll"]:
+                     *base.glob(f"game_{arch}.dll"), runtime / "OpenAL32.dll"]:
             if path.is_file():
                 data = path.read_bytes()[:4096]
                 offset = int.from_bytes(data[0x3C:0x40], "little")
@@ -895,7 +896,7 @@ def check_layout(runtime: Path) -> list[str]:
     dedicated = version_line(runtime / ded_name(arch))
     if engine and dedicated and engine["version"] != dedicated["version"]:
         problems.append(f"client {engine['version']} and dedicated server {dedicated['version']} differ")
-    for module in [*runtime.glob(f"renderer-*_{arch}{suffix}"), *base.glob(f"game-*_{arch}{suffix}")]:
+    for module in [*runtime.glob(f"renderer-*_{arch}{suffix}"), *base.glob(f"game_{arch}{suffix}")]:
         stamp = version_line(module)
         if engine and stamp and stamp["commit"] != engine["commit"]:
             problems.append(f"{module.name} names g{stamp['commit']}, the engine g{engine['commit']}")

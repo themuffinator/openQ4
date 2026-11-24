@@ -36,8 +36,8 @@ def require_before(haystack: str, first: str, second: str, context: str) -> None
 
 
 def main() -> None:
-    header = read("src/mpgame/bots/BotObjective.h")
-    source = read("src/mpgame/bots/BotObjective.cpp")
+    header = read("src/game/bots/BotObjective.h")
+    source = read("src/game/bots/BotObjective.cpp")
 
     # Stable integration interface: the bot brain consumes a single snapshot
     # without taking a dependency on concrete game-state classes.

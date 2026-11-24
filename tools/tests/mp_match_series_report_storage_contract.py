@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-MATCH_DIR = ROOT / "src/mpgame/mp/match"
+MATCH_DIR = ROOT / "src/game/mp/match"
 HEADER = MATCH_DIR / "MatchSeriesReportStorage.h"
 SOURCE = MATCH_DIR / "MatchSeriesReportStorage.cpp"
 REPORT_HEADER = MATCH_DIR / "MatchSeriesReport.h"
@@ -179,9 +179,8 @@ def static_contracts(header: str, source: str) -> None:
             shutil.which("python") or shutil.which("python3") or "python",
             str(ROOT / "tools/build/list_sources.py"),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         cwd=ROOT,
         check=True,
@@ -190,15 +189,15 @@ def static_contracts(header: str, source: str) -> None:
     ).stdout.splitlines()
     discovered = {line.strip() for line in listing}
     for source_name in (
-        "mpgame/mp/match/MatchSeriesReport.cpp",
-        "mpgame/mp/match/MatchSeriesReportStorage.cpp",
+        "game/mp/match/MatchSeriesReport.cpp",
+        "game/mp/match/MatchSeriesReportStorage.cpp",
     ):
         if source_name not in discovered:
             raise AssertionError(f"recursive MP source discovery omits {source_name}")
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchSeriesReportStorage.h"
+#include "game/mp/match/MatchSeriesReportStorage.h"
 
 #include <string.h>
 

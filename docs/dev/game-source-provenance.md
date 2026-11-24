@@ -1,7 +1,7 @@
 # Game source provenance
 
-The canonical single-player and multiplayer game sources now live in this
-repository's `src/game/` and `src/mpgame/`. Their licences and authorship are
+The canonical game sources live in this repository's `src/game/`. Their
+licences and authorship are
 unchanged by the move. [LICENSING.md](../../LICENSING.md) distinguishes the
 SDK-derived game code from the engine's GPL-covered code and dependencies.
 
@@ -18,6 +18,13 @@ SDK-derived game code from the engine's GPL-covered code and dependencies.
   in the archived repositories remain useful for older releases.
 - The original `EULA.Development Kit.rtf` is retained byte-for-byte at
   [`LICENSES/QUAKE-4-SDK-EULA.rtf`](../../LICENSES/QUAKE-4-SDK-EULA.rtf).
+
+On 24 November 2026 the multiplayer tree `src/mpgame/` was merged into
+`src/game/` to build a single game module (CORE-07, see
+[unified game module](unified-game-module.md)). Quake 4's SDK shipped the two
+trees as separate single-player and multiplayer copies of the same code; the
+merge keeps both trees' code, licence and notices, and their histories remain
+in openQ4's commit history under the old paths.
 
 Subsequent modifications are identified by openQ4's commit history. Source
 relocation does not grant an alternative licence or remove original notices.

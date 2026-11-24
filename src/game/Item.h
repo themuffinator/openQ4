@@ -1,5 +1,5 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
@@ -33,6 +33,7 @@ public:
 	void					GetAttributes( idDict &attributes );
 	virtual bool			GiveToPlayer( idPlayer *player, bool updateHud = true );
 	virtual bool			Pickup( idPlayer *player );
+	bool					TouchesPickup( const idBounds &bounds ) const;
 	virtual void			Think( void );
 	virtual void			Present();
 	virtual	void			InstanceJoin( void );
@@ -48,13 +49,6 @@ public:
 	virtual bool			Collide( const trace_t &collision, const idVec3 &velocity );
 // RAVEN END
 	
-// jmarshall
-	int						GetModelIndex() const
-	{
-		return modelindex;
-	}
-// jmarshall end
-
 	enum {
 		EVENT_PICKUP = idEntity::EVENT_MAXEVENTS,
 		EVENT_RESPAWNFX,
@@ -80,6 +74,16 @@ public:
 	bool					simpleItem;
 	float					simpleItemScale;
 	bool					pickedUp;
+
+	// Who took it, so a bot that watched the pickup happen can name them.
+	// Server side only: the client never needs it and never gets told.
+	int						pickedUpByClientNum;
+
+	// openQ4: Classic ruleset mega health.  The item holds its respawn until the
+	// player it went to has drained back to the normal limit (or died or left).
+	idEntityPtr<idPlayer>	classicMegaHolder;
+	float					classicMegaRespawn;
+
 	const idDeclSkin*		pickupSkin;
 	void					Event_DropToFloor	( void );
 protected:
@@ -98,6 +102,10 @@ protected:
 
 private:
 	idVec3					orgOrigin;
+	// openQ4: where the model was last updated from (Think)
+	idVec3					presentedOrigin;
+	idMat3					presentedAxis;
+	bool					visualsPresented;
 
 	rvPhysics_Particle		physicsObj;
 
@@ -134,10 +142,6 @@ private: // FIXME: Temp hack while Eric gets back to me about why GameState.cpp 
 // abahr
 	void					Event_SetGravity();
 // RAVEN END
-
-// jmarshall
-	int						modelindex;
-// jmarshall end
 };
 
 /*
@@ -160,6 +164,7 @@ public:
 	void					Spawn();
 	virtual bool			GiveToPlayer( idPlayer *player, bool updateHud = true );
 	virtual void			Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	virtual bool			Pickup( idPlayer *player );
 
 protected:
@@ -224,6 +229,10 @@ public:
 	
 	static void				ResetFlag( int type );
 	virtual void			Think( void );
+
+	// openQ4: the Classic ruleset scores defence around the base flag
+	int						GetFlagTeam( void ) const { return team; }
+	bool					IsDroppedFlag( void ) const { return dropped; }
 
 	virtual bool			Collide( const trace_t &collision, const idVec3 &velocity );
 

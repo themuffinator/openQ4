@@ -14,9 +14,9 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
-    source = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     body = function_body(source, "void idMultiplayerGame::ApplyMatchTeamsPlanToLegacy")
-    player = (ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8")
+    player = (ROOT / "src/game/Player.cpp").read_text(encoding="utf-8")
     initial_join = function_body(player, "if ( gameLocal.isServer && managedMatch )")
     synchronize = function_body(source, "void idMultiplayerGame::SynchronizeMatchParticipant")
     retry_anchor = "if ( IsManagedMatch() && player->initialJoinPending"

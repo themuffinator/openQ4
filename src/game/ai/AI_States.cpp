@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../vehicle/Vehicle.h"
@@ -21,11 +21,14 @@ static const int 	RANGED_ENEMYDELAY				= 2000;		// Time to wait to move after lo
 static const int 	COVER_ENEMYDELAY				= 5000;		// Stay behind cover for 5 seconds after loosing sight of an enemy
 
 static const float	COVER_TRIGGERRADIUS				= 64.0f;
-static const int	CORPSE_SINK_TIME_MS				= 15000;	// legacy = 1500
+// openQ4: SP corpses sink over 15 seconds (legacy = 1500); MP keeps 1.5 seconds
+static const int	CORPSE_SINK_TIME_MS_SP			= 15000;
+static const int	CORPSE_SINK_TIME_MS_MP			= 1500;
+#define CORPSE_SINK_TIME_MS		( gameLocal.isMultiplayer ? CORPSE_SINK_TIME_MS_MP : CORPSE_SINK_TIME_MS_SP )
 static const float	CORPSE_SINK_DISTANCE			= 16.0f;
 
 static float AI_GetCorpseRemoveDelaySettingSeconds( void ) {
-	return g_corpseRemoveDelaySP.GetFloat();
+	return gameLocal.isMultiplayer ? g_corpseRemoveDelayMP.GetFloat() : g_corpseRemoveDelaySP.GetFloat();
 }
 
 static int AI_GetCorpseSinkMode( void ) {
@@ -862,7 +865,8 @@ stateResult_t idAI::State_Burn ( const stateParms_t& parms ) {
 	}
 	
 
-	renderEntity.noShadow = !G_ShadowMapCorpseShadowsEnabled();
+	// openQ4: SP corpses cast shadow-map shadows when point-light shadow maps are on; MP keeps retail
+	renderEntity.noShadow = gameLocal.isMultiplayer || !G_ShadowMapCorpseShadowsEnabled();
 
 	// Dont let the articulated figure be shot once they start burning away
 	SetCombatContents ( false );
@@ -921,7 +925,7 @@ stateResult_t idAI::State_SinkCorpse( const stateParms_t& parms ) {
 			physicsObj.SetLinearVelocity( vec3_zero );
 		}
 
-		renderEntity.noShadow = !G_ShadowMapCorpseShadowsEnabled();
+		renderEntity.noShadow = gameLocal.isMultiplayer || !G_ShadowMapCorpseShadowsEnabled();
 		SetCombatContents( false );
 		fl.takedamage = false;
 		GetPhysics()->DisableClip();

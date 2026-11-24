@@ -13,8 +13,8 @@ The supported macOS client layout is a self-contained, drag-installable
 
 - `Contents/MacOS/openQ4` contains the client executable.
 - `Contents/Resources/baseoq4/` contains `mod.json`, `pak0.pk4`, and `pak1.pk4`.
-- `Contents/Frameworks/` contains the flat, signed
-  `game-sp_<arch>.dylib` and `game-mp_<arch>.dylib` modules.
+- `Contents/Frameworks/` contains the flat, signed `game_<arch>.dylib`
+  game module, which serves single-player and multiplayer.
 - `Contents/Resources/assets/splash/` contains the startup splash resource.
 
 Mach-O game modules deliberately live in `Contents/Frameworks`, not

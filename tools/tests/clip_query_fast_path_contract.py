@@ -28,7 +28,7 @@ def check(condition: bool, message: str) -> None:
 
 
 def main() -> int:
-    for tree in ("src/game", "src/mpgame"):
+    for tree in ("src/game",):
         clip = (ROOT / tree / "physics/Clip.cpp").read_text(encoding="utf-8", errors="surrogateescape")
         cvars = (ROOT / tree / "gamesys/SysCvar.cpp").read_text(encoding="utf-8", errors="surrogateescape")
         header = (ROOT / tree / "gamesys/SysCvar.h").read_text(encoding="utf-8", errors="surrogateescape")

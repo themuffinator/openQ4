@@ -41,9 +41,9 @@ def reject(text: str, token: str, context: str) -> None:
 
 
 def main() -> None:
-    multiplayer = read("src/mpgame/MultiplayerGame.cpp")
-    header = read("src/mpgame/MultiplayerGame.h")
-    commands = read("src/mpgame/gamesys/SysCmds.cpp")
+    multiplayer = read("src/game/MultiplayerGame.cpp")
+    header = read("src/game/MultiplayerGame.h")
+    commands = read("src/game/gamesys/SysCmds.cpp")
 
     frame = body(multiplayer, "void idMultiplayerGame::BeginCompetitiveFrame")
     require(

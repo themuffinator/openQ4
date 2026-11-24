@@ -87,8 +87,8 @@ def validate_workflow() -> None:
     require(source, "-Dlinux_x11=disabled", "Wayland-only ARM64 cross setup")
     require(source, "builddir-arm64-cross/openQ4-client_arm64", "ARM64 client verification")
     require(source, "builddir-arm64-cross/openQ4-ded_arm64", "ARM64 dedicated verification")
-    require(source, "builddir-arm64-cross/baseoq4/game-sp_arm64.so", "ARM64 SP module verification")
-    require(source, "builddir-arm64-cross/baseoq4/game-mp_arm64.so", "ARM64 MP module verification")
+    require(source, "builddir-arm64-cross/baseoq4/game_arm64.so", "ARM64 game module verification")
+    reject(source, "builddir-arm64-cross/baseoq4/game-sp_arm64.so", "retired ARM64 SP module verification")
     require(source, "Machine:[[:space:]]+AArch64", "ARM64 ELF header verification")
     require(source, "Wayland-only ARM64 artifact unexpectedly depends on X11/GLX", "ARM64 Wayland-only dependency verification")
     require(source, "libX11|libXext|libGLX", "ARM64 Wayland-only forbidden dependency set")
@@ -98,7 +98,9 @@ def validate_workflow() -> None:
     require(source, '$4 == "FUNC" && $5 == "GLOBAL" && $6 == "DEFAULT" && $8 == "GetGameAPI"', "ARM64 function export verification")
     require(source, '$4 == "FUNC" && $5 == "GLOBAL" && $6 == "DEFAULT" && $8 == "openQ4_Mem_GetModuleStats"', "ARM64 memory-counter function export")
     require(source, "count != 2 || api != 1 || stats != 1 || unexpected != 0", "only API and per-module memory counters are public")
-    require(source, 'cmp -s "${artifacts[2]}" "${artifacts[3]}"', "ARM64 SP/MP module separation")
+    # one game module serves both modes, so there is no SP/MP byte comparison
+    # (and no ${artifacts[3]}, which set -u would reject)
+    reject(source, "${artifacts[3]}", "retired ARM64 SP/MP module separation")
     require(source, "meson_setup.sh install -C builddir-arm64-cross --no-rebuild --skip-subprojects", "ARM64 package staging")
     require(source, "python tools/validation/openq4_validate.py push", "ARM64 staged package validation")
     require(source, "--build-dir builddir-arm64-cross", "ARM64 staged package build directory")
@@ -123,17 +125,14 @@ def validate_build_machine_generators() -> None:
     reject(sdl_meson, "host_machine.subsystem()", "SDL host OS detection")
     reject(sdl_hidapi_meson, "host_machine.subsystem()", "SDL HIDAPI host OS detection")
 
-    require(baseoq4_meson, "game_sp_module_target = shared_module(", "SP linker target capture")
-    require(baseoq4_meson, "game_mp_module_target = shared_module(", "MP linker target capture")
-    # two Linux targets plus the two darwin targets, which hide their symbols
-    # for the same reason (issue #90)
-    if baseoq4_meson.count("gnu_symbol_visibility: 'hidden'") != 4:
-        raise AssertionError("Linux and darwin SP and MP modules must hide non-API symbols")
+    require(baseoq4_meson, "game_module_target = shared_module(", "game module linker target capture")
+    # the Linux target plus the darwin target, which hides its symbols for the
+    # same reason (issue #90)
+    if baseoq4_meson.count("gnu_symbol_visibility: 'hidden'") != 2:
+        raise AssertionError("Linux and darwin game modules must hide non-API symbols")
     require(meson, "gnu_symbol_visibility: host_system == 'windows' ? 'default' : 'hidden'", "integrated game idlib visibility")
-    require(meson, "'openq4_stage_game_sp_direct_run'", "SP direct-run staging target")
-    require(meson, "input: game_sp_module_target", "SP direct-run staging dependency")
-    require(meson, "'openq4_stage_game_mp_direct_run'", "MP direct-run staging target")
-    require(meson, "input: game_mp_module_target", "MP direct-run staging dependency")
+    require(meson, "'openq4_stage_game_direct_run'", "game module direct-run staging target")
+    require(meson, "input: game_module_target", "game module direct-run staging dependency")
     require(meson, "'stage_direct_run_game_module.py'", "direct-run staging command")
     require(meson, "build_always_stale: true", "deleted direct-run module restoration")
     require(baseoq4_meson, "'openq4_stage_mod_manifest_direct_run'", "direct-run mod manifest target")
@@ -159,9 +158,9 @@ def validate_direct_run_module_staging() -> None:
 
     with tempfile.TemporaryDirectory(prefix="arm64-module-stage-", dir=temporary_root) as work:
         work_root = Path(work)
-        source = work_root / "linked" / "game-sp_arm64.so"
+        source = work_root / "linked" / "game_arm64.so"
         destination = work_root / "builddir" / "baseoq4" / source.name
-        stamp = work_root / "builddir" / "stage-game-sp-arm64.stamp"
+        stamp = work_root / "builddir" / "stage-game-arm64.stamp"
         source.parent.mkdir(parents=True)
 
         def stage() -> None:
@@ -201,8 +200,8 @@ def validate_documentation() -> None:
     source = read("docs/dev/linux-arm64-cross-compilation.md")
 
     require(source, "tools/cross/linux-arm64.ini", "cross-build documentation")
-    require(source, "`src/game/`", "cross-build in-tree SP source guidance")
-    require(source, "`src/mpgame/`", "cross-build in-tree MP source guidance")
+    require(source, "`src/game/`", "cross-build in-tree game source guidance")
+    reject(source, "`src/mpgame/`", "retired cross-build MP source guidance")
     require(source, "No companion checkout or source staging is required", "cross-build in-tree source guidance")
     require(source, "PKG_CONFIG_ALLOW_CROSS=1", "cross-build pkg-config guidance")
     require(source, "-Dlinux_x11=disabled", "Wayland-only cross-build guidance")

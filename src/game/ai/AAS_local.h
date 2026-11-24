@@ -76,7 +76,7 @@ public:
 // RAVEN BEGIN
 // bdube: added
 	virtual float				AreaRadius( int areaNum ) const;
-	virtual const idBounds &	AreaBounds( int areaNum ) const;
+	virtual const idBounds &		AreaBounds( int areaNum ) const;
 	virtual float				AreaCeiling( int areaNum ) const;
 // RAVEN END
 	virtual int					AreaFlags( int areaNum ) const;

@@ -193,12 +193,9 @@ bool idPlayer::DrawRetainedWeaponWheel() {
 
 float idPlayer::GetWeaponWheelBlend() const {
 	if ( entityNumber != gameLocal.localClientNum ) return 0;
-#ifdef GAME_MPAPI
-	// The quick-chat wheel softens the scene as the weapon wheel does.
+	// The quick-chat wheel softens the scene as the weapon wheel does (it only
+	// opens in network play, so it stays 0 in the campaign).
 	return Max( weaponWheelBlend, quickChatBlend );
-#else
-	return weaponWheelBlend;
-#endif
 }
 
 void idPlayer::DrawWeaponWheel() {
@@ -299,10 +296,8 @@ void idPlayer::ResetWeaponWheel( bool instantRestore ) {
 		weaponWheelBlend = 0.0f;
 		weaponWheelGuiActive = false;
 		if ( weaponWheelGui ) weaponWheelGui->HandleNamedEvent( "close" );
-		#ifndef GAME_MPAPI
-		gameLocal.SetSpecialEffect( SPECIAL_EFFECT_BLUR, false );
-		#endif
 		if ( !gameLocal.isMultiplayer ) {
+			gameLocal.SetSpecialEffect( SPECIAL_EFFECT_BLUR, false );
 			common->SetGameTimeScale( 1.0f );
 		}
 	}
@@ -493,12 +488,11 @@ bool idPlayer::HandleWeaponWheelImpulse( int impulse ) {
 }
 
 void idPlayer::UpdateWeaponWheelEffects( void ) {
-#ifndef GAME_MPAPI
-	const float blend = idMath::ClampFloat( 0.0f, 1.0f, weaponWheelBlend );
+	// Network play keeps full speed and draws no wheel blur.
 	if ( gameLocal.isMultiplayer ) {
-		gameLocal.SetSpecialEffect( SPECIAL_EFFECT_BLUR, false );
 		return;
 	}
+	const float blend = idMath::ClampFloat( 0.0f, 1.0f, weaponWheelBlend );
 
 	if ( blend <= 0.0f ) {
 		common->SetGameTimeScale( 1.0f );
@@ -521,7 +515,6 @@ void idPlayer::UpdateWeaponWheelEffects( void ) {
 	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 5, WeaponWheelLerp( 24.0f, 16.0f, blend ) );
 	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 6, blend );
 	gameLocal.SetSpecialEffectParm( SPECIAL_EFFECT_BLUR, 7, Max( cvarSystem->GetCVarFloat( "r_znear" ), 0.25f ) );
-#endif
 }
 
 void idPlayer::UpdateWeaponWheel( void ) {

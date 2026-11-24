@@ -7,6 +7,7 @@
 #ifndef __GAMESTATE_H__
 #define __GAMESTATE_H__
 
+#include "MatchPhase.h"
 #include "../Game_local.h"
 #include "../MultiplayerGame.h"
 #include "Tourney.h"
@@ -21,25 +22,25 @@ Game state info common for all gametypes
 ===============================================================================
 */
 
+// Local RTTI tag for the rvGameState hierarchy.  Not a wire value, so this
+// list may be reordered freely.
 typedef enum {
 	GS_BASE,
 	GS_DM,
 	GS_TEAMDM,
 	GS_CTF,
 	GS_TOURNEY,
-	GS_DZ
+	GS_DZ,
+	// openQ4
+	GS_DUEL,
+	GS_ROUND,
+	GS_CA,
+	GS_FREEZETAG,
+	GS_REDROVER,
+	GS_ATTACKDEFEND,
+	GS_OBELISK,
+	GS_DOMINATION
 } gameStateType_t;
-
-typedef enum {
-	INACTIVE = 0,						// not running
-	WARMUP,								// warming up
-	COUNTDOWN,							// post warmup pre-game
-	GAMEON,								// game is on
-	SUDDENDEATH,						// game is on but in sudden death, first frag wins
-	GAMEREVIEW,							// game is over, scoreboard is up. we wait si_gameReviewPause seconds (which has a min value)
-	NEXTGAME,
-	STATE_COUNT
-} mpGameState_t;
 
 class rvGameState {
 public:
@@ -49,23 +50,51 @@ public:
 
 					// clientNum == -1 except for SendInitialState
 					// when clientNum >= 0, always send the state
-	virtual void	SendState( int clientNum = -1 );
+	virtual void	SendState( const idMessageSender &sender, int clientNum = -1 );
 	virtual void	ReceiveState( const idBitMsg& msg );
 
-	virtual void	SendInitialState( int clientNum );
+	virtual void	SendInitialState( const idMessageSender &sender, int clientNum );
 
 	virtual void	PackState( idBitMsg& outMsg );
 	virtual	void	WriteState( idBitMsg &msg );
 
-	virtual void	UnpackState( const idBitMsg& inMsg );
+	virtual bool	BaseUnpackState( const idBitMsg& inMsg );	// validates the gametype class
 
 	virtual void	GameStateChanged( void );
 
 	virtual void	Run( void );
-	virtual void	NewState( mpGameState_t newState );
+	// Returns true only after the authoritative match aggregate accepts the
+	// transition and all legacy adapter side effects are applied.
+	virtual bool	NewState( mpGameState_t newState );
+	// Rebase absolute gameplay deadlines exactly once for a frozen engine
+	// frame.  Host/network clocks and operation expiry are owned elsewhere.
+	virtual void	ShiftMatchTime( int deltaMsec );
 
 	virtual void	ClientDisconnect( idPlayer* player );
 	virtual void	Spectate( idPlayer* player );
+
+// openQ4 BEGIN
+// Hooks the round based and objective gametypes need.  Quake 4 had no way for
+// a game state class to observe a death or to veto a respawn, so elimination
+// rules had nowhere to live outside the tourney arena special case.
+	// false keeps the player out until the game state says otherwise
+	virtual bool	AllowRespawn( idPlayer* player );
+	// called on the server for every multiplayer death, after scoring
+	virtual void	PlayerDeath( idPlayer* dead, idPlayer* killer );
+	// A player removed themselves from play without dying - a team change kills
+	// them with nodamage, which never reaches idPlayer::Killed and so is invisible
+	// to PlayerDeath.  Elimination modes have to hear about it or a losing player
+	// can launder a certain death into a fresh spawn on the other side.
+	virtual void	PlayerWithdrew( idPlayer* player );
+	// Called on the server whenever one player damages another.  damage is what
+	// reaches health and armorSave is what the victim's armour absorbed; a mode
+	// that scores damage dealt wants both, and neither has been applied yet.
+	virtual void	PlayerDamage( idPlayer* attacker, idPlayer* victim, int damage, int armorSave );
+	// true while player input should not be able to fire a weapon
+	virtual bool	WeaponsLocked( void ) const;
+	// what happens to a player AllowRespawn keeps out of the game
+	virtual bool	EliminatedBecomesSpectator( void ) const { return true; }
+// openQ4 END
 
 	virtual void	Clear( void );
 
@@ -87,6 +116,32 @@ public:
 	void			ReadNetworkInfo( idFile *file, int clientNum );
 
 	void			SpawnDeadZonePowerup();
+// openQ4: the match start used to ask for the map decl's artifact count no
+// matter how many hidden spawn spots the map actually shipped, and running out
+// dropped the server with a fatal error at the exact moment the match went
+// live.  Both the GAMEON and the SUDDENDEATH block go through here now.
+	void			SpawnDeadZonePowerups( void );
+	int				CountDeadZonePowerupSpawns( void );
+
+// openQ4 BEGIN
+// Overtime, carried over from Quake Live.  Quake Live does not run a separate
+// clock for overtime: it accumulates extra milliseconds and every limit check
+// measures against the extended total.  That model drops straight onto Quake 4
+// because si_timeLimit is only ever compared against matchStartedTime.
+//
+// Quake 4's SUDDENDEATH state is kept as the fallback for servers that turn
+// overtime off (si_overtime 0), so the meaning of that already-shipped state
+// byte is unchanged.
+	int				GetOvertimeCount( void ) const		{ return overtimeCount; }
+	int				GetOvertimeMsec( void ) const		{ return overtimeAccumulatedMsec; }
+	int				GetOvertimeStartTime( void ) const	{ return overtimeStartTime; }
+	bool			IsOvertime( void ) const			{ return ( overtimeCount > 0 ); }
+
+	// grants another overtime period; false when overtime is disabled
+	bool			StartOvertime( void );
+	void			StopOvertime( void );
+// openQ4 END
+
 protected:
 	static gameStateType_t type;
 	rvGameState*	previousGameState;
@@ -97,6 +152,13 @@ protected:
 	int				nextStateTime;
 
 	int				fragLimitTimeout;
+
+// openQ4: replicated with the base header, so they must also appear in
+// operator==, operator!= and operator= or SendState's delta early-out will
+// silently never ship them.
+	int				overtimeCount;
+	int				overtimeAccumulatedMsec;
+	int				overtimeStartTime;
 };
 
 /*
@@ -175,16 +237,23 @@ struct flagStatus_t {
 	int			clientNum;
 };
 
+// openQ4: One Flag CTF's neutral flag entity carries team == TEAM_MAX, and
+// Item.cpp passes that straight into SetFlagState/SetFlagCarrier.  The table
+// used to be TEAM_MAX entries long, so every write for the neutral flag ran off
+// the end and into apState - no flag announcer, no HUD flag icon, and corrupt
+// DeadZone assault point state.  The neutral flag gets its own slot.
+const int MAX_CTF_FLAGS = TEAM_MAX + 1;
+
 class rvCTFGameState : public rvGameState {
 public:
 					rvCTFGameState( bool allocPrevious = true );
 	virtual void	Clear( void );
 
 
-	virtual void	SendState( int clientNum = -1 );
+	virtual void	SendState( const idMessageSender &sender, int clientNum = -1 );
 	virtual void	ReceiveState( const idBitMsg& msg );
 
-	virtual void	SendInitialState( int clientNum );
+	virtual void	SendInitialState( const idMessageSender &sender, int clientNum );
 
 	virtual void	PackState( idBitMsg& outMsg );
 	virtual	void	WriteState( idBitMsg &msg );
@@ -209,7 +278,7 @@ public:
 	virtual	bool	IsType( gameStateType_t type ) const;
 	static gameStateType_t GetClassType( void );
 private:
-	flagStatus_t	flagStatus[ TEAM_MAX ];	
+	flagStatus_t	flagStatus[ MAX_CTF_FLAGS ];
 	apState_t		apState[ MAX_AP ];
 
 	static gameStateType_t type;
@@ -225,14 +294,21 @@ ID_INLINE int rvCTFGameState::GetAPOwner( int ap ) {
 	return apState[ ap ];
 }
 
+// openQ4: a real bound, not an assert.  ResetFlag() passes -1 for a powerup it
+// does not recognise and the one flag entity passes TEAM_MAX, and the assert is
+// compiled out of a release build - so both used to index outside the table.
 ID_INLINE flagState_t rvCTFGameState::GetFlagState( int flag ) {
-	assert( flag >= 0 && flag < TEAM_MAX );
+	if ( flag < 0 || flag >= MAX_CTF_FLAGS ) {
+		return FS_AT_BASE;
+	}
 
 	return flagStatus[ flag ].state;
 }
 
 ID_INLINE int rvCTFGameState::GetFlagCarrier( int flag ) {
-	assert( flag >= 0 && flag < TEAM_MAX );
+	if ( flag < 0 || flag >= MAX_CTF_FLAGS ) {
+		return -1;
+	}
 
 	return flagStatus[ flag ].clientNum;
 }
@@ -272,10 +348,10 @@ public:
 
 	virtual void	Reset( void );
 
-	virtual void	SendState( int clientNum = -1 );
+	virtual void	SendState( const idMessageSender &sender, int clientNum = -1 );
 	virtual void	ReceiveState( const idBitMsg& msg );
 
-	virtual void	SendInitialState( int clientNum );
+	virtual void	SendInitialState( const idMessageSender &sender, int clientNum );
 
 	virtual void	PackState( idBitMsg& outMsg );
 	virtual	void	WriteState( idBitMsg &msg );
@@ -283,7 +359,8 @@ public:
 	virtual void	UnpackState( const idBitMsg& inMsg );
 
 	virtual void	GameStateChanged( void );
-	virtual void	NewState( mpGameState_t newState );
+	virtual bool	NewState( mpGameState_t newState );
+	virtual void	ShiftMatchTime( int deltaMsec );
 
 	virtual void	ClientDisconnect( idPlayer* player );
 	virtual void	Spectate( idPlayer* player );
@@ -324,6 +401,7 @@ public:
 	static gameStateType_t GetClassType( void );
 private:
 	void			SetupInitialBrackets( void );
+	bool			CycleSpectatorTarget( idPlayer* player, int direction );
 
 	tourneyState_t			tourneyState;
 
@@ -438,10 +516,10 @@ public:
 	virtual void	Clear( void );
 
 
-	virtual void	SendState( int clientNum = -1 );
+	virtual void	SendState( const idMessageSender &sender, int clientNum = -1 );
 	virtual void	ReceiveState( const idBitMsg& msg );
 
-	virtual void	SendInitialState( int clientNum );
+	virtual void	SendInitialState( const idMessageSender &sender, int clientNum );
 
 	virtual void	PackState( idBitMsg& outMsg );
 	virtual void	WriteState( idBitMsg &msg );
@@ -457,13 +535,21 @@ public:
 	bool			operator==( const riDZGameState& rhs ) const;
 	riDZGameState&	operator=( const riDZGameState& rhs );
 
+	// openQ4: this class used to assign GS_DZ to the INHERITED rvGameState::type,
+	// which corrupted the RTTI tag of every game state class for the rest of the
+	// process.  It now owns its tag like every other subclass.
+	virtual	bool	IsType( gameStateType_t type ) const;
+	static gameStateType_t GetClassType( void );
+
 	int				dzTriggerEnt;
 	int				dzShaderParm;
 
 private:
-	dzStatus_t		dzStatus[ TEAM_MAX ];	
+	dzStatus_t		dzStatus[ TEAM_MAX ];
 
 	void ControlZoneStateChanged( int team );
+
+	static gameStateType_t type;
 };
 
 

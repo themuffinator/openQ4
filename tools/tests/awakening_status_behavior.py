@@ -75,11 +75,11 @@ def main() -> None:
             start = sources[name].index(signature)
             opening = sources[name].index('{', start)
             methods.append(sources[name][start:opening] + '{' + body + '}')
-    mp = (ROOT/'src/mpgame/weapon/WeaponNapalmGun.cpp').read_text()
+    mp = (ROOT/'src/game/weapon/WeaponNapalmGun.cpp').read_text()
     assert function_body(mp, SOURCES['src/game/weapon/WeaponNapalmGun.cpp'][0], 'MP napalm').replace('if(!clipSize)', 'if(!ClipSize())') == function_body(
         sources['src/game/weapon/WeaponNapalmGun.cpp'], SOURCES['src/game/weapon/WeaponNapalmGun.cpp'][0], 'SP napalm')
     # Existing v3 byte encodings must remain selected after the writer bumps.
-    for tree in ('game', 'mpgame'):
+    for tree in ('game',):
         for path in (ROOT/'src'/tree).rglob('*.cpp'):
             assert 'GetOpenQ4SaveGameCompatibilityVersion() == OPENQ4_SAVEGAME_COMPATIBILITY_VERSION' not in path.read_text(encoding='utf-8-sig'), path
     fixture = ROOT/'tools/tests/native/AwakeningStatusBehavior.cpp'

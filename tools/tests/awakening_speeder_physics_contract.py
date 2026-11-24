@@ -73,10 +73,31 @@ def check_friction_ceiling() -> None:
     for name in ("linear", "angular", "contact"):
         require(body, f"{name} > maxFriction", "idPhysics_RigidBody::SetFriction")
     reject(body, r">\s*1\.0f", "idPhysics_RigidBody::SetFriction")
-    # multiplayer has no Awakening content and keeps Quake 4's rule as it was
-    mp = function_body(read("src/mpgame/physics/Physics_RigidBody.cpp"),
-                       "void idPhysics_RigidBody::SetFriction(", "mpgame Physics_RigidBody.cpp")
-    require(mp, "angular > 1.0f", "mpgame idPhysics_RigidBody::SetFriction")
+    # One SetFriction serves both modes. Multiplayer has no Awakening content (the engine never
+    # mounts q4xbase for game_mp) and keeps Quake 4's rule as it was: the ceiling defaults to 1,
+    # and only a rigid vehicle passes another, its GetMaxFriction, which is 1 but for the bike.
+    raised = []
+    for path in sorted((ROOT / "src/game").rglob("*.cpp")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for match in re.finditer(r"\bSetFriction\s*\(", text):
+            depth, commas = 1, 0
+            for char in text[match.end():]:
+                if char == "(":
+                    depth += 1
+                elif char == ")":
+                    depth -= 1
+                    if depth == 0:
+                        break
+                elif char == "," and depth == 1:
+                    commas += 1
+            if commas >= 3:
+                raised.append(path.relative_to(ROOT).as_posix())
+    if raised != ["src/game/physics/Physics_RigidBody.cpp", "src/game/vehicle/VehicleRigid.cpp"]:
+        raise AssertionError(f"only rvVehicleRigid may raise the rigid-body friction ceiling, found {raised}")
+    overrides = sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "src/game").rglob("*.cpp")
+                       if "::GetMaxFriction" in path.read_text(encoding="utf-8", errors="replace"))
+    if overrides != ["src/game/awakening/vehicle/SpeederBike.cpp", "src/game/vehicle/VehicleRigid.cpp"]:
+        raise AssertionError(f"only the Awakening's bike raises its vehicle's friction ceiling, found {overrides}")
 
 
 def check_vehicle_friction() -> None:

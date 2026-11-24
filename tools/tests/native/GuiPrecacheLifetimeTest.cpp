@@ -37,12 +37,16 @@ struct idUserInterface {
 static idUserInterface* UI_CreateForPath(const char*) { return new idUserInterface; }
 static void openQ4_UpdateInitialization() {}
 // @LOOKUP@
-struct Game { bool isMultiplayer=true; void FindEntityDef(const char*,bool) {} };
+// One game module serves both modes: multiplayerMode is the load mode
+// (game_mp), isMultiplayer whether the loaded map is a network game.
+struct Game { bool isMultiplayer=true, multiplayerMode=true; void FindEntityDef(const char*,bool) {}
+    bool IsMultiplayerMode() const { return multiplayerMode; } };
 static Game gameLocal;
 struct Decls { void FindSound(const char*,bool) {} void MediaPrint(const char*,...) {} };
 static Decls decls;
 static auto* declManager = &decls;
-struct idPlayer { static void PrecacheMultiplayerSpawn() {} };
+static int spawnPrecaches = 0;
+struct idPlayer { static void PrecacheMultiplayerSpawn() { ++spawnPrecaches; } };
 struct idMultiplayerGame {
     static constexpr int AS_NUM_SOUNDS=2;
     static constexpr const char* announcerSoundDefs[2] = {"one","two"};
@@ -67,12 +71,16 @@ static void PrecacheDictionary(const KeyValue* kv) {
 }
 int main() {
     idMultiplayerGame mp;
-    gameLocal.isMultiplayer=false; mp.Precache(); check(live==0,"SP skips MP-only precache");
+    gameLocal.multiplayerMode=false; gameLocal.isMultiplayer=false; mp.Precache();
+    check(live==0 && spawnPrecaches==0,"SP skips MP-only precache");
+    gameLocal.multiplayerMode=true; mp.Precache();
+    check(live==0 && spawnPrecaches==0,"MP mode without a network map skips MP-only precache");
     gameLocal.isMultiplayer=true;
     for (int map=0;map<32;++map) {
         mp.Precache();
         check(live==3,"MP precache must reuse interactive templates across maps");
         check(manager.guis[0]->refs==map+1,"precache touches the surviving menu");
+        check(spawnPrecaches==map+1,"MP precache caches the player spawn media with each map");
     }
     const KeyValue gui{"gui_surface","terminal.gui"};
     for (int map=0;map<32;++map) {

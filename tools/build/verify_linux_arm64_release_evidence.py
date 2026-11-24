@@ -18,7 +18,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO, Mapping
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MAX_MANIFEST_BYTES = 64 * 1024
 MAX_RUNTIME_REPORT_BYTES = 2 * 1024 * 1024
 HASH_CHUNK_BYTES = 1024 * 1024
@@ -98,7 +98,8 @@ CANDIDATE_KEYS = frozenset(
         "package_filename",
     }
 )
-SHA256_KEYS = frozenset({"archive", "client", "dedicated", "game_sp", "game_mp"})
+# One game module serves both modes, so one hash covers the SP and MP reports' module.
+SHA256_KEYS = frozenset({"archive", "client", "dedicated", "game"})
 RUNTIME_REPORT_KEYS = frozenset({"stock_sp", "dedicated"})
 
 EXECUTION_EVIDENCE_KEYS = frozenset(
@@ -331,8 +332,7 @@ CONTAINER_DISCLOSURE_PATTERN = re.compile(
 ARM64_RUNTIME_PATHS: Mapping[str, PurePosixPath] = {
     "client": PurePosixPath("openQ4-client_arm64"),
     "dedicated": PurePosixPath("openQ4-ded_arm64"),
-    "game_sp": PurePosixPath("baseoq4/game-sp_arm64.so"),
-    "game_mp": PurePosixPath("baseoq4/game-mp_arm64.so"),
+    "game": PurePosixPath("baseoq4/game_arm64.so"),
 }
 
 
@@ -1088,7 +1088,7 @@ def _validate_stock_sp_report(
     hashes = _validate_report_hashes(
         report["sha256"],
         SP_HASH_KEYS,
-        {"client": evidence.sha256["client"], "gameSp": evidence.sha256["game_sp"]},
+        {"client": evidence.sha256["client"], "gameSp": evidence.sha256["game"]},
         f"{label}.sha256",
     )
     _validate_elf_metadata(report["elf"], SP_ELF_KEYS, f"{label}.elf")
@@ -1199,7 +1199,7 @@ def _validate_dedicated_report(
         {
             "client": evidence.sha256["client"],
             "dedicated": evidence.sha256["dedicated"],
-            "gameMp": evidence.sha256["game_mp"],
+            "gameMp": evidence.sha256["game"],
         },
         f"{label}.sha256",
     )
@@ -1391,7 +1391,7 @@ def verify_release_evidence(
 ) -> Evidence:
     evidence = validate_evidence_manifest(manifest, expected, runtime_reports)
     actual_hashes = collect_candidate_hashes(runtime_root, package_dir, archive, expected)
-    for key in ("client", "dedicated", "game_sp", "game_mp", "archive"):
+    for key in ("client", "dedicated", "game", "archive"):
         if actual_hashes[key] != evidence.sha256[key]:
             raise RuntimeError(
                 f"{key} SHA-256 {actual_hashes[key]} does not match accepted evidence "
@@ -1444,8 +1444,7 @@ def render_pending_candidate(expected: CandidateMetadata, hashes: Mapping[str, s
         f"archive = {_toml_quote(canonical_hashes['archive'])}",
         f"client = {_toml_quote(canonical_hashes['client'])}",
         f"dedicated = {_toml_quote(canonical_hashes['dedicated'])}",
-        f"game_sp = {_toml_quote(canonical_hashes['game_sp'])}",
-        f"game_mp = {_toml_quote(canonical_hashes['game_mp'])}",
+        f"game = {_toml_quote(canonical_hashes['game'])}",
         "",
     ]
     return "\n".join(lines)

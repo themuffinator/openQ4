@@ -101,7 +101,7 @@ def main():
     args.output.mkdir(parents=True)
     binaries = [args.runtime / ('openQ4-client_x64.exe' if os.name == 'nt' else 'openQ4-client_x64'),
                 *args.runtime.glob('renderer-*.dll'), *args.runtime.glob('renderer-*.so'),
-                *args.runtime.glob('renderer-*.dylib'), *sorted((args.runtime / 'baseoq4').glob('game-*'))]
+                *args.runtime.glob('renderer-*.dylib'), *sorted((args.runtime / 'baseoq4').glob('game_*'))]
     binaries = [p for p in binaries if p.is_file()]
     identity = {str(p.relative_to(args.runtime)): capture.digest(p) for p in binaries}
     source_paths = ['src/ui/UserInterfaceRetained.cpp', 'src/ui/retained/Runtime.cpp', 'src/ui/retained/Runtime.h',

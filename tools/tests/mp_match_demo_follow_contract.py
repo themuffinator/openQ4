@@ -14,13 +14,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
-    source = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    source = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
     body = function_body(source, "static bool CanLocalServerDemoFollow")
-    player_source = (ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8")
+    player_source = (ROOT / "src/game/Player.cpp").read_text(encoding="utf-8")
     prediction = function_body(player_source, "void idPlayer::LocalClientPredictionThink")
     eye_height = function_body(player_source, "void idPlayer::UpdateEyeHeight")
     filters = prediction[prediction.index("buttonMask &= usercmd.buttons;"):prediction.index("walkIK.ClearJointMods();")]
-    network = (ROOT / "src/mpgame/Game_network.cpp").read_text(encoding="utf-8")
+    network = (ROOT / "src/game/Game_network.cpp").read_text(encoding="utf-8")
     initialize = function_body(network, "void idGameLocal::InitLocalClient")
     set_follow = function_body(network, "bool idGameLocal::SetDemoFollowClient")
     interface = (ROOT / "src/game/Game.h").read_text(encoding="utf-8")
@@ -30,7 +30,7 @@ def main() -> None:
     # trees (the 9 November guard refused it and every offline MVD playback
     # failed at map load with "spawn_entnum 4095 out of range").
     assert "SpawnPlayer( ENTITYNUM_NONE );" in initialize
-    for tree in ("game", "mpgame"):
+    for tree in ("game",):
         register = function_body((ROOT / f"src/{tree}/Game_local.cpp").read_text(encoding="latin-1"),
                                  "void idGameLocal::RegisterEntity")
         assert "spawn_entnum < 0 || spawn_entnum >= MAX_GENTITIES" in register, f"{tree}: RegisterEntity must admit ENTITYNUM_NONE"

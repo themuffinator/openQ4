@@ -2,7 +2,7 @@
 // shots: the per-shot spread seed the server and the shooting client share, and the
 // notes that let the server's copy of a predicted shot add only the confirmed impacts.
 // tools/tests/mp_predicted_hitscan_state.py splices the functions in verbatim from
-// src/mpgame/Game_local.cpp and the member layout from src/mpgame/Game_local.h.
+// src/game/Game_local.cpp and the member layout from src/game/Game_local.h.
 
 #include <cstdio>
 #include <cstring>

@@ -487,7 +487,7 @@ def validate_engine_wiring() -> None:
 
 
 def validate_game_wiring() -> None:
-    game_network = GAME_LIBS_ROOT / "src/mpgame/Game_network.cpp"
+    game_network = GAME_LIBS_ROOT / "src/game/Game_network.cpp"
     if not game_network.is_file():
         print(
             f"multiview_demo: skipped companion game checks "
@@ -540,10 +540,10 @@ def validate_game_wiring() -> None:
         "invalid entity header",
         "invalid baseline instance",
     ):
-        require(source, needle, "mpgame/Game_network.cpp")
+        require(source, needle, "game/Game_network.cpp")
 
     game_implementation = "\n".join(
-        read(path) for path in sorted((GAME_LIBS_ROOT / "src/mpgame").glob("*.cpp"))
+        read(path) for path in sorted((GAME_LIBS_ROOT / "src/game").glob("*.cpp"))
     )
     sp_implementation = "\n".join(
         read(path) for path in sorted((GAME_LIBS_ROOT / "src/game").glob("*.cpp"))
@@ -556,8 +556,8 @@ def validate_game_wiring() -> None:
         require(game_implementation, needle, "multiplayer MVD compatibility implementation")
         require(sp_implementation, needle, "single-player MVD compatibility stub")
 
-    multiplayer = read(GAME_LIBS_ROOT / "src/mpgame/MultiplayerGame.cpp")
-    game_state = read(GAME_LIBS_ROOT / "src/mpgame/mp/GameState.cpp")
+    multiplayer = read(GAME_LIBS_ROOT / "src/game/MultiplayerGame.cpp")
+    game_state = read(GAME_LIBS_ROOT / "src/game/mp/GameState.cpp")
     require(multiplayer, "invalid multiplayer start-state client", "MP start-state bounds")
     require(multiplayer, "invalid start-state size", "MP start-state length bound")
     require(game_state, "invalid state size", "MP game-state bounds")

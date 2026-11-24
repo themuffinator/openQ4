@@ -645,7 +645,7 @@ def require_bot_lifecycle_mutation_rejected(
 
 
 def validate_wiring() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         print(f"mp_bot_characters: skipped game checks (no GameLibs checkout at {GAME_LIBS_ROOT})")
         return
@@ -689,7 +689,7 @@ def validate_wiring() -> None:
 
 
 def validate_manager() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -1012,7 +1012,7 @@ def validate_baseline(curve: dict[str, list[float]], levels: int) -> None:
 
 
 def validate_content() -> None:
-    header_path = GAME_LIBS_ROOT / "src" / "mpgame" / "bots" / "BotCharacter.h"
+    header_path = GAME_LIBS_ROOT / "src" / "game" / "bots" / "BotCharacter.h"
     if not header_path.is_file():
         print(f"mp_bot_characters: skipped content checks (no BotCharacter.h at {header_path})")
         return
@@ -1023,7 +1023,7 @@ def validate_content() -> None:
     fields = set(trait_fields(header))
     events = chat_event_enum(header)
 
-    manager = GAME_LIBS_ROOT / "src" / "mpgame" / "bots" / "BotCharacter.cpp"
+    manager = GAME_LIBS_ROOT / "src" / "game" / "bots" / "BotCharacter.cpp"
     words = chat_event_words(manager, len(events))
 
     style_dir = BOTFILES / "styles"
@@ -1425,7 +1425,7 @@ def validate_cvars_and_commands() -> None:
         if expected not in commands:
             raise AssertionError(f"docs/dev/mp-bots.md does not document the {expected!r} command")
 
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -1435,8 +1435,8 @@ def validate_cvars_and_commands() -> None:
     for name, default in documented:
         match = re.search(rf'^idCVar {name}\(\s*"{name}",\s*"([^"]*)",\s*([^,]+),', declared, re.MULTILINE)
         if match is None:
-            raise AssertionError(f"{name} is documented but not defined in mpgame SysCvar.cpp")
-        require(exported, f"extern idCVar {name};", "mpgame SysCvar.h")
+            raise AssertionError(f"{name} is documented but not defined in game SysCvar.cpp")
+        require(exported, f"extern idCVar {name};", "game SysCvar.h")
         documented_default = default.strip('"')
         if match.group(1) != documented_default:
             raise AssertionError(
@@ -1469,7 +1469,7 @@ def validate_cvars_and_commands() -> None:
     for name in ("bot_forceCharacter", "bot_debugAim"):
         line = re.search(rf"^idCVar {name}\(.*$", declared, re.MULTILINE)
         if line is None:
-            raise AssertionError(f"{name} is not defined in mpgame SysCvar.cpp")
+            raise AssertionError(f"{name} is not defined in game SysCvar.cpp")
         if "CVAR_ARCHIVE" in line.group(0):
             raise AssertionError(f"{name} is archived; it is a debugging knob and must not be")
 
@@ -1484,7 +1484,7 @@ def validate_cvars_and_commands() -> None:
 
 
 def validate_chat_path() -> None:
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 
@@ -1547,7 +1547,7 @@ def validate_chat_path() -> None:
 def validate_reply_runtime() -> None:
     """Guard the server-only conversational-reply path and its loop brakes."""
 
-    mp = GAME_LIBS_ROOT / "src" / "mpgame"
+    mp = GAME_LIBS_ROOT / "src" / "game"
     if not mp.is_dir():
         return
 

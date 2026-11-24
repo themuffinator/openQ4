@@ -4,8 +4,8 @@
 // Copyright 2002-2005 Raven Software
 //----------------------------------------------------------------
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Instance.h"
 
@@ -79,40 +79,25 @@ void rvInstance::Populate( int serverChecksum ) {
 			}
 		}
 	} else {
-		bool proto69 = ( gameLocal.GetCurrentDemoProtocol() == 69 );
-
-		// When populating on a client, spawn the map using existing numbers		
-		// check for good state
-		// OK to spawn w/o specific entity numbers if we're in the startup process.  Otherwise, 
-		// we need entity numbers from the server.
-		// TTimo: only valid for backward 1.2 playback now
-		assert( !proto69 || ( mapEntityNumbers || ( instanceID == 0 && gameLocal.GameState() == GAMESTATE_STARTUP ) ) );
-		
-		if ( !proto69 ) {
-			// have the client produce a log of the entity layout so we can match it with the server's
-			// this is also going to be used to issue the EV_FindTargets below
-			if ( mapEntityNumbers ) {
-				delete []mapEntityNumbers;
-			}
-			numMapEntities = gameLocal.GetNumMapEntities();
-			RV_PUSH_SYS_HEAP_ID(RV_HEAP_ID_LEVEL);
-			mapEntityNumbers = new unsigned short[ numMapEntities ];
-			RV_POP_HEAP();
-			memset( mapEntityNumbers, -1, sizeof( unsigned short ) * numMapEntities );
+		// have the client produce a log of the entity layout so we can match it with the server's
+		// this is also going to be used to issue the EV_FindTargets below
+		if ( mapEntityNumbers ) {
+			delete []mapEntityNumbers;
 		}
+		numMapEntities = gameLocal.GetNumMapEntities();
+		RV_PUSH_SYS_HEAP_ID(RV_HEAP_ID_LEVEL);
+		mapEntityNumbers = new unsigned short[ numMapEntities ];
+		RV_POP_HEAP();
+		memset( mapEntityNumbers, -1, sizeof( unsigned short ) * numMapEntities );
 
 		gameLocal.firstFreeIndex = gameLocal.GetStartingIndexForInstance( instanceID );
 
 		gameLocal.SetSpawnCount( initialSpawnCount ); // that was transmitted through the instance msg
-		if ( proto69 ) {
-			gameLocal.SpawnMapEntities( spawnInstanceID, mapEntityNumbers, NULL );
-		} else {
-			gameLocal.SpawnMapEntities( spawnInstanceID, NULL, mapEntityNumbers );
-			LittleRevBytes( mapEntityNumbers, sizeof(unsigned short ), numMapEntities ); //DAJ
-			int checksum = MD5_BlockChecksum( mapEntityNumbers, sizeof( unsigned short ) * numMapEntities );
-			if ( serverChecksum != 0 && checksum != serverChecksum ) {
-				common->Error( "client side map populate checksum ( 0x%x ) doesn't match server's ( 0x%x )", checksum, serverChecksum );
-			}
+		gameLocal.SpawnMapEntities( spawnInstanceID, NULL, mapEntityNumbers );
+		LittleRevBytes( mapEntityNumbers, sizeof(unsigned short ), numMapEntities ); //DAJ
+		int checksum = MD5_BlockChecksum( mapEntityNumbers, sizeof( unsigned short ) * numMapEntities );
+		if ( serverChecksum != 0 && checksum != serverChecksum ) {
+			common->Error( "client side map populate checksum ( 0x%x ) doesn't match server's ( 0x%x )", checksum, serverChecksum );
 		}
 	}
 
@@ -144,33 +129,16 @@ void rvInstance::Populate( int serverChecksum ) {
 }
 
 void rvInstance::PopulateFromMessage( const idBitMsg& msg ) {
-	bool proto69 = ( gameLocal.GetCurrentDemoProtocol() == 69 );
-
-	if ( proto69 ) {
-		numMapEntities = msg.ReadShort();
-	}
 	initialSpawnCount = msg.ReadShort();
 
 	delete[] mapEntityNumbers;
 	mapEntityNumbers = NULL;
 
-	if ( proto69 ) {
-		RV_PUSH_SYS_HEAP_ID(RV_HEAP_ID_LEVEL);
-		mapEntityNumbers = new unsigned short[ numMapEntities ];
-		RV_POP_HEAP();
-		memset( mapEntityNumbers, -1, sizeof( unsigned short ) * numMapEntities );
-
-		for ( int i = 0; i < numMapEntities; i++ ) {
-			mapEntityNumbers[ i ] = msg.ReadShort();
-		}
-		Populate();
-	} else {
-		int populateIndex = msg.ReadLong();
-		gameLocal.ClientSetStartingIndex( populateIndex );
-		//common->Printf( "pos: set firstFreeIndex to %d\n", populateIndex );
-		int checksum = msg.ReadLong();
-		Populate( checksum );
-	}
+	int populateIndex = msg.ReadLong();
+	gameLocal.ClientSetStartingIndex( populateIndex );
+	//common->Printf( "pos: set firstFreeIndex to %d\n", populateIndex );
+	int checksum = msg.ReadLong();
+	Populate( checksum );
 }
 
 void rvInstance::Restart( void ) {

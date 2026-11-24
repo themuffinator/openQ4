@@ -86,8 +86,7 @@ REQUIRED_REPORT_TOKENS = (
     "openQ4-client_",
     "openQ4-ded_",
     "Dedicated server:",
-    "game-sp_",
-    "game-mp_",
+    "baseoq4/game_",
 )
 
 

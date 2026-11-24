@@ -46,7 +46,7 @@ contract.
   gameplay, and a concise description of every warning or limitation reviewed.
 - Keep the generated candidate values unchanged: the full openQ4 and
   openQ4-game SHAs, release version and tags, exact archive filename, archive
-  SHA-256, and the client, dedicated-server, SP-module, and MP-module SHA-256s.
+  SHA-256, and the client, dedicated-server, and game-module SHA-256s.
   Every SHA-256 is a canonical 64-character lowercase hexadecimal value.
 
 Both stock-media harnesses record a best-effort host inspection alongside the
@@ -139,7 +139,7 @@ automation cannot hear the output.
 
 ## Manifest Rules
 
-The verifier accepts schema version 2 only, rejects missing or unknown fields,
+The verifier accepts schema version 3 only, rejects missing or unknown fields,
 and treats empty, placeholder, or `pending` review values as incomplete.
 `reviewed_at` must be a real ISO 8601 calendar date in `YYYY-MM-DD` form;
 reviewer and evidence descriptions must meet field-specific minimum lengths so
@@ -152,7 +152,8 @@ release. Placeholder markers such as `TODO`, `TBD`, `unknown`, `n/a`, and
   limitation evidence.
 - `[candidate]`: exact full source SHAs, release version, version tag, release
   tag, and first-class ARM64 archive filename.
-- `[sha256]`: the archive and all four runtime ELF hashes.
+- `[sha256]`: the archive and all three runtime ELF hashes (client, dedicated
+  server, and the one game module both the SP and MP reports load).
 - `[runtime_reports]`: SHA-256s of the exact canonical stock-SP and
   dedicated/client JSON report blobs committed beside the accepted record.
 

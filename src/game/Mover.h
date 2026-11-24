@@ -48,6 +48,7 @@ public:
 // RAVEN BEGIN
 // mekberg: added
 	void					Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 // RAVEN END
 
 	void					Save( idSaveGame *savefile ) const;
@@ -347,6 +348,7 @@ private:
 
 	class idDoor *			GetDoor( const char *name );
 	void					Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	void					OpenInnerDoor( void );
 	void					OpenFloorDoor( int floor );
 	void					CloseAllDoors( void );
@@ -412,9 +414,13 @@ public:
 	void					SetBlocked( bool b );
 	bool					IsBlocked( void );
 	idEntity *				GetActivator( void ) const;
+	// World-space envelope of an attached volume over this linear move.
+	// A bound mover's endpoints are local; those need a separate parent proof.
+	bool					GetTranslationBounds( const idBounds &worldBounds, idBounds &swept ) const;
 
 	virtual void			WriteToSnapshot( idBitMsgDelta &msg ) const;
 	virtual void			ReadFromSnapshot( const idBitMsgDelta &msg );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 
 	void					SetPortalState( bool open );
 
@@ -483,6 +489,7 @@ public:
 	void					Restore( idRestoreGame *savefile );
 
 	virtual void			Think( void );
+	virtual void			ThinkMatchPaused( int deltaMsec );
 	virtual void			PreBind( void );
 	virtual void			PostBind( void );
 	virtual void			Hide( void );

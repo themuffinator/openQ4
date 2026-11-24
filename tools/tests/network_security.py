@@ -402,23 +402,23 @@ def validate_snapshot_decode_bounds() -> None:
     game_bitmsg = read_game("src/idlib/BitMsg.cpp")
     game_bitmsg_header = read_game("src/idlib/BitMsg.h")
     sp_network = read_game("src/game/Game_network.cpp")
-    mp_network = read_game("src/mpgame/Game_network.cpp")
+    mp_network = read_game("src/game/Game_network.cpp")
     sp_player = read_game("src/game/Player.cpp")
-    mp_player = read_game("src/mpgame/Player.cpp")
+    mp_player = read_game("src/game/Player.cpp")
     sp_multiplayer = read_game("src/game/MultiplayerGame.cpp")
-    mp_multiplayer = read_game("src/mpgame/MultiplayerGame.cpp")
+    mp_multiplayer = read_game("src/game/MultiplayerGame.cpp")
     sp_projectile = read_game("src/game/Projectile.cpp")
-    mp_projectile = read_game("src/mpgame/Projectile.cpp")
+    mp_projectile = read_game("src/game/Projectile.cpp")
     sp_particle = read_game("src/game/physics/Physics_Particle.cpp")
-    mp_particle = read_game("src/mpgame/physics/Physics_Particle.cpp")
+    mp_particle = read_game("src/game/physics/Physics_Particle.cpp")
     sp_player_physics = read_game("src/game/physics/Physics_Player.cpp")
-    mp_player_physics = read_game("src/mpgame/physics/Physics_Player.cpp")
+    mp_player_physics = read_game("src/game/physics/Physics_Player.cpp")
     sp_entity = read_game("src/game/Entity.cpp")
-    mp_entity = read_game("src/mpgame/Entity.cpp")
+    mp_entity = read_game("src/game/Entity.cpp")
     sp_weapon = read_game("src/game/Weapon.cpp")
-    mp_weapon = read_game("src/mpgame/Weapon.cpp")
+    mp_weapon = read_game("src/game/Weapon.cpp")
     sp_af = read_game("src/game/physics/Physics_AF.cpp")
-    mp_af = read_game("src/mpgame/physics/Physics_AF.cpp")
+    mp_af = read_game("src/game/physics/Physics_AF.cpp")
 
     for header, label in (
         (engine_bitmsg_header, "engine bit-message API"),
@@ -490,8 +490,10 @@ def validate_snapshot_decode_bounds() -> None:
     require(queue, "msg.MarkReadOverflowed();", "game unreliable-message semantic failure propagation")
     require_before(queue, "encodedSize >= MAX_MSG_QUEUE_SIZE", "msg.ReadData( buffer", "queue bound before copy")
 
+    # One snapshot reader serves both modes (CORE-07). The campaign module's own
+    # copy, which never ran, also refused client MAX_CLIENTS; network play keeps
+    # that slot for the server demo's viewer.
     for source, label, client_bound in (
-        (sp_network, "SP snapshot", "clientNum < 0 || clientNum >= MAX_CLIENTS"),
         (mp_network, "MP snapshot", "clientNum < 0 || clientNum > MAX_CLIENTS"),
     ):
         snapshot = function_body(source, "bool idGameLocal::ClientReadSnapshot(", label)
@@ -502,10 +504,7 @@ def validate_snapshot_decode_bounds() -> None:
         require(snapshot, "truncated PVS state", label)
         require(snapshot, "truncated baseline state", label)
 
-    sp_snapshot = function_body(sp_network, "bool idGameLocal::ClientReadSnapshot(", "SP snapshot")
-    require_before(sp_snapshot, "targetPlayer < 0 || targetPlayer >= MAX_CLIENTS", "entities[ targetPlayer ]", "SP target-player bound")
-    require(sp_snapshot, "non-player entity %d has player state", "SP player-state type check")
-    require(sp_player, "msg.ReadBits( -idMath::BitsForInteger( MAX_WEAPONS ) )", "SP ideal-weapon signed wire decode")
+    require(sp_player, "msg.ReadBits( -idMath::BitsForInteger( MAX_WEAPONS ) )", "ideal-weapon signed wire decode")
 
     mp_snapshot = function_body(mp_network, "bool idGameLocal::ClientReadSnapshot(", "MP snapshot")
     require_before(mp_snapshot, "clientEntity->IsType( idPlayer::GetClassType() )", "static_cast<idPlayer *>( clientEntity )", "MP local-player type check before cast")
@@ -864,7 +863,7 @@ def validate_remote_dictionary_authority() -> None:
     engine_bitmsg = read("src/idlib/BitMsg.cpp")
     game_bitmsg = read_game("src/idlib/BitMsg.cpp")
     sp_network = read_game("src/game/Game_network.cpp")
-    mp_network = read_game("src/mpgame/Game_network.cpp")
+    mp_network = read_game("src/game/Game_network.cpp")
 
     for header, label in (
         (engine_header, "engine CVar interface"),
@@ -1047,7 +1046,7 @@ def validate_channel_and_message_abuse_bounds() -> None:
     )
 
     # Client-side handlers bound what a server or a demo indexes with.
-    for tree in ("src/game", "src/mpgame"):
+    for tree in ("src/game",):
         network = (ROOT / tree / "Game_network.cpp").read_text(encoding="latin-1")
         death = network[network.index("case GAME_RELIABLE_MESSAGE_DEATH") :]
         death = death[: death.index("mpGame.ReceiveDeathMessage(")]
@@ -1072,7 +1071,7 @@ def validate_channel_and_message_abuse_bounds() -> None:
         reject(history, "> MAX_ARENAS", f"{tree} tourney history bounded by the arena count")
 
     # Emotes are validated, throttled and rebuilt before they are forwarded.
-    player = (ROOT / "src/mpgame/Player.cpp").read_text(encoding="latin-1")
+    player = (ROOT / "src/game/Player.cpp").read_text(encoding="latin-1")
     receive = function_body(player, "bool idPlayer::ServerReceiveEvent(", "player server events")
     emote = receive[receive.index("case EVENT_EMOTE") :]
     emote = emote[: emote.index("default:")]
@@ -1232,7 +1231,7 @@ def validate_session_lifecycle_and_flood_bounds() -> None:
                    "channel.SendMessage( clientPort, clientTime, msg )", "while ( channel.UnsentFragmentsLeft() ) {",
                    "voice never leaves a fragment behind")
 
-    for tree in ("src/mpgame", "src/game"):
+    for tree in ("src/game", "src/game"):
         header = (GAME_LIBS_ROOT / tree / "Game_local.h").read_text(encoding="utf-8", errors="replace")
         game = (GAME_LIBS_ROOT / tree / "Game_local.cpp").read_text(encoding="utf-8", errors="replace")
         require(header, "return static_cast<int>( static_cast<unsigned int>( packedId ) >> GENTITYNUM_BITS );",
@@ -1242,13 +1241,13 @@ def validate_session_lifecycle_and_flood_bounds() -> None:
         register = function_body(game, "void idGameLocal::RegisterEntity(", f"{tree}: register entity")
         require(register, "spawnCount = MAX_GENTITIES;", f"{tree}: the spawn count wraps")
         reject(register, "spawn count overflow", f"{tree}: fatal spawn count overflow")
-    entity = (GAME_LIBS_ROOT / "src/mpgame/Entity.cpp").read_text(encoding="utf-8", errors="replace")
+    entity = (GAME_LIBS_ROOT / "src/game/Entity.cpp").read_text(encoding="utf-8", errors="replace")
     require(function_body(entity, "bool idEntity::ClientReceiveEvent(", "entity client events"),
             "if ( time < gameLocal.clientSnapshotTime - 300 ) {", "sound events age against the server's clock")
-    network = (GAME_LIBS_ROOT / "src/mpgame/Game_network.cpp").read_text(encoding="utf-8", errors="replace")
+    network = (GAME_LIBS_ROOT / "src/game/Game_network.cpp").read_text(encoding="utf-8", errors="replace")
     require(function_body(network, "void idGameLocal::ClientProcessEntityNetworkEventQueue(", "client event queue"),
             "} else if ( ( ent = entPtr.GetEntity() ) == NULL ) {", "client events test the entity for NULL")
-    player = (GAME_LIBS_ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8", errors="replace")
+    player = (GAME_LIBS_ROOT / "src/game/Player.cpp").read_text(encoding="utf-8", errors="replace")
     require(player, "const bool feedbackHitch = stateHitch && ( snapshotAge <= 0 || snapshotAge > FEEDBACK_HITCH_MSEC );",
             "one missed snapshot does not hide a death or a hit")
     for gated in ("if ( !feedbackHitch ) {\n \t\t\tStartSound( \"snd_death\"", "if ( feedbackHitch ) {\n\t\t\tlastDmgTime = gameLocal.time;"):
@@ -1300,11 +1299,11 @@ def validate_protocol_2_42() -> None:
     require(function_body(client, "void idAsyncClient::ProcessUnreliableServerMessage(", "server unreliable messages"),
             "if ( msg.GetRemainingReadBits() < 32 + 32 + 32 + 8 + 16 + 16 ) {", "the client expects the longer snapshot header")
 
-    game_header = (GAME_LIBS_ROOT / "src/mpgame/Game_local.h").read_text(encoding="utf-8", errors="replace")
-    network = (GAME_LIBS_ROOT / "src/mpgame/Game_network.cpp").read_text(encoding="utf-8", errors="replace")
-    player = (GAME_LIBS_ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8", errors="replace")
-    physics = (GAME_LIBS_ROOT / "src/mpgame/physics/Physics_Player.cpp").read_text(encoding="utf-8", errors="replace")
-    projectile = (GAME_LIBS_ROOT / "src/mpgame/Projectile.cpp").read_text(encoding="utf-8", errors="replace")
+    game_header = (GAME_LIBS_ROOT / "src/game/Game_local.h").read_text(encoding="utf-8", errors="replace")
+    network = (GAME_LIBS_ROOT / "src/game/Game_network.cpp").read_text(encoding="utf-8", errors="replace")
+    player = (GAME_LIBS_ROOT / "src/game/Player.cpp").read_text(encoding="utf-8", errors="replace")
+    physics = (GAME_LIBS_ROOT / "src/game/physics/Physics_Player.cpp").read_text(encoding="utf-8", errors="replace")
+    projectile = (GAME_LIBS_ROOT / "src/game/Projectile.cpp").read_text(encoding="utf-8", errors="replace")
     require(game_header, "const int GAME_SNAPSHOT_PROTOCOL\t\t\t= 42;", "the game's snapshot layout number")
     require(game_header, "( serverDemo && demo_protocol == GAME_SNAPSHOT_PROTOCOL_LEGACY ) || demo_protocol == GAME_SNAPSHOT_PROTOCOL_RETAIL",
             "the older layout is read only from a demo recorded with it")
@@ -1389,7 +1388,7 @@ def validate_mp_audit_round_2026_11_17() -> None:
     publish = function_body(session, "void Session_PublishSI_f(", "Session_PublishSI_f")
     require(publish, "CVAR_SERVERINFO", "publishSI publishes server info cvars only")
     reject(publish, "MoveCVarsToDict", "publishSI does not rescan every server info cvar")
-    mapdb = read("src/mpgame/mp/MapDatabaseHost.cpp")
+    mapdb = read("src/game/mp/MapDatabaseHost.cpp")
     require(mapdb, "publishSI si_nextMap si_mapPick", "map database publishes named keys")
     reject(mapdb, '"rescanSI\\n"', "map database no longer rescans")
 
@@ -1415,12 +1414,12 @@ def validate_password_cvars_private() -> None:
         require(lines[0], "CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE", f"{name} engine declaration")
         for flag in ("CVAR_ARCHIVE", "CVAR_SERVERINFO", "CVAR_USERINFO", "CVAR_NETWORKSYNC"):
             reject(lines[0], flag, f"{name} engine declaration")
-    game = [line for line in read_game("src/mpgame/gamesys/SysCvar.cpp").splitlines() if line.startswith("idCVar g_refPassword(")]
+    game = [line for line in read_game("src/game/gamesys/SysCvar.cpp").splitlines() if line.startswith("idCVar g_refPassword(")]
     if len(game) != 1:
         raise AssertionError("the multiplayer module declares g_refPassword once")
     require(game[0], '"",\t\t\t\t\tCVAR_GAME | CVAR_PRIVATE | CVAR_CASE_SENSITIVE,', "g_refPassword game declaration")
     reject(game[0], "CVAR_ARCHIVE", "g_refPassword game declaration")
-    reject(read_game("src/mpgame/gamesys/SysCvar.cpp"), "AdminPassword", "the admin passwords are the engine's cvars")
+    reject(read_game("src/game/gamesys/SysCvar.cpp"), "AdminPassword", "the admin passwords are the engine's cvars")
     common = read("src/framework/Common.cpp")
     require_before(common, "\t\tInitGame();", "Printf( \"Command line (parsed):\\n\" );", "the command line is echoed after the game is up")
     require_before(common, "if ( cvarSystem->CommandContainsPrivateCVar( lineText ) ) {",
@@ -1431,7 +1430,7 @@ def validate_server_moderation() -> None:
     """MP-18 (22 November 2026): bans by address, the per-address connection limit, the chat
     flood window, the name policy and the admin log. tools/tests/mp_moderation.py runs the
     engine-free core and pins each console command."""
-    core = read_game("src/mpgame/mp/Moderation.h")
+    core = read_game("src/game/mp/Moderation.h")
     for cap in (
         "static const int MP_MOD_MAX_BANS = 512;",
         "static const int MP_MOD_MAX_MUTES = 64;",
@@ -1460,7 +1459,7 @@ def validate_server_moderation() -> None:
     require(log_value, "ufffd", "a byte that is not UTF-8 is written as U+FFFD, so a log line is always valid")
     require(core, "inline int MPModEscapeLength( const char *s ) {", "names are read with the engine's own escape lengths")
     require(core, "static const int MP_MOD_PLAYER_PREFIX_V6 = 64;", "a player over IPv6 is their /64")
-    loader = read_game("src/mpgame/mp/ModerationFile.h")
+    loader = read_game("src/game/mp/ModerationFile.h")
     require(loader, "static const int MP_MOD_BANLIST_MAX_BYTES = 512 * 1024;", "ban file size cap")
     require(loader, "static const int MP_MOD_BANLIST_MAX_KEPT_LINES = 256;", "ban file kept-line cap")
 
@@ -1473,7 +1472,7 @@ def validate_server_moderation() -> None:
     require(read("src/framework/async/AsyncNetwork.cpp"),
             'idAsyncNetwork::serverMaxClientsPerAddress( "net_serverMaxClientsPerAddress", "0",', "the per-address limit is off by default")
 
-    network = read_game("src/mpgame/Game_network.cpp")
+    network = read_game("src/game/Game_network.cpp")
     for signature in ("allowReply_t idGameLocal::ServerAllowClient(", "allowReply_t idGameLocal::RepeaterAllowClient("):
         require_before(function_body(network, signature, signature), "if ( ModerationRefuseBanned( IP ) ) {", "si_pure",
                        "a banned address is refused first")
@@ -1483,7 +1482,7 @@ def validate_server_moderation() -> None:
         raise AssertionError("chat and voice-menu lines both answer to the mute and the flood window")
     require_before(reliable, "RELIABLE_FLOOD_CHAT_DELAY ) ) {", "if ( !ModerationAllowChat( clientNum, true ) ) {",
                    "the per-line delay still runs ahead of the flood window")
-    cvars = read_game("src/mpgame/gamesys/SysCvar.cpp")
+    cvars = read_game("src/game/gamesys/SysCvar.cpp")
     for declaration in (
         'idCVar g_chatFloodMessages(\t\t"g_chatFloodMessages",\t\t"4",',
         'idCVar g_chatFloodSeconds(\t\t\t"g_chatFloodSeconds",\t\t"4",',
@@ -1492,7 +1491,7 @@ def validate_server_moderation() -> None:
         'idCVar g_reservedNames(\t\t\t\t"g_reservedNames",\t\t\t"admin;console;referee",',
     ):
         require(cvars, declaration, "moderation defaults")
-    names = function_body(read_game("src/mpgame/Game_local.cpp"), "const idDict* idGameLocal::SetUserInfo(", "user info")
+    names = function_body(read_game("src/game/Game_local.cpp"), "const idDict* idGameLocal::SetUserInfo(", "user info")
     require_before(names, "MPModCleanName(", "MPModNameIsNumeric(", "the name policy runs on every server-side name")
     require(names, "MP_MOD_NAME_VISIBLE_MAX", "names are bounded")
 
@@ -1500,7 +1499,7 @@ def validate_server_moderation() -> None:
     require(read("src/framework/async/AsyncNetwork.cpp"),
             'idAsyncNetwork::serverLastDrop( "net_serverLastDrop", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_ROM,',
             "only the engine writes the last drop's reason")
-    vote = function_body(read_game("src/mpgame/MultiplayerGame.cpp"), "void idMultiplayerGame::ServerCallPackedVote(", "packed vote")
+    vote = function_body(read_game("src/game/MultiplayerGame.cpp"), "void idMultiplayerGame::ServerCallPackedVote(", "packed vote")
     require_before(vote, "if ( ( wireFieldFlags & VOTEFLAG_MUTE ) != 0 && ( wireFieldFlags & VOTEFLAG_KICK ) == 0 ) {",
                    "voteData.m_kick = msg.ReadByte();", "a mute vote must name its player in the kick field")
     shutdown = function_body(network, "void idGameLocal::Shutdown_f(", "serverShutdown")

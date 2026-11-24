@@ -72,7 +72,7 @@ def main() -> None:
     validate_tree(ROOT, "engine idLexer")
     validate_tree(GAME_LIBS_ROOT, "GameLibs idLexer")
 
-    bot_character = (GAME_LIBS_ROOT / "src/mpgame/bots/BotCharacter.cpp").read_text(
+    bot_character = (GAME_LIBS_ROOT / "src/game/bots/BotCharacter.cpp").read_text(
         encoding="utf-8"
     )
     if 'lexer.PeekTokenString( "{" )' not in bot_character:

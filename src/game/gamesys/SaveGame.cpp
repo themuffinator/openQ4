@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -26,7 +26,20 @@ void idSaveGame::ClearDictionaryCache() {
 	dictionaryPopulationTicks = dictionaryPopulationMaxTicks = 0.0;
 }
 
-#include "NoGameTypeInfo.h"
+
+#if defined(_WIN32)
+	#if defined(__has_include)
+		#if __has_include("TypeInfo.h")
+			#include "TypeInfo.h"
+		#else
+			#include "NoGameTypeInfo.h"
+		#endif
+	#else
+		#include "TypeInfo.h"
+	#endif
+#else
+	#include "NoGameTypeInfo.h"
+#endif
 
 // The generated stamp hashes every save-relevant game source, so it changes
 // whenever one of them does. Keep it out of SaveGame.h: through Game_local.h it
@@ -3295,6 +3308,7 @@ void Cmd_CheckSave_f( const idCmdArgs &args )
 	mp->Rewind();
 	idPlayer		test;
 	idRestoreGame	rg( mp );
+
 	rg.CallRestore_r( test.GetType(), &test );
 
 	common->Printf( "checkSave: save/restore round trip completed\n" );

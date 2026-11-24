@@ -1,6 +1,6 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -1128,7 +1128,7 @@ void idAI::Event_PostSpawn( void ) {
 	if ( team == TEAM_MARINE ) {
 		//health /= 1.0f + gameLocal.GetDifficultyModifier( );
 
-		//buddies are a little more healthy on hard & warlord since the baddies deal so much more damage
+		//buddies are a little more healthy on hard & nightmare since the baddies deal so much more damage
 		switch ( g_skill.GetInteger() ) {
 		case 4:
 			health *= 1.6f;

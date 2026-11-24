@@ -104,7 +104,7 @@ def main():
     (output / 'launch.json').write_text(json.dumps(launch, indent=2), encoding='utf-8')
     (output / 'runtime.json').write_text(json.dumps({str(p.relative_to(runtime)):
         hashlib.sha256(p.read_bytes()).hexdigest() for p in [runtime/'openQ4-client_x64.exe',
-        runtime/f'renderer-{args.render_api}_x64.dll', runtime/'baseoq4/game-sp_x64.dll']}, indent=2), encoding='utf-8')
+        runtime/f'renderer-{args.render_api}_x64.dll', runtime/'baseoq4/game_x64.dll']}, indent=2), encoding='utf-8')
     code, timeout, elapsed = benchmark.launch_and_wait(runtime/'openQ4-client_x64.exe', launch,
         runtime, output/'stdout.txt', output/'stderr.txt', 600)
     text = (game/'logs/openq4.log').read_text(encoding='utf-8', errors='replace')

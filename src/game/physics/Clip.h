@@ -241,6 +241,10 @@ public:
 	int						PointContents(const idVec3 p);
 // jmarshall end
 
+	// openQ4: the multiplayer mode keeps Raven's rounded clip sector coordinates,
+	// the campaign floors and ceils them (CoordsForBounds)
+	static bool				RoundedSectorCoords( void );
+
 	// clip versus the rest of the world
 // RAVEN BEGIN
 // nmckenzie: we have cases where both a guy and his target need to be ignored by a translation
@@ -391,36 +395,25 @@ ID_INLINE void idClip::CoordsForBounds( int* coords, idBounds& bounds ) const {
 	fCoords[ 2 ] = ( bounds[ 1 ].x - nodeOffset.x ) * nodeScale.x;
 	fCoords[ 3 ] = ( bounds[ 1 ].y - nodeOffset.y ) * nodeScale.y;
 
-	// Use explicit floor/ceil quantization for deterministic sector coverage
-	// across x86/x64. FtoiFast rounding differs by platform and can miss sectors.
-	coords[ 0 ] = idMath::Ftoi( idMath::Floor( fCoords[ 0 ] ) );
-	coords[ 1 ] = idMath::Ftoi( idMath::Floor( fCoords[ 1 ] ) );
-	coords[ 2 ] = idMath::Ftoi( idMath::Ceil( fCoords[ 2 ] ) );
-	coords[ 3 ] = idMath::Ftoi( idMath::Ceil( fCoords[ 3 ] ) );
+	const bool rounded = RoundedSectorCoords();
+	int i;
+	for( i = 0; i < 4; i++ ) {
 
-	if( coords[ 0 ] < 0 ) {
-		coords[ 0 ] = 0;
-	} else if( coords[ 0 ] > CLIPSECTOR_WIDTH - 1 ) {
-		coords[ 0 ] = CLIPSECTOR_WIDTH - 1;
-	}
-	if( coords[ 1 ] < 0 ) {
-		coords[ 1 ] = 0;
-	} else if( coords[ 1 ] > CLIPSECTOR_WIDTH - 1 ) {
-		coords[ 1 ] = CLIPSECTOR_WIDTH - 1;
-	}
-	if( coords[ 2 ] < 0 ) {
-		coords[ 2 ] = 0;
-	} else if( coords[ 2 ] > CLIPSECTOR_WIDTH - 1 ) {
-		coords[ 2 ] = CLIPSECTOR_WIDTH - 1;
-	}
-	if( coords[ 3 ] < 0 ) {
-		coords[ 3 ] = 0;
-	} else if( coords[ 3 ] > CLIPSECTOR_WIDTH - 1 ) {
-		coords[ 3 ] = CLIPSECTOR_WIDTH - 1;
-	}
+		if ( rounded ) {
+			coords[ i ] = idMath::FtoiFast( fCoords[ i ] );
+		} else {
+			// Use explicit floor/ceil quantization for deterministic sector coverage
+			// across x86/x64. FtoiFast rounding differs by platform and can miss sectors.
+			coords[ i ] = idMath::Ftoi( i < 2 ? idMath::Floor( fCoords[ i ] ) : idMath::Ceil( fCoords[ i ] ) );
+		}
 
-	coords[ 2 ]++;
-	coords[ 3 ]++;
+		if( coords[ i ] < 0 ) {
+			coords[ i ] = 0;
+		} else if( coords[ i ] > CLIPSECTOR_WIDTH - 1 ) {
+			coords[ i ] = CLIPSECTOR_WIDTH - 1;
+		}
+	}
+	coords[ 2 ]++; coords[ 3 ]++;
 }
 // RAVEN END
 

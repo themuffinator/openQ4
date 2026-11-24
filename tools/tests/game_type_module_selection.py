@@ -687,11 +687,10 @@ def validate_game_module_two_phase_lifecycle(source: str, header: str, label: st
 
 def validate_two_phase_game_api_contract() -> None:
     game_api_path = GAME_LIBS_ROOT / "src" / "game" / "Game.h"
-    sp_source_path = GAME_LIBS_ROOT / "src" / "game" / "Game_local.cpp"
-    sp_header_path = GAME_LIBS_ROOT / "src" / "game" / "Game_local.h"
-    mp_source_path = GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.cpp"
-    mp_header_path = GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.h"
-    required = (game_api_path, sp_source_path, sp_header_path, mp_source_path, mp_header_path)
+    # one game module serves both modes (game_sp and game_mp each carried a copy before the merge)
+    source_path = GAME_LIBS_ROOT / "src" / "game" / "Game_local.cpp"
+    header_path = GAME_LIBS_ROOT / "src" / "game" / "Game_local.h"
+    required = (game_api_path, source_path, header_path)
     if not all(path.is_file() for path in required):
         print(
             "game_type_module_selection: skipped two-phase lifecycle cross-check "
@@ -700,14 +699,13 @@ def validate_two_phase_game_api_contract() -> None:
         return
 
     game_api = read(game_api_path)
-    require(game_api, "const int GAME_API_VERSION\t\t= 63;", "current game API version")
+    require(game_api, "const int GAME_API_VERSION\t\t= 64;", "current game API version")
     require(
         game_api,
         "virtual void\t\t\t\tShutdownAfterDecls( void ) = 0;",
         "two-phase game API",
     )
-    validate_game_module_two_phase_lifecycle(read(sp_source_path), read(sp_header_path), "SP")
-    validate_game_module_two_phase_lifecycle(read(mp_source_path), read(mp_header_path), "MP")
+    validate_game_module_two_phase_lifecycle(read(source_path), read(header_path), "game")
 
 
 def parse_string_array(source: str, declaration: str) -> list[str]:
@@ -766,7 +764,7 @@ def validate_engine_mirror() -> None:
     if not reserved_routes:
         raise AssertionError("engine route table no longer distinguishes reserved multiplayer wire tokens")
 
-    game_types_source = GAME_LIBS_ROOT / "src" / "mpgame" / "mp" / "GameTypes.cpp"
+    game_types_source = GAME_LIBS_ROOT / "src" / "game" / "mp" / "GameTypes.cpp"
     if not game_types_source.is_file():
         print(
             f"game_type_module_selection: skipped table cross-check "
@@ -811,17 +809,33 @@ def validate_engine_mirror() -> None:
                 f"si_gameTypeArgs entries missing from the engine allowlist: {unlisted}"
             )
 
-        # The main menu runs under game_sp and carries its multiplayer mode to
-        # game_mp in si_gameType. A value outside game_sp's list falls back to
-        # its first, singleplayer, so game_sp lists every game_mp mode.
-        sp_types = parse_string_array(
-            read(GAME_LIBS_ROOT / "src" / "game" / "gamesys" / "SysCvar.cpp"), "const char *si_gameTypeArgs[]"
-        )
-        if sp_types != game_types:
+        # The main menu runs in the game_sp mode and carries its multiplayer
+        # mode to game_mp in si_gameType. A value outside the mode's list falls
+        # back to its first, singleplayer, so game_sp must list every game_mp
+        # mode. One module serves both modes now: si_gameType is declared once
+        # and both modes validate it against the one si_gameTypeArgs above.
+        sys_cvar = read(GAME_LIBS_ROOT / "src" / "game" / "gamesys" / "SysCvar.cpp")
+        if "const char *si_gameTypeArgs[]" in sys_cvar or game_types_text.count("const char *si_gameTypeArgs[]") != 1:
             raise AssertionError(
-                f"game_sp si_gameTypeArgs {sp_types} differs from game_mp's {game_types}; "
-                "a menu mode outside it would fall back to singleplayer"
+                "si_gameTypeArgs must be defined once, beside mpGameTypeInfoTable, so the game_sp "
+                "mode's list cannot drift from game_mp's; a menu mode outside it would fall back to singleplayer"
             )
+        game_type_cvars = re.findall(r"^(?:idCVar|idModeCVar) si_gameType\(.*$", sys_cvar, re.MULTILINE)
+        if len(game_type_cvars) != 1:
+            raise AssertionError(f"si_gameType must be declared once, found {len(game_type_cvars)}")
+        game_type_cvar = game_type_cvars[0]
+        # idModeCVar( name, spValue, spFlags, mpValue, mpFlags, description, valueStrings, completion ):
+        # game_sp kept si_gameType out of the configuration, game_mp archives the last mode played.
+        for token in (
+            'idModeCVar si_gameType(\t\t\t\t"si_gameType",\t\t\t\tsi_gameTypeArgs[ 0 ],\tCVAR_GAME | CVAR_SERVERINFO, '
+            "si_gameTypeArgs[ 0 ], CVAR_GAME | CVAR_SERVERINFO | PC_CVAR_ARCHIVE, ",
+            "si_gameTypeArgs, idCmdSystem::ArgCompletion_String<si_gameTypeArgs> );",
+        ):
+            if token not in game_type_cvar:
+                raise AssertionError(
+                    "si_gameType must validate against si_gameTypeArgs in both modes, archived only by game_mp: "
+                    f"missing {token!r}"
+                )
 
     # An allowlist, not "anything that is not singleplayer".
     for token in (
@@ -1121,16 +1135,12 @@ def validate_lifecycle_mutation_sensitivity() -> None:
         "generated TrueType material keeps an implicit or restart-stale stage",
     )
 
+    # one game module serves both modes (game_sp and game_mp each carried a copy before the merge)
     for label, source_path, header_path in (
         (
-            "SP",
+            "game",
             GAME_LIBS_ROOT / "src" / "game" / "Game_local.cpp",
             GAME_LIBS_ROOT / "src" / "game" / "Game_local.h",
-        ),
-        (
-            "MP",
-            GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.cpp",
-            GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.h",
         ),
     ):
         if not source_path.is_file() or not header_path.is_file():

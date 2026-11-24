@@ -79,7 +79,7 @@ struct idMapFile {
     void AddEntity(idMapEntity* e) { entities.push_back(e); }
 };
 struct idDeclEntityDef { idDict dict; };
-#include "mpgame/mp/GameTypes.h"
+#include "game/mp/GameTypes.h"
 enum { MAX_CTF_FLAGS=TEAM_MAX+1 };
 struct CVar { int GetInteger() const { return 1; } } g_skill;
 struct idGameLocal {
@@ -172,9 +172,9 @@ int main() {
 
 
 def main() -> None:
-    local = (ROOT / "src/mpgame/Game_local.cpp").read_text(encoding="utf-8")
-    mp = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
-    types = (ROOT / "src/mpgame/mp/GameTypes.cpp").read_text(encoding="utf-8")
+    local = (ROOT / "src/game/Game_local.cpp").read_text(encoding="utf-8")
+    mp = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    types = (ROOT / "src/game/mp/GameTypes.cpp").read_text(encoding="utf-8")
     begin = types.index("static const mpGameTypeInfo_t mpGameTypeInfoTable[]")
     end = types.index("\n/*", types.index("const int mpNumGameTypeInfo", begin))
     definitions = types[begin:end] + "\n".join(function(types, signature) for signature in (

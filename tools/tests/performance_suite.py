@@ -1068,7 +1068,7 @@ def parse_toggles(items: list[str]) -> list[tuple[str, list[str]]]:
 
 def is_head_build(cfg: RunConfig) -> bool:
     """True when the runtime's game module has the HEAD-only hitch triggers."""
-    dll = cfg.runtime / GAME_DIR / "game-sp_x64.dll"
+    dll = cfg.runtime / GAME_DIR / "game_x64.dll"
     if not dll.is_file():
         return False
     data = dll.read_bytes()

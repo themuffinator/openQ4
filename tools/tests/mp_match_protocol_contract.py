@@ -9,10 +9,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchProtocol.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchProtocol.cpp"
-SESSION_HEADER = ROOT / "src/mpgame/mp/match/MatchSession.h"
-SESSION_SOURCE = ROOT / "src/mpgame/mp/match/MatchSession.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchProtocol.h"
+SOURCE = ROOT / "src/game/mp/match/MatchProtocol.cpp"
+SESSION_HEADER = ROOT / "src/game/mp/match/MatchSession.h"
+SESSION_SOURCE = ROOT / "src/game/mp/match/MatchSession.cpp"
 
 
 def read(path: Path) -> str:

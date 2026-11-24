@@ -12,8 +12,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchOperations.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchOperations.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchOperations.h"
+SOURCE = ROOT / "src/game/mp/match/MatchOperations.cpp"
 
 
 def read(path: Path) -> str:
@@ -196,7 +196,7 @@ def static_contracts(header: str, source: str) -> None:
 
 
 SUPPORT_AND_TEST = r'''
-#include "src/mpgame/mp/match/MatchOperations.h"
+#include "src/game/mp/match/MatchOperations.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -1712,9 +1712,9 @@ def executable_contract() -> None:
             str(ROOT),
             str(harness),
             str(SOURCE),
-            str(ROOT / "src/mpgame/mp/match/MatchSession.cpp"),
-            str(ROOT / "src/mpgame/mp/match/MatchProposal.cpp"),
-            str(ROOT / "src/mpgame/mp/match/MatchSeries.cpp"),
+            str(ROOT / "src/game/mp/match/MatchSession.cpp"),
+            str(ROOT / "src/game/mp/match/MatchProposal.cpp"),
+            str(ROOT / "src/game/mp/match/MatchSeries.cpp"),
             "-o",
             str(executable),
         ]

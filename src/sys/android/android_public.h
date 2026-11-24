@@ -13,7 +13,7 @@ openQ4 Android platform layer.
 #define __SYS_ANDROID_PUBLIC__
 
 // Absolute path of the APK's native library directory, exported by the host
-// app's JNI glue before the engine starts. Sibling modules (game-sp,
+// app's JNI glue before the engine starts. Sibling modules (game,
 // renderer-gles) are loaded from there.
 #define OPENQ4_ANDROID_NATIVE_LIBS_ENV	"OPENQ4_NATIVE_LIBS"
 

@@ -36,7 +36,7 @@ VK_INTERACTIONS = (
     "interaction_shadow",
     "interaction_shadow_point",
 )
-GAME_COPIES = ("game", "mpgame")
+GAME_COPIES = ("game",)
 
 SWEEP_STRENGTH = 0.30
 SWEEP_CYCLES_PER_SECOND = 0.28

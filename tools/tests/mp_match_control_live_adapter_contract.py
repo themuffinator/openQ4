@@ -8,8 +8,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "src" / "mpgame" / "MultiplayerGame.cpp"
-HEADER = ROOT / "src" / "mpgame" / "MultiplayerGame.h"
+SOURCE = ROOT / "src" / "game" / "MultiplayerGame.cpp"
+HEADER = ROOT / "src" / "game" / "MultiplayerGame.h"
 
 
 def read(path: Path) -> str:

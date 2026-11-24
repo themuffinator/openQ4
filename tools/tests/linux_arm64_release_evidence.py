@@ -50,8 +50,7 @@ EXPECTED = HELPER.CandidateMetadata(
 FIXTURE_BYTES = {
     "client": b"synthetic ARM64 client\x00\x01\n",
     "dedicated": b"synthetic ARM64 dedicated server\x02\n",
-    "game_sp": b"synthetic ARM64 single-player module\x03\n",
-    "game_mp": b"synthetic ARM64 multiplayer module\x04\n",
+    "game": b"synthetic ARM64 game module\x03\n",
 }
 
 ACCEPTED_REVIEW_VALUES = {
@@ -244,7 +243,7 @@ def runtime_report_documents(candidate_hashes: dict[str, str]) -> dict[str, dict
         "openQ4GameCommit": EXPECTED.openq4_game_commit,
         "sha256": {
             "client": candidate_hashes["client"],
-            "gameSp": candidate_hashes["game_sp"],
+            "gameSp": candidate_hashes["game"],
             "retailPak001": retail_hash,
         },
         "elf": elf_metadata(("client", "gameSp")),
@@ -299,7 +298,7 @@ def runtime_report_documents(candidate_hashes: dict[str, str]) -> dict[str, dict
         "sha256": {
             "dedicated": candidate_hashes["dedicated"],
             "client": candidate_hashes["client"],
-            "gameMp": candidate_hashes["game_mp"],
+            "gameMp": candidate_hashes["game"],
             "retailPak001": retail_hash,
         },
         "elf": elf_metadata(("dedicated", "client", "gameMp")),
@@ -993,12 +992,12 @@ def main() -> None:
 
         legacy_schema_path = temp_root / "legacy-schema.toml"
         legacy_schema_path.write_text(
-            accepted_text.replace("schema_version = 2", "schema_version = 1", 1),
+            accepted_text.replace("schema_version = 3", "schema_version = 2", 1),
             encoding="utf-8",
         )
         expect_error(
             lambda: validate_manifest(legacy_schema_path),
-            "schema_version must be the integer 2",
+            "schema_version must be the integer 3",
             "legacy schema rejection",
         )
 

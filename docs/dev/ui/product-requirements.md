@@ -1217,7 +1217,7 @@ symbols, off-screen bearings inside the safe frame, and the stereo VR HUD-plane
 projection. No active row admitted them: `FLOW-035` lists the Remastered
 multiplayer additions one by one and `FLOW-056` covers only the Remastered top.
 `FLOW-067` appends the scope and depends on both. It is pending; the
-implementation (`src/mpgame/mp/ObjectiveMarkers.cpp`) is recorded in
+implementation (`src/game/mp/ObjectiveMarkers.cpp`) is recorded in
 [the HUD notes](remastered-hud.md), and its captures are not yet bound as
 evidence. No existing requirement, evidence record or supersession changes; the
 revision re-binds the visual specification and the three evidence records that

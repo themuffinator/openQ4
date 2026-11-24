@@ -4404,7 +4404,7 @@ column headings out of the first row.
 
 | Area | 1.5 | 1.6 | Basis |
 | --- | --- | --- | --- |
-| Loading screens | The stock composition (section 9) and one screen-pattern line | Section 14.17: the stock screens measured, and a Remastered screen with extended bands, the mission and objectives, named stages, tips, a device-aware continue prompt, and a multiplayer server card and arsenal | `guis/loading/*.gui`, `Session.cpp`, `mpgame/Game_local.cpp` |
+| Loading screens | The stock composition (section 9) and one screen-pattern line | Section 14.17: the stock screens measured, and a Remastered screen with extended bands, the mission and objectives, named stages, tips, a device-aware continue prompt, and a multiplayer server card and arsenal | `guis/loading/*.gui`, `Session.cpp`, `game/Game_local.cpp` |
 | Multiplayer menus | A pause pattern and the join card | Section 14.18: a card with a horizontal tab strip over the softened view, in Welcome and Escape variants, with every page's content | `mpmain.gui`, openQ4's join card and Match Control |
 | In-game panel ladder | The join card's values | The same values for every in-game partial panel, over the stock light plates, with focus at 1.00 | openQ4's `p_quickjoin` |
 | EKG | Beats, speed and colors | The traced waveform and its halo; no smoothed curves | `ekg.tga`, `hud.gui` |

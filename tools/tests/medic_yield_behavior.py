@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute SP/MP medic follower-yield guards without requiring game assets."""
+"""Execute the game module's medic follower-yield guards without requiring game assets."""
 from __future__ import annotations
 import argparse
 import hashlib
@@ -23,26 +23,24 @@ def main():
     if not compiler:
         raise RuntimeError('clang++ or g++ required')
     fixture = (ROOT/'tools/tests/native/MedicYieldBehavior.cpp').read_text()
-    implementations = []
+    # One game module serves game_sp and game_mp, so both modes run these
+    # same methods; neither carries a mode gate.
+    methods = []
     identities = {}
-    for tree in ('game', 'mpgame'):
-        methods = []
-        for file, signatures in (
-            ('AI.cpp', ('bool idAI::RequestMoveAside(',)),
-            ('AAS_Find.cpp', ('rvAASFindGoalOutOfRange::rvAASFindGoalOutOfRange(',
-                              'bool rvAASFindGoalOutOfRange::TestPoint (')),
-        ):
-            path = ROOT/'src'/tree/'ai'/file
-            source = path.read_text(encoding='utf-8-sig')
-            for signature in signatures:
-                start = source.index(signature)
-                opening = source.index('{', start)
-                methods.append(source[start:opening]+'{'+function_body(source, signature, str(path))+'}')
-            identities[str(path.relative_to(ROOT))] = hashlib.sha256(path.read_bytes()).hexdigest()
-        implementations.append(methods)
-    assert implementations[0] == implementations[1], 'SP/MP follower yield behavior diverged'
+    for file, signatures in (
+        ('AI.cpp', ('bool idAI::RequestMoveAside(',)),
+        ('AAS_Find.cpp', ('rvAASFindGoalOutOfRange::rvAASFindGoalOutOfRange(',
+                          'bool rvAASFindGoalOutOfRange::TestPoint (')),
+    ):
+        path = ROOT/'src/game/ai'/file
+        source = path.read_text(encoding='utf-8-sig')
+        for signature in signatures:
+            start = source.index(signature)
+            opening = source.index('{', start)
+            methods.append(source[start:opening]+'{'+function_body(source, signature, str(path))+'}')
+        identities[str(path.relative_to(ROOT))] = hashlib.sha256(path.read_bytes()).hexdigest()
     projection = output/'behavior.cpp'
-    projection.write_text(fixture.replace('// @PRODUCTION_METHODS@', '\n\n'.join(implementations[0])))
+    projection.write_text(fixture.replace('// @PRODUCTION_METHODS@', '\n\n'.join(methods)))
     binary = output/('behavior.exe' if os.name == 'nt' else 'behavior')
     env = {**os.environ, 'TMP': str(output), 'TEMP': str(output), 'TMPDIR': str(output)}
     build = subprocess.run([compiler, '-std=c++17', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter',

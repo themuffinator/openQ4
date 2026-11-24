@@ -1,12 +1,13 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
+#include "mp/match/MatchDeadline.h"
 
 #if !defined(__GAME_PROJECTILE_H__)
 	#include "Projectile.h"
@@ -546,6 +547,14 @@ void idMoveable::Think( void ) {
 	idDamagable::Think();
 }
 
+void idMoveable::ThinkMatchPaused( int deltaMsec ) {
+	idDamagable::ThinkMatchPaused( deltaMsec );
+	mpMatchShiftOptionalDeadline( nextCollideFxTime, deltaMsec );
+	if ( initialSpline != NULL && deltaMsec > 0 ) {
+		initialSpline->ShiftTime( deltaMsec );
+	}
+}
+
 /*
 ================
 idMoveable::GetRenderModelMaterial
@@ -1053,6 +1062,23 @@ void idExplodingBarrel::Think( void ) {
 		ipsEntity.axis = mat3_identity;
 		gameRenderWorld->UpdateEntityDef( ipsHandle, &ipsEntity );
 	}
+}
+
+void idExplodingBarrel::ThinkMatchPaused( int deltaMsec ) {
+	idBarrel::ThinkMatchPaused( deltaMsec );
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+
+	if ( ipsHandle >= 0 ) {
+		mpMatchShiftTimeOrigin( ipsTime, deltaMsec );
+		ipsEntity.shaderParms[ SHADERPARM_TIMEOFFSET ] -= MS2SEC( deltaMsec );
+		gameRenderWorld->UpdateEntityDef( ipsHandle, &ipsEntity );
+	}
+	if ( lightHandle >= 0 ) {
+		mpMatchShiftTimeOrigin( lightTime, deltaMsec );
+	}
+	mpMatchShiftOptionalDeadline( explodeFinishTime, deltaMsec );
 }
    
 /*

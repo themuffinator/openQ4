@@ -66,7 +66,7 @@ def main() -> int:
     )
     require(
         read(GAME_ROOT / "src" / "game" / "Game.h"),
-        "const int GAME_API_VERSION\t\t= 63;",
+        "const int GAME_API_VERSION\t\t= 64;",
         "game ABI v55",
     )
 
@@ -176,7 +176,7 @@ def main() -> int:
 
     for camera_source in (
         GAME_ROOT / "src" / "game" / "Camera.cpp",
-        GAME_ROOT / "src" / "mpgame" / "Camera.cpp",
+        GAME_ROOT / "src" / "game" / "Camera.cpp",
     ):
         camera = read(camera_source)
         require(camera, "view->forceUpdate = prevCut != cut;", "authored camera-cut signal")

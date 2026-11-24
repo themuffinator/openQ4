@@ -892,7 +892,7 @@ def client_executable(runtime: Path) -> Path:
 
 def package_identity(runtime: Path) -> dict:
     """SHA-256 of the staged files that decide what is qualified."""
-    patterns = ("openQ4-client_*", "renderer-*", "baseoq4/game-*", "baseoq4/pak*.pk4")
+    patterns = ("openQ4-client_*", "renderer-*", "baseoq4/game_*", "baseoq4/pak*.pk4")
     identity = {}
     for pattern in patterns:
         for path in sorted(runtime.glob(pattern)):

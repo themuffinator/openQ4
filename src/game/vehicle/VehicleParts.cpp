@@ -4,8 +4,8 @@
 // Copyright 2002-2004 Raven Software
 //----------------------------------------------------------------
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 #include "../gamesys/RetainedScope.h"
@@ -26,7 +26,8 @@ static float OpenQ4_TurboVehicleTopSpeed( float speed ) {
 // openQ4 VR: the local player, while driving this position in a headset
 static const idPlayer* OpenQ4_VRDriver( const rvVehiclePosition* position ) {
 	const idActor* driver = position != NULL ? position->GetDriver() : NULL;
-	if ( driver == NULL || driver != gameLocal.GetLocalPlayer() || vrSystem == NULL || !vrSystem->IsActive() ) {
+	// the multiplayer vehicles take no headset aim
+	if ( gameLocal.isMultiplayer || driver == NULL || driver != gameLocal.GetLocalPlayer() || vrSystem == NULL || !vrSystem->IsActive() ) {
 		return NULL;
 	}
 	return static_cast<const idPlayer*>( driver );
@@ -251,8 +252,7 @@ void rvVehicleSound::Play ( void ) {
 		return;
 	}
 
-	idSoundEmitter* emitter = NULL;
-	emitter = soundSystem->EmitterForIndex(SOUNDWORLD_GAME, refSound.referenceSoundHandle);
+	idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
 	if ( !emitter )  {
 		refSound.referenceSoundHandle = soundSystem->AllocSoundEmitter( SOUNDWORLD_GAME );
 	}
@@ -297,8 +297,7 @@ void rvVehicleSound::Update ( bool force ) {
 		return;
 	}
 
-	idSoundEmitter* emitter = NULL;
-	emitter = soundSystem->EmitterForIndex(SOUNDWORLD_GAME, refSound.referenceSoundHandle);
+	idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
 	if( !emitter ) {
 		return;
 	}
@@ -562,19 +561,20 @@ rvVehicleLight::Impulse
 =====================
 */
 void rvVehicleLight::Impulse ( int impulse ) {
-// jmarshall - todo
-	//switch ( impulse ) {
-	//	case IMPULSE_50:
-	//		if ( lightOn ) {
-	//			lightOn = false;
-	//			TurnOff ( );
-	//		} else {
-	//			lightOn = true;
-	//			TurnOn ( );
-	//		}
-	//		break;
-	//}
-// jmarshall end
+	// jmarshall - todo: the campaign leaves the light toggle disabled
+	if ( gameLocal.isMultiplayer ) {
+		switch ( impulse ) {
+			case IMPULSE_50:
+				if ( lightOn ) {
+					lightOn = false;
+					TurnOff ( );
+				} else {
+					lightOn = true;
+					TurnOn ( );
+				}
+				break;
+		}
+	}
 }
 
 /*
@@ -789,7 +789,7 @@ rvVehicleWeapon::Activate
 */
 void rvVehicleWeapon::Activate ( bool activate ) {
 	rvVehiclePart::Activate ( activate );
-
+	
 	nextFireTime = gameLocal.time + WEAPON_DELAY_FIRE;
 	burstShots = 0;
 
@@ -1030,11 +1030,13 @@ void rvVehicleWeapon::WeaponFeedback( const idDict* dict ) {
 		player->playerView.WeaponFireFeedback( dict );
 	}
 	if( dict->GetInt("shakeTime") ) {
-		player->playerView.SetShakeParms( MS2SEC(gameLocal.GetTime() + dict->GetInt("shakeTime")), dict->GetFloat("shakeMagnitude"), true );
+		player->playerView.SetShakeParms( MS2SEC(gameLocal.GetTime() + dict->GetInt("shakeTime")), dict->GetFloat("shakeMagnitude"), !gameLocal.isMultiplayer );
 	}
-	// openQ4 VR: a headset view never shakes, so the shot kicks in the weapon
-	// hand instead, harder for the guns that shake the screen
-	player->VRVibrate( true, false, dict->GetInt( "shakeTime" ) ? 0.8f : 0.5f, 50 );
+	if ( !gameLocal.isMultiplayer ) {
+		// openQ4 VR: a headset view never shakes, so the shot kicks in the weapon
+		// hand instead, harder for the guns that shake the screen
+		player->VRVibrate( true, false, dict->GetInt( "shakeTime" ) ? 0.8f : 0.5f, 50 );
+	}
 	EjectBrass();
 }
 
@@ -1636,13 +1638,10 @@ void rvVehicleWeapon::EjectBrass ( void ) {
 		return;
 	}
 
-	// openQ4: a vehicle's gun is part of the world model, not a view weapon,
-	// so casings leave its ejection port in the joint's frame (Raven's code
-	// took the player's view axis and depth-hacked them over the view).
 	cent->SetOrigin ( origin + axis * brassEjectOffset );
 	cent->SetAxis ( axis );
 	cent->SetOwner ( position->GetDriver() );
-
+	
 	// Fade the brass out so they dont accumulate; the same lifetime as a
 	// hand-held weapon's, long enough for a casing to land
 	brassTime =(int)SEC2MS(g_brassTime.GetFloat() / 2.0f);
@@ -1790,12 +1789,11 @@ void rvVehicleTurret::Spawn ( void ) {
 
 
 	// Find the vehicle part for the turret sound
-// jmarshall - sound parts causing a crash, disabling for now.
-	//if ( *spawnArgs.GetString ( "snd_loop", "" ) ) {
-	//	soundPart = position->AddPart ( rvVehicleSound::GetClassType(), spawnArgs );
-	//	static_cast<rvVehicleSound*>(position->GetPart(soundPart))->SetAutoActivate ( false );
-	//}
-// jmarshall end
+	// jmarshall - sound parts causing a crash, disabled in the campaign; multiplayer keeps them
+	if ( gameLocal.isMultiplayer && *spawnArgs.GetString ( "snd_loop", "" ) ) {
+		soundPart = position->AddPart ( rvVehicleSound::GetClassType(), spawnArgs );
+		static_cast<rvVehicleSound*>(position->GetPart(soundPart))->SetAutoActivate ( false );
+	}
 }
 
 /*
@@ -1907,7 +1905,7 @@ void rvVehicleTurret::RunPostPhysics ( void ) {
 			} else {
 				diff = (invert[i] * idMath::AngleDelta ( inputAngles[i], lastInputAngles[i] ));
 			}
-
+			
 			diff = SignZero( diff ) * idMath::ClampFloat ( 0.0f, turnRate * MS2SEC(gameLocal.GetMSec()), idMath::Fabs ( diff ) );
 			const float before = currentAngles[axisMap[i]];
 			if ( angles[0][i] == angles[1][i] ) {
@@ -1918,7 +1916,7 @@ void rvVehicleTurret::RunPostPhysics ( void ) {
 			// what a stop kept the turret from taking stays owed, so the aim
 			// leads it back out of the stop rather than dragging it
 			vrPendingInput[i] = ( vrDriver != NULL && !vrSteered ) ? vrPendingInput[i] - idMath::AngleDelta( currentAngles[axisMap[i]], before ) : 0.0f;
-
+			
 			idAngles angles;
 			angles.Zero();
 			angles[axisMap[i]] = currentAngles[axisMap[i]];
@@ -2102,7 +2100,7 @@ void rvVehicleTurret::Restore ( idRestoreGame* savefile ) {
 	savefile->ReadInt ( moveTime );
 	savefile->ReadFloat ( turnRate );
 
-	savefile->ReadInt ( soundPart );
+	savefile->ReadInt ( soundPart );	
 
 	ReadMovementLock ( );
 	ReadMoveSound ( );
@@ -2764,7 +2762,7 @@ rvVehicleUserAnimated::SetFrame
 ================
 */
 void rvVehicleUserAnimated::SetFrame( const rvUserAnimatedAnim_t & anim ) {
-	const int frame			= int( anim.frame );
+	int frame				= static_cast<int>( anim.frame );
 	float lerp				= anim.frame - frame;
 	frameBlend_t frameBlend	= { 0, frame, frame + 1, 1.0f - lerp, lerp };
 	position->GetParent()->GetAnimator()->SetFrame( anim.channel, anim.index, frameBlend );

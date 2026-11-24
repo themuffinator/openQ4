@@ -18,7 +18,7 @@ if str(SCRIPT_DIR) not in sys.path:
 import json  # noqa: E402
 import hashlib  # noqa: E402
 
-from game_layer import PACKAGED_LAYER_GAME_DIRS  # noqa: E402
+from game_layer import GAME_MODULE_STEM, PACKAGED_LAYER_GAME_DIRS, RETIRED_GAME_MODULE_STEMS  # noqa: E402
 from openq4_pak import OPENQ4_BULK_PACK_NAMES, OPENQ4_PACK_NAMES  # noqa: E402
 
 
@@ -172,10 +172,9 @@ def validate_package_dir(package_dir: Path, arch: str) -> None:
         package_dir / "docs" / "index.html",
         package_dir / "baseoq4" / "mod.json",
         *(package_dir / "baseoq4" / pack_name for pack_name in OPENQ4_PACK_NAMES),
-        package_dir / "baseoq4" / f"game-sp_{arch}.dll",
-        package_dir / "baseoq4" / f"game-mp_{arch}.dll",
+        package_dir / "baseoq4" / f"{GAME_MODULE_STEM}_{arch}.dll",
     ]
-    # a packaged game-library layer (q4xbase) must be complete: its mod.json and modules.
+    # a packaged game-library layer (q4xbase) must be complete: its mod.json and module.
     # Symbols are published separately (the -symbols.zip asset), never installed.
     for layer in PACKAGED_LAYER_GAME_DIRS:
         layer_dir = package_dir / layer
@@ -183,8 +182,7 @@ def validate_package_dir(package_dir: Path, arch: str) -> None:
             raise FileNotFoundError(f"packaged game layer must not be a symlink: {layer_dir}")
         if layer_dir.exists():
             required_paths.append(layer_dir / "mod.json")
-            for module in (f"game-sp_{arch}", f"game-mp_{arch}"):
-                required_paths.append(layer_dir / f"{module}.dll")
+            required_paths.append(layer_dir / f"{GAME_MODULE_STEM}_{arch}.dll")
 
     missing = [path for path in required_paths if not path.is_file() and not path.is_symlink()]
     if missing:
@@ -444,6 +442,9 @@ def render_install_delete(download_packs: list[dict[str, object]]) -> str:
         'Type: files; Name: "{app}\\*.pdb"',
         'Type: files; Name: "{app}\\baseoq4\\*.pdb"',
         *(f'Type: files; Name: "{{app}}\\{layer}\\*.pdb"' for layer in PACKAGED_LAYER_GAME_DIRS),
+        # One game module replaced the split game-sp/game-mp modules, so an
+        # upgrade over an older install must not leave them beside it.
+        *(f'Type: files; Name: "{{app}}\\baseoq4\\{stem}_*.dll"' for stem in RETIRED_GAME_MODULE_STEMS),
     ]
     used = set(OPENQ4_PACK_NAMES)
     lines += [

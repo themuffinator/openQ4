@@ -36,10 +36,10 @@ GAME_LIBS_ROOT = Path(os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT)).resolve()
 SOURCES = {
     "arena": ROOT / "src" / "framework" / "ArenaCampaign.cpp",
     "arena_header": ROOT / "src" / "framework" / "ArenaCampaign.h",
-    "game_local": GAME_LIBS_ROOT / "src" / "mpgame" / "Game_local.cpp",
-    "mp": GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.cpp",
-    "mp_header": GAME_LIBS_ROOT / "src" / "mpgame" / "MultiplayerGame.h",
-    "player": GAME_LIBS_ROOT / "src" / "mpgame" / "Player.cpp",
+    "game_local": GAME_LIBS_ROOT / "src" / "game" / "Game_local.cpp",
+    "mp": GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.cpp",
+    "mp_header": GAME_LIBS_ROOT / "src" / "game" / "MultiplayerGame.h",
+    "player": GAME_LIBS_ROOT / "src" / "game" / "Player.cpp",
 }
 
 

@@ -5,7 +5,7 @@ tools/tests/native/MpLagCompensationFixture.cpp supplies a mock server - players
 through a rewind history, a network system reporting each client's prediction lead and
 round trip, and user info carrying the advertised remote extrapolation - and the
 history, estimate, advertisement and rewind/restore functions are spliced in verbatim
-from src/mpgame/Game_local.cpp.
+from src/game/Game_local.cpp.
 
 The fixture proves the coupled contract MP-07 asks for: a client in legacy prediction
 is rewound by its whole displayed pose age; a client that extrapolates remote players
@@ -95,9 +95,9 @@ def build_fixture(game_local: str, header: str, gauntlet: str | None = None,
     bodies = "\n".join(block(game_local, signature) for signature in FUNCTIONS)
     harness = (ROOT / "tools/tests/native/MpLagCompensationFixture.cpp").read_text(encoding="utf-8")
     if gauntlet is None:
-        gauntlet = (ROOT / "src/mpgame/weapon/WeaponGauntlet.cpp").read_text(encoding="utf-8")
+        gauntlet = (ROOT / "src/game/weapon/WeaponGauntlet.cpp").read_text(encoding="utf-8")
     if lightning is None:
-        lightning = (ROOT / "src/mpgame/weapon/WeaponLightningGun.cpp").read_text(encoding="utf-8")
+        lightning = (ROOT / "src/game/weapon/WeaponLightningGun.cpp").read_text(encoding="utf-8")
     hitscan = block(game_local, "idEntity* idGameLocal::HitScan(")
     resolution = hitscan[hitscan.index("collisionPoint = tr.c.point"):hitscan.index("// computing the collisionArea")]
     penetration = block(hitscan, "if ( ent->IsType ( idActor::GetClassType() ) && penetrate > 0.0f )")
@@ -121,8 +121,8 @@ def compile_and_run(source: str, directory: Path, name: str, compiler: str) -> s
 
 
 def main() -> None:
-    game_local = (ROOT / "src/mpgame/Game_local.cpp").read_text(encoding="utf-8")
-    header = (ROOT / "src/mpgame/Game_local.h").read_text(encoding="utf-8")
+    game_local = (ROOT / "src/game/Game_local.cpp").read_text(encoding="utf-8")
+    header = (ROOT / "src/game/Game_local.h").read_text(encoding="utf-8")
     compiler = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("g++")
     if not compiler:
         raise RuntimeError("A C++ compiler is required for the lag compensation fixture")
@@ -146,8 +146,8 @@ def main() -> None:
 
         # Execute the real weapon resolution blocks too: restoring physics alone
         # does not put an impact/beam in the present or keep a rail ray straight.
-        gauntlet = (ROOT / "src/mpgame/weapon/WeaponGauntlet.cpp").read_text(encoding="utf-8")
-        lightning = (ROOT / "src/mpgame/weapon/WeaponLightningGun.cpp").read_text(encoding="utf-8")
+        gauntlet = (ROOT / "src/game/weapon/WeaponGauntlet.cpp").read_text(encoding="utf-8")
+        lightning = (ROOT / "src/game/weapon/WeaponLightningGun.cpp").read_text(encoding="utf-8")
         old_restore = "if ( lagCompApplied ) { gameLocal.EndMPLagCompensation( lagCompRestore, lagCompRestoreCount ); }"
         controls = (
             ("gauntlet impact left in the past", game_local,

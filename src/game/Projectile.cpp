@@ -1,13 +1,14 @@
 // RAVEN BEGIN
-// bdube: note that this file is no longer merged with legacy engine updates
+// bdube: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 #include "ai/AI_Manager.h"
+#include "mp/match/MatchDeadline.h"
 #include "Projectile.h"
 #include "spawner.h"
 
@@ -82,6 +83,7 @@ idProjectile::idProjectile( void ) {
 	fl.networkSync		= true;
 
 	prePredictTime		= 0;
+	deadReckonPrestep	= 0;
 
 	syncPhysics			= false;
 
@@ -89,6 +91,10 @@ idProjectile::idProjectile( void ) {
 	launchOrig			= vec3_origin;
 	launchDir			= vec3_origin;
 	launchSpeed			= 0.0f;
+
+	playedDamageEffect = false;
+	
+	predictedProjectiles = false;
 }
 
 /*
@@ -112,12 +118,22 @@ void idProjectile::Spawn( void ) {
  	physicsObj.PutToRest();
  	SetPhysics( &physicsObj );
 	prePredictTime = spawnArgs.GetInt( "predictTime", "0" );
+	// Set here rather than in Launch: the terminal-state reconstructions in
+	// ReadFromSnapshot rebuild a projectile without Launch ever having run, and they
+	// dead reckon too.
+	deadReckonPrestep = prePredictTime;
 	syncPhysics = spawnArgs.GetBool( "net_syncPhysics", "0" );
 
 	if ( gameLocal.isClient ) {
 		Hide();
 	}
+
+	// the campaign never predicts projectiles, whatever the archived cvar says
+	predictedProjectiles = gameLocal.IsMultiplayerMode() && g_predictedProjectiles.GetBool();
 }
+
+// The value a campaign save stores for idProjectile::STUCK (see Save).
+static const int PROJECTILE_SAVED_STUCK = 5;
 
 /*
 ================
@@ -165,7 +181,9 @@ void idProjectile::Save( idSaveGame *savefile ) const {
 	savefile->WriteInt ( bounceCount );
 	savefile->WriteInt ( hitCount );
 
- 	savefile->WriteInt( (int)state );
+	// openQ4 (CORE-07): saves keep the single-player numbering, in which STUCK
+	// followed EXPLODED. IMPACTED is a predicted multiplayer state, never saved.
+ 	savefile->WriteInt( state == STUCK ? PROJECTILE_SAVED_STUCK : (int)state );
 }
 
 /*
@@ -231,7 +249,9 @@ void idProjectile::Restore( idRestoreGame *savefile ) {
 	savefile->ReadInt ( bounceCount );
 	savefile->ReadInt ( hitCount );
 
-	savefile->ReadInt( (int &)state );
+	int savedState;
+	savefile->ReadInt( savedState );
+	state = ( savedState == PROJECTILE_SAVED_STUCK ) ? STUCK : (projectileState_t)savedState;
 }
 
 /*
@@ -309,28 +329,13 @@ void idProjectile::Create( idEntity* _owner, const idVec3 &start, const idVec3 &
 		renderLight.noShadows = !G_DynamicLightShadowsEnabled();
 // RAVEN END
 	}
-	// openQ4: with no authored light, the classic layer decides whether this is
-	// a bright projectile and gives it an asset-matched dlight to carry.
-	else if ( !G_ClassicProjectileLight( spawnArgs, renderLight ) && gameLocal.isMultiplayer ) {
-		const char *className = spawnArgs.GetString( "classname", "" );
-		if ( !idStr::Icmpn( className, "projectile_rocket", 17 ) ) {
-			// MP rocket trail effects don't carry a light segment in stock assets.
-			// Add an explicit projectile light so rockets still illuminate nearby geometry.
-			renderLight.shader = declManager->FindMaterial( "lights/fire2", false );
-			if ( renderLight.shader ) {
-				renderLight.pointLight = true;
-				renderLight.lightRadius[0] = 200.0f;
-				renderLight.lightRadius[1] = 200.0f;
-				renderLight.lightRadius[2] = 200.0f;
-				renderLight.shaderParms[0] = 0.905882f;
-				renderLight.shaderParms[1] = 0.517647f;
-				renderLight.shaderParms[2] = 0.160784f;
-				renderLight.shaderParms[3] = 1.0f;
-				renderLight.detailLevel = DEFAULT_LIGHT_DETAIL_LEVEL;
-				renderLight.noShadows = true;
-			}
-		}
+// openQ4 BEGIN
+	// With no authored light, the classic layer decides whether this is a
+	// bright projectile and gives it an asset-matched dlight to carry.
+	else {
+		G_ClassicProjectileLight( spawnArgs, renderLight );
 	}
+// openQ4 END
 
 	// openQ4: a projectile whose light casts shadows keeps its own model out of
 	// them; the light sits inside it.  Stock projectile defs already say
@@ -373,6 +378,36 @@ void idProjectile::FreeLightDef( void ) {
 		gameRenderWorld->FreeLightDef( lightDefHandle );
 		lightDefHandle = -1;
 	}
+}
+
+/*
+=================
+idProjectile::DeadReckonOrigin
+
+Where the server's copy of this projectile is at atTime, reproduced analytically.
+
+The server folds the def's predictTime into the projectile's FIRST physics step.  Launch
+records launchOrig before any physics has run and latches predictTime; the projectile is
+appended to gameLocal.activeEntities by BecomeActive and is therefore visited on its own
+launch frame by the forward walk in idGameLocal::RunFrame; and idEntity::RunPhysics
+evaluates ( endTime - startTime + predictTime ) once and clears it.  So the authoritative
+trajectory is launchOrig + v * ( t - launchTime + tic + prestep ).  This helper supplies
+the prestep, and every caller is followed by exactly one RunPhysics tic which supplies
+the tic.
+
+Every copy of this expression used to omit the prestep, so a client drew
+projectile_rocket_mp 46.75 units short of the server for the projectile's whole flight
+and snapped backward by that amount on its second visible frame.  Measured on a listen
+server, as the flight time the travelled distance implies minus the flight time actually
+elapsed: server 65-66 ms, remote client 13-15 ms.
+=================
+*/
+idVec3 idProjectile::DeadReckonOrigin( int atTime ) const {
+	// Clamped because a snapshot whose gameTime equals launchTime - ClientReadSnapshot
+	// winds the clock back - would otherwise seed a negative flight time and place a
+	// nailgun or hyperblaster bolt behind the muzzle, inside the shooter's own bounds.
+	const int flightMS = Max( 0, atTime - launchTime + deadReckonPrestep );
+	return launchOrig + ( flightMS * 0.001f ) * launchSpeed * launchDir;
 }
 
 /*
@@ -515,7 +550,7 @@ void idProjectile::Launch( const idVec3 &start, const idVec3 &dir, const idVec3 
 	physicsObj.SetLinearVelocity( dir * speed.GetCurrentValue(gameLocal.time) + pushVelocity );
 	physicsObj.SetOrigin( start );
 	physicsObj.SetAxis( dir.ToMat3() );
-
+	
 	if ( !gameLocal.isClient ) {
 		if ( fuse <= 0 ) {
 			// run physics for 1 second
@@ -576,7 +611,12 @@ void idProjectile::Launch( const idVec3 &start, const idVec3 &dir, const idVec3 
 
 	hitCount = 0;
 
-	predictTime = prePredictTime;
+	// Only the server integrates the prestep through physics.  A client reproduces it
+	// analytically in DeadReckonOrigin, and letting its own RunPhysics consume
+	// predictTime as well puts the first visible frame 50 ms ahead and every frame after
+	// it 46.75 units behind.  isClient is false on a listen server, so the host keeps the
+	// authoritative behaviour.
+	predictTime = gameLocal.isClient ? 0 : prePredictTime;
 
 	if ( spawnArgs.GetFloat( "delay_emit_damage" ) > 0.0f ) {
 		PostEventSec( &EV_EmitDamage, spawnArgs.GetFloat( "wait_emit_damage", "0" ), this );
@@ -587,6 +627,10 @@ void idProjectile::Launch( const idVec3 &start, const idVec3 &dir, const idVec3 
 		launchTime = gameLocal.time;
 		launchOrig = physicsObj.GetOrigin();
 		launchDir = dir;
+	} else {
+		if ( predictedProjectiles ) {
+			physicsObj.Evaluate( gameLocal.time - launchTime + deadReckonPrestep, gameLocal.time );
+		}
 	}
 
 	if ( g_perfTest_noProjectiles.GetBool() ) {
@@ -618,13 +662,29 @@ void idProjectile::Think( void ) {
 		
 		RunPhysics();
 
+		// openQ4: how far this projectile has travelled along its launch direction, expressed as
+		// the flight time that displacement implies, minus the flight time actually elapsed.  Both
+		// ends derive it from the same replicated launchOrig/launchTime/launchDir, so the server's
+		// figure and a client's are directly comparable with nothing added to the wire.
+		if ( g_projectilePredictionDebug.GetInteger() > 0 && state == LAUNCHED && launchSpeed > 1.0f ) {
+			const float along = ( GetPhysics()->GetOrigin() - launchOrig ) * launchDir;
+			const int offsetMS = idMath::Ftoi( ( along / launchSpeed ) * 1000.0f ) - ( gameLocal.time - launchTime );
+			gameLocal.Printf( "MPProj: %s ent=%d client=%d offsetMS=%d prestep=%d\n",
+				GetEntityDefName(), entityNumber, gameLocal.isClient ? 1 : 0, offsetMS, prePredictTime );
+		}
+
 // openQ4 BEGIN
 		// The physics mask deliberately excludes liquids. Compare the endpoints of this frame's
 		// movement to find entry and exit crossings, place a splash on the actual boundary, and
 		// leave the projectile's velocity untouched.
 		const idVec3 currentOrigin = physicsObj.GetOrigin();
 		const int currentLiquid = gameLocal.LiquidContentsAtPoint( currentOrigin, this );
-		if ( previousLiquid != currentLiquid ) {
+		// Server only: a client reaches this through ClientPredictionThink on a straight,
+		// unclipped dead-reckoned line, so it would splash on boundaries the authoritative
+		// trajectory never crossed, and it would splash again when the server's broadcast
+		// arrived.  The broadcast is the copy that is right for everyone, including clients
+		// that are not simulating this projectile.
+		if ( !gameLocal.isClient && previousLiquid != currentLiquid ) {
 			const int crossedLiquid = previousLiquid ? previousLiquid : currentLiquid;
 			const idVec3 insidePoint = currentLiquid ? currentOrigin : previousOrigin;
 			const idVec3 outsidePoint = currentLiquid ? previousOrigin : currentOrigin;
@@ -704,8 +764,8 @@ void idProjectile::Think( void ) {
 		}
 
 		if ( applyRotation ) {
-			UpdateVisualAngles();
-		}
+		UpdateVisualAngles();
+	}
 	}
 		
 	// a stuck projectile may still have a corpse to pin
@@ -717,7 +777,14 @@ void idProjectile::Think( void ) {
 
 	// add the light
  	if ( renderLight.lightRadius.x > 0.0f && g_projectileLights.GetBool() ) {
-		renderLight.origin = GetPhysics()->GetOrigin() + GetPhysics()->GetAxis() * lightOffset;
+		if ( gameLocal.isMultiplayer ) {
+			// Composed from the visual transform rather than from physics: the drawn
+			// projectile rides the presentation clock, and a light built from physics steps
+			// 15 units a tic under an eye that does not.
+			renderLight.origin = renderEntity.origin + GetPhysics()->GetAxis() * lightOffset;
+		} else {
+			renderLight.origin = GetPhysics()->GetOrigin() + GetPhysics()->GetAxis() * lightOffset;
+		}
 		renderLight.axis = GetPhysics()->GetAxis();
 		if ( ( lightDefHandle != -1 ) ) {
 			if ( lightEndTime > 0 && gameLocal.time <= lightEndTime + gameLocal.GetMSec() ) {
@@ -734,6 +801,45 @@ void idProjectile::Think( void ) {
 		} else {
 			lightDefHandle = gameRenderWorld->AddLightDef( &renderLight );
 		}
+	}
+}
+
+/*
+================
+idProjectile::ThinkMatchPaused
+
+Projectile fuses are posted events and are shifted by the central queue pass.
+The trajectory is frame-delta driven, but its acceleration, orientation,
+cheap-prediction origin and light fade retain absolute engine-time origins.
+================
+*/
+void idProjectile::ThinkMatchPaused( int deltaMsec ) {
+	idEntity::ThinkMatchPaused( deltaMsec );
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+
+	float startTime = speed.GetStartTime();
+	mpMatchShiftTimeOrigin( startTime, deltaMsec );
+	speed.SetStartTime( startTime );
+
+	startTime = rotation.GetStartTime();
+	mpMatchShiftTimeOrigin( startTime, deltaMsec );
+	rotation.SetStartTime( startTime );
+
+	if ( state >= LAUNCHED ) {
+		mpMatchShiftTimeOrigin( launchTime, deltaMsec );
+	}
+	if ( lightEndTime > 0 ) {
+		mpMatchShiftTimeOrigin( lightStartTime, deltaMsec );
+		mpMatchShiftOptionalDeadline( lightEndTime, deltaMsec );
+	}
+	if ( lightDefHandle != -1 ) {
+		renderLight.shaderParms[ SHADERPARM_TIMEOFFSET ] -= MS2SEC( deltaMsec );
+		if ( renderLight.shaderParms[ SHADERPARM_TIME_OF_DEATH ] > 0.0f ) {
+			renderLight.shaderParms[ SHADERPARM_TIME_OF_DEATH ] += MS2SEC( deltaMsec );
+		}
+		gameRenderWorld->UpdateLightDef( lightDefHandle, &renderLight );
 	}
 }
 
@@ -787,16 +893,21 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
  	
  	hitTeleporter = false;
 
-	if ( state == EXPLODED || state == FIZZLED || state == STUCK ) {
+	if ( state == EXPLODED || state == FIZZLED || state == STUCK || ( state == IMPACTED && predictedProjectiles ) ) {
 		return true;
+	}
+
+	if ( IsHidden() && predictedProjectiles ) {
+		// teleported, ignore impacts
+		return false;
 	}
 
 	// allow projectiles to hit triggers (teleports)
 	// predict this on a client
-	if( collision.c.contents & CONTENTS_TRIGGER ) {
+	if ( collision.c.contents & CONTENTS_TRIGGER ) {
 		idEntity* trigger = gameLocal.entities[ collision.c.entityNum ];
 		
-		if( trigger ) {
+		if ( trigger ) {
 			if ( trigger->RespondsTo( EV_Touch ) || trigger->HasSignal( SIG_TOUCH ) ) {
 				
 				hitTeleporter = true;
@@ -814,9 +925,19 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 					trace.c.id = 0;
 				}
 				
+				// hack to play the effect on clients when mispredicted (Hide() ensures it can't play twice for the same teleport)
+				int wasNewFrame = gameLocal.isNewFrame;
+				if ( gameLocal.isClient && predictedProjectiles ) {
+					gameLocal.isNewFrame = true;
+				}
 
 				trigger->Signal( SIG_TOUCH );
 				trigger->ProcessEvent( &EV_Touch, this, &trace );
+
+				if ( gameLocal.isClient && predictedProjectiles ) {
+					Hide();
+					gameLocal.isNewFrame = wasNewFrame;
+				}
 			}
 		}
 
@@ -847,11 +968,17 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 		}
 	}
 
-	// don't predict collisions on projectiles that need their physics synced (e.g. grenades)
-	if ( gameLocal.isClient && (!g_clientProjectileCollision.GetBool() || syncPhysics) ) {
-		// optionally do not try to predict detonates, that causes projectiles disappearing
-		// but most of the time works well to stop projectiles clipping through geometry onc lients
-		return false;
+	// network clients: heuristic to skip predicting collisions
+	if ( gameLocal.isClient ) {
+		if ( predictedProjectiles ) {
+			if ( syncPhysics ) {
+				return false;
+			}
+		} else {
+			if ( spawnArgs.GetBool( "no_impact_prediction" ) || syncPhysics ) {
+				return false;
+			}
+		}
 	}
 
  	// remove projectile when a 'noimpact' surface is hit
@@ -867,7 +994,6 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 	// get the entity the projectile collided with
 	ent = gameLocal.entities[ collision.c.entityNum ];
 	if ( ent == owner.GetEntity() ) {
-		// assert( 0 );		// twhitaker: this isn't necessary
 		return true;
 	}
 
@@ -879,9 +1005,9 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
    	}
 
 	// If the hit entity is bound to an actor use the actor instead
-	if ( ent->GetTeamMaster( ) && ent->GetTeamMaster( )->IsType ( idActor::GetClassType() ) ) {
+	if ( ent->GetTeamMaster() && ent->GetTeamMaster()->IsType ( idActor::GetClassType() ) ) {
 		actualHitEnt = ent;
-		ent = ent->GetTeamMaster( );
+		ent = ent->GetTeamMaster();
 	}
 
 	// a "passThroughActors" projectile hurts an actor only once
@@ -920,6 +1046,7 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 
 	//Apply any impact force if the necessary
 	ApplyImpactForce(ent, collision, dir);
+	//ApplyImpactForce(ent, collision, dir);
  
 	// MP: projectiles open doors
 	if ( gameLocal.isMultiplayer && ent->IsType( idDoor::GetClassType() ) && !static_cast< idDoor * >(ent)->IsOpen() && !ent->spawnArgs.GetBool( "no_touch" ) ) {
@@ -928,7 +1055,8 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 
 // openQ4 BEGIN
 	// A liquid surface never stops a projectile, it splashes and lets it through. This used to test
-	// only the hit entity's contents, so map water - a world brush - never splashed at all.
+	// only the hit entity's contents, so map water - a world brush - never splashed at all, and the
+	// multiplayer tree played no splash whatsoever.
 	const int liquidContents = gameLocal.LiquidContentsAtCollision( ent, collision );
 	if ( liquidContents ) {
 		if ( !physicsObj.IsInWater( ) ) {
@@ -937,12 +1065,11 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 				//flyEffect->Event_Remove();
 			}
 
-			// Match stock behavior by preferring an explicit water impact effect.
-			const rvDeclMatType* waterMaterialType = collision.c.materialType;
-			if ( waterMaterialType == NULL ) {
-				waterMaterialType = declManager->FindMaterialType( gameLocal.LiquidTypeName( liquidContents ), false );
+			const rvDeclMatType* liquidMaterialType = collision.c.materialType;
+			if ( liquidMaterialType == NULL ) {
+				liquidMaterialType = declManager->FindMaterialType( gameLocal.LiquidTypeName( liquidContents ), false );
 			}
-			const idDecl *impactEffect = gameLocal.GetEffect( spawnArgs, "fx_impact", waterMaterialType );
+			const idDecl *impactEffect = gameLocal.GetEffect( spawnArgs, "fx_impact", liquidMaterialType );
 			if ( impactEffect ) {
 				gameLocal.PlayEffect( impactEffect, collision.c.point, collision.c.normal.ToMat3(), false, vec3_origin, true );
 			} else {
@@ -1030,7 +1157,6 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 // jshepard: Single Player- if the the player is the attacker and the victim is teammate, don't play any blood effects.
 	bool willPlayDamageEffect = true;
 
-// jnewquist: Use accessor for static class type 
 		if ( owner.GetEntity() && owner.GetEntity()->IsType( idPlayer::GetClassType() ) ) {
 			// if the projectile hit an ai
 			if ( ent->IsType( idAI::GetClassType() ) ) {
@@ -1081,30 +1207,20 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 	
 	ignore = ent;
 
-	// TODO: fixme
-	ent->AddDamageEffect ( collision, velocity, damageDefName, owner );
+	// single player plays the hit's damage effects first, also for a hit that
+	// sticks in a corpse or passes through a living actor
+	if ( !gameLocal.isMultiplayer ) {
+		// TODO: fixme
+		ent->AddDamageEffect ( collision, velocity, damageDefName, owner );
 
 // RAVEN BEGIN
 // jshepard: Single Player- if the the player is the attacker and the victim is teammate, don't play any effects.
 // this should make sure that only explosion effects play when the player shoots his comrades. 
-	if( willPlayDamageEffect || spawnArgs.GetBool( "friendly_impact") )	{
-		DefaultDamageEffect( collision, velocity, damageDefName );
-	}
-// RAVEN END
-
-/*
-	// if the projectile causes a damage effect
-	bool explodeFX = true;
- 	if ( spawnArgs.GetBool( "impact_damage_effect" ) ) {
-		// if the hit entity has a special damage effect
-		if ( ent->spawnArgs.GetBool( "bleed" ) ) {
- 			ent->AddDamageEffect( collision, velocity, damageDefName );
-		} else {
- 			DefaultDamageEffect( collision, velocity, damageDefName );
-			explodeFX = false;
+		if( willPlayDamageEffect || spawnArgs.GetBool( "friendly_impact") )	{
+			DefaultDamageEffect( collision, velocity, damageDefName );
 		}
+// RAVEN END
 	}
-*/
 
 	// "freezeEnemies": every hit chills the AI a little more (idAI::AddFreeze)
 	if ( spawnArgs.GetBool( "freezeEnemies" ) ) {
@@ -1117,25 +1233,59 @@ bool idProjectile::Collide( const trace_t &collision, const idVec3 &velocity, bo
 		}
 	}
 
-	// "sticky" projectiles stay in an actor they kill and may pin the corpse;
-	// "passThroughActors" ones hurt a living actor once and glance off it instead of detonating
-	if ( !gameLocal.isClient && canDamage && ent->IsType( idActor::GetClassType() ) ) {
-		if ( sticky && ent->health <= 0 && !gameLocal.isMultiplayer ) {
-			Stick( collision, ent, dir );
-			return true;
-		}
-		if ( passThroughActors && ent->health > 0 ) {
-			passedThrough = ent;
-			return false;
-		}
-	}
-
-	// don't predict explosions on clients
-	if( gameLocal.isClient ) {
+	// "sticky" projectiles stay in an actor they kill and may pin the corpse (single player only)
+	if ( !gameLocal.isClient && canDamage && ent->IsType( idActor::GetClassType() ) && sticky && ent->health <= 0 && !gameLocal.isMultiplayer ) {
+		Stick( collision, ent, dir );
 		return true;
 	}
 
-	Explode( &collision, false, ignore );
+	// "passThroughActors" projectiles hurt a living actor once and glance off it instead of detonating
+	if ( !gameLocal.isClient && canDamage && ent->IsType( idActor::GetClassType() ) && passThroughActors && ent->health > 0 ) {
+		if ( gameLocal.isMultiplayer ) {
+			ent->AddDamageEffect( collision, velocity, damageDefName, owner );
+		}
+		passedThrough = ent;
+		return false;
+	}
+
+	if ( predictedProjectiles ) {
+		if ( ( gameLocal.isClient || gameLocal.isListenServer ) && !playedDamageEffect ) {
+			ent->AddDamageEffect( collision, velocity, damageDefName, owner );
+		}
+
+		// hack to play the effect on clients when mispredicted (state/playedDamageEffect ensure it can't happen twice)
+		int wasNewFrame = gameLocal.isNewFrame;
+		if ( gameLocal.isClient ) {
+			gameLocal.isNewFrame = true;
+		}
+
+		// if the the player is the attacker and the victim is teammate, don't play any effects.
+		if ( ( gameLocal.isClient || gameLocal.isListenServer ) && !playedDamageEffect && ( willPlayDamageEffect || spawnArgs.GetBool( "friendly_impact") ) ) {
+			DefaultDamageEffect( collision, velocity, damageDefName );
+			playedDamageEffect = true;
+		}
+
+		Explode( &collision, false, ignore );
+
+		gameLocal.isNewFrame = wasNewFrame;
+	} else {
+		// single player played these before "freezeEnemies"
+		if ( gameLocal.isMultiplayer ) {
+			ent->AddDamageEffect ( collision, velocity, damageDefName, owner );
+
+			// if the the player is the attacker and the victim is teammate, don't play any effects.
+			if ( willPlayDamageEffect || spawnArgs.GetBool( "friendly_impact") ) {
+				DefaultDamageEffect( collision, velocity, damageDefName );
+			}
+		}
+
+		// don't predict explosions on clients
+		if ( gameLocal.isClient ) {
+			return true;
+		}
+
+		Explode( &collision, false, ignore );
+	}
 
 	return true;
 }
@@ -1407,7 +1557,7 @@ void idProjectile::DefaultDamageEffect( const trace_t &tr, const idVec3 &velocit
 		// Play an actor specific impact effect?
 		const idDecl *actorImpactEffect = gameLocal.GetEffect( spawnArgs, "fx_impact_actor", tr.c.materialType );
 		if ( actorImpactEffect ) {
-			gameLocal.PlayEffect( actorImpactEffect, tr.c.point, axis, false, vec3_origin, true );
+			gameLocal.PlayEffect( actorImpactEffect, tr.c.point, axis, false, vec3_origin, true, true );
 			return;
 		}
 	} else {
@@ -1416,9 +1566,9 @@ void idProjectile::DefaultDamageEffect( const trace_t &tr, const idVec3 &velocit
 	
 	// Play an impact effect on the entity that got hit
 	if ( ent->IsType( idMover::GetClassType ( ) ) ) {
-		ent->PlayEffect( gameLocal.GetEffect( spawnArgs, "fx_impact", tr.c.materialType ), tr.c.point, axis, false, vec3_origin, true );
+		ent->PlayEffect( gameLocal.GetEffect( spawnArgs, "fx_impact", tr.c.materialType ), tr.c.point, axis, false, vec3_origin, spawnArgs.GetBool( "no_impact_prediction" ), true );
 	} else { 
-		gameLocal.PlayEffect( gameLocal.GetEffect( spawnArgs, "fx_impact", tr.c.materialType ), tr.c.point, axis, false, vec3_origin, true );
+		gameLocal.PlayEffect( gameLocal.GetEffect( spawnArgs, "fx_impact", tr.c.materialType ), tr.c.point, axis, false, vec3_origin, spawnArgs.GetBool( "no_impact_prediction" ), true );
 	}
 }
 
@@ -1443,14 +1593,23 @@ idProjectile::Fizzle
 ================
 */
 void idProjectile::Fizzle( void ) {
-
-	if ( gameLocal.isClient || state == EXPLODED || state == FIZZLED ) {
+	if ( state == EXPLODED || state == FIZZLED ) {
 		return;
+	}
+
+	if ( predictedProjectiles ) {
+		if ( state == IMPACTED ) {
+			return;
+		}		
+	} else {
+		if ( gameLocal.isClient ) {
+			return;
+		}
 	}
 
 	StopSound( SND_CHANNEL_BODY, false );
 	StartSound( "snd_fizzle", SND_CHANNEL_BODY, 0, false, NULL );
-	
+
 	gameLocal.PlayEffect( spawnArgs, "fx_fuse", GetPhysics()->GetOrigin(), GetPhysics()->GetAxis() );
 
 	fl.takedamage = false;
@@ -1469,9 +1628,23 @@ void idProjectile::Fizzle( void ) {
 
 	state = FIZZLED;
 
-	CancelEvents( &EV_EmitDamage );
+	int removeTime = spawnArgs.GetInt( "remove_time", "1500" );
+	
+	if ( predictedProjectiles ) {
+		// ensure the projectile makes it in to at least one snapshot
+		int snapshotTime = gameLocal.GetMSec() + cvarSystem->GetCVarInteger( "net_serverSnapshotDelay" );	if ( removeTime < snapshotTime )
+		if ( removeTime < snapshotTime ) {
+			removeTime = snapshotTime;
+		}
+	}
+
+	// openQ4: a fizzled single-player projectile stops emitting damage
+	if ( !gameLocal.isMultiplayer ) {
+		CancelEvents( &EV_EmitDamage );
+	}
+
  	CancelEvents( &EV_Fizzle );
-	PostEventMS( &EV_Remove, spawnArgs.GetInt( "remove_time", "1500" ) );
+	PostEventMS( &EV_Remove, removeTime );
 }
 
 /*
@@ -1518,11 +1691,15 @@ idProjectile::Explode
 */
 void idProjectile::Explode( const trace_t *collision, const bool showExplodeFX, idEntity *ignore, const char *sndExplode ) {
 	idVec3		normal, endpos;
-	int			removeTime;
+	int 		removeTime;
 
 	if ( state == EXPLODED || state == FIZZLED ) {
 		return;
 	}
+
+	if ( predictedProjectiles && state == IMPACTED ) {
+		return;
+	} 
 
 	CancelEvents( &EV_EmitDamage );
 
@@ -1532,30 +1709,31 @@ void idProjectile::Explode( const trace_t *collision, const bool showExplodeFX, 
 		normal = collision ? collision->c.normal : idVec3( 0, 0, 1 );
 	}
 	endpos = ( collision ) ? collision->endpos : GetPhysics()->GetOrigin();
-
+	
 	removeTime = spawnArgs.GetInt( "remove_time", "1500" );
 
 	// play sound
 	StopSound( SND_CHANNEL_BODY, false );
 	StartSound( sndExplode, SND_CHANNEL_BODY, 0, false, NULL );
 
-	if ( showExplodeFX ) {
-		idVec3 fxDir;
-		if ( physicsObj.GetGravityNormal( ) != vec3_zero ) {
-			fxDir = -physicsObj.GetGravityNormal( );
-		} else { 
-			fxDir = -physicsObj.GetLinearVelocity( );
-			fxDir.Normalize( );
+	idVec3 fxDir;
+	if ( physicsObj.GetGravityNormal( ) != vec3_zero ) {
+		fxDir = -physicsObj.GetGravityNormal( );
+	} else { 
+		fxDir = -physicsObj.GetLinearVelocity( );
+		fxDir.Normalize( );
+	}
+
+	if ( predictedProjectiles ) {
+		if ( ( gameLocal.isClient || gameLocal.isListenServer ) && !playedDamageEffect ) {
+			PlayDetonateEffect( endpos, fxDir.ToMat3() );
 		}
-		// FIXME: This should be done in a better way
+	} else if ( showExplodeFX ) {
 		PlayDetonateEffect( endpos, fxDir.ToMat3() );
 	}
 
 	// Stop the fly effect without destroying particles to ensure the trail within can persist.
 	StopEffect( "fx_fly" );	
-	if( flyEffect)	{
-		//flyEffect->Event_Remove();
-	}
 	
 	// Stop the remaining particles
 	StopAllEffects( );
@@ -1569,7 +1747,11 @@ void idProjectile::Explode( const trace_t *collision, const bool showExplodeFX, 
 	physicsObj.SetContents( 0 );
 	physicsObj.PutToRest();
 
-	state = EXPLODED;
+	if ( predictedProjectiles ) {
+		state = showExplodeFX ? EXPLODED : IMPACTED;
+	} else {
+		state = EXPLODED;
+	}
 
 	if ( gameLocal.isClient ) {
 		return;
@@ -1583,8 +1765,19 @@ void idProjectile::Explode( const trace_t *collision, const bool showExplodeFX, 
 		Bind( gameLocal.entities[collision->c.entityNum], true );
 	}
 
+	if ( predictedProjectiles ) {
+		removeTime = spawnArgs.GetInt( "detonate_remove_time", "0" );
+	
+		// ensure the projectile makes it in to at least one snapshot
+		int snapshotTime = gameLocal.GetMSec() + cvarSystem->GetCVarInteger( "net_serverSnapshotDelay" );
+		if ( removeTime < snapshotTime ) {
+			removeTime = snapshotTime;
+		}
+	} else {
+		removeTime = 0;
+	}
+
 	// splash damage
-	removeTime = 0;
 	float delay = spawnArgs.GetFloat( "delay_splash" );
 	if ( delay ) {
 		if ( removeTime < delay * 1000 ) {
@@ -1668,27 +1861,27 @@ void idProjectile::PlayPainEffect ( idEntity* ent, int damage, const rvDeclMatTy
 idProjectile::PlayDetonateEffect
 ================
 */
-void idProjectile::PlayDetonateEffect( const idVec3& origin, const idMat3& axis ) {
+void idProjectile::PlayDetonateEffect( const idVec3& origin, const idMat3& axis, bool forceImpact ) {
 // openQ4 BEGIN
 	// Classic Quake II/III explosion dlight.  Nothing in the shipped Quake 4
 	// detonation effects flashes the room, so this is the whole of it.
 	G_ClassicExplosionFlash( spawnArgs, origin );
 // openQ4 END
 
-	if( physicsObj.HasGroundContacts() ) {
+	if( physicsObj.HasGroundContacts() || ( forceImpact && predictedProjectiles ) ) {
 		if ( spawnArgs.GetBool( "detonateTestGroundMaterial" ) ) {
 			trace_t tr;
 			idVec3 down;
 			down = GetPhysics()->GetOrigin() + GetPhysics()->GetGravityNormal()*8.0f;
 			gameLocal.Translation( this, tr, GetPhysics()->GetOrigin(), down, GetPhysics()->GetClipModel(), GetPhysics()->GetClipModel()->GetAxis(), GetPhysics()->GetClipMask(), this );
-			gameLocal.PlayEffect( gameLocal.GetEffect( spawnArgs, "fx_impact", tr.c.materialType ), origin, axis, false, vec3_origin, true );
+			gameLocal.PlayEffect( gameLocal.GetEffect( spawnArgs, "fx_impact", tr.c.materialType ), origin, axis, false, vec3_origin, true, true );
 		} else {
-			gameLocal.PlayEffect( spawnArgs, "fx_impact", origin, axis, false, vec3_origin, true );
+			gameLocal.PlayEffect( spawnArgs, "fx_impact", origin, axis, false, vec3_origin, true, true );
 		}
 		return;
 	}
 
-	gameLocal.PlayEffect( spawnArgs, "fx_detonate", origin, axis, false, vec3_origin, true );
+	gameLocal.PlayEffect( spawnArgs, "fx_detonate", origin, axis, false, vec3_origin, true, true );
 }
 
 /*
@@ -1735,8 +1928,13 @@ void idProjectile::Event_Touch( idEntity *other, trace_t *trace ) {
 		memset( &collision, 0, sizeof( collision ) );
 		collision.c.point = GetPhysics()->GetOrigin();
 		collision.c.normal.Set( 0, 0, 1 );
-		DefaultDamageEffect( collision, collision.c.normal, NULL );
-		Explode( NULL, true );
+
+		bool playDefaultDamageEffect = predictedProjectiles ? !playedDamageEffect : true;
+		if ( playDefaultDamageEffect ) {
+			DefaultDamageEffect( collision, collision.c.normal, NULL );
+			playedDamageEffect = true;
+		}
+		Explode( NULL, !predictedProjectiles );
 
 		gameLocal.currentThinkingEntity = think;
 	}
@@ -1758,11 +1956,8 @@ void idProjectile::ClientPredictionThink( void ) {
 		return;
 	}
 	if ( !syncPhysics && state == LAUNCHED ) {
-		idMat3 axis = launchDir.ToMat3();
-		idVec3 origin( launchOrig );
-		origin += ( ( gameLocal.time - launchTime ) / 1000.0f ) * launchSpeed * launchDir;
-		physicsObj.SetAxis( axis );
-		physicsObj.SetOrigin( origin );
+		physicsObj.SetAxis( launchDir.ToMat3() );
+		physicsObj.SetOrigin( DeadReckonOrigin( gameLocal.time ) );
 		physicsObj.SetLinearVelocity( launchSpeed * launchDir );
 	}
 	Think();
@@ -1786,7 +1981,16 @@ void idProjectile::WriteToSnapshot( idBitMsgDelta &msg ) const {
 		msg.WriteFloat( launchOrig[ 0 ] );
 		msg.WriteFloat( launchOrig[ 1 ] );
 		msg.WriteFloat( launchOrig[ 2 ] );
-		msg.WriteDir( launchDir, 24 );
+		// openQ4: 16 bits a component (protocol 2.42). The 24-bit direction kept 7 bits a
+		// component while the server flies the exact one, so a client drew every rocket,
+		// nail and bolt up to 0.3 degrees off its real path, about 5 units in 1,000, for
+		// the whole flight.
+		msg.WriteShort( idMath::ClampInt( -32767, 32767, idMath::FtoiFast( launchDir[ 0 ] * 32767.0f ) ) );
+		msg.WriteShort( idMath::ClampInt( -32767, 32767, idMath::FtoiFast( launchDir[ 1 ] * 32767.0f ) ) );
+		msg.WriteShort( idMath::ClampInt( -32767, 32767, idMath::FtoiFast( launchDir[ 2 ] * 32767.0f ) ) );
+
+		int ownerNum = (GetOwner() && GetOwner()->entityNumber < MAX_CLIENTS) ? GetOwner()->entityNumber : MAX_CLIENTS;
+		msg.WriteBits( ownerNum, idMath::BitsForInteger(MAX_CLIENTS) );
 	}
 }
 
@@ -1798,9 +2002,11 @@ idProjectile::ReadFromSnapshot
 void idProjectile::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 	projectileState_t newState;
 	particlePState_t newPhysicsState;
+	idEntity *ownerEnt = NULL;
 	int newLaunchTime = launchTime;
 	idVec3 newLaunchOrig = launchOrig;
 	idVec3 newLaunchDir = launchDir;
+	int ownerNum = MAX_CLIENTS;
 
 	if ( syncPhysics ) {
 		if ( !physicsObj.DecodeSnapshotState( msg, newPhysicsState ) ) {
@@ -1814,59 +2020,175 @@ void idProjectile::ReadFromSnapshot( const idBitMsgDelta &msg ) {
 		newLaunchOrig[ 0 ] = msg.ReadFloat();
 		newLaunchOrig[ 1 ] = msg.ReadFloat();
 		newLaunchOrig[ 2 ] = msg.ReadFloat();
-		newLaunchDir = msg.ReadDir( 24 );
+		if ( gameLocal.LegacySnapshotFormat() ) {
+			newLaunchDir = msg.ReadDir( 24 );
+		} else {
+			newLaunchDir[ 0 ] = msg.ReadShort() * ( 1.0f / 32767.0f );
+			newLaunchDir[ 1 ] = msg.ReadShort() * ( 1.0f / 32767.0f );
+			newLaunchDir[ 2 ] = msg.ReadShort() * ( 1.0f / 32767.0f );
+			if ( newLaunchDir.Normalize() == 0.0f ) {
+				newLaunchDir = launchDir;
+			}
+		}
+
+		ownerNum = msg.ReadBits( idMath::BitsForInteger(MAX_CLIENTS) );
 	}
 	if ( msg.IsReadOverflowed() ) {
 		return;
+	}
+
+	// A teleporter relaunch on the server re-stamps launchTime AND launchOrig without
+	// re-arming predictTime, which RunPhysics already spent on the launch frame, so that
+	// leg carries no prestep.  A match-clock shift moves launchTime on both ends by the
+	// same delta and never touches launchOrig, so the origin change is what tells the two
+	// apart; launchOrig is three full floats on the wire, so exact comparison is valid.
+	// Without this a teleported rocket is drawn 46.75 units AHEAD of the server - the
+	// same error with the sign flipped, on exactly the maps that have portals.
+	if ( state == LAUNCHED && newState == LAUNCHED &&
+		 newLaunchTime != launchTime && newLaunchOrig != launchOrig ) {
+		deadReckonPrestep = 0;
 	}
 
 	if ( syncPhysics ) {
 		physicsObj.ApplySnapshotState( newPhysicsState );
 	}
 	if ( newState >= LAUNCHED ) {
-		launchTime = newLaunchTime;
 		launchOrig = newLaunchOrig;
 		launchDir = newLaunchDir;
-	}
-	// we always create and launch at the same time
-	// state on a client can be SPAWNED, LAUNCHED, EXPLODED
-	// expect never to get a CREATED projectile, they should launch right away
-	assert( state != CREATED && state != FIZZLED && newState != CREATED );
-	if ( newState != state ) {
-		switch ( newState ) {
-		case LAUNCHED:
-			Create( NULL, launchOrig, launchDir );
-			Launch( launchOrig, launchDir, vec3_origin );
-			Show();
-			break;
-		case STUCK:
-			if ( state == LAUNCHED ) {
-				HoldStuck();
+		if ( ownerNum >= 0 && ownerNum < MAX_CLIENTS && gameLocal.entities[ ownerNum ] && gameLocal.entities[ ownerNum ]->IsType( idPlayer::GetClassType() ) ) {
+			ownerEnt = gameLocal.entities[ ownerNum ];
+		}
+
+		if ( predictedProjectiles && launchTime != newLaunchTime ) {
+			launchTime = newLaunchTime;
+	
+			if ( !syncPhysics && state == LAUNCHED && newState == LAUNCHED ) {
+				physicsObj.SetAxis( launchDir.ToMat3() );
+				physicsObj.SetOrigin( DeadReckonOrigin( gameLocal.time ) );
+				physicsObj.SetLinearVelocity( launchSpeed * launchDir );
 			}
-			break;
-		case FIZZLED:
-		case EXPLODED:
-			if ( state != EXPLODED ) {
-				StopSound( SND_CHANNEL_BODY, false );
-				StopAllEffects();
-				Hide();
-				FreeLightDef();
-				state = EXPLODED;
+
+			if ( state == LAUNCHED && newState == LAUNCHED ) {
+				Show();
 			}
-			break;
+
+			UpdateVisuals();
+		}
+		
+		if ( !predictedProjectiles ) {
+			launchTime = newLaunchTime;
 		}
 	}
 
-	if ( msg.HasChanged() ) {
-		if( !syncPhysics && state == LAUNCHED ) {
-			idMat3 axis = launchDir.ToMat3();
-			idVec3 origin( launchOrig );
-			origin += ( ( gameLocal.time - launchTime ) / 1000.0f ) * launchSpeed * launchDir;
-			physicsObj.SetAxis( axis );
-			physicsObj.SetOrigin( origin );
+	// we always create and launch at the same time
+	// state on a client can be SPAWNED, LAUNCHED, EXPLODED
+	// expect never to get a CREATED projectile, they should launch right away
+	if ( predictedProjectiles ) {
+		if ( msg.HasChanged() ) {
+			if ( !syncPhysics && state == LAUNCHED && newState == LAUNCHED ) {
+				physicsObj.SetAxis( launchDir.ToMat3() );
+				physicsObj.SetOrigin( DeadReckonOrigin( gameLocal.time ) );
+				physicsObj.SetLinearVelocity( launchSpeed * launchDir );
+			}
+		}
+		UpdateVisuals();
+		
+		assert( state != CREATED && newState != CREATED );
+		
+		if ( newState != state ) {
+			if ( state < LAUNCHED && newState >= LAUNCHED ) {
+				Create( ownerEnt, launchOrig, launchDir );
+				Launch( launchOrig, launchDir, vec3_origin );
+				Show();
+			}
+			switch ( newState ) {
+			case STUCK:
+				HoldStuck();
+				break;
+			case FIZZLED:
+				Fizzle();
+				break;
+			case EXPLODED:
+			case IMPACTED:
+				Explode( NULL, state == EXPLODED );
+				break;
+			}
+		}
+	} else {
+		assert( state != CREATED && state != FIZZLED && newState != CREATED );
+
+		if ( newState != state ) {
+			switch ( newState ) {
+			case LAUNCHED:
+				Create( ownerEnt, launchOrig, launchDir );
+				Launch( launchOrig, launchDir, vec3_origin );
+				Show();
+				break;
+			case STUCK:
+				if ( state == LAUNCHED ) {
+					HoldStuck();
+				}
+				break;
+			case FIZZLED:
+				// A short-lived projectile can reach its terminal state before
+				// this client receives a LAUNCHED snapshot.  Recreate its visual
+				// pose so the terminal effect is not silently lost.
+				if ( state < LAUNCHED ) {
+					const idVec3 snapshotOrigin = syncPhysics ? physicsObj.GetOrigin() : launchOrig;
+					const idVec3 snapshotDir = syncPhysics ? physicsObj.GetAxis()[ 0 ] : launchDir;
+					Create( ownerEnt, snapshotOrigin, snapshotDir );
+					if ( !syncPhysics ) {
+						launchSpeed = GetVelocity( &spawnArgs ).LengthFast();
+						physicsObj.SetAxis( launchDir.ToMat3() );
+						// Not followed by a RunPhysics, so this lands one tic (15 units for a
+						// rocket) short of the authoritative point.  It is a single frame of a
+						// projectile that is about to fizzle or explode, and the terminal
+						// snapshot carries no impact point to be short of.
+						physicsObj.SetOrigin( DeadReckonOrigin( gameLocal.time ) );
+						physicsObj.SetLinearVelocity( launchSpeed * launchDir );
+					}
+					UpdateVisuals();
+				}
+				if ( state != FIZZLED && state != EXPLODED ) {
+					StopSound( SND_CHANNEL_BODY, false );
+					StartSound( "snd_fizzle", SND_CHANNEL_BODY, 0, false, NULL );
+					gameLocal.PlayEffect( spawnArgs, "fx_fuse", GetPhysics()->GetOrigin(), GetPhysics()->GetAxis() );
+					StopAllEffects();
+					Hide();
+					FreeLightDef();
+					state = FIZZLED;
+				}
+				break;
+			case IMPACTED:
+			case EXPLODED:
+				if ( state < LAUNCHED ) {
+					const idVec3 snapshotOrigin = syncPhysics ? physicsObj.GetOrigin() : launchOrig;
+					const idVec3 snapshotDir = syncPhysics ? physicsObj.GetAxis()[ 0 ] : launchDir;
+					Create( ownerEnt, snapshotOrigin, snapshotDir );
+					if ( !syncPhysics ) {
+						launchSpeed = GetVelocity( &spawnArgs ).LengthFast();
+						physicsObj.SetAxis( launchDir.ToMat3() );
+						// Not followed by a RunPhysics, so this lands one tic (15 units for a
+						// rocket) short of the authoritative point.  It is a single frame of a
+						// projectile that is about to fizzle or explode, and the terminal
+						// snapshot carries no impact point to be short of.
+						physicsObj.SetOrigin( DeadReckonOrigin( gameLocal.time ) );
+						physicsObj.SetLinearVelocity( launchSpeed * launchDir );
+					}
+					UpdateVisuals();
+				}
+				if ( state != EXPLODED ) {
+					Explode( NULL, true );
+				}
+				break;
+			}
+		}
+		
+		if ( !syncPhysics && state == LAUNCHED ) {
+			physicsObj.SetAxis( launchDir.ToMat3() );
+			physicsObj.SetOrigin( DeadReckonOrigin( gameLocal.time ) );
 			physicsObj.SetLinearVelocity( launchSpeed * launchDir );
 		}
-	
 		UpdateVisuals();
 	}
 }
@@ -2151,6 +2473,21 @@ void idGuidedProjectile::Think( void ) {
 	}
 }
 
+void idGuidedProjectile::ThinkMatchPaused( int deltaMsec ) {
+	idProjectile::ThinkMatchPaused( deltaMsec );
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+
+	if ( state >= LAUNCHED ) {
+		mpMatchShiftTimeOrigin( launchTime, deltaMsec );
+	}
+	mpMatchShiftOptionalDeadline( driftTime, deltaMsec );
+	float startTime = turn_max.GetStartTime();
+	mpMatchShiftTimeOrigin( startTime, deltaMsec );
+	turn_max.SetStartTime( startTime );
+}
+
 /*
 =================
 idGuidedProjectile::Launch
@@ -2331,6 +2668,22 @@ void rvDriftingProjectile::Think( void ) {
 	dir = GetPhysics()->GetOrigin() - oldOrigin;
 	dir.Normalize ( );	
 	GetPhysics ( )->SetAxis ( dir.ToMat3 ( ) );
+}
+
+void rvDriftingProjectile::ThinkMatchPaused( int deltaMsec ) {
+	idProjectile::ThinkMatchPaused( deltaMsec );
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+
+	for ( int index = 0; index < 2; ++index ) {
+		float startTime = driftOffset[ index ].GetStartTime();
+		mpMatchShiftTimeOrigin( startTime, deltaMsec );
+		driftOffset[ index ].SetStartTime( startTime );
+	}
+	float startTime = driftSpeed.GetStartTime();
+	mpMatchShiftTimeOrigin( startTime, deltaMsec );
+	driftSpeed.SetStartTime( startTime );
 }
 
 /*

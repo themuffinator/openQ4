@@ -12,8 +12,9 @@ the current engine, renderer API, multiplayer module and package checks.
 
 Android targets `arm64-v8a`, Android API 24 or later, SDL3 and OpenGL ES 3.0.
 The native application is `libquake4.so`. The renderer is
-`librenderer-gles_arm64.so`; the in-tree `src/game/` and `src/mpgame/` supply
-`libgame-sp_arm64.so` and `libgame-mp_arm64.so`. Both modes use `baseoq4/`.
+`librenderer-gles_arm64.so`; the in-tree `src/game/` supplies
+`libgame_arm64.so`, which serves single-player and multiplayer. Both modes use
+`baseoq4/`.
 Android has no dedicated-server target. Desktop defaults remain unchanged.
 
 Meson is the engine's build entry point on Android as on desktop. The port's
@@ -137,7 +138,7 @@ ABI; the phone release workflow and certificate policy remain unchanged.
 For verification, pass `--variant emulator` to
 `tools/build/verify_android_apk.py`, with the exact staged version, SDK build
 tools and the public certificate for the diagnostic signing key. It requires a
-debuggable emulator package, API 24, exactly seven matching x86_64 libraries,
+debuggable emulator package, API 24, exactly six matching x86_64 libraries,
 16 KiB alignment and the same content/notices checks. The default verifier
 continues to require a nondebuggable ARM64 phone release and rejects this APK.
 An ABI label alone does not qualify a binary: ELF machine/API and every
@@ -224,7 +225,7 @@ names the frame thread (`XR_KHR_android_thread_settings`).
 
 `verify_android_apk.py --variant quest` then requires its own application ID,
 `com.darkmatter.openq4.quest` (never the phone's, so neither APK replaces the
-other), a nondebuggable release signature, the same seven ARM64 libraries,
+other), a nondebuggable release signature, the same six ARM64 libraries,
 the marker asset, and a manifest that requires head tracking, requests the
 OpenXR runtime permission, opens the game with the immersive OpenXR and Quest
 categories and names its supported headsets. Phone and emulator APKs must

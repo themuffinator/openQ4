@@ -9,7 +9,7 @@ import stat
 import struct
 from pathlib import Path
 
-from game_layer import PACKAGED_LAYER_GAME_DIRS
+from game_layer import GAME_MODULE_STEM, PACKAGED_LAYER_GAME_DIRS, RETIRED_GAME_MODULE_STEMS
 from openq4_pak import OPENQ4_PACK_NAMES, copy_file_if_changed
 
 
@@ -25,8 +25,9 @@ WINDOWS_ROOT_RUNTIME_PATTERNS = (
 )
 # Meson installs overlay their destination and deliberately do not remove files
 # from an earlier build.  Keep the Windows cleanup policy as an explicit,
-# narrow manifest: these names can only be foreign POSIX engine binaries or
-# obsolete renderer-validation backups in a Windows runtime tree.
+# narrow manifest: these names can only be foreign POSIX engine binaries,
+# obsolete renderer-validation backups, or the split game-sp/game-mp modules
+# (and their symbols) that the single game_<arch> module replaced.
 WINDOWS_STALE_STAGE_FILE_MANIFEST = (
     "openQ4-client_x86",
     "openQ4-client_x64",
@@ -40,6 +41,12 @@ WINDOWS_STALE_STAGE_FILE_MANIFEST = (
     "renderer-vk_x86.dll.mainbak",
     "renderer-vk_x64.dll.mainbak",
     "renderer-vk_arm64.dll.mainbak",
+    *(
+        f"{GAME_DIR_NAME}/{stem}_{arch}.{extension}"
+        for stem in RETIRED_GAME_MODULE_STEMS
+        for arch in ("x86", "x64", "arm64")
+        for extension in ("dll", "pdb")
+    ),
 )
 # These directories were emitted by older content staging.  They are removed
 # only when empty; populated directories may contain intentional local content
@@ -57,10 +64,9 @@ RUNTIME_BINARY_PATTERNS = (
     # renderer-gl_x64.dll can sit next to an arm64 client and pass every check.
     "renderer-gl_*.dll",
     "renderer-vk_*.dll",
-    f"{GAME_DIR_NAME}/game-sp_*.dll",
-    f"{GAME_DIR_NAME}/game-mp_*.dll",
-    # game-library layers (q4xbase) ship their own game modules beside baseoq4
-    *(f"{layer}/game-{kind}_*.dll" for layer in PACKAGED_LAYER_GAME_DIRS for kind in ("sp", "mp")),
+    f"{GAME_DIR_NAME}/{GAME_MODULE_STEM}_*.dll",
+    # game-library layers (q4xbase) ship their own game module beside baseoq4
+    *(f"{layer}/{GAME_MODULE_STEM}_*.dll" for layer in PACKAGED_LAYER_GAME_DIRS),
 )
 BUILD_GAME_GENERATED_IGNORE_PATTERNS = (
     "*.dll.p",

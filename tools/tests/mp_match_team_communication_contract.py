@@ -13,12 +13,12 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-HEADER = ROOT / "src/mpgame/mp/match/MatchTeamCommunication.h"
-SOURCE = ROOT / "src/mpgame/mp/match/MatchTeamCommunication.cpp"
-SESSION_SOURCE = ROOT / "src/mpgame/mp/match/MatchSession.cpp"
-MULTIPLAYER_HEADER = ROOT / "src/mpgame/MultiplayerGame.h"
-MULTIPLAYER_SOURCE = ROOT / "src/mpgame/MultiplayerGame.cpp"
-VOICE_SOURCE = ROOT / "src/mpgame/mp/VoiceComms.cpp"
+HEADER = ROOT / "src/game/mp/match/MatchTeamCommunication.h"
+SOURCE = ROOT / "src/game/mp/match/MatchTeamCommunication.cpp"
+SESSION_SOURCE = ROOT / "src/game/mp/match/MatchSession.cpp"
+MULTIPLAYER_HEADER = ROOT / "src/game/MultiplayerGame.h"
+MULTIPLAYER_SOURCE = ROOT / "src/game/MultiplayerGame.cpp"
+VOICE_SOURCE = ROOT / "src/game/mp/VoiceComms.cpp"
 
 
 def read(path: Path) -> str:
@@ -266,7 +266,7 @@ def live_adapter_contracts(
 
 
 HARNESS = r'''
-#include "mpgame/mp/match/MatchTeamCommunication.h"
+#include "game/mp/match/MatchTeamCommunication.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -526,9 +526,8 @@ def source_discovery_contract() -> None:
             os.environ.get("PYTHON", "python"),
             str(lister),
             str(ROOT / "src"),
-            "mpgame",
-            "mpgame/Callbacks.cpp",
-            "mpgame/gamesys/Callbacks.cpp",
+            "game",
+            "game/gamesys/Callbacks.cpp",
         ],
         cwd=ROOT,
         text=True,
@@ -536,7 +535,7 @@ def source_discovery_contract() -> None:
     )
     if listed.returncode != 0:
         raise AssertionError("source discovery failed:\n" + listed.stdout + listed.stderr)
-    if "mpgame/mp/match/MatchTeamCommunication.cpp" not in listed.stdout.replace(
+    if "game/mp/match/MatchTeamCommunication.cpp" not in listed.stdout.replace(
         "\\", "/"
     ):
         raise AssertionError(

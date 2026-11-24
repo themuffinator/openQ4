@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[2]
 GAME_LIBS_ROOT = Path(os.environ.get("OPENQ4_GAMELIBS_REPO", ROOT)).resolve()
 CLASS_SOURCES = (
     "src/game/gamesys/Class.cpp",
-    "src/mpgame/gamesys/Class.cpp",
+    "src/game/gamesys/Class.cpp",
 )
 
 

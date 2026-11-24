@@ -140,7 +140,7 @@ If start-up stops with `couldn't find game dynamic library`, include the
 `Game module search failed:` line. It lists the package folders that were
 checked, which tells a damaged app apart from an older package layout. A
 current app looks in `openQ4.app/Contents/Frameworks` for
-`game-sp_arm64.dylib` and `game-mp_arm64.dylib`. Do not copy game modules into
+`game_arm64.dylib`. Do not copy game modules into
 your retail `q4base` folder.
 
 If the module was found but start-up stops with `couldn't load game dynamic
@@ -247,8 +247,7 @@ The macOS app is self-contained:
 ```text
 openQ4.app/Contents/MacOS/openQ4
 openQ4.app/Contents/Resources/baseoq4/
-openQ4.app/Contents/Frameworks/game-sp_arm64.dylib
-openQ4.app/Contents/Frameworks/game-mp_arm64.dylib
+openQ4.app/Contents/Frameworks/game_arm64.dylib
 ```
 
 The app finds openQ4's own files inside `Contents/Resources` wherever Finder

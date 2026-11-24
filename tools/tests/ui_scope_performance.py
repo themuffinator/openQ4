@@ -59,7 +59,7 @@ def main():
                'testWeaponScope weapon_railgun', 'waitMsec 1500',
                'testWeaponScope', 'screenshot "screenshots/railgun-selected.tga"']
     capture.SCENARIOS['scope-performance'] = ('game/airdefense1', stages)
-    runtime_files = ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll', 'baseoq4/pak0.pk4',
+    runtime_files = ('openQ4-client_x64.exe', 'baseoq4/game_x64.dll', 'baseoq4/pak0.pk4',
                      f'renderer-{"gl" if args.renderer == "gl" else "vk"}_x64.dll')
     identity = {name: capture.digest(args.runtime / name) for name in runtime_files}
     result = capture.run(args, 'scope-performance')

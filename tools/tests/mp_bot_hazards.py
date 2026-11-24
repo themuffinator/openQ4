@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def main() -> None:
-    nav = (ROOT / "src/mpgame/bots/NavMesh.cpp").read_text(encoding="utf-8")
-    mover = (ROOT / "src/mpgame/Mover.cpp").read_text(encoding="utf-8")
+    nav = (ROOT / "src/game/bots/NavMesh.cpp").read_text(encoding="utf-8")
+    mover = (ROOT / "src/game/Mover.cpp").read_text(encoding="utf-8")
     bodies = function(mover, "bool idMover_Binary::GetTranslationBounds(") + "\n" + "\n".join(
         function(nav, signature) for signature in (
             "void rvNavMesh::GatherHazards(", "int rvNavMesh::HazardAtFloor(")

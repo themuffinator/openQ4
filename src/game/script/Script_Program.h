@@ -420,6 +420,7 @@ public:
 	varEval_t				value;
 	idVarDef *				scope; 			// function, namespace, or object the var was defined in
 	int						numUsers;		// number of users if this is a constant
+	int						compileStamp;	// compilation stamp for deleting failed compiles
 
 	typedef enum {
 		uninitialized, initializedVariable, initializedConstant, stackVariable
@@ -579,6 +580,8 @@ private:
 
 	void										CompileStats( void );
 
+	int											compileStamp;
+
 public:
 	idVarDef									*returnDef;
 	idVarDef									*returnStringDef;
@@ -598,9 +601,9 @@ public:
 
 	void										Startup( const char *defaultScript );
 	void										Restart( void );
-	bool										CompileText( const char *source, const char *text, bool console );
+	bool										CompileText( const char *source, const char *text, bool console, bool fatal = true );
 	const function_t							*CompileFunction( const char *functionName, const char *text );
-	void										CompileFile( const char *filename );
+	bool										CompileFile( const char *filename, bool fatal = true );
 	void										BeginCompilation( void );
 	void										FinishCompilation( void );
 	void										DisassembleStatement( idFile *file, int instructionPointer ) const;

@@ -212,9 +212,9 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     runtime = ROOT/'.install'
     identities = {p.relative_to(runtime).as_posix():sha(p) for p in
-        (runtime/'openQ4-client_x64.exe', runtime/'baseoq4/game-sp_x64.dll',
+        (runtime/'openQ4-client_x64.exe', runtime/'baseoq4/game_x64.dll',
          runtime/'renderer-gl_x64.dll', runtime/'renderer-vk_x64.dll', runtime/'baseoq4/pak0.pk4', runtime/'baseoq4/pak1.pk4')}
-    for name in ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll'):
+    for name in ('openQ4-client_x64.exe', 'baseoq4/game_x64.dll'):
         assert identities[name] == sha(ROOT/'builddir'/name), 'Re-stage the current build first'
     reports = []
     for case in CASES if args.case == 'all' else (args.case,):

@@ -9,10 +9,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-GAME_TREES = ("game", "mpgame")
+GAME_TREES = ("game",)
 CLASS_SOURCES = (
     "src/game/gamesys/Class.cpp",
-    "src/mpgame/gamesys/Class.cpp",
+    "src/game/gamesys/Class.cpp",
 )
 
 

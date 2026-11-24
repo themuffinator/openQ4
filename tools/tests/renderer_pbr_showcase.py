@@ -60,7 +60,7 @@ import renderer_pbr_laboratory as lab  # noqa: E402
 from physics_workloads import wait_for_memory  # noqa: E402
 
 BINARIES = ("openQ4-client_x64.exe", "openQ4-ded_x64.exe", "renderer-gl_x64.dll", "renderer-vk_x64.dll",
-            "OpenAL32.dll", "baseoq4/game-sp_x64.dll", "baseoq4/game-mp_x64.dll", "baseoq4/mod.json",
+            "OpenAL32.dll", "baseoq4/game_x64.dll", "baseoq4/mod.json",
             "baseoq4/pak0.pk4", "baseoq4/pak1.pk4", "baseoq4/pak2.pk4")
 SHOWCASE = {
     # Production lighting: environment from the map's own ambient light, every

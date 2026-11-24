@@ -135,7 +135,7 @@ int main(){
 
 
 def main():
-    paths = ['src/mpgame/Player.cpp', 'src/mpgame/MultiplayerGame.cpp', 'tools/tests/ui_player_identity.py']
+    paths = ['src/game/Player.cpp', 'src/game/MultiplayerGame.cpp', 'tools/tests/ui_player_identity.py']
     digest = lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
     bindings = {p: digest(ROOT / p) for p in paths}
     player = (ROOT / paths[0]).read_text()

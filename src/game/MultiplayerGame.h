@@ -1,5 +1,5 @@
 // RAVEN BEGIN
-// ddynerman: note that this file is no longer merged with legacy engine updates
+// ddynerman: note that this file is no longer merged with Doom3 updates
 //
 // MERGE_DATE 09/30/2004
 
@@ -14,41 +14,45 @@
 ===============================================================================
 */
 
+#include "mp/GameTypeIds.h"
 #include "mp/Buying.h"
-#include "mp/Tourney.h"
-
-class riBuyingManager;
+#include "mp/Modifiers.h"
+#include "mp/HitFeedback.h"
+#include "mp/HitSounds.h"
+#include "mp/Locations.h"
+#include "mp/TeamInfo.h"
+#include "mp/ItemTimers.h"
+#include "mp/ObjectiveMarkers.h"
+#include "mp/MvdMarkers.h"
+#include "mp/LiveEventStream.h"
+#include "gamesys/HudLines.h"
+#include "mp/match/MatchRules.h"
+#include "mp/match/MatchSeries.h"
+#include "mp/match/MatchSeriesRecovery.h"
+#include "mp/match/MatchSeriesReport.h"
+#include "mp/match/MatchSeriesReportStorage.h"
+#include "mp/match/MatchSession.h"
+#include "mp/match/MatchTeamCommunication.h"
+#include "mp/match/MatchTerminationPolicy.h"
+#include "mp/match/MatchTeams.h"
+#include "mp/match/MatchAuthentication.h"
+#include "mp/match/MatchEvidence.h"
+#include "mp/match/MatchEvidenceObserver.h"
+#include "mp/match/MatchEvidenceStorage.h"
+#include "mp/match/MatchDisclosurePolicy.h"
+#include "mp/match/MatchItemTiming.h"
+#include "mp/match/MatchOperations.h"
+#include "mp/match/MatchProposal.h"
+#include "mp/match/MatchView.h"
+#include "mp/match/MatchControlModel.h"
 class idPlayer;
+class idItem;
 class rvCTF_AssaultPoint;
 class rvItemCTFFlag;
-typedef enum {
-	GAME_SP,
-	GAME_DM,
-	GAME_TOURNEY,
-	GAME_TDM,
-	// bdube: added ctf
-	GAME_CTF,
-	// ddynerman: new gametypes
-	GAME_1F_CTF,
-	GAME_ARENA_CTF,
-	GAME_ARENA_1F_CTF,	// is not used, but leaving it in the list so I don't offset GAME_DEADZONE
 
-// RITUAL BEGIN
-// squirrel: added DeadZone multiplayer mode
-	GAME_DEADZONE,
-	NUM_GAME_TYPES,
-// RITUAL END
-} gameType_t;
-
-
-// ddynerman: teams
-typedef enum {
-	TEAM_NONE = -1,
-	TEAM_MARINE,
-	TEAM_STROGG,
-	TEAM_MAX,
-} team_t;
-
+// jmarshall - the engine file system interface only exposes map decls by
+// index; this resolves a map path the way the old GetMapDecl( name ) did.
+const idDict *MultiplayerResolveMapDecl( const char *mapPath );
 // shouchard:  server admin command types
 typedef enum {
 	SERVER_ADMIN_KICK,
@@ -61,7 +65,9 @@ typedef enum {
 //             note that we have two mechanisms for dealing with vote data that
 //             should be consolidated:  this one that handles the interface and
 //             multi-field votes and the one that handles console commands and
-//             single line votes.  
+//             single line votes.
+// openQ4: a preset vote's name, nul included (MP_PRESET_NAME_MAX in mp/Presets.h)
+const int MP_VOTE_PRESET_BYTES = 32;
 struct voteStruct_t {
 	int				m_fieldFlags;	// flags for which fields are valid
 	int				m_kick;			// id of the player
@@ -74,6 +80,16 @@ struct voteStruct_t {
 	int				m_buying;
 	int				m_teamBalance;
 	int				m_controlTime;
+	int				m_roundLimit;	// openQ4 MP-12 casual callvote fields
+	int				m_ruleset;
+	int				m_instagib;
+	int				m_overtime;
+	// openQ4 MP-12/MP-14/MP-16: the modifier, arena, preset and spectator chat votes
+	int				m_modifierMask;		// the modifiers the vote changes (MPModifierBit)
+	int				m_modifierValues;	// and what each becomes, under the same bits
+	int				m_weaponArena;		// rvMPModifiers' weapon arena index, -1 for none
+	int				m_spectatorChat;	// g_spectatorChat
+	char			m_preset[ MP_VOTE_PRESET_BYTES ];	// a preset name, nul-terminated
 	// restart is a flag only
 	// nextmap is a flag only but we don't technically support it (but doom had it so it's here)
 };
@@ -91,9 +107,44 @@ typedef enum {
 	VOTEFLAG_CAPTURELIMIT	= 0x0200,
 	VOTEFLAG_FRAGLIMIT		= 0x0400,
 	VOTEFLAG_CONTROLTIME	= 0x0800,
+	// openQ4 MP-12: the casual callvote surface. Payload-free flags act when
+	// the vote passes; the others carry one typed value.
+	VOTEFLAG_NEXTMAP		= 0x1000,
+	VOTEFLAG_ROUNDLIMIT		= 0x2000,
+	VOTEFLAG_RULESET		= 0x4000,
+	VOTEFLAG_INSTAGIB		= 0x8000,
+	VOTEFLAG_OVERTIME		= 0x10000,
+	VOTEFLAG_COINTOSS		= 0x20000,
+	VOTEFLAG_RANDOMMAP		= 0x40000,
+	VOTEFLAG_READYALL		= 0x80000,
+	// openQ4 MP-18: with VOTEFLAG_KICK, the vote silences the named player's text
+	// chat instead of removing them. It carries no payload of its own: the
+	// player and their identity are the kick field's, so every check on a kick
+	// target covers a mute target. Never valid without VOTEFLAG_KICK.
+	VOTEFLAG_MUTE			= 0x100000,
+	// openQ4 MP-14: turn modifiers on or off (m_modifierMask, m_modifierValues).
+	// Instagib may be named here or by VOTEFLAG_INSTAGIB, never by both.
+	VOTEFLAG_MODIFIER		= 0x200000,
+	// openQ4 MP-16: whether spectators reach players' all-chat (g_spectatorChat);
+	// bit 22 was reserved for it when MP-16 landed.
+	VOTEFLAG_SPECTATORCHAT	= 0x400000,
+	// openQ4 MP-14: apply a named preset. A preset sets the game type, ruleset,
+	// modifiers and limits together, so it is valid only on its own.
+	VOTEFLAG_PRESET			= 0x800000,
+	// openQ4 MP-14: a single-weapon arena, or none (m_weaponArena)
+	VOTEFLAG_ARENA			= 0x1000000,
 } voteFlag_t;
 
-#define NUM_VOTES			11
+// The flags a preset vote may not share a ballot with: the preset sets them.
+#define VOTEFLAG_PRESET_EXCLUSIVE	( VOTEFLAG_GAMETYPE | VOTEFLAG_RULESET | VOTEFLAG_INSTAGIB | VOTEFLAG_MODIFIER | VOTEFLAG_ARENA | \
+									  VOTEFLAG_TIMELIMIT | VOTEFLAG_FRAGLIMIT | VOTEFLAG_CAPTURELIMIT | VOTEFLAG_TOURNEYLIMIT | \
+									  VOTEFLAG_ROUNDLIMIT | VOTEFLAG_OVERTIME | VOTEFLAG_BUYING | VOTEFLAG_CONTROLTIME )
+// The flags whose payloads follow the MP-12 fields on every vote message, in
+// this order. A vote without them is laid out exactly as before.
+#define VOTEFLAG_MP14_FIELDS		( VOTEFLAG_MODIFIER | VOTEFLAG_SPECTATORCHAT | VOTEFLAG_PRESET | VOTEFLAG_ARENA )
+
+#define NUM_VOTES			25	// VOTEFLAG_ARENA is bit 24 and must participate in vote masking
+#define VOTEFLAG_ALL			( ( 1 << NUM_VOTES ) - 1 )
 #define MAX_PRINT_LEN 128
 
 // more compact than a chat line
@@ -198,6 +249,36 @@ enum announcerSound_t {
 	AS_NUM_SOUNDS
 };
 
+// openQ4 BEGIN
+// Announcer events for the modes carried over from Quake Live.  Quake 4 ships
+// no round, overtime or elimination voice-overs, and openQ4's rule is to run
+// on the retail assets, so these are aliases onto stock clips rather than new
+// announcerSound_t values.  announcerSoundDefs[] is index-parallel with no
+// compile-time check, so aliasing also avoids the easiest way to break it.
+// Point these at dedicated shaders if a voice pack ever ships.
+const announcerSound_t AS_ROUND_PREPARE			= AS_GENERAL_PREPARE_TO_FIGHT;
+const announcerSound_t AS_ROUND_FIGHT			= AS_GENERAL_FIGHT;
+const announcerSound_t AS_ROUND_YOU_WIN			= AS_TEAM_YOU_SCORE;
+const announcerSound_t AS_ROUND_YOU_LOSE		= AS_TEAM_ENEMY_SCORES;
+const announcerSound_t AS_ROUND_DRAW			= AS_TEAM_TEAMS_TIED;
+const announcerSound_t AS_MATCH_OVERTIME		= AS_GENERAL_SUDDEN_DEATH;
+const announcerSound_t AS_MATCH_LAST_STANDING	= AS_GENERAL_ONE_FRAG;
+const announcerSound_t AS_OBJECTIVE_ATTACKED	= AS_CTF_ENEMY_HAS_FLAG;
+const announcerSound_t AS_OBJECTIVE_SECURED		= AS_CTF_YOUR_FLAG_RETURNED;
+
+// Localized team name and colour escape, used by every message that names a
+// team.  Quake 4's teams are Marine and Strogg, which stand in for Quake
+// Live's red and blue throughout the port.
+const char *	MPLocalizedTeamName( int team );
+const char *	MPTeamColor( int team );
+// openQ4 END
+
+const int VOTEMAPS_WAITING_MAPLIST		= (1<<0);
+const int VOTEMAPS_WAITING_SAMAPLIST	= (1<<1);
+const int VOTEMAPS_WAITING_LISTMAPS		= (1<<2);
+// openQ4: the multiplayer card's Vote page asked for the server's maps
+const int VOTEMAPS_WAITING_RETAINED		= (1<<3);
+
 typedef struct mpPlayerState_s {
 	int				ping;			// player ping
 	int				fragCount;		// kills
@@ -224,6 +305,10 @@ const int MP_PLAYER_MAXPING	= 999;
 const int MP_PLAYER_MAXKILLS = 999;
 const int MP_PLAYER_MAXDEATHS = 999;
 
+// openQ4: team scores ride the snapshot as a short.  Domination accrues a
+// point per control point per tick, so an unclamped total could wrap.
+const int MP_TEAM_MAXSCORE = 30000;
+
 const int MAX_AP = 5;
 
 const int CHAT_HISTORY_SIZE = 32768;
@@ -248,6 +333,10 @@ const int MAX_TEAM_POWERUPS = 5;
 //RITUAL END
 // ddynerman: game state
 #include "mp/GameState.h"
+// openQ4: gametypes carried over from Quake Live
+#include "mp/RoundGameState.h"
+#include "mp/RoundModes.h"
+#include "mp/Duel.h"
 
 typedef struct mpChatLine_s {
 	idStr			line;
@@ -256,7 +345,8 @@ typedef struct mpChatLine_s {
 
 // openQ4 MP-18: a ban as the menus read it. Quake 4 kept a GUID here that no
 // client sends; guid is now the banned range ("192.0.2.0/24").
-#include "../mpgame/mp/Moderation.h"
+#include "mp/Moderation.h"
+#include "mp/Identity.h"
 typedef struct mpBanInfo_s {
 	char			name[ MP_MOD_NAME_BYTES ];
 	char			guid[ MP_MOD_RANGE_TEXT_BYTES ];
@@ -265,6 +355,9 @@ typedef struct mpBanInfo_s {
 } mpBanInfo_t;
 
 class idPhysics_Player;
+
+// currentMenu's value while the single-player Arena's pause menu is open.
+static const int MP_MENU_ARENA_PAUSE = 5;
 
 class idMultiplayerGame {
 
@@ -279,6 +372,7 @@ public:
 
 	// resets everything and prepares for a match
 	void			Reset( void );
+	void			ResetMatchSession( void );
 
 // RAVEN BEGIN
 // mwhitlock: Dynamic memory consolidation
@@ -310,6 +404,7 @@ public:
 	void			PlayerDeath( idPlayer *dead, idPlayer *killer, int methodOfDeath );
 
 	void			AddChatLine( const char *fmt, ... ) id_attribute((format(printf,2,3)));
+	void			PrintChatLine( const char *message, const bool teamChat );
 
 // RITUAL BEGIN
 // squirrel: Mode-agnostic buymenus
@@ -327,14 +422,17 @@ public:
 	bool			CanTalk( idPlayer *from, idPlayer *to, bool echo );
 	void			ReceiveAndForwardVoiceData( int clientNum, const idBitMsg &inMsg, int messageType );
 
-#ifdef _USE_VOICECHAT
 // jscott: game side voice comms
 	void			XmitVoiceData( void );
 	void			ReceiveAndPlayVoiceData( const idBitMsg &inMsg );
-#endif
+	void			ResetVoiceState( int client = -1 );
+	static void		ServerVoiceMute_f( const idCmdArgs& args );
+	static void		ServerAdminTarget_f( const idCmdArgs& args );
+	static void		ServerVoiceStats_f( const idCmdArgs& args );
 
 // jshepard: selects a map at random that will run with the current game type
 	bool			PickMap( idStr gameType, bool checkOnly = false );
+	bool			PickRandomMap( const char *gameType, idStr &mapName ) const;
 	void			ClearVote( int clientNum = -1 );
 	void			ResetRconGuiStatus( void );
 
@@ -342,6 +440,32 @@ public:
 
 	idUserInterface*	StartMenu( void );
 	void			ShowInitialJoinMenu( void );
+	void			UpdateJoinScreenGui( void );
+	void			SetJoinScreenSoftFocus( bool enabled );
+	// openQ4: the retained menu card (section 14.18). The session covers
+	// mainGui with it and asks for its mp.* keys; the menu, its state and its
+	// commands stay here, and mainGui stops drawing while covered.
+	void			SetRetainedMenuCover( bool covered, idUserInterface *card );
+	void			PublishRetainedMenu( idUserInterface *card );
+	bool			RetainedMenuCovered( void ) const { return retainedMenuCovered; }
+	// The Arena pause menu's match block, for the stock menu or its card.
+	void			PublishArenaPauseMenu( idUserInterface *gui, bool retained );
+	// The Arena pause menu's "arenaPause <action>" commands.
+	const char *	HandleArenaPauseCommand( const char *action );
+	idStr			RetainedScoreLine( void );
+	// The card's commands ("retained ..."); true when the menu closes.
+	bool			HandleRetainedMenuCommand( const idCmdArgs &args, int &icmd );
+	// Which card the menu opens: Welcome while the player has not answered the
+	// join offer (the offer stands, or ui_joined is still 0 while spectating),
+	// Escape otherwise.
+	bool			RetainedMenuWelcome( void );
+	// What joining a team would refuse, as the stock CheckTeamBalance tells
+	// it ("#str_202039" to "#str_202042"), or NULL; and the team "join auto"
+	// picks.
+	const char *	TeamJoinRefusal( int team );
+	int				AutoJoinTeam( void );
+	// The map si_mapCycle plays after the current one, or "" without a cycle.
+	idStr			PredictNextMap( void ) const;
 
 	const char*		HandleGuiCommands( const char *menuCommand );
 
@@ -354,12 +478,128 @@ public:
 
 	rvGameState*	GetGameState( void );
 
+	// One authoritative competitive aggregate owns phase, round, clocks and
+	// frozen rules.  rvGameState remains the gameplay adapter, but may mutate
+	// its legacy state only after these methods accept the same transition.
+	const mpMatchSession &GetMatchSession( void ) const { return matchSession; }
+	const mpCompetitiveRules &GetCompetitiveRules( void ) const { return matchRules; }
+	const mpCompetitionSeries &GetCompetitionSeries( void ) const { return matchSeries; }
+	const mpSessionView *GetClientMatchView( void ) const {
+		return clientMatchViewValid ? &clientMatchView : NULL;
+	}
+	// Resolve both current slot-generation bindings on every attempt.  This is
+	// the authoritative camera gate; recipient views are discovery data only.
+	bool			CanSpectatorFollow( int observerSlot, int targetSlot ) const;
+	// openQ4: the casual caster role (g_casterAccess). Returns the notice for the requester.
+	const char *	ServerRequestCasterRole( int clientNum, bool enabled );
+	bool			IsCasualCaster( int clientNum ) const { return clientNum >= 0 && clientNum < MAX_CLIENTS && casualCaster[ clientNum ]; }
+	// the team-vital rows the server disclosed to this client's accepted match view
+	int				GetClientTeamVitalCount( void ) const { return clientMatchViewValid ? clientMatchView.teamVitalCount : 0; }
+	// Placed, respawning major items report only authoritative lifecycle
+	// transitions.  The registry derives identity and recipient disclosure;
+	// item code never writes client UI or network state directly.
+	void			ObserveCompetitiveItemPickup( const idItem *item,
+						float respawnSeconds );
+	void			ObserveCompetitiveItemAvailable( const idItem *item );
+	// Called once at the authoritative frame boundary, before any gameplay
+	// input, events or entity thinking.  A pending pause therefore takes effect
+	// atomically for the whole simulation frame.
+	void			BeginCompetitiveFrame( void );
+	bool			IsGameplayFrozen( void ) const;
+	bool			CanCommitMatchPhaseTransition( mpGameState_t newState ) const;
+	bool			CommitMatchPhaseTransition( mpGameState_t newState );
+	bool			CommitMatchPhaseTransition( mpGameState_t newState,
+						mpMatchTransitionReason_t reason, mpParticipantId authorizer );
+	bool			CommitMatchPhaseTransition( mpGameState_t newState,
+						mpMatchTransitionReason_t reason, mpParticipantId authorizer,
+						int forfeitingSide );
+	bool			CommitMatchRoundTransition( roundState_t newState );
+	bool			ApplyRoundTeamAssignment( idPlayer *player, int team, bool respawn );
+	bool			BeginMatchOvertimePeriod( void );
+	void			ServerReceiveMatchOperation( int clientNum, const idBitMsg &msg );
+	void			ClientReceiveMatchOperationResult( const idBitMsg &msg );
+	void			ClientReceiveMatchView( const idBitMsg &msg );
+	void			ClientReceiveRefereeAuthChallenge( const idBitMsg &msg );
+	bool			SubmitMatchOperation( mpMatchOperationRequest_t &request );
+	bool			RequestRefereeAuthentication( const char *password );
+	// openQ4 (MP-18): admins log in with the server's second password through
+	// the same challenge and response; the grant belongs to the connection.
+	bool			RequestAdminAuthentication( const char *password );
+	bool			IsServerAdmin( int clientNum ) const {
+						return clientNum >= 0 && clientNum < MAX_CLIENTS && matchAdminConnection[ clientNum ] != 0 &&
+							matchAdminConnection[ clientNum ] == matchConnectionId[ clientNum ];
+					}
+	bool			AdminLoginAvailable( void ) const { return matchAdminCredentialIsReal; }
+	bool			ServerAdminLogout( int clientNum );
+	// the host's own control: end every grant, or forget the password as well
+	int				ServerAdminRevokeAll( const char *why );
+	void			ServerAdminLoginsOff( void );
+
 
 	void			PrintMessageEvent( int to, msg_evt_t evt, int parm1 = -1, int parm2 = -1 );
 	void			PrintMessage( int to, const char* message );
 
+// openQ4 BEGIN
+// Server driven centre-screen notice.  Quake 4 had no such channel: every big
+// message was derived client side from an observed state delta, which cannot
+// express text that varies with who did what to whom.  The payload is a
+// localization id plus up to two typed parameters, so nothing on the wire is
+// pre-translated.
+	typedef enum {
+		CPARM_NONE = 0,		// slot unused
+		CPARM_INT,			// printed as a number
+		CPARM_CLIENT,		// resolved to that client's name, with team colour
+		CPARM_TEAM			// resolved to the localized team name
+	} centerPrintParm_t;
+
+	// to == -1 broadcasts.  strId must be a #str_ id, never display text.
+	void			CenterPrint( int to, const char *strId, bool persist = false );
+	void			CenterPrint( int to, const char *strId, centerPrintParm_t type1, int parm1, bool persist = false );
+	void			CenterPrint( int to, const char *strId, centerPrintParm_t type1, int parm1, centerPrintParm_t type2, int parm2, bool persist = false );
+	void			CenterPrintTeam( int team, const char *strId, centerPrintParm_t type1 = CPARM_NONE, int parm1 = 0, bool persist = false );
+	// openQ4 MP-12: the client's HUD clock origin follows a frozen frame (Game_network.cpp)
+	void			RebaseClientPauseClock( int deltaMsec );
+	void			CenterPrintTeam( int team, const char *strId, centerPrintParm_t type1, int parm1, centerPrintParm_t type2, int parm2, bool persist = false );
+	void			ReceiveCenterPrint( const idBitMsg &msg );
+
+	// Server driven announcer cue.  ScheduleAnnouncerSound only ever reaches the
+	// machine it runs on, so a cue decided by server-only game logic - who was
+	// left standing, whose round it was - never reached the player it was about.
+	// to == -1 broadcasts.
+	void			AnnounceTo( int to, announcerSound_t sound );
+	void			AnnounceToTeam( int team, announcerSound_t sound );
+	void			ReceiveAnnouncer( const idBitMsg &msg );
+
+	// authoritative ready state, set from the client's reliable ready message
+	void			ServerSetPlayerReady( int clientNum, bool ready );
+	bool			IsManagedMatch( void ) const;
+	// openQ4: the map database changed settings for the map about to load; a
+	// casual session imports its rules from them again when that map starts.
+	void			InvalidateCasualRulesImport( void );
+	bool			RotateManagedDuelQueue( int firstSlot, int secondSlot, int losingSlot );
+	void			RecordManagedDuelResult( mpMatchTransitionReason_t reason,
+						int forfeitingSide, mpParticipantId authorizer );
+	bool			ResolveManagedDuelForfeitParticipants( int forfeitingSide,
+						mpParticipantId authorizer, mpParticipantId &forfeiter,
+						mpParticipantId &winner ) const;
+	// Legacy server administration is intentionally unavailable while the
+	// revisioned Match Control authority owns the session.  Command and GUI
+	// adapters call this before touching cvars, maps, teams, or clients.
+	bool			RejectManagedLegacyMutation( const char *action );
+	bool			ServerReconcileManagedUserInfo( int clientNum, idDict &userInfo );
+	static void		Ready_f( const idCmdArgs &args );
+	static void		NotReady_f( const idCmdArgs &args );
+	static void		ReadyUp_f( const idCmdArgs &args );
+// openQ4 END
+
 	void			DisconnectClient( int clientNum );
 	static void		ForceReady_f( const idCmdArgs &args );
+	static void		SeriesBind_f( const idCmdArgs &args );
+	static void		Broadcaster_f( const idCmdArgs &args );
+	static void		Timeout_f( const idCmdArgs &args );
+	static void		TimeIn_f( const idCmdArgs &args );
+	static void		Pause_f( const idCmdArgs &args );
+	static bool		SubmitConsoleMatchOperation( mpMatchOperationRequest_t &request, const char *command );
 	static void		DropWeapon_f( const idCmdArgs &args );
 	static void		MessageMode_f( const idCmdArgs &args );
 	static void		VoiceChat_f( const idCmdArgs &args );
@@ -413,6 +653,9 @@ public:
 
 // RAVEN BEGIN
 // shouchard:  added enum to remove magic numbers
+	// openQ4: mirrors mpVoteGameTypeOrder[] in mp/GameTypes.cpp, which is the
+	// authority.  The gametype menu dropdowns index this positionally, so it
+	// is append-only.
 	typedef enum {
 		VOTE_GAMETYPE_DM = 0,
 		VOTE_GAMETYPE_TOURNEY,
@@ -423,13 +666,26 @@ public:
 //
 		VOTE_GAMETYPE_DEADZONE,
 //RITUAL END
+		VOTE_GAMETYPE_DUEL,
+		VOTE_GAMETYPE_CA,
+		VOTE_GAMETYPE_FREEZETAG,
+		VOTE_GAMETYPE_REDROVER,
+		VOTE_GAMETYPE_1F_CTF,
+		VOTE_GAMETYPE_ARENA_1F_CTF,
+		VOTE_GAMETYPE_OVERLOAD,
+		VOTE_GAMETYPE_HARVESTER,
+		VOTE_GAMETYPE_DOMINATION,
+		VOTE_GAMETYPE_ATTACK_DEFEND,
 		VOTE_GAMETYPE_COUNT
 	} vote_gametype_t;
 // RAVEN END
 
+	void			SendMapList( int clientNum );
+	void			ReadMapList( const idBitMsg &msg );
+
 	static void		Vote_f( const idCmdArgs &args );
 	static void		CallVote_f( const idCmdArgs &args );
-	void			ClientCallVote( vote_flags_t voteIndex, const char *voteValue );
+	void			ClientCallVote( vote_flags_t voteIndex, const char *voteValue, int kickIdentity = 0 );
 	void			ServerCallVote( int clientNum, const idBitMsg &msg );
 	void			ClientStartVote( int clientNum, const char *voteString );
 	void			ServerStartVote( int clientNum, vote_flags_t voteIndex, const char *voteValue );
@@ -441,7 +697,14 @@ public:
 	void			ExecuteVote( void );
 // RAVEN BEGIN
 // shouchard:  multiline vote handlers
-	void			ClientCallPackedVote( const voteStruct_t &voteData );
+	// openQ4 MP-14/MP-16: the payloads of VOTEFLAG_MP14_FIELDS, written after
+	// the MP-12 fields on every vote message. Read checks shape and range only.
+	static void		WriteVoteExtensionFields( idBitMsg &msg, const voteStruct_t &voteData );
+	static bool		ReadVoteExtensionFields( const idBitMsg &msg, voteStruct_t &voteData );
+	static void		EmptyVoteStruct( voteStruct_t &voteData );
+	bool			ValidateVoteExtensionFields( int clientNum, voteStruct_t &voteData );
+	void			ExecuteVoteExtensionFields( const voteStruct_t &voteData, bool &needRescanSI, bool &presetRestart );
+	void			ClientCallPackedVote( const voteStruct_t &voteData, int kickIdentity = 0 );
 	void			ServerCallPackedVote( int clientNum, const idBitMsg &msg );
 	void			ClientStartPackedVote( int clientNum, const voteStruct_t &voteData );
 	void			ServerStartPackedVote( int clientNum, const voteStruct_t &voteData );
@@ -458,13 +721,14 @@ public:
 	void			SwitchToTeam( int clientNum, int oldteam, int newteam );
 	
 	bool			IsPureReady( void ) const;
-	void			ProcessChatMessage( int clientNum, bool team, const char *name, const char *text, const char *sound );
+	void			ProcessChatMessage( int clientNum, bool team, const char *name, const char *text,
+									const char *sound, bool triggerBotReplies );
 	void			ProcessVoiceChat( int clientNum, bool team, int index );
 // RAVEN BEGIN
 // shouchard:  added commands to mute/unmute voice chat
 	void			ClientVoiceMute( int clientNum, bool mute );
 	int				GetClientNumFromPlayerName( const char *playerName );
-	void			ServerHandleVoiceMuting( int clientSrc, int clientDest, bool mute );
+	void			ServerHandleVoiceMuting( int clientSrc, int clientDest, int identity, bool mute );
 // shouchard:  fixing a bug in multiplayer where round timer sounds (5 minute
 //             warning, etc.) don't go away at the end of the round.
 	void			ClearAnnouncerSounds( void );
@@ -478,14 +742,15 @@ public:
 		int			fragLimit;
 		int			tourneyLimit;
 		int			timeLimit;
-		int			minPlayers;
 		int			controlTime;
-		bool		buying;
+		int			buying;			// buyingMode_t
 		bool		autoBalance;
 		bool		shuffleTeams;
 	} serverAdminData_t;
 
-	void			HandleServerAdminBanPlayer( int clientNum );
+	// openQ4 MP-18: for seconds (0 for good) and with a reason, by its row of
+	// RetainedAdminBanReasonText's table
+	void			HandleServerAdminBanPlayer( int clientNum, int seconds = 0, int reason = 0 );
 	void			HandleServerAdminRemoveBan( const char * info );
 	void			HandleServerAdminKickPlayer( int clientNum );
 	void			HandleServerAdminForceTeamSwitch( int clientNum );
@@ -514,15 +779,18 @@ public:
 	void			ToggleSpectate( void );
 	void			ToggleReady( void );
 	void			ToggleTeam( void );
+	// openQ4: scrolls the held Remastered scoreboard by whole rows
+	void			ScrollScoreboard( int rows );
 
 	void			ClearFrags( int clientNum );
 
 	void			EnterGame( int clientNum );
 	bool			CanPlay( idPlayer *p );
+	bool			IsRankedParticipant( idPlayer *player );
 	bool			IsInGame( int clientNum );
 	bool			WantRespawn( idPlayer *p );
 
-	void			ServerWriteInitialReliableMessages( int clientNum );
+	void			ServerWriteInitialReliableMessages( const idMessageSender &sender, int clientNum );
 	void			ClientReadStartState( const idBitMsg &msg );
 
 	void			ServerClientConnect( int clientNum );
@@ -540,6 +808,7 @@ public:
 	void			SetHudOverlay( idUserInterface* overlay, int duration );
 
 	void			ClearMap ( void );
+	void			PrepareForMapShutdown( void );
 
 	void			EnableDamage( bool enable = true );
 
@@ -572,6 +841,7 @@ public:
 	int				GetPlayerTime( idPlayer* player );
 
 	const char*		GetLongGametypeName( const char* gametype );
+	const char*		VoteGameTypeToString( int gameTypeInt );
 	int				GameTypeToVote( const char *gameType );
 
 	void			ReceiveRemoteConsoleOutput( const char* output );
@@ -599,8 +869,8 @@ public:
 	void			ScheduleTimeAnnouncements( void );
 // RAVEN END
 
-	void			SendDeathMessage( idPlayer *attacker, idPlayer *victim, int methodOfDeath );
-	void			ReceiveDeathMessage( idPlayer *attacker, int attackerScore, idPlayer *victim, int victimScore, int methodOfDeath );
+	void			SendDeathMessage( idPlayer *attacker, idPlayer *victim, int methodOfDeath, bool quadKill );
+	void			ReceiveDeathMessage( idPlayer *attacker, int attackerScore, idPlayer *victim, int victimScore, int methodOfDeath, bool quadKill );
 
 	rvCTF_AssaultPoint*		NextAP( int team );
 	int						OpposingTeam( int team );
@@ -615,6 +885,97 @@ public:
 	rvTourneyGUI	tourneyGUI;
 
 	void			ShowStatSummary( void );
+	// Called by rvGameState at the authoritative GAMEON/GAMEREVIEW
+	// transitions.  Keeping campaign result capture on the transition itself
+	// means disconnect/forfeit paths cannot skip it by changing state outside
+	// idMultiplayerGame::Run.
+	void			OnMatchStarted( void );
+	void			OnMatchEnded( void );
+	// The Arena campaign is a local single-player experience hosted by the MP
+	// game.  Keep its staging and review presentation behind the campaign token
+	// so ordinary multiplayer retains the stock ready, spectate and camera flow.
+	bool			IsArenaCampaignMatch( void ) const;
+	// Instagib (si_instagib): a modifier over any game type, not a game type of
+	// its own. Everyone carries an unlimited railgun and the gauntlet, a hit
+	// from another player kills, falls do no harm, and the map's pickups are
+	// not spawned. It is latched with the game type when a map loads or
+	// restarts, on every peer, so a match never changes rules half way.
+	bool			IsInstagib( void ) const { return HasModifier( MPMOD_INSTAGIB ); }
+	// The modifier layer (mp/Modifiers.h, roadmap MP-14). Instagib is one row
+	// of it; Quad Hog, Vampiric Damage, Weapons Frenzy and the single-weapon
+	// arenas are the others, and all of them are latched together.
+	bool			HasModifier( mpModifier_t modifier ) const { return ( modifiers.mask & MPModifierBit( modifier ) ) != 0; }
+	const mpModifierState_t &	Modifiers( void ) const { return modifiers; }
+	// The one weapon a fixed-loadout rule hands out (Instagib's railgun, a
+	// weapon arena's weapon), or NULL when players arm themselves.
+	const char *	FixedLoadoutWeapon( void ) const;
+	bool			HasFixedLoadout( void ) const { return FixedLoadoutWeapon() != NULL; }
+	// True when the latched rules leave this map pickup out. Runs at map
+	// populate on every peer, so it reads nothing but the latch.
+	bool			PickupInhibited( const char *classname ) const;
+	// A caller that has just written new rules queues the restart that
+	// latches them here, so CheckModifierChange does not queue a second one.
+	void			QueueRulesRestart( void );
+	// openQ4: a drop the server decides on while entities think (g_inactivity) runs
+	// from Run, outside the think loop: dropping a client deletes its player at once
+	void			QueueClientDrop( int clientNum, const char *reason );
+	void			RunQueuedClientDrops( void );
+	// the server is removing this client itself (a kick, an idle drop): not a lost connection
+	void			BeginServerDrop( int clientNum ) { if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) { serverDropInFlight[ clientNum ] = true; } }
+	void			EndServerDrop( int clientNum ) { if ( clientNum >= 0 && clientNum < MAX_CLIENTS ) { serverDropInFlight[ clientNum ] = false; } }
+	bool			ServerDropInFlight( int clientNum ) const { return clientNum >= 0 && clientNum < MAX_CLIENTS && serverDropInFlight[ clientNum ]; }
+	// g_pauseOnDisconnect: the pause is held for this side's player to come back
+	bool			DisconnectPauseAdmits( const char *teamName ) const;
+	void			RulesRestartRefused( void ) { modifierRestartPending = false; }
+	bool			AnyMapPlaysGameType( const char *gameTypeName );
+	// Quad Hog: the client carrying the quad (-1 for none), and whether a
+	// frag scores under its rule.
+	int				QuadHogClient( void ) const { return quadHogClient; }
+	bool			QuadHogFragScores( idPlayer *killer, idPlayer *dead ) const;
+	// Vampiric Damage: an attacker drains the health a hit took.
+	void			ApplyVampiricDamage( idPlayer *attacker, idPlayer *victim, int damage, int healthBefore );
+	bool			ArenaCampaignLocksPlayers( void ) const;
+	bool			ArenaCampaignAllowsFreeLook( void ) const;
+	// The local view is an Arena presentation shot rather than gameplay: the
+	// HUD keeps only the match layer that carries the cinematic cards.
+	bool			ArenaCampaignPresentationActive( void ) const;
+	// The single-player Arena pauses while its in-game menu (or the main menu
+	// over it) is open, the way a story level does. Host-local, like the rest
+	// of the ceremony: the paused frames rebase every match deadline.
+	bool			ArenaCampaignPausesWorld( void ) const;
+	void			UpdateArenaSoundPause( bool pause );
+	void			RebaseArenaCampaignPauseFrame( int deltaMsec );
+	// Escape during the end-of-match ceremony skips ahead to the match report
+	// instead of opening a menu whose Disconnect would forfeit the result.
+	bool			ArenaCampaignOwnsEscape( void );
+	// The Arena pause menu (guis/arena_pause.gui) replaces the multiplayer
+	// menu during a live Arena match: Resume, Restart match, Settings and
+	// Leave match. The retained card covers it like the menu's own card.
+	bool			IsArenaPauseMenuOpen( void ) const { return currentMenu == MP_MENU_ARENA_PAUSE; }
+	// Restart match resets the live match in place. The campaign authorizes
+	// one restart by setting ui_arenaRestartMatch to the match's token and
+	// running serverMapRestart, which then comes here instead of the
+	// administration guard; clearing the CVar tells the campaign it happened.
+	bool			ArenaCampaignRestartAuthorized( void ) const;
+	void			RestartArenaCampaignMatch( void );
+	// openq4_arenaCeremony: drives a local Arena match without device input.
+	void			DebugArenaCampaignCeremony( const idCmdArgs &args );
+	void			AdvanceArenaCampaignCeremony( void );
+	void			SetupArenaCampaignStatSummary( void );
+	int				GetMapWeaponMask( void );
+	bool			ArenaCampaignFreezesWorld( void ) const;
+	bool			BuildArenaCampaignSpawnInView( idPlayer *viewer, renderView_t *view );
+	bool			BuildArenaCampaignIntroView( idPlayer *viewer, renderView_t *view );
+	idPlayer *		ArenaCampaignIntroSubject( void );
+	int				ArenaCampaignIntroCount( void );
+	void			ShowArenaCampaignIntroCard( idPlayer *subject );
+	bool			ArenaCampaignIntroBlocksCountdown( void );
+	float			ArenaCampaignCeremonyFade( void ) const;
+	void			DrawArenaCampaignCeremonyFade( void );
+	bool			BuildArenaCampaignPresentationView( idPlayer *viewer, renderView_t *view );
+	void			BeginArenaCampaignEntrancePresentation( void );
+	void			ShowArenaCampaignVictoryPresentation( void );
+	void			ClearArenaCampaignPresentation( void );
 	bool			CanCapture( int team );
 	void			FlagCaptured( idPlayer *player );
 	
@@ -624,6 +985,22 @@ public:
 	idPlayer *		FragLimitHit( void );
 	idPlayer *		FragLeader( void );
 	bool			TimeLimitHit( void );
+// openQ4 BEGIN
+// Exit rules carried over from Quake Live.
+	// true when the match is level at the top.  The optional output receives
+	// the authoritative leading score, including valid zero/negative scores.
+	bool			ScoreIsTied( int *leadingScore = NULL );
+	// team that has pulled far enough ahead to end the match early, or -1
+	int				MercyLimitHit( void );
+	// team left holding the match when the other side empties out, or -1
+	int				ForfeitTeam( void );
+	// respawn delay in milliseconds while a match is in overtime, 0 otherwise
+	int				GetOvertimeRespawnDelay( void );
+	// total match length in milliseconds including every overtime granted
+	int				GetMatchLengthMsec( void );
+	// true while scoring is turned off, which is warmup unless si_warmupScoring
+	bool			ScoringSuppressed( void ) const;
+// openQ4 END
 	int				GetCurrentMenu( void ) { return currentMenu; }
 
 	void			SetFlagEntity( idEntity* ent, int team );
@@ -642,6 +1019,8 @@ public:
 	void			ReportZoneController(int team, int pCount, int situation, idEntity* zoneTrigger = 0);
 	bool			IsValidTeam(int team);
 	void			ControlZoneStateChanged( int team );
+
+	void			ListMaps( void );
 
 	int				powerupCount;
 	int				prevAnnouncerSnd;
@@ -664,7 +1043,90 @@ public:
 // RITUAL END
 	static const char*	teamNames[ TEAM_MAX ];
 
+	// openQ4 MP-17: player identity, reconnect restoration, the local ranking
+	// table and the player's match history (mp/Identity.h, mp/IdentityHost.cpp).
+	void			IdentityServerInit( void );
+	void			IdentityClientConnect( int clientNum );
+	void			IdentityClientBegin( int clientNum, bool isBot );
+	void			IdentityUserInfoChanged( int clientNum );
+	void			IdentityClientDisconnect( int clientNum );
+	void			IdentityServerFrame( void );
+	void			IdentityNewMatch( void );
+	void			IdentityMatchEnded( void );
+	void			ServerReceiveIdentity( int clientNum, const idBitMsg &msg );
+	void			ClientReceiveIdentityChallenge( const idBitMsg &msg );
+	const char *	ClientIdentity( int clientNum ) const;	// sixteen hex digits, or "" when none was proved
+	bool			IdentityRankingEnabled( void ) const;
+	void			IdentityRecordHistory( void );		// the client's side: this match in its own history
+	// openQ4 MP-12: the intermission names the next map and reads out the
+	// match's awards, one every two seconds, with g_intermissionAnnounce.
+	bool			IntermissionAnnounces( void ) const;
+	// openQ4 MP-22: autoaction (ui_autoAction for this player, si_autoAction for the server)
+	void			AutoActionMatchStarted( bool local );
+	void			AutoActionMatchEnded( bool local );
+	void			AutoActionFrame( void );
+	static void		IdentityReset_f( const idCmdArgs &args );
+	static void		Identity_f( const idCmdArgs &args );
+	static void		Ghost_f( const idCmdArgs &args );
+	static void		Rankings_f( const idCmdArgs &args );
+	static void		History_f( const idCmdArgs &args );
+
 private:
+	// MP-17, the server's side
+	unsigned char	identityServerId[ MP_ID_SERVER_ID_BYTES ];
+	bool			identityServerIdReady = false;
+	unsigned char	identityNonce[ MAX_CLIENTS ][ MP_ID_NONCE_BYTES ];
+	bool			identityPending[ MAX_CLIENTS ];
+	int				identityChallengeTime[ MAX_CLIENTS ];
+	char			identityFingerprint[ MAX_CLIENTS ][ MP_ID_FINGERPRINT_TEXT_BYTES ];
+	char			identityGhost[ MAX_CLIENTS ][ MP_ID_GHOST_CODE_LENGTH + 1 ];
+	bool			identityGhostTold[ MAX_CLIENTS ];
+	bool			identityRestored[ MAX_CLIENTS ];
+	bool			identityBegun[ MAX_CLIENTS ];		// the connection has the map
+	bool			identityAsked[ MAX_CLIENTS ];		// and was challenged: once a connection
+	mpIdReturnStore_t identityReturns;
+	int				identityMatchStamp = 1;
+	bool			identityMatchRated = false;
+	// MP-12's awards reel: (award << 8) | client, read out in this order
+	idList<int>		intermissionAwards;
+	int				intermissionAwardsMatch = 0;	// the identityMatchStamp the reel was built for
+	int				intermissionAwardNext = 0;		// game time of the next line
+	// MP-22's autoaction: [0] this player's (ui_autoAction), [1] the server's (si_autoAction)
+	idStr			autoActionName[ 2 ];				// the match's file name, MPBuildMatchBasename
+	int				autoActionActions[ 2 ] = { 0, 0 };	// MP_AUTOACTION_* for this match
+	int				autoActionPending[ 2 ] = { 0, 0 };	// what the result still owes
+	int				autoActionResultTime[ 2 ] = { 0, 0 };
+	bool			autoActionDemo[ 2 ] = { false, false };	// autoaction started the recording
+	int				AutoActionActions( bool local ) const;
+	void			WriteAutoActionStats( const char *name );
+	void			RunIntermissionAwards( void );
+	void			IdentityProved( int clientNum, const char *fingerprint );
+	void			IdentityTellGhost( int clientNum );
+	void			IdentitySendChallenge( int clientNum );
+	void			IdentityWriteChallenge( int clientNum );
+	int				identityChallengeSends[ MAX_CLIENTS ];
+	bool			IdentityRestore( int clientNum, const char *fingerprint, const char *ghost );
+	bool			IdentityCasual( void ) const;
+	// MP-17, the client's side
+	bool			IdentityLoadSeed( unsigned char seed[ MP_ID_SEED_BYTES ], bool create );
+
+	mpModifierState_t	modifiers;			// the modifier switches as latched by SetGameType
+	bool			modifierRestartPending;	// a restart is queued to latch new modifier switches
+	bool			modifierPublishPending;	// si_modifiers changed and the server info has not been rescanned
+	void			ModifiersWanted( mpModifierState_t &state ) const;
+	void			LatchModifiers( void );
+	void			CheckModifierChange( void );
+
+	int				quadHogClient;			// who carries the quad, -1 for nobody
+	idEntityPtr<idEntity>	quadHogItem;	// the quad while it lies in the world
+	int				quadHogSpawnTime;		// when the next quad is due
+	int				quadHogLooseTime;		// when the quad in the world appeared
+	int				quadHogSpawnCount;		// quads spawned this map; names them openq4_quad_hog_<n>
+	void			ResetQuadHog( void );
+	void			RunQuadHog( void );
+	idEntity *		FindLooseQuad( void ) const;
+	bool			SpawnQuadHogItem( void );
+
 	static const char	*MPGuis[];
 	static const char	*ThrottleVars[];
 	static const char	*ThrottleVarsInEnglish[];
@@ -678,24 +1140,623 @@ private:
 
 	// game state
 	rvGameState*	gameState;
+	mpCompetitiveRules matchRules;
+	mpMatchSession	matchSession;
+	mpCompetitionSeries matchSeries;
+	mpCompetitionSeriesReport matchSeriesReport;
+	uint64_t		matchSeriesId;
+	uint64_t		matchSeriesLinkedSessionId;
+	mpSeriesRecoveryWorkspace matchSeriesRecoveryWorkspace;
+	mpSeriesReportStorageWorkspace matchSeriesReportWorkspace;
+	int			matchSeriesContestantSlot[ MP_SERIES_SIDE_COUNT ];
+	uint64_t		matchSeriesContestantConnection[ MP_SERIES_SIDE_COUNT ];
+	int			matchSeriesCompetitionSide[ MAX_CLIENTS ];
+	uint64_t		matchSeriesCompetitionConnection[ MAX_CLIENTS ];
+	int			matchSeriesGameSideForCompetition[ MP_SERIES_SIDE_COUNT ];
+	bool			matchSeriesNeedsBindingRecovery;
+	bool			matchSeriesAwaitingMapSession;
+	bool			matchSessionOperational;
+	// The client slot whose committed match-layer side ApplyMatchTeamsPlanToLegacy
+	// is publishing, or -1. VerifyTeamSwitch leaves that side as it is.
+	int				matchTeamApplicationSlot;
+	uint64_t		nextMatchConnectionId;
+	uint64_t		matchConnectionId[ MAX_CLIENTS ];
+	mpMatchTeams	matchTeams;
+	mpProposalService matchProposals;
+	mpMatchOperationExecutor matchOperationExecutor;
+	mpRefereeAuthenticationService matchRefereeAuthentication;
+	// openQ4 (MP-18): the admin password's own verifier, challenges and lockout
+	mpRefereeAuthenticationService matchAdminAuthentication;
+	uint64_t		matchAdminConnection[ MAX_CLIENTS ];	// the connection that logged in, or 0
+	int				matchAdminRefusalNotice[ MAX_CLIENTS ];	// game time before which a refused login is not reported again
+	// The address and port of the connection that logged in, kept from the login
+	// until that connection ends: a map change re-initialises every client
+	// without a disconnect, and the grant goes with the connection across it.
+	idStr			matchAdminCarry[ MAX_CLIENTS ];
+	int				matchAdminLockoutLogged[ MAX_CLIENTS ];	// game time before which a locked-out login is not logged again
+	bool			matchAdminGaveReferee[ MAX_CLIENTS ];	// this session's referee role came with the admin login
+	mpMatchEvidence	matchEvidence;
+	mpMatchEvidenceObserver matchEvidenceObserver;
+	mpEvidenceStorageWorkspace matchEvidenceWorkspace;
+	mpMatchItemTimingRegistry matchItemTiming;
+	mpSessionView	clientMatchView;
+	bool			clientMatchViewValid;
+	mpMatchProtocolSessionId_t clientSummaryAnnouncedSession;
+	mpMatchProtocolRevision_t clientSummaryAnnouncedResult;
+	mpMatchControlModel clientMatchControlModel;
+	mpMatchControlError_t clientMatchControlError;
+	bool			clientMatchControlErrorValid;
+	uint64_t		clientMatchControlChoiceSessionId;
+	uint64_t		clientMatchMenuProjectedViewRevision;
+	uint64_t		clientMatchHudProjectedViewRevision;
+	uint64_t		clientMatchScoreboardProjectedViewRevision;
+	mpMatchOperationResult_t clientMatchOperationResult;
+	bool			clientMatchOperationResultValid;
+	// openQ4 MP-12: the console command whose typed request awaits the
+	// server's answer; a refusal is printed where the command was typed
+	unsigned int	consoleMatchRequestId;
+	idStr			consoleMatchCommand;
+	mpMatchOperationRequest_t clientPendingMatchConfirmation;
+	bool			clientPendingMatchConfirmationValid;
+	uint64_t		matchViewRevision;
+	uint64_t		matchControlRevision;
+	uint64_t		matchViewObservedSessionRevision;
+	uint32_t		matchViewObservedRulesRevision;
+	uint64_t		matchViewObservedRulesDigest;
+	mpProposalRevision_t matchViewObservedProposalRevision;
+	uint64_t		matchViewObservedSeriesRevision;
+	uint64_t		matchViewObservedTeamsRevision;
+	uint64_t		matchViewObservedEvidenceRevision;
+	uint64_t		matchViewObservedItemTimingRevision;
+	bool			matchViewObservedEvidenceFinalized;
+	bool			matchViewObservedEvidencePersisted;
+	bool			matchViewObservedMVDRecording;
+	bool			matchItemTimingNeedsInitialScan;
+	int			matchViewNextClockUpdateTime;
+	uint64_t		matchViewSentRevision[ MAX_CLIENTS ];
+	uint32_t		lastMatchRequestId[ MAX_CLIENTS ];
+	mpMatchOperationResult_t lastMatchRequestResult[ MAX_CLIENTS ];
+	bool			lastMatchRequestResultValid[ MAX_CLIENTS ];
+	int			matchOperationNextAllowedTime[ MAX_CLIENTS ][ MP_MATCH_COOLDOWN_COUNT ];
+	uint32_t		nextClientMatchRequestId;
+	uint32_t		nextTrustedLocalMatchRequestId;
+	mpProposalId_t	nextMatchProposalId;
+	// The newest passed proposal executed in each scope.  Proposal ids only grow
+	// within a session, so a record at or below it ran already and only its
+	// acknowledgement is retried: a ballot never executes twice.
+	mpProposalId_t	lastExecutedMatchProposalId[ MP_PROPOSAL_SCOPE_COUNT ];
+	uint64_t		nextMatchSessionId;
+	bool			matchRefereeCredentialInitialized;
+	bool			matchRefereeCredentialIsReal;
+	bool			matchAdminCredentialInitialized;
+	bool			matchAdminCredentialIsReal;
+	bool			matchAdminAuthenticationReady;
+	uint64_t		matchAdminSessionId;			// the match session the admin service is bound to
+	bool			BindAdminAuthenticationSession( void );
+	bool			pendingRefereePasswordIsAdmin;	// the pending password answers the admin challenge
+	char			pendingRefereePassword[ MP_REFEREE_AUTH_MAX_PASSWORD_BYTES + 1 ];
+	int			pendingRefereePasswordLength;
+	int			pendingRefereePasswordDeadline;
+	mpRefereeAuthChallenge pendingRefereeChallenge;
+	bool			pendingRefereeChallengeValid;
+	bool			competitiveRulesValidForSession;
+	bool			competitiveRulesInitialized;
+	mpRuleValidationReason_t competitiveRulesFailure;
+	bool			matchEvidenceFinalized;
+	bool			matchEvidencePersisted;
+	bool			matchEvidenceFinalizationPending;
+	int				matchEvidenceMode;
+	bool			matchMVDStartedBySession;
+	bool			matchMVDAttemptedBySession;
+	bool			matchMVDOperatorOwnedBySession;
+	char			matchMVDQPath[ MP_MATCH_EVIDENCE_STORAGE_QPATH_BYTES + 1 ];
+	uint64_t		matchPhaseEffectsSessionId;
+	uint64_t		matchPhaseEffectsRevision;
+	uint64_t		matchTerminalResultSessionId;
+	mpMatchViewTerminalResult_t matchTerminalResult;
+	mpEvidenceMapResult matchTerminalEvidenceResult;
+
+	bool			InitializeCompetitiveRules( void );
+	bool			CanEnterMatchCountdown( void ) const;
+	bool			IsManagedTeamCommunicationActive( void ) const;
+	bool			BuildManagedTeamCommunicationBinding( int clientNum,
+						mpMatchTeamCommunicationBinding_t &binding ) const;
+	mpMatchRulesValidationContext_t BuildCompetitiveRuleValidationContext( void ) const;
+	bool			ConfigureMatchSessionFromCompetitiveRules( void );
+	mpMatchTeamsPolicy_t BuildMatchTeamsPolicy( void ) const;
+	bool			ApplyMatchTeamsTransaction(
+						const mpMatchTeamsJoinDecision_t &decision,
+						mpOperationExecutionResult_t &execution );
+	bool			ApplyMatchSpectatorTransition( mpParticipantId participant,
+						mpOperationExecutionResult_t &execution );
+	void			ReconcileGameplayPhaseAfterMatchMutation( void );
+	bool			MatchTeamJoinUnbalances( mpParticipantId participant, int side );
+	void			ApplyMatchTeamsPlanToLegacy(
+						const mpMatchTeamsTransactionPlan_t &plan );
+	void			ProcessMatchTeamQueue( void );
+	bool			ConfigureMatchSessionForRules( mpMatchSession &session,
+						const mpMatchRulesSnapshot &rules, bool rulesValid ) const;
+	bool			BeginMatchSession( void );
+	bool			BeginMatchEvidence( void );
+	void			ReconcileMatchEvidenceForCommittedRules( void );
+	bool			IsCompetitionSeriesModeSupported( void ) const;
+	bool			CollectCompetitionSeriesContestants(
+						int slots[ MP_SERIES_SIDE_COUNT ],
+						uint64_t connections[ MP_SERIES_SIDE_COUNT ] ) const;
+	int			ResolveCompetitionSide( mpParticipantId participant ) const;
+	bool			BuildCompetitionSeriesMapPool(
+						const mpSeriesProfileDescriptor &profile,
+						char storage[ MP_SERIES_MAX_MAP_POOL ][ MP_SERIES_MAP_TOKEN_BYTES ],
+						const char *tokens[ MP_SERIES_MAX_MAP_POOL ], int &count,
+						mpSeriesReason_t &reason ) const;
+	bool			PersistCompetitionSeries( void );
+	bool			PersistCompetitionSeriesCandidate(
+						const mpCompetitionSeries &series,
+						const mpCompetitionSeriesReport &report,
+						uint64_t seriesId, uint64_t linkedSessionId );
+	bool			AbortUnstartedCompetitionSeriesMap(
+						mpCompetitionSeries &series,
+						mpCompetitionSeriesReport &report,
+						uint64_t seriesId, uint64_t linkedSessionId ) const;
+	bool			InitializeCompetitionSeriesReport(
+						const mpCompetitionSeries &series, uint64_t seriesId,
+						const int contestantSlots[ MP_SERIES_SIDE_COUNT ],
+						mpCompetitionSeriesReport &report ) const;
+	bool			FinalizeCompetitionSeriesReport(
+						mpCompetitionSeries &series,
+						mpCompetitionSeriesReport &report,
+						mpParticipantId authorizer );
+	bool			CommitCompetitionSeriesMapEvidence(
+						const mpEvidenceStorageResult &evidenceStorage );
+	bool			RestoreCompetitionSeriesIfRequested( void );
+	bool			BindCompetitionSeriesContestant( int competitionSide,
+						int clientNum );
+	bool			ScheduleCompetitionSeriesMap( mpCompetitionSeries &candidate,
+						const char *mapToken, mpOperationExecutionResult_t &execution );
+	void			LinkCurrentSeriesEvidence( void );
+	mpEvidenceCommittedStamp BuildMatchEvidenceStamp( void ) const;
+	mpEvidenceActorRef MatchEvidenceActor( mpParticipantId participant,
+						bool serverOperator = false ) const;
+	void			ObserveMatchEvidence( mpParticipantId actor,
+						bool serverOperator = false );
+	void			RecordMatchEvidenceFinalStats( void );
+	void			RecordMatchEvidenceParticipantStats( int clientNum,
+						mpParticipantId participant );
+	void			RecordMatchEvidenceResult( mpMatchTransitionReason_t reason,
+						mpParticipantId authorizer, int forfeitingSide = MP_MATCH_SIDE_NONE );
+	mpEvidenceMapResult BuildMatchTerminalEvidenceResult( mpMatchTransitionReason_t reason,
+						mpParticipantId authorizer, int forfeitingSide );
+	void			ClearMatchTerminalResult( void );
+	void			FreezeMatchTerminalResult( const mpEvidenceMapResult &result );
+	bool			PersistMatchEvidence(
+						mpEvidenceStorageResult *storageResult = NULL );
+	bool			FinalizeMatchEvidence( bool abortedIfUndecided );
+	void			ProjectMatchMVDReportArtifact(
+						mpSeriesReportArtifactInput &artifact, idStr &qpathStorage ) const;
+	bool			ReconcileCompetitionSeriesMVDResults(
+						mpCompetitionSeriesReport &report, bool sealing );
+	void			StartMatchMVDIfRequired( void );
+	void			StopMatchMVD( const char *reason );
+	bool			ApplyCommittedMatchPhaseEffects( int forfeitingSide );
+	void			PublishCompetitiveRulesIdentity( void );
+	void			MirrorCompetitiveRulesToLegacy( void );
+	void			SynchronizeMatchParticipant( int clientNum );
+	void			SynchronizeAllMatchParticipants( void );
+	// openQ4: slots whose broadcaster role came from their own caster request,
+	// so only those are withdrawn when the policy or their standing changes
+	bool			casualCaster[ MAX_CLIENTS ];
+	// openQ4: when each spectator may next be told their chat is limited to spectators
+	int				spectatorChatNoticeTime[ MAX_CLIENTS ];
+	bool			SetCasualCasterRole( int clientNum, bool enabled );
+	void			ReleaseBroadcasterOnJoin( int clientNum, mpParticipantId participant );
+	void			UpdateCasualCasters( void );
+	void			ProjectCasterVitals( idUserInterface *gui );
+	void			RebaseCompetitivePauseFrame( int deltaMsec );
+	void			AnnounceCasualPauseTransitions( void );
+	bool			BeginDisconnectPause( bool playingHuman, int side );
+	void			AdvanceMatchViewRevision( bool forceClockSample = false );
+	void			InitializeMatchItemTimingObservations( void );
+	bool			BuildMatchItemTimingIdentity( const idItem *item,
+						mpMatchItemTimingKind_t &kind, char *adapterToken,
+						int adapterTokenBytes ) const;
+	void			ObserveCompetitiveItemState( const idItem *item,
+						bool available, int respawnMsec );
+	void			SendChangedMatchViews( bool force = false );
+	mpMatchDisclosurePolicy_t BuildMatchDisclosurePolicy( void ) const;
+	bool			BuildMatchDisclosureRecipient( int clientNum,
+						mpParticipantId &participant,
+						mpMatchDisclosureRecipient_t &recipient ) const;
+	int				ResolveMatchDisclosureTargetSide(
+						const mpMatchParticipantState &target ) const;
+	bool			BuildMatchView( int clientNum, mpSessionView &view ) const;
+	bool			AcceptClientMatchView( const mpSessionView &incoming );
+	bool			RefreshLocalClientMatchView( void );
+	void			ProjectClientMatchControlMenu( bool notifyGui );
+	void			ProjectClientManagedMatchContext( idUserInterface *gui );
+	bool			HandleMatchControlCommand( const char *token );
+	void			ClearClientPendingMatchConfirmation( bool closeModal );
+	void			ClearClientMatchControlConnectionState( bool clearGuiCredential );
+	bool			WriteMatchViewMessage( int clientNum, idBitMsg &msg ) const;
+	mpMatchViewAllowedOperationMask_t AllowedMatchOperationsFor( mpParticipantId participant ) const;
+	mpMatchOperationResult_t MakeMatchOperationResult( const mpMatchOperationRequest_t &request,
+						const mpOperationExecutionResult_t &execution ) const;
+	bool			StoreClientMatchOperationResult(
+						const mpMatchOperationResult_t &result );
+	void			ClearMatchOperationTransportSlot( int clientNum );
+	void			SendMatchOperationResult( int clientNum,
+						const mpMatchOperationResult_t &result );
+	bool			MatchOperationRateLimitAccepted( int clientNum,
+						const mpMatchOperationDescriptor_t &descriptor );
+	bool			VoteRateLimitAccepted( int clientNum );
+	void			StampVoteRateLimit( int clientNum );
+	void			ResetVoteCooldownSlot( int clientNum );
+	bool			VoteLimitAccepted( int clientNum );
+	bool			VoteReadyAllAvailable( void ) const;
+	void			CasualVoteLines( const voteStruct_t &data, idStrList &lines ) const;
+	bool			HasRecoveredCompetitionReview( void ) const;
+	void			BuildMatchOperationContext( int clientNum,
+						mpMatchOperationOpcode_t opcode, bool enforceTransportCooldown,
+						mpOperationAdapterContext_t &context );
+	void			ProcessPassedMatchProposals( void );
+	void			RetireUnpassedMatchProposals( void );
+	bool			ApplyMatchOperationContinuation( int clientNum,
+						const mpMatchOperationRequest_t &request,
+						mpOperationExecutionResult_t &execution );
+	bool			ExecuteTrustedLocalMatchOperation(
+						mpMatchOperationRequest_t &request,
+						mpOperationExecutionResult_t &execution );
+	bool			InitializeRefereeAuthentication( void );
+	bool			InitializeAdminAuthentication( void );
+	bool			InstallOpaqueAdminCredential( void );
+	bool			ApplyAdminAuthentication( int clientNum,
+						const mpMatchOperationRequest_t &request,
+						mpOperationExecutionResult_t &execution );
+	bool			SendRefereeAuthChallenge( int clientNum,
+						const mpRefereeAuthChallenge &challenge );
+	bool			CompleteRefereeAuthChallenge( const mpRefereeAuthChallenge &challenge );
+	void			ClearPendingRefereePassword( void );
+	void			ApplyMatchOperationLegacyMirror( int clientNum,
+						const mpMatchOperationRequest_t &request,
+						const mpOperationExecutionResult_t &execution );
+	mpMatchTransitionReason_t InferMatchTransitionReason( mpGameState_t from,
+						mpGameState_t to ) const;
+	mpMatchRoundTransitionReason_t InferRoundTransitionReason( roundState_t from,
+						roundState_t to ) const;
+	void			BeginArenaCampaignResult( void );
+	void			UpdateArenaCampaignResult( void );
+	// Publishes a decided, contested result (ui_arenaDecidedResult) for as long
+	// as the ceremony holds it back, so the campaign keeps it if the player
+	// leaves or quits before the handoff.
+	void			PublishArenaCampaignDecidedResult( void );
+	// Resets every ceremony, camera and introduction field. No HUD events and
+	// no renderer calls, so the constructor and ClearMap can share it.
+	void			ResetArenaCampaignCeremonyState( void );
+	void			BuildArenaCampaignIntroOrder( void );
+	void			SkipArenaCampaignCeremony( void );
+	void			UpdateArenaCampaignSkipInput( void );
+	const char *	ArenaCampaignPresentedGameType( void );
+	const char *	ArenaCampaignMatchTitle( void ) const;
+	void			ArenaCampaignAnnounceResult( void );
+
+	// Ordered end-of-match ceremony. An Arena match is always one human on a
+	// listen server with no remote clients, so these phases are host-local and
+	// need no wire state - deliberately NOT mpGameState_t values, which are
+	// replicated bytes every gametype branches on.
+	enum arenaCeremonyPhase_t {
+		ARENA_CEREMONY_NONE = 0,
+		ARENA_CEREMONY_INTRO,		// warmup: present each authored opponent in turn
+		ARENA_CEREMONY_SPAWN_IN,	// match start: orbit own body, land in first person
+		ARENA_CEREMONY_TABLEAU,		// frozen world, player-steered orbit of the victor
+		ARENA_CEREMONY_SCOREBOARD,
+		ARENA_CEREMONY_STATS,
+		ARENA_CEREMONY_DONE			// ceremony over; the result may be reported
+	};
+	int				arenaCeremonyPhase;
+	int				arenaCeremonyPhaseStartTime;
+	int				arenaCeremonyPhaseEndTime;
+	int				arenaTableauStartTime;
+
+	// What the HUD was last asked to present: 0 nothing, 1 the match entrance,
+	// 2 the victory tableau, 3 an opponent introduction. A clear is only sent
+	// over something visible, so it cannot outlive a card armed after it.
+	int				arenaHudPresentation;
+	// Escape, or a fresh fire press after a short grace, skips the rest of the
+	// introductions or of the end-of-match ceremony.
+	bool			arenaCeremonySkipping;
+	bool			arenaSkipButtonHeld;
+	bool			arenaMenuWasPaused;
+	bool			arenaSoundPauseOwned;
+	// The introduction order, latched when it arms: teammates first, then the
+	// opposition, each in slot order.
+	int				arenaIntroOrder[ MAX_CLIENTS ];
+	int				arenaIntroTotal;
+	int				arenaIntroTeammates;
+	// The current subject's camera side, latched on its first frame so a wall
+	// behind one candidate cannot flip the shot mid-introduction.
+	bool			arenaIntroShotLatched;
+	float			arenaIntroShotBase;
+	float			arenaVictorLookPitch;
+
+	bool			arenaResultPending;
+	bool			arenaResultReported;
+	int				arenaResultToken;
+	int				arenaResultOutcome;	// 0 loss, 1 win, 2 draw, 3 aborted; framework handoff contract
+	int				arenaResultPlayerScore;
+	int				arenaResultOpponentScore;
+	int				arenaResultReportTime;
+	int				arenaPresentationVictor;
+	int				arenaPresentationFocus;
+	bool			arenaPresentationBlurEnabled;
+	// Completed serverMapRestart resets, so the Arena's Restart match can tell
+	// a restart from one MapRestart refused or turned into a map reload.
+	int				mapRestartCount;
+	// The connect-time join screen is a compact panel drawn over a live view of
+	// the map, so it borrows the same Raven special-effect blur the arena
+	// presentation uses and holds it for as long as that panel is up.
+	bool			joinScreenSoftFocusEnabled;
+	// True from the moment a connect-time join is offered until the player
+	// answers it.  The menu can legitimately be opened more than once before
+	// that happens - a listen-server host is offered the screen again after its
+	// own player entity respawns - so this cannot be a one-shot GUI state bit.
+	bool			joinScreenPending;
+	// The session's retained card covers mainGui; the header texts last
+	// published to it, and the revision that tells the session they changed.
+	bool			retainedMenuCovered;
+	int				retainedMenuRevision;
+	idDict			retainedMenuPublished;
+	// The Team page's three action slots (section 14.18), derived from the
+	// local player's state each time they are published or chosen.
+	enum retainedTeamAction_t { RTA_NONE, RTA_JOIN_MARINE, RTA_JOIN_STROGG, RTA_JOIN_AUTO, RTA_SPECTATE, RTA_READY, RTA_TOURNEY };
+	struct retainedTeamSlot_t {
+		retainedTeamAction_t	action;
+		idStr					label, reason, detail;
+		bool					available;
+	};
+	static const int RETAINED_TEAM_SLOTS = 3;
+	void			RetainedTeamSlots( retainedTeamSlot_t slots[ RETAINED_TEAM_SLOTS ] );
+	// The Welcome card's Join page (section 14.18): in team modes the two team
+	// cards, Auto join and Spectate; in Tourney joining or leaving the
+	// tournament; elsewhere Join game and Spectate.
+	static const int RETAINED_WELCOME_SLOTS = 4;
+	void			RetainedWelcomeSlots( retainedTeamSlot_t slots[ RETAINED_WELCOME_SLOTS ] );
+	void			PublishRetainedWelcome( idUserInterface *card, bool &changed );
+	// Takes a card action as the stock buttons take it and closes the menu;
+	// false for an action that does nothing.
+	bool			RunRetainedAction( retainedTeamAction_t action );
+	bool			PublishRetainedValue( idUserInterface *card, const char *key, const char *value );
+	// The Players page's lists: the player's own team (Marines while
+	// spectating, everyone outside team modes), the other team and the
+	// spectators, each up to the rows a server can hold. A list keeps its
+	// order while the menu stays open, and sorts again by score only when it
+	// opens or the list's players change. The page shows the statistics of
+	// retainedStatClient.
+	static const int RETAINED_PLAYER_LISTS = 3;
+	static const int RETAINED_PLAYER_ROWS = 32;
+	static_assert( RETAINED_PLAYER_ROWS == MAX_CLIENTS, "retained rosters cover every client slot" );
+	idList<int>		retainedPlayerOrder[ RETAINED_PLAYER_LISTS ];
+	int				retainedStatClient;
+	idStr			retainedStatIdentity;
+	idStr			RetainedPlayerIdentity( int client ) const;
+	void			RetainedPlayerLists( idList<int> lists[ RETAINED_PLAYER_LISTS ], int colors[ RETAINED_PLAYER_LISTS ] );
+	bool			RetainedListed( int client );
+	void			PublishRetainedPlayers( idUserInterface *card, bool &changed );
+	// The summary card (section 14.14) covers statSummary at the end of a
+	// match: the result, the standings (the top ten, or each team's top five)
+	// with each player's three most accurate weapons, and the chat's newest
+	// messages; retained_mp_summary.py lays out the same numbers.
+	static const int RETAINED_SUMMARY_TOP = 10;
+	static const int RETAINED_SUMMARY_TEAM = 5;
+	static const int RETAINED_SUMMARY_CHAT = 10;
+	static const int RETAINED_SUMMARY_AWARDS = 3;
+	void			PublishRetainedSummary( idUserInterface *card, bool &changed );
+	bool			PublishRetainedBuy( idUserInterface *card );
+	// Marks or unmarks a friend: the platform's friends service where there is
+	// one, and the player's own mark, which the lists and scoreboard show.
+	void			ToggleFriend( int client );
+	// The Vote page (section 14.18). The call being drafted is reset to the
+	// server's values each time the card covers the menu; "retained voteSet"
+	// changes one field and "retained callVote" calls a vote with the fields
+	// that differ from the server's. The map is drafted by its path; its
+	// choice lists the maps the drafted game type plays, and the kick choice
+	// the other players. The session's RETAINED_MP_VOTE_FIELDS and the
+	// document's rows follow this order. The casual callvote fields (MP-12)
+	// follow the kick, so the Admin page's fields stay the ones before it:
+	// skipping to the next map, a random map, the round limit, the overtime
+	// period, the ruleset, Instagib, readying everyone and a coin toss. Then
+	// the moderation and modifier votes (MP-18, MP-14, MP-16): whether the
+	// chosen player is muted rather than kicked, Quad Hog, Vampiric Damage,
+	// Weapons Frenzy, a weapon arena (by row; -1 none), a preset (by row of
+	// the built-in table; -1 keeps the rules) and spectator chat.
+	enum retainedVoteField_t {
+		RVF_MAP, RVF_GAMETYPE, RVF_TIMELIMIT, RVF_FRAGLIMIT, RVF_CAPTURELIMIT, RVF_TOURNEYLIMIT, RVF_CONTROLTIME,
+		RVF_BALANCE, RVF_SHUFFLE, RVF_RESTART, RVF_BUYING, RVF_KICK,
+		RVF_NEXTMAP, RVF_RANDOMMAP, RVF_ROUNDLIMIT, RVF_OVERTIME, RVF_RULESET, RVF_INSTAGIB, RVF_READYALL, RVF_COINTOSS,
+		RVF_MUTE, RVF_QUADHOG, RVF_VAMPIRIC, RVF_FRENZY, RVF_ARENA, RVF_PRESET, RVF_SPECTATORCHAT, RVF_COUNT
+	};
+	static const int RETAINED_VOTE_MAPS = 128;
+	static const int RETAINED_VOTE_ARENAS = 16;		// the weapon arena choice's rows
+	static const int RETAINED_VOTE_PRESETS = 16;	// the preset choice's rows (the built-in table)
+	static const int RETAINED_VOTE_LINES = 6;
+	int				retainedVoteDraft[ RVF_COUNT ];
+	idStr			retainedVoteMap;
+	idList<int>		retainedVoteMaps;
+	idList<int>		retainedVoteKick;
+	idStr			retainedVoteKickCatalog;
+	int				retainedVoteKickIdentity = 0;
+	bool			retainedVoteKickStale = false;
+	bool			SetRetainedVoteKick( int row, const char *catalog );
+	static int		RetainedVoteModifier( int field );
+	static int		RetainedVotePresetRow( const char *name );
+	bool			retainedVoteMapsRequested;
+	void			ResetRetainedVoteDraft( void );
+	void			RetainedVoteChoices( void );
+	// The rows a drafted game type uses: its own limit, team balance and
+	// shuffle in team modes, buying where the mode has a buy menu.
+	static bool		RetainedDraftFieldShown( int voteGameType, int field );
+	bool			RetainedVoteFieldShown( int field ) const;
+	bool			RetainedVoteFieldAllowed( int field ) const;
+	int				RetainedVoteChanges( voteStruct_t &data );
+	const char *	RetainedVoteRefusal( void );
+	const char *	RetainedBallotRefusal( void ) const;
+	bool			SetRetainedVoteField( int field, int value );
+	void			RetainedVoteLines( const voteStruct_t &data, idStrList &lines );
+	void			PublishRetainedVote( idUserInterface *card, bool &changed );
+	// The Escape card's Admin page (section 14.18): the remote console
+	// password first, then Players (kick, ban, force team switch and the ban
+	// list), Server (the rules, drafted as the Vote page drafts a call, and
+	// Apply changes) and Console. A listen server's host is the admin; a
+	// client becomes one once the server accepts its password, until the map
+	// changes. The drafted fields follow retainedVoteField_t without the kick,
+	// as do the session's RETAINED_MP_ADMIN_FIELDS and the document's rows.
+	enum retainedAdminState_t { RAS_NONE, RAS_CHECKING, RAS_REFUSED };
+	enum retainedAdminAction_t { RAA_KICK, RAA_BAN, RAA_SWITCH, RAA_APPLY, RAA_COUNT };
+	static const int RETAINED_ADMIN_PLAYERS = 32;
+	static const int RETAINED_ADMIN_BANS = 32;
+	static const int RETAINED_ADMIN_CONSOLE_LINES = 12;
+	bool			retainedAdminValid;
+	int				retainedAdminState;
+	int				retainedAdminClient;		// the player chosen, by client number (-1: none)
+	idStr			retainedAdminIdentity;
+	int				retainedAdminBan;			// the ban chosen, by row (-1: none)
+	// openQ4 MP-18: the Players section's Ban is for the length and with the
+	// reason chosen here, by row of RetainedAdminBanLength/-Reason's tables.
+	int				retainedAdminBanLength = 0;
+	int				retainedAdminBanReason = 0;
+	static const int RETAINED_ADMIN_BAN_LENGTHS = 5;	// 10 minutes, an hour, a day, a week, for good
+	static const int RETAINED_ADMIN_BAN_REASONS = 6;	// none, then five
+	static int		RetainedAdminBanSeconds( int row );
+	static bool		RetainedAdminBanLengthKnown( int seconds );
+	static const char *RetainedAdminBanReasonText( int row );
+	static idStr	RetainedAdminBanDetail( const mpBanInfo_t &ban );
+	int				retainedAdminDraft[ RVF_COUNT ];
+	idStr			retainedAdminMap;
+	idList<int>		retainedAdminMaps;
+	bool			RetainedAdmin( void ) const;
+	void			ResetRetainedAdminDraft( void );
+	void			RetainedAdminChoices( void );
+	bool			RetainedAdminFieldShown( int field ) const;
+	bool			SetRetainedAdminField( int field, int value );
+	bool			RetainedAdminChanges( serverAdminData_t &data );
+	const char *	RetainedAdminRefusal( int action );
+	void			PublishRetainedAdmin( idUserInterface *card, bool &changed );
+	bool			HandleRetainedAdminCommand( const idStr &sub, const idCmdArgs &args, int &icmd );
+	// The stock Admin console's Enter ("command") and Tab ("tab") on the
+	// menu's admin_console_input.
+	void			RunAdminConsole( idUserInterface *gui, const char *mode );
+	// The Settings pages (section 14.18): the player's name and clan, three
+	// model lists (the player's own model for the mode and team, the model
+	// forced on enemies and, in team modes, the one forced on teammates) by
+	// row, the stock rail color swatches and the custom crosshairs.
+	static const int RETAINED_MODEL_SLOTS = 3;
+	static const int RETAINED_MODEL_ROWS = 24;
+	static const int RETAINED_RAIL_COLORS = 7;
+	static const char *	RetainedRailColor( int row );
+	bool			RetainedModelChoice( int slot, idStr &cvar, idStrList &values, idStrList &names, int &current );
+	void			RetainedCrosshairs( idStrList &crosshairs );
+	void			PublishRetainedSettings( idUserInterface *card, bool &changed );
+	// The Escape card's Match page (section 14.18): Match Control, mirrored
+	// from the game's own projection of it on the menu (the match_* states),
+	// the status lines one key each and each list's rows. The replacements,
+	// proposals, profiles, rule fields, map pool and evidence hold every row
+	// Match Control can (MatchControlModel.h); the team rows hold a full
+	// 32-player server's sides, participants and 30 seats, invitations or
+	// queue places, and the series history 24 steps. Past those two (the
+	// Escape card is near the runtime's 16 MiB document limit) a list ends
+	// with the way to the stock page. tools/ui/retained_mp_menus.py reads
+	// these numbers; PublishRetainedMatch asserts them against the model.
+	static const int RETAINED_MATCH_STATUS_LINES = 6;
+	static const int RETAINED_MATCH_TEAM_ROWS = 64;
+	static const int RETAINED_MATCH_REPLACEMENT_ROWS = 32;
+	static const int RETAINED_MATCH_PROPOSAL_ROWS = 7;
+	static const int RETAINED_MATCH_PROFILE_ROWS = 16;
+	static const int RETAINED_MATCH_RULE_ROWS = 34;
+	static const int RETAINED_MATCH_SERIES_MAP_ROWS = 32;
+	static const int RETAINED_MATCH_HISTORY_ROWS = 24;
+	static const int RETAINED_MATCH_EVIDENCE_ROWS = 5;
+	void			PublishRetainedMatch( idUserInterface *card, bool &changed );
+	void			PublishRetainedMatchList( idUserInterface *card, bool &changed, const char *list, const char *key, int count, int rows,
+						int columns );
+	bool			arenaEntranceCameraResolved;
+	// Which presentation the latched camera belongs to.  The entrance and the
+	// final tableau both latch a collision-safe anchor, but they resolve it
+	// around different points in the map, so the latch has to be re-resolved
+	// when the phase changes instead of carrying the spawn shot into review.
+	bool			arenaEntranceCameraIsEntrance;
+	bool			arenaEntranceCameraFallback;
+	bool			arenaEntranceCameraValid;
+	idVec3			arenaEntranceCameraForward;
+	idVec3			arenaEntranceCameraLeft;
+	idVec3			arenaEntranceCameraRadial;
+	float			arenaEntranceCameraHeightLimit;
+	// Reference yaw for the final tableau's player-steered orbit, latched on its
+	// first frame so the shot opens at the authored angle wherever the player
+	// happened to be looking when the match ended.
+	bool			arenaVictorLookLatched;
+	float			arenaVictorLookYaw;
+	// Match-start orbit basis, latched once so the shot cannot swim.
+	// Weapon slots present as pickups on the loaded map, for the warmup
+	// arsenal. Invalidated by ClearMap.
+	int				mapWeaponMask;
+	bool			mapWeaponMaskValid;
+	bool			arenaSpawnInLatched;
+	int				arenaIntroIndex;
+	int				arenaIntroSubjectStartTime;
+	int				arenaIntroArmDeadline;
+	idVec3			arenaSpawnInForward;
+	idVec3			arenaSpawnInLeft;
+
+	void			SelectArenaCampaignPresentationFocus( idPlayer *host );
+	idPlayer *		GetArenaCampaignPresentationFocus( void ) const;
+	void			SetArenaCampaignDepthOfField( bool enabled, float focusDistance = 0.0f, float strength = 0.0f );
 
 	// vote vars
 	vote_flags_t	vote;					// active vote or VOTE_NONE
 	int				voteTimeOut;			// when the current vote expires
 	int				voteExecTime;			// delay between vote passed msg and execute
+	int				voteKickIdentity = 0;	// connection captured when the server starts a kick vote
+	bool			VoteKickTargetCurrent( void ) const;
 	int				yesVotes;				// counter for yes votes
 	int				noVotes;				// and for no votes
+	int				voteEligibleCount;		// frozen electorate size for the active inherited vote
 	idStr			voteValue;				// the data voted upon ( server )
 	idStr			voteString;				// the vote string ( client )
 	bool			voted;					// hide vote box ( client )
 	int				kickVoteMap[ MAX_CLIENTS ];
+	int				kickVoteMapIdentities[ MAX_CLIENTS ] = {};
 // RAVEN BEGIN
 // shouchard:  names for kickVoteMap
 	idStr			kickVoteMapNames[ MAX_CLIENTS ];
 	voteStruct_t	currentVoteData;		// used for multi-field votes
 // RAVEN END
+	// openQ4: who called the running vote, when it started and how long it
+	// runs, kept on clients too for the multiplayer card's Vote page
+	int				voteCaller;
+	int				voteStartTime;
+	int				voteLength;
+	bool			votePacked;
+	// openQ4: per-caller cool-off so one client cannot own the vote channel by
+	// re-issuing on the frame after its own vote resolves
+	int				nextVoteAllowedTime[ MAX_CLIENTS ];
+	int				nextVoteRejectNoticeTime[ MAX_CLIENTS ];
+	int				votesCalledThisMap[ MAX_CLIENTS ];	// g_voteLimit: votes a connection started on this map
+	mpMatchPauseState_t	announcedPauseState;		// the pause state the casual centre print last described
+	int				disconnectPauseSide;		// g_pauseOnDisconnect: the side that lost a player
+	int				disconnectPauseHumans;		// playing humans left on that side when its pause began
+	int				disconnectPauseUsedMask;	// sides that have had their disconnect pause this match
+	int				queuedDropSpawnId[ MAX_CLIENTS ];	// the occupant a server drop is queued for, 0 for none
+	const char *	queuedDropReason[ MAX_CLIENTS ];
+	bool			serverDropInFlight[ MAX_CLIENTS ];
+	int				CountPlayingHumans( int team ) const;
+	void			CheckDisconnectPauseReturn( void );
+	bool			abortCheckAfterPause;		// run CheckAbortGame when that pause ends
 
 	idStr			localisedGametype;
+
+	idList<int>		voteMapDecls;
+	int				voteMapsWaiting;
+	// openQ4: one-shot operator diagnostics, reset per map
+	bool			mapListTruncationWarned;
+	bool			matchItemTimingFullWarned;
 
 	// time related
 	int				matchStartedTime;		// time current match started
@@ -711,7 +1772,8 @@ private:
 	idUserInterface *mainGui;				// ready / nick / votes etc.
 	idListGUI		*mapList;
 	idUserInterface *msgmodeGui;			// message mode
-	int				currentMenu;			// 0 - none, 1 - mainGui, 2 - msgmodeGui
+	idUserInterface *arenaPauseGui;			// the single-player Arena's pause menu
+	int				currentMenu;			// 0 - none, 1 - mainGui, 2 - msgmodeGui, 3 - statSummary, 4 - buyMenu, 5 - arenaPauseGui
 	int				nextMenu;				// if 0, will do mainGui
 	bool			bCurrentMenuMsg;		// send menu state updates to server
 
@@ -731,13 +1793,63 @@ private:
 	// chat buffer
 	idStr			chatHistory;
 
+	// openQ4: the Remastered kill feed and chat lines, timed like the stock
+	// ones and published to the multiplayer HUD as fields (ui-visual-design.md 14.9)
+	rvHudLines		remasteredKills;
+	rvHudLines		remasteredChat;
+	// the last 64 chat lines, untimed: the history the open input shows,
+	// eight at a time
+	idList<idDict>	remasteredChatLog;
+	// the chat entry last published (a change restarts the caret's blink)
+	bool			remasteredChatOpen;
+	idStr			remasteredChatEntry;
+	int				remasteredChatCaret;
+	// the transmit displays last sent to the HUD (-1 unknown; the talker's client)
+	int				hudTransmitSelf;
+	int				hudTransmitOther;
+	// the Remastered HUD's flag, clock-warning and match states last announced
+	// (oq4_flags, oq4_clockWarn, oq4_state start and stop its looping motion)
+	int				hudFlagStates[ 3 ];
+	int				hudClockWarn;
+	int				hudMatchState;
+	// the respawn prompt last published (oq4_respawn fades it in as it appears)
+	int				hudRespawn;
+	// Dead Zone's score pulse: the scores last seen on this map and when the
+	// pulse last faded, so it starts clean on each map and fades by time
+	// the HUD and game clocks PublishRemasteredHud last published for: a frame
+	// drawn again inside one tic publishes nothing
+	idUserInterface *hudPublishGui;
+	int				hudPublishRealTime;
+	int				hudPublishTime;
+	bool			hudZoneScoresValid;
+	int				hudZoneScores[ 2 ];
+	int				hudZonePulseTime;
+	// the held Remastered scoreboard's scroll in rows, the most it scrolls, and
+	// whether ui_scoreboardScrolls last said it does
+	int				remasteredScoreboardScroll;
+	int				remasteredScoreboardScrollMax;
+	bool			remasteredScoreboardScrolls;
+	void			ResetRemasteredHudAnnouncements( void );
+
+	void			PublishRemasteredHud( idUserInterface *_mphud, idPlayer *localPlayer );
+	void			PublishRemasteredNameTags( idUserInterface *_mphud, idPlayer *localPlayer, bool freeCamera );
+	void			PublishRemasteredCompetitive( idUserInterface *_mphud, idPlayer *localPlayer, idPlayer *followed, int limit );
+	void			PublishRemasteredChat( idUserInterface *_mphud, int now );
+	// openQ4 (MP-15): crosshair ammunition, item timers and the time of day, in every layout
+	void			PublishClientOptions( idUserInterface *_mphud, idPlayer *localPlayer );
+	idUserInterface *clientOptionsGui;
+	int				clientOptionsTime;
+
 	// rcon buffer
 	idStr			rconHistory;
 
 //RAVEN BEGIN
 //asalmon: Need to refresh stats periodically if the player is looking at stats
-	int currentStatClient;
+	int currentStatClient;			// GUI list selection index, NOT a client num
 	int currentStatTeam;
+	// openQ4: client num currentStatClient/currentStatTeam last resolved to, so the
+	// periodic refresh polls the selected player instead of an unrelated slot
+	int currentStatClientNum;
 //RAVEN END
 
 public:
@@ -747,25 +1859,46 @@ public:
 
 	rvPair<int, int>		rankedTeams[ TEAM_MAX ];
 
+	// openQ4: live damage numbers for the local view.  Client side only, but
+	// a listen server host stages into the same slab.
+	rvDamageNumbers			damageNumbers;
+	// openQ4 (MP-15): landmark place names, team mates beyond the snapshot and
+	// the item timers the server admits this client to
+	rvMapLocations			locations;
+	rvTeamInfo				teamInfo;
+	rvItemTimers			itemTimers;
+	// si_forcedModels as last applied to the player models, -1 before the first look
+	int						cosmeticForcedModels;
+	rvObjectiveMarkers		objectiveMarkers;
+
 private:
 
 	int				lastVOAnnounce;
 
 	int				lastReadyToggleTime;
 	bool			pureReady;				// defaults to false, set to true once server game is running with pure checksums
+	// openQ4: typed match events for overlay tools (g_matchEventStream)
+	mpLiveEventStream liveEvents;
+	// openQ4 MP-18: the same events appended to a server's match log (g_matchLog)
+	mpLiveEventStream matchLog { mpLiveEventStream::MATCH_LOG };
+	// openQ4: match state last compared for MVD markers; primed while recording
+	mpMVDMarkerState mvdMarkerState;
+	bool			mvdMarkersPrimed;
+	void			PublishMVDMarkers( void );
 	bool			currentSoundOverride;
 	int				switchThrottle[ 3 ];
+	static void		SendReady( bool isReady );
 	int				voiceChatThrottle;
 
 	void			SetupBuyMenuItems();
 
 	idList<int>		privateClientIds;
-	int				privatePlayers;
+	uint32_t		privatePlayers;
 
 	// player who's rank info we're displaying
 	idEntityPtr<idPlayer>		rankTextPlayer;
 
-	idEntityPtr<idEntity>		flagEntities[ TEAM_MAX ];	
+	idEntityPtr<idEntity>		flagEntities[ MAX_CTF_FLAGS ];
 	idEntityPtr<idPlayer>		flagCarriers[ TEAM_MAX ];
 
 	// updates the passed gui with current score information
@@ -779,11 +1912,16 @@ private:
 
 	void			UpdateDMScoreboard( idUserInterface *scoreBoard );
 	void			UpdateTeamScoreboard( idUserInterface *scoreBoard );
+	// openQ4: the Remastered scoreboard's rows as fields (ui-visual-design.md 14.14)
+	void			PublishRemasteredScoreboard( idUserInterface *scoreBoard );
 	void			UpdateSummaryBoard( idUserInterface *scoreBoard );
+	bool			UpdateManagedSummaryResult( idUserInterface *gui, bool announce );
+	const mpMatchViewTerminalResult_t *ClientTerminalResult( void );
 
 	int				GetPlayerRank( idPlayer* player, bool& isTied );
-	char*			GetPlayerRankText( idPlayer* player );
-	char*			GetPlayerRankText( int rank, bool tied, int score );
+	idPlayer*		GetRankLeader( void );
+	const char*		GetPlayerRankText( idPlayer* player );
+	const char*		GetPlayerRankText( int rank, bool tied, int score );
 
 	const char*		BuildSummaryListString( idPlayer* player, int rankedScore );
 
@@ -810,11 +1948,16 @@ private:
 	int				teamDeadZoneScore[ TEAM_MAX];
 	void			ClearTeamScores ( void );
 
+	// openQ4: last ready tally computed by AllPlayersReady, for the warmup HUD
+	int				readyPlayerCount;
+	int				eligiblePlayerCount;
+
 	void			UpdateLeader( idPlayer* oldLeader );
 
 	void			ClearGuis( void );
 	void			DrawScoreBoard( idPlayer *player );
 	void			CheckVote( void );
+	bool			AbortInheritedVoteForManagedMatch( void );
 	bool			AllPlayersReady( idStr* reason = NULL );
 	
 	const char *	GameTime( void );
@@ -825,6 +1968,9 @@ private:
 	// called during normal gameplay for death -> respawn cycles
 	// and for a spectator who want back in the game (see param)
 	void			CheckRespawns( idPlayer *spectator = NULL );
+	// puts a spectating player's camera on a living team mate, if they have not
+	// already picked one themselves
+	void			FollowTeamMate( idPlayer *p );
 
 	void			FreeLight ( int lightID );
 	void			UpdateLight ( int lightID, idPlayer *player );
@@ -832,6 +1978,8 @@ private:
 	void			ForceReady();
 	// when clients disconnect or join spectate during game, check if we need to end the game
 	void			CheckAbortGame( void );
+	void			CheckAbortGame( mpParticipantId departedParticipant,
+						int departedGameSide, int departedCompetitionSide );
 	void			MessageMode( const idCmdArgs &args );
 	void			DisableMenu( void );
 	void			SetMapShot( void );
@@ -844,6 +1992,12 @@ private:
 // RAVEN END
 
 	void			WriteStartState( int clientNum, idBitMsg &msg, bool withLocalClient );
+
+	bool			RequestVoteMaps( int flags );
+
+	void			SetMapList( const char *listName, const char *mapName, int gameTypeInt );
+	void			SetVoteMapList( void );
+	void			SetSAMapList( void );
 };
 
 ID_INLINE bool idMultiplayerGame::IsPureReady( void ) const {
@@ -914,7 +2068,7 @@ ID_INLINE void idMultiplayerGame::ResetRconGuiStatus( void ) {
 
 // asalmon: needed access team scores for rich presence
 ID_INLINE int idMultiplayerGame::GetScoreForTeam( int i ) {
-	if( i < 0 || i > TEAM_MAX ) {
+	if( i < 0 || i >= TEAM_MAX ) {
 		return 0;
 	}
 	return teamScore[ i ];

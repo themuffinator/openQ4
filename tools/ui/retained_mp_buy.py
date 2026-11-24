@@ -6,7 +6,7 @@ the other retained screens. The buy card covers the game's buy menu
 card, header, tab strip, prompt bar and motion, at the Escape card's size.
 
 Its four tabs (WEAPONS, MODS, ARMOR & AMMO, TEAM) list the game's catalog
-(buyCatalog in src/mpgame/mp/Buying.cpp, read here so the two agree). Each
+(buyCatalog in src/game/mp/Buying.cpp, read here so the two agree). Each
 item is a plate: its HUD icon, its name, a lock where it cannot be bought
 now (a check where the player owns it), and its price in the value colour
 (the error colour where the player cannot afford it). The focused or
@@ -86,14 +86,14 @@ LABEL_SIZE, PRICE_SIZE = 16.0, 17.0
 
 def catalog() -> list:
     """The game's catalog, in its order: (item, category page, name key)."""
-    source = (ROOT / "src" / "mpgame" / "mp" / "Buying.cpp").read_text(encoding="latin-1")
+    source = (ROOT / "src" / "game" / "mp" / "Buying.cpp").read_text(encoding="latin-1")
     body = source[source.index("const buyCatalogItem_t buyCatalog[] = {"):]
     body = body[:body.index("};")]
     items = []
     for match in re.finditer(r'\{\s*"(\w+)",\s*(\d+),\s*(BUY_CATEGORY_\w+),\s*(?:true|false),\s*\d+,\s*"(#str_\d+)",\s*(?:"#str_\d+"|NULL)\s*\}', body):
         items.append((match.group(1), CATEGORY_PAGE[match.group(3)], match.group(4)))
     if not items:
-        raise SystemExit("could not read buyCatalog from src/mpgame/mp/Buying.cpp")
+        raise SystemExit("could not read buyCatalog from src/game/mp/Buying.cpp")
     missing = [item for item, _page, _name in items if item not in ICONS]
     if missing:
         raise SystemExit(f"buy catalog items without icons: {missing}")

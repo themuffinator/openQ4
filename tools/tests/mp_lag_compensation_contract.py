@@ -89,7 +89,7 @@ def function_body(source: str, signature: str, context: str) -> str:
 
 
 def validate_estimator() -> None:
-    game_local = read(GAME_LIBS_ROOT, "src/mpgame/Game_local.cpp")
+    game_local = read(GAME_LIBS_ROOT, "src/game/Game_local.cpp")
     estimator = function_body(
         game_local,
         "void idGameLocal::EstimateMPLagCompensation(",
@@ -154,11 +154,11 @@ def validate_estimator() -> None:
     require(update, "net_mpPredictMaxFrames.GetInteger()", "advertised remote extrapolation update")
     init = function_body(game_local, "void idGameLocal::Init( void )", "MP game init")
     require(init, "UpdateAdvertisedRemoteExtrapolation();", "MP game init advertises before connecting")
-    network = read(GAME_LIBS_ROOT, "src/mpgame/Game_network.cpp")
+    network = read(GAME_LIBS_ROOT, "src/game/Game_network.cpp")
     client_run = function_body(network, "void idGameLocal::ClientRun( void )", "MP client frame")
     require(client_run, "UpdateAdvertisedRemoteExtrapolation();", "MP client frame keeps the advertisement current")
 
-    mp_cvar = read(GAME_LIBS_ROOT, "src/mpgame/gamesys/SysCvar.cpp")
+    mp_cvar = read(GAME_LIBS_ROOT, "src/game/gamesys/SysCvar.cpp")
     advert_line = next(line for line in mp_cvar.splitlines() if "idCVar net_mpRemoteExtrapolation(" in line)
     require(advert_line, "CVAR_USERINFO | CVAR_ROM", "advertised extrapolation cvar")
     # The prediction cvars themselves must not be user info: a server echoes user info back into
@@ -167,14 +167,14 @@ def validate_estimator() -> None:
         line = next(line for line in mp_cvar.splitlines() if name in line)
         reject(line, "CVAR_USERINFO", f"{name} stays client-local")
 
-    commands = read(GAME_LIBS_ROOT, "src/mpgame/gamesys/SysCmds.cpp")
+    commands = read(GAME_LIBS_ROOT, "src/game/gamesys/SysCmds.cpp")
     require(commands, 'cmdSystem->AddCommand( "lagCompStatus", Cmd_LagCompStatus_f', "lag compensation status command")
     status = function_body(commands, "static void Cmd_LagCompStatus_f(", "lag compensation status command")
     require(status, "gameLocal.EstimateMPLagCompensation( clientNum, estimate );", "lag compensation status command")
     require(status, "estimate.leadMS > 0 && estimate.measuredMS > 0 ?",
             "lag compensation status must not manufacture a bot or listen-host rewind from bias")
 
-    player = read(GAME_LIBS_ROOT, "src/mpgame/Player.cpp")
+    player = read(GAME_LIBS_ROOT, "src/game/Player.cpp")
     require(player, "gameLocal.lastChainReplayTics - remoteChainResimulatedTics", "client-side displayed pose age")
     # The budget counter is reset by PredictionErrorDecay on every presented frame, so the
     # diagnostic needs its own per-chain count, reset only when the snapshot is read.
@@ -187,7 +187,7 @@ def validate_estimator() -> None:
 
 
 def validate_hit_is_resolved_in_the_present() -> None:
-    game_local = read(GAME_LIBS_ROOT, "src/mpgame/Game_local.cpp")
+    game_local = read(GAME_LIBS_ROOT, "src/game/Game_local.cpp")
     label = "MP lag compensation hit resolution"
 
     resolve = function_body(
@@ -217,12 +217,12 @@ def validate_hit_is_resolved_in_the_present() -> None:
         "if ( ent->IsType ( idActor::GetClassType() ) && penetrate > 0.0f )", "rail penetration")
     require(penetration, "start = traceCollisionPoint;", "rail penetration stays on the traced ray")
 
-    gauntlet = function_body(read(GAME_LIBS_ROOT, "src/mpgame/weapon/WeaponGauntlet.cpp"),
+    gauntlet = function_body(read(GAME_LIBS_ROOT, "src/game/weapon/WeaponGauntlet.cpp"),
                             "void rvWeaponGauntlet::Attack", "gauntlet attack")
     require_before(gauntlet, "ResolveMPLagCompensationHit(", "EndMPLagCompensation(", "gauntlet impact translation")
     require_before(gauntlet, "EndMPLagCompensation(", "gameLocal.PlayEffect (", "gauntlet world restored before effects")
     require_before(gauntlet, "EndMPLagCompensation(", "ent->Damage (", "gauntlet world restored before damage")
-    lightning = function_body(read(GAME_LIBS_ROOT, "src/mpgame/weapon/WeaponLightningGun.cpp"),
+    lightning = function_body(read(GAME_LIBS_ROOT, "src/game/weapon/WeaponLightningGun.cpp"),
                              "void rvWeaponLightningGun::Think", "lightning think")
     require_before(lightning, "UpdateChainLightning();", "MPLagCompensationOffset(", "chain selection stays historical")
     require_before(lightning, "MPLagCompensationOffset(", "ResolveMPLagCompensationHit(", "translate paths before consuming entries")
@@ -233,8 +233,8 @@ def validate_hit_is_resolved_in_the_present() -> None:
 
 def validate_invalidation() -> None:
     label = "MP lag compensation history invalidation"
-    player = read(GAME_LIBS_ROOT, "src/mpgame/Player.cpp")
-    network = read(GAME_LIBS_ROOT, "src/mpgame/Game_network.cpp")
+    player = read(GAME_LIBS_ROOT, "src/game/Player.cpp")
+    network = read(GAME_LIBS_ROOT, "src/game/Game_network.cpp")
 
     # A respawn was the only invalidation site the feature shipped with.
     spawn = function_body(player, "void idPlayer::SpawnToPoint(", label)
@@ -281,7 +281,7 @@ def validate_usercmd_stamp_is_server_authored() -> None:
 
 def validate_defaults() -> None:
     label = "MP lag compensation defaults"
-    mp_cvar = read(GAME_LIBS_ROOT, "src/mpgame/gamesys/SysCvar.cpp")
+    mp_cvar = read(GAME_LIBS_ROOT, "src/game/gamesys/SysCvar.cpp")
 
     # Off until the rewind has been measured against a real server, and because it must not be on
     # at the same time as full remote extrapolation - the two corrections invert rather than

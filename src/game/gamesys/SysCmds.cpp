@@ -1,8 +1,12 @@
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
+#include "../mp/RoundGameState.h"
+#include "../mp/RoundModes.h"
+#include "../mp/Presets.h"
+#include "../mp/ChatTokens.h"
 
 extern void Awakening_TestM01Feedback_f( const idCmdArgs &args );
 // RAVEN BEGIN
@@ -28,8 +32,19 @@ extern void Awakening_TestM01Feedback_f( const idCmdArgs &args );
 #endif
 // RAVEN END
 
-#include "NoGameTypeInfo.h"
-
+#if defined(_WIN32)
+	#if defined(__has_include)
+		#if __has_include("TypeInfo.h")
+			#include "TypeInfo.h"
+		#else
+			#include "NoGameTypeInfo.h"
+		#endif
+	#else
+		#include "TypeInfo.h"
+	#endif
+#else
+	#include "NoGameTypeInfo.h"
+#endif
 
 /*
 ==================
@@ -763,7 +778,7 @@ void Cmd_KillMessage_f( const idCmdArgs &args ) {
 		return;
 	}
 	
-	gameLocal.mpGame.SendDeathMessage( gameLocal.GetLocalPlayer(), gameLocal.GetLocalPlayer(), 2 );
+	gameLocal.mpGame.SendDeathMessage( gameLocal.GetLocalPlayer(), gameLocal.GetLocalPlayer(), 2, false );
 }
 
 void Cmd_APState_f( const idCmdArgs &args ) {
@@ -918,6 +933,20 @@ void GiveStuffToPlayer( idPlayer* player, const char* name, const char* value )
 		player->GivePowerUp( POWERUP_GUARD, -1 );
 		return;
 	}
+	if ( gameLocal.IsMultiplayerMode() ) {
+
+		// Quake 4: The Awakening's powerups exist only where its defs do
+		if ( !idStr::Icmp( name, "adrenaline" ) || !idStr::Icmp( name, "fc_armor_regen" ) ) {
+			const int powerup = !idStr::Icmp( name, "adrenaline" ) ? POWERUP_ADRENALINE : POWERUP_FC_ARMOR_REGEN;
+			const idDict *def = gameLocal.FindEntityDefDict( idPlayer::GetPowerupDefName( powerup ), false );
+			if ( def == NULL ) {
+				gameLocal.Printf( "%s is not in this game's content\n", idPlayer::GetPowerupDefName( powerup ) );
+				return;
+			}
+			player->GivePowerUp( powerup, SEC2MS( def->GetFloat( "time", "30" ) ) );
+			return;
+		}
+	}
 // RAVEN END
 
 	if ( !idStr::Icmp ( name, "wpmod_all" ) ) {
@@ -950,17 +979,6 @@ void Cmd_Give_f( const idCmdArgs &args ) {
 
 	player = gameLocal.GetLocalPlayer();
 	if ( !player || !gameLocal.CheatsOk() ) {
-		return;
-	}
-
-	if ( gameLocal.isMultiplayer && gameLocal.isClient ) {
-		idBitMsg	outMsg;
-		byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
-		outMsg.Init( msgBuf, sizeof( msgBuf ) );
-		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_CHEAT_GIVE );
-		outMsg.WriteString( args.Argc() > 1 ? args.Argv( 1 ) : "" );
-		outMsg.WriteString( args.Argc() > 2 ? args.Argv( 2 ) : "" );
-		networkSystem->ClientSendReliableMessage( outMsg );
 		return;
 	}
 
@@ -1004,15 +1022,6 @@ void Cmd_God_f( const idCmdArgs &args ) {
 
 	player = gameLocal.GetLocalPlayer();
 	if ( !player || !gameLocal.CheatsOk() ) {
-		return;
-	}
-
-	if ( gameLocal.isMultiplayer && gameLocal.isClient ) {
-		idBitMsg	outMsg;
-		byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
-		outMsg.Init( msgBuf, sizeof( msgBuf ) );
-		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_CHEAT_GOD );
-		networkSystem->ClientSendReliableMessage( outMsg );
 		return;
 	}
 
@@ -1098,15 +1107,6 @@ void Cmd_Noclip_f( const idCmdArgs &args ) {
 
 	player = gameLocal.GetLocalPlayer();
 	if ( !player || !gameLocal.CheatsOk() ) {
-		return;
-	}
-
-	if ( gameLocal.isMultiplayer && gameLocal.isClient ) {
-		idBitMsg	outMsg;
-		byte		msgBuf[ MAX_GAME_MESSAGE_SIZE ];
-		outMsg.Init( msgBuf, sizeof( msgBuf ) );
-		outMsg.WriteByte( GAME_RELIABLE_MESSAGE_CHEAT_NOCLIP );
-		networkSystem->ClientSendReliableMessage( outMsg );
 		return;
 	}
 
@@ -1303,6 +1303,22 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 		gameLocal.Printf( "usage: %s <text>\n", cmd );
 		return;
 	}
+	
+	text.Replace( "&bsl;", "\\" );
+	text.Replace( "&amp;", "&" );
+
+	// openQ4 (MP-15): #h #a #w #l #n become the sender's health, armour, weapon,
+	// location and nearby team mates here, before the line leaves this client.
+	// A dedicated server's console has no player to speak for.
+	// A team line outside a team game goes to everyone below, so its tokens stay
+	// as typed: a `say_team #w at #l` bind pressed in a duel told the opponent.
+	const bool teamLineToAll = team && !gameLocal.IsTeamGame();
+	if ( !teamLineToAll && ( gameLocal.isClient || cvarSystem->GetCVarInteger( "net_serverDedicated" ) == 0 ) ) {
+		idStr expanded;
+		if ( MPChatExpandForPlayer( gameLocal.GetLocalPlayer(), text.c_str(), args.Argc() > 2, expanded ) > 0 ) {
+			text = expanded;
+		}
+	}
 
 // asalmon: check to see if the text passes the live decency standard
 #ifdef _XENON
@@ -1322,6 +1338,20 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 	if ( text[ text.Length() - 1 ] == '\n' ) {
 		text[ text.Length() - 1 ] = '\0';
 	}
+	// openQ4: the server reads this much of a chat line. A longer one (a paste, a
+	// long bind) overflowed the 256-byte message built below, and a message that
+	// overflows is a fatal error on the client. Cut on a character and not inside
+	// a colour escape.
+	if ( text.Length() > MP_CHAT_TOKEN_TEXT_BYTES - 1 ) {
+		int cut = MP_CHAT_TOKEN_TEXT_BYTES - 1;
+		while ( cut > 0 && ( static_cast<unsigned char>( text[ cut ] ) & 0xC0 ) == 0x80 ) {
+			cut--;
+		}
+		if ( cut > 0 && text[ cut - 1 ] == '^' ) {
+			cut--;
+		}
+		text.CapLength( cut );
+	}
 	name = "player";
 
 	idPlayer *	player;
@@ -1329,14 +1359,21 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 	// here we need to special case a listen server to use the real client name instead of "server"
 	// "server" will only appear on a dedicated server
 	if ( gameLocal.isClient || cvarSystem->GetCVarInteger( "net_serverDedicated" ) == 0 ) {
-		player = gameLocal.localClientNum >= 0 ? static_cast<idPlayer *>( gameLocal.entities[ gameLocal.localClientNum ] ) : NULL;
+		player = gameLocal.GetLocalPlayer();
 		if ( player ) {
-			name = player->GetUserInfo()->GetString( "ui_name", "player" );
+			if ( player->GetUserInfo() ) {
+				name = player->GetUserInfo()->GetString( "ui_name", "player" );
+			}
 
 // RAVEN BEGIN
 // mekberg: activate the mphud gui so the time is right before receiving the chat message
 			if ( player->mphud ) {
 				player->mphud->Activate( true, gameLocal.time );
+			}
+
+			if (player->IsFakeClient())
+			{
+				name = cvarSystem->GetCVarString( "ui_name" );
 			}
 		}
 // RAVEN END
@@ -1349,12 +1386,116 @@ static void Cmd_Say( bool team, const idCmdArgs &args ) {
 		byte		msgBuf[ 256 ];
 		outMsg.Init( msgBuf, sizeof( msgBuf ) );
 		outMsg.WriteByte( team ? GAME_RELIABLE_MESSAGE_TCHAT : GAME_RELIABLE_MESSAGE_CHAT );
-		outMsg.WriteString( name );
+		// the server takes the name from its own user info; this one only has to fit
+		outMsg.WriteString( name, 64 );
 		outMsg.WriteString( text );
 		outMsg.WriteString( "" );
 		networkSystem->ClientSendReliableMessage( outMsg );
 	} else {
-		gameLocal.mpGame.ProcessChatMessage( gameLocal.localClientNum, team, name, text, NULL );
+		gameLocal.mpGame.ProcessChatMessage( gameLocal.localClientNum, team, name, text, NULL, true );
+	}
+}
+
+/*
+==================
+Cmd_ListLocations_f
+
+openQ4 (MP-15): the landmarks this map names its places by, and the name of
+where the local player stands.
+==================
+*/
+static void Cmd_ListLocations_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer ) {
+		gameLocal.Printf( "listLocations can only be used in a multiplayer game\n" );
+		return;
+	}
+	rvMapLocations &locations = gameLocal.mpGame.locations;
+	const int count = locations.NumLandmarks();
+	for ( int i = 0; i < count; i++ ) {
+		idVec3 origin;
+		idStr name;
+		if ( locations.GetLandmark( i, origin, name ) ) {
+			gameLocal.Printf( "%3d  %-28s  %s\n", i, name.c_str(), origin.ToString( 0 ) );
+		}
+	}
+	gameLocal.Printf( "%d landmarks\n", count );
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( player != NULL ) {
+		const char *here = locations.NameForPoint( player->GetPhysics()->GetOrigin() );
+		gameLocal.Printf( "you are at: %s\n", here[ 0 ] ? here : "-" );
+	}
+}
+
+/*
+==================
+Cmd_OpenQ4ReportClientOptions_f
+
+openQ4 (MP-15) validation: what the competitive client options currently hold
+for the local player, one fact a line, so a smoke can read them from the log
+with no input. Cheat protected, like the other report commands.
+==================
+*/
+static void Cmd_OpenQ4ReportClientOptions_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !gameLocal.isMultiplayer || player == NULL ) {
+		gameLocal.Printf( "openq4_reportClientOptions requires multiplayer gameplay\n" );
+		return;
+	}
+	idMultiplayerGame &mp = gameLocal.mpGame;
+	const idVec3 &origin = player->GetPhysics()->GetOrigin();
+	const int weapon = player->GetCurrentWeapon();
+	const mpWeaponOrder_t &order = player->GetWeaponOrder();
+	gameLocal.Printf( "CLIENTOPT player slot=%d team=%d spectating=%d health=%d origin=%.0f,%.0f,%.0f yaw=%.0f\n",
+		player->entityNumber, player->team, player->spectating ? 1 : 0, player->health,
+		origin.x, origin.y, origin.z, player->viewAngles.yaw );
+	gameLocal.Printf( "CLIENTOPT weapon slot=%d def=%s ideal=%d order_listed=%d rank=%d\n", weapon,
+		( weapon >= 0 && weapon < MAX_WEAPONS ) ? player->spawnArgs.GetString( va( "def_weapon%d", weapon ) ) : "",
+		player->GetIdealWeapon(), order.listed, MPWeaponOrderRank( order, weapon ) );
+	gameLocal.Printf( "CLIENTOPT location landmarks=%d name=\"%s\"\n", mp.locations.NumLandmarks(), mp.locations.NameForPoint( origin ) );
+
+	for ( int i = 0; i < Min( gameLocal.numClients, MAX_CLIENTS ); i++ ) {
+		idEntity *ent = gameLocal.entities[ i ];
+		if ( ent == NULL || ent == player || !ent->IsType( idPlayer::GetClassType() ) ) {
+			continue;
+		}
+		idPlayer *other = static_cast< idPlayer * >( ent );
+		if ( other->spectating && other->wantSpectate ) {
+			continue;
+		}
+		mpTeamInfoEntry_t info;
+		mp.teamInfo.Resolve( other, info );
+		gameLocal.Printf( "CLIENTOPT mate slot=%d team=%d source=%s health=%d armor=%d weapon=%d ammo=%d origin=%d,%d,%d location=\"%s\"\n",
+			i, other->team, mp.teamInfo.UsesRecord( other ) ? "record" : "entity", info.health, info.armor, info.weapon, info.ammo,
+			info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ],
+			mp.locations.NameForPoint( idVec3( info.origin[ 0 ], info.origin[ 1 ], info.origin[ 2 ] ) ) );
+	}
+
+	itemTimerRow_t rows[ MP_ITEMTIMERS_MAX_ROWS ];
+	const int count = mp.itemTimers.GetRows( rows, MP_ITEMTIMERS_MAX_ROWS );
+	gameLocal.Printf( "CLIENTOPT timers policy=%d count=%d\n", gameLocal.serverInfo.GetInt( "si_itemTimers", "1" ), count );
+	for ( int i = 0; i < count; i++ ) {
+		const idEntity *item = gameLocal.entities[ rows[ i ].entityNumber ];
+		const int left = ( rows[ i ].respawnAt > 0 ) ? Max( 0, rows[ i ].respawnAt - gameLocal.realClientTime ) : rows[ i ].respawnAt;
+		gameLocal.Printf( "CLIENTOPT timer row=%d kind=%d entity=%s left_ms=%d total_ms=%d\n", i, rows[ i ].kind,
+			item != NULL ? item->name.c_str() : "?", left, rows[ i ].totalMsec );
+	}
+
+	int tones = 0;
+	int stock = 0;
+	float pitch = 0.0f;
+	rvHitSounds::GetCounts( tones, stock, pitch );
+	gameLocal.Printf( "CLIENTOPT hitsound set=%d tones=%d stock=%d last_pitch=%.2f\n", hud_hitSound.GetInteger(), tones, stock, pitch );
+
+	if ( player->mphud != NULL ) {
+		// the crosshair name can hold a line break; the report is one line
+		idStr aimText = idStr( player->mphud->GetStateString( "aim_text" ) ).RemoveEscapes();
+		aimText.Replace( "\n", " " );
+		aimText.Replace( "\r", " " );
+		gameLocal.Printf( "CLIENTOPT hud xhair_ammo=\"%s\" local_clock=\"%s\" it_count=%d it0=\"%s\"/\"%s\" aim=\"%s\" ts0=\"%s\"@\"%s\"\n",
+			player->mphud->GetStateString( "oq4_xhair_ammo" ), player->mphud->GetStateString( "oq4_local_clock" ),
+			player->mphud->GetStateInt( "oq4_it_count" ), player->mphud->GetStateString( "oq4_it_0_name" ),
+			player->mphud->GetStateString( "oq4_it_0_time" ), aimText.c_str(),
+			player->mphud->GetStateString( "oq4_ts0_0_name" ), player->mphud->GetStateString( "oq4_ts0_0_location" ) );
 	}
 }
 
@@ -1399,7 +1540,8 @@ static void Cmd_Kick_f( const idCmdArgs &args ) {
 	}
 
 	if ( gameLocal.isClient ) {
-		gameLocal.Printf( "You have no such power. This is a server command\n" );
+		// openQ4 (MP-18): from a client this is a logged-in admin's request
+		idGameLocal::ClientKick_f( args );
 		return;
 	}
 
@@ -1409,12 +1551,19 @@ static void Cmd_Kick_f( const idCmdArgs &args ) {
 		return;
 	}
 	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "say kicking out client %d '%s^0'\n", player->entityNumber, gameLocal.userInfo[ player->entityNumber ].GetString( "ui_name" ) ) );
-	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d\n", player->entityNumber ) );
+	// the kick deletes the player; a kick is not a lost connection (g_pauseOnDisconnect)
+	const int kickedClient = player->entityNumber;
+	gameLocal.ModerationLogClient( "kick", "console", kickedClient, "", 0 );
+	gameLocal.mpGame.BeginServerDrop( kickedClient );
+	cmdSystem->BufferCommandText( CMD_EXEC_NOW, va( "kick %d\n", kickedClient ) );
+	gameLocal.mpGame.EndServerDrop( kickedClient );
 }
 
 /*
 ==================
-Cmd_GetViewpos_f
+Cmd_GetCurrentViewPose
+
+openQ4: the local player's view origin and angles, for getviewpos and viewpos.
 ==================
 */
 static bool Cmd_GetCurrentViewPose( idVec3 &origin, idAngles &angles ) {
@@ -1436,14 +1585,23 @@ static bool Cmd_GetCurrentViewPose( idVec3 &origin, idAngles &angles ) {
 	return true;
 }
 
-void Cmd_GetViewpos_f( const idCmdArgs &args ) {
+/*
+==================
+Cmd_Viewpos_f
+==================
+*/
+static void Cmd_Viewpos_f( const idCmdArgs &args ) {
 	idVec3 origin;
 	idAngles angles;
 	if ( !Cmd_GetCurrentViewPose( origin, angles ) ) {
 		return;
 	}
 
-	gameLocal.Printf( "(%s) %.1f\n", origin.ToString(), angles.yaw );
+	gameLocal.Printf(
+		"origin: (%.1f %.1f %.1f) angles: (%.1f %.1f %.1f)\n",
+		origin.x, origin.y, origin.z,
+		angles.pitch, angles.yaw, angles.roll
+	);
 }
 
 /*
@@ -1470,21 +1628,38 @@ static void Cmd_HudGet_f( const idCmdArgs &args ) {
 
 /*
 ==================
-Cmd_Viewpos_f
+Cmd_GetViewpos_f
 ==================
 */
-static void Cmd_Viewpos_f( const idCmdArgs &args ) {
-	idVec3 origin;
-	idAngles angles;
-	if ( !Cmd_GetCurrentViewPose( origin, angles ) ) {
+void Cmd_GetViewpos_f( const idCmdArgs &args ) {
+	// openQ4: the campaign prints the yaw of the view angles (-180 to 180) and
+	// multiplayer the yaw of the view axis (0 to 360), as each module always did.
+	if ( !gameLocal.IsMultiplayerMode() ) {
+		idVec3 origin;
+		idAngles angles;
+		if ( !Cmd_GetCurrentViewPose( origin, angles ) ) {
+			return;
+		}
+		gameLocal.Printf( "(%s) %.1f\n", origin.ToString(), angles.yaw );
 		return;
 	}
 
-	gameLocal.Printf(
-		"origin: (%.1f %.1f %.1f) angles: (%.1f %.1f %.1f)\n",
-		origin.x, origin.y, origin.z,
-		angles.pitch, angles.yaw, angles.roll
-	);
+	idPlayer	*player;
+	idVec3		origin;
+	idMat3		axis;
+
+	player = gameLocal.GetLocalPlayer();
+	if ( !player ) {
+		return;
+	}
+
+	const renderView_t *view = player->GetRenderView();
+	if ( view ) {
+		gameLocal.Printf( "(%s) %.1f\n", view->vieworg.ToString(), view->viewaxis[0].ToYaw() );
+	} else {
+		player->GetViewPos( origin, axis );
+		gameLocal.Printf( "(%s) %.1f\n", origin.ToString(), axis[0].ToYaw() );
+	}
 }
 
 /*
@@ -1842,45 +2017,47 @@ void Cmd_SetViewpos_f( const idCmdArgs &args ) {
 	origin.z -= pm_normalviewheight.GetFloat() - 0.25f;
 
 	player->Teleport( origin, angles, NULL );
-	// Keep cheat teleports useful for trigger/door debugging by forcing
-	// an immediate trigger pass at the new location.
-	const bool touchedTriggers = player->TouchTriggers();
-	const idBounds playerBounds = player->GetPhysics()->GetAbsBounds();
-	gameLocal.Printf(
-		"DBG setviewpos raw=(%.1f %.1f %.1f) origin=(%.1f %.1f %.1f) angles=(%.1f %.1f %.1f) touched=%d clipWorld=%d boundsMins=(%.1f %.1f %.1f) boundsMaxs=(%.1f %.1f %.1f)\n",
-		atof( args.Argv( 1 ) ),
-		atof( args.Argv( 2 ) ),
-		atof( args.Argv( 3 ) ),
-		origin.x, origin.y, origin.z,
-		angles.pitch, angles.yaw, angles.roll,
-		touchedTriggers ? 1 : 0,
-		player->GetClipWorld(),
-		playerBounds[0].x, playerBounds[0].y, playerBounds[0].z,
-		playerBounds[1].x, playerBounds[1].y, playerBounds[1].z
-	);
-	if ( !touchedTriggers ) {
-		idClipModel *clipModels[64];
-		const int numClipModels = gameLocal.ClipModelsTouchingBounds( player, playerBounds, CONTENTS_TRIGGER, clipModels, 64 );
-		gameLocal.Printf( "DBG setviewpos triggerCandidates=%d\n", numClipModels );
-		for ( int j = 0; j < numClipModels; j++ ) {
-			idClipModel *cm = clipModels[ j ];
-			idEntity *ent = cm ? cm->GetEntity() : NULL;
-			if ( !ent ) {
-				continue;
-			}
-			if ( ( ent->name == "func_door_63" ) || ( ent->name == "func_door_64" ) || ( ent->name == "trigger_once_47" ) ) {
-				const bool clipHit = player->GetPhysics()->ClipContents( cm );
-				const idBounds triggerBounds = cm->GetAbsBounds();
-				gameLocal.Printf(
-					"DBG setviewpos candidate name='%s' class='%s' clipHit=%d triggerId=%d owner='%s' boundsMins=(%.1f %.1f %.1f) boundsMaxs=(%.1f %.1f %.1f)\n",
-					ent->name.c_str(),
-					ent->GetClassname(),
-					clipHit ? 1 : 0,
-					cm->GetId(),
-					cm->GetOwner() ? cm->GetOwner()->name.c_str() : "<null>",
-					triggerBounds[0].x, triggerBounds[0].y, triggerBounds[0].z,
-					triggerBounds[1].x, triggerBounds[1].y, triggerBounds[1].z
-				);
+	if ( !gameLocal.IsMultiplayerMode() ) {
+		// Keep cheat teleports useful for trigger/door debugging by forcing
+		// an immediate trigger pass at the new location.
+		const bool touchedTriggers = player->TouchTriggers();
+		const idBounds playerBounds = player->GetPhysics()->GetAbsBounds();
+		gameLocal.Printf(
+			"DBG setviewpos raw=(%.1f %.1f %.1f) origin=(%.1f %.1f %.1f) angles=(%.1f %.1f %.1f) touched=%d clipWorld=%d boundsMins=(%.1f %.1f %.1f) boundsMaxs=(%.1f %.1f %.1f)\n",
+			atof( args.Argv( 1 ) ),
+			atof( args.Argv( 2 ) ),
+			atof( args.Argv( 3 ) ),
+			origin.x, origin.y, origin.z,
+			angles.pitch, angles.yaw, angles.roll,
+			touchedTriggers ? 1 : 0,
+			player->GetClipWorld(),
+			playerBounds[0].x, playerBounds[0].y, playerBounds[0].z,
+			playerBounds[1].x, playerBounds[1].y, playerBounds[1].z
+		);
+		if ( !touchedTriggers ) {
+			idClipModel *clipModels[64];
+			const int numClipModels = gameLocal.ClipModelsTouchingBounds( player, playerBounds, CONTENTS_TRIGGER, clipModels, 64 );
+			gameLocal.Printf( "DBG setviewpos triggerCandidates=%d\n", numClipModels );
+			for ( int j = 0; j < numClipModels; j++ ) {
+				idClipModel *cm = clipModels[ j ];
+				idEntity *ent = cm ? cm->GetEntity() : NULL;
+				if ( !ent ) {
+					continue;
+				}
+				if ( ( ent->name == "func_door_63" ) || ( ent->name == "func_door_64" ) || ( ent->name == "trigger_once_47" ) ) {
+					const bool clipHit = player->GetPhysics()->ClipContents( cm );
+					const idBounds triggerBounds = cm->GetAbsBounds();
+					gameLocal.Printf(
+						"DBG setviewpos candidate name='%s' class='%s' clipHit=%d triggerId=%d owner='%s' boundsMins=(%.1f %.1f %.1f) boundsMaxs=(%.1f %.1f %.1f)\n",
+						ent->name.c_str(),
+						ent->GetClassname(),
+						clipHit ? 1 : 0,
+						cm->GetId(),
+						cm->GetOwner() ? cm->GetOwner()->name.c_str() : "<null>",
+						triggerBounds[0].x, triggerBounds[0].y, triggerBounds[0].z,
+						triggerBounds[1].x, triggerBounds[1].y, triggerBounds[1].z
+					);
+				}
 			}
 		}
 	}
@@ -2600,6 +2777,13 @@ static void Cmd_TestDoor_f( const idCmdArgs &args ) {
 	}
 }
 
+/*
+==================
+Cmd_Flashlight_f
+
+Toggles flashlight on specified entity
+==================
+*/
 void Cmd_Flashlight_f( const idCmdArgs &args ) {
 	if ( gameLocal.IsMultiplayer() || !gameLocal.GetLocalPlayer() || !gameLocal.CheatsOk( false ) ) {
 		return;
@@ -3806,6 +3990,17 @@ static void Cmd_TestHitMarker_f( const idCmdArgs &args ) {
 	rvHitMarker::Trigger( damage, flags, HITMARKER_PRECISE );
 }
 
+static void Cmd_TestHudOverlays_f(const idCmdArgs& args) {
+	idPlayer* player=gameLocal.GetLocalPlayer();
+	if (!player || !gameLocal.CheatsOk()) return;
+	idVec3 origin;idMat3 axis;player->GetViewPos(origin,axis);
+	// [damage] [distance]: far away, the number's origin jitter barely moves it on screen
+	const float distance=args.Argc()>2?Max(8.0f,static_cast<float>(atof(args.Argv(2)))):128.0f;
+	gameLocal.mpGame.damageNumbers.Add(origin+axis[0]*distance,args.Argc()>1?atoi(args.Argv(1)):75,1,0);
+	gameLocal.lagometer.Update(20,2);
+	rvHitMarker::Trigger(75,0,HITMARKER_PRECISE);
+}
+
 /*
 ==================
 Cmd_TestCrosshair_f
@@ -4671,6 +4866,252 @@ void Cmd_BuyItem_f( const idCmdArgs& args ) {
 }
 // RITUAL END
 
+/*
+===============================================================================
+
+	openQ4 multiplayer bots
+
+===============================================================================
+*/
+
+/*
+==================
+Cmd_AddBot_f
+
+addbot [name] [skill] [exact].  The skill argument is a per-bot override that
+bypasses bot_skill and bot_skillVariance entirely, which is how a server
+operator puts one hard opponent in an otherwise gentle match without editing a
+character file.  "exact" is used by authored matches: the named character must
+exist and be available, so a typo can never silently seat a different opponent.
+==================
+*/
+void Cmd_AddBot_f( const idCmdArgs &args ) {
+	const char *name = ( args.Argc() > 1 ) ? args.Argv( 1 ) : NULL;
+	int skill = -1;			// -1 means no override: follow bot_skill
+	bool requireExactCharacter = false;
+
+	if ( args.Argc() > 2 ) {
+		skill = atoi( args.Argv( 2 ) );
+		if ( skill < 1 || skill > BOT_SKILL_LEVELS ) {
+			gameLocal.Printf( "usage: addbot [name] [skill 1-%d]\n", BOT_SKILL_LEVELS );
+			return;
+		}
+	}
+	if ( args.Argc() > 3 ) {
+		if ( idStr::Icmp( args.Argv( 3 ), "exact" ) != 0 || args.Argc() > 4 ) {
+			gameLocal.Printf( "usage: addbot [name] [skill 1-%d] [exact]\n", BOT_SKILL_LEVELS );
+			return;
+		}
+		requireExactCharacter = true;
+	}
+
+	botManager.AddBot( name, skill, requireExactCharacter );
+}
+
+/*
+==================
+Cmd_RemoveBot_f
+==================
+*/
+void Cmd_RemoveBot_f( const idCmdArgs &args ) {
+	const char *name = ( args.Argc() > 1 ) ? args.Argv( 1 ) : NULL;
+
+	if ( !botManager.RemoveBot( name ) ) {
+		if ( name ) {
+			gameLocal.Printf( "removebot: no bot called '%s'\n", name );
+		} else {
+			gameLocal.Printf( "removebot: no bots in the match\n" );
+		}
+	}
+}
+
+/*
+==================
+Cmd_KickBots_f
+==================
+*/
+void Cmd_KickBots_f( const idCmdArgs &args ) {
+	botManager.RemoveAll();
+}
+
+/*
+==================
+Cmd_BotList_f
+==================
+*/
+void Cmd_BotList_f( const idCmdArgs &args ) {
+	botManager.ListBots( args.Argc() > 1 && !idStr::Icmp( args.Argv( 1 ), "weapons" ) );
+}
+
+/*
+==================
+Cmd_BotCharacters_f
+==================
+*/
+void Cmd_BotCharacters_f( const idCmdArgs &args ) {
+	botCharacterManager.ListCharacters();
+}
+
+/*
+==================
+Cmd_BotReload_f
+
+Re-reads the style and character files in place.  Bots keep the character they
+are already wearing where the name survives the reload, so an author can retune
+a personality and watch it change without restarting the match.
+==================
+*/
+void Cmd_BotReload_f( const idCmdArgs &args ) {
+	const bool loaded = botCharacterManager.Reload();
+
+	// Unconditional, and before the early return: Reload has already freed the
+	// old roster either way, so every live bot is holding a dangling pointer
+	// from here until it is re-bound.  Skipping this on the failure path would
+	// leave the bots reading freed memory for the rest of the match.
+	botManager.RebindCharacters();
+
+	if ( !loaded ) {
+		gameLocal.Printf( "botreload: no bot style or character files were loaded\n" );
+		return;
+	}
+
+	gameLocal.Printf( "botreload: %d characters, %d styles\n",
+					  botCharacterManager.NumCharacters(), botCharacterManager.NumStyles() );
+}
+
+/*
+==================
+Cmd_BotProbeTraversal_f
+==================
+*/
+void Cmd_BotProbeTraversal_f( const idCmdArgs &args ) {
+	const bool padTraffic = !idStr::Icmp( args.Argv( 0 ), "bot_probePadTraffic" );
+	const bool padProbe = padTraffic || !idStr::Icmp( args.Argv( 0 ), "bot_probePad" );
+	const bool padEntry = padProbe && args.Argc() == 15;
+	const bool dodgeProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeDodge" );
+	const bool airProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeAir" );
+	const bool dropProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeDrop" );
+	const bool recoverProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeRecover" );
+	const bool climbProbe = !idStr::Icmp( args.Argv( 0 ), "bot_probeClimb" );
+	const bool walkProbe = recoverProbe || climbProbe || !idStr::Icmp( args.Argv( 0 ), "bot_probeWalk" );
+	const navTravelType_t travel = padProbe ? NAVTRAVEL_JUMPPAD :
+		( dropProbe ? NAVTRAVEL_DROP : ( dodgeProbe || airProbe || walkProbe || !idStr::Icmp( args.Argv( 0 ), "bot_probeMove" ) ? NAVTRAVEL_WALK : NAVTRAVEL_JUMP ) );
+	if ( args.Argc() != ( padProbe ? 12 : 11 ) && !padEntry && !( ( dropProbe || ( walkProbe && !recoverProbe ) ) && args.Argc() == 14 ) ) {
+		gameLocal.Printf( "usage: %s client x y z vx vy vz %s%s\n", args.Argv( 0 ),
+			airProbe ? "inputX inputY inputZ" : "targetX targetY targetZ", padProbe ? " padName [entryX entryY entryZ]" :
+			( dropProbe ? " [entryX entryY entryZ]" : ( walkProbe ? " [nextJumpX nextJumpY nextJumpZ]" : "" ) ) );
+		return;
+	}
+	int clientNum = 0;
+	const char *clientText = args.Argv( 1 );
+	if ( !*clientText ) {
+		return;
+	}
+	for ( const char *digit = clientText; *digit; digit++ ) {
+		if ( *digit < '0' || *digit > '9' ||
+			 ( clientNum = clientNum * 10 + ( *digit - '0' ) ) >= MAX_CLIENTS ) {
+			gameLocal.Printf( "%s: client must be an integer from 0 to %d\n", args.Argv( 0 ), MAX_CLIENTS - 1 );
+			return;
+		}
+	}
+	float values[12] = { 0.0f };
+	for ( int i = 0; i < ( padEntry || ( ( dropProbe || walkProbe ) && args.Argc() == 14 ) ? 12 : 9 ); i++ ) {
+		const int argument = i + ( padEntry && i >= 9 ? 3 : 2 );
+		if ( !idStr::IsNumeric( args.Argv( argument ) ) ) {
+			gameLocal.Printf( "%s: coordinates must be numeric\n", args.Argv( 0 ) );
+			return;
+		}
+		values[i] = atof( args.Argv( argument ) );
+		if ( idMath::Fabs( values[i] ) > 65536.0f ) {
+			gameLocal.Printf( "%s: coordinate or speed outside diagnostic range\n", args.Argv( 0 ) );
+			return;
+		}
+	}
+	idEntity *pad = padProbe ? gameLocal.FindEntity( args.Argv( 11 ) ) : NULL;
+	if ( padProbe && !pad ) {
+		gameLocal.Printf( "bot_probePad: pad entity not found\n" );
+		return;
+	}
+	// bot_probeAir's last three values are a fixed input direction, not a
+	// target; the bot only faces along it.
+	const idVec3 origin( values[0], values[1], values[2] );
+	const idVec3 airInput( values[6], values[7], 0.0f );
+	const idVec3 target = airProbe ? origin + airInput * 64.0f : idVec3( values[6], values[7], values[8] );
+	const idVec3 entry( values[9], values[10], values[11] );
+	if ( !botManager.ProbeTraversal( clientNum, origin, idVec3( values[3], values[4], values[5] ), target,
+			travel, pad, dodgeProbe, airProbe ? &airInput : NULL, padEntry || ( dropProbe && args.Argc() == 14 ) ? &entry : NULL,
+			walkProbe && args.Argc() == 14 ? &entry : NULL, walkProbe, padTraffic, recoverProbe, climbProbe ) ) {
+		gameLocal.Printf( "%s: requires an isolated local cheat server with %s live bot%s and a separate observer%s\n",
+			args.Argv( 0 ), padTraffic ? "two" : "one", padTraffic ? "s" : "",
+			padProbe ? ", and a pad with a proven natural landing" : "" );
+	}
+}
+
+/*
+==================
+Cmd_BotProbeHealth_f
+==================
+*/
+void Cmd_BotProbeHealth_f( const idCmdArgs &args ) {
+	bool numeric = true;
+	for ( int i = 1; i < args.Argc(); i++ ) {
+		numeric &= idStr::IsNumeric( args.Argv( i ) );
+	}
+	if ( ( args.Argc() != 3 && args.Argc() != 4 && args.Argc() != 7 && args.Argc() != 8 ) || !numeric ) {
+		gameLocal.Printf( "usage: bot_probeHealth client health [knockbackMsec [kickX kickY kickZ [armor]]]\n" );
+		return;
+	}
+	const idVec3 kick = args.Argc() >= 7 ? idVec3( atof( args.Argv( 4 ) ), atof( args.Argv( 5 ) ), atof( args.Argv( 6 ) ) ) : vec3_origin;
+	if ( !botManager.SetProbeHealth( atoi( args.Argv( 1 ) ), atoi( args.Argv( 2 ) ),
+			args.Argc() >= 4 ? atoi( args.Argv( 3 ) ) : 0, kick, args.Argc() == 8 ? atoi( args.Argv( 7 ) ) : -1 ) ) {
+		gameLocal.Printf( "bot_probeHealth: requires an isolated local cheat server with one live bot, 1-1000 health and 0-1000 ms\n" );
+	}
+}
+
+/*
+==================
+Cmd_NavMesh_f
+==================
+*/
+void Cmd_NavMesh_f( const idCmdArgs &args ) {
+	const char *sub = ( args.Argc() > 1 ) ? args.Argv( 1 ) : "info";
+
+	if ( !idStr::Icmp( sub, "build" ) ) {
+		// Generation is a long collision sweep and only the server routes bots,
+		// so a connected client must not be able to run it.
+		if ( !gameLocal.isServer || gameLocal.isClient ) {
+			gameLocal.Printf( "navmesh build: only the server can build a navmesh\n" );
+			return;
+		}
+		navMesh.Build();
+		return;
+	}
+
+	if ( !idStr::Icmp( sub, "info" ) ) {
+		if ( !navMesh.IsValid() ) {
+			gameLocal.Printf( "navmesh: not built\n" );
+			return;
+		}
+
+		gameLocal.Printf( "navmesh: %d nodes, %d links, built in %d ms\n",
+						  navMesh.NumNodes(), navMesh.NumLinks(), navMesh.GetBuildMilliseconds() );
+		return;
+	}
+
+	if ( !idStr::Icmp( sub, "probe" ) && args.Argc() >= 5 ) {
+		if ( !navMesh.IsValid() ) {
+			gameLocal.Printf( "navmesh: not built\n" );
+			return;
+		}
+		const idVec3 point( atof( args.Argv( 2 ) ), atof( args.Argv( 3 ) ), atof( args.Argv( 4 ) ) );
+		const float radius = ( args.Argc() > 5 ) ? atof( args.Argv( 5 ) ) : 24.0f;
+		navMesh.Probe( point, idMath::ClampFloat( 4.0f, 64.0f, radius ) );
+		return;
+	}
+
+	gameLocal.Printf( "usage: navmesh <build|info|probe x y z [radius]>\n" );
+}
+
 void Cmd_PlayerEmote_f( const idCmdArgs& args ) {
 	if( gameLocal.GetLocalPlayer() == NULL ) {
 		gameLocal.Warning( "Cmd_Emote_f() - local player is NULL" );
@@ -4714,22 +5155,27 @@ void Cmd_SetPMCVars_f ( const idCmdArgs &args ) {
 #include "AudioGraphDebug.inl"
 
 void Cmd_FadeSound_f( const idCmdArgs &args )	{
-// jmarshall: eval is this needed?
-	//if( args.Argc() < 2)	{
-	//	return;
-	//}
-	//
-	//float fadeDB = 0.0f;
-	//float fadeTime = 0.0f;
-	//
-	//idStr _fadeDB = args.Argv( 1);
-	//fadeDB = atof( _fadeDB );
-	//
-	//idStr _fadeTime = args.Argv( 2);
-	//fadeTime = atof( _fadeTime );
-	//
-	//soundSystem->FadeSoundClasses( SOUNDWORLD_GAME, SOUND_CLASS_MUSICAL, 0.0f - fadeDB, fadeTime );
-// jmarshall end
+	// openQ4: the single-player module leaves fadeSound a no-op (jmarshall
+	// commented the body out); multiplayer fades the music class.
+	if ( !gameLocal.IsMultiplayerMode() ) {
+		return;
+	}
+
+	if( args.Argc() < 2)	{
+		return;
+	}
+
+	float fadeDB = 0.0f;
+	float fadeTime = 0.0f;
+
+	idStr _fadeDB = args.Argv( 1);
+	fadeDB = atof( _fadeDB );
+
+	idStr _fadeTime = args.Argv( 2);
+	fadeTime = atof( _fadeTime );
+
+	soundSystem->FadeSoundClasses( SOUNDWORLD_GAME, SOUND_CLASS_MUSICAL, 0.0f - fadeDB, fadeTime );
+
 }
 
 void Cmd_TestClientModel_f( const idCmdArgs& args ) {
@@ -4770,25 +5216,604 @@ void Cmd_ClientOverflowReliable_f( const idCmdArgs& args ) {
 }
 #endif
 
-// jmarshall
-void Cmd_AddBot_f(const idCmdArgs& args)
-{
-	if (args.Argc() < 2)
-	{
-		common->Warning("USAGE: addbot <botfile> e.g. addbot major or addbot dark - see botfiles/bots for more details\n");
-		return;
-	}
-	gameLocal.AddBot(args.Argv(1));
+void Cmd_ListMaps_f( const idCmdArgs& args ) {
+	gameLocal.mpGame.ListMaps();
 }
 
-void Cmd_FillBots_f(const idCmdArgs& args)
-{
-	for( int i = 0; i < 7; ++i )
-	{
-		gameLocal.AddBot( "major" );
+// Drives the local single-player Arena match without device input: ends the
+// live match with a chosen result through the normal scoring path, or skips
+// the current ceremony beat. A cheat, because it changes a live match's score.
+static void Cmd_OpenQ4ArenaCeremony_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer || !gameLocal.isServer ) {
+		gameLocal.Printf( "openq4_arenaCeremony requires the local Arena server\n" );
+		return;
+	}
+	gameLocal.mpGame.DebugArenaCampaignCeremony( args );
+}
+
+// Server-local diagnostics for scripted gameplay validation. This reads the
+// actual game/session state and never changes players or synthesizes input.
+// These diagnostics exercise the same accepted-view GUI adapter as a local
+// menu action.  They never manufacture participants, revisions or authority.
+static void Cmd_OpenQ4MatchControl_f( const idCmdArgs &args ) {
+	idMultiplayerGame &mp = gameLocal.mpGame;
+	idUserInterface *gui = mp.GetMainGUI();
+	if ( !gameLocal.isMultiplayer || gameLocal.GetLocalPlayer() == NULL || gui == NULL ) {
+		gameLocal.Printf( "openq4_matchControl requires a local multiplayer client\n" );
+		return;
+	}
+	if ( args.Argc() == 2 && idStr::Icmp( args.Argv( 1 ), "open" ) == 0 ) {
+		// Review owns a separate GUI and its players are intentionally spectating.
+		// Exercise the normal menu toggle, without synthesizing device input.
+		if ( mp.GetCurrentMenu() != 1 ) {
+			if ( mp.GetCurrentMenu() != 0 ) {
+				mp.StartMenu();
+			}
+			gameLocal.sessionCommand = "game_startmenu";
+		}
+		gameLocal.Printf( "MP_CONTROL requested multiplayer menu\n" );
+		return;
+	}
+	if ( args.Argc() == 4 && idStr::Icmp( args.Argv( 1 ), "set" ) == 0 ) {
+		static const char *fields[] = {
+			"match_team_rows_sel_0", "match_replacement_rows_sel_0",
+			"match_proposal_rows_sel_0", "match_profile_rows_sel_0",
+			"match_rule_rows_sel_0", "match_series_map_rows_sel_0",
+			"match_role_choice", "match_proposal_scope_choice",
+			"match_series_profile_choice", "match_rule_value"
+		};
+		for ( int i = 0; i < static_cast<int>( sizeof( fields ) / sizeof( fields[ 0 ] ) ); ++i ) {
+			if ( strcmp( args.Argv( 2 ), fields[ i ] ) == 0 && strlen( args.Argv( 3 ) ) <= 64 ) {
+				gui->SetStateString( fields[ i ], args.Argv( 3 ) );
+				return;
+			}
+		}
+		gameLocal.Printf( "MP_CONTROL rejected unsupported choice\n" );
+		return;
+	}
+	if ( args.Argc() == 3 && idStr::Icmp( args.Argv( 1 ), "action" ) == 0 ) {
+		const char *token = args.Argv( 2 );
+		const int length = static_cast<int>( strlen( token ) );
+		if ( length < 1 || length > 64 || mp.GetCurrentMenu() != 1 ) {
+			gameLocal.Printf( "MP_CONTROL action requires the active multiplayer menu\n" );
+			return;
+		}
+		for ( int i = 0; i < length; ++i ) {
+			if ( ( token[ i ] < 'a' || token[ i ] > 'z' ) && token[ i ] != '_' ) {
+				gameLocal.Printf( "MP_CONTROL rejected malformed action\n" );
+				return;
+			}
+		}
+		mp.HandleGuiCommands( va( "matchControl %s", token ) );
+		gameLocal.Printf( "MP_CONTROL action=%s\n", token );
+		return;
+	}
+	if ( args.Argc() != 2 || idStr::Icmp( args.Argv( 1 ), "report" ) != 0 ) {
+		gameLocal.Printf( "usage: openq4_matchControl <open|report|action token|set choice value>\n" );
+		return;
+	}
+	const mpSessionView *view = mp.GetClientMatchView();
+	if ( view != NULL ) {
+		const mpMatchViewPublicState_t &state = view->publicState;
+		gameLocal.Printf( "MP_VIEW slot=%d side=%d roles=%u active=%d phase=%d round=%d pause=%d engine=%llu match=%llu vitals=%d items=%d follows=%d session=%llu revision=%llu\n",
+			state.recipient.slot, state.recipient.side, state.recipient.publicRoleMask,
+			state.recipient.active, state.lifecycle.phase, state.lifecycle.round, state.lifecycle.pauseState,
+			state.clocks.engineTimeMsec, state.clocks.matchTimeMsec,
+			view->teamVitalCount, view->itemTimingCount, view->followTargetCount,
+			state.sessionId, state.sessionRevision );
+		for ( int i = 0; i < view->teamVitalCount; ++i ) {
+			gameLocal.Printf( "MP_VITAL participant=%u side=%d health=%d armor=%d\n",
+				view->teamVitals[ i ].participantId, view->teamVitals[ i ].participantSide,
+				view->teamVitals[ i ].health, view->teamVitals[ i ].armor );
+		}
+		for ( int i = 0; i < view->followTargetCount; ++i ) {
+			gameLocal.Printf( "MP_FOLLOW participant=%u side=%d selectable=%d\n",
+				view->followTargets[ i ].participantId, view->followTargets[ i ].participantSide,
+				view->followTargets[ i ].selectable );
+		}
+		byte buffer[ MP_MATCH_VIEW_MAX_MESSAGE_BYTES ];
+		idBitMsg encoded;
+		encoded.Init( buffer, sizeof( buffer ) );
+		encoded.BeginWriting();
+		mpMatchViewError_t error;
+		if ( MPMatchViewEncode( encoded, *view, &error ) ) {
+			fileSystem->WriteFile( va( "match-probe/view-%d.bin", state.recipient.slot ),
+				buffer, encoded.GetSize() );
+		}
+	}
+	const idDict &state = gui->State();
+	for ( int i = 0; i < state.GetNumKeyVals(); ++i ) {
+		const idKeyValue *entry = state.GetKeyVal( i );
+		if ( entry != NULL && idStr::Icmpn( entry->GetKey(), "match_", 6 ) == 0 &&
+			idStr::Icmp( entry->GetKey(), "match_referee_credential" ) != 0 ) {
+			gameLocal.Printf( "MP_CONTROL %s=%s\n", entry->GetKey().c_str(), entry->GetValue().c_str() );
+		}
 	}
 }
-// jmarshall end
+
+static void Cmd_OpenQ4ReportMPState_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer ) {
+		gameLocal.Printf( "openq4_reportMPState requires multiplayer gameplay\n" );
+		return;
+	}
+	idMultiplayerGame &mp = gameLocal.mpGame;
+	rvGameState *state = mp.GetGameState();
+	if ( state == NULL ) {
+		return;
+	}
+	const rvRoundGameState *round = MPGameTypeHasAny( gameLocal.gameType, GTF_ROUND ) ?
+		static_cast< const rvRoundGameState * >( state ) : NULL;
+	gameLocal.Printf( "MP_STATE time=%d gametype=%d phase=%d session_phase=%d round=%d round_number=%d marine=%d strogg=%d timelimit=%d session_round=%d round_remaining=%d pause=%d pause_kind=%d timeouts_marine=%d timeouts_strogg=%d roundlimit=%d\n",
+		gameLocal.time, gameLocal.gameType, state->GetMPGameState(), mp.GetMatchSession().GetPhase(),
+		round != NULL ? round->GetRoundState() : RS_INACTIVE, round != NULL ? round->GetRoundNumber() : 0,
+		mp.GetScoreForTeam( TEAM_MARINE ), mp.GetScoreForTeam( TEAM_STROGG ),
+		gameLocal.serverInfo.GetInt( "si_timeLimit" ), mp.GetMatchSession().GetRoundState(),
+		round != NULL && round->GetRoundStateTime() > 0 ? round->GetRoundStateTime() - gameLocal.time : 0,
+		// openQ4 MP-12: the pause overlay and the casual timeout budgets
+		mp.GetMatchSession().GetPause().state, mp.GetMatchSession().GetPause().kind,
+		mp.GetMatchSession().GetTimeoutBudget( 0 ).remaining, mp.GetMatchSession().GetTimeoutBudget( 1 ).remaining,
+		gameLocal.serverInfo.GetInt( "si_roundLimit" ) );
+	idPlayer *local = gameLocal.GetLocalPlayer();
+	if ( local != NULL ) {
+		gameLocal.Printf( "MP_LOCAL client=%d entity=%d demo=%d serverDemo=%d repeater=%d spectator=%d fake=%d spectating=%d follow0=%d\n",
+			gameLocal.localClientNum, local->entityNumber, gameLocal.GetDemoState(),
+			gameLocal.IsServerDemoPlaying(), gameLocal.isRepeater, local->spectator,
+			local->IsFakeClient(), local->spectating,
+			mp.CanSpectatorFollow( local->entityNumber, 0 ) );
+		// openQ4: what this client draws: the follow view in use, the vitals the
+		// server disclosed to it and the caster panel they feed
+		const idPlayer *followed = local->spectating && local->spectator != local->entityNumber ?
+			gameLocal.GetClientByNum( local->spectator ) : NULL;
+		gameLocal.Printf( "MP_VIEW followView=%d camera=%d vitals=%d context=%d sideA=\"%s\" sideB=\"%s\"\n",
+			g_spectatorFollowView.GetInteger(),
+			followed != NULL ? static_cast<int>( followed->FollowCameraMode() ) : static_cast<int>( local->FollowCameraMode() ),
+			mp.GetClientTeamVitalCount(),
+			local->mphud != NULL ? local->mphud->GetStateInt( "match_context_visible" ) : -1,
+			local->mphud != NULL ? local->mphud->GetStateString( "match_context_readiness" ) : "",
+			local->mphud != NULL ? local->mphud->GetStateString( "match_context_timeouts" ) : "" );
+	}
+	{
+		// The latched modifier layer (mp/Modifiers.h) and what the match is called under it.
+		idStr modifierTokens;
+		rvMPModifiers::Tokens( mp.Modifiers(), modifierTokens );
+		gameLocal.Printf( "MP_RULES modifiers='%s' fixedWeapon=%s quadHog=%d preset='%s' selfDamage=%d knockback=%d fallDamage=%d weaponRespawn=%d title='%s'\n",
+			modifierTokens.c_str(), mp.FixedLoadoutWeapon() != NULL ? mp.FixedLoadoutWeapon() : "none", mp.QuadHogClient(),
+			gameLocal.serverInfo.GetString( "si_preset" ), gameLocal.serverInfo.GetInt( "si_selfDamage", "100" ),
+			gameLocal.serverInfo.GetInt( "si_knockback", "100" ), gameLocal.serverInfo.GetInt( "si_fallDamage", "100" ),
+			gameLocal.serverInfo.GetInt( "si_weaponRespawn" ), mp.LocalizeGametype() );
+	}
+	for ( int slot = 0; slot < gameLocal.numClients && slot < MAX_CLIENTS; ++slot ) {
+		idEntity *entity = gameLocal.entities[ slot ];
+		if ( entity == NULL || !entity->IsType( idPlayer::GetClassType() ) ) {
+			continue;
+		}
+		idPlayer *player = static_cast< idPlayer * >( entity );
+		{
+			const int currentWeapon = player->GetCurrentWeapon();
+			const int ammoIndex = currentWeapon >= 0 ? player->inventory.AmmoIndexForWeaponIndex( currentWeapon ) : 0;
+			gameLocal.Printf( "MP_LOADOUT slot=%d weapons=0x%x current=%d ammo=%d powerups=0x%x armor=%d\n", slot, player->inventory.weapons,
+				currentWeapon, ( ammoIndex > 0 && ammoIndex < MAX_AMMO ) ? player->inventory.ammo[ ammoIndex ] : 0,
+				player->inventory.powerups, player->inventory.armor );
+		}
+		gameLocal.Printf( "MP_PLAYER slot=%d bot=%d team=%d health=%d spectating=%d wantSpectate=%d ingame=%d score=%d teamScore=%d\n",
+			slot, botManager.IsBot( slot ), player->team, player->health, player->spectating,
+			player->wantSpectate, mp.IsInGame( slot ), mp.GetScore( slot ), mp.GetTeamScore( slot ) );
+		gameLocal.Printf( "MP_POSE slot=%d entity=%s origin=%s hidden=%d\n",
+			slot, player->GetName(), player->GetPhysics()->GetOrigin().ToString( 2 ),
+			player->IsHidden() );
+		gameLocal.Printf( "MP_PHYSICS slot=%d grounded=%d health=%d velocity=%s\n",
+			slot, player->pfl.onGround, player->health, player->GetPhysics()->GetLinearVelocity().ToString( 3 ) );
+		gameLocal.Printf( "MP_AIR slot=%d reservoir=%d percent=%d serverTime=%d\n", slot,
+			player->GetAirTics(), player->GetAirReadoutPercent(), player->GetAirReadoutServerTime() );
+		if ( gameLocal.isServer && player->spectating ) {
+			// openQ4: the server's record of each spectator's camera and view rights
+			gameLocal.Printf( "MP_SPECTATE slot=%d following=%d autoFollow=%d speed=%d caster=%d\n",
+				slot, player->spectator != slot ? player->spectator : -1, player->GetSpectatorAutoFollow(),
+				static_cast<int>( player->GetSpectatorSpeedScale() * 100.0f + 0.5f ), mp.IsCasualCaster( slot ) );
+			for ( int target = 0; target < gameLocal.numClients && target < MAX_CLIENTS; ++target ) {
+				// Live follow authority belongs to the server. A remote client's
+				// local permission query intentionally cannot grant a camera.
+				gameLocal.Printf( "MP_CAMERA observer=%d target=%d allowed=%d following=%d\n",
+					slot, target, mp.CanSpectatorFollow( slot, target ), player->spectator == target );
+			}
+		}
+	}
+	if ( MPGameTypeHasAny( gameLocal.gameType, GTF_FREEZE ) ) {
+		static_cast<rvFreezeTagGameState *>( state )->ReportThawState();
+	}
+	if ( gameLocal.gameType == GAME_TOURNEY ) {
+		rvTourneyGameState *tourney = static_cast<rvTourneyGameState *>( state );
+		for ( int arena = 0; arena < MAX_ARENAS; ++arena ) {
+			rvTourneyArena &bracket = tourney->GetArena( arena );
+			idPlayer **players = bracket.GetPlayers();
+			if ( players[ 0 ] != NULL || players[ 1 ] != NULL ) {
+				gameLocal.Printf( "MP_TOURNEY round=%d arena=%d state=%d first=%d second=%d winner=%d remaining=%d\n",
+					tourney->GetRound(), arena, bracket.GetState(),
+					players[ 0 ] != NULL ? players[ 0 ]->entityNumber : -1,
+					players[ 1 ] != NULL ? players[ 1 ]->entityNumber : -1,
+					bracket.GetWinner() != NULL ? bracket.GetWinner()->entityNumber : -1,
+					bracket.GetNextStateTime() > 0 ? bracket.GetNextStateTime() - gameLocal.time : 0 );
+			}
+		}
+	}
+}
+
+static void OpenQ4ReportMPAnimation( idEntity *entity, const char *surface ) {
+	idAnimator *animator = entity != NULL ? entity->GetAnimator() : NULL;
+	if ( animator == NULL ) {
+		return;
+	}
+	for ( int channel = 0; channel < ANIM_NumAnimChannels; ++channel ) {
+		const idAnimBlend *animation = animator->CurrentAnim( channel );
+		if ( animation != NULL && animation->AnimNum() != 0 ) {
+			gameLocal.Printf( "MP_WORLD_ANIM surface=%s entity=%d channel=%d anim=%d time=%d frame=%d\n",
+				surface, entity->entityNumber, channel, animation->AnimNum(),
+				animation->AnimTime( gameLocal.time ), animation->GetFrameNumber( gameLocal.time ) );
+		}
+	}
+}
+
+static void Cmd_OpenQ4LaunchMPTestProjectile_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer || !gameLocal.isServer ||
+		!gameLocal.CheatsOk( false ) || args.Argc() != 7 ) {
+		gameLocal.Printf( "usage: openq4_launchMPTestProjectile <def> <name> <origin> <direction> <speed> <fuse>\n" );
+		return;
+	}
+	if ( gameLocal.FindEntity( args.Argv( 2 ) ) != NULL ) {
+		gameLocal.Printf( "MP_WORLD_PROJECTILE name already exists\n" );
+		return;
+	}
+	idDict spawn;
+	spawn.Set( "classname", args.Argv( 1 ) );
+	spawn.Set( "name", args.Argv( 2 ) );
+	spawn.Set( "origin", args.Argv( 3 ) );
+	spawn.Set( "direction", args.Argv( 4 ) );
+	spawn.Set( "speed", args.Argv( 5 ) );
+	spawn.Set( "fuse", args.Argv( 6 ) );
+	idVec3 direction = spawn.GetVector( "direction" );
+	if ( direction.Normalize() == 0.0f ) {
+		gameLocal.Printf( "MP_WORLD_PROJECTILE direction must be nonzero\n" );
+		return;
+	}
+	idEntity *entity = NULL;
+	if ( !gameLocal.SpawnEntityDef( spawn, &entity ) || entity == NULL ) {
+		gameLocal.Printf( "MP_WORLD_PROJECTILE spawn failed\n" );
+		return;
+	}
+	if ( !entity->IsType( idProjectile::GetClassType() ) ) {
+		gameLocal.Printf( "MP_WORLD_PROJECTILE definition is not a projectile\n" );
+		entity->PostEventMS( &EV_Remove, 0 );
+		return;
+	}
+	idProjectile *projectile = static_cast<idProjectile *>( entity );
+	const idVec3 origin = spawn.GetVector( "origin" );
+	projectile->Create( gameLocal.GetLocalPlayer(), origin, direction );
+	projectile->Launch( origin, direction, vec3_origin );
+	gameLocal.Printf( "MP_WORLD_PROJECTILE launched name=%s\n", projectile->GetName() );
+}
+
+/*
+==================
+Cmd_LagCompStatus_f
+
+openQ4: what lag compensation would rewind for each connected client, and why: its reported
+lead, the round trip the server measured, the remote extrapolation it advertises and the
+displayed pose age that leaves.  Read-only, and meaningful with net_mpLagCompensation off.
+==================
+*/
+static void Cmd_LagCompStatus_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer || !gameLocal.isServer ) {
+		gameLocal.Printf( "lagCompStatus: only a multiplayer server can report lag compensation\n" );
+		return;
+	}
+	const int maxRewindMS = idMath::ClampInt( 0, 1000, net_mpLagCompMaxMS.GetInteger() );
+	gameLocal.Printf( "LAGCOMP_STATUS enabled=%d max=%dms slack=%dms bias=%dms frame=%dms\n",
+		net_mpLagCompensation.GetBool() ? 1 : 0, maxRewindMS, net_mpLagCompSlackMS.GetInteger(),
+		net_mpLagCompBiasMS.GetInteger(), gameLocal.GetMSec() );
+	for ( int clientNum = 0; clientNum < MAX_CLIENTS; clientNum++ ) {
+		const idEntity *entity = gameLocal.entities[ clientNum ];
+		if ( entity == NULL || !entity->IsType( idPlayer::GetClassType() ) ) {
+			continue;
+		}
+		idGameLocal::mpLagCompEstimate_t estimate;
+		gameLocal.EstimateMPLagCompensation( clientNum, estimate );
+		const int rewindMS = estimate.leadMS > 0 && estimate.measuredMS > 0 ?
+			idMath::ClampInt( 0, maxRewindMS, estimate.poseAgeMS + net_mpLagCompBiasMS.GetInteger() ) : 0;
+		gameLocal.Printf( "LAGCOMP_CLIENT client=%d name=\"%s\" lead=%dms rtt=%dms advertised=%dtics extrap=%dms age=%dms rewind=%dms\n",
+			clientNum, gameLocal.userInfo[ clientNum ].GetString( "ui_name" ), estimate.leadMS, estimate.measuredMS,
+			estimate.advertisedTics, estimate.extrapolationMS, estimate.poseAgeMS, rewindMS );
+	}
+}
+
+// Read actual simulation and animation state without moving the camera or
+// injecting player commands. This complements engine render-target captures
+// when qualifying repeated competitive pauses and subsequent resumption.
+static void Cmd_OpenQ4ReportMPWorld_f( const idCmdArgs &args ) {
+	if ( !gameLocal.isMultiplayer || !gameLocal.CheatsOk( false ) || args.Argc() != 2 ) {
+		gameLocal.Printf( "usage: openq4_reportMPWorld <entity name>\n" );
+		return;
+	}
+	idEntity *entity = gameLocal.FindEntity( args.Argv( 1 ) );
+	if ( entity == NULL || entity->GetPhysics() == NULL ) {
+		gameLocal.Printf( "MP_WORLD_MISSING name=%s\n", args.Argv( 1 ) );
+		return;
+	}
+	const idPhysics *physics = entity->GetPhysics();
+	gameLocal.Printf( "MP_WORLD entity=%d name=%s type=%s engine=%d frozen=%d physics=%d hidden=%d health=%d origin=\"%s\" velocity=\"%s\" angles=\"%s\"\n",
+		entity->entityNumber, entity->GetName(), entity->GetClassname(), gameLocal.time,
+		gameLocal.mpGame.IsGameplayFrozen(), physics->GetTime(), entity->IsHidden(), entity->health,
+		physics->GetOrigin().ToString( 4 ), physics->GetLinearVelocity().ToString( 4 ),
+		physics->GetAxis().ToAngles().ToString( 4 ) );
+	OpenQ4ReportMPAnimation( entity, "world" );
+	if ( entity->IsType( idPlayer::GetClassType() ) ) {
+		idPlayer *player = static_cast<idPlayer *>( entity );
+		idVec3 viewOrigin;
+		idMat3 viewAxis;
+		player->GetViewPos( viewOrigin, viewAxis );
+		const renderView_t *view = player->GetRenderView();
+		gameLocal.Printf( "MP_WORLD_VIEW entity=%d think=%d eye=\"%s\" render=\"%s\"\n",
+			entity->entityNumber, entity->thinkFlags, viewOrigin.ToString( 2 ),
+			view != NULL ? view->vieworg.ToString( 2 ) : "unavailable" );
+		for ( int powerup = 0; powerup < POWERUP_MAX; ++powerup ) {
+			if ( ( player->inventory.powerups & ( 1 << powerup ) ) != 0 ) {
+				gameLocal.Printf( "MP_WORLD_POWERUP entity=%d kind=%d remaining=%d\n",
+					entity->entityNumber, powerup,
+					player->inventory.powerupEndTime[ powerup ] - gameLocal.time );
+			}
+		}
+		gameLocal.Printf( "MP_WORLD_INVENTORY entity=%d armor=%d maxHealth=%d maxArmor=%d credits=%d weapons=%d\n",
+			entity->entityNumber, player->inventory.armor, player->inventory.maxHealth,
+			player->inventory.maxarmor, (int)player->buyMenuCash, player->inventory.weapons );
+		if ( player->weapon != NULL ) {
+			gameLocal.Printf( "MP_WORLD_WEAPON entity=%d clip=%d ready=%d reloading=%d\n",
+				entity->entityNumber, player->weapon->AmmoInClip(),
+				player->weapon->IsReady(), player->weapon->IsReloading() );
+			// The weapon mods this end knows and the weapon it built from them
+			// (the buying modes' mods travel in the player snapshot).
+			idStr mods;
+			for ( int weaponIndex = 0; weaponIndex < MAX_WEAPONS; ++weaponIndex ) {
+				if ( player->inventory.weaponMods[ weaponIndex ] != 0 ) {
+					mods += va( "%s%d:%d", mods.Length() > 0 ? "," : "", weaponIndex, player->inventory.weaponMods[ weaponIndex ] );
+				}
+			}
+			gameLocal.Printf( "MP_WORLD_WEAPON_MODS entity=%d weapon=%d mods=%s clipSize=%d fireRate=%.3f projectile=%s\n",
+				entity->entityNumber, player->GetCurrentWeapon(), mods.Length() > 0 ? mods.c_str() : "-",
+				player->weapon->ClipSize(), player->weapon->spawnArgs.GetFloat( "fireRate" ),
+				player->weapon->spawnArgs.GetString( "def_projectile", "-" ) );
+		}
+		OpenQ4ReportMPAnimation( player->GetWeaponViewModel(), "weapon" );
+		rvViewWeapon *viewModel = player->GetWeaponViewModel();
+		const renderEntity_t *model = viewModel != NULL ? viewModel->GetRenderEntity() : NULL;
+		gameLocal.Printf( "MP_WORLD_VIEWMODEL entity=%d exists=%d present=%d hidden=%d stale=%d model=%s view=%d\n",
+			entity->entityNumber, viewModel != NULL,
+			viewModel != NULL && viewModel->GetModelDefHandle() >= 0,
+			viewModel != NULL && viewModel->IsHidden(),
+			viewModel != NULL && viewModel->fl.networkStale,
+			model != NULL && model->hModel != NULL ? model->hModel->Name() : "none",
+			model != NULL ? model->allowSurfaceInViewID : 0 );
+	}
+}
+
+static void Cmd_OpenQ4AssertMPClientActive_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	const bool inGame = player != NULL && gameLocal.mpGame.IsInGame( player->entityNumber );
+	const bool menuClosed = gameLocal.mpGame.GetCurrentMenu() == 0;
+	const bool disableHud = player != NULL && player->disableHud;
+	if ( player == NULL || player->spectating || player->wantSpectate || !inGame ||
+			!menuClosed || disableHud ) {
+		gameLocal.Error(
+			"openq4_assertMPClientActive failed: client=%d spectating=%d wantSpectate=%d ingame=%d menu=%d disableHud=%d",
+			player != NULL ? player->entityNumber : -1,
+			player != NULL && player->spectating ? 1 : 0,
+			player != NULL && player->wantSpectate ? 1 : 0,
+			inGame ? 1 : 0,
+			menuClosed ? 0 : 1,
+			disableHud ? 1 : 0
+		);
+		return;
+	}
+
+	gameLocal.Printf(
+		"OPENQ4_STOCK_BASELINE_MP_CLIENT_ACTIVE client=%d spectating=0 wantSpectate=0 ingame=1 menu=0 disableHud=0\n",
+		player->entityNumber
+	);
+}
+
+// openQ4: scrolls the held Remastered scoreboard by whole rows
+// (ui-visual-design.md 14.14). The engine sends it in place of the
+// weapon-cycle controls and the right stick while ui_scoreboardScrolls says
+// the board lists more rows than it shows; it never leaves this client.
+static void Cmd_ScoreboardScroll_f( const idCmdArgs &args ) {
+	if ( args.Argc() != 2 ) {
+		common->Printf( "usage: scoreboardScroll <rows>\n" );
+		return;
+	}
+	gameLocal.mpGame.ScrollScoreboard( atoi( args.Argv( 1 ) ) );
+}
+
+// openQ4: a player this client could ask to follow. The server decides whether
+// it may; this only keeps spectators and empty slots out of names and lists.
+static const idPlayer *FollowListPlayer( int slot ) {
+	if ( slot < 0 || slot >= MAX_CLIENTS || slot >= gameLocal.numClients || gameLocal.entities[ slot ] == NULL ||
+		!gameLocal.entities[ slot ]->IsType( idPlayer::GetClassType() ) ) {
+		return NULL;
+	}
+	const idPlayer *player = static_cast<const idPlayer *>( gameLocal.entities[ slot ] );
+	if ( player == gameLocal.GetLocalPlayer() || player->IsFakeClient() || player->spectating ||
+		!gameLocal.mpGame.IsInGame( slot ) ) {
+		return NULL;
+	}
+	return player;
+}
+
+// The slot a name selects: -1 when nobody matches, -2 when more than one player
+// does. Colours are ignored and an exact name beats a partial one, so "Kane"
+// still reaches Kane while Kaneda plays.
+static int FollowSlotFromName( const char *name ) {
+	idStr wanted = name;
+	wanted.RemoveColors();
+	if ( wanted.Length() == 0 ) {
+		return -1;
+	}
+	int exact = -1, exactCount = 0, partial = -1, partialCount = 0;
+	for ( int slot = 0; slot < MAX_CLIENTS; ++slot ) {
+		if ( FollowListPlayer( slot ) == NULL ) {
+			continue;
+		}
+		idStr playerName = gameLocal.userInfo[ slot ].GetString( "ui_name" );
+		playerName.RemoveColors();
+		if ( !playerName.Icmp( wanted ) ) {
+			exact = slot;
+			++exactCount;
+		} else if ( idStr::FindText( playerName, wanted, false ) >= 0 ) {
+			partial = slot;
+			++partialCount;
+		}
+	}
+	if ( exactCount != 0 ) {
+		return exactCount == 1 ? exact : -2;
+	}
+	return partialCount == 1 ? partial : ( partialCount == 0 ? -1 : -2 );
+}
+
+// Auto-follow modes by their command words, in MP_AUTOTRACK_* order.
+static const char *const followAutoModes[ MP_AUTOTRACK_MODE_COUNT ] = {
+	"off", "killer", "action", "leader", "powerup", "flag"
+};
+
+// Fixed camera verbs and numeric slots keep the reliable request compact and
+// independent of mutable display names: a name is resolved to a slot here, on
+// the client, and the server revalidates every target.
+static void Cmd_Follow_f( const idCmdArgs &args ) {
+	idPlayer::spectatorFollow_t operation = idPlayer::SPECTATOR_FOLLOW_NEXT;
+	int targetSlot = -1;
+	const char *choice = args.Argv( 1 );
+	const char *autoMode = NULL;
+	if ( !idStr::Icmp( args.Argv( 0 ), "follownext" ) && args.Argc() == 1 ) {
+		choice = "next";
+	} else if ( !idStr::Icmp( args.Argv( 0 ), "followprev" ) && args.Argc() == 1 ) {
+		choice = "prev";
+	} else if ( !idStr::Icmp( args.Argv( 0 ), "followfree" ) && args.Argc() == 1 ) {
+		choice = "free";
+	} else if ( !idStr::Icmp( args.Argv( 0 ), "followauto" ) && args.Argc() <= 2 ) {
+		autoMode = args.Argc() == 2 ? args.Argv( 1 ) : "action";
+	} else if ( !idStr::Icmp( args.Argv( 0 ), "follow" ) && args.Argc() == 3 && !idStr::Icmp( choice, "auto" ) ) {
+		autoMode = args.Argv( 2 );
+	} else if ( idStr::Icmp( args.Argv( 0 ), "follow" ) || args.Argc() != 2 ) {
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_232206" ) );
+		return;
+	}
+	if ( autoMode == NULL && !idStr::Icmp( choice, "auto" ) ) {
+		autoMode = "action";
+	}
+	if ( autoMode != NULL ) {
+		operation = idPlayer::SPECTATOR_FOLLOW_AUTO;
+		for ( int mode = 0; mode < MP_AUTOTRACK_MODE_COUNT; ++mode ) {
+			if ( !idStr::Icmp( autoMode, followAutoModes[ mode ] ) ) {
+				targetSlot = mode;
+			}
+		}
+		if ( targetSlot < 0 ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232206" ) );
+			return;
+		}
+	} else if ( !idStr::Icmp( choice, "next" ) ) {
+		operation = idPlayer::SPECTATOR_FOLLOW_NEXT;
+	} else if ( !idStr::Icmp( choice, "prev" ) ) {
+		operation = idPlayer::SPECTATOR_FOLLOW_PREV;
+	} else if ( !idStr::Icmp( choice, "free" ) ) {
+		operation = idPlayer::SPECTATOR_FOLLOW_FREE;
+	} else {
+		operation = idPlayer::SPECTATOR_FOLLOW_PLAYER;
+		bool digits = choice[0] != '\0';
+		targetSlot = 0;
+		for ( int i = 0; choice[i]; ++i ) {
+			if ( choice[i] < '0' || choice[i] > '9' ) {
+				digits = false;
+				break;
+			}
+			if ( targetSlot >= MAX_CLIENTS ) {
+				targetSlot = -1;
+				break;
+			}
+			targetSlot = targetSlot * 10 + choice[i] - '0';
+		}
+		if ( !digits ) {
+			// Anything that is not a slot number is a player's name.
+			targetSlot = FollowSlotFromName( choice );
+			if ( targetSlot < 0 ) {
+				common->Printf( "%s\n", common->GetLocalizedString( targetSlot == -2 ? "#str_232208" : "#str_232207" ) );
+				return;
+			}
+		} else if ( targetSlot < 0 || targetSlot >= MAX_CLIENTS ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232206" ) );
+			return;
+		}
+	}
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( player == NULL ) {
+		common->Printf( "%s\n", common->GetLocalizedString( "#str_42881" ) );
+		return;
+	}
+	player->RequestSpectatorFollow( operation, targetSlot );
+}
+
+// The named list `follow <name>` and `follow <slot>` choose from.
+static void Cmd_FollowList_f( const idCmdArgs &args ) {
+	common->Printf( "%s\n", common->GetLocalizedString( "#str_232209" ) );
+	for ( int slot = 0; slot < MAX_CLIENTS; ++slot ) {
+		const idPlayer *player = FollowListPlayer( slot );
+		if ( player == NULL ) {
+			continue;
+		}
+		const char *team = "";
+		if ( gameLocal.IsTeamGame() ) {
+			team = common->GetLocalizedString( player->team == TEAM_STROGG ? "#str_42632" : "#str_42631" );
+		}
+		common->Printf( "%2d  %s" S_COLOR_DEFAULT "  %s  %d\n", slot,
+			gameLocal.userInfo[ slot ].GetString( "ui_name" ), team, gameLocal.mpGame.GetScore( slot ) );
+	}
+}
+
+// Asks the server for the caster's view of both sides, or gives it up. The
+// server decides (g_casterAccess); the answer arrives as a server notice.
+static void Cmd_Caster_f( const idCmdArgs &args ) {
+	int enabled = -1;
+	if ( args.Argc() == 2 ) {
+		enabled = !idStr::Icmp( args.Argv( 1 ), "on" ) ? 1 : ( !idStr::Icmp( args.Argv( 1 ), "off" ) ? 0 : -1 );
+	}
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( enabled < 0 || player == NULL ) {
+		common->Printf( "%s\n", common->GetLocalizedString( enabled < 0 ? "#str_232214" : "#str_42881" ) );
+		return;
+	}
+	player->RequestSpectatorFollow( idPlayer::SPECTATOR_FOLLOW_CASTER, enabled );
+}
+
+// How a followed player is shown: through their eyes, from behind them, or
+// from a camera the spectator orbits. A presentation choice of this client's;
+// the server sends the same snapshot for all three.
+static void Cmd_FollowView_f( const idCmdArgs &args ) {
+	static const char *const views[] = { "first", "third", "chase" };
+	static const char *const notices[] = { "#str_232210", "#str_232211", "#str_232212" };
+	int view = idMath::ClampInt( 0, 2, g_spectatorFollowView.GetInteger() );
+	if ( args.Argc() == 1 || ( args.Argc() == 2 && !idStr::Icmp( args.Argv( 1 ), "next" ) ) ) {
+		view = ( view + 1 ) % 3;
+	} else {
+		view = -1;
+		for ( int i = 0; i < 3; ++i ) {
+			if ( !idStr::Icmp( args.Argv( 1 ), views[ i ] ) ) {
+				view = i;
+			}
+		}
+		if ( args.Argc() != 2 || view < 0 ) {
+			common->Printf( "%s\n", common->GetLocalizedString( "#str_232213" ) );
+			return;
+		}
+	}
+	g_spectatorFollowView.SetInteger( view );
+	common->Printf( "%s\n", common->GetLocalizedString( notices[ view ] ) );
+}
 
 static void Cmd_TestStatusBar_f( const idCmdArgs &args ) {
 	idPlayer *player = gameLocal.GetLocalPlayer();
@@ -4798,6 +5823,25 @@ static void Cmd_TestStatusBar_f( const idCmdArgs &args ) {
 static void Cmd_TestWeaponWheel_f( const idCmdArgs &args ) {
 	idPlayer *player = gameLocal.GetLocalPlayer();
 	if ( player ) player->DebugWeaponWheel( args );
+}
+
+// openQ4: the quick-chat wheel without host input (open, slot N, channel,
+// release, cancel); release sends the selected phrase.
+static void Cmd_TestQuickChat_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( player ) player->DebugQuickChat( args );
+}
+
+// testScoreboard <msec>: holds the local player's scoreboard open, as a tournament's
+// end does, so headless captures can show it without input.
+static void Cmd_TestScoreboard_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player || args.Argc() < 2 ) {
+		gameLocal.Printf( "usage: testScoreboard <msec>\n" );
+		return;
+	}
+	player->forceScoreBoard = true;
+	player->forceScoreBoardTime = gameLocal.time + idMath::ClampInt( 1, 60000, atoi( args.Argv( 1 ) ) );
 }
 
 // openQ4: physicsStats / physicsDigest (PHYS-01)
@@ -4819,12 +5863,6 @@ void idGameLocal::InitConsoleCommands( void ) {
 //	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
 //	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"test a save game for a level" );
 // RAVEN END
-
-// jmarshall
-	cmdSystem->AddCommand("addbot", Cmd_AddBot_f, CMD_FL_GAME, "adds a multiplayer bot");
-	cmdSystem->AddCommand("fillbots", Cmd_FillBots_f, CMD_FL_GAME, "fill bots");
-// jmarshall end
-
 	cmdSystem->AddCommand( "game_memory",			idClass::DisplayInfo_f,		CMD_FL_GAME,				"displays game class info" );
 	cmdSystem->AddCommand( "listClasses",			idClass::ListClasses_f,		CMD_FL_GAME,				"lists game classes" );
 	cmdSystem->AddCommand( "listThreads",			idThread::ListThreads_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"lists script threads" );
@@ -4846,10 +5884,12 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "listActiveEntities",	Cmd_ActiveEntityList_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"lists active game entities" );
 	cmdSystem->AddCommand( "listMonsters",			idAI::List_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"lists monsters" );
 	cmdSystem->AddCommand( "listSpawnArgs",			Cmd_ListSpawnArgs_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"list the spawn args of an entity", idGameLocal::ArgCompletion_EntityName );
+	cmdSystem->AddCommand( "listMaps",				Cmd_ListMaps_f,				CMD_FL_GAME,				"list the available maps" );
 	cmdSystem->AddCommand( "say",					Cmd_Say_f,					CMD_FL_GAME,				"text chat" );
 	cmdSystem->AddCommand( "sayTeam",				Cmd_SayTeam_f,				CMD_FL_GAME,				"team text chat" );
+	cmdSystem->AddCommand( "listLocations",			Cmd_ListLocations_f,		CMD_FL_GAME,				"lists the landmarks multiplayer place names come from" );
 	cmdSystem->AddCommand( "addChatLine",			Cmd_AddChatLine_f,			CMD_FL_GAME,				"internal use - core to game chat lines" );
-	cmdSystem->AddCommand( "gameKick",				Cmd_Kick_f,					CMD_FL_GAME,				"same as kick, but recognizes player names" );
+	cmdSystem->AddCommand( "gameKick",				Cmd_Kick_f,					CMD_FL_GAME | CMD_FL_RAWTEXT,	"same as kick, but recognizes player names" );
 	cmdSystem->AddCommand( "give",					Cmd_Give_f,					CMD_FL_GAME|CMD_FL_CHEAT,	"gives one or more items" );
 	cmdSystem->AddCommand( "centerview",			Cmd_CenterView_f,			CMD_FL_GAME,				"centers the view" );
 	cmdSystem->AddCommand( "god",					Cmd_God_f,					CMD_FL_GAME|CMD_FL_CHEAT,	"enables god mode" );
@@ -4908,6 +5948,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "testCrosshair",		Cmd_TestCrosshair_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"holds the animated crosshair in a state" );
 	cmdSystem->AddCommand( "testHitMaterials", Cmd_TestHitMaterials_f, CMD_FL_GAME|CMD_FL_CHEAT, "sample a posed entity's material types and hitscan effects", idGameLocal::ArgCompletion_EntityName );
 	cmdSystem->AddCommand( "testWeaponScope", Cmd_TestWeaponScope_f, CMD_FL_GAME|CMD_FL_CHEAT, "report the current scope and optionally set its zoom state", idCmdSystem::ArgCompletion_Boolean );
+	cmdSystem->AddCommand("testHudOverlays",Cmd_TestHudOverlays_f,CMD_FL_GAME|CMD_FL_CHEAT,"stages damage numbers, hit feedback and one network graph sample without input");
 	cmdSystem->AddCommand( "testSave",				Cmd_TestSave_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"writes out a test savegame" );
 	cmdSystem->AddCommand( "testModel",				idTestModel::TestModel_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"tests a model", idTestModel::ArgCompletion_TestModel );
 	cmdSystem->AddCommand( "testSkin",				idTestModel::TestSkin_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"tests a skin on an existing testModel", idCmdSystem::ArgCompletion_Decl<DECL_SKIN> );
@@ -4969,15 +6010,46 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "messagemode", idMultiplayerGame::MessageMode_f, CMD_FL_GAME, "open all-player chat" );
 	cmdSystem->AddCommand( "messagemode2", idMultiplayerGame::MessageMode_f, CMD_FL_GAME, "open team chat" );
 	cmdSystem->AddCommand( "say_team", Cmd_SayTeam_f, CMD_FL_GAME, "team text chat" );
+	cmdSystem->AddCommand( "follow", Cmd_Follow_f, CMD_FL_GAME, "spectator camera: follow <next|prev|free|client slot|name>, or follow auto <off|killer|action|leader|powerup|flag>" );
+	cmdSystem->AddCommand( "followauto", Cmd_Follow_f, CMD_FL_GAME, "let the server move the camera: followauto <off|killer|action|leader|powerup|flag>" );
+	cmdSystem->AddCommand( "followlist", Cmd_FollowList_f, CMD_FL_GAME, "lists the players a spectator can follow by slot or name" );
+	cmdSystem->AddCommand( "followview", Cmd_FollowView_f, CMD_FL_GAME, "how a followed player is shown: followview <first|third|chase|next>" );
+	cmdSystem->AddCommand( "caster", Cmd_Caster_f, CMD_FL_GAME, "as a spectator, take or give up the caster view of both sides where the server allows it: caster <on|off>" );
+	cmdSystem->AddCommand( "follownext", Cmd_Follow_f, CMD_FL_GAME, "follow the next authorized player" );
+	cmdSystem->AddCommand( "followprev", Cmd_Follow_f, CMD_FL_GAME, "follow the previous authorized player" );
+	cmdSystem->AddCommand( "followfree", Cmd_Follow_f, CMD_FL_GAME, "leave player follow for a free spectator camera" );
+	cmdSystem->AddCommand( "scoreboardScroll", Cmd_ScoreboardScroll_f, CMD_FL_GAME, "scrolls the held scoreboard by whole rows: scoreboardScroll <rows>" );
 	// FIXME: implement
 	cmdSystem->AddCommand( "clientVote",			idMultiplayerGame::Vote_f,	CMD_FL_GAME,				"cast your vote: clientVote yes | no" );
 	cmdSystem->AddCommand( "clientCallVote",		idMultiplayerGame::CallVote_f,	CMD_FL_GAME,			"call a vote: clientCallVote si_.. proposed_value" );
+	// openQ4 MP-12: the names Quake players type. All three reach the same vote.
+	cmdSystem->AddCommand( "callvote",				idMultiplayerGame::CallVote_f,	CMD_FL_GAME,			"call a vote: callvote <vote> [value]" );
+	cmdSystem->AddCommand( "cv",					idMultiplayerGame::CallVote_f,	CMD_FL_GAME,			"call a vote: cv <vote> [value]" );
+	cmdSystem->AddCommand( "vote",					idMultiplayerGame::Vote_f,	CMD_FL_GAME,				"cast your vote: vote yes | no" );
 	cmdSystem->AddCommand( "clientVoiceChat",		idMultiplayerGame::VoiceChat_f,	CMD_FL_GAME,			"voice chats: clientVoiceChat <sound shader>" );
 	cmdSystem->AddCommand( "clientVoiceChatTeam",	idMultiplayerGame::VoiceChatTeam_f,	CMD_FL_GAME,		"team voice chats: clientVoiceChat <sound shader>" );
+	cmdSystem->AddCommand( "serverVoiceMute", idMultiplayerGame::ServerVoiceMute_f, CMD_FL_GAME, "silence a voice sender for this connection: <client slot> <0|1>" );
+	cmdSystem->AddCommand( "serverAdminTarget", idMultiplayerGame::ServerAdminTarget_f, CMD_FL_GAME, "administer an exact connection: <kick|ban|switch> <client slot> <identity>" );
+	cmdSystem->AddCommand( "serverVoiceStats", idMultiplayerGame::ServerVoiceStats_f, CMD_FL_GAME, "report per-sender voice admission, forwarding and added delay" );
 // RAVEN BEGIN
 	// jshepard
 	cmdSystem->AddCommand( "forceTeamChange",				idMultiplayerGame::ForceTeamChange_f,			CMD_FL_GAME,		"force team change: forceTeamChange <id>" );
-	cmdSystem->AddCommand( "removeClientFromBanList",		idMultiplayerGame::RemoveClientFromBanList_f,	CMD_FL_GAME,		"removes a client id from the ban list: removeClientFromBanList <client id>" );
+	cmdSystem->AddCommand( "removeClientFromBanList",		idMultiplayerGame::RemoveClientFromBanList_f,	CMD_FL_GAME,		"lift a ban (the older name of unban): removeClientFromBanList <row of banlist|address[/prefix]>" );
+	// openQ4 MP-18: server moderation (mp/Moderation.h). They run on the server: its console, a listen host, or rcon.
+	cmdSystem->AddCommand( "ban",					idGameLocal::Ban_f,			CMD_FL_GAME | CMD_FL_RAWTEXT,	"ban an address or a range and remove its players: ban <client slot|name|address[/prefix]> [time] [reason]" );
+	cmdSystem->AddCommand( "unban",					idGameLocal::Unban_f,		CMD_FL_GAME | CMD_FL_RAWTEXT,	"lift a ban: unban <row of banlist|address[/prefix]>" );
+	cmdSystem->AddCommand( "banlist",				idGameLocal::BanList_f,		CMD_FL_GAME,	"list the bans; banlist reload reads banlist.txt again" );
+	cmdSystem->AddCommand( "mute",					idGameLocal::Mute_f,		CMD_FL_GAME | CMD_FL_RAWTEXT,	"stop a player's text chat reaching anyone: mute <client slot|name> [time]" );
+	cmdSystem->AddCommand( "unmute",				idGameLocal::Mute_f,		CMD_FL_GAME | CMD_FL_RAWTEXT,	"lift a text mute: unmute <client slot|name>" );
+	cmdSystem->AddCommand( "status",				idGameLocal::Status_f,		CMD_FL_GAME,	"list the connected clients with their address, ping and mute state" );
+	cmdSystem->AddCommand( "admin",					idGameLocal::Admin_f,		CMD_FL_GAME,	"log in to the server as an admin with the password in net_clientAdminPassword; 'admin logout' gives the right up" );
+	// openQ4 MP-17: player identity, returning players, the ranking table and the match history
+	cmdSystem->AddCommand( "identity",				idMultiplayerGame::Identity_f,		CMD_FL_GAME,	"show your identity on the server you are connected to" );
+	cmdSystem->AddCommand( "identityReset",			idMultiplayerGame::IdentityReset_f,	CMD_FL_GAME,	"identityReset confirm: become a new player on every server" );
+	cmdSystem->AddCommand( "ghost",					idMultiplayerGame::Ghost_f,			CMD_FL_GAME,	"ghost <code>: back after losing your connection, claim your team and score with the code the server told you" );
+	cmdSystem->AddCommand( "rankings",				idMultiplayerGame::Rankings_f,		CMD_FL_GAME,	"rankings [game type]: the server's local ranking table (g_ranking)" );
+	cmdSystem->AddCommand( "history",				idMultiplayerGame::History_f,		CMD_FL_GAME,	"your last multiplayer matches, from profile/history.ndjson" );
+	cmdSystem->AddCommand( "serverShutdown",		idGameLocal::Shutdown_f,	CMD_FL_GAME | CMD_FL_RAWTEXT,	"stop the server once the players are told: serverShutdown <match|now|time|cancel> [reason]" );
 
 #ifndef _XBOX
 // shouchard:  more voice chat stuff (non-XBOX)
@@ -4988,12 +6060,47 @@ void idGameLocal::InitConsoleCommands( void ) {
 
 	// multiplayer server commands
 	cmdSystem->AddCommand( "verifyServerSettings",	idGameLocal::VerifyServerSettings_f,	CMD_FL_GAME,	"verifies the game type can be played on the map" );
+	// openQ4 MP-14: the modifier layer and presets (mp/Modifiers.h, mp/Presets.h)
+	cmdSystem->AddCommand( "modifier",				MP_Modifier_f,				CMD_FL_GAME,				"turn a match modifier on or off and restart the match: modifier <name> <0|1>", MP_ArgCompletion_Modifier );
+	cmdSystem->AddCommand( "weaponArena",			MP_WeaponArena_f,			CMD_FL_GAME,				"play a single-weapon arena and restart the match: weaponArena <weapon|none>", MP_ArgCompletion_WeaponArena );
+	cmdSystem->AddCommand( "preset",				MP_Preset_f,				CMD_FL_GAME,				"apply a named preset (game type, ruleset, modifiers and limits) and restart the match", MP_ArgCompletion_Preset );
+	cmdSystem->AddCommand( "listPresets",			MP_ListPresets_f,			CMD_FL_GAME,				"list the built-in presets and presets/*.cfg" );
 	cmdSystem->AddCommand( "serverMapRestart",		idGameLocal::MapRestart_f,	CMD_FL_GAME,				"restart the current game" );
 	cmdSystem->AddCommand( "serverForceReady",		idMultiplayerGame::ForceReady_f,CMD_FL_GAME,				"force all players ready" );
 	cmdSystem->AddCommand( "serverNextMap",			idGameLocal::NextMap_f,		CMD_FL_GAME,				"change to the next map" );
 #endif
 
+	// openQ4: the map database (MP-13)
+	cmdSystem->AddCommand( "mymap",					mpMapDatabaseHost::MyMap_f,		CMD_FL_GAME,	"queue a map for the next map change: mymap [map|clear]", mpMapDatabaseHost::ArgCompletion_Map );
+	cmdSystem->AddCommand( "mappick",				mpMapDatabaseHost::MapPick_f,	CMD_FL_GAME,	"choose a map of the end-of-match pick: mappick <1-3>" );
+	cmdSystem->AddCommand( "mapdb",					mpMapDatabaseHost::MapDb_f,		CMD_FL_GAME,	"the multiplayer map database: mapdb [list|rotation|queue|next|settings|check|reload]" );
+
 	cmdSystem->AddCommand( "CheckTeamBalance", idMultiplayerGame::CheckTeamBalance_f, CMD_FL_GAME, "helper for team switching in the guis - <team to switch to> <named event for yes> <named event for no> <named event for same team>" );
+
+	// openQ4: explicit ready commands.  Quake 4 only exposed ready through
+	// _impulse17 and the menu, both of which route through the throttled
+	// ui_ready userinfo key.
+	cmdSystem->AddCommand( "ready",					idMultiplayerGame::Ready_f,		CMD_FL_GAME,	"declare yourself ready to start the match" );
+	cmdSystem->AddCommand( "notready",				idMultiplayerGame::NotReady_f,	CMD_FL_GAME,	"withdraw your ready state" );
+	cmdSystem->AddCommand( "unready",				idMultiplayerGame::NotReady_f,	CMD_FL_GAME,	"withdraw your ready state" );
+	cmdSystem->AddCommand( "readyup",				idMultiplayerGame::ReadyUp_f,	CMD_FL_GAME,	"toggle your ready state" );
+	cmdSystem->AddCommand( "forceReady",			idMultiplayerGame::ForceReady_f,	CMD_FL_GAME,	"force a managed match through readiness using the typed authority path" );
+	cmdSystem->AddCommand( "allready",				idMultiplayerGame::ForceReady_f,	CMD_FL_GAME,	"force all players ready" );
+	cmdSystem->AddCommand( "matchSeriesBind",		idMultiplayerGame::SeriesBind_f,	CMD_FL_GAME,	"bind a current Duel connection after series recovery: matchSeriesBind <a|b> <client slot>" );
+	cmdSystem->AddCommand( "matchBroadcaster",		idMultiplayerGame::Broadcaster_f,	CMD_FL_GAME,	"grant or revoke broadcaster observation for a current spectator: matchBroadcaster <client slot> <on|off>" );
+	// openQ4 MP-12: timeouts and pauses from the console, on casual servers too
+	cmdSystem->AddCommand( "timeout",				idMultiplayerGame::Timeout_f,	CMD_FL_GAME,	"call a team timeout for your side (dedicated console: timeout <marine|strogg>)" );
+	cmdSystem->AddCommand( "timein",				idMultiplayerGame::TimeIn_f,	CMD_FL_GAME,	"end the running timeout or pause early" );
+	cmdSystem->AddCommand( "unpause",				idMultiplayerGame::TimeIn_f,	CMD_FL_GAME,	"end the running timeout or pause early" );
+	cmdSystem->AddCommand( "pause",					idMultiplayerGame::Pause_f,		CMD_FL_GAME,	"pause the match (host, referee or dedicated console); timein resumes" );
+	cmdSystem->AddCommand( "openq4_assertMPClientActive", Cmd_OpenQ4AssertMPClientActive_f, CMD_FL_GAME | CMD_FL_CHEAT, "fail validation unless the local multiplayer player is active and not spectating" );
+	cmdSystem->AddCommand( "openq4_reportClientOptions", Cmd_OpenQ4ReportClientOptions_f, CMD_FL_GAME | CMD_FL_CHEAT, "report the local player's competitive client options (weapon order, location, team info, item timers, hit sounds) to the console" );
+	cmdSystem->AddCommand( "openq4_reportMPState", Cmd_OpenQ4ReportMPState_f, CMD_FL_GAME | CMD_FL_CHEAT, "report local multiplayer phases, scores and player state to the console" );
+	cmdSystem->AddCommand( "openq4_reportMPWorld", Cmd_OpenQ4ReportMPWorld_f, CMD_FL_GAME | CMD_FL_CHEAT, "report one multiplayer entity's simulation, animation and powerup state" );
+	cmdSystem->AddCommand( "lagCompStatus", Cmd_LagCompStatus_f, CMD_FL_GAME, "report each client's lag-compensation lead, round trip, advertised remote extrapolation and rewind" );
+	cmdSystem->AddCommand( "openq4_launchMPTestProjectile", Cmd_OpenQ4LaunchMPTestProjectile_f, CMD_FL_GAME | CMD_FL_CHEAT, "launch a named stock projectile for multiplayer world-clock diagnostics" );
+	cmdSystem->AddCommand( "openq4_matchControl", Cmd_OpenQ4MatchControl_f, CMD_FL_GAME | CMD_FL_CHEAT, "exercise and inspect the local accepted-view Match Control adapter without device input" );
+	cmdSystem->AddCommand( "openq4_arenaCeremony", Cmd_OpenQ4ArenaCeremony_f, CMD_FL_GAME | CMD_FL_CHEAT, "drive the local Arena Campaign match without device input: openq4_arenaCeremony <win|loss|draw|skip|status>" );
 
 	// localization help commands
 	cmdSystem->AddCommand( "nextGUI",				Cmd_NextGUI_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"teleport the player to the next func_static with a gui" );
@@ -5032,6 +6139,8 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "testRadioChatter", Cmd_TestRadioChatter_f, CMD_FL_GAME|CMD_FL_CHEAT, "plays or probes the radio HUD audio graph", idCmdSystem::ArgCompletion_SoundName );
 	cmdSystem->AddCommand( "testStatusBar", Cmd_TestStatusBar_f, CMD_FL_GAME|CMD_FL_CHEAT, "status bar: probe or stats <health> <armor>" );
 	cmdSystem->AddCommand( "testWeaponWheel", Cmd_TestWeaponWheel_f, CMD_FL_GAME|CMD_FL_CHEAT, "weapon wheel: open, slot N, release, cancel, family marine|strogg, probe" );
+	cmdSystem->AddCommand( "testQuickChat", Cmd_TestQuickChat_f, CMD_FL_GAME|CMD_FL_CHEAT, "quick-chat wheel: open, slot N, channel, release, cancel" );
+	cmdSystem->AddCommand( "testScoreboard", Cmd_TestScoreboard_f, CMD_FL_GAME|CMD_FL_CHEAT, "holds the scoreboard open for <msec>" );
 
 // mekberg: added.
 	cmdSystem->AddCommand( "setPMCVars",			Cmd_SetPMCVars_f,			CMD_FL_GAME,				"Resets player movement cvars" );
@@ -5045,8 +6154,30 @@ void idGameLocal::InitConsoleCommands( void ) {
 // squirrel: Mode-agnostic buymenus
 	cmdSystem->AddCommand( "buyMenu",				Cmd_ToggleBuyMenu_f,		CMD_FL_GAME,				"Toggle buy menu (if in a buy zone and the game type supports it)" );
 	cmdSystem->AddCommand( "buy",					Cmd_BuyItem_f,				CMD_FL_GAME,				"Buy an item (if in a buy zone and the game type supports it)" );
+	// the Awakening's names for the same two commands (its buy menu and default binds)
+	cmdSystem->AddCommand( "sq_buyMenu",				Cmd_ToggleBuyMenu_f,		CMD_FL_GAME,				"Toggle buy menu (if in a buy zone and the game type supports it)" );
+	cmdSystem->AddCommand( "sq_buy",					Cmd_BuyItem_f,				CMD_FL_GAME,				"Buy an item (if in a buy zone and the game type supports it)" );
 // RITUAL END
 
+	// openQ4: multiplayer bots
+	cmdSystem->AddCommand( "addbot",				Cmd_AddBot_f,				CMD_FL_GAME,				"addbot [name] [skill] [exact] - add a bot; exact requires that named character" );
+	cmdSystem->AddCommand( "removebot",				Cmd_RemoveBot_f,			CMD_FL_GAME,				"remove a bot from the match, optionally by name" );
+	cmdSystem->AddCommand( "kickbots",				Cmd_KickBots_f,				CMD_FL_GAME,				"remove every bot from the match" );
+	cmdSystem->AddCommand( "botlist",				Cmd_BotList_f,				CMD_FL_GAME,				"botlist [weapons] - list the bots, their match statistics and the state of the navmesh; weapons adds each bot's per-weapon shots, hits and kills" );
+	cmdSystem->AddCommand( "botcharacters",			Cmd_BotCharacters_f,		CMD_FL_GAME,				"list the loaded bot characters, their play style and their skill band" );
+	cmdSystem->AddCommand( "botreload",				Cmd_BotReload_f,			CMD_FL_GAME,				"re-read the bot style and character files without a map change" );
+	cmdSystem->AddCommand( "navmesh",				Cmd_NavMesh_f,				CMD_FL_GAME,				"navmesh <build|info|probe x y z [radius]> - generate, report or probe the bot navigation mesh" );
+	cmdSystem->AddCommand( "bot_probeJump", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay a bot jump on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probePad", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay a bot pad flight on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probePadTraffic", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay two bots' pad traffic on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeMove", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay bot movement on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeWalk", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay an unforced walk and optional following jump on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeClimb", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay a pending climb attempt on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeRecover", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay off-route recovery toward a supplied node on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeDrop", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay a displaced bot drop on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeDodge", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay bot dodge admission on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeAir", Cmd_BotProbeTraversal_f, CMD_FL_GAME, "replay a fall under one fixed full air input on an isolated local cheat server" );
+	cmdSystem->AddCommand( "bot_probeHealth", Cmd_BotProbeHealth_f, CMD_FL_GAME, "give the next traversal probe's bot this health on an isolated local cheat server" );
 }
 
 /*

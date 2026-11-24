@@ -2,8 +2,8 @@
 """Execute MVD 1.3 navigation: markers, keyframes, marker diff and auto-tracking.
 
 tools/tests/native/MvdNavigationFixture.cpp compiles against the production
-headers src/framework/async/MvdNavigation.h, src/mpgame/mp/MvdMarkers.h and
-src/mpgame/mp/DemoAutoTrack.h. It checks marker records and their directory,
+headers src/framework/async/MvdNavigation.h, src/game/mp/MvdMarkers.h and
+src/game/mp/DemoAutoTrack.h. It checks marker records and their directory,
 keyframe records and their directory, the game baseline grammar, marker
 stepping, the server's per-frame marker diff and the playback camera choice.
 Single-reversal controls then re-run it against mutated copies of the headers
@@ -21,8 +21,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 NAVIGATION = "src/framework/async/MvdNavigation.h"
-MARKERS = "src/mpgame/mp/MvdMarkers.h"
-AUTOTRACK = "src/mpgame/mp/DemoAutoTrack.h"
+MARKERS = "src/game/mp/MvdMarkers.h"
+AUTOTRACK = "src/game/mp/DemoAutoTrack.h"
 
 MUTATIONS = (
     ("marker text keeps control bytes", NAVIGATION,
@@ -88,14 +88,14 @@ SOURCE_CONTRACTS = (
         "virtual bool				ServerWriteServerDemoBaseline( int sequence, idFile *file ) = 0;",
         "virtual bool				ClientReadServerDemoBaseline( int sequence, idFile *file ) = 0;",
     )),
-    ("src/mpgame/Game_network.cpp", (
+    ("src/game/Game_network.cpp", (
         "bool idGameLocal::ServerWriteServerDemoBaseline( int sequence, idFile *file ) {",
         "if ( pending == NULL || pending->next != NULL || pending->sequence != sequence ) {",
         "bool idGameLocal::ClientReadServerDemoBaseline( int sequence, idFile *file ) {",
         "UpdateDemoAutoTrack( player, clientCmds[ clientNum ] );",
         "demoAutoTrack.NoteKill( attackerEntityNumber, victimEntityNumber, GetDemoFollowClient(), time );",
     )),
-    ("src/mpgame/MultiplayerGame.cpp", (
+    ("src/game/MultiplayerGame.cpp", (
         "PublishMVDMarkers();",
         "const int count = MPMVDMarkerDiff( mvdMarkerState, current, gameLocal.IsTeamGame(), tracked, events, 64 );",
         "marker.kind = SERVER_MVD_MARKER_KILL;",

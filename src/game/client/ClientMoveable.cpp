@@ -4,8 +4,8 @@
 // Copyright 2002-2004 Raven Software
 //----------------------------------------------------------------
 
-
-
+#include "../../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "../Game_local.h"
 
@@ -148,6 +148,15 @@ void rvClientMoveable::Spawn ( void ) {
 	mHasBounced = false;
 	
 	scale.Init( gameLocal.GetTime(), SEC2MS(spawnArgs.GetFloat("scale_reset_duration", "0.2")), Max(VECTOR_EPSILON, spawnArgs.GetFloat("scale", "1.0f")), 1.0f );
+
+	// openQ4: an MVD seek replays snapshots without running frames, so gibs,
+	// brass and debris spawned during it never move or expire before the seek
+	// lands. They showed frozen where they spawned - a cluster of gibs inside a
+	// body, often right at the death camera. Drop them: the presentation frame
+	// that ends the seek services this before anything is drawn.
+	if ( gameLocal.IsServerDemoSeeking() ) {
+		PostEventMS( &EV_Remove, 0 );
+	}
 }
 
 /*
@@ -442,7 +451,7 @@ rvClientMoveable::Event_FadeOut
 ================
 */
 void rvClientMoveable::Event_FadeOut ( int duration ) {
-	renderEntity.noShadow = !G_ShadowMapCorpseShadowsEnabled();
+	renderEntity.noShadow = gameLocal.isMultiplayer || !G_ShadowMapCorpseShadowsEnabled();
 	renderEntity.shaderParms[ SHADERPARM_TIME_OF_DEATH ] = gameLocal.time * 0.001f;
 	PostEventMS ( &EV_Remove, duration );	
 }

@@ -18,14 +18,14 @@ def require(text: str, token: str, context: str) -> None:
 
 
 def main() -> None:
-    game_local = read("src/mpgame/Game_local.cpp")
-    player = read("src/mpgame/Player.cpp")
-    item = read("src/mpgame/Item.cpp")
-    multiplayer = read("src/mpgame/MultiplayerGame.cpp")
-    multiplayer_h = read("src/mpgame/MultiplayerGame.h")
-    operations = read("src/mpgame/mp/match/MatchOperations.cpp")
-    session = read("src/mpgame/mp/match/MatchSession.cpp")
-    syscmds = read("src/mpgame/gamesys/SysCmds.cpp")
+    game_local = read("src/game/Game_local.cpp")
+    player = read("src/game/Player.cpp")
+    item = read("src/game/Item.cpp")
+    multiplayer = read("src/game/MultiplayerGame.cpp")
+    multiplayer_h = read("src/game/MultiplayerGame.h")
+    operations = read("src/game/mp/match/MatchOperations.cpp")
+    session = read("src/game/mp/match/MatchSession.cpp")
+    syscmds = read("src/game/gamesys/SysCmds.cpp")
 
     reconcile = "gameLocal.mpGame.ServerReconcileManagedUserInfo( entityNumber"
     userinfo_changed = "static_cast<idPlayer *>( entities[ clientNum ] )->UserInfoChanged()"

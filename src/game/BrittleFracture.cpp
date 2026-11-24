@@ -1,6 +1,6 @@
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
 
@@ -719,13 +719,25 @@ void idBrittleFracture::ProjectDecal( const idVec3 &point, const idVec3 &dir, co
 		msg.WriteFloat( dir[0] );
 		msg.WriteFloat( dir[1] );
 		msg.WriteFloat( dir[2] );
-		ServerSendInstanceEvent( EVENT_PROJECT_DECAL, &msg, true, -1 );
+		// openQ4: saveEvent must be false - saved-event replay is unimplemented here, and asking for
+		// it used to drop the server on the first bullet to hit a pane
+		ServerSendInstanceEvent( EVENT_PROJECT_DECAL, &msg, false, -1 );
 	}
 
 	if ( gameLocal.isListenServer && gameLocal.GetLocalPlayer() ) {
 		if ( GetInstance() != gameLocal.GetLocalPlayer()->GetInstance() ) {
 			return;
 		}
+	}
+
+	// openQ4: everything below this point is presentation - a bullet-hole sound
+	// and a decal winding appended to each shard.  A dedicated server has no
+	// local player to show it to, and nothing ever frees those windings until the
+	// shard drops, so shooting a pane that never shatters grew the heap without
+	// bound.  It never showed before only because the saveEvent Error above
+	// killed the server on the first bullet.
+	if ( gameLocal.isServer && !gameLocal.isListenServer ) {
+		return;
 	}
 
 	if ( time >= gameLocal.time ) {
@@ -904,7 +916,8 @@ void idBrittleFracture::Shatter( const idVec3 &point, const idVec3 &impulse, con
 		msg.WriteFloat( impulse[0] );
 		msg.WriteFloat( impulse[1] );
 		msg.WriteFloat( impulse[2] );
-		ServerSendInstanceEvent( EVENT_SHATTER, &msg, true, -1 );
+		// openQ4: saveEvent must be false - see idBrittleFracture::ProjectDecal
+		ServerSendInstanceEvent( EVENT_SHATTER, &msg, false, -1 );
 	}
 
 	if ( time > ( gameLocal.time - SHARD_ALIVE_TIME ) ) {

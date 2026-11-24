@@ -163,7 +163,7 @@ def main() -> int:
         validate_mapfile(ROOT, "engine")
         validate_mapfile(GAME_ROOT, "game-library")
         validate_game_mode(GAME_ROOT / "src" / "game" / "Game_local.cpp", "single-player")
-        validate_game_mode(GAME_ROOT / "src" / "mpgame" / "Game_local.cpp", "multiplayer")
+        validate_game_mode(GAME_ROOT / "src" / "game" / "Game_local.cpp", "multiplayer")
         validate_docs()
     except AssertionError as error:
         print(f"map_entity_strings: FAILED - {error}")

@@ -16,7 +16,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-COMMS = ROOT / 'src/mpgame/mp/VoiceComms.cpp'
+COMMS = ROOT / 'src/game/mp/VoiceComms.cpp'
 NETWORK = ROOT / 'src/framework/async/AsyncNetwork.h'
 PACKET = ROOT / 'src/sound/VoicePacket.h'
 

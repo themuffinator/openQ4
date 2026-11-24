@@ -264,8 +264,8 @@ def main():
     args.cache=task_path(args.cache)
     args.output.mkdir(parents=True,exist_ok=True)
     runtime=ROOT/'.install'
-    identity={name:digest(runtime/name) for name in ('openQ4-client_x64.exe','baseoq4/game-sp_x64.dll','baseoq4/pak0.pk4')}
-    for name in ('openQ4-client_x64.exe','baseoq4/game-sp_x64.dll'):
+    identity={name:digest(runtime/name) for name in ('openQ4-client_x64.exe','baseoq4/game_x64.dll','baseoq4/pak0.pk4')}
+    for name in ('openQ4-client_x64.exe','baseoq4/game_x64.dll'):
         assert identity[name]==digest(ROOT/'builddir'/name), 'stage the current build first'
     results=[]
     for case in ('m03','m04') if args.case=='all' else (args.case,):

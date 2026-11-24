@@ -223,7 +223,10 @@ def validate_script_slot_widths() -> None:
                        ("entity", "sizeof( int )"), ("field", "sizeof( int )"), ("function", "sizeof(intptr_t)"),
                        ("virtual function", "sizeof( int )"), ("pointer", "sizeof(intptr_t)"),
                        ("object", "sizeof( int )"), ("boolean", "sizeof( int )")):
-        if not re.search(rf'"{re.escape(name)}",\s*{re.escape(size)},', source):
+        # spacing inside sizeof() is style, not width
+        size_pattern = re.escape(size).replace(r"\(\ ", r"\(").replace(r"\ \)", r"\)")
+        size_pattern = size_pattern.replace(r"\(", r"\(\s*").replace(r"\)", r"\s*\)")
+        if not re.search(rf'"{re.escape(name)}",\s*{size_pattern},', source):
             raise AssertionError(f"script type '{name}' no longer has size {size}; reclassify script storage")
 
 
@@ -268,7 +271,7 @@ def main() -> None:
     self_test()
     validate_script_slot_widths()
     problems = []
-    for tree in ("game", "mpgame"):
+    for tree in ("game",):
         problems += compare(f"src/{tree}", scan(ROOT / "src" / tree), GAME)
         problems += validate_flag_lists(tree)
     problems += compare("src/ui", scan(ROOT / "src" / "ui"), UI)

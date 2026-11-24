@@ -1140,7 +1140,7 @@ def main():
     output, source, runtime = args.output.resolve(), args.source_save.resolve(), ROOT/'.install'
     if (ROOT/'.tmp').resolve() not in output.parents:
         parser.error('Output must be a new directory below project .tmp.')
-    for relative in ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll', 'baseoq4/game-mp_x64.dll'):
+    for relative in ('openQ4-client_x64.exe', 'baseoq4/game_x64.dll'):
         if sha(ROOT/'builddir'/relative) != sha(runtime/relative):
             parser.error('Stage the current build before running this probe: '+relative)
     original = source.read_bytes()
@@ -1201,7 +1201,7 @@ def main():
         harness_sha256=sha(Path(__file__)), ui=args.ui, renderer=args.renderer, fixture_set=args.cases,
         unavailable_pause_menu=args.unavailable_pause_menu, game_directory=game_name,
         runtime={relative: sha(runtime/relative) for relative in
-                 ('openQ4-client_x64.exe', 'baseoq4/game-sp_x64.dll', 'baseoq4/game-mp_x64.dll', 'baseoq4/pak0.pk4', 'baseoq4/pak1.pk4')},
+                 ('openQ4-client_x64.exe', 'baseoq4/game_x64.dll', 'baseoq4/pak0.pk4', 'baseoq4/pak1.pk4')},
         before={path.name: sha(path) for path in saves},
         scope='Current v5 semantic restore rejection, real recovery UI, good reload. Hidden window, input disabled, engine screenshots.')
     (output/'plan.json').write_text(json.dumps(report, indent=2)+'\n')

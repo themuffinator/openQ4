@@ -189,7 +189,7 @@ def capture(args):
         if count == 1 or original[index+1].lower() not in {key.lower() for key in overrides}:
             command.extend(value.replace('${workspaceFolder}', str(ROOT)) for value in original[index:index+count])
         index += count
-    binaries = [executable] + sorted(runtime.glob('renderer-*.dll')) + sorted((runtime/'baseoq4').glob('game-*.dll'))
+    binaries = [executable] + sorted(runtime.glob('renderer-*.dll')) + sorted((runtime/'baseoq4').glob('game_*.dll'))
     metadata = {'status':'running', 'profile':profile['name'], 'mode':args.mode, 'renderer':args.renderer,
         'command':command, 'cwd':str(runtime), 'windowed':True, 'hidden_window':True, 'host_input_injection':False,
         'capture_method':'engine screenshot command after gameplay and typed display operations',

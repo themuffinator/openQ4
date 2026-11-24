@@ -419,10 +419,9 @@ def runtime_kind(path: Path, executable: Path) -> str:
         return "rendererModuleOpenGL" if path.suffix.casefold() != ".pdb" else "diagnosticSymbols"
     if name.startswith("renderer-vk_"):
         return "rendererModuleVulkan" if path.suffix.casefold() != ".pdb" else "diagnosticSymbols"
-    if name.startswith("game-sp_"):
-        return "singlePlayerGameModule" if path.suffix.casefold() != ".pdb" else "diagnosticSymbols"
-    if name.startswith("game-mp_"):
-        return "multiplayerGameModule" if path.suffix.casefold() != ".pdb" else "diagnosticSymbols"
+    if name.startswith("game_"):
+        # one module serves both game_sp and game_mp
+        return "gameModule" if path.suffix.casefold() != ".pdb" else "diagnosticSymbols"
     if path.suffix.casefold() == ".pdb":
         return "diagnosticSymbols"
     return "runtimeLibrary"
@@ -456,7 +455,7 @@ def collect_runtime_files(runtime_dir: Path, executable: Path) -> list[dict[str,
     ]
     records.sort(key=lambda item: (item["kind"], item["path"].casefold()))
     kinds = {item["kind"] for item in records}
-    required = {"clientExecutable", "singlePlayerGameModule", "multiplayerGameModule"}
+    required = {"clientExecutable", "gameModule"}
     if sys.platform != "darwin":
         required.add("rendererModuleOpenGL")
     missing = sorted(required - kinds)

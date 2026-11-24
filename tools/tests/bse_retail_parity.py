@@ -82,7 +82,7 @@ def validate_sound_emitter_ownership() -> None:
         forbid(destroy, needle, "rvBSE::Destroy",
                "the client effect owns the reference emitter and keeps it across effect restarts")
 
-    for tree in ("game", "mpgame"):
+    for tree in ("game",):
         source = read("src", tree, "client", "ClientEffect.cpp")
         context = f"src/{tree}/client/ClientEffect.cpp"
         dtor = body_of(source, "rvClientEffect::~rvClientEffect( void ) {", context)

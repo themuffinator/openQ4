@@ -27,6 +27,7 @@ public:
 
 	virtual void	UpdateChangeableSpawnArgs( const idDict *source );
 	virtual void	Think( void );
+	virtual void	ThinkMatchPaused( int deltaMsec );
 	virtual void	FreeLightDef( void );
 	virtual bool	GetPhysicsToSoundTransform( idVec3 &origin, idMat3 &axis );
 	void			Present( void );

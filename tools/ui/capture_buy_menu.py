@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/tests'))
 from mp_round_remote_smoke import verify_runtime_is_current
 
-# buyCatalog's order (src/mpgame/mp/Buying.cpp): the hyperblaster, its bounce
+# buyCatalog's order (src/game/mp/Buying.cpp): the hyperblaster, its bounce
 # mod, the nailgun's firepower mod and the team ammo regeneration.
 HYPERBLASTER, BOUNCE, AMMO_REGEN = 1, 9, 16
 

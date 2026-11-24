@@ -1016,8 +1016,7 @@ jobs:
             required_macos_payload=(
               ".install/openQ4-client_${{ matrix.binary_arch }}"
               ".install/openQ4-ded_${{ matrix.binary_arch }}"
-              ".install/baseoq4/game-sp_${{ matrix.binary_arch }}.dylib"
-              ".install/baseoq4/game-mp_${{ matrix.binary_arch }}.dylib"
+              ".install/baseoq4/game_${{ matrix.binary_arch }}.dylib"
               ".install/collect_macos_support_info.sh"
               ".install/openQ4.icns"
               ".install/assets/splash/quake4_rt_bitmap_4001.bmp"
@@ -1039,10 +1038,8 @@ jobs:
 
             shopt -s nullglob
             bad_macos_modules=(
-              .install/baseoq4/game-sp_*.dll
-              .install/baseoq4/game-sp_*.so
-              .install/baseoq4/game-mp_*.dll
-              .install/baseoq4/game-mp_*.so
+              .install/baseoq4/game_*.dll
+              .install/baseoq4/game_*.so
             )
             shopt -u nullglob
             if [ "${#bad_macos_modules[@]}" -ne 0 ]; then
@@ -1068,11 +1065,12 @@ jobs:
                 exit 1
               fi
             done
+            # One game module serves game_sp and game_mp. The game-* glob also
+            # rejects the retired split game-sp/game-mp modules of an older build.
             expected_macos_game_modules=(
-              ".install/baseoq4/game-sp_${{ matrix.binary_arch }}.dylib"
-              ".install/baseoq4/game-mp_${{ matrix.binary_arch }}.dylib"
+              ".install/baseoq4/game_${{ matrix.binary_arch }}.dylib"
             )
-            for staged_module in .install/baseoq4/game-sp_*.dylib .install/baseoq4/game-mp_*.dylib; do
+            for staged_module in .install/baseoq4/game_*.dylib .install/baseoq4/game-*.dylib; do
               [ -e "${staged_module}" ] || continue
               matched=0
               for expected_module in "${expected_macos_game_modules[@]}"; do
@@ -1119,8 +1117,7 @@ jobs:
           binaries=(
             ".install/openQ4-client_${{ matrix.binary_arch }}"
             ".install/openQ4-ded_${{ matrix.binary_arch }}"
-            ".install/baseoq4/game-sp_${{ matrix.binary_arch }}.so"
-            ".install/baseoq4/game-mp_${{ matrix.binary_arch }}.so"
+            ".install/baseoq4/game_${{ matrix.binary_arch }}.so"
             ".install/openQ4-updater_${{ matrix.binary_arch }}"
           )
 
@@ -1783,8 +1780,7 @@ jobs:
           dedicated_binary="${{ steps.package.outputs.package_dir }}/openQ4-ded_${{ matrix.binary_arch }}"
           game_dir="${app_root}/Contents/Resources/baseoq4"
           module_dir="${app_root}/Contents/Frameworks"
-          sp_module="${module_dir}/game-sp_${{ matrix.binary_arch }}.dylib"
-          mp_module="${module_dir}/game-mp_${{ matrix.binary_arch }}.dylib"
+          game_module="${module_dir}/game_${{ matrix.binary_arch }}.dylib"
           renderer_module="${module_dir}/renderer-vk_${{ matrix.binary_arch }}.dylib"
           openal_runtime="${module_dir}/libopenal.1.dylib"
 
@@ -1905,7 +1901,7 @@ jobs:
             echo "Awakening content is user-supplied; no separate q4xbase module directory is packaged."
             exit 1
           fi
-          for module in "${sp_module}" "${mp_module}" "${renderer_module}"; do
+          for module in "${game_module}" "${renderer_module}"; do
             if [ ! -x "${module}" ]; then
               echo "Missing or non-executable macOS package game module: ${module}"
               exit 1
@@ -2023,7 +2019,7 @@ jobs:
               done
             done
           }
-          for binary in "${app_exec}" "${client_binary}" "${dedicated_binary}" "${sp_module}" "${mp_module}" "${renderer_module}" "${openal_runtime}"; do
+          for binary in "${app_exec}" "${client_binary}" "${dedicated_binary}" "${game_module}" "${renderer_module}" "${openal_runtime}"; do
             check_macos_binary_architecture "${binary}"
             check_macos_binary_dependencies "${binary}"
             check_macos_codesignature "${binary}"
@@ -2042,8 +2038,7 @@ jobs:
             check_macos_ad_hoc_signature "${app_root}"
             echo "macOS unsigned release archive is ad-hoc signed and not notarized."
           fi
-          check_macos_install_name "${sp_module}" "@loader_path/game-sp_${{ matrix.binary_arch }}.dylib"
-          check_macos_install_name "${mp_module}" "@loader_path/game-mp_${{ matrix.binary_arch }}.dylib"
+          check_macos_install_name "${game_module}" "@loader_path/game_${{ matrix.binary_arch }}.dylib"
           check_macos_install_name "${renderer_module}" "@loader_path/renderer-vk_${{ matrix.binary_arch }}.dylib"
           check_macos_install_name "${openal_runtime}" "@rpath/libopenal.1.dylib"
           check_plist_value() {

@@ -1,8 +1,9 @@
 
-
-
+#include "../idlib/precompiled.h"
+#pragma hdrstop
 
 #include "Game_local.h"
+#include "mp/match/MatchDeadline.h"
 
 /*
 ===============================================================================
@@ -697,8 +698,7 @@ void idLight::Off( void ) {
 	{
 		currentLevel = 0;
 		// kill any sound it was making
-		idSoundEmitter* emitter = NULL;
-		emitter = soundSystem->EmitterForIndex(SOUNDWORLD_GAME, refSound.referenceSoundHandle);
+		idSoundEmitter *emitter = soundSystem->EmitterForIndex( SOUNDWORLD_GAME, refSound.referenceSoundHandle );
 		if ( emitter && emitter->CurrentlyPlaying() ) {
 			StopSound( SND_CHANNEL_ANY, false );
 			soundWasPlaying = true;
@@ -787,7 +787,9 @@ void idLight::BecomeBroken( idEntity *activator ) {
 
 	if ( gameLocal.isServer ) {
 
-		ServerSendInstanceEvent( EVENT_BECOMEBROKEN, NULL, true, -1 );
+		// openQ4: saveEvent must be false - saved-event replay is unimplemented here, and asking for
+		// it used to drop the server the moment anyone shot a breakable light
+		ServerSendInstanceEvent( EVENT_BECOMEBROKEN, NULL, false, -1 );
 
 		if ( spawnArgs.GetString( "def_damage", "", &damageDefName ) ) {
 			idVec3 origin = renderEntity.origin + renderEntity.bounds.GetCenter() * renderEntity.axis;
@@ -841,7 +843,6 @@ void idLight::PresentLightDefChange( void ) {
 	} else {
 		lightDefHandle = gameRenderWorld->AddLightDef( &renderLight );
 	}
-
 }
 
 /*
@@ -999,6 +1000,22 @@ void idLight::Think( void ) {
 
 	RunPhysics();
 	Present();
+}
+
+void idLight::ThinkMatchPaused( int deltaMsec ) {
+	idEntity::ThinkMatchPaused( deltaMsec );
+	if ( deltaMsec <= 0 ) {
+		return;
+	}
+	if ( fadeEnd > 0 ) {
+		mpMatchShiftTimeOrigin( fadeStart, deltaMsec );
+		mpMatchShiftOptionalDeadline( fadeEnd, deltaMsec );
+	}
+	renderLight.shaderParms[ SHADERPARM_TIMEOFFSET ] -= MS2SEC( deltaMsec );
+	if ( renderLight.shaderParms[ SHADERPARM_TIME_OF_DEATH ] > 0.0f ) {
+		renderLight.shaderParms[ SHADERPARM_TIME_OF_DEATH ] += MS2SEC( deltaMsec );
+	}
+	PresentLightDefChange();
 }
 
 /*

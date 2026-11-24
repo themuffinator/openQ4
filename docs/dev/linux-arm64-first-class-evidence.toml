@@ -1,4 +1,4 @@
-schema_version = 2
+schema_version = 3
 status = "pending"
 
 [review]
@@ -30,5 +30,4 @@ package_filename = "pending"
 archive = "pending"
 client = "pending"
 dedicated = "pending"
-game_sp = "pending"
-game_mp = "pending"
+game = "pending"

@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE_ROOTS = ("src/game", "src/mpgame")
+SOURCE_ROOTS = ("src/game",)
 
 
 def read(relative_path: str) -> str:
@@ -111,10 +111,9 @@ def check_source_root(source_root: str) -> dict[str, str]:
 
 
 def main() -> None:
-    checked = {source_root: check_source_root(source_root) for source_root in SOURCE_ROOTS}
-    for function_name in checked[SOURCE_ROOTS[0]]:
-        if checked[SOURCE_ROOTS[0]][function_name] != checked[SOURCE_ROOTS[1]][function_name]:
-            raise AssertionError(f"SP/MP vehicle sound drift in {function_name}")
+    # one game tree since CORE-07: there is no second copy to drift from
+    for source_root in SOURCE_ROOTS:
+        check_source_root(source_root)
 
     # Suite membership and CI execution are checked by game_regression_suite.py.
     print("vehicle_sound_contract: ok")

@@ -206,8 +206,8 @@ def main() -> None:
     if not GAME_ROOT.is_dir():
         raise AssertionError(f"Companion game repository not found: {GAME_ROOT}")
 
-    game_types = read(GAME_ROOT, "src/mpgame/mp/GameTypes.cpp")
-    multiplayer = read(GAME_ROOT, "src/mpgame/MultiplayerGame.cpp")
+    game_types = read(GAME_ROOT, "src/game/mp/GameTypes.cpp")
+    multiplayer = read(GAME_ROOT, "src/game/MultiplayerGame.cpp")
     main_menu = read(ROOT, "content/baseoq4/pak0/guis/mainmenu.gui")
     mp_menu = read(ROOT, "content/baseoq4/pak0/guis/mpmain.gui")
     mp_hud = read(ROOT, "content/baseoq4/pak0/guis/mphud.gui")

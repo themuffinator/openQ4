@@ -1,9 +1,9 @@
-// openQ4 MP-22: autoaction words and the match basename (src/mpgame/mp/AutoAction.h).
+// openQ4 MP-22: autoaction words and the match basename (src/game/mp/AutoAction.h).
 #include <cstdio>
 #include <cstring>
 #include <string>
 
-#include "../../../src/mpgame/mp/AutoAction.h"
+#include "../../../src/game/mp/AutoAction.h"
 
 static int failures = 0;
 

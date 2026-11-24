@@ -982,7 +982,7 @@ players themselves move through.
 
 ## The navmesh
 
-`src/mpgame/bots/NavMesh.{h,cpp}` builds a multi-level grid navmesh at map
+`src/game/bots/NavMesh.{h,cpp}` builds a multi-level grid navmesh at map
 load.
 
 **Generation** follows the same shape as a modern voxel navmesh generator -
@@ -1230,7 +1230,7 @@ is added, so a server that never uses bots never pays for it.
 
 ## The bot
 
-`src/mpgame/bots/Bot.{h,cpp}`. A bot is not an entity. It takes a real client
+`src/game/bots/Bot.{h,cpp}`. A bot is not an entity. It takes a real client
 slot through `idNetworkSystem::AllocateClientSlotForBot`, spawns a real
 `idPlayer`, and each server frame writes the user command that a remote player's
 packet would have delivered. Everything downstream - movement physics, weapons,
@@ -1731,7 +1731,7 @@ dead.
 
 ## Characters
 
-`src/mpgame/bots/BotCharacter.{h,cpp}`. Difficulty used to be five numbers on a
+`src/game/bots/BotCharacter.{h,cpp}`. Difficulty used to be five numbers on a
 straight line, which made every bot at a given `bot_skill` identical and every
 match feel the same. It is now three layers of content that resolve, once per
 spawn, into one flat `botTraits_t` — 51 floats that are the only thing the

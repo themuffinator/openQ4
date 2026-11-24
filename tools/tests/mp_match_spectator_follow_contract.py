@@ -16,7 +16,7 @@ SUPPORT = r'''
 #include <cstdarg>
 #include <string>
 #include <vector>
-#include "mpgame/mp/DemoAutoTrack.h"
+#include "game/mp/DemoAutoTrack.h"
 template<class T>T Min(T a,T b){return std::min(a,b);}
 static const int MAX_CLIENTS=32,MAX_ARENAS=4,DEMO_NONE=0,GAME_TOURNEY=1;
 static const int AS_INACTIVE=0,AS_DONE=2,BUTTON_ATTACK=1;
@@ -351,15 +351,15 @@ int main(){
 
 
 def main() -> None:
-    player = (ROOT / "src/mpgame/Player.cpp").read_text(encoding="utf-8")
-    header = (ROOT / "src/mpgame/Player.h").read_text(encoding="utf-8")
-    commands = (ROOT / "src/mpgame/gamesys/SysCmds.cpp").read_text(encoding="utf-8")
-    multiplayer = (ROOT / "src/mpgame/MultiplayerGame.cpp").read_text(encoding="utf-8")
-    network = (ROOT / "src/mpgame/Game_network.cpp").read_text(encoding="utf-8")
+    player = (ROOT / "src/game/Player.cpp").read_text(encoding="utf-8")
+    header = (ROOT / "src/game/Player.h").read_text(encoding="utf-8")
+    commands = (ROOT / "src/game/gamesys/SysCmds.cpp").read_text(encoding="utf-8")
+    multiplayer = (ROOT / "src/game/MultiplayerGame.cpp").read_text(encoding="utf-8")
+    network = (ROOT / "src/game/Game_network.cpp").read_text(encoding="utf-8")
     assert "entPtr.GetEntity() != entities[ event->sender ]" in network
     # A follow request is made once, between frames. Sent through the simulated
     # event path it was dropped whenever the last prediction pass was a re-run.
-    entity = (ROOT / "src/mpgame/Entity.cpp").read_text(encoding="utf-8")
+    entity = (ROOT / "src/game/Entity.cpp").read_text(encoding="utf-8")
     request_send = function_body(entity, "void idEntity::ClientSendRequestEvent( int eventId, const idBitMsg *msg ) const")
     assert "isNewFrame" not in request_send and "ClientSendReliableMessage( outMsg )" in request_send
     simulated_send = function_body(entity, "void idEntity::ClientSendEvent( int eventId, const idBitMsg *msg ) const")
@@ -431,8 +431,8 @@ def main() -> None:
         subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror",
             "-DMP_MATCH_SESSION_STANDALONE_TEST", "-DMP_MATCH_DISCLOSURE_STANDALONE_TEST",
             "-I" + str(ROOT / "src"), str(source),
-            str(ROOT / "src/mpgame/mp/match/MatchDisclosurePolicy.cpp"),
-            str(ROOT / "src/mpgame/mp/match/MatchSession.cpp"), "-o", str(binary)], check=True)
+            str(ROOT / "src/game/mp/match/MatchDisclosurePolicy.cpp"),
+            str(ROOT / "src/game/mp/match/MatchSession.cpp"), "-o", str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
     print("mp_match_spectator_follow_contract: PASS (production command/camera/event/auto-follow paths and disclosure policy)")
 

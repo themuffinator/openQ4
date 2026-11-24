@@ -58,11 +58,10 @@ openQ4/
     ├── pak1.pk4             # openQ4 light grids (clients only)
     ├── pak2.pk4             # openQ4 loadscreens (clients only)
     ├── mod.json             # Game-directory manifest
-    ├── game-sp_<arch>       # Single-player module (.dll / .so / .dylib)
-    └── game-mp_<arch>       # Multiplayer module (.dll / .so / .dylib)
+    └── game_<arch>          # Game module (.dll / .so / .dylib)
 ```
 
-- Single-player loads `game-sp_<arch>` and multiplayer loads `game-mp_<arch>`. Quake 4 and The Awakening both use the same single-player module.
+- One game module, `game_<arch>`, serves both modes: the engine loads it as `game_sp` for single-player and as `game_mp` for multiplayer. Quake 4 and The Awakening both use it. Packages from 0.15.0 and earlier shipped two modules, `game-sp_<arch>` and `game-mp_<arch>`; current builds ignore them.
 - Your retail game data stays in the Quake 4 install's `q4base` directory; openQ4 reads it from there. Optional Awakening content goes in its own `q4xbase` directory, described in the [campaign guide](docs/user/campaigns.md).
 - Windows packages also include `OpenAL32.dll`. Debug symbols are a separate download on every platform: `openq4-<version>-windows-<arch>-symbols.zip` for Windows `.pdb` files, a debug-symbols archive for Linux and a symbols archive for macOS.
 - When upgrading, replace the whole package. The engine, renderer modules and game modules must come from the same release.
@@ -228,7 +227,7 @@ Example:
 }
 ```
 
-Game modules are optional. openQ4 first looks for `game-sp_<arch>` or `game-mp_<arch>` in the mod's directory and otherwise uses the one in `baseoq4/`, so a content-only mod needs just its `mod.json` and content files. Mods with their own game code can ship their own modules.
+Game modules are optional. openQ4 first looks for `game_<arch>` in the mod's directory and otherwise uses the one in `baseoq4/`, so a content-only mod needs just its `mod.json` and content files. Mods with their own game code can ship their own module, which serves both single-player and multiplayer; modules named `game-sp_<arch>` or `game-mp_<arch>`, as openQ4 0.15.0 and earlier used, are no longer loaded.
 
 A mod built on the retail base (`fs_game_base` other than `baseoq4`) still gets openQ4's runtime content: the filesystem searches `baseoq4/` between the mod and `q4base/`, so openQ4's shaders, GUIs and fonts remain available.
 
@@ -238,9 +237,9 @@ When a mod ships a declaration file with the same name as one beneath it (for ex
 
 ## Game Code and The Awakening
 
-openQ4's game code is derived from the Quake 4 SDK and lives in [`src/game`](src/game/) and [`src/mpgame`](src/mpgame/). It remains under the [Quake 4 SDK EULA](LICENSES/QUAKE-4-SDK-EULA.rtf), while the engine is GPL-licensed. [LICENSING.md](LICENSING.md) explains the separate terms.
+openQ4's game code is derived from the Quake 4 SDK and lives in [`src/game`](src/game/). It remains under the [Quake 4 SDK EULA](LICENSES/QUAKE-4-SDK-EULA.rtf), while the engine is GPL-licensed. [LICENSING.md](LICENSING.md) explains the separate terms.
 
-Support for **Quake 4: The Awakening** is written independently for openQ4 and built into the same single-player module as Quake 4. It is active only while The Awakening campaign is running, keeps its saves and settings separate, and is removed when you return to Quake 4, Arena or multiplayer. The expansion's original game DLLs and older openQ4 `q4xbase` modules are ignored, and its multiplayer changes are not supported. See the [campaign guide](docs/user/campaigns.md).
+Support for **Quake 4: The Awakening** is written independently for openQ4 and built into the same game module as Quake 4. It is active only while The Awakening campaign is running, keeps its saves and settings separate, and is removed when you return to Quake 4, Arena or multiplayer. The expansion's original game DLLs and older openQ4 `q4xbase` modules are ignored, and its multiplayer changes are not supported. See the [campaign guide](docs/user/campaigns.md).
 
 The Awakening was developed by Raven Software and Ritual Entertainment, and recovered and published by Justin Marshall. openQ4 includes none of its content.
 

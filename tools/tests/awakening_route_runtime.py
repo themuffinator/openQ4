@@ -395,7 +395,7 @@ def main():
     cmd = launch_command(opts, exe, out)
     (out/'launch.json').write_text(json.dumps(cmd, indent=2))
     module_root = exe.parent.parent/'Frameworks' if sys.platform == 'darwin' else exe.parent/'baseoq4'
-    binaries = [exe, *module_root.glob('game-sp_*'), *exe.parent.glob('renderer-*')]
+    binaries = [exe, *module_root.glob('game_*'), *exe.parent.glob('renderer-*')]
     content_package = exe.parent/'baseoq4/pak0.pk4'
     if content_package.is_file():
         binaries.append(content_package)

@@ -173,7 +173,7 @@ static const char *ServerBrowserGameType( const char *type ) {
 
 // The modifiers a server latched, as it publishes them in si_modifiers: the
 // name, label and title columns of the game's table (mpModifierTable in
-// src/mpgame/mp/Modifiers.cpp) and its weapon arenas. The text is a remote
+// src/game/mp/Modifiers.cpp) and its weapon arenas. The text is a remote
 // server's, so it is only ever matched against these tables, never shown.
 typedef struct serverBrowserModifier_s {
 	const char *	name;
