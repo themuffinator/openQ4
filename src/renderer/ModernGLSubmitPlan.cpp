@@ -684,6 +684,15 @@ static void R_ModernGLSubmitPlan_FillMaterialTextureCache( modernGLSubmitCommand
 		command.materialAlphaTestRegister = materialRecord->alphaTestRegister;
 		command.alphaTestMaterial = materialRecord->alphaTest;
 		command.alphaTestOrPerforatedMaterial = materialRecord->alphaTest || materialRecord->materialClass == RENDER_MATERIAL_PERFORATED;
+		// REN-02: perforated only by conditioned ambient stages that are all
+		// off this frame (the corpse-burn guide): ARB2 fills the depth solid.
+		const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
+		const drawSurf_t *surf = draw != NULL ? draw->legacyDrawSurf : NULL;
+		if ( command.alphaTestOrPerforatedMaterial && surf != NULL
+				&& R_MaterialResourceTable_ClassicConditionalCutoutInactive( surf->material, surf->shaderRegisters ) ) {
+			command.alphaTestMaterial = false;
+			command.alphaTestOrPerforatedMaterial = false;
+		}
 	}
 	R_ModernGLSubmitPlan_SetTextureCacheSlot(
 		command,

@@ -1231,8 +1231,8 @@ diagnostics establish whole-frame ownership or production performance.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | REN-01 — Closed | All nine shared classic domains own stock (and, for subview forms stock content never authors, validation-room) views on a fresh GL/Vulkan package under the default preset, with 4x MSAA and with the post chain off: byte-identical to classic, visible content controls, named zero-commit rollback. They now draw into the scene target the classic walker uses. Defaults stay off. | Human appearance review of the retained captures and physical Linux/macOS/Android runs belong to platform qualification; default promotion is a separate owner decision. |
-| REN-02 — Partial | In the laboratory the classic-lighting corridor owns classic stage shapes, cutouts, baked light and stencil-shadowed lights, each matched against native ARB2, and the aggregate executor composes with the shared domains behind `r_rendererOwnershipCompose`. No stock view is owned yet; the remaining decline reasons are inventoried. | Take the stock shapes the census names (skinned receivers, lit surfaces without a forward command, stage colour), shadow-mapped lights and the point-cube pool; move the corridor onto the sealed interaction stream; then measure benefit on owned stock views before parity promotion. |
-| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). The opt-in modern OpenGL receivers filter projected shadows with the classic kernel and PCSS-lite blocker search since 17 November; a widened PCSS radius now softens the same pixels as the classic receivers (84% overlap), where before it changed none. The 9 November [stencil-parity audit](shadowmapping-audit-2026-11-09.md) fixed prelight-only (`noDynamicShadows`) lights losing their shadows, `noSelfShadow` world geometry no longer shadowing `noSelfShadow` receivers under prelit lights, the one-sided five-tap kernel and the packed-depth wrap at the far envelope. Since 23 November a light whose source lies outside its own box (an off-centre point light, a parallel sun) casts the static world into its map from the front caps of its dmap prelight volume, the triangles its stencil shadow is built from (`r_shadowMapPrelightCasters`): against stencil, mcc_landing's `light_9083` goes from 48.9% of a view wrongly shadowed to 0.01%, `light_9081` from 10.4% wrongly lit to 0.22%, and q4cmp13's suns from 30.9% wrongly lit to 0.7%, on both backends, with the existing motion, mover and caster-cycle gates passing; the `noSelfShadow` world-geometry rule has its image on both backends. | Physical platforms; the quiet-machine FPS-02/FPS-03 budgets; what the audit leaves open for lights whose source lies outside their box: the 78 stock lights whose prelight volume folds its caps away keep uncut per-surface casters, the casters other than the static world under distant and parallel lights store the faces turned towards the light, and the far-shell caster lets light through to a receiver closer behind it than the map's bias, tens of units under a coarse distant map (1.0% of one view of `light_9083`, 1.9% of one of Air Defense 1's `light_7910_cursed`, up from 0.15%); and mcc_landing's `outdoor_Main`, a cube light 280 units outside its box, differs from stencil more with the caster than without (9.6% map-only and 9.9% stencil-only of its worst view on OpenGL, 8.8% and 8.9% on Vulkan, against 0.6% and 1.0% with `r_shadowMapPrelightCasters 0`; cause not established, caster kept on by default). The cascade range end is closed (19 November, whole-light last cascade). |
+| REN-02 — Partial | In the laboratory the classic-lighting corridor owns classic stage shapes, cutouts, baked light and stencil-shadowed lights, each matched against native ARB2, and the aggregate executor composes with the shared domains behind `r_rendererOwnershipCompose`. Since 24 November it also owns the lit stock shapes the census named: glow and mask-weighted reflection overlays (drawn by ARB2 over the composed frame, byte-identical in display frames), CPU-skinned receivers and the conditioned corpse-burn stages; on `game/airdefense1` the corridor is ready on two of eight poses. No stock frame is owned yet; every refusal is named. | Unlit ambient surfaces in the corridor's view (decals, glass, effects) and lit translucent receivers, which the second census names; shadow-mapped lights and the point-cube pool; the corridor on the sealed interaction stream; then measured benefit on owned stock views before parity promotion. |
+| REN-03 — Partial | Point/projected/CSM and hybrid shadow paths, caches and Vulkan translucent moments exist. A continuous-motion stock tour passes at default, cascaded and constrained budgets on GL/Vulkan with bounded slots and retained light; receivers after motion match a fresh render, as do moving doors, cutout and translucent casters under camera motion; static/live composition and cutout-alpha audits done (GL now falls back to stencil like Vulkan). The opt-in modern OpenGL receivers filter projected shadows with the classic kernel and PCSS-lite blocker search since 17 November; a widened PCSS radius now softens the same pixels as the classic receivers (84% overlap), where before it changed none. The 9 November [stencil-parity audit](shadowmapping-audit-2026-11-09.md) fixed prelight-only (`noDynamicShadows`) lights losing their shadows, `noSelfShadow` world geometry no longer shadowing `noSelfShadow` receivers under prelit lights, the one-sided five-tap kernel and the packed-depth wrap at the far envelope. Since 23 November a light whose source lies outside its own box (an off-centre point light, a parallel sun) casts the static world into its map from the front caps of its dmap prelight volume, the triangles its stencil shadow is built from (`r_shadowMapPrelightCasters`): against stencil, mcc_landing's `light_9083` goes from 48.9% of a view wrongly shadowed to 0.01%, `light_9081` from 10.4% wrongly lit to 0.22%, and q4cmp13's suns from 30.9% wrongly lit to 0.7%, on both backends, with the existing motion, mover and caster-cycle gates passing; the `noSelfShadow` world-geometry rule has its image on both backends. Since 24 November the 78 stock volumes whose caps dmap folded away give their caps too (a grate inside the light's box keeps its holes, `r_shadowMapPrelightCutouts`), and distant and parallel lights store every caster by the stencil rule, with the face verdict measured right for their projections and almost none of the receiver bias that let light through behind a far-shell caster (`r_shadowMapDistantFarShell`, `r_shadowMapDistantFarShellBias`): over twelve off-centre lights the summed worst-view share that stencil shadows and the map lights falls from 29.0 to 5.4 points on both backends (hub2's `light_6456` 13.1% to 0.4%, Air Defense 1's `light_7910_cursed` 1.9% to 0.03%, `light_9083` 1.0% to 0.2%) while the share the map alone shadows rises from 9.4 to 10.1, every light's two shares together falling; the motion, mover, caster-cycle and sunlight gates pass on both. mcc_landing's `outdoor_Main` has no prelight volume, so the caster never reached it; the 23 November reading did not repeat. | Physical platforms; the quiet-machine FPS-02/FPS-03 budgets; for lights whose source lies outside their box: network1's tube lights, where a grate's own prelight caps darken 7.8% of a view that stencil leaves lit (6.8% before the round; cause not established), why the synthesized projections raster unmirrored against their determinant, and the 31 lights with no prelight volume, which keep their surface casters. The cascade range end is closed (19 November, whole-light last cascade). |
 | REN-04 — Closed | Exact vectors, TAAU and dynamic resolution; cumulative resolve counters and a GL/Vulkan runtime gate (cuts, capture, pause, restart, failed presents, mirrors, stale timing, scale recovery, SMAA rollback). Mirror/remote-view, withheld-present and capture-depth gaps fixed; the picture is still at rest (#216). A temporally upscaled scene samples sharper texture mips (16-18% more detail at 50% scale, stability unchanged), and Vulkan corrects the NVIDIA driver's softer anisotropic filter, so its frames hold OpenGL's detail. | Human review of ghosting and disocclusion on the reference display and physical Linux/macOS/Android belong to platform qualification. |
 | REN-05 — Partial | Authored PBR, animated/MD5R models, box probes and indirect-only SSAO have scoped evidence. SSAO parity controls repaired after half-resolution SSAO, with a matched half-resolution control; the Intel residual is reproduced and explicitly bounded; skin substitutions and a mixed PBR/classic model on packed MD5R match CPU skinning. lavapipe's one-byte difference is traced to its texel decode and bounded to lavapipe. The showcase map qualifies skins, a mixed PBR/classic model, cutout coverage and shadows on both renderers (67/67 each, procedural stand-ins). | The Mesa SSAO controls that fail since 21 November (not investigated); real textures.com materials (the owner's downloads); physical Linux/Apple fallback (PLAT). |
 | REN-06 — Partial | Probe admission decided (RGBA8/sRGB/generated RGBA16F; compressed, oversized and authored HDR excluded); cold misses filter on a background job and publish within the 4 ms budget on both backends; SSR and SSGI pass individually and together with byte-exact master-off rollback on GL/Vulkan in seven stock scenes; a map's own baked probe, a probe captured in a stock scene and authored decals pass on both renderers; a scratch re-bake of one bundled grid is measured. | Re-bake of the cropped bundled grids (owner decision, evidence recorded); quiet-machine cost of the leaves beyond the first scene; other GPUs/platforms and appearance review (PLAT). |
@@ -1357,7 +1357,7 @@ diagnostics establish whole-frame ownership or production performance.
   The corridor still derives its own interactions; moving it onto the sealed
   stream remains.
   Named rollbacks: `r_rendererModernClassicShapes` (bit 1 stage state, bit 2
-  stencil lights) and `r_rendererOwnershipCompose 0`. No parity mask,
+  stencil lights; bits 4 and 8 since 24 November) and `r_rendererOwnershipCompose 0`. No parity mask,
   promotion token or default changed.
   Step 6 is not reached: no stock view is owned. Of eight
   `game/airdefense1` poses with the modern path requested and shadows off,
@@ -1372,6 +1372,36 @@ diagnostics establish whole-frame ownership or production performance.
   lights and the point-cube pool, the corridor on the sealed interaction
   stream, then measured CPU/GPU benefit on owned stock views before any
   promotion.
+  Progress, 24 November: the lit shapes that census named are owned.
+  - **Overlay stages** (`r_rendererModernClassicShapes` bit 4). A lit
+    material's ambient stages are drawn by ARB2 over the composed frame in
+    sort order when their colour does not depend on the lit colour beneath:
+    additive glows (`generic_glow_mi` and its kin), `maskcolor` alpha writers
+    with the `GL_DST_ALPHA, GL_ONE` reflections they weight (the marine
+    helmet), and stages a stage expression keeps off. A material perforated
+    only by such stages (the corpse-burn guide) draws opaque in a frame where
+    none is active, as ARB2's depth fill does.
+  - **Front-end geometry** (bit 8): CPU-skinned and other front-end-deformed
+    receivers.
+  - Laboratory, display frames against native ARB2: a glow, a conditioned
+    and parm-coloured glow, and the mask-weighted shape are byte-identical
+    on the specimen; a glow over baked light matches as its flat baseline
+    does (mean 0.02, max 1). The linear scene and a fog or blend light
+    decline overlays by name; clearing bit 4 hands the frame to ARB2.
+    Every earlier control passes again.
+  - A second census names every refusal (`gfxInfo` prints the material
+    reason and a `Modern material proof:` line). On `game/airdefense1` the
+    corridor is ready on two of eight poses, where the frame stops at an
+    unlit decal; the other six stop at a lit translucent decal. A lookup by
+    vertex cache replaced a per-surface scan of the submit plan, which had
+    cost the newly ready poses 96 and 37 ms a frame; requesting the path now
+    costs a declined frame 8.0 ms against ARB2's 4.1 (shared machine)
+    ([census](modern-lit-frame-inventory.md#stock-views-step-6)).
+
+  Next, in order: unlit ambient surfaces in the corridor's view, handed to
+  the classic walker as the overlays are; lit translucent receivers;
+  shadow-mapped lights and the point-cube pool; the corridor on the sealed
+  interaction stream; then measured benefit before any promotion.
 - [ ] **REN-03 — P1, qualification and implementation: shadow production scope.**
   Qualify point/projected/CSM, stencil/map hybrids, moments, movers, near emitters,
   dynamic/cutout/custom receivers and constrained budgets through full scenes and
@@ -1480,12 +1510,34 @@ diagnostics establish whole-frame ownership or production performance.
   rebuilds interactions for each picture and takes projectors, parallel and
   distant lights, exact views and spawned stock entities. See
   [what the stock volumes hold](shadowmapping-audit-2026-11-09.md#what-the-stock-volumes-hold).
-  Remaining from the audit: the 78 lights whose volume folds its caps (the
-  caps are recoverable; cutouts would cast solid), the other casters of
-  distant and parallel lights on the reversed faces, and the far shell's
-  leak under a coarse map: a receiver closer behind a cap than the map's
-  bias is lit (Air Defense 1's `light_7910_cursed` 0.15% to 1.9% of one
-  view, the one light measured that is worse for the change).
+  The rest of the off-centre lights, 24 November: in the order of what they
+  moved. The far shell's leak was the receiver bias: a map of faces turned
+  away from the light holds no receiver that faces it, so the bias only lights
+  receivers close behind a caster. Distant and parallel lights now keep
+  `r_shadowMapDistantFarShellBias` (default 0) of it, applied once in the
+  shared projected state. The 78 folded volumes give their caps (a triangle
+  on three even vertexes); a perforated surface inside the light's box keeps
+  its own caster and its holes, one reaching outside casts solid as stencil
+  does. The synthesized projections' face verdict was wrong as measured
+  (`light_9083` from whole surfaces: 48.9% to 0.01% when turned), and sealed
+  hulls under those lights take the far shell too
+  (`r_shadowMapDistantFarShell`, 0 as before). Worst views summed over twelve
+  lights, map only / stencil only: OpenGL 9.4 / 29.0 to 10.1 / 5.4, Vulkan 9.3
+  / 29.1 to 10.5 / 5.4; hub2's `light_6456` 0.7% / 13.1% to 0.1% / 0.4%, Air
+  Defense 1's `light_170` 2.2% to 1.0% stencil only, convoy1's `light_7744`
+  4.3% to 1.4%, q4cmp13's suns 0.7-0.8% to 0.1-0.2%. `outdoor_Main` has no
+  prelight volume in the retail `.proc`, so the caster could not reach it: its
+  worst view is the same with the setting at 0 and 1, and three repeats give
+  0.61% / 1.00% as a cube; with the far shell, as a wide source, 0.15% / 2.0%
+  to 0.4% / 0.9%. Gates on the final build: the five door and six caster-cycle
+  scenarios, Air Defense 1's outdoor and the cascade-motion scenarios and the
+  continuous-motion receiver case on both backends, storage2's projectors
+  unchanged, the in-engine self-tests on both. See
+  [the rest of the off-centre lights](shadowmapping-audit-2026-11-09.md#the-rest-of-the-off-centre-lights).
+  Remaining: network1's tube lights (a grate's own caps darken 7.8% of a view
+  that stencil leaves lit, 6.8% before the round; cause not established), why
+  the synthesized projections raster unmirrored against their determinant,
+  and the 31 lights with no prelight volume.
 - [x] **REN-04 — P1, qualification: temporal AA and dynamic resolution.** Exercise
   existing rigid/skinned/weapon exact vectors and reactive surfaces through
   interpolation, disocclusion, pause, cuts, failed presents, capture, multiple

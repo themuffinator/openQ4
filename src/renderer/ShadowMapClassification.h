@@ -37,6 +37,10 @@ typedef struct shadowMapLightClassification_s {
 // That covers the wide sources too (R_ShadowMapWideSourceAxis) while sunlight
 // is cascaded.
 bool R_ShadowMapUsesDistantPointProjection( const renderLight_t &parms );
+// A parallel light or a distant point light whose map, with
+// r_shadowMapDistantFarShell on, holds every caster by the stencil rule: the
+// faces turned away from the light.
+bool R_ShadowMapLightStoresFarShell( const struct viewLight_s *vLight );
 
 // A wide source: a large point light whose source sits just outside one face
 // of an enormous radius box, the way Quake 4 lights its outdoor areas

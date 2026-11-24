@@ -2667,12 +2667,15 @@ void idInteraction::AddActiveInteraction( void ) {
 
 			// The prelight's front caps hold every world triangle stencil casts
 			// from, so a world surface that would be drawn into the map, or that
-			// stencil has a volume for, is in the map already. A cutout is not:
-			// dmap gives a volume with a perforated caster no front caps, and
-			// such a light has no caster of this kind.
+			// stencil has a volume for, is in the map already. A cutout that
+			// lies inside the light's box is not: the caster leaves out its
+			// caps, and the surface casts through its holes as before
+			// (R_ShadowMapPrelightKeepsCutout). One that reaches outside the
+			// box casts solid from the caps, as stencil does: drawn whole, it
+			// would shadow from where stencil has no volume.
 			const bool castsThroughPrelight =
 				worldCastsFromPrelight &&
-				shadowShader->Coverage() != MC_PERFORATED &&
+				!R_ShadowMapPrelightKeepsCutout( lightDef, shadowShader, sint->ambientTris ) &&
 				( allowShadowMapCaster || sint->shadowStencilEligible );
 			if ( castsThroughPrelight ) {
 				linkedShadowMapCaster = true;

@@ -278,12 +278,16 @@ static bool R_ModernGLDrawPlan_ShouldUseForwardPlus( const modernGLDrawPlanBuild
 			shaderKind = MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE;
 			return true;
 		}
-		if ( materialRecord.alphaTest || materialRecord.materialClass == RENDER_MATERIAL_PERFORATED ) {
+		// REN-02: a material perforated only by conditioned ambient stages,
+		// all off this frame, is an opaque surface for ARB2 as well.
+		const bool inactiveCutout = draw.legacyDrawSurf != NULL
+			&& R_MaterialResourceTable_ClassicConditionalCutoutInactive( draw.legacyDrawSurf->material, draw.legacyDrawSurf->shaderRegisters );
+		if ( ( materialRecord.alphaTest || materialRecord.materialClass == RENDER_MATERIAL_PERFORATED ) && !inactiveCutout ) {
 			pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_ALPHA_TEST;
 			shaderKind = MODERN_GL_SHADER_CLUSTERED_FORWARD_ALPHA_TEST;
 			return true;
 		}
-		if ( materialRecord.materialClass == RENDER_MATERIAL_OPAQUE ) {
+		if ( materialRecord.materialClass == RENDER_MATERIAL_OPAQUE || inactiveCutout ) {
 			pipeline = MODERN_GL_DRAW_PLAN_PIPELINE_FORWARD_PLUS_OPAQUE;
 			shaderKind = MODERN_GL_SHADER_CLUSTERED_FORWARD_OPAQUE;
 			return true;

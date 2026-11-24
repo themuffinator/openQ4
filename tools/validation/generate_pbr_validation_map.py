@@ -287,6 +287,25 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     # (dark keeps the sum inside the comparison's unclipped range).
     mats += [f'{PREFIX}/classic_multistage\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap _white\n{{\nblend bumpmap\nmap _flat\n}}\n{{\nblend diffusemap\nmap {PREFIX}/dark\n}}\n}}\n']
     mats += [f'{PREFIX}/classic_texmatrix\n{{\n{{\nblend bumpmap\nmap {PREFIX}/normal\nscale 3, 3\n}}\ndiffusemap {PREFIX}/grey\nspecularmap _white\n}}\n']
+    # The dominant stock shape (generic_glow_mi, marine bodies, strip lights):
+    # a lit material plus an additive glow stage with its own colour, which
+    # ARB2 draws over the composed modern frame. The checker keeps a misplaced
+    # or missing glow visible; the second material adds a glow that a stage
+    # expression switches off (the specimen's parm7 is 0) and a parm-driven one.
+    mats += [f'{PREFIX}/classic_overlay\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap _white\n'
+             f'{{\nblend add\nmap {PREFIX}/checker\nred 0.25\ngreen 0.15\nblue 0.08\n}}\n}}\n',
+             f'{PREFIX}/classic_overlay_condition\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap _white\n'
+             f'{{\nblend add\nmap _white\nif ( parm7 > 0.5 )\n}}\n'
+             f'{{\nblend gl_one, gl_one\nmap {PREFIX}/checker\nred parm0 * 0.2\ngreen parm1 * 0.1\nblue parm2 * 0.05\n}}\n}}\n']
+    # The baked-light control's glow material keeps a flat bump: bump-mapped
+    # baked light has its own open difference, which would hide this one.
+    mats += [f'{PREFIX}/classic_overlay_flat\n{{\nbumpmap _flat\ndiffusemap {PREFIX}/grey\nspecularmap _white\n'
+             f'{{\nblend add\nmap {PREFIX}/checker\nred 0.25\ngreen 0.15\nblue 0.08\n}}\n}}\n']
+    # The stock helmet and visor shape: a maskcolor stage writes a checker into
+    # destination alpha, and a GL_DST_ALPHA, GL_ONE stage adds through it.
+    mats += [f'{PREFIX}/classic_overlay_mask\n{{\nbumpmap {PREFIX}/normal\ndiffusemap {PREFIX}/grey\nspecularmap _white\n'
+             f'{{\nmaskcolor\nmap makealpha({PREFIX}/checker)\n}}\n'
+             f'{{\nblend gl_dst_alpha, gl_one\nmaskalpha\nmap _white\nred 0.2\ngreen 0.12\nblue 0.3\n}}\n}}\n']
     # ... and the common stock shape: a bumped, specular cutout.
     mats += [f'{PREFIX}/classic_cutout_bump\n{{\nbumpmap {PREFIX}/normal\n{{\nblend diffusemap\nmap {PREFIX}/cutout\nalphaTest 0.5\n}}\nspecularmap _white\n}}\n']
     # REN-02 step 1 remainder: the same stage state on a cutout. The diffuse
@@ -404,7 +423,8 @@ def payloads() -> tuple[dict[str, bytes], list[dict]]:
     level = f'Version 3\n{{\n"classname" "worldspawn"\n"mtr_local_global_test" "{PREFIX}/noself_shadow"\n' + ''.join(brush(lo,hi,f'{PREFIX}/classic_floor') for lo,hi in room) + '}\n'
     precache = f'"model_sampling_test" "{SAMPLING_MODEL}"\n"model_skinning_test" "{SKINNING_MODEL}"\n"def_skinning_test" "func_animate"\n"mtr_classic_rejection_test" "{PREFIX}/classic_specular"\n' + ''.join(f'"mtr_sampling_{name}" "{PREFIX}/sampler_{name}"\n' for name in ('nearest','linear','clamp','mips'))
     precache += ''.join(f'"mtr_fixed_{name}" "{PREFIX}/classic_{name}"\n' for name in ('bump','diffuse','colored','cutout','cutout_bump','vertex','texmatrix','condition','multistage',
-        'cutout_texmatrix','cutout_vertex','cutout_condition','grid_stage','grid_flat_stage','grid_flat_vertex'))
+        'cutout_texmatrix','cutout_vertex','cutout_condition','grid_stage','grid_flat_stage','grid_flat_vertex',
+        'overlay','overlay_condition','overlay_mask','overlay_flat'))
     precache += f'"mtr_extreme_emissive_test" "{PREFIX}/extreme_emissive"\n'
     precache += ''.join(f'"skin_skinning_{name}_test" "{skin}"\n' for name, skin in SKINNING_SKINS.items())
     precache += f'"model_mixed_material_test" "{MIXED_MODEL}"\n'

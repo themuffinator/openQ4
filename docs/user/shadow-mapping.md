@@ -203,6 +203,9 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 | `r_shadowMapStableAlphaHash` | `1` | `0..1` | Keeps that cutout pattern fixed to the world, so it doesn't crawl as the camera moves. |
 | `r_shadowMapTranslucentReceivers` | `1` | `0..1` | Lets see-through surfaces receive shadows like solid ones, as `r_stencilTranslucentShadows` does for the original shadows. |
 | `r_shadowMapCasterCulling` | `2` | `0..4` | Which side of an object's surfaces the shadow records. `2` (automatic) matches the original shadows: a lamp behind a one-sided panel shines through it, and solid props keep a grounded contact shadow. `0` records both sides, `1` the side facing the light, `3` the side facing away for every object, and `4` is the earlier automatic mode, kept for comparison. |
+| `r_shadowMapDistantFarShell` | `1` | `0..1` | Sunlight and other distant lights record every object by the rule the original shadows use, the surfaces facing away from the light, and keep almost no bias (`r_shadowMapDistantFarShellBias`). Shadows then reach into corners and under ledges as the original ones do, where they used to stop short by up to tens of units. `0` restores the earlier behaviour. **Not in 0.15.0.** |
+| `r_shadowMapPrelightCasters` | `1` | `0..2` | What the level's own geometry casts into the shadow of a light mounted outside the area it lights (sunlight, distant fill lights): `1` uses the shadow volume the map compiler stored for that light, so the shadow matches the original one; `0` casts each surface whole, as in 0.15.0; `2` uses the stored volume for every light that has one. **Not in 0.15.0.** |
+| `r_shadowMapPrelightCutouts` | `1` | `0..1` | With `r_shadowMapPrelightCasters`, a grate or other see-through surface inside such a light's area keeps the holes in its shadow. `0` casts it solid, as the original shadows do. **Not in 0.15.0.** |
 
 ### Sharpness and memory
 
@@ -271,6 +274,7 @@ Shadow artifacts usually come in two kinds: speckles or stripes on a lit surface
 | `r_shadowMapNormalOffsetScale` | `1.0` | `0..8` | Nudges the shadow lookup off sloped surfaces. Helps with stripes, but too high moves contact edges, especially on large lights. |
 | `r_shadowMapDistantNormalOffsetDepth` | `1` | `0..1` | For sunlight and other distant lights, sizes that nudge to the shadow pixel at each surface's distance from the light, so nearby shadows stay attached. `0` uses one size, the one for the far end of the light. **New in 0.15.0.** |
 | `r_shadowMapReceiverPlaneBias` | `0` | `0..1` | An experimental alternative bias. Leave it off for normal play. |
+| `r_shadowMapDistantFarShellBias` | `0` | `0..1` | How much of the bias above sunlight and distant lights keep while `r_shadowMapDistantFarShell` is on. Their shadows hold only surfaces facing away from the light, so a lit surface cannot shade itself, and any bias only lets light into the corner behind a wall or under a roof. Raise it in small steps if speckles appear in sunlight. **Not in 0.15.0.** |
 | `r_shadowMapPolygonFactor` | `0.25` | `0..16` | Pushes shadow-casting surfaces back in proportion to their slope while the shadow is drawn. |
 | `r_shadowMapPolygonOffset` | `0.5` | `0..64` | Pushes shadow-casting surfaces back by a fixed amount while the shadow is drawn. |
 | `r_shadowMapPointBias` | `0.00010` | `0..0.05` | Basic point-light bias. |

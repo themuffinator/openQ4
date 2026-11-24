@@ -2545,32 +2545,229 @@ bool R_MaterialResourceTable_ClassicFixedPathEligible( const materialResourceTab
 	return R_MaterialResourceTable_ClassicFixedMaterialEligible( record.material );
 }
 
+static const char *R_MaterialResourceTable_ClassicCorridorCheck( const materialResourceTableRecord_t &record, const bool explain );
+
 bool R_MaterialResourceTable_ClassicCorridorPathEligible( const materialResourceTableRecord_t &record ) {
+	return R_MaterialResourceTable_ClassicCorridorCheck( record, false ) == NULL;
+}
+
+const char *R_MaterialResourceTable_ClassicCorridorRefusal( const materialResourceTableRecord_t &record ) {
+	return R_MaterialResourceTable_ClassicCorridorCheck( record, true );
+}
+
+// Only the census formats a reason; the per-draw checks need the verdict.
+static const char *R_MaterialResourceTable_ClassicCorridorCheck( const materialResourceTableRecord_t &record, const bool explain ) {
 	// Stage expressions (conditions, colours, matrices) are evaluated by the
 	// same RB_CreateSingleDrawInteractions call ARB2 uses to build interactions.
+	// REN-02: a glow stage's own colour is the stage-colour fallback; ARB2
+	// draws it over the composed frame (MODERN_CLASSIC_SHAPE_OVERLAYS).
+	const char *overlayRefusal = NULL;
+	const int overlayCount = R_MaterialResourceTable_ClassicOverlayStageCount( record.material, &overlayRefusal );
+	const bool overlaysAllowed = ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_OVERLAYS ) != 0;
+	const bool overlays = overlaysAllowed && overlayCount > 0;
+	if ( !overlaysAllowed && overlayCount > 0 ) { overlayRefusal = "rollback-overlays"; }
+	// Overlay stages carry their own colour and texgen, which ARB2 evaluates.
+	// A stage's private polygon offset survives the overlay count only on a
+	// conditioned stage, which ARB2 never draws while the corridor owns the view.
+	const unsigned int overlayFallbacks = MATERIAL_RESOURCE_FALLBACK_FLAG_STAGE_COLOR
+		| MATERIAL_RESOURCE_FALLBACK_FLAG_UNSUPPORTED_TEXGEN | MATERIAL_RESOURCE_FALLBACK_FLAG_SKY_TEXGEN
+		| MATERIAL_RESOURCE_FALLBACK_FLAG_SCREEN_TEXGEN
+		| ( record.hasMaterialPolygonOffset ? 0u : static_cast<unsigned int>( MATERIAL_RESOURCE_FALLBACK_FLAG_POLYGON_OFFSET ) );
 	const unsigned int corridorFallbacks = MATERIAL_RESOURCE_FALLBACK_FLAG_VERTEX_COLOR
-		| MATERIAL_RESOURCE_FALLBACK_FLAG_TEXTURE_MATRIX | MATERIAL_RESOURCE_FALLBACK_FLAG_STAGE_CONDITION;
-	if ( ( record.fallbackFlags & ~corridorFallbacks ) != 0
-			|| ( record.fallbackFlags == 0 ) != ( record.fallbackReason == MATERIAL_RESOURCE_FALLBACK_NONE ) ) {
-		return false;
+		| MATERIAL_RESOURCE_FALLBACK_FLAG_TEXTURE_MATRIX | MATERIAL_RESOURCE_FALLBACK_FLAG_STAGE_CONDITION
+		| ( overlays ? overlayFallbacks : 0u );
+	static char refusal[96];
+	const unsigned int foreign = record.fallbackFlags & ~corridorFallbacks;
+	if ( foreign != 0 && ( foreign & ~overlayFallbacks ) == 0 ) {
+		if ( !explain ) { return "refused"; }
+		idStr::snPrintf( refusal, sizeof( refusal ), "overlay-flags-0x%x/%s", foreign, overlayRefusal != NULL ? overlayRefusal : "no-overlay" );
+		return refusal;
 	}
+	if ( foreign != 0 ) {
+		if ( !explain ) { return "refused"; }
+		idStr::snPrintf( refusal, sizeof( refusal ), "fallback-flags-0x%x", foreign );
+		return refusal;
+	}
+	if ( ( record.fallbackFlags == 0 ) != ( record.fallbackReason == MATERIAL_RESOURCE_FALLBACK_NONE ) ) { return "fallback-record"; }
 	// REN-02 step 1: the depth and forward passes now test a cutout's alpha
 	// through the stage's texture matrix (uClassicStage), so these stay in a
 	// cutout. The corridor still checks each frame that one alpha-tested
 	// diffuse stage is active; clearing the rollback bit restores the exclusion.
 	if ( ( record.hasTextureMatrix || record.hasVertexColor || record.hasConditionRegisters ) && record.alphaTest
-			&& ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_STAGES ) == 0 ) { return false; }
+			&& ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_STAGES ) == 0 ) { return "rollback-stages"; }
 	const bool cutout = record.materialClass == RENDER_MATERIAL_PERFORATED
 		&& record.blendMode == MATERIAL_RESOURCE_BLEND_ALPHA_TEST && record.alphaTest;
-	if ( record.hasPBR || record.material == NULL || globalImages == NULL
-			|| ( record.materialClass != RENDER_MATERIAL_OPAQUE && !cutout )
-			|| ( record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE && !cutout )
-			|| record.hasEmissive || ( record.alphaTest && !cutout )
-			|| record.hasCustomProgram || record.hasCustomGLSL
-			|| record.hasMaterialPolygonOffset || record.hasPrivatePolygonOffset ) {
-		return false;
+	if ( record.hasPBR ) { return "pbr"; }
+	if ( record.material == NULL || globalImages == NULL ) { return "material"; }
+	if ( record.materialClass != RENDER_MATERIAL_OPAQUE && !cutout ) { return "material-class"; }
+	// The record takes its blend mode from the first stage. With overlays every
+	// ambient stage is one, so a non-opaque mode on an opaque surface is an
+	// overlay's (a glow or mask listed first); the lit surface is opaque.
+	const bool overlayBlend = overlays && record.materialClass == RENDER_MATERIAL_OPAQUE && !record.alphaTest
+		&& record.blendMode != MATERIAL_RESOURCE_BLEND_ALPHA_TEST;
+	if ( record.blendMode != MATERIAL_RESOURCE_BLEND_OPAQUE && !cutout && !overlayBlend ) {
+		if ( !explain ) { return "refused"; }
+		idStr::snPrintf( refusal, sizeof( refusal ), "blend-mode-%d/class-%d/%s", static_cast<int>( record.blendMode ),
+			static_cast<int>( record.materialClass ), overlayRefusal != NULL ? overlayRefusal : "overlays" );
+		return refusal;
 	}
-	return R_MaterialResourceTable_ClassicFixedMaterialEligible( record.material );
+	if ( record.hasEmissive && !overlays ) {
+		if ( !explain ) { return "refused"; }
+		idStr::snPrintf( refusal, sizeof( refusal ), "emissive/%s", overlayRefusal != NULL ? overlayRefusal : "no-overlay" );
+		return refusal;
+	}
+	if ( record.alphaTest && !cutout ) { return "alpha-test"; }
+	if ( record.hasCustomProgram || record.hasCustomGLSL ) { return "program"; }
+	if ( record.hasMaterialPolygonOffset || ( record.hasPrivatePolygonOffset && !overlays ) ) { return "polygon-offset"; }
+	// The overlay count has already checked the lit stages against the fixed class.
+	if ( overlays || R_MaterialResourceTable_ClassicFixedMaterialEligible( record.material ) ) { return NULL; }
+	if ( !explain ) { return "refused"; }
+	idStr::snPrintf( refusal, sizeof( refusal ), "stages/%s", overlayRefusal != NULL ? overlayRefusal : "fixed-class" );
+	return refusal;
+}
+
+/*
+==================
+R_MaterialResourceTable_ClassicOverlayStageRefusal
+
+REN-02: an ambient stage ARB2 can draw over the composed modern frame because
+its colour result does not depend on the lit colour beneath it:
+- a colour stage that keeps the destination (GL_ONE as the destination factor)
+  and scales its own texel by one, its own alpha, or the destination alpha;
+- an alpha-only stage (maskcolor) that replaces the destination alpha, which a
+  later GL_DST_ALPHA stage reads (the stock helmet and visor reflections);
+- a (GL_ZERO, GL_ONE) stage, which ARB2's shader-pass walk skips.
+ARB2 evaluates the stage's own condition, colour, matrix and texgen, so those
+stay exact. Anything that would read or replace the lit colour, change depth
+or coverage, or sample the scene stays out.
+==================
+*/
+enum classicOverlayStageKind_t {
+	CLASSIC_OVERLAY_STAGE_COLOR,
+	CLASSIC_OVERLAY_STAGE_DST_ALPHA_COLOR,
+	CLASSIC_OVERLAY_STAGE_ALPHA_WRITER,
+	CLASSIC_OVERLAY_STAGE_INERT
+};
+
+static const char *R_MaterialResourceTable_ClassicOverlayStageRefusal( const shaderStage_t *stage, classicOverlayStageKind_t &kind ) {
+	kind = CLASSIC_OVERLAY_STAGE_INERT;
+	if ( stage == NULL ) { return "stage"; }
+	if ( stage->hasAlphaTest ) { return "overlay-alpha-test"; }
+	if ( stage->newStage != NULL ) { return "overlay-program"; }
+	if ( stage->privatePolygonOffset != 0.0f ) { return "overlay-offset"; }
+	if ( stage->texture.texgen == TG_GLASSWARP || stage->texture.texgen == TG_POT_CORRECTION ) { return "overlay-texgen"; }
+	if ( stage->texture.image == NULL || stage->texture.cinematic != NULL || stage->texture.dynamic != DI_STATIC ) { return "overlay-image"; }
+	if ( globalImages != NULL && ( stage->texture.image == globalImages->currentRenderImage
+			|| stage->texture.image == globalImages->currentDepthImage ) ) { return "overlay-scene-image"; }
+	const int source = stage->drawStateBits & GLS_SRCBLEND_BITS;
+	const int destination = stage->drawStateBits & GLS_DSTBLEND_BITS;
+	const int colorMask = stage->drawStateBits & GLS_COLORMASK;
+	if ( colorMask == GLS_COLORMASK ) {
+		if ( ( stage->drawStateBits & GLS_ALPHAMASK ) != 0 ) { return NULL; }
+		// Only a replacing writer leaves an alpha that does not depend on the
+		// frame beneath it.
+		if ( source != GLS_SRCBLEND_ONE || destination != GLS_DSTBLEND_ZERO ) { return "overlay-alpha-blend"; }
+		kind = CLASSIC_OVERLAY_STAGE_ALPHA_WRITER;
+		return NULL;
+	}
+	if ( colorMask != 0 ) { return "overlay-color-mask"; }
+	if ( source == GLS_SRCBLEND_ZERO && destination == GLS_DSTBLEND_ONE ) { return NULL; }
+	if ( destination != GLS_DSTBLEND_ONE ) { return "overlay-blend"; }
+	if ( source == GLS_SRCBLEND_ONE || source == GLS_SRCBLEND_SRC_ALPHA ) {
+		kind = CLASSIC_OVERLAY_STAGE_COLOR;
+		return NULL;
+	}
+	if ( source == GLS_SRCBLEND_DST_ALPHA ) {
+		kind = CLASSIC_OVERLAY_STAGE_DST_ALPHA_COLOR;
+		return NULL;
+	}
+	return "overlay-blend";
+}
+
+int R_MaterialResourceTable_ClassicOverlayStageCount( const idMaterial *material, const char **refusal ) {
+	const char *unused = NULL;
+	const char *&why = refusal != NULL ? *refusal : unused;
+	why = NULL;
+	if ( material == NULL || material->HasPBR() ) { why = "material"; return -1; }
+	if ( material->TestMaterialFlag( MF_NEED_CURRENT_RENDER ) ) { why = "current-render"; return -1; }
+	if ( material->Coverage() != MC_OPAQUE && material->Coverage() != MC_PERFORATED ) { why = "coverage"; return -1; }
+	const bool perforated = material->Coverage() == MC_PERFORATED;
+	int counts[3] = {}, overlays = 0, testedDiffuse = 0, conditionalCutouts = 0;
+	bool alphaWritten = false;
+	for ( int i = 0; i < material->GetNumStages(); ++i ) {
+		const shaderStage_t *stage = material->GetStage( i );
+		if ( stage == NULL ) { why = "stage"; return -1; }
+		if ( stage->lighting == SL_AMBIENT ) {
+			classicOverlayStageKind_t kind;
+			const char *stageRefusal = R_MaterialResourceTable_ClassicOverlayStageRefusal( stage, kind );
+			if ( stageRefusal != NULL ) {
+				// A stage outside the overlay class is admitted only behind a
+				// stage expression (the stock corpseBurnEffect guide's
+				// `if parm7`), which must leave it off in every frame the
+				// corridor owns (ClassicOverlayFrameReady).
+				float condition = 1.0f;
+				if ( material->GetConstantRegisterValue( stage->conditionRegister, condition ) && condition != 0.0f ) {
+					why = stageRefusal;
+					return -1;
+				}
+				conditionalCutouts += stage->hasAlphaTest ? 1 : 0;
+				++overlays;
+				continue;
+			}
+			// The destination alpha a weighted stage reads must come from this
+			// material, or it would be whatever the composed frame holds.
+			if ( kind == CLASSIC_OVERLAY_STAGE_DST_ALPHA_COLOR && !alphaWritten ) { why = "overlay-dst-alpha"; return -1; }
+			alphaWritten = alphaWritten || kind == CLASSIC_OVERLAY_STAGE_ALPHA_WRITER;
+			++overlays;
+			continue;
+		}
+		// The lit stages follow ClassicFixedMaterialEligible's rules.
+		if ( stage->hasAlphaTest && ( !perforated || stage->lighting != SL_DIFFUSE ) ) { why = "lit-alpha-test"; return -1; }
+		if ( stage->privatePolygonOffset != 0.0f ) { why = "lit-offset"; return -1; }
+		testedDiffuse += stage->lighting == SL_DIFFUSE && stage->hasAlphaTest ? 1 : 0;
+		const int slot = stage->lighting == SL_BUMP ? 0 : stage->lighting == SL_DIFFUSE ? 1 : stage->lighting == SL_SPECULAR ? 2 : -1;
+		if ( slot < 0 ) { why = "lit-stage"; return -1; }
+		++counts[slot];
+	}
+	if ( counts[0] < 1 || counts[1] < 1 ) { why = "no-bump-or-diffuse"; return -1; }
+	// A cutout tests every diffuse stage; otherwise only conditioned ambient
+	// stages may make the material perforated, and ARB2 fills its depth
+	// solid in a frame where none of them is active.
+	if ( perforated && testedDiffuse != counts[1] && ( testedDiffuse != 0 || conditionalCutouts == 0 ) ) { why = "perforated-diffuse"; return -1; }
+	if ( overlays == 0 ) { why = "no-overlay"; }
+	return overlays;
+}
+
+bool R_MaterialResourceTable_ClassicConditionalCutoutInactive( const idMaterial *material, const float *regs ) {
+	// REN-02: a material perforated only by conditioned ambient stages, none
+	// of them active this frame. ARB2 fills its depth solid and draws none of
+	// them, so the modern depth and forward passes treat it as opaque too.
+	if ( material == NULL || regs == NULL || material->Coverage() != MC_PERFORATED
+			|| ( r_rendererModernClassicShapes.GetInteger() & MODERN_CLASSIC_SHAPE_OVERLAYS ) == 0 ) { return false; }
+	bool conditional = false;
+	for ( int i = 0; i < material->GetNumStages(); ++i ) {
+		const shaderStage_t *stage = material->GetStage( i );
+		if ( stage == NULL || !stage->hasAlphaTest ) { continue; }
+		if ( stage->lighting != SL_AMBIENT || regs[ stage->conditionRegister ] != 0.0f ) { return false; }
+		conditional = true;
+	}
+	return conditional && R_MaterialResourceTable_ClassicOverlayStageCount( material ) > 0;
+}
+
+bool R_MaterialResourceTable_ClassicOverlayFrameReady( const idMaterial *material, const float *regs ) {
+	if ( material == NULL || regs == NULL ) { return false; }
+	// A stage expression can switch the alpha writer off while its reader
+	// stays on; ARB2 would then read the frame's alpha, which differs here.
+	bool alphaWritten = false;
+	for ( int i = 0; i < material->GetNumStages(); ++i ) {
+		const shaderStage_t *stage = material->GetStage( i );
+		if ( stage == NULL || stage->lighting != SL_AMBIENT || regs[ stage->conditionRegister ] == 0.0f ) { continue; }
+		classicOverlayStageKind_t kind;
+		if ( R_MaterialResourceTable_ClassicOverlayStageRefusal( stage, kind ) != NULL ) { return false; }
+		if ( kind == CLASSIC_OVERLAY_STAGE_DST_ALPHA_COLOR && !alphaWritten ) { return false; }
+		alphaWritten = alphaWritten || kind == CLASSIC_OVERLAY_STAGE_ALPHA_WRITER;
+	}
+	return true;
 }
 
 bool R_MaterialResourceTable_ClassicCorridorOnly( const materialResourceTableRecord_t &record ) {
