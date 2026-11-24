@@ -23,6 +23,7 @@
 #include "RendererMetrics.h"
 #include "RendererUpload.h"
 
+#include <algorithm>
 #include <cmath>
 
 typedef struct modernGLFrameConstants_s {
@@ -520,6 +521,13 @@ static int rg_modernClassicStencilPassesOwned = 0;
 // Why the corridor last declined a frame: the first reason it met, for the
 // "Modern classic lighting" telemetry line. "none" while it owns the view.
 static char rg_modernClassicDecline[128] = "none";
+// REN-02: corridor-owned surfaces whose additive overlay stages (glows) the
+// classic walker draws over the composed frame, sorted by address for lookup.
+static idList<const drawSurf_t *> rg_modernClassicOverlaySurfaces;
+static int rg_modernClassicOverlayDraws = 0;
+static int rg_modernClassicSkinnedReceivers = 0;
+// The first draw R_ModernGLExecutor_MaterialLightingProven refused this frame.
+static char rg_modernMaterialProofRefusal[192] = "none";
 
 static void R_ModernGLExecutor_ClassicDecline( const char *reason, const char *detail = NULL ) {
 	if ( idStr::Icmp( rg_modernClassicDecline, "none" ) != 0 ) { return; }
@@ -531,6 +539,12 @@ static void R_ModernGLExecutor_ClassicDecline( const char *reason, const char *d
 }
 
 static const modernGLSubmitCommand_t *rg_modernClassicCollectCommand = NULL;
+// The corridor view's forward commands, keyed by vertex cache, for the lookup
+// each lit surface of each light makes.
+static idHashIndex rg_modernClassicCommandHash;
+static int R_ModernGLExecutor_ClassicCommandKey( const vertCache_t *cache ) {
+	return cache != NULL ? static_cast<int>( ( reinterpret_cast<uintptr_t>( cache ) >> 4 ) & 0x7fffffff ) : -1;
+}
 static bool rg_modernClassicCollectValid = false;
 static const viewDef_t *rg_modernClassicView = NULL;
 static bool rg_modernClassicExecuted = false;
@@ -2207,7 +2221,14 @@ static void R_ModernGLExecutor_RecordPacketFallbackBlockers( const idScenePacket
 				continue;
 			}
 			stats.modernVisibleMaterialFallbackDraws++;
-			R_ModernGLExecutor_SetOwnershipBlocker( stats, "material", viewIndex, draw.passCategory, materialRecord->materialId, materialRecord->materialName, MaterialResourceFallbackReason_Name( materialRecord->fallbackReason ) );
+			// REN-02 census: a classic material outside the corridor's class
+			// names its first refusal beside the fallback.
+			char blockerReason[160];
+			const char *corridorRefusal = !materialRecord->hasPBR && stats.modernVisibleOwnershipBlocker[0] == '\0'
+				? R_MaterialResourceTable_ClassicCorridorRefusal( *materialRecord ) : NULL;
+			idStr::snPrintf( blockerReason, sizeof( blockerReason ), "%s%s%s", MaterialResourceFallbackReason_Name( materialRecord->fallbackReason ),
+				corridorRefusal != NULL ? "/corridor:" : "", corridorRefusal != NULL ? corridorRefusal : "" );
+			R_ModernGLExecutor_SetOwnershipBlocker( stats, "material", viewIndex, draw.passCategory, materialRecord->materialId, materialRecord->materialName, blockerReason );
 		}
 	}
 }
@@ -2251,7 +2272,11 @@ static bool R_ModernGLExecutor_MaterialLightingProven( const idScenePacketFrame 
 	// Authored PBR has its own tested BRDF, not the classic interaction model.
 	// Qualify every participating receiver before bypassing classic parity;
 	// admitting one PBR material must never approve unrelated stock shading.
-	if ( !r_rendererModernQuality.GetBool() || !r_useScissor.GetBool() ) { return false; }
+	idStr::Copynz( rg_modernMaterialProofRefusal, "none", sizeof( rg_modernMaterialProofRefusal ) );
+	if ( !r_rendererModernQuality.GetBool() || !r_useScissor.GetBool() ) {
+		idStr::Copynz( rg_modernMaterialProofRefusal, "quality-or-scissor", sizeof( rg_modernMaterialProofRefusal ) );
+		return false;
+	}
 	// Disabling scissors changes the classic projector contract: its remaining
 	// per-interaction triangle culling is not represented by cluster bounds.
 	// Retain native ownership for this diagnostic/tiled-capture mode.
@@ -2269,6 +2294,12 @@ static bool R_ModernGLExecutor_MaterialLightingProven( const idScenePacketFrame 
 		if ( record == NULL || ( !R_MaterialResourceTable_PBRModernPathEligible( *record )
 				&& !R_MaterialResourceTable_ClassicDiffusePathEligible( *record )
 				&& !( draw.viewDef == rg_modernClassicView && R_MaterialResourceTable_ClassicCorridorPathEligible( *record ) ) ) ) {
+			// REN-02 census: the first draw outside the proven classes.
+			const char *refusal = record != NULL && !record->hasPBR ? R_MaterialResourceTable_ClassicCorridorRefusal( *record ) : NULL;
+			idStr::snPrintf( rg_modernMaterialProofRefusal, sizeof( rg_modernMaterialProofRefusal ), "pass=%d view=%s %s(%s)",
+				static_cast<int>( draw.passCategory ), draw.viewDef == rg_modernClassicView ? "corridor" : "other",
+				record != NULL ? record->materialName : "<no-record>",
+				record == NULL ? "no-record" : record->hasPBR ? "pbr-not-ready" : refusal != NULL ? refusal : "corridor-eligible" );
 			return false;
 		}
 		haveClassicDiffuse = haveClassicDiffuse || !record->hasPBR;
@@ -2342,7 +2373,9 @@ static bool R_ModernGLExecutor_ClassicStageForCommand( const modernGLSubmitComma
 	const GLuint normalTexture = static_cast<GLuint>( command.materialTextureHandles[MODERN_GL_SUBMIT_MATERIAL_TEXTURE_NORMAL] );
 	idVec4 diffuseMatrix[2];
 	bool haveDiffuse = false;
-	if ( shader->Coverage() == MC_PERFORATED ) {
+	// A material perforated only by conditioned ambient stages, none active,
+	// is filled solid by ARB2 and drawn opaque by the modern passes.
+	if ( shader->Coverage() == MC_PERFORATED && !R_MaterialResourceTable_ClassicConditionalCutoutInactive( shader, regs ) ) {
 		// ARB2's depth fill draws each active alpha-tested stage with its own
 		// image, texture matrix and alpha scale (RB_T_FillDepthBuffer).
 		const shaderStage_t *tested = NULL;
@@ -7303,6 +7336,9 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	rg_modernClassicPrimitives.SetNum( 0, false );
 	rg_modernClassicLights.SetNum( 0, false );
 	rg_modernClassicStencilLights = 0;
+	rg_modernClassicOverlaySurfaces.SetNum( 0, false );
+	rg_modernClassicOverlayDraws = 0;
+	rg_modernClassicSkinnedReceivers = 0;
 	idStr::Copynz( rg_modernClassicDecline, "none", sizeof( rg_modernClassicDecline ) );
 	// REN-02 step 3: the corridor accumulates classic light exactly as ARB2
 	// writes its framebuffer, and the forward pass passes it through unchanged
@@ -7332,9 +7368,23 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 		const materialResourceTableRecord_t *material = R_ModernGLExecutor_MaterialRecordForCommand( command );
 		if ( material == NULL || material->hasPBR ) { continue; }
 		const drawPacket_t *draw = command.drawPlanEntry != NULL ? command.drawPlanEntry->drawPacket : NULL;
-		if ( draw == NULL || draw->geometryRecord == NULL || draw->geometryRecord->skinningMode != GEOMETRY_SKINNING_NONE
-				|| draw->geometryRecord->deformMode != GEOMETRY_DEFORM_NONE ) {
-			R_ModernGLExecutor_ClassicDecline( "skinned-or-deformed-geometry", material->materialName );
+		// A CPU-skinned surface, like any surface the front end deformed, is
+		// finished geometry in this frame's vertices, which its ambient command
+		// and ARB2's interactions both draw. The interaction collector still
+		// requires the two to share one vertex cache.
+		const int shapes = r_rendererModernClassicShapes.GetInteger();
+		const bool frontEndGeometry = ( shapes & MODERN_CLASSIC_SHAPE_CPU_SKINNED ) != 0;
+		const geometryResourceRecord_t *geometry = draw != NULL ? draw->geometryRecord : NULL;
+		const bool cpuSkinned = geometry != NULL && geometry->skinningMode == GEOMETRY_SKINNING_CPU && frontEndGeometry;
+		const bool surfaceDeform = geometry != NULL && geometry->deformMode == GEOMETRY_DEFORM_SURFACE && frontEndGeometry;
+		if ( geometry == NULL
+				|| ( geometry->skinningMode != GEOMETRY_SKINNING_NONE && !cpuSkinned )
+				|| ( geometry->deformMode != GEOMETRY_DEFORM_NONE && !surfaceDeform ) ) {
+			char detail[160];
+			idStr::snPrintf( detail, sizeof( detail ), "%s(skin=%d,deform=%d)", material->materialName,
+				draw != NULL && draw->geometryRecord != NULL ? static_cast<int>( draw->geometryRecord->skinningMode ) : -1,
+				draw != NULL && draw->geometryRecord != NULL ? static_cast<int>( draw->geometryRecord->deformMode ) : -1 );
+			R_ModernGLExecutor_ClassicDecline( "skinned-or-deformed-geometry", detail );
 			return;
 		}
 		if ( !R_MaterialResourceTable_ClassicCorridorPathEligible( *material ) ) {
@@ -7371,6 +7421,21 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 		}
 		root = command.viewDef;
 		extended = extended || !R_MaterialResourceTable_ClassicDiffusePathEligible( *material );
+		rg_modernClassicSkinnedReceivers += cpuSkinned ? 1 : 0;
+		if ( surf != NULL && ( shapes & MODERN_CLASSIC_SHAPE_OVERLAYS ) != 0
+				&& R_MaterialResourceTable_ClassicOverlayStageCount( material->material ) > 0 ) {
+			// ARB2 writes display-referred values; added into the laboratory's
+			// linear HDR scene they would be the wrong quantity.
+			if ( R_ModernGLExecutor_PBRLinearSceneRequested() ) {
+				R_ModernGLExecutor_ClassicDecline( "overlay-linear-scene", material->materialName );
+				return;
+			}
+			if ( !R_MaterialResourceTable_ClassicOverlayFrameReady( material->material, surf->shaderRegisters ) ) {
+				R_ModernGLExecutor_ClassicDecline( "overlay-frame", material->materialName );
+				return;
+			}
+			rg_modernClassicOverlaySurfaces.Append( surf );
+		}
 	}
 	if ( !extended || root == NULL ) {
 		// Nothing here needs the corridor: the forward pass owns the proven
@@ -7383,6 +7448,16 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 		if ( view != NULL && view->viewEntitys != NULL && !R_ModernGLExecutor_ViewDefUsesLegacySidecar( view ) && view != root ) {
 			R_ModernGLExecutor_ClassicDecline( "second-view" );
 			return;
+		}
+	}
+	// ARB2 fogs and blends a glow after drawing it; added over a composed frame
+	// whose fog and blend lights the modern path already drew, it would not be.
+	if ( rg_modernClassicOverlaySurfaces.Num() > 0 ) {
+		for ( const viewLight_t *light = root->viewLights; light != NULL; light = light->next ) {
+			if ( light->lightShader->IsFogLight() || light->lightShader->IsBlendLight() ) {
+				R_ModernGLExecutor_ClassicDecline( "overlay-fog-blend", light->lightShader->GetName() );
+				return;
+			}
 		}
 	}
 	const renderGraphResourceHandle_t *depth = R_RenderGraphResources_FindHandle( "sceneDepth" );
@@ -7402,6 +7477,17 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	RB_DetermineLightScale();
 	rg_modernClassicCollectValid = backEnd.overBright == 1.0f;
 	if ( !rg_modernClassicCollectValid ) { R_ModernGLExecutor_ClassicDecline( "overbright" ); }
+	// Each lit surface finds its forward command by vertex cache. Added from
+	// the last command back, so a chain yields the first match in plan order.
+	rg_modernClassicCommandHash.Clear();
+	for ( int i = rg_modernGLSubmitPlan.NumCommands() - 1; i >= 0 && rg_modernClassicCollectValid; --i ) {
+		const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
+		const drawSurf_t *owner = R_ModernGLExecutor_CommandSurface( command );
+		if ( R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) && command.viewDef == root
+				&& owner != NULL && owner->geo != NULL && owner->geo->ambientCache != NULL ) {
+			rg_modernClassicCommandHash.Add( R_ModernGLExecutor_ClassicCommandKey( owner->geo->ambientCache ), i );
+		}
+	}
 	for ( viewLight_t *light = root->viewLights; light != NULL && rg_modernClassicCollectValid; light = light->next ) {
 		if ( light->lightShader->IsFogLight() || light->lightShader->IsBlendLight() ) { continue; }
 		backEnd.vLight = light;
@@ -7433,16 +7519,21 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 					continue;
 				}
 				rg_modernClassicCollectCommand = NULL;
-				for ( int i = 0; i < rg_modernGLSubmitPlan.NumCommands(); ++i ) {
+				const int surfaceKey = surface->geo != NULL ? R_ModernGLExecutor_ClassicCommandKey( surface->geo->ambientCache ) : -1;
+				for ( int i = surfaceKey >= 0 ? rg_modernClassicCommandHash.First( surfaceKey ) : -1; i != -1; i = rg_modernClassicCommandHash.Next( i ) ) {
 					const modernGLSubmitCommand_t &command = rg_modernGLSubmitPlan.Command( i );
 					const drawSurf_t *owner = R_ModernGLExecutor_CommandSurface( command );
-					if ( R_ModernGLExecutor_ClassicCorridorShaderKind( command.shaderKind ) && command.viewDef == root
-							&& owner != NULL && owner->space == surface->space && owner->material == surface->material
-							&& owner->geo != NULL && surface->geo != NULL && owner->geo->ambientCache != NULL
+					if ( owner->space == surface->space && owner->material == surface->material
 							&& owner->geo->ambientCache == surface->geo->ambientCache ) { rg_modernClassicCollectCommand = &command; break; }
 				}
 				if ( rg_modernClassicCollectCommand == NULL || chain == 2 ) {
-					R_ModernGLExecutor_ClassicDecline( chain == 2 ? "translucent-interaction" : "interaction-without-command", surface->material->GetName() );
+					// Name why the surface has no corridor command: the material's
+					// first refusal, or none when its ambient draw is missing.
+					const materialResourceTableRecord_t *record = R_MaterialResourceTable_FindRecordForMaterial( surface->material );
+					const char *refusal = record != NULL ? R_MaterialResourceTable_ClassicCorridorRefusal( *record ) : "no-record";
+					char detail[192];
+					idStr::snPrintf( detail, sizeof( detail ), "%s(%s)", surface->material->GetName(), refusal != NULL ? refusal : "no-command" );
+					R_ModernGLExecutor_ClassicDecline( chain == 2 ? "translucent-interaction" : "interaction-without-command", detail );
 					rg_modernClassicCollectValid = false;
 					break;
 				}
@@ -7462,12 +7553,22 @@ static void R_ModernGLExecutor_PrepareClassicLighting( const idScenePacketFrame 
 	glScissor( scissor[0], scissor[1], scissor[2], scissor[3] );
 	backEnd = savedBackend;
 	rg_modernClassicCollectCommand = NULL;
-	if ( rg_modernClassicCollectValid && R_ModernGLExecutor_PrepareClassicTarget( *depth ) ) { rg_modernClassicView = root; }
-	else {
+	if ( rg_modernClassicCollectValid && R_ModernGLExecutor_PrepareClassicTarget( *depth ) ) {
+		rg_modernClassicView = root;
+		// The classic walker asks for each drawSurf of the view; keep the lookup
+		// logarithmic and each surface once (depth and forward commands share it).
+		std::sort( rg_modernClassicOverlaySurfaces.Ptr(), rg_modernClassicOverlaySurfaces.Ptr() + rg_modernClassicOverlaySurfaces.Num() );
+		const drawSurf_t **end = std::unique( rg_modernClassicOverlaySurfaces.Ptr(), rg_modernClassicOverlaySurfaces.Ptr() + rg_modernClassicOverlaySurfaces.Num() );
+		rg_modernClassicOverlaySurfaces.SetNum( static_cast<int>( end - rg_modernClassicOverlaySurfaces.Ptr() ), false );
+	} else {
 		R_ModernGLExecutor_ClassicDecline( "target" );
 		rg_modernClassicPrimitives.SetNum( 0, false );
 		rg_modernClassicLights.SetNum( 0, false );
 		rg_modernClassicStencilLights = 0;
+	}
+	if ( rg_modernClassicView == NULL ) {
+		rg_modernClassicOverlaySurfaces.SetNum( 0, false );
+		rg_modernClassicSkinnedReceivers = 0;
 	}
 	R_GLStateCache_InvalidateAll( "classic lighting preflight" );
 }
@@ -10651,6 +10752,31 @@ void R_ModernGLExecutor_ComposeVisibleSceneForPost( void ) {
 	R_ModernGLExecutor_ComposeVisibleSceneToTarget( true, true, true, false, false, "modern-visible-post-handoff" );
 }
 
+/*
+==================
+R_ModernGLExecutor_ClassicOverlaysPending / ClassicOverlaySurface
+
+REN-02: the forward pass draws a corridor surface's light and baked term and
+leaves its additive overlay stages (glows) to the classic walker, which draws
+them over the composed frame with its own shader-pass walk. Only meaningful
+while this executor owns the view's ambient pass.
+==================
+*/
+bool R_ModernGLExecutor_ClassicOverlaysPending( const viewDef_t *viewDef ) {
+	return rg_modernClassicExecuted && viewDef != NULL && viewDef == rg_modernClassicView
+		&& rg_modernClassicOverlaySurfaces.Num() > 0;
+}
+
+bool R_ModernGLExecutor_ClassicOverlaySurface( const drawSurf_t *surf ) {
+	if ( surf == NULL || !R_ModernGLExecutor_ClassicOverlaysPending( backEnd.viewDef ) ) { return false; }
+	const drawSurf_t *const *begin = rg_modernClassicOverlaySurfaces.Ptr();
+	const drawSurf_t *const *end = begin + rg_modernClassicOverlaySurfaces.Num();
+	const drawSurf_t *const *found = std::lower_bound( begin, end, surf );
+	if ( found == end || *found != surf ) { return false; }
+	++rg_modernClassicOverlayDraws;
+	return true;
+}
+
 void R_ModernGLExecutor_ComposeVisibleFrame( void ) {
 	modernGLExecutorStats_t &stats = rg_modernGLExecutorStats;
 	if ( !stats.modernVisibleRequested ) {
@@ -10857,10 +10983,14 @@ bool R_ModernGLExecutor_ModernVisiblePostProcessHandoffActive( void ) {
 }
 
 void R_ModernGLExecutor_PrintGfxInfo( void ) {
-	common->Printf( "Modern classic lighting: ready=%d executed=%d primitives=%d extent=%dx%d lights=%d stencilLights=%d decline=%s\n",
+	common->Printf( "Modern classic lighting: ready=%d executed=%d primitives=%d extent=%dx%d lights=%d stencilLights=%d overlays=%d overlayDraws=%d skinned=%d decline=%s\n",
 		rg_modernClassicView != NULL ? 1 : 0, rg_modernClassicExecuted ? 1 : 0,
 		rg_modernClassicPrimitives.Num(), rg_modernClassicWidth, rg_modernClassicHeight,
-		rg_modernClassicLights.Num(), rg_modernClassicStencilLights, rg_modernClassicDecline );
+		rg_modernClassicLights.Num(), rg_modernClassicStencilLights,
+		rg_modernClassicView != NULL ? rg_modernClassicOverlaySurfaces.Num() : 0, rg_modernClassicOverlayDraws,
+		rg_modernClassicView != NULL ? rg_modernClassicSkinnedReceivers : 0, rg_modernClassicDecline );
+	common->Printf( "Modern material proof: proven=%d refusal=%s\n",
+		rg_modernGLExecutorStats.modernVisibleMaterialLightingProven ? 1 : 0, rg_modernMaterialProofRefusal );
 	common->Printf( "Modern PBR display: linear=%d output=%s\n",
 		R_ModernGLExecutor_PBRLinearSceneActive() ? 1 : 0,
 		R_ModernGLExecutor_PBRLinearSceneActive() ? "filmic-sRGB" : "legacy-or-diagnostic" );

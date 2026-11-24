@@ -220,6 +220,18 @@ static bool RB_DrawSurfNeedsPostFogLegacyFeedback( const drawSurf_t *surf ) {
 	return RB_DrawSurfNeedsLegacyFeedback( surf ) && RB_DrawSurfIsPostFogMaterialPass( surf );
 }
 
+// REN-02: a corridor-owned classic surface's additive overlay stages (glows),
+// which the modern forward pass leaves for this walk over the composed frame.
+static bool RB_DrawSurfIsModernClassicOverlay( const drawSurf_t *surf ) {
+	return RB_DrawSurfIsPreFogMaterialPass( surf ) && R_ModernGLExecutor_ClassicOverlaySurface( surf );
+}
+
+// One walk in sort order for everything the classic walker still draws inside
+// a modern-owned pre-fog ambient pass.
+static bool RB_DrawSurfNeedsPreFogLegacyDraw( const drawSurf_t *surf ) {
+	return RB_DrawSurfNeedsPreFogLegacyFeedback( surf ) || RB_DrawSurfIsModernClassicOverlay( surf );
+}
+
 static bool RB_HasLegacyFeedbackDrawSurfs( drawSurf_t **drawSurfs, int numDrawSurfs, rbShaderPassSurfFilter_t filter = NULL ) {
 	for ( int i = 0; i < numDrawSurfs; ++i ) {
 		if ( filter != NULL && !filter( drawSurfs[i] ) ) {
@@ -18268,16 +18280,18 @@ void	RB_STD_DrawView( void ) {
 			RENDER_PASS_AMBIENT, backEnd.viewDef );
 	const bool preFogFeedback = ambientLegacySkipped && RB_HasLegacyFeedbackDrawSurfs( drawSurfs, processed, RB_DrawSurfIsPreFogMaterialPass );
 	const bool postFogFeedback = ambientLegacySkipped && RB_HasLegacyFeedbackDrawSurfs( drawSurfs, processed, RB_DrawSurfIsPostFogMaterialPass );
+	const bool classicOverlays = ambientLegacySkipped && R_ModernGLExecutor_ClassicOverlaysPending( backEnd.viewDef );
 	if ( sharedWorldAmbientOwned ) {
 		RB_DrawSharedWorldAmbientPhase(
 			CLASSIC_WORLD_AMBIENT_PHASE_PRE_FOG );
 	} else if ( ambientLegacySkipped ) {
-		if ( preFogFeedback || postFogFeedback ) {
+		if ( preFogFeedback || postFogFeedback || classicOverlays ) {
 			R_ModernGLExecutor_ComposeVisibleSceneForPost();
 			backEnd.currentRenderCopied = false;
 			backEnd.currentDepthCopied = false;
-			if ( preFogFeedback ) {
-				RB_STD_DrawShaderPasses( drawSurfs, processed, RB_DrawSurfNeedsPreFogLegacyFeedback );
+			if ( preFogFeedback || classicOverlays ) {
+				RB_STD_DrawShaderPasses( drawSurfs, processed,
+					classicOverlays ? RB_DrawSurfNeedsPreFogLegacyDraw : RB_DrawSurfNeedsPreFogLegacyFeedback );
 			}
 		}
 		R_ModernGLExecutor_RecordLegacyPassSkipped( RENDER_PASS_AMBIENT );

@@ -57,7 +57,7 @@ BASE = {
     'r_rendererModernOpaque': '1', 'r_rendererModernDeferred': '1',
     'r_rendererForwardPlus': '1', 'r_rendererModernVisible': '1',
     'r_rendererModernLightingParity': '0', 'r_rendererModernQuality': '1',
-    'r_rendererModernClassicShapes': '3',
+    'r_rendererModernClassicShapes': '15',
     'r_rendererModernAutoPromote': '0', 'r_rendererClusteredDecals': '0',
     'r_rendererSharedWorldFogBlend':'0',
     'r_rendererSharedWorldAmbient':'0',
@@ -184,7 +184,7 @@ CASES = {
     **{f'production-fixed{kind}{suffix}': {'r_rendererModernLightingParity':'0','r_hdrToneMap':'1','r_lightScale':'0.1',
           **({'r_pbrMaterials':'0','r_rendererReflectionProbes':'0'} if suffix else {})}
        for kind in ('','-bump','-diffuse','-colored','-cutout','-cutout-bump','-vertex','-texmatrix','-condition','-multistage','-ambient','-fog',
-                    '-cutout-texmatrix','-cutout-vertex','-cutout-condition') for suffix in ('','-native')},
+                    '-cutout-texmatrix','-cutout-vertex','-cutout-condition','-overlay','-overlay-condition','-overlay-mask') for suffix in ('','-native')},
     'production-curved': {'r_rendererModernLightingParity':'0'},
     'production-curved-native': {'r_rendererModernLightingParity':'0','r_pbrMaterials':'0','r_rendererReflectionProbes':'0'},
     **{f'production-{light}{suffix}': {'r_rendererModernLightingParity':'0',
@@ -314,12 +314,17 @@ for restart in ('partial','full'):
 # expression) on a cutout, and on a baked-light receiver.
 CUTOUT_STAGE_KINDS = ('-cutout-texmatrix', '-cutout-vertex', '-cutout-condition')
 GRID_STAGE_KINDS = ('-grid-texmatrix', '-grid-vertex', '-grid-condition', '-grid-stage')
+# REN-02: lit materials with additive overlay stages (glows), which ARB2 draws
+# over the composed frame. ARB2 writes display-referred values, so the corridor
+# declines them in the laboratory's linear scene and they are proven in the
+# display frame only (`-display` against `-native`), alone and over baked light.
+OVERLAY_KINDS = ('-overlay', '-overlay-condition', '-overlay-mask', '-grid-overlay')
 # At the laboratory's 0.2 grid intensity the baked term is 1 to 4 levels on
 # the specimen, the size of the comparison's own tolerance. These repeat the
 # flat-bump baseline and the diffuse stage state at ten times that intensity.
 GRID_STRONG_KINDS = ('-grid-strong', '-grid-flat-stage', '-grid-flat-vertex')
 DISPLAY_CORRIDOR_KINDS = ('', '-bump', '-cutout-bump', '-vertex', '-texmatrix', '-condition', '-multistage', '-ambient', '-grid', '-fog',
-                          *CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS, '-stencil', '-compose')
+                          *CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS, '-stencil', '-compose', *OVERLAY_KINDS)
 # Mixed-material model (REN-05): one skinned mesh, PBR above its equator and
 # classic below, on CPU skinning and packed MD5R.
 for backend in ('cpu','md5r'):
@@ -376,6 +381,13 @@ for kind in GRID_STRONG_KINDS:
 CASES['production-fixed-grid-multistage-fallback'] = dict(CASES['production-fixed-grid'])
 CASES['production-fixed-grid-multistage-native'] = dict(CASES['production-fixed-grid-native'])
 CASES['production-fixed-stages-fallback'] = {**CASES['production-fixed-cutout-texmatrix'], 'r_rendererModernClassicShapes': '0'}
+for suffix in ('', '-native'):
+    CASES['production-fixed-grid-overlay'+suffix] = dict(CASES['production-fixed-grid-strong'+suffix])
+# Overlays decline by name in the linear scene, and clearing the overlay bit
+# hands the frame back to ARB2.
+CASES['production-fixed-overlay-linear-fallback'] = dict(CASES['production-fixed-overlay'])
+CASES['production-fixed-overlay-off-fallback'] = {**CASES['production-fixed-overlay'], 'r_pbrLinearScene': '0',
+                                                  'r_rendererModernClassicShapes': '11'}
 # REN-02 step 4: every light shadows with stencil volumes (r_useShadowMap 0),
 # and a second sphere casts across the specimen. The rollback control clears
 # the stencil bit, which hands the frame back to ARB2.
@@ -417,6 +429,7 @@ FALLBACK_CASES.update(('fog-fallback','blend-fallback','lightgrid-fallback'))
 FALLBACK_CASES.update(f'production-fixed-{boundary}-fallback' for boundary in ('shadow','msaa'))
 FALLBACK_CASES.update(('production-fixed-grid-multistage-fallback','production-fixed-stages-fallback'))
 FALLBACK_CASES.update(('production-fixed-stencil-off-fallback','production-fixed-stencil-compose-fallback'))
+FALLBACK_CASES.update(('production-fixed-overlay-linear-fallback','production-fixed-overlay-off-fallback'))
 # Controls whose PBR specimen is deliberately hidden (background captures for
 # composite oracles): no native owner is expected to admit anything there.
 HIDDEN_SPECIMEN_CASES: set[str] = set()
@@ -428,7 +441,7 @@ LEGACY_CASES.update(('production-fixed-colored-native','production-fixed-master-
 LEGACY_CASES.add('production-fixed-grid-native')
 LEGACY_CASES.add('production-fixed-grid-multistage-native')
 LEGACY_CASES.update(('production-fixed-stencil-native','production-fixed-compose-native'))
-LEGACY_CASES.update(f'production-fixed{kind}-native' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS))
+LEGACY_CASES.update(f'production-fixed{kind}-native' for kind in (*CUTOUT_STAGE_KINDS, *GRID_STAGE_KINDS, *GRID_STRONG_KINDS, *OVERLAY_KINDS))
 LEGACY_CASES.update(f'production-fixed-{boundary}-native' for boundary in ('shadow','msaa'))
 LEGACY_CASES.update(f'production-{light}-native' for light in ('points','projector'))
 LEGACY_CASES.update(('production-no-scissor-native','production-fixed-native','production-fixed-bump-native','production-fixed-diffuse-native','production-fixed-cutout-native','production-fixed-cutout-bump-native','production-fixed-vertex-native','production-fixed-texmatrix-native','production-fixed-condition-native','production-fixed-multistage-native','production-fixed-ambient-native','production-fixed-fog-native'))
@@ -2088,6 +2101,10 @@ def inspect_capture(args: argparse.Namespace, case: str, text: str, shot: Path) 
     if case in ('production-fixed-compose','production-fixed-compose-display','production-fixed-stencil-compose-fallback'):
         if not re.search(r'Renderer shared interaction: requested=1 prepared=1 valid=1 views=[1-9]\d* ready=[1-9]\d* fallback=0\b', text):
             failures.append('the shared interaction domain did not seal the view beside the aggregate executor')
+    if case in (*(f'production-fixed{kind}-display' for kind in OVERLAY_KINDS),) and not re.search(r'Modern classic lighting: ready=1 executed=1 .*overlays=[1-9]\d* overlayDraws=[1-9]',text):
+        failures.append('the classic walker did not draw the corridor surface\'s overlay stages')
+    if case == 'production-fixed-overlay-linear-fallback' and 'decline=overlay-linear-scene:' not in text:
+        failures.append('the linear scene did not decline the overlay by name')
     if case == 'production-fixed-stencil-clear' and not re.search(r'Modern classic lighting: ready=1 executed=1 .*stencilLights=0\b',text):
         failures.append('the unshadowed twin still drew a stencil-shadowed light')
     if case in ('production-fixed-stencil','production-fixed-stencil-display') and not re.search(r'Modern classic lighting: ready=1 executed=1 .*stencilLights=[1-9]',text):
@@ -2458,6 +2475,10 @@ def capture_cases(args: argparse.Namespace, cases: list[str], save: Path) -> lis
             for name in ('texmatrix','vertex','condition','multistage'):
                 if case.startswith('production-fixed-grid-'+name): material='classic_'+name
             if case.startswith('production-fixed-grid-stage'): material='classic_grid_stage'
+            if case.startswith('production-fixed-overlay'): material='classic_overlay'
+            if case.startswith('production-fixed-grid-overlay'): material='classic_overlay_flat'
+            if case.startswith('production-fixed-overlay-condition'): material='classic_overlay_condition'
+            if case.startswith('production-fixed-overlay-mask'): material='classic_overlay_mask'
             for name in ('flat-stage','flat-vertex'):
                 if case.startswith('production-fixed-grid-'+name): material='classic_grid_'+name.replace('-','_')
             if case.startswith(('production-fixed-stencil','production-fixed-compose')): material='classic_bump'
