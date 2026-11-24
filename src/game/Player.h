@@ -548,6 +548,7 @@ public:
 
 							// the entity whose interactive GUI the crosshair is on, or NULL
 	idEntity *				GetFocusGuiEntity( void ) const { return focusUI != NULL ? focusEnt.GetEntity() : NULL; }
+	bool					GetFocusGuiPoint( idVec3 &point ) const { if ( focusType != FOCUS_GUI || focusUI == NULL ) return false; point = focusGuiPoint; return true; }
 
 	// save games
 	void					Save( idSaveGame *savefile ) const;					// archives object for save game file
@@ -1145,6 +1146,10 @@ private:
 	// if there is a focusGUIent, the attack button will be changed into mouse clicks
 	idUserInterface *		focusUI;
 	int						focusTime;
+	// openQ4: where the cursor meets the focused interactive GUI (FOCUS_GUI),
+	// so the view can focus its depth of field there. Rebuilt every frame by
+	// UpdateFocus; not saved.
+	idVec3					focusGuiPoint = idVec3( 0.0f, 0.0f, 0.0f );
 	playerFocus_t			focusType;
 	idEntityPtr<idEntity>	focusEnt;
 	idUserInterface *		focusBrackets;	

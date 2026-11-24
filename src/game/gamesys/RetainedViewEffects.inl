@@ -66,19 +66,69 @@ The view's depth of field, asked for before it renders. While the weapon
 wheel is open the renderer keeps the view weapon and the world near it sharp
 and defocuses the rest; where it cannot (the Depth of Field setting is off,
 no post-processing, a headset's eye) the view-effects document blurs the
-whole scene instead, as it always did. Otherwise the scene's own request
-(a map script's lens, ScriptedDepthOfField) goes through.
+whole scene instead, as it always did.
+
+While the cursor is on an interactive in-world GUI (a terminal, a door panel)
+the screen becomes the focus plane of a fast lens: the panel and its frame
+stay sharp, the room behind and anything between softens, and the view weapon
+keeps its detail. It eases in and out and pulls focus as the player moves.
+It has no fallback: blurring the whole view would blur the screen being read.
+The player's Depth of Field setting (r_depthOfField) switches it with the rest.
+
+Otherwise the scene's own request (a map script's lens, ScriptedDepthOfField)
+goes through; a focused GUI wins over it for as long as it is in focus.
 */
-void idPlayerView::RequestRetainedWheelFocus( bool allowed, bool headset, const renderViewDepthOfField_t &scene ) {
+static const float GUI_FOCUS_FADE_IN_SECONDS = 0.25f;
+static const float GUI_FOCUS_FADE_OUT_SECONDS = 0.4f;
+static const float GUI_FOCUS_PULL_RATE = 10.0f;		// per second, for the eased focus distance
+// A longer lens than the view's own: at arm's length the wide game field of
+// view would barely soften anything. With 50 mm at f/2 the room a few metres
+// behind the screen reaches the full blur.
+static const float GUI_FOCUS_FOCAL_LENGTH = 50.0f;	// millimetres
+static const float GUI_FOCUS_FSTOP = 2.0f;
+static const float GUI_FOCUS_MAX_BLUR = 12.0f;		// pixels of a 1080-line view
+
+void idPlayerView::RequestViewDepthOfField( bool allowed, const renderView_t &view, const renderViewDepthOfField_t &scene ) {
+	const bool headset = view.asymmetricFov;
+	const bool usable = allowed && !headset && player && !player->spectating;
 	float wheel = 0;
-	if ( allowed && !headset && player && !player->spectating && cvarSystem->GetCVarBool( "ui_retained" ) ) {
+	if ( usable && cvarSystem->GetCVarBool( "ui_retained" ) ) {
 		wheel = RetainedViewEase( player->GetWeaponWheelBlend() );
 	}
+
+	// The focused GUI's lens, advanced by game time so a paused game holds it.
+	idVec3 guiPoint;
+	const bool guiFocused = usable && player->GetFocusGuiPoint( guiPoint );
+	const int now = gameLocal.time;
+	const float elapsed = guiFocusTime < 0 || now < guiFocusTime ? 0.0f : Min( now - guiFocusTime, 100 ) * 0.001f;
+	guiFocusTime = now;
+	if ( guiFocused ) {
+		const float target = Max( ( guiPoint - view.vieworg ) * view.viewaxis[0], 4.0f );
+		if ( guiFocusBlend <= 0 ) {
+			guiFocusDistance = target;
+		} else {
+			guiFocusDistance += ( target - guiFocusDistance ) * ( 1.0f - idMath::Exp( -GUI_FOCUS_PULL_RATE * elapsed ) );
+		}
+		guiFocusBlend = Min( 1.0f, guiFocusBlend + elapsed / GUI_FOCUS_FADE_IN_SECONDS );
+	} else {
+		guiFocusBlend = usable ? Max( 0.0f, guiFocusBlend - elapsed / GUI_FOCUS_FADE_OUT_SECONDS ) : 0.0f;
+	}
+
 	renderViewDepthOfField_t dof = scene;
 	if ( wheel > 0 ) {
 		dof = renderViewDepthOfField_t();
 		dof.amount = wheel;
 		dof.flags = VIEW_DOF_FOCUS_VIEW_WEAPON;
+	} else if ( guiFocusBlend > 0 ) {
+		dof = renderViewDepthOfField_t();
+		dof.amount = RetainedViewEase( guiFocusBlend );
+		dof.flags = VIEW_DOF_SHARP_VIEW_WEAPON;
+		dof.focusDistance = guiFocusDistance;
+		dof.fStop = GUI_FOCUS_FSTOP;
+		dof.focalLength = GUI_FOCUS_FOCAL_LENGTH;
+		// A panel seen at an angle spans some depth; keep all of it sharp.
+		dof.focusRange = idMath::ClampFloat( 8.0f, 24.0f, guiFocusDistance * 0.3f );
+		dof.maxBlur = GUI_FOCUS_MAX_BLUR;
 	} else if ( headset ) {
 		dof.amount = 0;
 	}

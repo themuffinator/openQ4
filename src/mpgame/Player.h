@@ -835,6 +835,7 @@ public:
 
 	virtual bool			HandleSingleGuiCommand( idEntity *entityGui, idLexer *src );
 	bool					GuiActive( void ) { return focusType == FOCUS_GUI; }
+	bool					GetFocusGuiPoint( idVec3 &point ) const { if ( focusType != FOCUS_GUI || focusUI == NULL ) return false; point = focusGuiPoint; return true; }
 
 	void					GenerateImpulseForBuyAttempt( const char* itemName );
 	bool					AttemptToBuyItem( const char* itemName );
@@ -1185,6 +1186,10 @@ private:
 	// if there is a focusGUIent, the attack button will be changed into mouse clicks
 	idUserInterface *		focusUI;
 	int						focusTime;
+	// openQ4: where the cursor meets the focused interactive GUI (FOCUS_GUI),
+	// so the view can focus its depth of field there. Rebuilt every frame by
+	// UpdateFocus; not saved.
+	idVec3					focusGuiPoint = idVec3( 0.0f, 0.0f, 0.0f );
 	playerFocus_t			focusType;
 	idEntityPtr<idEntity>	focusEnt;
 	idUserInterface *		focusBrackets;	

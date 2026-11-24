@@ -611,8 +611,9 @@ the [development roadmap](../roadmap.md) for current scope.
   and the arrow pointing at your choice again; only the spokes, icons and
   text had been showing.
 - **Depth of Field** (Settings > Display > Effects, `r_depthOfField`) turns
-  the game's own depth of field on or off: the weapon wheel's focus and
-  scripted cutscene focus. Enhanced, Quality, Ultra and Maximum turn it on.
+  the game's own depth of field on or off: the weapon wheel's focus,
+  focus on the in-world screen you are using (the screen stays sharp, the
+  room behind it softens) and scripted cutscene focus. Enhanced, Quality, Ultra and Maximum turn it on.
   Because the presets changed, the game offers its graphics system check once
   more on the next start.
 - Map and mod scripts can drive depth of field with `sys.setDepthOfField`,

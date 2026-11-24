@@ -11,14 +11,15 @@
 //
 // r_depthOfField is the player's Depth of Field setting (Settings > System,
 // owned by the performance presets): it lets the game's requests draw, the
-// weapon wheel's focus and map scripts' cinematic lens. It does not touch the
+// weapon wheel's focus, a focused in-world screen and map scripts' cinematic
+// lens. It does not touch the
 // r_dof camera.
 
 #include "tr_local.h"
 #include "DepthOfFieldCore.h"
 
 idCVar r_depthOfField( "r_depthOfField", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
-	"depth of field where the game asks for it: the weapon wheel's focus on your weapon and cinematic focus from map scripts" );
+	"depth of field where the game asks for it: the weapon wheel's focus on your weapon, focus on the in-world screen you are using, and cinematic focus from map scripts" );
 idCVar r_dof( "r_dof", "0", CVAR_RENDERER | CVAR_CHEAT | CVAR_BOOL,
 	"cinematic depth of field for promotional captures: a thin-lens camera focused by r_dofFocusDistance (or the depth under r_dofFocusX/Y)" );
 idCVar r_dofFocusDistance( "r_dofFocusDistance", "0", CVAR_RENDERER | CVAR_CHEAT | CVAR_FLOAT,
@@ -111,7 +112,8 @@ bool R_DepthOfField_ResolveView( const viewDef_t *viewDef, int viewWidth, int vi
 	depthOfFieldInputs_t in;
 	in.enabled = r_dof.GetBool();
 	in.requestAmount = request.amount;
-	in.requestFlags = ( request.flags & VIEW_DOF_FOCUS_VIEW_WEAPON ) != 0 ? DOF_REQUEST_FOCUS_VIEW_WEAPON : 0;
+	in.requestFlags = ( ( request.flags & VIEW_DOF_FOCUS_VIEW_WEAPON ) != 0 ? DOF_REQUEST_FOCUS_VIEW_WEAPON : 0 )
+		| ( ( request.flags & VIEW_DOF_SHARP_VIEW_WEAPON ) != 0 ? DOF_REQUEST_SHARP_VIEW_WEAPON : 0 );
 	in.requestFocusDistance = request.focusDistance;
 	in.requestFStop = request.fStop;
 	in.requestFocalLength = request.focalLength;

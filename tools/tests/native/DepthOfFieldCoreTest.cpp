@@ -155,6 +155,31 @@ static void TestScriptedLens() {
 	Check( s.weaponFocus, "the weapon wheel wins over both" );
 }
 
+// A focused in-world screen: a fast lens focused on the panel that leaves
+// the view weapon sharp in front of it.
+static void TestGuiFocusLens() {
+	depthOfFieldInputs_t in = Camera();
+	in.enabled = false;
+	in.requestAmount = 1.0f;
+	in.requestFlags = DOF_REQUEST_SHARP_VIEW_WEAPON;
+	in.requestFocusDistance = 40.0f;
+	in.requestFStop = 1.4f;
+	in.requestFocalLength = 0.0f;
+	in.requestFocusRange = 12.0f;
+	in.requestMaxBlur = 10.0f;
+	depthOfFieldSettings_t s;
+	Check( DepthOfFieldCore_Resolve( in, s ), "a screen's lens resolves" );
+	Check( s.weaponFocus && !s.autoFocus && Near( s.focusDistance, 40.0f ) && s.fixedScale == 0.0f,
+		"the screen is the focus plane of a thin lens, with the weapon kept sharp" );
+	Check( DepthOfFieldCore_CircleOfConfusion( s, 50.0f, 40.0f, false ) == 0.0f, "the panel's depth stays sharp" );
+	Check( DepthOfFieldCore_CircleOfConfusion( s, 15.0f, 40.0f, true ) == 0.0f, "the view weapon stays sharp" );
+	Check( DepthOfFieldCore_CircleOfConfusion( s, 15.0f, 40.0f, false ) < 0.0f, "the world in front softens" );
+	Check( DepthOfFieldCore_CircleOfConfusion( s, 1024.0f, 40.0f, false ) > s.maxRadius * 0.5f, "the room behind softens" );
+	in.requestFlags = 0;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( !s.weaponFocus, "a plain script lens blurs the weapon with the rest" );
+}
+
 static void TestPlan() {
 	depthOfFieldSettings_t s;
 	depthOfFieldInputs_t in = Camera();
@@ -205,6 +230,7 @@ int main() {
 	TestShaping();
 	TestWeaponRequest();
 	TestScriptedLens();
+	TestGuiFocusLens();
 	TestPlan();
 	if ( failures != 0 ) {
 		std::fprintf( stderr, "DepthOfFieldCoreTest: %d failure(s)\n", failures );

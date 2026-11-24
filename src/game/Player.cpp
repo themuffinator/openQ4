@@ -8322,6 +8322,7 @@ void idPlayer::UpdateFocus( void ) {
 			hud->SetStateInt( "hideInteractive", 0 );
 #endif
 
+			focusGuiPoint = start + ( end - start ) * pt.fraction;
 			SetFocus ( FOCUS_GUI, FOCUS_GUI_TIME, ent, ui );
 			break;
 		}

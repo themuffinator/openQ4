@@ -9,7 +9,8 @@ only on a server with cheats on; joining a server without cheats resets them.
 The weapon wheel and map scripts use the same effect for players: while the
 wheel is open, your weapon stays raised, it and everything within about
 three metres stay sharp, the distance falls out of focus, and the crosshair
-hides; cutscenes can pull focus between characters. That needs no cheats: the
+hides; a screen you are using (a terminal, a door panel) stays sharp while
+the room behind it softens; cutscenes can pull focus between characters. That needs no cheats: the
 **Depth of Field** setting (Settings → Display → Effects, `r_depthOfField`, on
 from the Enhanced preset up) turns it on or off. With it off, the wheel blurs
 the whole scene as before.

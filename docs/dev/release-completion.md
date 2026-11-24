@@ -202,6 +202,19 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   system check again). Evidence: airdefense2 `script` calls draw and clear on
   OpenGL; the setting off returns the reference frame. Cinematics across the
   campaign are REN-13.
+- **In-world screens take focus** (third round, 24 November). While the
+  cursor is on an interactive GUI (`FOCUS_GUI`), the player view asks for a
+  thin lens focused on the cursor's point on the screen: 50 mm at f/2, a
+  focus range of 8 to 24 units for panels seen at an angle, 12 px at most,
+  easing in over 0.25 s and out over 0.4 s and pulling focus as the player
+  moves. The new request flag `VIEW_DOF_SHARP_VIEW_WEAPON` keeps the view
+  weapon sharp under a lens. The weapon wheel still wins; a focused screen
+  wins over a script. Single and multiplayer modules; no fallback blur, and
+  the Depth of Field setting gates it with the rest. Evidence: airdefense1's
+  exit panel on Vulkan and OpenGL, driven by `setviewpos` (no input), sharp
+  panel and softened room with the setting on, unchanged with it off;
+  `openq4-depth-of-field-core` passes. Not yet run: a cost measurement,
+  Linux, macOS.
 
 ## Texture packs' converted normal maps light correctly; a clearer settings failure, 23 November 2026
 

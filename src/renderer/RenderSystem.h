@@ -501,9 +501,10 @@ class idRenderWorld;
 
 // SetViewDepthOfField flags (DepthOfFieldCore.h DOF_REQUEST_*)
 static const int VIEW_DOF_FOCUS_VIEW_WEAPON = 1 << 0;	// the weapon wheel: the view weapon and the world near it stay sharp
+static const int VIEW_DOF_SHARP_VIEW_WEAPON = 1 << 1;	// with the thin lens: the view weapon stays sharp wherever the focus is
 
-// A depth of field asked for by the game: the weapon wheel, or a map script
-// (sys.setDepthOfField and friends). With VIEW_DOF_FOCUS_VIEW_WEAPON only
+// A depth of field asked for by the game: the weapon wheel, a focused in-world
+// screen, or a map script (sys.setDepthOfField and friends). With VIEW_DOF_FOCUS_VIEW_WEAPON only
 // amount counts. Otherwise it is the thin lens of the r_dof camera: amount
 // scales its blur, so fading amount in and out fades the effect.
 typedef struct renderViewDepthOfField_s {

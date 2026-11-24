@@ -653,8 +653,8 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view, i
 	if ( !( RF_GUI_ONLY & renderFlags ) ) {
 		// The wheel's scene focus is part of how this view renders. The scene
 		// pass is often RF_NO_GUI, with the wheel drawn by a later GUI-only pass.
-		RequestRetainedWheelFocus( !pm_thirdPerson.GetBool() && !g_skipViewEffects.GetBool(),
-			view->asymmetricFov, ScriptedDepthOfField::Evaluate( view->vieworg, view->viewaxis ) );
+		RequestViewDepthOfField( !pm_thirdPerson.GetBool() && !g_skipViewEffects.GetBool(),
+			*view, ScriptedDepthOfField::Evaluate( view->vieworg, view->viewaxis ) );
 // jmarshall
 		// jscott: portal sky rendering with KRABS
 		//idCamera *portalSky = gameLocal.GetPortalSky();

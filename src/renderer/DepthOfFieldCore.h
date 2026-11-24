@@ -12,7 +12,9 @@
 //     sensor unless r_dofFocalLength sets one, so zooming in narrows the
 //     depth of field the way a real lens does.
 //   - the game (idRenderSystem::SetViewDepthOfField): the weapon wheel keeps
-//     the view weapon sharp and defocuses the world behind it, and map
+//     the view weapon sharp and defocuses the world behind it, a focused
+//     in-world screen (a terminal or door panel under the cursor) is the
+//     focus plane of a thin lens that leaves the view weapon sharp, and map
 //     scripts (sys.setDepthOfField and friends) drive the same thin lens for
 //     cinematics. The player's Depth of Field setting gates both.
 // The weapon wheel wins over everything, then the r_dof camera, then a script.
@@ -59,6 +61,7 @@ static const int DOF_SCRIPTED_QUALITY = 2;
 
 // The game's request (idRenderSystem::SetViewDepthOfField flags).
 static const int DOF_REQUEST_FOCUS_VIEW_WEAPON = 1 << 0;
+static const int DOF_REQUEST_SHARP_VIEW_WEAPON = 1 << 1;	// a lens request that leaves the view weapon sharp
 
 // Plain values: cvars, the game's request and the view. Nothing here reads a
 // cvar, so the unit test can drive every path.
@@ -257,6 +260,9 @@ inline bool DepthOfFieldCore_Resolve( const depthOfFieldInputs_t &in, depthOfFie
 		out.bladeRoundness = 1.0f;
 		out.highlightBoost = 1.0f;
 		out.highlightThreshold = 0.7f;
+		// A focused in-world screen: the weapon in front of it is part of the
+		// player, not the scene, so it keeps its detail.
+		out.weaponFocus = ( in.requestFlags & DOF_REQUEST_SHARP_VIEW_WEAPON ) != 0;
 	} else {
 		return false;
 	}

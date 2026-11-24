@@ -92,7 +92,11 @@ private:
 	void ResetRetainedViewEffects();
 	void RetainedRecoveryFade( const idVec4 &color, int duration );
 	void DrawRetainedViewEffects( bool wheelOnly = false );
-	void RequestRetainedWheelFocus( bool allowed, bool headset, const renderViewDepthOfField_t &scene );
+	void RequestViewDepthOfField( bool allowed, const renderView_t &view, const renderViewDepthOfField_t &scene );
+	// Depth of field on a focused in-world GUI: how far it has faded in (0..1),
+	// the eased focus distance and the game time it was last advanced.
+	float guiFocusBlend = 0, guiFocusDistance = 0;
+	int guiFocusTime = -1;
 	idUserInterface *presentationFx = NULL;
 	// The renderer draws the wheel's scene focus as depth of field this frame.
 	bool wheelSceneFocus = false;
