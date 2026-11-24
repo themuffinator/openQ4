@@ -1828,7 +1828,9 @@ What remains after it, in the order it shows:
   map leaves lit a stretch of terrain behind the rocks that stencil shadows,
   and darkens ground that stencil leaves lit. The caster was kept on by
   default because the lights above improve by far more; the cause for this
-  light is not established.
+  light is not established. (Settled on 24 November: the light has no
+  prelight volume, so the caster never reached it, and the reading does not
+  repeat; see "The rest of the off-centre lights".)
 - **A far shell leaks behind itself.** The caps are the faces turned away
   from the light, and a receiver that stands closer behind one than the
   map's bias is lit: `light_9083`'s stencil-only share rises from 0.22% to
@@ -1913,6 +1915,121 @@ map by a temporary switch, the crate went from 2.11 to 3.25 on a narrower
 mask where the unshadowed picture reads 3.76: it is that geometry that
 shadows it.
 
+### The rest of the off-centre lights
+
+Added on 24 November, from the four items "What the stock volumes hold" left
+open. Same scan, machine and settings (Windows x64, GeForce RTX 4060 Laptop
+GPU, 1280 x 720, the Quality shadow configuration), worst of six views from
+each light's entity origin, map only / stencil only. "Before" is the build of
+the morning (45c7c4fc7), kept as a separate runtime, "after" this round's;
+both in the same session. The before column repeats the 23 November figures.
+
+| Light | OpenGL before | OpenGL after | Vulkan before | Vulkan after |
+|---|---:|---:|---:|---:|
+| mcc_landing `light_9083` (distant) | 0.01% / 1.01% | 0.07% / 0.18% | 0.01% / 1.01% | 0.07% / 0.18% |
+| mcc_landing `outdoor_Main` (wide source) | 0.15% / 2.00% | 0.41% / 0.88% | 0.15% / 1.99% | 0.42% / 0.88% |
+| mcc_landing `light_9081` (cube, 8 units) | 0.54% / 0.12% | 0.42% / 0.26% | 0.42% / 0.23% | 0.49% / 0.17% |
+| Air Defense 1 `light_146` (the sun) | 0.01% / 0.04% | 0.01% / 0.01% | 0.01% / 0.04% | 0.00% / 0.01% |
+| Air Defense 1 `light_170` (folded) | 0.29% / 2.22% | 0.36% / 1.04% | 0.23% / 2.22% | 0.38% / 1.04% |
+| Air Defense 1 `light_7910_cursed` | 0.05% / 1.89% | 0.02% / 0.03% | 0.05% / 1.90% | 0.02% / 0.03% |
+| hub2 `light_6456` (folded) | 0.73% / 13.07% | 0.11% / 0.43% | 0.74% / 13.07% | 0.12% / 0.43% |
+| network1 `light_6365` (folded) | 6.77% / 2.15% | 7.60% / 0.73% | 6.85% / 2.14% | 7.84% / 0.73% |
+| convoy1 `light_7744` (folded) | 0.15% / 4.32% | 0.38% / 1.43% | 0.15% / 4.34% | 0.42% / 1.51% |
+| q4cmp13 `light_4895` (parallel sun) | 0.21% / 0.65% | 0.20% / 0.20% | 0.21% / 0.65% | 0.20% / 0.19% |
+| q4cmp13 `light_4894` (parallel sun) | 0.10% / 0.82% | 0.18% / 0.13% | 0.10% / 0.82% | 0.18% / 0.13% |
+| q4cmp13 `light_2` (parallel sun) | 0.38% / 0.69% | 0.36% / 0.12% | 0.39% / 0.68% | 0.37% / 0.12% |
+| Sum | 9.39 / 28.98 | 10.12 / 5.44 | 9.31 / 29.09 | 10.51 / 5.42 |
+
+Every light's two shares together fall; map only rises by a few tenths on
+some, the price of the bias below. In the order of what they moved:
+
+**1. The far shell's leak was the receiver bias.** A map that holds only the
+faces turned away from the light holds no receiver that faces it, so the bias
+that keeps such a receiver off its own depth has nothing to do there, and
+every unit of it lights a receiver that stands that close behind a caster.
+On the frozen build, with the bias terms set by hand (Vulkan): the texel bias
+alone took `light_9083`'s stencil-only share from 1.01% to 0.62% and
+`light_7910_cursed`'s from 1.90% to 1.17%; the normal offset alone moved them
+by a tenth. With every bias term and the caster offset at zero and every
+caster on its far faces, 13 lights went from 2.7 / 25.9 points summed to
+3.1 / 5.5 (network1 aside, see below); keeping a quarter of the bias gave
+2.6 / 9.3. Distant
+point and parallel lights now store every caster by the stencil rule and keep
+`r_shadowMapDistantFarShellBias` (default 0) of the receiver bias: the
+constant and normal bias through the cascade bias scale, the texel bias and
+the filter taps' bias through the texel steps, and the normal offset, all
+applied once in `R_BuildShadowMapProjectedLightState`, so both backends and
+the sealed interaction packets take it without a change of their own. The
+caster offset is left as it was. `r_shadowMapDistantFarShell 0` restores the
+earlier faces, verdict and bias.
+
+**2. The 78 folded volumes keep their caps.** A front cap is a triangle on
+three even vertexes, wherever dmap put it in the index list
+(`R_ShadowMapBuildPrelightCaster`). Alone, before the bias change, over 11 of
+those lights (Vulkan): 50.5 points summed to 41.0; hub2's `light_6456` 13.8 to
+6.1, Air Defense 1's `light_7160` 4.4 to 0.6, convoy1's `light_9015` 3.2 to
+0.0. The stencil-only share rose on others (Air Defense 1's `light_170` 2.2%
+to 5.6%, network1 2.1% to 7.1%): the same far-shell leak, which the bias
+change then removed. Cutouts are the choice left open: a perforated world
+surface that lies inside the light's box keeps a caster of its own and
+casts through its holes, and its caps are left out of the caster (a cap is a
+piece of a casting triangle, so its centre lies in that triangle);
+one that reaches outside the box casts solid from the caps, as stencil does,
+since drawn whole it would shadow from where the volume holds nothing.
+`r_shadowMapPrelightCutouts 0` casts every cutout solid. The 31 lights with
+no prelight volume keep their surface casters.
+
+**3. The face verdict of the synthesized projections was wrong, as measured.**
+With the world drawn surface by surface (`r_shadowMapPrelightCasters 0`),
+`light_9083` shadows 48.9% of a view that stencil lights with the verdict as
+it was, with every caster two-sided, and with the "far faces for every caster"
+mode alike: what the caster passes stored was the faces turned towards the
+light. Turned for the parallel and distant point projections, the same
+setting gives 0.01% / 1.01%, exactly what the prelight caps give. The
+determinant does call both mirrored (their axes come from `NormalVectors`, a
+left-handed pair), and nothing in the cascade crop or the matrix upload was
+found to turn the picture back; why the raster disagrees is still not
+established. Authored projectors keep the determinant (storage2's alarm
+lights: 0.16% / 0.18% at most, as before). Under the default caster the
+static world does not depend on the verdict, so on its own it moved the scan
+little (summed over 14 lights, 2.9 / 31.0 to 9.2 / 28.3, the rise in map
+only being network1's); it matters for
+entities, the 31 lights without a volume (`outdoor_Main` among them) and,
+above all, for the bias: a near shell at zero bias would shade itself.
+Sealed hulls under these lights take the far shell too, the stencil rule.
+
+**4. `outdoor_Main` was never the caster.** The retail `mcc_landing.proc`
+holds no prelight volume for it, so `r_shadowMapPrelightCasters` cannot reach
+it: on this build its worst view is 0.15% / 1.99% with the setting at 1 and
+0.12-0.15% / 1.99-2.00% at 0, and with `r_shadowMapWideSources 0` (the cube
+it was on 23 November) 0.61% / 1.00% both ways, the figure recorded then for
+the setting at 0. Three repeats and two earlier autoexec delays (0 and 200
+ms, the capture then falls at another moment of the level's opening) gave
+0.61% / 1.00% each time. The 9.6% / 9.9% of 23 November came from one run on
+the REN-02/REN-03 merge under load, and the 6.4% / 6.6% of that morning from
+a build that had no caster at all: an equal share both ways is one large
+shadow edge drawn differently, and it came and went with the run, not the
+setting. Since 24 November it is cascaded (`r_shadowMapWideSources`), and
+with the far shell its stencil-only share falls from 2.0% to 0.9%.
+
+**Bounded: network1's tube lights.** network1's ten folded lights (sources 32
+units outside a 256-unit box, a projection that spans 162 degrees) darken
+about 7.8% of the view up the tube that stencil leaves lit: a grate ring
+round the tube, from that grate's own prelight caps. It was 6.8% before the
+round (the whole grate drawn), 0.07% (with 7.1% stencil only) while the grate
+kept its own caster under the earlier verdict, and 0.14% / 0.44% with its caps and
+caster withheld altogether; casting the grate solid or through its holes
+gives the same 7.8%. Stencil lights those caps' own receiver, the map does
+not, and why is not established. Their sum still falls (8.99 points to 8.57).
+
+Checked on the final build: the scan above on both backends; the five
+moving-door and six caster-cycle scenarios, Air Defense 1's outdoor scenario
+and the cascade-motion scenario on both, all passing; the continuous-motion
+receiver case on both (OpenGL on a second run: the first found two identical
+frozen captures 3.5 MB apart at one pose, an unfrozen scene); storage2's alarm lights; the in-engine self-tests on
+both renderers (folded caps, cutouts, the far-shell faces and the bias
+scale).
+
 ## Presets
 
 Unchanged. Enhanced keeps point lights on stencil: mapping them still costs
@@ -1934,12 +2051,12 @@ whether Enhanced can now map point lights on Vulkan.
 3. A static model that moves under still lights (a lift, a door) builds its
    volumes again each frame it moves, 40 to 45 microseconds a view in hub2.
    Leaving them out needs a mark on the entity for having moved.
-4. Stencil parity for lights whose source lies outside their box, beyond the
-   static world of the 296 that take the prelight caster: the 78 whose
-   volume folds its caps (the caps can be recovered, at the price of solid
-   cutouts), the reversed faces of the other casters under distant and
-   parallel lights, and the far shell's corner leak under a coarse map. See
-   "What the stock volumes hold".
+4. Stencil parity for lights whose source lies outside their box: the folded
+   volumes, the faces and the far shell's leak were done on 24 November (see
+   "The rest of the off-centre lights"). What remains: network1's tube lights,
+   where a grate's own caps darken what stencil leaves lit; why the
+   synthesized projections raster unmirrored against their determinant; and
+   the 31 lights with no prelight volume, which keep their surface casters.
 
 Set aside after measurement: cube faces the view cannot see (see "Static
 cutout casters"); the stencil volumes of static models under lights that have

@@ -63,6 +63,10 @@ static bool R_ShadowMapProjectedLightNeedsAuthoredSingleProjection( const viewLi
 		|| R_ShadowMapProjectedLightUsesStockFlashlightShader( vLight );
 }
 
+idCVar r_shadowMapDistantFarShell( "r_shadowMapDistantFarShell", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
+	"distant point and parallel lights store every shadow caster by the stencil rule, the faces turned away from the light, and their receivers keep r_shadowMapDistantFarShellBias of the receiver bias; 0 = sealed hulls keep their near shell, the earlier face verdict and the whole bias" );
+idCVar r_shadowMapDistantFarShellBias( "r_shadowMapDistantFarShellBias", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,
+	"share of the receiver depth bias, normal offset and filter-tap bias kept by the receivers of a light whose map holds only far faces (r_shadowMapDistantFarShell): a receiver that faces the light is not in such a map, and the bias only lets light through to a receiver close behind a caster", 0.0f, 1.0f );
 idCVar r_shadowMapWideSources( "r_shadowMapWideSources", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
 	"while sunlight is cascaded, a large point light whose source sits just outside one face of its radius box "
 	"(the big outdoor lights) is shadowed through fitted cascades seen down that axis instead of one cube; 0 keeps the cube" );
@@ -819,6 +823,14 @@ static shadowMapCasterFaces_t R_ShadowMapSwapCasterFaces(
 	}
 }
 
+bool R_ShadowMapLightStoresFarShell( const viewLight_t *vLight ) {
+	if ( vLight == NULL || vLight->lightDef == NULL || !r_shadowMapDistantFarShell.GetBool() ) {
+		return false;
+	}
+	const renderLight_t &parms = vLight->lightDef->parms;
+	return parms.parallel || R_ShadowMapUsesDistantPointProjection( parms );
+}
+
 shadowMapCasterFaces_t R_ShadowMapCasterFaces( const int cullingMode,
 		const viewLight_t *vLight, const bool windingMirrored,
 		const bool haveGeometry, const bool perfectHull,
@@ -847,7 +859,11 @@ shadowMapCasterFaces_t R_ShadowMapCasterFaces( const int cullingMode,
 	if ( winding == 0 ) {
 		return SHADOWMAP_CASTER_FACES_BOTH;
 	}
-	if ( ( mode == 2 || mode == 4 ) && perfectHull ) {
+	// A light whose map stores the far shell takes it for sealed hulls too:
+	// stencil builds every volume from the faces turned away from the light,
+	// and such a light's receivers keep almost none of the bias a near shell
+	// needs (R_BuildShadowMapProjectedLightState).
+	if ( ( mode == 4 || ( mode == 2 && !R_ShadowMapLightStoresFarShell( vLight ) ) ) && perfectHull ) {
 		if ( winding < 0 || R_ShadowMapLightOriginInsideCasterBounds( vLight,
 				modelMatrix, boundsMin, boundsMax ) ) {
 			return SHADOWMAP_CASTER_FACES_BOTH;
