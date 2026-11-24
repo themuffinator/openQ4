@@ -42,6 +42,14 @@ the [development roadmap](../roadmap.md) for current scope.
   timing are under Video Capture in Settings > Game Options. See
   [Record Video](../../user/video-capture.md).
 
+- **Play in 3D without a headset.** Turn on **Stereoscopic 3D** in Settings >
+  Game Options > Virtual Reality and the game draws a view for each eye: side
+  by side or top and bottom for 3D televisions and monitors, full-resolution
+  side by side for video glasses, interlaced for passive 3D displays, or a
+  red/cyan anaglyph for paper glasses. The HUD and menus stay readable at the
+  screen's depth, and Stereo Depth and Convergence tune how far the world
+  stands out. See [Stereoscopic 3D](../../user/stereoscopic-3d.md).
+
 - **Sharper textures at lower resolution scales, and on Vulkan with NVIDIA
   cards.** When the game draws the 3D scene below your screen's resolution
   and upscales it, the world's textures now keep more of their detail: 16-18%
@@ -572,6 +580,14 @@ the [development roadmap](../roadmap.md) for current scope.
   for its format, quality, frame rate, resolution, sound and timing, and
   Settings > Controls > Other has a Record Video key. See
   [Record Video](../../user/video-capture.md).
+- Stereoscopic 3D without a headset (`r_stereo3D`) on OpenGL and Vulkan:
+  side by side (half and full resolution), top and bottom, red/cyan anaglyph
+  and row interlaced, with Stereo Depth (`r_stereoSeparation`), Stereo
+  Convergence (`r_stereoConvergence`) and Swap Eyes (`r_stereoSwapEyes`) in
+  Settings > Game Options > Virtual Reality and in the classic Game Options'
+  new last section. Single-player, multiplayer, cutscenes and menus all show
+  in the chosen layout, and window-sized screenshots capture it. See
+  [Stereoscopic 3D](../../user/stereoscopic-3d.md).
 - The weapon wheel uses a depth of field focused on your weapon and the
   world within about three metres, keeps your weapon raised (single player
   used to put it away) and hides the crosshair while it is open;

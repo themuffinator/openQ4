@@ -58,7 +58,7 @@ exact; the estimate column is deliberately approximate.
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **65%** | 5 / 13 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, partial). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026; temporal AA and dynamic resolution (REN-04) closed 23 November 2026; depth of field (REN-12, partial) 23 November, with scripted cinematic focus to follow (REN-13). |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **40%** | 4 / 9 | Shadow-map cost, equal-settings regressions (the retained HUD's composition and most of the Vulkan depth capture removed 22 November, unmeasured in fullscreen), hitches, front-end cost and the release gate. |
-| [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 6 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05). |
+| [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 7 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05); desktop stereoscopic 3D on physical stereo displays (VR-07). |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **70%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest on a headset. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
@@ -2862,7 +2862,7 @@ Sources: [OpenXR implementation history](archive/2026-10-18/plans/2026-10-02-ope
 
 ### VR completion checkpoints
 
-**Estimate: 75%; 4/6 tasks closed.** Credit the OpenGL and Vulkan PC paths,
+**Estimate: 75%; 4/7 tasks closed.** Credit the OpenGL and Vulkan PC paths,
 their fault handling, play spaces and per-eye TAA on the simulated runtime.
 Synthetic stereo results do not qualify a headset, its comfort, its frame
 budget or standalone Quest; those are the [headset checklist](vr-headset-qualification.md)
@@ -2876,6 +2876,7 @@ and AND-05.
 | VR-04 — Partial | `openxr_vr_stereo_cost.py` records flat/stereo/warm-stereo CPU, build, submit and GPU tails, now at a chosen preset (`--preset quality`); the simulated baselines on this GPU are recorded below. Uploads, dynamic geometry, remote cameras, cached static shadow maps and (8 November) world-GUI quads are shared between the eyes; culling, lights, draws, mirror/reflection/refraction/x-ray maps and dynamic shadow composition stay per eye. `openxr_vr_stereo_share_smoke.py` proves both by work count on OpenGL and Vulkan. | Headset tails against the refresh budgets (checklist 2.2), and sharing work where those tails show a view-independent cost. |
 | VR-05 — Closed (approved scope) | Decision: per-eye TAA only. Each eye has its own view identity, history images, motion vectors and resets in the SP game chain and both backends' own temporal scenes; dynamic resolution stays off in VR. SP/MP GL/Vulkan pass the simulated-runtime smoke. | Headset comfort is checklist section 7. Hand presence arrived with the body (VR-02, 17 November); physical-object interaction needs its own design. |
 | VR-06 — Closed | Active GL teardown/ownership repair passes native failure cases and simulated-runtime SP/MP gameplay. | Carry guarantees into VR-01 backends; physical controller/headset validation remains VR-02. |
+| VR-07 — Partial | 24 November 2026: desktop stereoscopic 3D (`r_stereo3D`) on OpenGL and Vulkan: side by side (half and full width), top and bottom, red/cyan anaglyph (Dubois) and row interlaced, with depth, convergence and eye swap; SP, MP, menus, the paused menu's backdrop and window-sized screenshots captured in every layout; Settings rows on both interfaces in all 12 languages. | Physical stereo displays (a 3D TV or monitor, side-by-side glasses, a passive interlaced panel, anaglyph glasses); the zero-parallax crosshair; Apple GL and GLES, which decline it. |
 
 ### VR task evidence and acceptance
 
@@ -3087,6 +3088,26 @@ and AND-05.
   [recovery evidence](platform-recovery-review.md#opengl-xr-lifecycle-closure-18-october-2026).
   VR-01 carries these guarantees into other backends; VR-02 retains physical
   headset/controller qualification.
+- [ ] **VR-07 — P3, implementation and qualification: stereoscopic 3D without a
+  headset.** Present a stereo pair to the window for 3D televisions and
+  monitors, side-by-side glasses, passive interlaced panels and anaglyph
+  glasses, on both desktop renderers, with the HUD and menus readable in every
+  layout. Implemented 24 November 2026
+  ([player guide](../user/stereoscopic-3d.md)): `r_stereo3D` opens each frame
+  as a stereo frame of the VR target machinery with no swapchains; the game
+  renders its scene chain once per eye (`idPlayerView::StereoView`, eyes from
+  `Stereo_BuildEyeView`: parallel axes and frusta shifted to meet at
+  `r_stereoConvergence`, as ioquake3's `r_zProj`), the 2D lands on the
+  premultiplied screen layer, and the swap composites the three
+  (`RB_DesktopStereo_Composite`, `post_stereo.frag`). A capture of the screen
+  layer reads the left eye, so the menus' blurred backdrop keeps the scene.
+  Checked by window-sized screenshots in airdefense1, q4dm1, the title and the
+  paused menu on both renderers, and by the retained and classic Settings
+  captures (`capture_retained_screens.py` scenarios `game-stereo` and
+  `game-stereo-stock`). Open: qualification on physical stereo displays, a
+  crosshair at the target's depth, and the Apple GL 2.1 and GLES renderers,
+  which keep a flat frame and say why.
+
 
 ## Android and mobile rendering
 

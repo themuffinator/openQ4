@@ -2003,4 +2003,80 @@
 				}
 			}
 		}
+		windowDef set_game_stereo3d_hover
+		{
+			rect	245,2461,361,20
+			visible	0
+
+			onMouseEnter {
+				if ("desktop::active" == 0) {
+					stoptransitions "set_game_stereo3d_background" ;
+					set "set_game_stereo3d_background::matcolor_w" "1" ;
+					set "cmd" "play main_menu_mouseover" ;
+				}
+			}
+
+			onMouseExit {
+				if ("desktop::active" == 0) {
+					transition "set_game_stereo3d_background::matcolor_w" "1" "0.4" "300" ;
+				}
+			}
+		}
+		windowDef set_game_stereodepth_hover
+		{
+			rect	245,2485,361,20
+			visible	0
+
+			onMouseEnter {
+				if ("desktop::active" == 0) {
+					stoptransitions "set_game_stereodepth_background" ;
+					set "set_game_stereodepth_background::matcolor_w" "1" ;
+					set "cmd" "play main_menu_mouseover" ;
+				}
+			}
+
+			onMouseExit {
+				if ("desktop::active" == 0) {
+					transition "set_game_stereodepth_background::matcolor_w" "1" "0.4" "300" ;
+				}
+			}
+		}
+		windowDef set_game_stereoconvergence_hover
+		{
+			rect	245,2509,361,20
+			visible	0
+
+			onMouseEnter {
+				if ("desktop::active" == 0) {
+					stoptransitions "set_game_stereoconvergence_background" ;
+					set "set_game_stereoconvergence_background::matcolor_w" "1" ;
+					set "cmd" "play main_menu_mouseover" ;
+				}
+			}
+
+			onMouseExit {
+				if ("desktop::active" == 0) {
+					transition "set_game_stereoconvergence_background::matcolor_w" "1" "0.4" "300" ;
+				}
+			}
+		}
+		windowDef set_game_stereoswap_hover
+		{
+			rect	245,2533,361,20
+			visible	0
+
+			onMouseEnter {
+				if ("desktop::active" == 0) {
+					stoptransitions "set_game_stereoswap_background" ;
+					set "set_game_stereoswap_background::matcolor_w" "1" ;
+					set "cmd" "play main_menu_mouseover" ;
+				}
+			}
+
+			onMouseExit {
+				if ("desktop::active" == 0) {
+					transition "set_game_stereoswap_background::matcolor_w" "1" "0.4" "300" ;
+				}
+			}
+		}
 	//==============================================================//

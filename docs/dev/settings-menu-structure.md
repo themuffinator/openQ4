@@ -29,7 +29,7 @@ With `ui_retained 1` (the default) the Settings screen opens the retained SETTIN
 | Game Options | HUD | HUD: Layout, Size, Width, Safe Area Inset, Opacity, Toggle Objectives, Damage Direction, Pickup Messages, Weapon Strip | Crosshair: Custom Crosshair, the crosshair, Size, Color, Hit Marker, Animated Crosshair |
 | Game Options | View Weapon | Show Gun, Gun Position, Weapon X/Y/Z Offset | Weapon FOV, Weapon FOV Aspect, Weapon Kick |
 | Game Options | Accessibility | Motion: View Kick, Screen Shake, Cinematic Shake | Visibility: Reduced Flashing, Opaque Menu Backing |
-| Game Options | Virtual Reality | VR Mode to Walk Direction | Room Scale to Your Body |
+| Game Options | Virtual Reality | VR Mode to Walk Direction | Room Scale to Your Body. Stereoscopic 3D: Stereoscopic 3D, Stereo Depth, Stereo Convergence, Swap Eyes |
 | Display | Graphics | Performance Preset, Auto-Detect, Rendering Backend and Device, Renderer Fallback, Restart Renderer | Interface: UI Scale, Text Size, UI Aspect, Reset UI Sizes |
 | Display | Screen | Display: Display Device, Expand Across Displays, Fullscreen, Borderless, Fullscreen Policy, V-Sync, Frame Rate Cap | Display Sizing: window size, Display Resolution, custom fullscreen size, Refresh Rate |
 | Display | Image Quality | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering | Rendering: Specular, Bump Mapping, Sky, Ambient Light, Ambient Brightness |
@@ -67,6 +67,7 @@ On the retained pages a row that another setting has turned off is dimmed and di
 | Game Options | Laser Sight, Two-Handed Grip | Aim is hand aim | Head aim draws no laser and has no grip. |
 | Game Options | Custom crosshair picker | Custom Crosshair is on | Unchanged. |
 | Game Options | Record Sound | Video Format is not GIF | A GIF has no sound track. |
+| Game Options | Stereo Depth, Stereo Convergence, Swap Eyes | Stereoscopic 3D is not Off | They shape a stereo frame, which needs a layout. |
 | Audio | Subtitle Size, Subtitle Background, Speaker Names, Untranscribed Speech | Subtitles is on | No subtitle is drawn with them off. |
 | Audio | Surround Speakers | Headphone HRTF is not On | HRTF On always outputs stereo HRTF. |
 
@@ -105,8 +106,8 @@ Scroll controls:
 
 | Pane | Scroll widget | Cvar | Range | Step | Notes |
 |---|---|---|---|---|---|
-| Game Options | `choiceDef set_game_section_choice` | `game_section_choice` | General / Mouse / Controller / Crosshair / HUD / Gameplay / View Weapon / VR / Video Capture | `1` | Localized section picker below the pane title and above the scroll frame. Sets live GUI state `gui::gui_set_game_scroll` to the group anchor and calls `applySettingsScroll game`; the engine clamps and applies the matching row-canvas rect. |
-| Game Options | `sliderDef set_game_scroll_thumb` | `gui_set_game_scroll` | `0..90` | `1` | Vertical scrollbar. Calls `applySettingsScroll game`; `idSliderWindow` propagates the command from thumb drag as well as key/button events. |
+| Game Options | `choiceDef set_game_section_choice` | `game_section_choice` | General / Mouse / Controller / Crosshair / HUD / Gameplay / View Weapon / VR / Video Capture / Stereoscopic 3D | `1` | Localized section picker below the pane title and above the scroll frame. Sets live GUI state `gui::gui_set_game_scroll` to the group anchor and calls `applySettingsScroll game`; the engine clamps and applies the matching row-canvas rect. |
+| Game Options | `sliderDef set_game_scroll_thumb` | `gui_set_game_scroll` | `0..95` | `1` | Vertical scrollbar. Calls `applySettingsScroll game`; `idSliderWindow` propagates the command from thumb drag as well as key/button events. |
 | System | `choiceDef set_sys_section_choice` | `sys_section_choice` | Video / Window / Rendering / Quality / Post FX / Sizing | `1` | Localized section picker above the scroll frame. Sets live GUI state `gui::gui_set_sys_scroll` to the group anchor and calls `applySettingsScroll system`; the engine clamps and applies the matching row-canvas rect. |
 | System | `sliderDef set_sys_scroll_thumb` | `gui_set_sys_scroll` | `0..26` | `1` | Vertical scrollbar. Calls `applySettingsScroll system`; `idSliderWindow` propagates the command from thumb drag as well as key/button events. |
 | Audio | `sliderDef set_audio_scroll_thumb` | `gui_set_audio_scroll` | `0..0` | `1` | Disabled in practice because Audio fits without scrolling; the engine keeps its scroll thumb hidden and no-evented. |
@@ -330,13 +331,18 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Physical Crouch | `choiceDef` | `set_game_vr_physicalcrouch_value` | `vr_physicalCrouch` | `Disabled;Enabled` | Crouching in the room crouches the character. |
 | Play Space | `choiceDef` | `set_game_vr_playspace_value` | `vr_playSpace` | `0 Automatic`, `1 Seated`, `2 Standing` | Seated play measures height from where the player recentred; standing play from the floor, against the standing eye height (`vr_standingHeight`, learned at the first recentre or measured by `vr_calibrateHeight`). Automatic stands when the headset knows the floor. |
 | Your Body | `choiceDef` | `set_game_vr_body_value` | `vr_body` | `0 Off`, `1 Legs and Torso`, `2 With Arms` | The player's own body in the headset: a second render entity of the player model, seen in the player's own view only and posed from the tracked head and hands (`src/framework/VRBody.h`). With Arms needs controller aiming; aimed by the head it shows legs and torso. |
-| Video Capture | `windowDef` label | `set_game_video` | N/A | N/A | Section label; the last section, reached by the section picker's ninth entry (scroll `90`). The rows set the `com_video*` CVars `recordVideo` reads when a recording starts ([Record Video](../user/video-capture.md)). |
+| Video Capture | `windowDef` label | `set_game_video` | N/A | N/A | Section label, reached by the section picker's ninth entry (scroll `90`). The rows set the `com_video*` CVars `recordVideo` reads when a recording starts ([Record Video](../user/video-capture.md)). |
 | Video Format | `choiceDef` | `set_game_videoformat_value` | `com_videoFormat` | `mp4`, `mkv`, `webm`, `mov`, `avi`, `gif` | MKV, WebM, MOV and GIF need FFmpeg; without it the recording falls back to the built-in Motion JPEG AVI. MP4 needs FFmpeg outside Windows. |
 | Video Quality | `sliderDef` + `editDef` | `set_game_videoquality_slider_bar`, `set_game_videoquality_value` | `com_videoQuality` | `1..100`, step `1` | 80 (the default) is close to the screen. A non-zero `com_videoBitrate` (console) overrides it. |
 | Video Frame Rate | `choiceDef` | `set_game_videofps_value` | `com_videoFPS` | `24;30;60;120` | 30 and 60 divide the tic rate and record frame-exact offline; 24 and 120 follow the clock. |
 | Video Resolution | `choiceDef` | `set_game_videoheight_value` | `com_videoHeight` | `0 Window Size`, `480p`, `720p`, `1080p`, `1440p`, `2160p` | Scales down to the height, keeping the window's shape; a height at or above the window's records at the window's size. |
 | Record Sound | `choiceDef` | `set_game_videoaudio_value` | `com_videoAudio` | `No;Yes` | The game's sound in the video. |
 | Video Timing | `choiceDef` | `set_game_videotiming_value` | `com_videoTiming` | `auto Automatic`, `fixed Frame-Exact`, `realtime Real Time` | Automatic is frame-exact in single-player and demos, real time online. |
+| Stereoscopic 3D | `windowDef` label | `set_game_stereo` | N/A | N/A | Section label; the last section, reached by the section picker's tenth entry (scroll `95`). The rows set the `r_stereo*` CVars, which apply on the next frame ([Stereoscopic 3D](../user/stereoscopic-3d.md)). |
+| Stereoscopic 3D | `choiceDef` | `set_game_stereo3d_value` | `r_stereo3D` | `0 Off`, `1 Side by Side`, `2 Side by Side (Full)`, `3 Top and Bottom`, `4 Anaglyph (Red/Cyan)`, `5 Interlaced` | Without a headset, renders each eye and composites them into the window in the display's layout; a headset's own frames take precedence. |
+| Stereo Depth | `sliderDef` + `editDef` | `set_game_stereodepth_slider_bar`, `set_game_stereodepth_value` | `r_stereoSeparation` | `0..8`, step `0.5` | Distance between the eyes in game units (2.5 a person's); the console reaches 32. |
+| Stereo Convergence | `sliderDef` + `editDef` | `set_game_stereoconvergence_slider_bar`, `set_game_stereoconvergence_value` | `r_stereoConvergence` | `32..512`, step `16` | Where the world meets the screen's surface, in game units; the console reaches 8 to 4096. |
+| Swap Eyes | `choiceDef` | `set_game_stereoswap_value` | `r_stereoSwapEyes` | `No;Yes` | Shows each eye's image to the other eye. |
 
 ## System
 

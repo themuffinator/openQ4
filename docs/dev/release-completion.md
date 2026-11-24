@@ -12,6 +12,44 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Stereoscopic 3D without a headset, 24 November 2026
+
+- **A stereo option for flat displays (VR-07).** The user asked for a
+  stereoscopic 3D option; ioquake3's `r_stereo`/`r_anaglyphMode` was the
+  suggested reference. `r_stereo3D` 1-5 gives side by side (half width), side
+  by side at full resolution (double-width displays and glasses), top and
+  bottom, red/cyan anaglyph (Dubois matrices in linear light) and row
+  interlaced; `r_stereoSeparation` (units), `r_stereoConvergence` (the
+  zero-parallax distance, ioquake3's `r_zProj`) and `r_stereoSwapEyes` tune
+  it. All archived, all applied on the next frame.
+- **How it renders.** Without a headset, `BeginVRFrame` opens the frame as a
+  stereo frame of the VR target machinery with internal targets and no
+  swapchains (`R_DesktopStereo_BeginFrame`), so per-eye TAA, subview keys and
+  world-GUI sharing carry over. Both game modules render the scene chain per
+  eye (`idPlayerView::StereoView`, eyes from `Stereo_BuildEyeView` in
+  `VRSystem.h`: parallel axes, frusta shifted to meet at the convergence),
+  then the HUD, fades and menus land on the premultiplied screen layer. At
+  the swap the GL composite (`RB_DesktopStereo_Composite`) or Vulkan's
+  `post_stereo.frag` lays the eyes and the layer into the window. A capture
+  of the layer (the retained menus' blurred backdrop, wipes) reads the left
+  eye, revisiting it without finishing it twice. Window-sized screenshots
+  read the composite; tiled ones stay flat. Double vision, influence and the
+  paused-scene cache stand down in stereo, as in a headset.
+- **Menus.** Settings > Game Options > Virtual Reality gains a
+  STEREOSCOPIC 3D section (layout, depth, convergence, swap; the last three
+  dimmed while off); the classic Game Options a tenth section after Video
+  Capture (scroll 0..95). Strings `#str_232920`-`232925` and the picker's new
+  name in all twelve languages.
+- Evidence: window-sized screenshots of every layout and the swap on OpenGL
+  and Vulkan in airdefense1, q4dm1 (MP), the title and the paused menu
+  (blurred backdrop kept); `capture_retained_screens.py` scenarios
+  `game-stereo` (the rows set `r_stereo3D` and `r_stereoSwapEyes`, the menu
+  then draws side by side) and `game-stereo-stock`; `settings_menu_coverage`,
+  `ui_retained_gate`, `vk_shader_header_pin` and the retained-screens `pages`
+  group pass. The `mp-*` and `pointer-reach` groups fail on the existing
+  `mp_escape.rui` timeline warning. Not yet run: physical stereo displays or
+  glasses, Linux, macOS (its GL renderer declines with a console warning).
+
 ## The weapon wheel's mouse dot, keyboard and D-pad, 24 November 2026
 
 - **A dot bounded by the rim.** The user asked for the wheel's mouse selector

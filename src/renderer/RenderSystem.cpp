@@ -2234,6 +2234,9 @@ void idRenderSystemLocal::CaptureRenderToImage( const char *imageName ) {
 	// may need to sync to create the image
 	idImage	*image = globalImages->ImageFromFile(imageName, TF_DEFAULT, TR_REPEAT, TD_DEFAULT);
 
+	// openQ4: a desktop stereo frame's scene is in its eyes, not its screen layer
+	const bool stereoCapture = R_DesktopStereo_BeginCapture();
+
 	renderCrop_t *rc = &renderCrops[currentRenderCrop];
 
 	copyRenderCommand_t *cmd = (copyRenderCommand_t *)R_GetCommandBuffer( sizeof( *cmd ) );
@@ -2248,6 +2251,9 @@ void idRenderSystemLocal::CaptureRenderToImage( const char *imageName ) {
 	if ( R_ScenePackets_FrontEndCaptureRequired() ) {
 		R_ScenePackets_AddCopyRender( image, cmd->x, cmd->y,
 			cmd->imageWidth, cmd->imageHeight, cmd->cubeFace, cmd->copyDepth );
+	}
+	if ( stereoCapture ) {
+		R_DesktopStereo_EndCapture();
 	}
 
 	guiModel->Clear();

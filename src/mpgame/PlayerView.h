@@ -100,6 +100,8 @@ private:
 	void				SingleView( idUserInterface *hud, const renderView_t *view, int renderFlags = RF_NORMAL );
 	// openQ4 VR: the 3D pass once per headset eye, the HUD on the virtual screen
 	void				VRView( idUserInterface *hud, const renderView_t *view, const vrFrameState_t &vrFrame, float trackingYaw );
+	// openQ4: desktop stereoscopic 3D (r_stereo3D); false renders the flat view
+	bool				StereoView( idUserInterface *hud, const renderView_t *view, int eyeLiquidContents );
 // RAVEN END
 	void				DoubleVision( idUserInterface *hud, const renderView_t *view, int offset );
 	void				BerserkVision( idUserInterface *hud, const renderView_t *view );

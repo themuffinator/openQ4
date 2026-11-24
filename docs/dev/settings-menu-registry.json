@@ -4713,6 +4713,126 @@
       "accessibility": "Focusable choiceDef row. Automatic records frame-exact offline and in real time online; Frame-Exact slows the game if encoding falls behind."
     },
     {
+      "id": "game.stereo3d",
+      "pane": "Game Options",
+      "section": "Stereoscopic 3D",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Stereoscopic 3D > Stereoscopic 3D",
+      "container": "set_game_stereo3d",
+      "widgets": [
+        "set_game_stereo3d_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_232921",
+      "choices_key": "#str_232922",
+      "values": [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5"
+      ],
+      "target": "r_stereo3D",
+      "default": "0",
+      "accessibility": "Focusable choiceDef row. Shows the game in 3D without a headset, laid out for the display or glasses: side by side, side by side at full resolution, top and bottom, red/cyan anaglyph or row interlaced."
+    },
+    {
+      "id": "game.stereodepth",
+      "pane": "Game Options",
+      "section": "Stereoscopic 3D",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Stereoscopic 3D > Stereo Depth",
+      "container": "set_game_stereodepth",
+      "widgets": [
+        "set_game_stereodepth_slider_bar",
+        "set_game_stereodepth_value"
+      ],
+      "edit_fields": [
+        {
+          "name": "set_game_stereodepth_value",
+          "maxchars": 4
+        }
+      ],
+      "widget_type": "slider_edit",
+      "label_key": "#str_232923",
+      "target": "r_stereoSeparation",
+      "default": "2.5",
+      "ui_range": {
+        "low": "0",
+        "high": "8",
+        "step": "0.5"
+      },
+      "cvar_range": {
+        "low": "0",
+        "high": "32"
+      },
+      "range_intent": "The slider covers comfortable depths; the console reaches up to 32 units for exaggerated effects.",
+      "accessibility": "Slider with paired edit field. The distance between the eyes in game units; more deepens the 3D, 0 flattens it."
+    },
+    {
+      "id": "game.stereoconvergence",
+      "pane": "Game Options",
+      "section": "Stereoscopic 3D",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Stereoscopic 3D > Stereo Convergence",
+      "container": "set_game_stereoconvergence",
+      "widgets": [
+        "set_game_stereoconvergence_slider_bar",
+        "set_game_stereoconvergence_value"
+      ],
+      "edit_fields": [
+        {
+          "name": "set_game_stereoconvergence_value",
+          "maxchars": 4
+        }
+      ],
+      "widget_type": "slider_edit",
+      "label_key": "#str_232924",
+      "target": "r_stereoConvergence",
+      "default": "128",
+      "ui_range": {
+        "low": "32",
+        "high": "512",
+        "step": "16"
+      },
+      "cvar_range": {
+        "low": "8",
+        "high": "4096"
+      },
+      "range_intent": "The slider covers the useful screen distances; the console reaches from 8 to 4096 units.",
+      "accessibility": "Slider with paired edit field. How far ahead the world meets the screen's surface, in game units; nearer things stand out of the screen."
+    },
+    {
+      "id": "game.stereoswap",
+      "pane": "Game Options",
+      "section": "Stereoscopic 3D",
+      "source": "game",
+      "target_type": "cvar",
+      "restart_required": false,
+      "path": "Settings > Game Options > Stereoscopic 3D > Swap Eyes",
+      "container": "set_game_stereoswap",
+      "widgets": [
+        "set_game_stereoswap_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_232925",
+      "choices_key": "#str_200059",
+      "values": [
+        "0",
+        "1"
+      ],
+      "target": "r_stereoSwapEyes",
+      "default": "0",
+      "accessibility": "Focusable choiceDef row. Shows each eye's image to the other eye, for displays that start with the right eye or cross-eyed viewing."
+    },
+    {
       "id": "audio.subtitles",
       "pane": "Audio",
       "section": "Subtitles",

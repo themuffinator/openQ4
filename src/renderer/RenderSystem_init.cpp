@@ -6735,6 +6735,8 @@ void idRenderSystemLocal::Clear( void ) {
 	vrWindowHeight = 0;
 	memset( vrSavedUIViewport, 0, sizeof( vrSavedUIViewport ) );
 	memset( vrTargets, 0, sizeof( vrTargets ) );
+	desktopStereoLayout = STEREO3D_OFF;
+	desktopStereoSwapEyes = false;
 	memset( gammaTable, 0, sizeof( gammaTable ) );
 	takingScreenshot = false;
 }

@@ -223,6 +223,57 @@ ID_INLINE void VR_BuildEyeView( const vrFrameState_t &frame, int eye, const idVe
 	view.fov_y = RAD2DEG( 2.0f * idMath::ATan( halfY ) );
 }
 
+/*
+===============================================================================
+
+	Desktop stereoscopic 3D (r_stereo3D), both game modules.
+
+	Without a headset the renderer can still present a stereo pair to the
+	window: side by side, top and bottom, anaglyph or row interlaced. It then
+	opens every frame as a stereo frame (SetVRRenderTarget accepts eyes 0
+	and 1), and the game renders its first-person 3D pass once per eye, as it
+	does for a headset, with each eye built from the flat view below.
+
+	The eyes keep the view's axes and stand separation units apart along its
+	left axis. Each frustum is shifted towards the other eye so that both see
+	the same rectangle at convergence units ahead: that plane shows on the
+	screen's surface, nearer things in front of it and farther ones behind.
+
+===============================================================================
+*/
+
+const float STEREO_MIN_CONVERGENCE = 8.0f;
+
+ID_INLINE void Stereo_BuildEyeView( int eye, float separation, float convergence, renderView_t &view ) {
+	separation = idMath::ClampFloat( 0.0f, 32.0f, separation );
+	convergence = Max( convergence, STEREO_MIN_CONVERGENCE );
+	float left, right, up, down;
+	if ( view.asymmetricFov ) {
+		left = view.fovTanLeft;
+		right = view.fovTanRight;
+		up = view.fovTanUp;
+		down = view.fovTanDown;
+	} else {
+		right = idMath::Tan( DEG2RAD( view.fov_x * 0.5f ) );
+		up = idMath::Tan( DEG2RAD( view.fov_y * 0.5f ) );
+		left = -right;
+		down = -up;
+	}
+	// the left eye (0) stands on the view's left, so its frustum turns right
+	const float half = 0.5f * separation;
+	const float side = eye == 0 ? 1.0f : -1.0f;
+	// never so far that the frustum stops enclosing its own axis
+	const float shift = side * Min( half / convergence, 0.9f * Min( -left, right ) );
+	view.vieworg += view.viewaxis[1] * ( side * half );
+	view.asymmetricFov = true;
+	view.fovTanLeft = left + shift;
+	view.fovTanRight = right + shift;
+	view.fovTanUp = up;
+	view.fovTanDown = down;
+	const float halfX = Max( idMath::Fabs( view.fovTanLeft ), idMath::Fabs( view.fovTanRight ) );
+	view.fov_x = RAD2DEG( 2.0f * idMath::ATan( halfX ) );
+}
+
 // The view weapon held in the weapon hand at true scale. barrel is the
 // direction the model's barrel points and grip the point its hand holds, both
 // in model space: the barrel turns onto the hand's aim, by the shortest turn,

@@ -1256,6 +1256,27 @@ SCENARIOS = {
         'bind F10 toggleVideo', 'openq4_guiAction set_b_controls', 'waitMsec 1500', 'openq4_guiAction set_b_controls_4', 'waitMsec 800',
         'waitMsec 400', 'openq4_guiGet set_ctrls_other_video::visible', 'screenshot "screenshots/stock-record-video.tga"',
     ]),
+    # Stereoscopic 3D (r_stereo3D): VIRTUAL REALITY's second column ends with
+    # its section; its depth rows are dimmed while it is off, and choosing Side
+    # by Side lays the menu itself out in both halves of the window.
+    'game-stereo': (None, [
+        'waitMsec 9000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_gameoptions',
+        'waitMsec 1500', 'openq4_retainedGui event tab_vr', 'waitMsec 500', 'openq4_retainedGui focus game_stereo3d',
+        'waitMsec 400', 'openq4_retainedGui report', 'screenshot "screenshots/game-stereo.tga"',
+        *menu_step('accept'), *menu_step('down'), *menu_step('accept'),
+        'waitMsec 800', 'r_stereo3D', 'openq4_retainedGui focus game_stereoswap', *menu_step('accept'),
+        'waitMsec 800', 'r_stereoSwapEyes', 'screenshot "screenshots/game-stereo-set.tga"',
+    ]),
+    # The classic page: Game Options ends with STEREOSCOPIC 3D, reached by its
+    # section, its rows following their CVars.
+    'game-stereo-stock': (None, [
+        'waitMsec 9000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_gameoptions', 'waitMsec 1500',
+        'openq4_guiSet gui::game_section_choice 9', 'openq4_guiSet gui::gui_set_game_scroll 95', 'waitMsec 1000',
+        'openq4_guiGet set_game_stereo::visible', 'openq4_guiGet set_game_stereoswap::visible', 'openq4_guiGet set_game_content::rect',
+        'screenshot "screenshots/stock-stereo.tga"',
+        'set r_stereo3D 4', 'set r_stereoSeparation 3', 'set r_stereoConvergence 160', 'set r_stereoSwapEyes 1', 'waitMsec 800',
+        'screenshot "screenshots/stock-stereo-set.tga"',
+    ]),
     # The settings tree (UI-01): every tab of every settings sub-page, as the
     # settings tree audit of 20 November 2026 laid them out, each reached by
     # its tab event from the SETTINGS page and left with Back.

@@ -1154,6 +1154,46 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 
 /*
 ===================
+idPlayerView::StereoView
+
+openQ4: desktop stereoscopic 3D (r_stereo3D, VRSystem.h). The renderer opens
+the frame as a stereo frame; each eye gets the scene chain on its own target
+and temporal history, the way a headset's eyes do, and the 2D that follows
+lands on the frame's screen layer, which the renderer lays over both eyes at
+the screen's depth. The view effects that capture the finished scene to draw
+it again (double vision, influence, the paused-menu snapshot) would capture
+that layer instead, so they stand down as they do in a headset.
+===================
+*/
+bool idPlayerView::StereoView( idUserInterface *hud, const renderView_t *view, int eyeLiquidContents ) {
+	if ( cvarSystem->GetCVarInteger( "r_stereo3D" ) <= 0 || !renderSystem->SetVRRenderTarget( 0 ) ) {
+		return false;
+	}
+	const float separation = cvarSystem->GetCVarFloat( "r_stereoSeparation" );
+	const float convergence = cvarSystem->GetCVarFloat( "r_stereoConvergence" );
+	LiquidOverlay( eyeLiquidContents, false );
+	for ( int eye = 0; eye < 2; eye++ ) {
+		if ( eye > 0 && !renderSystem->SetVRRenderTarget( eye ) ) {
+			break;
+		}
+		renderView_t eyeView = *view;
+		Stereo_BuildEyeView( eye, separation, convergence, eyeView );
+		gameLocal.SelectTemporalHistorySlot( eye );
+		SingleView( hud, &eyeView, RF_NO_GUI | RF_PRIMARY_VIEW );
+		gameLocal.SelectTemporalHistorySlot( 0 );
+		// the flat wash that stands in for the underwater pass belongs in the eyes
+		LiquidWash();
+	}
+	renderSystem->SetVRRenderTarget( -1 );
+
+	DrawRetainedViewEffects();
+	SingleView( hud, view, RF_GUI_ONLY );
+	ScreenFade();
+	return true;
+}
+
+/*
+===================
 idPlayerView::VRComfortVignette
 
 openQ4 VR: how strongly to vignette this frame (vr_comfortVignette). It
@@ -1301,6 +1341,12 @@ void idPlayerView::RenderPlayerView( idUserInterface *hud, bool menuPaused ) {
 		pauseSceneValid = false;
 		LiquidOverlay( eyeLiquidContents, false );
 		VRView( hud, view, vrFrame, vrTrackingYaw );
+		return;
+	}
+
+	// a stereoscopic display: one 3D pass per eye, the 2D over both
+	if ( StereoView( hud, view, eyeLiquidContents ) ) {
+		pauseSceneValid = false;
 		return;
 	}
 // openQ4 END

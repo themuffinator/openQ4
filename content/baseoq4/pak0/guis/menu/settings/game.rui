@@ -64,6 +64,10 @@
   "cvar.vr_physicalCrouch": {"type": "boolean", "initial": false, "cvar": "vr_physicalCrouch"},
   "cvar.vr_playSpace": {"type": "number", "initial": 0, "cvar": "vr_playSpace"},
   "cvar.vr_body": {"type": "number", "initial": 0, "cvar": "vr_body"},
+  "cvar.r_stereo3D": {"type": "number", "initial": 0, "cvar": "r_stereo3D"},
+  "cvar.r_stereoSeparation": {"type": "number", "initial": 0, "cvar": "r_stereoSeparation"},
+  "cvar.r_stereoConvergence": {"type": "number", "initial": 0, "cvar": "r_stereoConvergence"},
+  "cvar.r_stereoSwapEyes": {"type": "boolean", "initial": false, "cvar": "r_stereoSwapEyes"},
   "cvar.com_videoFormat": {"type": "string", "initial": "", "cvar": "com_videoFormat"},
   "cvar.com_videoQuality": {"type": "number", "initial": 0, "cvar": "com_videoQuality"},
   "cvar.com_videoFPS": {"type": "number", "initial": 0, "cvar": "com_videoFPS"},
@@ -358,6 +362,26 @@
    "operation": "settings.player.set",
    "input": "number",
    "arguments": {"cvar": "vr_body", "value": {"input": "value"}}
+  },
+  "set.r_stereo3D": {
+   "operation": "settings.player.set",
+   "input": "number",
+   "arguments": {"cvar": "r_stereo3D", "value": {"input": "value"}}
+  },
+  "set.r_stereoSeparation": {
+   "operation": "settings.player.set",
+   "input": "number",
+   "arguments": {"cvar": "r_stereoSeparation", "value": {"input": "value"}}
+  },
+  "set.r_stereoConvergence": {
+   "operation": "settings.player.set",
+   "input": "number",
+   "arguments": {"cvar": "r_stereoConvergence", "value": {"input": "value"}}
+  },
+  "set.r_stereoSwapEyes": {
+   "operation": "settings.player.set",
+   "input": "boolean",
+   "arguments": {"cvar": "r_stereoSwapEyes", "value": {"input": "value"}}
   },
   "set.com_videoFormat": {
    "operation": "settings.player.set",
@@ -1273,6 +1297,51 @@
    "node": "game_videoaudio",
    "property": "opacity",
    "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.com_videoFormat"}, "gif"]}, 1, 0.4]}
+  },
+  {
+   "id": "game_stereodepth.enabled",
+   "node": "game_stereodepth",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"op": "!=", "args": [{"state": "cvar.r_stereo3D"}, 0]}]
+   }
+  },
+  {
+   "id": "game_stereodepth.opacity",
+   "node": "game_stereodepth",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.r_stereo3D"}, 0]}, 1, 0.4]}
+  },
+  {
+   "id": "game_stereoconvergence.enabled",
+   "node": "game_stereoconvergence",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"op": "!=", "args": [{"state": "cvar.r_stereo3D"}, 0]}]
+   }
+  },
+  {
+   "id": "game_stereoconvergence.opacity",
+   "node": "game_stereoconvergence",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.r_stereo3D"}, 0]}, 1, 0.4]}
+  },
+  {
+   "id": "game_stereoswap.enabled",
+   "node": "game_stereoswap",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"op": "!=", "args": [{"state": "cvar.r_stereo3D"}, 0]}]
+   }
+  },
+  {
+   "id": "game_stereoswap.opacity",
+   "node": "game_stereoswap",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.r_stereo3D"}, 0]}, 1, 0.4]}
   },
   {
    "id": "tab-general-active.display",
@@ -26121,8 +26190,1470 @@
    }
   },
   {
+   "id": "tall.game-vr-head-1-8.width",
+   "node": "game-vr-head-1-8",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     837.5488,
+     {"op": "*", "args": [409.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-8.height",
+   "node": "game-vr-head-1-8",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-8.padding-left",
+   "node": "game-vr-head-1-8",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-8.font-size",
+   "node": "game-vr-head-1-8",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-8.line-height",
+   "node": "game-vr-head-1-8",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d.width",
+   "node": "game_stereo3d",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d.height",
+   "node": "game_stereo3d",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-focus.width",
+   "node": "game_stereo3d-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-focus.height",
+   "node": "game_stereo3d-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-head.left",
+   "node": "game_stereo3d-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-head.width",
+   "node": "game_stereo3d-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     345.6551,
+     {"op": "*", "args": [169, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-head.height",
+   "node": "game_stereo3d-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-label.font-size",
+   "node": "game_stereo3d-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-label.line-height",
+   "node": "game_stereo3d-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-value.left",
+   "node": "game_stereo3d-value",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {"op": "*", "args": [198, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-value.width",
+   "node": "game_stereo3d-value",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     418.2631,
+     {"op": "*", "args": [204.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-value.height",
+   "node": "game_stereo3d-value",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-value.font-size",
+   "node": "game_stereo3d-value",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-value.line-height",
+   "node": "game_stereo3d-value",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     36.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-chevron.left",
+   "node": "game_stereo3d-chevron",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     831.4129,
+     {"op": "*", "args": [406.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-chevron.top",
+   "node": "game_stereo3d-chevron",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     30.6794,
+     {"op": "*", "args": [15.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-chevron.width",
+   "node": "game_stereo3d-chevron",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     24.5436,
+     {"op": "*", "args": [12, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-chevron.height",
+   "node": "game_stereo3d-chevron",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     12.2718,
+     {"op": "*", "args": [6, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-viewport.margin-left",
+   "node": "game_stereo3d-viewport",
+   "property": "margin-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-viewport.margin-top",
+   "node": "game_stereo3d-viewport",
+   "property": "margin-top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {"op": "*", "args": [2, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-0.height",
+   "node": "game_stereo3d-option-0",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-0-label.padding-left",
+   "node": "game_stereo3d-option-0-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-0-label.font-size",
+   "node": "game_stereo3d-option-0-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-0-label.line-height",
+   "node": "game_stereo3d-option-0-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-1.height",
+   "node": "game_stereo3d-option-1",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-1-label.padding-left",
+   "node": "game_stereo3d-option-1-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-1-label.font-size",
+   "node": "game_stereo3d-option-1-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-1-label.line-height",
+   "node": "game_stereo3d-option-1-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-2.height",
+   "node": "game_stereo3d-option-2",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-2-label.padding-left",
+   "node": "game_stereo3d-option-2-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-2-label.font-size",
+   "node": "game_stereo3d-option-2-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-2-label.line-height",
+   "node": "game_stereo3d-option-2-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-3.height",
+   "node": "game_stereo3d-option-3",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-3-label.padding-left",
+   "node": "game_stereo3d-option-3-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-3-label.font-size",
+   "node": "game_stereo3d-option-3-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-3-label.line-height",
+   "node": "game_stereo3d-option-3-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-4.height",
+   "node": "game_stereo3d-option-4",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-4-label.padding-left",
+   "node": "game_stereo3d-option-4-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-4-label.font-size",
+   "node": "game_stereo3d-option-4-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-4-label.line-height",
+   "node": "game_stereo3d-option-4-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-5.height",
+   "node": "game_stereo3d-option-5",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-5-label.padding-left",
+   "node": "game_stereo3d-option-5-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-5-label.font-size",
+   "node": "game_stereo3d-option-5-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-option-5-label.line-height",
+   "node": "game_stereo3d-option-5-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-scroll-track.width",
+   "node": "game_stereo3d-scroll-track",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereo3d-scroll-thumb.width",
+   "node": "game_stereo3d-scroll-thumb",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth.width",
+   "node": "game_stereodepth",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth.height",
+   "node": "game_stereodepth",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-focus.width",
+   "node": "game_stereodepth-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-focus.height",
+   "node": "game_stereodepth-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-head.left",
+   "node": "game_stereodepth-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-head.width",
+   "node": "game_stereodepth-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     345.6551,
+     {"op": "*", "args": [169, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-head.height",
+   "node": "game_stereodepth-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-label.font-size",
+   "node": "game_stereodepth-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-label.line-height",
+   "node": "game_stereodepth-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-track.left",
+   "node": "game_stereodepth-track",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {"op": "*", "args": [198, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-track.width",
+   "node": "game_stereodepth-track",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     336.4512,
+     {"op": "*", "args": [164.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-track.height",
+   "node": "game_stereodepth-track",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-fill.top",
+   "node": "game_stereodepth-fill",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-fill.height",
+   "node": "game_stereodepth-fill",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-thumb.top",
+   "node": "game_stereodepth-thumb",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     10.2265,
+     {"op": "*", "args": [5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-thumb.width",
+   "node": "game_stereodepth-thumb",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-thumb.height",
+   "node": "game_stereodepth-thumb",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     32.7247,
+     {"op": "*", "args": [16, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-value.left",
+   "node": "game_stereodepth-value",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     757.7822,
+     {"op": "*", "args": [370.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-value.width",
+   "node": "game_stereodepth-value",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     98.1742,
+     {"op": "*", "args": [48, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-value.height",
+   "node": "game_stereodepth-value",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-value.font-size",
+   "node": "game_stereodepth-value",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereodepth-value.line-height",
+   "node": "game_stereodepth-value",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [53.1777, {"state": "view.text"}]},
+     26.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence.width",
+   "node": "game_stereoconvergence",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence.height",
+   "node": "game_stereoconvergence",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-focus.width",
+   "node": "game_stereoconvergence-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-focus.height",
+   "node": "game_stereoconvergence-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-head.left",
+   "node": "game_stereoconvergence-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-head.width",
+   "node": "game_stereoconvergence-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     345.6551,
+     {"op": "*", "args": [169, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-head.height",
+   "node": "game_stereoconvergence-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-label.font-size",
+   "node": "game_stereoconvergence-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-label.line-height",
+   "node": "game_stereoconvergence-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-track.left",
+   "node": "game_stereoconvergence-track",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {"op": "*", "args": [198, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-track.width",
+   "node": "game_stereoconvergence-track",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     336.4512,
+     {"op": "*", "args": [164.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-track.height",
+   "node": "game_stereoconvergence-track",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-fill.top",
+   "node": "game_stereoconvergence-fill",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-fill.height",
+   "node": "game_stereoconvergence-fill",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-thumb.top",
+   "node": "game_stereoconvergence-thumb",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     10.2265,
+     {"op": "*", "args": [5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-thumb.width",
+   "node": "game_stereoconvergence-thumb",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-thumb.height",
+   "node": "game_stereoconvergence-thumb",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     32.7247,
+     {"op": "*", "args": [16, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-value.left",
+   "node": "game_stereoconvergence-value",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     757.7822,
+     {"op": "*", "args": [370.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-value.width",
+   "node": "game_stereoconvergence-value",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     98.1742,
+     {"op": "*", "args": [48, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-value.height",
+   "node": "game_stereoconvergence-value",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     53.1777,
+     {"op": "*", "args": [26.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-value.font-size",
+   "node": "game_stereoconvergence-value",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoconvergence-value.line-height",
+   "node": "game_stereoconvergence-value",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [53.1777, {"state": "view.text"}]},
+     26.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap.width",
+   "node": "game_stereoswap",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap.height",
+   "node": "game_stereoswap",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-focus.width",
+   "node": "game_stereoswap-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-focus.height",
+   "node": "game_stereoswap-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-head.left",
+   "node": "game_stereoswap-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-head.width",
+   "node": "game_stereoswap-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     345.6551,
+     {"op": "*", "args": [169, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-head.height",
+   "node": "game_stereoswap-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-label.font-size",
+   "node": "game_stereoswap-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-label.line-height",
+   "node": "game_stereoswap-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-box.left",
+   "node": "game_stereoswap-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {"op": "*", "args": [198, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-box.top",
+   "node": "game_stereoswap-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-box.width",
+   "node": "game_stereoswap-box",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-box.height",
+   "node": "game_stereoswap-box",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-checked.left",
+   "node": "game_stereoswap-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {"op": "*", "args": [198, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-checked.top",
+   "node": "game_stereoswap-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-checked.width",
+   "node": "game_stereoswap-checked",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_stereoswap-checked.height",
+   "node": "game_stereoswap-checked",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
    "id": "game_vr.enabled",
    "node": "game_vr",
+   "property": "enabled",
+   "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
+  },
+  {
+   "id": "game_stereo3d.enabled",
+   "node": "game_stereo3d",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 4]}
   },
@@ -34834,6 +36365,582 @@
     },
     {
      "node": "game_vrbody-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereo3d.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "game_stereo3d-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_stereo3d-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_stereo3d-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereo3d.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "game_stereo3d-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereo3d-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "game_stereo3d-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereo3d.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "game_stereo3d-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereo3d-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereo3d-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereo3d.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "game_stereo3d-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereo3d-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereo3d-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereo3d.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "game_stereo3d-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereo3d-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereo3d-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereodepth.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "game_stereodepth-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_stereodepth-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_stereodepth-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereodepth.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "game_stereodepth-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereodepth-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "game_stereodepth-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereodepth.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "game_stereodepth-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereodepth-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereodepth-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereodepth.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "game_stereodepth-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereodepth-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereodepth-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereodepth.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "game_stereodepth-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereodepth-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereodepth-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoconvergence.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "game_stereoconvergence-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_stereoconvergence-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_stereoconvergence-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoconvergence.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "game_stereoconvergence-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereoconvergence-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "game_stereoconvergence-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoconvergence.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "game_stereoconvergence-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereoconvergence-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereoconvergence-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoconvergence.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "game_stereoconvergence-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereoconvergence-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereoconvergence-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoconvergence.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "game_stereoconvergence-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereoconvergence-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereoconvergence-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoswap.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "game_stereoswap-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_stereoswap-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_stereoswap-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoswap.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "game_stereoswap-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereoswap-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "game_stereoswap-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoswap.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "game_stereoswap-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereoswap-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereoswap-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoswap.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "game_stereoswap-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereoswap-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_stereoswap-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_stereoswap.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "game_stereoswap-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereoswap-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_stereoswap-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -75052,7 +77159,2409 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vr", "up": "game_vrplayspace", "left": "game_vrmove", "right": "game_vrbody"}
+                 "navigation": {"down": "game_stereo3d", "up": "game_vrplayspace", "left": "game_vrmove", "right": "game_vrbody"}
+                }
+               },
+               {
+                "id": "game-vr-head-1-8",
+                "type": "text",
+                "properties": {
+                 "text": {"type": "text", "value": "#str_232920"},
+                 "position": {"type": "keyword", "value": "relative"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 409.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "padding-left": {"type": "length", "value": 21.0, "unit": "dp"},
+                 "font-family": {"type": "font", "value": "lowpixel"},
+                 "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                 "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "color": {"type": "color", "value": [1, 1, 1, 0.4]},
+                 "white-space": {"type": "keyword", "value": "nowrap"},
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "pointer-events": {"type": "keyword", "value": "none"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "flex-shrink": {"type": "number", "value": 0}
+                }
+               },
+               {
+                "id": "game_stereo3d",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "game_stereo3d-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereo3d-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereo3d-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereo3d-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 169, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_stereo3d-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_232921"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereo3d-value",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_230030"},
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 204.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
+                   "white-space": {"type": "keyword", "value": "nowrap"},
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
+                  }
+                 },
+                 {
+                  "id": "game_stereo3d-chevron",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 406.5, "unit": "dp"},
+                   "top": {"type": "length", "value": 15.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 12, "unit": "dp"},
+                   "height": {"type": "length", "value": 6, "unit": "dp"}
+                  },
+                  "paths": [
+                   {
+                    "id": "chevron",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 1.0}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.0}]]}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereo3d-popup",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 190, "unit": "dp"},
+                   "top": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 228.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 136.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_stereo3d-popup-frame",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "rim",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                       "widthDp": 4,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "body",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0.698, 0.8039, 0.2627, 0.2]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "game_stereo3d-viewport",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "width": {"type": "length", "value": 210.5, "unit": "dp"},
+                     "height": {"type": "length", "value": 132.0, "unit": "dp"},
+                     "margin-left": {"type": "length", "value": 2, "unit": "dp"},
+                     "margin-top": {"type": "length", "value": 2, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "game_stereo3d-content",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "children": [
+                       {
+                        "id": "game_stereo3d-option-0",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "game_stereo3d-option-0-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-0-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-0-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_232922"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       },
+                       {
+                        "id": "game_stereo3d-option-1",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "game_stereo3d-option-1-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-1-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-1-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_232922"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       },
+                       {
+                        "id": "game_stereo3d-option-2",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "game_stereo3d-option-2-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-2-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-2-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_232922"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       },
+                       {
+                        "id": "game_stereo3d-option-3",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "game_stereo3d-option-3-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-3-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-3-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_232922"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       },
+                       {
+                        "id": "game_stereo3d-option-4",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "game_stereo3d-option-4-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-4-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-4-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_232922"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       },
+                       {
+                        "id": "game_stereo3d-option-5",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "game_stereo3d-option-5-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-5-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_stereo3d-option-5-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_232922"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "id": "game_stereo3d-scroll-track",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 216.5, "unit": "dp"},
+                     "top": {"type": "length", "value": 2, "unit": "dp"},
+                     "width": {"type": "length", "value": 8, "unit": "dp"},
+                     "height": {"type": "length", "value": 132.0, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "game_stereo3d-scroll-trough",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "trough",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.375}, {"fraction": 0.0}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 0.0}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 1}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.375}, {"fraction": 1}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.12]}}
+                       }
+                      ]
+                     },
+                     {
+                      "id": "game_stereo3d-scroll-thumb",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 8, "unit": "dp"},
+                       "height": {"type": "length", "value": 24, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "game_stereo3d-scroll-ink",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "paths": [
+                         {
+                          "id": "thumb",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[{"fraction": 0.125}, {"fraction": 0.0}]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 0.0}]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[{"fraction": 0.125}, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.9]}}
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "choice",
+                 "label": "#str_232921",
+                 "action": "set.r_stereo3D",
+                 "value": {"state": "cvar.r_stereo3D"},
+                 "states": {
+                  "default": "game_stereo3d.default",
+                  "hover": "game_stereo3d.hover",
+                  "focus": "game_stereo3d.focus",
+                  "pressed": "game_stereo3d.pressed",
+                  "disabled": "game_stereo3d.disabled"
+                 },
+                 "parts": {
+                  "popup": "game_stereo3d-popup",
+                  "viewport": "game_stereo3d-viewport",
+                  "content": "game_stereo3d-content",
+                  "value": "game_stereo3d-value"
+                 },
+                 "visibleRows": 6,
+                 "options": [
+                  {
+                   "id": "game_stereo3d-option-0",
+                   "node": "game_stereo3d-option-0",
+                   "label": "#str_232922",
+                   "value": 0,
+                   "parts": {
+                    "label": "game_stereo3d-option-0-label",
+                    "selected": "game_stereo3d-option-0-selected",
+                    "highlight": "game_stereo3d-option-0-highlight"
+                   },
+                   "labelIndex": 0
+                  },
+                  {
+                   "id": "game_stereo3d-option-1",
+                   "node": "game_stereo3d-option-1",
+                   "label": "#str_232922",
+                   "value": 1,
+                   "parts": {
+                    "label": "game_stereo3d-option-1-label",
+                    "selected": "game_stereo3d-option-1-selected",
+                    "highlight": "game_stereo3d-option-1-highlight"
+                   },
+                   "labelIndex": 1
+                  },
+                  {
+                   "id": "game_stereo3d-option-2",
+                   "node": "game_stereo3d-option-2",
+                   "label": "#str_232922",
+                   "value": 2,
+                   "parts": {
+                    "label": "game_stereo3d-option-2-label",
+                    "selected": "game_stereo3d-option-2-selected",
+                    "highlight": "game_stereo3d-option-2-highlight"
+                   },
+                   "labelIndex": 2
+                  },
+                  {
+                   "id": "game_stereo3d-option-3",
+                   "node": "game_stereo3d-option-3",
+                   "label": "#str_232922",
+                   "value": 3,
+                   "parts": {
+                    "label": "game_stereo3d-option-3-label",
+                    "selected": "game_stereo3d-option-3-selected",
+                    "highlight": "game_stereo3d-option-3-highlight"
+                   },
+                   "labelIndex": 3
+                  },
+                  {
+                   "id": "game_stereo3d-option-4",
+                   "node": "game_stereo3d-option-4",
+                   "label": "#str_232922",
+                   "value": 4,
+                   "parts": {
+                    "label": "game_stereo3d-option-4-label",
+                    "selected": "game_stereo3d-option-4-selected",
+                    "highlight": "game_stereo3d-option-4-highlight"
+                   },
+                   "labelIndex": 4
+                  },
+                  {
+                   "id": "game_stereo3d-option-5",
+                   "node": "game_stereo3d-option-5",
+                   "label": "#str_232922",
+                   "value": 5,
+                   "parts": {
+                    "label": "game_stereo3d-option-5-label",
+                    "selected": "game_stereo3d-option-5-selected",
+                    "highlight": "game_stereo3d-option-5-highlight"
+                   },
+                   "labelIndex": 5
+                  }
+                 ],
+                 "placementBounds": "screen",
+                 "scrollbar": {
+                  "track": "game_stereo3d-scroll-track",
+                  "thumb": "game_stereo3d-scroll-thumb",
+                  "lineStep": 22.0,
+                  "minimumThumb": 24
+                 },
+                 "navigation": {"down": "game_stereodepth", "up": "game_vrbody", "left": "game_vrmove", "right": "game_stereo3d"}
+                }
+               },
+               {
+                "id": "game_stereodepth",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "game_stereodepth-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereodepth-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereodepth-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereodepth-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 169, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_stereodepth-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_232923"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereodepth-track",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 164.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 26.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_stereodepth-ramp",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "tick0",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.384615}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.615385}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick1",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.062498}, {"fraction": 0.372615}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.062498}, {"fraction": 0.627385}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick2",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.124997}, {"fraction": 0.360577}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.124997}, {"fraction": 0.639423}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick3",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.187502}, {"fraction": 0.348538}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.187502}, {"fraction": 0.651462}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick4",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.336538}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.663462}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick5",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.312498}, {"fraction": 0.324538}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.312498}, {"fraction": 0.675462}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick6",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.375003}, {"fraction": 0.3125}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.375003}, {"fraction": 0.6875}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick7",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.437502}, {"fraction": 0.300462}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.437502}, {"fraction": 0.699538}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick8",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.5}, {"fraction": 0.288462}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 0.711538}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick9",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.562498}, {"fraction": 0.276462}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.562498}, {"fraction": 0.723538}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick10",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.624997}, {"fraction": 0.264423}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.624997}, {"fraction": 0.735577}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick11",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.687502}, {"fraction": 0.252385}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.687502}, {"fraction": 0.747615}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick12",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.75}, {"fraction": 0.240385}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.759615}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick13",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.812498}, {"fraction": 0.228385}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.812498}, {"fraction": 0.771615}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick14",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.875003}, {"fraction": 0.216346}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.875003}, {"fraction": 0.783654}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick15",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.937502}, {"fraction": 0.204308}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.937502}, {"fraction": 0.795692}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick16",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 1.0}, {"fraction": 0.192308}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.807692}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "game_stereodepth-fill",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 11, "unit": "dp"},
+                     "width": {"type": "length", "value": 0, "unit": "dp"},
+                     "height": {"type": "length", "value": 4, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "game_stereodepth-fill-ink",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "fill",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[0, 0]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 4]]},
+                         {"id": "p3", "op": "line", "points": [[0, 4]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 0.8]}}
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "id": "game_stereodepth-thumb",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 5, "unit": "dp"},
+                     "width": {"type": "length", "value": 4, "unit": "dp"},
+                     "height": {"type": "length", "value": 16, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "game_stereodepth-thumb-ink",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "thumb",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.0}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 1.0}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1.0}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereodepth-value",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_230030"},
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 370.5, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 48, "unit": "dp"},
+                   "height": {"type": "length", "value": 26.0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
+                   "text-align": {"type": "keyword", "value": "right"},
+                   "white-space": {"type": "keyword", "value": "nowrap"}
+                  }
+                 }
+                ],
+                "control": {
+                 "role": "slider",
+                 "label": "#str_232923",
+                 "action": "set.r_stereoSeparation",
+                 "value": {
+                  "op": "/",
+                  "args": [{"op": "round", "args": [{"op": "*", "args": [{"state": "cvar.r_stereoSeparation"}, 10]}]}, 10]
+                 },
+                 "states": {
+                  "default": "game_stereodepth.default",
+                  "hover": "game_stereodepth.hover",
+                  "focus": "game_stereodepth.focus",
+                  "pressed": "game_stereodepth.pressed",
+                  "disabled": "game_stereodepth.disabled"
+                 },
+                 "minimum": 0,
+                 "maximum": 8,
+                 "step": 0.5,
+                 "decimals": 1,
+                 "orientation": "horizontal",
+                 "parts": {
+                  "track": "game_stereodepth-track",
+                  "fill": "game_stereodepth-fill",
+                  "thumb": "game_stereodepth-thumb",
+                  "value": "game_stereodepth-value"
+                 },
+                 "navigation": {"down": "game_stereoconvergence", "up": "game_stereo3d", "left": "game_vrmove", "right": "game_stereodepth"}
+                }
+               },
+               {
+                "id": "game_stereoconvergence",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "game_stereoconvergence-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoconvergence-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoconvergence-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoconvergence-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 169, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_stereoconvergence-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_232924"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoconvergence-track",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 164.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 26.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_stereoconvergence-ramp",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "tick0",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.384615}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.615385}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick1",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.033331}, {"fraction": 0.378192}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.033331}, {"fraction": 0.621808}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick2",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.066669}, {"fraction": 0.371808}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.066669}, {"fraction": 0.628192}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick3",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.1}, {"fraction": 0.365385}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.1}, {"fraction": 0.634615}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick4",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.133331}, {"fraction": 0.358962}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.133331}, {"fraction": 0.641038}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick5",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.166669}, {"fraction": 0.352577}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.166669}, {"fraction": 0.647423}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick6",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.2}, {"fraction": 0.346154}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.2}, {"fraction": 0.653846}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick7",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.233331}, {"fraction": 0.339731}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.233331}, {"fraction": 0.660269}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick8",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.266669}, {"fraction": 0.333346}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.266669}, {"fraction": 0.666654}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick9",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.3}, {"fraction": 0.326923}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.3}, {"fraction": 0.673077}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick10",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.333331}, {"fraction": 0.3205}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.333331}, {"fraction": 0.6795}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick11",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.366669}, {"fraction": 0.314115}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.366669}, {"fraction": 0.685885}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick12",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.4}, {"fraction": 0.307692}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.4}, {"fraction": 0.692308}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick13",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.433331}, {"fraction": 0.301269}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.433331}, {"fraction": 0.698731}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick14",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.466669}, {"fraction": 0.294885}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.466669}, {"fraction": 0.705115}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick15",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.5}, {"fraction": 0.288462}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 0.711538}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick16",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.533331}, {"fraction": 0.282038}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.533331}, {"fraction": 0.717962}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick17",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.566669}, {"fraction": 0.275654}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.566669}, {"fraction": 0.724346}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick18",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.6}, {"fraction": 0.269231}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.6}, {"fraction": 0.730769}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick19",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.633331}, {"fraction": 0.262808}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.633331}, {"fraction": 0.737192}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick20",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.666669}, {"fraction": 0.256423}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.666669}, {"fraction": 0.743577}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick21",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.7}, {"fraction": 0.25}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.7}, {"fraction": 0.75}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick22",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.733331}, {"fraction": 0.243577}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.733331}, {"fraction": 0.756423}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick23",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.766669}, {"fraction": 0.237192}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.766669}, {"fraction": 0.762808}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick24",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.8}, {"fraction": 0.230769}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.8}, {"fraction": 0.769231}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick25",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.833331}, {"fraction": 0.224346}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.833331}, {"fraction": 0.775654}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick26",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.866669}, {"fraction": 0.217962}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.866669}, {"fraction": 0.782038}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick27",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.9}, {"fraction": 0.211538}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.9}, {"fraction": 0.788462}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick28",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.933331}, {"fraction": 0.205115}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.933331}, {"fraction": 0.794885}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick29",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.966669}, {"fraction": 0.198731}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.966669}, {"fraction": 0.801269}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "tick30",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 1.0}, {"fraction": 0.192308}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.807692}]]}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "game_stereoconvergence-fill",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 11, "unit": "dp"},
+                     "width": {"type": "length", "value": 0, "unit": "dp"},
+                     "height": {"type": "length", "value": 4, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "game_stereoconvergence-fill-ink",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "fill",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[0, 0]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, 4]]},
+                         {"id": "p3", "op": "line", "points": [[0, 4]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 0.8]}}
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "id": "game_stereoconvergence-thumb",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 5, "unit": "dp"},
+                     "width": {"type": "length", "value": 4, "unit": "dp"},
+                     "height": {"type": "length", "value": 16, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "game_stereoconvergence-thumb-ink",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "thumb",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.0}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 1.0}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1.0}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoconvergence-value",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_230030"},
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 370.5, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 48, "unit": "dp"},
+                   "height": {"type": "length", "value": 26.0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 26.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
+                   "text-align": {"type": "keyword", "value": "right"},
+                   "white-space": {"type": "keyword", "value": "nowrap"}
+                  }
+                 }
+                ],
+                "control": {
+                 "role": "slider",
+                 "label": "#str_232924",
+                 "action": "set.r_stereoConvergence",
+                 "value": {"state": "cvar.r_stereoConvergence"},
+                 "states": {
+                  "default": "game_stereoconvergence.default",
+                  "hover": "game_stereoconvergence.hover",
+                  "focus": "game_stereoconvergence.focus",
+                  "pressed": "game_stereoconvergence.pressed",
+                  "disabled": "game_stereoconvergence.disabled"
+                 },
+                 "minimum": 32,
+                 "maximum": 512,
+                 "step": 16,
+                 "decimals": 0,
+                 "orientation": "horizontal",
+                 "parts": {
+                  "track": "game_stereoconvergence-track",
+                  "fill": "game_stereoconvergence-fill",
+                  "thumb": "game_stereoconvergence-thumb",
+                  "value": "game_stereoconvergence-value"
+                 },
+                 "navigation": {
+                  "down": "game_stereoswap",
+                  "up": "game_stereodepth",
+                  "left": "game_vrmove",
+                  "right": "game_stereoconvergence"
+                 }
+                }
+               },
+               {
+                "id": "game_stereoswap",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "game_stereoswap-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoswap-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoswap-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoswap-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 169, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_stereoswap-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_232925"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoswap-box",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"}
+                  },
+                  "paths": [
+                   {
+                    "id": "box",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_stereoswap-checked",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_stereoswap-mark",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "mark",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "toggle",
+                 "label": "#str_232925",
+                 "action": "set.r_stereoSwapEyes",
+                 "value": {"state": "cvar.r_stereoSwapEyes"},
+                 "states": {
+                  "default": "game_stereoswap.default",
+                  "hover": "game_stereoswap.hover",
+                  "focus": "game_stereoswap.focus",
+                  "pressed": "game_stereoswap.pressed",
+                  "disabled": "game_stereoswap.disabled"
+                 },
+                 "parts": {"checked": "game_stereoswap-checked"},
+                 "navigation": {"down": "game_vr", "up": "game_stereoconvergence", "left": "game_vrmove", "right": "game_stereoswap"}
                 }
                }
               ]

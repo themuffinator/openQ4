@@ -1,10 +1,11 @@
 """The retained GAME OPTIONS settings page (docs/dev/ui-visual-design.md
 sections 7, 9 and 13.7; UI-01): the stock page's rows
 (guis/menu/settings/game.gui) in the settings sub-page
-(retained_settings_rows), in ten sections on five tabs of at most two
+(retained_settings_rows), in eleven sections on five tabs of at most two
 columns: GENERAL (gameplay | interface, items and players, video capture),
 HUD (HUD | crosshair), VIEW WEAPON (its place | its view), ACCESSIBILITY
-(motion | visibility) and VIRTUAL REALITY. The stock page's mouse and
+(motion | visibility) and VIRTUAL REALITY (its rows | the rest of them,
+stereoscopic 3D). The stock page's mouse and
 controller sections, with Free Look, Toggle Zoom and Scope Sensitivity, are
 the CONTROLS page's MOUSE and CONTROLLER tabs (retained_controls, issue
 #220).
@@ -130,6 +131,14 @@ SECTIONS = (
         choice("game_vrplayspace", "#str_231760", "vr_playSpace", "#str_231761", (0, 1, 2)),
         choice("game_vrbody", "#str_232514", "vr_body", "#str_232515", (0, 1, 2)),
     )),
+    # Stereoscopic 3D without a headset (r_stereo3D, docs/user/stereoscopic-3d.md),
+    # under the VR rows on VIRTUAL REALITY's second column.
+    ("stereo", "#str_232920", (
+        choice("game_stereo3d", "#str_232921", "r_stereo3D", "#str_232922", (0, 1, 2, 3, 4, 5)),
+        slider("game_stereodepth", "#str_232923", "r_stereoSeparation", 0, 8, 0.5, 1),
+        slider("game_stereoconvergence", "#str_232924", "r_stereoConvergence", 32, 512, 16),
+        toggle("game_stereoswap", "#str_232925", "r_stereoSwapEyes"),
+    )),
     # Video capture (recordVideo, docs/user/video-capture.md), on GENERAL
     # under Screenshot Format's column: the strip has no room for a sixth tab
     # in every language. The codec, bitrates, encoder and FFmpeg's path stay
@@ -161,7 +170,7 @@ TABS = (
     ("hud", "#str_231235", (("hud",), ("crosshair",))),
     ("viewweapon", "#str_229952", (("viewweapon", 0, VIEW_PLACE), ("viewweapon", VIEW_PLACE, None))),
     ("accessibility", "#str_232542", (("motion",), ("visibility",))),
-    ("vr", "#str_230120", (("vr", 0, 6), ("vr", 6, None))),
+    ("vr", "#str_230120", (("vr", 0, 6), (("vr", 6, None), "stereo"))),
 )
 
 
@@ -187,7 +196,8 @@ def dependencies() -> dict:
       Weapon FOV Aspect while Weapon FOV is 0 too (it adjusts only a set FOV);
     - every VR row with VR Mode off (no OpenXR session), Snap Turn Angle with
       smooth turning, and the Aim Laser and Two-Handed Grip with head aim;
-    - Record Sound while the video format is GIF, which has no sound.
+    - Record Sound while the video format is GIF, which has no sound;
+    - the stereo depth, convergence and eye swap with Stereoscopic 3D off.
     The gun's offsets, position and kick stay: they still move the hidden
     weapon, whose barrel some weapons fire from."""
     layout = _cvar("ui_hudLayout")
@@ -206,6 +216,8 @@ def dependencies() -> dict:
         "game_vrlaser": hand_aim,
         "game_vrtwohanded": hand_aim,
         "game_videoaudio": {"op": "!=", "args": [_cvar("com_videoFormat"), "gif"]},
+        **{ident: {"op": "!=", "args": [_cvar("r_stereo3D"), 0]}
+           for ident in ("game_stereodepth", "game_stereoconvergence", "game_stereoswap")},
     }
 
 
@@ -263,13 +275,16 @@ def game_document() -> dict:
     for ident, key, columns in TABS:
         laid = []
         for column in columns:
-            if len(column) == 3 and isinstance(column[1], int):
-                section, first, end = column
-                laid.append([built[row[1]] for row in sections[section][1][first:end]])
-                continue
+            # a column is one run of a section's rows (section, first, end),
+            # or parts: whole sections under their headings, and runs
+            parts = (column,) if len(column) == 3 and isinstance(column[1], int) else column
             items = []
-            for section in column:
-                heading_key, rows = sections[section]
+            for part in parts:
+                if isinstance(part, tuple):
+                    section, first, end = part
+                    items += [built[row[1]] for row in sections[section][1][first:end]]
+                    continue
+                heading_key, rows = sections[part]
                 items += [heading(heading_key), *(built[row[1]] for row in rows)]
             laid.append(items)
         tabs.append((ident, key, laid))

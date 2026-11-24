@@ -327,8 +327,8 @@ void RB_VR_SetTarget( const void *data ) {
 		return;
 	}
 
-	// an eye is finished when the frame leaves it
-	if ( rb_vrTarget >= 0 && rb_vrTarget != cmd->target ) {
+	// an eye is finished when the frame leaves it (once: a capture's revisit is not)
+	if ( rb_vrTarget >= 0 && rb_vrTarget != cmd->target && !cmd->revisit ) {
 		RB_VR_FinishBoundTarget();
 	}
 
@@ -667,6 +667,68 @@ static void RB_VR_DrawMirror( void ) {
 
 /*
 ====================
+R_VR_BackendCanPresentDesktopStereo
+
+Desktop stereoscopic 3D composites through a GLSL program; the Quest's GLES
+module presents to its headset only.
+====================
+*/
+bool R_VR_BackendCanPresentDesktopStereo( void ) {
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+	return false;
+#else
+	return RB_DesktopStereo_CompositeAvailable();
+#endif
+}
+
+/*
+====================
+RB_VR_PresentDesktopStereo
+
+The swap of a desktop stereo frame (r_stereo3D): the finished eyes and screen
+layer are composited into the window, which presents as usual. An eye the
+frame did not draw (a menu with no game view) is black under the layer.
+====================
+*/
+static void RB_VR_PresentDesktopStereo( void ) {
+	const int windowWidth = tr.vrWindowWidth;
+	const int windowHeight = tr.vrWindowHeight;
+	glBindFramebuffer( GL_FRAMEBUFFER, 0 );
+	glDrawBuffer( GL_BACK );
+	glReadBuffer( GL_BACK );
+	glConfig.vidWidth = windowWidth;
+	glConfig.vidHeight = windowHeight;
+	if ( windowWidth <= 0 || windowHeight <= 0 ) {
+		return;
+	}
+	glViewport( 0, 0, windowWidth, windowHeight );
+	glScissor( 0, 0, windowWidth, windowHeight );
+
+	const bool eyesDrawn = tr.vrFrameResult.eyeRendered[0] && tr.vrFrameResult.eyeRendered[1]
+		&& rb_vrCleared[1] && rb_vrCleared[2];
+	const int left = tr.desktopStereoSwapEyes ? 2 : 1;
+	const int right = tr.desktopStereoSwapEyes ? 1 : 2;
+	idImage *images[3] = { NULL, NULL, NULL };
+	const int sources[3] = { left, right, 0 };
+	for ( int i = 0; i < 3; i++ ) {
+		idRenderTexture *target = tr.vrTargets[sources[i]];
+		if ( target != NULL && target->GetNumColorImages() > 0 ) {
+			images[i] = target->GetColorImage( 0 );
+		}
+	}
+	if ( !RB_DesktopStereo_Composite( images[0], images[1], images[2], tr.desktopStereoLayout,
+			windowWidth, windowHeight, tr.vrFrame.eyeHeight, eyesDrawn, rb_vrCleared[0] ) ) {
+		RB_VR_ClearBound( 1.0f );
+		static bool warned = false;
+		if ( !warned ) {
+			common->Warning( "r_stereo3D: the stereo composite could not run; the window shows nothing" );
+			warned = true;
+		}
+	}
+}
+
+/*
+====================
 RB_VR_PresentFrame
 
 Runs in place of the window's back-buffer passes at swap time. False when
@@ -678,6 +740,37 @@ not write is never submitted, as on Vulkan.
 bool RB_VR_PresentFrame( void ) {
 	if ( !tr.vrFrame.active ) {
 		return false;
+	}
+	if ( tr.desktopStereoLayout != STEREO3D_OFF ) {
+		if ( tr.takingScreenshot && !tr.tiledViewport[0] ) {
+			// a capture flush inside the frame: it goes on drawing into its
+			// targets and composites at its own swap (a window-sized screenshot
+			// reads the composite back)
+			return true;
+		}
+		if ( rb_vrTarget == -2 ) {
+			// nothing reached the targets: the window presents as a flat frame would
+			return false;
+		}
+		if ( rb_vrTarget != -1 ) {
+			RB_VR_FinishBoundTarget();
+			R_SetDefaultRenderTarget( tr.vrTargets[0] );
+			idRenderTexture::BindNull();
+			R_SetDefaultDrawAndReadBuffers();
+			glConfig.vidWidth = tr.vrFrame.screenWidth;
+			glConfig.vidHeight = tr.vrFrame.screenHeight;
+		}
+		RB_VR_FinishBoundTarget();
+		R_SetDefaultRenderTarget( NULL );
+		// a checkpoint's preview is the left eye, as in a headset
+		if ( tr.vrFrameResult.eyeRendered[0] && rb_vrCleared[1] && tr.vrTargets[1] != NULL ) {
+			RB_QueueSavePreviewFromFramebuffer( tr.vrTargets[1]->GetDeviceHandle(), tr.vrFrame.eyeWidth, tr.vrFrame.eyeHeight );
+		}
+		RB_VR_PresentDesktopStereo();
+		rb_vrTarget = -2;
+		backEnd.renderTexture = NULL;
+		backEnd.feedbackRenderTexture = NULL;
+		return true;
 	}
 	if ( rb_vrTarget == -2 ) {
 		// nothing reached the targets: submit no layers
@@ -753,6 +846,10 @@ void R_VR_ShutdownTargets( void ) {
 #else // !OPENQ4_VR_GL_PRESENTATION
 
 bool R_VR_BackendCanPresent( void ) {
+	return false;
+}
+
+bool R_VR_BackendCanPresentDesktopStereo( void ) {
 	return false;
 }
 

@@ -327,6 +327,8 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","ui_identity"
 	"vr_playSpace","vr_body",
 	// openQ4: GENERAL's VIDEO CAPTURE section
 	"com_videoFormat","com_videoQuality","com_videoFPS","com_videoHeight","com_videoAudio","com_videoTiming",
+	// openQ4: VIRTUAL REALITY's STEREOSCOPIC 3D section
+	"r_stereo3D","r_stereoSeparation","r_stereoConvergence","r_stereoSwapEyes",
 	// openQ4 (PAD): the Controller and Aim tabs
 	"in_aimAssist","in_alwaysRun","in_gyroActivation","in_gyroDeadZone","in_gyroInvertPitch","in_gyroInvertYaw","in_gyroMenuPointer","in_gyroPitchRatio","in_gyroSpace","in_gyroYawRatio","in_joystickAdaptiveTriggers","in_joystickContextActions","in_joystickDevicePin","in_joystickDirectionalRumble","in_joystickLayout","in_joystickLight","in_joystickLookDeadZone","in_joystickLookOuterDeadZone","in_joystickLowBatteryNotice","in_joystickMoveCurve","in_joystickMoveDeadZone","in_joystickMoveDeadZoneAxial","in_joystickMoveOuterDeadZone","in_joystickPitchSpeed","in_joystickPlayerLight","in_joystickResponse","in_joystickTriggerRumble","in_joystickTurnBoost","in_joystickYawSpeed","in_toggleCrouch"};
 
@@ -5137,7 +5139,9 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 		{"game_crosshaircolor","g_crosshairColor"},{"game_hudscale","ui_hudScale"},{"game_console","con_allowConsole"},
 		{"game_vrsnap","vr_snapTurnAngle"},{"game_viewkick","g_viewKick"},{"game_vr","vr_enable"},{"game_vrcrouch","vr_physicalCrouch"},
 		{"game_videoformat","com_videoFormat"},{"game_videoquality","com_videoQuality"},{"game_videofps","com_videoFPS"},
-		{"game_videoheight","com_videoHeight"},{"game_videoaudio","com_videoAudio"},{"game_videotiming","com_videoTiming"}});
+		{"game_videoheight","com_videoHeight"},{"game_videoaudio","com_videoAudio"},{"game_videotiming","com_videoTiming"},
+		{"game_stereo3d","r_stereo3D"},{"game_stereodepth","r_stereoSeparation"},{"game_stereoconvergence","r_stereoConvergence"},
+		{"game_stereoswap","r_stereoSwapEyes"}});
 	for (const char* moved : {"game_freelook","game_togglezoom","game_scopesensitivity","game_msensitivity","game_controller","game_promptstyle"})
 		Check(!document.Model().FindNode(moved),"the mouse, controller and aim rows are on CONTROLS");
 	for (const char* setting : {"set.in_freeLook","set.sensitivity","set.in_joystick"})

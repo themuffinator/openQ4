@@ -42,6 +42,7 @@
 
 void VK_PostProcess_ApplyBackBuffer( void );
 bool VK_QueueSavePreviewFromImage( VkCommandBuffer cmd, VkImage image, VkFormat format, int width, int height );
+bool VK_PostProcess_DesktopStereoComposite( const vkExecDefaultOutput_t *const sources[ 3 ], int layout, int eyeHeight );
 
 // The window's back-buffer passes for the VR target the frame is leaving.
 static void VK_VR_FinishTarget( void ) {
@@ -92,6 +93,18 @@ R_VR_BackendCanPresent
 */
 bool R_VR_BackendCanPresent( void ) {
 	return glConfig.isInitialized && VK_VR_DeviceUsable() && vkCtx.depthFormat != VK_FORMAT_UNDEFINED;
+}
+
+/*
+====================
+R_VR_BackendCanPresentDesktopStereo
+
+The eye targets take the window's 8-bit format and the composite writes the
+window: an HDR window (VK-08) keeps its flat presentation.
+====================
+*/
+bool R_VR_BackendCanPresentDesktopStereo( void ) {
+	return VK_VR_TargetFormat( (int)vkCtx.swapchainFormat ) != VK_FORMAT_UNDEFINED;
 }
 
 /*
@@ -226,7 +239,8 @@ image and loses only the mirror.
 ====================
 */
 bool VK_VR_FrameMayOpenWithoutWindow( bool *forced ) {
-	const bool vrFrame = tr.vrFrame.active && glConfig.isInitialized;
+	// a desktop stereo frame presents nowhere but the window
+	const bool vrFrame = tr.vrFrame.active && tr.desktopStereoLayout == STEREO3D_OFF && glConfig.isInitialized;
 	if ( forced != NULL ) {
 		*forced = vrFrame && r_vkVRWindowlessTest.GetBool();
 	}
@@ -239,6 +253,15 @@ R_VR_BackendPrepareTargets
 ====================
 */
 bool R_VR_BackendPrepareTargets( renderVRFrame_t &frame ) {
+	if ( tr.desktopStereoLayout != STEREO3D_OFF ) {
+		// desktop stereoscopic 3D: no swapchains, the targets take the window's format
+		const VkFormat windowFormat = VK_VR_TargetFormat( (int)vkCtx.swapchainFormat );
+		frame.stereo = windowFormat != VK_FORMAT_UNDEFINED
+			&& VK_VR_EnsureTarget( 0, frame.screenWidth, frame.screenHeight, windowFormat )
+			&& VK_VR_EnsureTarget( 1, frame.eyeWidth, frame.eyeHeight, windowFormat )
+			&& VK_VR_EnsureTarget( 2, frame.eyeWidth, frame.eyeHeight, windowFormat );
+		return frame.stereo;
+	}
 	const VkFormat format = VK_VR_TargetFormat( frame.vkImageFormat );
 	if ( format == VK_FORMAT_UNDEFINED || frame.vkScreenImage == 0 ) {
 		static bool warned = false;
@@ -393,8 +416,8 @@ void RB_VR_SetTarget( const void *data ) {
 		return;
 	}
 
-	// an eye is finished when the frame leaves it
-	if ( rb_vrTarget >= 0 && rb_vrTarget != cmd->target ) {
+	// an eye is finished when the frame leaves it (once: a capture's revisit is not)
+	if ( rb_vrTarget >= 0 && rb_vrTarget != cmd->target && !cmd->revisit ) {
 		VK_VR_FinishTarget();
 	}
 
@@ -549,6 +572,73 @@ static void VK_VR_DrawMirror( VkCommandBuffer cmd, const vkVRTarget_t *source ) 
 
 /*
 ====================
+VK_VR_PresentDesktopStereo
+
+The swap of a desktop stereo frame (r_stereo3D): each finished target gets
+the window's back-buffer passes as a headset's do, then the composite draws
+the eyes and the screen layer into the window, which presents as usual and
+is not mapped again. An eye the frame did not draw (a menu with no game
+view) is black under the layer.
+====================
+*/
+static bool VK_VR_PresentDesktopStereo( void ) {
+	if ( rb_vrTarget != -1 ) {
+		VK_VR_FinishTarget();
+		const vkExecDefaultOutput_t screen = VK_VR_Output( 0 );
+		VK_Exec_SetDefaultOutput( &screen );
+		rb_vrTarget = -1;
+	}
+	VK_VR_FinishTarget();
+	rb_vrTarget = -2;
+
+	const bool eyesDrawn = tr.vrFrameResult.eyeRendered[0] && tr.vrFrameResult.eyeRendered[1]
+		&& rb_vrCleared[1] && rb_vrCleared[2];
+	const vkExecDefaultOutput_t outputs[3] = { VK_VR_Output( 1 ), VK_VR_Output( 2 ), VK_VR_Output( 0 ) };
+	const int left = tr.desktopStereoSwapEyes ? 1 : 0;
+	const int right = tr.desktopStereoSwapEyes ? 0 : 1;
+	const vkExecDefaultOutput_t *sources[3] = {
+		eyesDrawn ? &outputs[left] : NULL,
+		eyesDrawn ? &outputs[right] : NULL,
+		rb_vrCleared[0] ? &outputs[2] : NULL
+	};
+	const bool composited = VK_PostProcess_DesktopStereoComposite( sources, tr.desktopStereoLayout, tr.vrFrame.eyeHeight );
+	VK_Exec_SetDefaultOutput( NULL );
+	if ( !composited ) {
+		static bool warned = false;
+		if ( !warned ) {
+			common->Warning( "r_stereo3D: the Vulkan stereo composite could not run" );
+			warned = true;
+		}
+	}
+	// the eyes and the layer were mapped as they finished
+	VK_Exec_MarkWindowColorMapped();
+	glConfig.vidWidth = tr.vrWindowWidth;
+	glConfig.vidHeight = tr.vrWindowHeight;
+	backEnd.renderTexture = NULL;
+	backEnd.feedbackRenderTexture = NULL;
+
+	// a checkpoint's preview is the left eye, as in a headset
+	if ( tr.vrFrameResult.eyeRendered[0] && rb_vrCleared[1] ) {
+		VkCommandBuffer cmd = VK_Exec_SuspendRendering();
+		const vkVRTarget_t &leftEye = vkVRTargets[1];
+		if ( cmd != VK_NULL_HANDLE && leftEye.color != VK_NULL_HANDLE ) {
+			VK_VR_ImageBarrier( cmd, leftEye.color, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT, VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_2_TRANSFER_READ_BIT,
+				VK_PIPELINE_STAGE_2_TRANSFER_BIT, VK_ACCESS_2_TRANSFER_READ_BIT );
+			VK_QueueSavePreviewFromImage( cmd, leftEye.color, leftEye.format, leftEye.width, leftEye.height );
+			VK_VR_ImageBarrier( cmd, leftEye.color, VK_IMAGE_ASPECT_COLOR_BIT,
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+				VK_PIPELINE_STAGE_2_TRANSFER_BIT, 0,
+				VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+				VK_ACCESS_2_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT );
+		}
+	}
+	return true;
+}
+
+/*
+====================
 RB_VR_PresentFrame
 
 Runs in place of the window's back-buffer passes at swap time. False when
@@ -565,10 +655,15 @@ bool RB_VR_PresentFrame( void ) {
 		tr.vrFrameResult.eyeRendered[0] = tr.vrFrameResult.eyeRendered[1] = false;
 		return false;
 	}
-	if ( tr.takingScreenshot ) {
+	const bool desktopStereo = tr.desktopStereoLayout != STEREO3D_OFF;
+	if ( tr.takingScreenshot && !( desktopStereo && tr.tiledViewport[0] ) ) {
 		// a capture flush that is not presented: the frame goes on drawing into
-		// its targets and presents at its own swap
+		// its targets and presents at its own swap (a window-sized screenshot
+		// of a desktop stereo frame reads its composite back instead)
 		return true;
+	}
+	if ( desktopStereo ) {
+		return VK_VR_PresentDesktopStereo();
 	}
 
 	// EndFrame returned the frame to the virtual screen; finish it like a back buffer

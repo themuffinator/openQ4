@@ -160,7 +160,8 @@ enum vkPostPassKind_t {
 	VK_POST_SKY_MASK,
 	VK_POST_VOLUMETRIC_INJECT,
 	VK_POST_VOLUMETRIC_COMPOSITE,
-	VK_POST_DOF
+	VK_POST_DOF,
+	VK_POST_STEREO
 };
 
 // scene shader modules, created the first time a pass needs one
@@ -474,6 +475,11 @@ typedef struct vkPostState_s {
 	VkShaderModule	crtFrag;
 	bool			modulesFailed;	// creation failed once; do not retry every frame
 	idImage *		backBufferCopy;
+	// desktop stereoscopic 3D: the composite, and copies of the left eye,
+	// right eye and screen layer it samples
+	VkShaderModule	stereoFrag;
+	bool			stereoFailed;
+	idImage *		stereoCopies[3];
 } vkPostState_t;
 
 static vkPostState_t vkPost;
@@ -601,6 +607,7 @@ void VK_PostProcess_Shutdown( void ) {
 	VK_Post_ResetHDRExposure();
 	VK_Post_DestroyModule( vkPost.fullscreenVert );
 	VK_Post_DestroyModule( vkPost.crtFrag );
+	VK_Post_DestroyModule( vkPost.stereoFrag );
 	memset( &vkPost, 0, sizeof( vkPost ) );
 
 	for ( int i = 0; i < VK_POST_SCENE_MODULE_COUNT; i++ ) {
@@ -787,6 +794,87 @@ void VK_PostProcess_ApplyBackBuffer( void ) {
 			crtWarned = true;
 		}
 	}
+}
+
+/*
+====================
+VK_PostProcess_DesktopStereoComposite
+
+openQ4 desktop stereoscopic 3D (r_stereo3D): composites a stereo frame's
+finished targets into the window with post_stereo.frag, the twin of
+RB_DesktopStereo_Composite. sources are the left eye, the right eye and the
+screen layer, each the default output it was drawn on, or NULL for one the
+frame did not draw. Each is copied once into a sampled image while it is the
+output, as the back-buffer passes copy the window. Ends on the window.
+====================
+*/
+typedef struct vkPostStereoBlock_s {
+	float	params[ 4 ];	// x: stereo3DLayout_t, y: window height, z: eye height, w: 1 when the eyes were drawn
+	float	screen[ 4 ];	// x: 1 when the screen layer was drawn
+} vkPostStereoBlock_t;
+
+static void VK_Post_StereoCopyImage( idImage *image ) {
+	VK_Post_BackBufferCopyImage( image );
+}
+
+bool VK_PostProcess_DesktopStereoComposite( const vkExecDefaultOutput_t *const sources[ 3 ], int layout, int eyeHeight ) {
+	if ( !VK_GuiExecutor_FrameIsOpen() || vkPost.stereoFailed || !VK_Post_EnsureModules() || globalImages == NULL ) {
+		return false;
+	}
+	if ( vkPost.stereoFrag == VK_NULL_HANDLE ) {
+		vkPost.stereoFrag = VK_Post_CreateModule( vk_post_stereo_frag_spv,
+				vk_post_stereo_frag_spv_size, "post stereo fragment" );
+		if ( vkPost.stereoFrag == VK_NULL_HANDLE ) {
+			vkPost.stereoFailed = true;
+			return false;
+		}
+	}
+	static const char *const copyNames[ 3 ] = { "_vkStereoLeftCopy", "_vkStereoRightCopy", "_vkStereoScreenCopy" };
+	VkDescriptorSet sets[ 3 ] = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE };
+	bool drawn[ 3 ] = { false, false, false };
+	for ( int i = 0; i < 3; i++ ) {
+		if ( sources[ i ] == NULL ) {
+			continue;
+		}
+		if ( vkPost.stereoCopies[ i ] == NULL ) {
+			vkPost.stereoCopies[ i ] = globalImages->ImageFromFunction( copyNames[ i ], VK_Post_StereoCopyImage );
+		}
+		idImage *copy = vkPost.stereoCopies[ i ];
+		if ( copy == NULL || !VK_Exec_SetDefaultOutput( sources[ i ] ) || !VK_Exec_SetRenderTarget( NULL ) ) {
+			continue;
+		}
+		const int width = VK_Exec_ActiveFramebufferWidth();
+		const int height = VK_Exec_ActiveFramebufferHeight();
+		if ( width <= 0 || height <= 0 || !VK_Exec_CopyRender( copy, 0, 0, width, height, 0, false ) ) {
+			continue;
+		}
+		VK_Exec_TransitionImageForSampling( copy );
+		sets[ i ] = VK_Exec_ImageDescriptor( copy->GetDeviceHandle(), true );
+		drawn[ i ] = sets[ i ] != VK_NULL_HANDLE;
+	}
+	if ( !VK_Exec_SetDefaultOutput( NULL ) || !VK_Exec_SetRenderTarget( NULL ) ) {
+		return false;
+	}
+	// an input the frame did not draw is weighted out; black stands in
+	for ( int i = 0; i < 3; i++ ) {
+		if ( !drawn[ i ] ) {
+			if ( globalImages->blackImage == NULL ) {
+				return false;
+			}
+			sets[ i ] = VK_Exec_ImageDescriptor( globalImages->blackImage->GetDeviceHandle(), true );
+		}
+	}
+	vkPostStereoBlock_t block;
+	memset( &block, 0, sizeof( block ) );
+	block.params[ 0 ] = (float)layout;
+	block.params[ 1 ] = (float)VK_Exec_ActiveFramebufferHeight();
+	block.params[ 2 ] = (float)Max( eyeHeight, 1 );
+	block.params[ 3 ] = drawn[ 0 ] && drawn[ 1 ] ? 1.0f : 0.0f;
+	block.screen[ 0 ] = drawn[ 2 ] ? 1.0f : 0.0f;
+	const int uniformOffset = VK_Exec_InteractionUniformAlloc( &block, sizeof( block ) );
+	const VkPipeline pipeline = VK_Exec_PostPipeline( VK_POST_STEREO,
+			vkPost.fullscreenVert, vkPost.stereoFrag, GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO );
+	return VK_Post_DrawFullscreen( pipeline, sets, 3, uniformOffset );
 }
 
 /*

@@ -127,6 +127,7 @@ POST_SHADERS = [
     REPO_ROOT / "src" / "renderer" / "Vulkan" / "shaders" / "post_debug_view.frag",
     REPO_ROOT / "src" / "renderer" / "Vulkan" / "shaders" / "post_skymask.frag",
     REPO_ROOT / "src" / "renderer" / "Vulkan" / "shaders" / "post_dof.frag",
+    REPO_ROOT / "src" / "renderer" / "Vulkan" / "shaders" / "post_stereo.frag",
 ]
 
 # The scene overlays (vk_SceneEffects.cpp): light grid, player visibility

@@ -65,6 +65,7 @@ What you get in **0.15.0**, the Multiplayer Edition and the latest release:
 - 🔊 **Sound as designed.** [Room reverb](docs/user/gameplay-settings.md#room-reverb) for every map, subtitles and a separate dialogue volume.
 - 🌍 **Twelve languages**, including German, Brazilian Portuguese, Czech, Hungarian, Turkish and Ukrainian. See [Languages](docs/user/languages.md).
 - 🌊 **Real liquids.** Swim, wade and drown in water, and take damage in slime and lava, in maps built for them. See [Liquids](docs/user/liquids.md).
+- 🕶️ **Stereoscopic 3D without a headset** on 3D TVs and monitors, side-by-side video glasses, passive 3D displays or red/cyan glasses, switched on in the menu. See [Stereoscopic 3D](docs/user/stereoscopic-3d.md).
 - 🥽 **VR through OpenXR** (experimental), with your own body in the headset. [Try it](docs/user/vr.md#quick-start) and [tell us how it runs](https://github.com/themuffinator/openQ4/issues/new?template=vr-headset-report.yml).
 - 🧪 **Experimental extras**: an [Android app](docs/user/android-setup.md), a [level editor](docs/user/level-editor.md), [PBR materials](docs/user/pbr-materials.md) for mods and [enhanced physics](docs/user/gameplay-settings.md#enhanced-physics) for ragdolls and debris.
 
@@ -119,7 +120,7 @@ These guides describe 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**
 - [Getting Started](docs/user/getting-started.md): install, first launch and common questions
 - [Client Settings](docs/user/client-settings.md): where the most useful options live
 - [Display Settings](docs/user/display-settings.md) · [Input Settings](docs/user/input-settings.md) · [Gameplay Settings](docs/user/gameplay-settings.md) · [Steam Deck](docs/user/steam-deck.md)
-- [Languages](docs/user/languages.md) · [VR](docs/user/vr.md) (experimental) · [Android Setup](docs/user/android-setup.md) (experimental)
+- [Languages](docs/user/languages.md) · [Stereoscopic 3D](docs/user/stereoscopic-3d.md) · [VR](docs/user/vr.md) (experimental) · [Android Setup](docs/user/android-setup.md) (experimental)
 
 **Play**
 - [Campaigns](docs/user/campaigns.md) · [The Awakening](docs/user/awakening.md): choosing and installing a campaign

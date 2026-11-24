@@ -609,6 +609,9 @@ typedef struct {
 	// the target's temporal frame state, restored when the backend reaches it:
 	// the front end rewrites the frame's one state for every target (VR-05)
 	bool	temporalAA;
+	// a brief return to a finished eye (a desktop stereo capture): the target
+	// left is not finished again and nothing is cleared
+	bool	revisit;
 } vrTargetCommand_t;
 
 typedef struct {
@@ -1259,6 +1262,13 @@ public:
 	int						vrWindowHeight;
 	int						vrSavedUIViewport[4];
 	idRenderTexture *		vrTargets[3];
+	// openQ4 desktop stereoscopic 3D (r_stereo3D, RenderSystem_vr.cpp): with no
+	// headset, BeginVRFrame can open the frame as a stereo frame of its own,
+	// whose targets the backend composites into the window in this layout
+	// (stereo3DLayout_t) at the swap instead of copying them to swapchains.
+	// 0 on every other frame.
+	int						desktopStereoLayout;
+	bool					desktopStereoSwapEyes;
 
 	bool					BeginVRFrame( int &windowWidth, int &windowHeight );
 	void					EndVRFrame( void );
@@ -1300,6 +1310,24 @@ int	R_VR_EyeSubviewFrameKey( void );
 void	R_ShutdownStereoGuiShare( void );
 // RenderSystem_init.cpp: VR frames present the window without waiting for vsync
 void	R_SetVRSwapIntervalBypass( bool active );
+
+// openQ4 desktop stereoscopic 3D (r_stereo3D): how a frame's two eyes and its
+// screen layer (menus, HUD, console) reach the window.
+typedef enum {
+	STEREO3D_OFF = 0,
+	STEREO3D_SIDE_BY_SIDE,			// half-width eyes, left on the left (3D TVs, monitors)
+	STEREO3D_SIDE_BY_SIDE_FULL,		// full-resolution eyes on a double-width display (glasses)
+	STEREO3D_TOP_BOTTOM,			// half-height eyes, left on top
+	STEREO3D_ANAGLYPH,				// red/cyan glasses (Dubois colour matrices)
+	STEREO3D_INTERLACED,			// alternate window rows, left on the top row (passive 3D)
+	STEREO3D_LAYOUT_COUNT
+} stereo3DLayout_t;
+// The backend can composite a desktop stereo frame into the window.
+bool	R_VR_BackendCanPresentDesktopStereo( void );
+// A capture of a desktop stereo frame's screen layer reads the left eye
+// between these (RenderSystem_vr.cpp); false when there is nothing to read.
+bool	R_DesktopStereo_BeginCapture( void );
+void	R_DesktopStereo_EndCapture( void );
 
 extern backEndState_t		backEnd;
 
@@ -2368,6 +2396,11 @@ void RB_ApplyResolutionScaleToBackBuffer( void );
 void RB_ApplyCRTToBackBuffer( void );
 // openQ4 VR desktop mirror (draw_common.cpp)
 void RB_VR_DrawImageRect( idImage *image, int x, int y, int width, int height, float s0, float t0, float s1, float t1 );
+// openQ4 desktop stereoscopic 3D: the OpenGL composite of a stereo frame into
+// the bound window (draw_common.cpp); false draws nothing
+bool RB_DesktopStereo_CompositeAvailable( void );
+bool RB_DesktopStereo_Composite( idImage *left, idImage *right, idImage *screen, int layout,
+	int windowWidth, int windowHeight, int eyeHeight, bool eyesDrawn, bool screenDrawn );
 bool RB_UnderwaterViewAvailable( void );
 // Depth of field (DepthOfField.cpp; the pass in draw_common.cpp and
 // Vulkan/vk_PostProcess.cpp). RB_DepthOfFieldAvailable: whether this back end

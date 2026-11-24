@@ -453,7 +453,10 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		// GENERAL's VIDEO CAPTURE section (recordVideo, src/framework/VideoCapture.cpp).
 		{"com_videoFormat",{2,0,0,false,{"mp4","mkv","webm","mov","avi","gif"}}},{"com_videoQuality",{0,1,100,true}},
 		{"com_videoFPS",{0,24,120,true,{},{24,30,60,120}}},{"com_videoHeight",{0,0,2160,true,{},{0,480,720,1080,1440,2160}}},
-		{"com_videoAudio",{1}},{"com_videoTiming",{2,0,0,false,{"auto","fixed","realtime"}}}};
+		{"com_videoAudio",{1}},{"com_videoTiming",{2,0,0,false,{"auto","fixed","realtime"}}},
+		// VIRTUAL REALITY's STEREOSCOPIC 3D section (src/renderer/RenderSystem_vr.cpp).
+		{"r_stereo3D",{0,0,5,true,{},{0,1,2,3,4,5}}},{"r_stereoSeparation",{0,0,8,false}},
+		{"r_stereoConvergence",{0,32,512,false}},{"r_stereoSwapEyes",{1}}};
 	const auto found = settings.find(cvar);
 	return found == settings.end() ? nullptr : &found->second;
 }

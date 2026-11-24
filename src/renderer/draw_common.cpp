@@ -8162,6 +8162,232 @@ void RB_ApplyColorMappingsToBackBuffer( void ) {
 }
 
 /*
+====================
+RB_DesktopStereo_Composite
+
+openQ4 desktop stereoscopic 3D (r_stereo3D): draws a frame's two eyes and its
+premultiplied screen layer into the bound window in one of the
+stereo3DLayout_t layouts. Vulkan/shaders/post_stereo.frag is the same
+program; keep the two in step. Every image is a bottom-up OpenGL texture, so
+uv (0,0) is the window's bottom-left here as there.
+====================
+*/
+static GLhandleARB rbStereoProgram = 0;
+static GLhandleARB rbStereoShaders[2] = { 0, 0 };
+static int rbStereoProgramGeneration = 0;
+static bool rbStereoProgramFailed = false;
+static GLint rbStereoLeftLocation = -1;
+static GLint rbStereoRightLocation = -1;
+static GLint rbStereoScreenLocation = -1;
+static GLint rbStereoParamsLocation = -1;
+static GLint rbStereoScreenWeightLocation = -1;
+
+static void RB_FreeDesktopStereoProgram( void ) {
+	if ( rbStereoProgram != 0 && glConfig.isInitialized && rbStereoProgramGeneration == tr.glContextGeneration ) {
+		for ( int i = 0; i < 2; i++ ) {
+			if ( rbStereoShaders[i] != 0 ) {
+				glDetachObjectARB( rbStereoProgram, rbStereoShaders[i] );
+				glDeleteObjectARB( rbStereoShaders[i] );
+			}
+		}
+		glDeleteObjectARB( rbStereoProgram );
+	}
+	rbStereoProgram = 0;
+	rbStereoShaders[0] = rbStereoShaders[1] = 0;
+	rbStereoProgramGeneration = 0;
+}
+
+static bool RB_EnsureDesktopStereoProgram( void ) {
+	if ( rbStereoProgramGeneration != tr.glContextGeneration ) {
+		// a new context forgets the program, and any failure of the old one
+		rbStereoProgram = 0;
+		rbStereoShaders[0] = rbStereoShaders[1] = 0;
+		rbStereoProgramFailed = false;
+	}
+	if ( rbStereoProgram != 0 ) {
+		return true;
+	}
+	if ( rbStereoProgramFailed || !glConfig.GLSLProgramAvailable ) {
+		return false;
+	}
+	rbStereoProgramFailed = true;
+
+	static const char *vertexSource =
+		"void main() {\n"
+		"	gl_Position = ftransform();\n"
+		"	gl_TexCoord[0] = gl_MultiTexCoord0;\n"
+		"}\n";
+	static const char *fragmentSource =
+		"uniform sampler2D LeftEye;\n"
+		"uniform sampler2D RightEye;\n"
+		"uniform sampler2D ScreenLayer;\n"
+		"uniform vec4 params;\n"			// x: layout, y: window height, z: eye height, w: eyes drawn
+		"uniform float screenWeight;\n"
+		"\n"
+		"vec3 Over( vec4 layer, vec3 below ) {\n"
+		"	return layer.rgb + below * ( 1.0 - layer.a );\n"
+		"}\n"
+		"vec3 ToLinear( vec3 c ) {\n"
+		"	return pow( max( c, vec3( 0.0 ) ), vec3( 2.2 ) );\n"
+		"}\n"
+		"vec3 FromLinear( vec3 c ) {\n"
+		"	return pow( clamp( c, 0.0, 1.0 ), vec3( 1.0 / 2.2 ) );\n"
+		"}\n"
+		"\n"
+		"void main() {\n"
+		"	vec2 uv = gl_TexCoord[0].st;\n"
+		"	float mode = params.x;\n"
+		"	float eyes = params.w;\n"
+		"	if ( mode > 3.5 && mode < 4.5 ) {\n"
+		"		vec4 layer = texture2D( ScreenLayer, uv ) * screenWeight;\n"
+		"		vec3 left = ToLinear( Over( layer, texture2D( LeftEye, uv ).rgb * eyes ) );\n"
+		"		vec3 right = ToLinear( Over( layer, texture2D( RightEye, uv ).rgb * eyes ) );\n"
+		"		vec3 color;\n"
+		"		color.r = dot( vec3( 0.456, 0.500, 0.176 ), left ) + dot( vec3( -0.043, -0.088, -0.002 ), right );\n"
+		"		color.g = dot( vec3( -0.040, -0.038, -0.016 ), left ) + dot( vec3( 0.378, 0.734, -0.018 ), right );\n"
+		"		color.b = dot( vec3( -0.015, -0.021, -0.005 ), left ) + dot( vec3( -0.072, -0.113, 1.226 ), right );\n"
+		"		gl_FragColor = vec4( FromLinear( color ), 1.0 );\n"
+		"		return;\n"
+		"	}\n"
+		"	vec2 eyeUV = uv;\n"
+		"	vec2 screenUV = uv;\n"
+		"	float rightEye = 0.0;\n"
+		"	if ( mode < 2.5 ) {\n"
+		"		rightEye = step( 0.5, uv.x );\n"
+		"		eyeUV.x = uv.x * 2.0 - rightEye;\n"
+		"		screenUV = eyeUV;\n"
+		"	} else if ( mode < 3.5 ) {\n"
+		"		rightEye = 1.0 - step( 0.5, uv.y );\n"
+		"		eyeUV.y = uv.y * 2.0 - ( 1.0 - rightEye );\n"
+		"		screenUV = eyeUV;\n"
+		"	} else {\n"
+		"		float row = floor( ( 1.0 - uv.y ) * params.y );\n"
+		"		rightEye = mod( row, 2.0 );\n"
+		"		eyeUV.y = 1.0 - ( floor( row * 0.5 ) + 0.5 ) / params.z;\n"
+		"	}\n"
+		"	vec3 eye = mix( texture2D( LeftEye, eyeUV ).rgb, texture2D( RightEye, eyeUV ).rgb, rightEye ) * eyes;\n"
+		"	gl_FragColor = vec4( Over( texture2D( ScreenLayer, screenUV ) * screenWeight, eye ), 1.0 );\n"
+		"}\n";
+
+	const char *sources[2] = { vertexSource, fragmentSource };
+	const GLenum types[2] = { GL_VERTEX_SHADER_ARB, GL_FRAGMENT_SHADER_ARB };
+	const char *stages[2] = { "vertex shader compile", "fragment shader compile" };
+	GLhandleARB shaders[2] = { 0, 0 };
+	for ( int i = 0; i < 2; i++ ) {
+		shaders[i] = glCreateShaderObjectARB( types[i] );
+		if ( shaders[i] == 0 ) {
+			break;
+		}
+		const GLcharARB *source = (const GLcharARB *)sources[i];
+		glShaderSourceARB( shaders[i], 1, &source, NULL );
+		glCompileShaderARB( shaders[i] );
+		GLint compiled = GL_FALSE;
+		glGetObjectParameterivARB( shaders[i], GL_OBJECT_COMPILE_STATUS_ARB, &compiled );
+		if ( compiled == GL_FALSE ) {
+			RB_PrintGLSLInfoLog( shaders[i], stages[i], "builtin/desktop_stereo" );
+			glDeleteObjectARB( shaders[i] );
+			shaders[i] = 0;
+			break;
+		}
+	}
+	if ( shaders[0] == 0 || shaders[1] == 0 ) {
+		for ( int i = 0; i < 2; i++ ) {
+			if ( shaders[i] != 0 ) {
+				glDeleteObjectARB( shaders[i] );
+			}
+		}
+		return false;
+	}
+
+	GLhandleARB program = glCreateProgramObjectARB();
+	glAttachObjectARB( program, shaders[0] );
+	glAttachObjectARB( program, shaders[1] );
+	glLinkProgramARB( program );
+	GLint linked = GL_FALSE;
+	glGetObjectParameterivARB( program, GL_OBJECT_LINK_STATUS_ARB, &linked );
+	if ( linked == GL_FALSE ) {
+		RB_PrintGLSLInfoLog( program, "program link", "builtin/desktop_stereo" );
+		for ( int i = 0; i < 2; i++ ) {
+			glDetachObjectARB( program, shaders[i] );
+			glDeleteObjectARB( shaders[i] );
+		}
+		glDeleteObjectARB( program );
+		return false;
+	}
+
+	rbStereoProgram = program;
+	rbStereoShaders[0] = shaders[0];
+	rbStereoShaders[1] = shaders[1];
+	rbStereoProgramGeneration = tr.glContextGeneration;
+	rbStereoLeftLocation = glGetUniformLocationARB( program, "LeftEye" );
+	rbStereoRightLocation = glGetUniformLocationARB( program, "RightEye" );
+	rbStereoScreenLocation = glGetUniformLocationARB( program, "ScreenLayer" );
+	rbStereoParamsLocation = glGetUniformLocationARB( program, "params" );
+	rbStereoScreenWeightLocation = glGetUniformLocationARB( program, "screenWeight" );
+	if ( rbStereoLeftLocation < 0 || rbStereoRightLocation < 0 || rbStereoScreenLocation < 0
+			|| rbStereoParamsLocation < 0 || rbStereoScreenWeightLocation < 0 ) {
+		common->Warning( "GLSL builtin/desktop_stereo is missing required uniforms" );
+		RB_FreeDesktopStereoProgram();
+		return false;
+	}
+	rbStereoProgramFailed = false;
+	common->Printf( "Loaded built-in GLSL program 'builtin/desktop_stereo'\n" );
+	return true;
+}
+
+bool RB_DesktopStereo_CompositeAvailable( void ) {
+	return glConfig.GLSLProgramAvailable && !rbStereoProgramFailed;
+}
+
+bool RB_DesktopStereo_Composite( idImage *left, idImage *right, idImage *screen, int layout,
+		int windowWidth, int windowHeight, int eyeHeight, bool eyesDrawn, bool screenDrawn ) {
+	if ( windowWidth <= 0 || windowHeight <= 0 || !RB_EnsureDesktopStereoProgram() ) {
+		return false;
+	}
+	// an input the frame did not draw is weighted out; any image stands in
+	idImage *fallback = globalImages->blackImage;
+	idImage *images[3] = {
+		eyesDrawn && left != NULL ? left : fallback,
+		eyesDrawn && right != NULL ? right : fallback,
+		screenDrawn && screen != NULL ? screen : fallback
+	};
+	if ( images[0] == NULL || images[1] == NULL || images[2] == NULL ) {
+		return false;
+	}
+
+	RB_LogComment( "---------- RB_DesktopStereo_Composite ----------\n" );
+	glViewport( 0, 0, windowWidth, windowHeight );
+	RB_BeginFullscreenPostProcessPass( 0, 0, windowWidth, windowHeight );
+	for ( int i = 0; i < 3; i++ ) {
+		GL_SelectTexture( i );
+		images[i]->Bind();
+	}
+	GL_SelectTexture( 0 );
+
+	glUseProgramObjectARB( rbStereoProgram );
+	glUniform1iARB( rbStereoLeftLocation, 0 );
+	glUniform1iARB( rbStereoRightLocation, 1 );
+	glUniform1iARB( rbStereoScreenLocation, 2 );
+	const GLfloat params[4] = {
+		static_cast<GLfloat>( layout ),
+		static_cast<GLfloat>( windowHeight ),
+		static_cast<GLfloat>( Max( eyeHeight, 1 ) ),
+		eyesDrawn ? 1.0f : 0.0f
+	};
+	glUniform4fvARB( rbStereoParamsLocation, 1, params );
+	glUniform1fARB( rbStereoScreenWeightLocation, screenDrawn ? 1.0f : 0.0f );
+
+	RB_DrawFullscreenPostProcessQuadUnitUV();
+	glUseProgramObjectARB( 0 );
+	for ( int i = 2; i >= 0; i-- ) {
+		GL_SelectTexture( i );
+		globalImages->BindNull();
+	}
+	RB_EndFullscreenPostProcessPass();
+	return true;
+}
+
+/*
 =====================
 RB_BakeTextureMatrixIntoTexgen
 =====================
@@ -9117,6 +9343,7 @@ void RB_ShutdownScenePostProcess( void ) {
 
 	RB_FreeBuiltinMaterialGLSLPrograms();
 	RB_FreeColorMappingProgram();
+	RB_FreeDesktopStereoProgram();
 
 	RB_Volumetric_GL_Shutdown();
 	RB_DestroyPostProcessRenderTexture( rbSceneRenderTexture );
