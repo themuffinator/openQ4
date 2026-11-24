@@ -1811,7 +1811,13 @@ stencil does, since a surface caster is drawn whole and would shadow from
 where the volume holds nothing (network1's tube lights).
 =================
 */
+idCVar r_shadowMapPrelightCutouts( "r_shadowMapPrelightCutouts", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
+	"with r_shadowMapPrelightCasters, a perforated world surface (a grate) that lies inside the light's box keeps its own caster and shadows through its holes; 0 casts it solid from the prelight caps, as stencil shadows do" );
+
 bool R_ShadowMapPrelightKeepsCutout( const idRenderLightLocal *light, const idMaterial *shader, const srfTriangles_t *geo ) {
+	if ( !r_shadowMapPrelightCutouts.GetBool() ) {
+		return false;
+	}
 	if ( light == NULL || shader == NULL || geo == NULL || light->frustumTris == NULL
 			|| shader->Coverage() != MC_PERFORATED || !shader->SurfaceCastsShadow() ) {
 		return false;
@@ -1909,8 +1915,10 @@ srfTriangles_t *R_ShadowMapPrelightCaster( idRenderLightLocal *light ) {
 		return NULL;
 	}
 #endif
+	// keyed on the volume and on whether cutouts keep their own casters
+	const int sourceKey = shadowTri->numIndexes * 2 + ( r_shadowMapPrelightCutouts.GetBool() ? 1 : 0 );
 	if ( light->shadowMapPrelightCasterSource != shadowTri
-			|| light->shadowMapPrelightCasterSourceIndexes != shadowTri->numIndexes ) {
+			|| light->shadowMapPrelightCasterSourceIndexes != sourceKey ) {
 		if ( light->shadowMapPrelightCaster != NULL ) {
 			R_FreeStaticTriSurf( light->shadowMapPrelightCaster );
 		}
@@ -1920,7 +1928,7 @@ srfTriangles_t *R_ShadowMapPrelightCaster( idRenderLightLocal *light ) {
 		}
 		light->shadowMapPrelightCaster = R_ShadowMapBuildPrelightCaster( shadowTri, &cutouts );
 		light->shadowMapPrelightCasterSource = shadowTri;
-		light->shadowMapPrelightCasterSourceIndexes = shadowTri->numIndexes;
+		light->shadowMapPrelightCasterSourceIndexes = sourceKey;
 	}
 	return light->shadowMapPrelightCaster;
 }
