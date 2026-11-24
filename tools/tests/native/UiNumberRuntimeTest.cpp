@@ -556,7 +556,20 @@ static void PaddedEditingRectangles(){
     }
 }
 
+// A field without an editor rests with the page; an open editor keeps the
+// full pass every frame, so its caret blinks while nothing else changes.
+static void CaretBlinksOnRestingPage(){
+	View view;view.runtime.SetReducedMotion(false,view.time);view.Frame();view.Frame();
+	Check(view.runtime.Statistics().layoutUpdates==0&&view.runtime.Statistics().interactionUpdates==0,"a field without an editor rests");
+	view.Begin();bool shown=false,hidden=false;
+	for(int frame=0;frame<12;++frame){
+		view.Frame(.1);Check(view.runtime.Statistics().layoutUpdates>0,"an open editor keeps the full pass");
+		(view.host.Colour(0,0,1)?shown:hidden)=true;
+	}
+	Check(shown&&hidden,"an open editor's caret blinks on an otherwise still page");
+}
 int main(int argc,char** argv){
+	currentCase="caret-at-rest";CaretBlinksOnRestingPage();
 	PaddedEditingRectangles();
 	Check(argc<=2,"only optional authored fixture path accepted");if(argc==2)AuthoredFixture(argv[1]);
 	for(const auto& [name,test]:std::vector<std::pair<const char*,void(*)()>>{{"fractional-density",FractionalDrawingAndDensity},{"framed-transform",FramedReversedSelectionAndTransforms},{"scroll-empty-preedit",ScrollEmptyAndPreedit},{"validation-proposals",ValidationProposalsAndIdentity},{"detached-draft",DetachedDraftAndNativeAffinity},{"unavailable-layout",UnavailableLayoutHidesStaleInk},{"snapshot-recreation",SnapshotDraftsAndResourceRecreation},{"snapshot-conflict",SnapshotFreshHostConflict},{"snapshot-pending",SnapshotPendingProposalDoesNotReplay},{"host-acknowledgement",HostAcknowledgementBetweenFrames},{"host-before-dispatch",HostChangeBeforeDispatch},{"range-message",RangeMessageAndDecimals}}){currentCase=name;test();}

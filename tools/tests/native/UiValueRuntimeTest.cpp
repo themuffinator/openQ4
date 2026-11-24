@@ -211,6 +211,35 @@ static void ReadbackAndToggle(TestHost& host) {
 	ActionInvocation invocation;std::string error;Check(view.runtime.ResolveAction(proposal.action,invocation,error,&*proposal.proposal)&&std::get<double>(invocation.arguments.at("value"))==1.1,"runtime resolves exact typed input operand");
 	view.State({{"level",1.1}});view.Ack(proposal,true);view.Frame();Check(Near(view.BoxOf("slider-fill").width,110),"accepted slider readback changes fill");
 }
+// A page of settled widgets stands as its last frame left it: no style or
+// layout walk and no interaction refresh. A value changed from outside, an
+// open list and the frame after it closes still take the full pass.
+static void WidgetsAtRest(TestHost& host) {
+	View view(host);
+	const auto quiet=[&]{const auto stats=view.runtime.Statistics();return stats.layoutUpdates==0 && stats.interactionUpdates==0;};
+	for (int frame=0;frame<3;++frame) view.Frame();
+	Check(quiet() && !host.HasColour(0,1,0),"settled widgets skip layout and interaction");
+	view.State({{"flag",true}});view.Frame();
+	Check(view.runtime.Statistics().layoutUpdates>0 && host.HasColour(0,1,0),"a readback on a resting page repaints its widget");
+	view.State({{"level",1.5}});view.Frame();
+	Check(Near(view.BoxOf("slider-fill").width,150),"a resting slider follows its readback");
+	for (int frame=0;frame<2;++frame) view.Frame();
+	Check(quiet() && host.HasColour(0,1,0),"widgets rest again with their new values");
+	// Settled widgets let a recorded frame replay; an open list never does.
+	bool replayed=false;
+	for (int frame=0;frame<6 && !replayed;++frame) { view.Frame(); replayed=view.runtime.Statistics().frameReplays>0; }
+	Check(replayed && host.HasColour(0,1,0),"a page of settled widgets replays its recorded frame");
+	view.runtime.FocusControl("choice",view.time);view.Key(MenuInput::Accept);
+	for (int frame=0;frame<3;++frame) {
+		view.Frame();
+		Check(view.Widget("choice").popupOpen && view.runtime.Statistics().frameReplays==0,"an open list never replays a recorded frame");
+	}
+	view.Key(MenuInput::Back);view.Frame();
+	Check(!view.Widget("choice").popupOpen && view.runtime.Statistics().frameReplays==0,"the frame a list closes in draws afresh");
+	bool rested=false;
+	for (int frame=0;frame<6 && !rested;++frame) { view.Frame(); rested=quiet(); }
+	Check(rested,"a closed list leaves the page at rest");
+}
 // The stock menu sounds (visual section 8, MOT-006): Focus once each time a
 // device event moves the lit control or option, never for frames, programs, a
 // finger, a held button or a pointer finding what the keys already lit;
@@ -530,7 +559,7 @@ static void CountedStateLabels(TestHost& host) {
 
 int main() {
 	TestHost host;PaddedValueParts(host);ReadbackAndToggle(host);ProjectedDragAndHandoff(host);PopupAndPersistence(host);ScrollBodyAndFocusReveal(host);PositionedOverflowBoundaries(host);
-	CountedStateLabels(host); SoundCues(host);
+	CountedStateLabels(host); SoundCues(host); WidgetsAtRest(host);
 	Check(host.errors==0,"real Runtime/RmlUi reports no errors");
 	std::printf("Value Runtime: %u checks passed\n",checks);
     return 0;

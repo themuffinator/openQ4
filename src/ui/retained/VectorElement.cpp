@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <limits>
 
 namespace openq4::ui {
 namespace {
@@ -89,6 +90,61 @@ size_t VectorCompileBatch::Install() {
 	}
 	requests.clear();
 	return installed;
+}
+bool VectorGeometry::ArtworkExtent(const VectorOptions& options, double extent[4]) {
+	auto& local = localExtent;
+	if (local.generation != compileGeneration || local.width != options.widthDp || local.height != options.heightDp) {
+		local = {}; local.generation = compileGeneration; local.width = options.widthDp; local.height = options.heightDp;
+		double box[4] = {std::numeric_limits<double>::infinity(),std::numeric_limits<double>::infinity(),
+			-std::numeric_limits<double>::infinity(),-std::numeric_limits<double>::infinity()};
+		bool finite = true;
+		for (const auto& path : paths) {
+			if (path.stroke.paint.type != PaintType::None) {
+				const auto& stroke = path.stroke;
+				if (!std::isfinite(stroke.widthDp) || !std::isfinite(stroke.minimumPixels) || !std::isfinite(stroke.miterLimit)) finite = false;
+				local.stroked = true;
+				local.strokeDp = std::max(local.strokeDp,stroke.widthDp);
+				local.strokePixels = std::max(local.strokePixels,stroke.minimumPixels);
+				local.strokeMiter = std::max(local.strokeMiter,stroke.miterLimit);
+			}
+			for (const auto& command : path.commands) {
+				const unsigned count = command.op == PathOperation::Cubic ? 3 : command.op == PathOperation::Quadratic ? 2 :
+					command.op == PathOperation::Close ? 0 : 1;
+				for (unsigned i = 0; i < count; ++i) {
+					const auto p = command.points[i].Resolve(options.widthDp,options.heightDp);
+					if (!std::isfinite(p.x) || !std::isfinite(p.y)) finite = false;
+					box[0] = std::min(box[0],p.x); box[1] = std::min(box[1],p.y);
+					box[2] = std::max(box[2],p.x); box[3] = std::max(box[3],p.y);
+				}
+			}
+		}
+		local.valid = finite && box[0] <= box[2] && box[1] <= box[3];
+		local.left = box[0]; local.top = box[1]; local.right = box[2]; local.bottom = box[3];
+	}
+	if (!local.valid) return false;
+	const auto& t = options.transform;
+	const double maximumScale = t.MaximumScale();
+	const double determinant = std::abs(t.a*t.d-t.b*t.c);
+	if (!std::isfinite(maximumScale) || maximumScale <= 0 || !std::isfinite(determinant) || determinant <= 0) return false;
+	const double minimumScale = determinant/maximumScale;
+	// The tessellator's stroke half-width in dp (StrokeContours): a miter
+	// join reaches miterLimit of it, a square cap sqrt(2), a round one 1.
+	double reach = 1;
+	if (local.stroked) {
+		const double half = .5*std::max(local.strokeDp,local.strokePixels/minimumScale);
+		reach += half*std::max(local.strokeMiter,std::sqrt(2.0))*maximumScale;
+	}
+	// An affine map keeps every point inside the image of the box's corners.
+	extent[0] = extent[1] = std::numeric_limits<double>::infinity();
+	extent[2] = extent[3] = -std::numeric_limits<double>::infinity();
+	for (const double x : {local.left,local.right}) for (const double y : {local.top,local.bottom}) {
+		const auto p = t.Apply({x,y});
+		extent[0] = std::min(extent[0],p.x); extent[1] = std::min(extent[1],p.y);
+		extent[2] = std::max(extent[2],p.x); extent[3] = std::max(extent[3],p.y);
+	}
+	extent[0] -= reach; extent[1] -= reach; extent[2] += reach; extent[3] += reach;
+	return std::isfinite(extent[0]) && std::isfinite(extent[1]) && std::isfinite(extent[2]) && std::isfinite(extent[3]) &&
+		extent[0] <= extent[2] && extent[1] <= extent[3];
 }
 void VectorGeometry::Configure(const std::vector<VectorPath>& source, Host& owner, RuntimeStatistics& measurements) {
 	paths = source; host = &owner; statistics = &measurements;
@@ -312,9 +368,19 @@ void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 	auto lower = [](double value) { return static_cast<int>(std::clamp(std::floor(value/256)*256,-1000000.0,1000000.0)); };
 	auto upper = [](double value) { return static_cast<int>(std::clamp(std::ceil(value/256)*256,-1000000.0,1000000.0)); };
 	VectorPixelBounds cachedBounds{lower(bounds.left-offsetX),lower(bounds.top-offsetY),upper(bounds.right-offsetX),upper(bounds.bottom-offsetY)};
+	// Artwork wholly inside the visible region compiles the same mesh whatever
+	// region bounds it, so it keys on its own extent instead. A clip that grows
+	// or moves over still artwork (a page opening) otherwise recompiled it
+	// whenever an edge crossed into another cache region, dropping its
+	// sub-pixel phases too.
+	double extent[4];
+	if (!localMesh && ArtworkExtent(options,extent) && extent[0] >= bounds.left-offsetX && extent[1] >= bounds.top-offsetY &&
+			extent[2] <= bounds.right-offsetX && extent[3] <= bounds.bottom-offsetY) {
+		cachedBounds = {lower(extent[0]),lower(extent[1]),upper(extent[2]),upper(extent[3])};
+	}
 	// Only where the view alone clips it: a scissored element keeps the visible
 	// region, so its compilation still matches a fresh one vertex for vertex.
-	if (sliding && !state.scissor_region.Valid()) {
+	else if (sliding && !state.scissor_region.Valid()) {
 		// The view's region slides across a moving element, and each new block
 		// would recompile it (a scrolling data layer several views tall). Its
 		// own box does not move in this space: cover that as well, while the
@@ -364,7 +430,13 @@ void VectorGeometry::Render(Rml::Element& element, bool inheritOpacity) {
 	bool moving = false;
 	if (valid) {
 		moving = !SameCompilation(signature,previous);
-		for (size_t i = 0; moving && i < signature.size(); ++i) if (i != 6 && i != 7 && signature[i] != previous[i]) moving = false;
+		// The region it compiles for (8 to 11) may change as it slides, under
+		// a clip that moves with it or a region that follows its own box; it
+		// is still moving, and keeps the compilations it made where that
+		// region differed. An element that stays put under a changing clip
+		// compiles exactly.
+		moving = moving && sliding;
+		for (size_t i = 0; moving && i < 6; ++i) if (signature[i] != previous[i]) moving = false;
 	}
 	previous = signature; valid = true;
 	slidingRenders = moving ? std::min(slidingRenders+1,SlidingHalfPhaseRenders) : 0;

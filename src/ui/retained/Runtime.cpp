@@ -1958,8 +1958,14 @@ struct Runtime::Impl {
 	bool focusLayoutVisible = false;
 	std::vector<std::string> controls;
 	// Every control but a button: their views paint what a state change
-	// changed, and a shown one rules out replaying a recorded frame.
+	// changed, and a shown one replays a recorded frame only at rest.
 	std::vector<Rml::Element*> layoutWidgets;
+	// Number and text fields: an editor's caret blinks.
+	std::vector<std::pair<Rml::Element*,std::string>> editableWidgets;
+	// Whether the last frame found shown widgets not at rest (WidgetsAtRest),
+	// and whether that frame or the one before did: a page with shown widgets
+	// replays a recorded frame only after two resting frames.
+	bool widgetsLive = false, widgetsReplayBlocked = false;
 	std::uint64_t valuePaintRevision = ~std::uint64_t{0}; // The state revision the value widgets last checked.
 	double rmlUpdateDue = 0; // When RmlUi last asked to be updated again (runtime seconds).
 	// Whether the focused control is a number field being edited.
@@ -2096,6 +2102,9 @@ struct Runtime::Impl {
 		// and whether they let input through (display and pointer-events).
 		PropertyKey display,pointerEvents;
 		bool presented=true;
+		// Whether presented was read at the eligibility cache's revisions; a
+		// branch under a refused ancestor skips the read and goes stale.
+		bool presentedCurrent=false;
 		std::vector<InteractionBranch> children;
 	};
 	InteractionBranch inputBranches,modalBranches;
@@ -2360,14 +2369,25 @@ struct Runtime::Impl {
 	void CollectInputEligibility(InteractionBranch& branch, bool inherited, bool reread) {
 		if (!branch.node) return;
 		const auto& node=*branch.node;
-		if (reread) {
-			const auto* display = PropertyPointer(state,motion,branch.display);
-			const auto* events = PropertyPointer(state,motion,branch.pointerEvents);
-			branch.presented = (!display || display->text != "none") && (!events || events->text != "none");
+		// Under a branch that already refuses input nothing is allowed, so a
+		// refused subtree (a large page's hidden tabs) skips its lookups. Its
+		// cached values are marked stale instead, and are read again once an
+		// ancestor lets input through (a mask's area can change at the same
+		// revisions).
+		bool allowed = false;
+		if (inherited) {
+			if (reread || !branch.presentedCurrent) {
+				const auto* display = PropertyPointer(state,motion,branch.display);
+				const auto* events = PropertyPointer(state,motion,branch.pointerEvents);
+				branch.presented = (!display || display->text != "none") && (!events || events->text != "none");
+				branch.presentedCurrent = true;
+			}
+			auto* element = branch.element;
+			const bool maskArea = !node.mask || (element && static_cast<VectorElement*>(element)->HasMaskArea());
+			allowed = maskArea && branch.presented;
+		} else if (reread) {
+			branch.presentedCurrent = false;
 		}
-		auto* element = branch.element;
-		const bool maskArea = !node.mask || (element && static_cast<VectorElement*>(element)->HasMaskArea());
-		const bool allowed = inherited && maskArea && branch.presented;
 		// A load fixes the branches, so each update overwrites the same entries.
 		if (node.control) inputAllowed[node.id] = allowed;
 		for (auto& child : branch.children) CollectInputEligibility(child,allowed,reread);
@@ -2597,13 +2617,23 @@ struct Runtime::Impl {
 		if (!document || interaction.Focused().empty()) return result;
 		auto* target = CanonicalElement(interaction.Focused());
 		if (auto* viewport = NumberViewport(target)) target = viewport;
+		// Only the path up to the outermost scrolling ancestor counts.
+		// RevealFocus scrolls only those, measuring the control in each one's
+		// own plane, so a page that moves or grows around them (a frame
+		// opening) changes nothing a reveal would do.
+		size_t scrolled = 0;
 		for (auto* element = target; element && element != document; element = element->GetParentNode()) {
 			// Relative layout and client extents exclude scroll offsets. A user
 			// can deliberately scroll away without an unchanged focus undoing it.
 			result.push_back(element->GetRelativeOffset(Rml::BoxArea::Border));
 			result.push_back(element->GetBox().GetSize(Rml::BoxArea::Border));
 			result.push_back({element->GetClientWidth(),element->GetClientHeight()});
+			using Rml::Style::Overflow;
+			const auto& style = element->GetComputedValues();
+			if (element != target && ((style.overflow_x() != Overflow::Visible && style.overflow_x() != Overflow::Hidden) ||
+					(style.overflow_y() != Overflow::Visible && style.overflow_y() != Overflow::Hidden))) scrolled = result.size();
 		}
+		result.resize(scrolled);
 		return result;
 	}
 	bool FocusVisible() const {
@@ -2928,6 +2958,21 @@ struct Runtime::Impl {
         std::string error;scrollLayoutDirty|=scrollView.Sync(interaction,viewport.DpRatio(),false,error);
         if(!error.empty())host.Log(true,error);
     }
+	// Whether the shown widgets can stand as the last frame left them. Their
+	// inputs (readbacks, availability, focus, pointer parts, scrolling) raise
+	// the interaction and scroll flags. A number field paints its caret from
+	// time, and an open list, a drag, a fling or a press is a gesture in
+	// progress. A page leaving any of these is not at rest until one more
+	// frame has passed.
+	bool WidgetsAtRest() const {
+		const auto visible=[](const auto* element){return element->IsVisible(true);};
+		if (std::none_of(layoutWidgets.begin(),layoutWidgets.end(),visible)) return true;
+		return !interactionLayoutDirty && !scrollLayoutDirty && !preserveRestoredScroll && pendingFocus.empty() &&
+			focusLayoutId==interaction.Focused() && interaction.OpenPopup().empty() && !interaction.PointerHeld() &&
+			interaction.CapturedPointerControl().empty() && fling.container.empty() && !touch.pressed &&
+			std::none_of(editableWidgets.begin(),editableWidgets.end(),[&](const auto& widget){
+				return interaction.HasEditor(widget.second) && widget.first->IsVisible(true);});
+	}
     bool UpdateInteraction(double seconds = -1, bool freshLayout = false, bool refreshPopup = false) {
 		if (!document || viewport.width<=0 || viewport.height<=0) return false;
         if (!canonical) return true; // Valid legacy RML has no canonical interaction work.
@@ -3043,7 +3088,13 @@ struct Runtime::Impl {
 			changedKeys.insert(changedKeys.end(),deferredInputs.begin(),deferredInputs.end());
 			deferredInputs.clear();
 		}
-		appliedMotionRevision = 0; ++presentationPass;
+		appliedMotionRevision = 0;
+		// A settled closed list is reasserted only when this pass can undo its
+		// paint: a complete pass, or one that writes its value text, its popup
+		// or an opacity its popup reads. Decoration moving or a page frame
+		// growing no longer repaints every closed list on the page.
+		if (!incremental || std::any_of(changedKeys.begin(),changedKeys.end(),
+				[&](const PropertyKey& key) { return valueView.PaintsNode(key.first,key.second); })) ++presentationPass;
 		bool complete = true;
 		const auto sameValue = [](const Value& a, const Value& b) {
 			return a.type == b.type && std::memcmp(a.data.data(),b.data.data(),sizeof(a.data)) == 0 && a.unit == b.unit && a.text == b.text;
@@ -3434,7 +3485,7 @@ void Runtime::Shutdown() {
 	impl->ReleaseModelScenes();
 	impl->canonicalElements.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
+	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->editableWidgets.clear(); impl->widgetsLive=impl->widgetsReplayBlocked=false; impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
 	impl->hud = nullptr;
 	impl->paintDirty=true;
 	impl->changedProjections.clear();
@@ -3456,7 +3507,7 @@ void Runtime::CloseDocument() {
 
 	impl->sourcePath.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
+	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->editableWidgets.clear(); impl->widgetsLive=impl->widgetsReplayBlocked=false; impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
 	impl->hud = nullptr;
 	impl->valueView.Reset();
 	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
@@ -3545,6 +3596,7 @@ bool Runtime::LoadCanonical(std::unique_ptr<Document> candidate, const std::stri
 		if (node->control) {
 			impl->controls.push_back(node->id);
 			if (node->control->role!=ControlRole::Button && element) impl->layoutWidgets.push_back(element);
+			if (node->control->role==ControlRole::Number && element) impl->editableWidgets.emplace_back(element,node->id);
 		}
 		if (element) {
 			// Canonical subtrees preserve paint order when opacity crosses 1 and
@@ -4118,6 +4170,11 @@ bool Runtime::Layout(const Viewport& viewport,double seconds) {
 	const bool rmlDue=impl->canonical && impl->time>=impl->rmlUpdateDue;
 	const bool explicitLayout=impl->canonical && !impl->NumberEditing() && !impl->interaction.PointerHeld();
 	bool layoutUpdated=!explicitLayout || viewportChanged || impl->presentationDirty || rmlDue;
+	// Replay (Frame) also waits for the shown widgets to rest for two frames:
+	// no focus, scroll, list, drag, fling or editor settling.
+	const bool widgetsAtRest=!impl->canonical || impl->WidgetsAtRest();
+	impl->widgetsReplayBlocked=!widgetsAtRest || impl->widgetsLive;
+	impl->widgetsLive=!widgetsAtRest;
 	if (layoutUpdated) {
 		++impl->Stats().layoutUpdates;
 		impl->context->Update(explicitLayout); impl->presentationDirty=false;
@@ -4228,8 +4285,7 @@ bool Runtime::Frame(const Viewport& viewport, double seconds) {
 	}
 	const auto updated = statistics.Now();
 	impl->backend->renderer.BeginFrame(viewport.width,viewport.height);
-	const bool replayCandidate=impl->host.CanReplayFrames() && impl->canonical && !impl->paintDirty &&
-		std::none_of(impl->layoutWidgets.begin(),impl->layoutWidgets.end(),[](const auto* element){return element->IsVisible(true);});
+	const bool replayCandidate=impl->host.CanReplayFrames() && impl->canonical && !impl->paintDirty && !impl->widgetsReplayBlocked;
 	bool projectionMatches=true;
 	if (replayCandidate && !impl->changedProjections.empty()) {
 		impl->context->GetRootElement()->UpdateGeometryForProjection();
@@ -4541,6 +4597,9 @@ bool Runtime::AcknowledgeControlProposal(const std::string& id, std::uint64_t to
 		impl->ReadStateSources();
 		if (!impl->stateError.empty()) accepted = false;
 	}
+	// A settled or refused proposal changes what its widget shows, with no
+	// state change when it is refused: settle the interaction next frame.
+	impl->interactionLayoutDirty=true;
 	return impl->interaction.AcknowledgeProposal(id,token,accepted);
 }
 bool Runtime::BeginNumberEdit(const std::string& id,std::string& error,double seconds) {
@@ -4623,6 +4682,15 @@ bool Runtime::CancelNumberEdit(const std::string& id,NumberEditIdentity expected
 bool Runtime::QueryNumberDrafts(NumberDraftSummary& out,std::string& error,double seconds) {
     if(!Mutate())return false;
 
+	// The host asks on every prepare (SyncNumberDrafts). Drafts live in
+	// editors alone, so with none open the answer reads no layout: refreshing
+	// every control's bounds for it also raised the interaction flag, costing
+	// a resting page its settling pass every frame.
+	if (impl->canonical && impl->document && std::isfinite(seconds) && seconds >= 0 && !impl->interaction.HasEditors()) {
+		impl->ReadStateSources();
+		if (!impl->stateError.empty()) { error = impl->stateError; return false; }
+		return impl->interaction.QueryNumberDrafts(out,error);
+	}
 	if (!impl->PrepareNumberEdit(seconds,error)) return false;
 	return impl->interaction.QueryNumberDrafts(out,error);
 }

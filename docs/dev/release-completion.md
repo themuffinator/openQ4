@@ -12,6 +12,73 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Faster pack reads and cache writes, oversized screenshots and cleaner mirrors, from openPR06, 24 November 2026
+
+Fixes and speed-ups first made in openPR06, the PREY port built on openQ4,
+brought back to openQ4. Thanks to danperisse-hue, whose openPR06 pull requests
+gave the pack-read and cache-write improvements.
+
+- **Faster pack reads.** Reading a file from a PK4 reuses an idle handle on
+  that pack instead of opening the pack file again each time
+  (`fs_reusePackHandles`, default 1; up to 16 idle handles per pack and 64 in
+  all, so the open-file limits on macOS and the Windows C runtime are never
+  reached). Member CRC checks use a slicing-by-8 CRC-32 that gives the same
+  result on every CPU byte order. Writing a file stats its folder once,
+  instead of calling mkdir on every folder in its path.
+- **Level-load caches are written off the load thread.** Generated caches are
+  hashed with the CPU's SHA instructions where available and written by a
+  background writer, so a first visit no longer waits on disk writes. It
+  falls back to writing during the load if the thread cannot start, and
+  `com_levelLoadCacheAsyncWrite 0` turns it off. The cache report adds a
+  `Generated cache writer: written/failed/pending` line.
+- **A copy of openQ4 built without git history can save and load.** Such a
+  copy (GitHub's "Download ZIP") builds as build 0, and it refused every
+  save it wrote, its own autosaves included. It now loads its own saves; see
+  [savegame compatibility](savegame-compatibility-policy.md#builds-without-git-history).
+  Meson warns when it configures such a tree.
+- **Screenshots larger than the window** (`screenshot 3840 2160`) draw the
+  HUD across the whole picture. On Vulkan the tiles are no longer magnified,
+  and animated models no longer leave stray wedges between tiles.
+- **Mirrors clip at the mirror plane** with an oblique near plane on both
+  renderers. Nothing between the reflected camera and the mirror draws over
+  the reflection, and OpenGL mirrors keep alpha-tested surfaces such as
+  grates. In mirror views, shadow volumes are always capped and soft
+  particles draw plainly. The cheat `r_skipSubviewClip 1` turns the clip
+  off for comparison.
+- **Shadow-map fallbacks.** The view weapon and depth-hacked models keep
+  their stencil shadows. A light whose shadow map is skipped by the update
+  budget or the subview policy is no longer locked onto stencil shadows, and
+  a built but empty shadow volume no longer counts as a missing caster.
+  Region-split levelshots fit shadow cascades to the whole tile and leave out
+  the view weapon's shadow.
+- **Steadier heat haze with temporal AA.** The jitter no longer makes the
+  stock heat-haze programs' strength flicker at range, on OpenGL, Vulkan and
+  GLES.
+- **Vulkan compiles authored material programs when the level loads**, not
+  on first draw.
+- **Retained menus do less work at rest.** A settled page replays its last
+  frame even when it has widgets. A refused subtree skips its input lookups.
+  A closed list repaints only what its motion changes, vector art inside the
+  visible region keeps its compiled mesh, and the focus check stops at the
+  outermost scrolling ancestor.
+- Not ported: particle-bounds and bindings-file fixes (openQ4 has neither the
+  code nor the file), the libvorbisfile Ogg fallback (every Ogg in the stock
+  Quake 4 PK4s decodes with stb_vorbis), the LP64 script-argument,
+  `GetGameAPI` export and glass-shard NaN fixes (already in openQ4), and
+  PREY-only game, portal, glow, pointer and sound work.
+- Evidence: a clean MSVC build; 18 native tests (CRC-32, core safety,
+  level-load cache format, retained UI, value, number, scrollbar, choice,
+  popup and document runtimes, material compiler); and the level-load cache,
+  file-system write and length-probe, pure-cache, ARM64-portability, Vulkan
+  shadow and screenshot readback contracts. `renderer_native_ui_output` and
+  `renderer_display_presentation` fail on the video-capture symbols from 23
+  November, before this change. In game on airdefense1, OpenGL and Vulkan,
+  cold then warm: the cold load wrote 198 generated caches in the background
+  with none failed, the warm loads hit all 198, logs carry no errors or
+  warnings, and 3840x2160 shots from a 2560x1440 window show the full-frame
+  HUD on both renderers. Not yet run: a mirror scene, heat haze under TAA,
+  retained menu interaction in game, Linux and macOS.
+
 ## Low holds 60 FPS on low-end graphics, 24 November 2026
 
 - **The Low preset holds its 60 FPS cap on low-end graphics again.** Since

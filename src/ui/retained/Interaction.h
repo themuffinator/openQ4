@@ -5,6 +5,7 @@
 #include "TextEdit.h"
 #include "TextEditCommand.h"
 #include "NativeTextEditor.h"
+#include <algorithm>
 #include <cstdint>
 #include <functional>
 #include <set>
@@ -218,6 +219,16 @@ public:
 	// outside-track values during capture) or a stable popup option ID.
 	void PointerPart(const std::string& id, std::optional<double> trackFraction = {}, const std::string& option = {}, bool scrollThumb = false, bool choiceTrack = false);
 	std::string CapturedPointerControl() const { return dragging; }
+	// The choice whose list is open; empty while every list is closed.
+	const std::string& OpenPopup() const { return popup; }
+	// Whether a number or text field holds an editor: an edit begun and not
+	// yet committed or cancelled, whose caret blinks.
+	bool HasEditor(const std::string& id) const {
+		const auto found = items.find(id); return found != items.end() && found->second.number.has_value();
+	}
+	bool HasEditors() const {
+		return std::any_of(items.begin(),items.end(),[](const auto& item){return item.second.number.has_value();});
+	}
 	void Pointer(bool down);
 	void Input(MenuInput input, bool down);
     // Record held sources while native layout is unavailable, without dispatch.

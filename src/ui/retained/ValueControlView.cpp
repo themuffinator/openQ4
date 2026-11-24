@@ -17,6 +17,8 @@
 #include <limits>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include <locale>
 #include <sstream>
 
@@ -171,6 +173,9 @@ struct ValueControlView::Impl {
 	std::unordered_map<std::string_view,Rml::Element*> elements;
 	std::unordered_map<std::string_view,const std::map<std::string,Value>*> authored;
 	std::map<std::pair<std::string,std::string>,Applied,AppliedLess> applied;
+	// The nodes a choice's paint writes (its value text, its popup's subtree
+	// and its parts) and those whose opacity its popup's filter reads.
+	std::unordered_set<std::string> paintedNodes, opacityNodes;
 	Rml::Element* Element(const std::string& id) const { const auto found = elements.find(id); return found == elements.end() ? nullptr : found->second; }
 	const std::map<std::string,Value>& Authored(const std::string& id) const { return *authored.at(id); }
 	bool Property(const std::string& id, const std::string& property, const std::string& value) {
@@ -611,11 +616,13 @@ bool ValueControlView::Initialize(std::shared_ptr<const DocumentModel> model, Rm
 	error.clear(); auto candidate = std::make_unique<Impl>(); candidate->document = &document; candidate->translate = std::move(translate);
 	candidate->model = std::move(model);
 	std::vector<const Node*> pending{&candidate->model->root};
+	std::unordered_map<std::string_view,const Node*> nodes;
 	while (!pending.empty()) {
 		const auto* node = pending.back(); pending.pop_back();
 		auto* element = find ? find(node->id) : document.GetElementById(node->id);
 		if (!element) { error = "Missing canonical value-control view node '"+node->id+"'"; return false; }
 		candidate->elements[node->id] = element; candidate->authored[node->id] = &node->properties;
+		nodes[node->id] = node;
 		if (node->control && node->control->role != ControlRole::Button) candidate->entries[node->id] = {*node->control,element,nullptr};
 		for (const auto& child : node->children) pending.push_back(&child);
 	}
@@ -630,6 +637,21 @@ bool ValueControlView::Initialize(std::shared_ptr<const DocumentModel> model, Rm
 		}
 		for (auto* ancestor = popup; ancestor && ancestor != &document; ancestor = ancestor->GetParentNode())
 			if (candidate->authored.contains(ancestor->GetId())) entry.opacityAncestry.push_back(ancestor->GetId());
+		candidate->opacityNodes.insert(entry.opacityAncestry.begin(),entry.opacityAncestry.end());
+		auto& painted = candidate->paintedNodes;
+		for (const auto* part : {&choice->popup,&choice->viewport,&choice->content,&choice->valueText})
+			if (!part->empty()) painted.insert(*part);
+		for (const auto& option : choice->options)
+			for (const auto* part : {&option.node,&option.labelPart,&option.selectedPart,&option.highlightPart})
+				if (!part->empty()) painted.insert(*part);
+		if (const auto found = nodes.find(choice->popup); found != nodes.end()) {
+			std::vector<const Node*> subtree{found->second};
+			while (!subtree.empty()) {
+				const auto* node = subtree.back(); subtree.pop_back();
+				painted.insert(node->id);
+				for (const auto& child : node->children) subtree.push_back(&child);
+			}
+		}
 	}
 	for (const auto& [id,entry] : candidate->entries) if (const auto* choice = std::get_if<ChoiceSpec>(&entry.control.widget)) {
 		auto* popup = candidate->Element(choice->popup);
@@ -643,6 +665,9 @@ bool ValueControlView::Initialize(std::shared_ptr<const DocumentModel> model, Rm
 		candidate->Display(choice->popup,false);
 	}
 	impl = std::move(candidate); return true;
+}
+bool ValueControlView::PaintsNode(const std::string& id, const std::string& property) const {
+	return impl->paintedNodes.contains(id) || (property == "opacity" && impl->opacityNodes.contains(id));
 }
 void ValueControlView::SetSafeArea(float left, float top, float right, float bottom) {
 	const auto inset = [](float value) { return std::isfinite(value) ? std::max(value,0.f) : 0.f; };

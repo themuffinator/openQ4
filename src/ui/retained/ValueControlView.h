@@ -35,6 +35,12 @@ public:
 	// The window's safe area as pixel insets from the view's edges: a popup
 	// opens within it, 4 dp clear, as it otherwise does within the view.
 	void SetSafeArea(float left, float top, float right, float bottom);
+	// Whether a presented `property` of canonical node `id` can undo what a
+	// choice's paint wrote: its value text, anything in its popup or its
+	// parts, or the opacity of an ancestor its popup's filter reads. A
+	// presentation pass that writes none of these leaves every settled closed
+	// list as it was painted, so the caller need not count it as a new pass.
+	bool PaintsNode(const std::string& id, const std::string& property) const;
 	// Use the actual clipped Rml hit, except a captured slider projects outside
 	// its track. Coordinates are the same physical viewport pixels as RmlUi.
 	bool ChoiceScrollFresh(const std::string&, const Interaction&) const;

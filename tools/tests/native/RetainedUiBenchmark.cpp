@@ -86,12 +86,14 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 	if (runtime.HasEvent("onInit") && !runtime.RunEvent("onInit",start,effects,error)) throw std::runtime_error("onInit: "+error);
 	runtime.PlayTimeline("open",start);
 	runtime.Frame(viewport,start);
-	const double cold = runtime.Statistics().frameMilliseconds;
+	const auto coldStats = runtime.Statistics();
+	const double cold = coldStats.frameMilliseconds;
 	for (int i = 1; i <= 240; ++i) runtime.Frame(viewport,start+i/60.0);
 	const auto eventStart = std::chrono::steady_clock::now();
 	if (!event.empty() && !runtime.RunEvent(event,start+4,effects,error)) throw std::runtime_error(event+": "+error);
 	const double eventMs = std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-eventStart).count();
 	std::vector<double> frame, update, render, compile, paths, uploads, draws, vertices, layers, elisions;
+	std::vector<double> sources, motion, apply, layout, layoutUpdates, interactionUpdates, inputsScanned, replays;
 	double layouts = 0; // Style and layout passes: a frame that only moves decoration needs none.
 	for (int i = 1; i <= frames; ++i) {
 		// Exercise the game-driven motion as well as authored idle timelines.
@@ -110,18 +112,29 @@ void Screen(const std::string& path, int frames, int width, int height, const st
 		uploads.push_back(static_cast<double>(stats.vectorUploads)); draws.push_back(static_cast<double>(stats.drawCalls));
 		vertices.push_back(static_cast<double>(stats.submittedVertices)); layers.push_back(static_cast<double>(stats.layerPushes));
 		elisions.push_back(static_cast<double>(stats.layerElisions));
+		sources.push_back(stats.sourceMilliseconds); motion.push_back(stats.motionMilliseconds); apply.push_back(stats.applyMilliseconds);
+		layout.push_back(stats.layoutMilliseconds); layoutUpdates.push_back(static_cast<double>(stats.layoutUpdates));
+		interactionUpdates.push_back(static_cast<double>(stats.interactionUpdates)); inputsScanned.push_back(static_cast<double>(stats.motionInputsScanned));
+		replays.push_back(static_cast<double>(stats.frameReplays));
 		layouts += static_cast<double>(stats.layoutUpdates);
 	}
 	if (!host.error.empty()) throw std::runtime_error("Screen logged an error: "+host.error);
 	// What the shown document holds after its frames (the view, its state and motion).
 	const auto heldKb = (PrivateBytes()-bytesBefore)/1024;
 	std::printf("{\"scenario\":\"screen\",\"held_kb\":%llu,\"document\":\"%s\",\"event\":\"%s\",\"width\":%d,\"height\":%d,\"frames\":%d,\"load_ms\":%.6f,\"cold_ms\":%.6f,\"event_ms\":%.6f,"
+		"\"cold_update_ms\":%.6f,\"cold_vector_compile_ms\":%.6f,\"cold_paths_compiled\":%llu,\"cold_geometry_compiles\":%llu,"
 		"\"first_ms\":%.6f,\"p50_ms\":%.6f,\"p95_ms\":%.6f,\"max_ms\":%.6f,"
 		"\"update_p50_ms\":%.6f,\"render_p50_ms\":%.6f,\"vector_compile_p50_ms\":%.6f,\"paths_compiled_p50\":%.0f,\"uploads_p50\":%.0f,"
-		"\"draw_calls_p50\":%.0f,\"submitted_vertices_p50\":%.0f,\"layer_pushes_p50\":%.0f,\"layer_elisions_p50\":%.0f,\"layout_updates_mean\":%.3f}\n",
-		static_cast<unsigned long long>(heldKb),path.c_str(),event.c_str(),width,height,frames,loadMs,cold,eventMs,frame.front(),Percentile(frame,.5),Percentile(frame,.95),Percentile(frame,1),
+		"\"draw_calls_p50\":%.0f,\"submitted_vertices_p50\":%.0f,\"layer_pushes_p50\":%.0f,\"layer_elisions_p50\":%.0f,"
+		"\"sources_p50_ms\":%.6f,\"motion_p50_ms\":%.6f,\"apply_p50_ms\":%.6f,\"layout_p50_ms\":%.6f,"
+		"\"layout_updates_p50\":%.0f,\"interaction_updates_p50\":%.0f,\"motion_inputs_scanned_p50\":%.0f,\"replays_p50\":%.0f,\"layout_updates_mean\":%.3f}\n",
+		static_cast<unsigned long long>(heldKb),path.c_str(),event.c_str(),width,height,frames,loadMs,cold,eventMs,
+		coldStats.updateMilliseconds,coldStats.vectorCompileMilliseconds,static_cast<unsigned long long>(coldStats.vectorPathsCompiled),
+		static_cast<unsigned long long>(coldStats.geometryCompiles),frame.front(),Percentile(frame,.5),Percentile(frame,.95),Percentile(frame,1),
 		Percentile(update,.5),Percentile(render,.5),
-		Percentile(compile,.5),Percentile(paths,.5),Percentile(uploads,.5),Percentile(draws,.5),Percentile(vertices,.5),Percentile(layers,.5),Percentile(elisions,.5),layouts/frames);
+		Percentile(compile,.5),Percentile(paths,.5),Percentile(uploads,.5),Percentile(draws,.5),Percentile(vertices,.5),Percentile(layers,.5),Percentile(elisions,.5),
+		Percentile(sources,.5),Percentile(motion,.5),Percentile(apply,.5),Percentile(layout,.5),
+		Percentile(layoutUpdates,.5),Percentile(interactionUpdates,.5),Percentile(inputsScanned,.5),Percentile(replays,.5),layouts/frames);
 	runtime.CloseDocument(); runtime.Shutdown();
 }
 
@@ -223,6 +236,53 @@ void EventRepeats(const std::string& path, const std::string& event, int repeats
 	if (!host.error.empty()) throw std::runtime_error("Event document logged an error: "+host.error);
 	std::printf("{\"scenario\":\"event\",\"document\":\"%s\",\"event\":\"%s\",\"repeats\":%d,\"event_p50_ms\":%.6f,\"event_min_ms\":%.6f,\"event_max_ms\":%.6f,\"frame_p50_ms\":%.6f}\n",
 		path.c_str(),event.c_str(),repeats,Percentile(eventMs,.5),Percentile(eventMs,0.0001),Percentile(eventMs,1),Percentile(frameMs,.5));
+	runtime.CloseDocument(); runtime.Shutdown();
+}
+
+// A page's arrival and departure as the session plays them: `enter` (the
+// page's opening, such as onActivate) and then `leave` (its closing, such as
+// onDeactivate), each followed by `frames` 60 Hz frames, `cycles` times. The
+// frames measured are the ones that animate, the page's opening and closing
+// transitions, where the menus stutter if they cost too much.
+void Transition(const std::string& path, const std::string& enter, const std::string& leave, int cycles, int frames) {
+	std::ifstream file(path,std::ios::binary);
+	if (!file) throw std::runtime_error("Cannot read transition document");
+	const std::string source{std::istreambuf_iterator<char>(file),{}};
+	Document model; std::vector<Diagnostic> diagnostics;
+	if (!model.Load(source,diagnostics)) throw std::runtime_error("Invalid transition document");
+	ScreenHost host; Runtime runtime(host);
+	if (!runtime.LoadDocument(source,path,diagnostics)) throw std::runtime_error("Cannot load transition runtime document");
+	Viewport viewport; viewport.width = 1280; viewport.height = 720;
+	viewport.canvasHeight = static_cast<float>(model.Model().canvasHeight);
+	Runtime::EventEffects effects; std::string error;
+	double now = 1;
+	if (runtime.HasEvent("onInit") && !runtime.RunEvent("onInit",now,effects,error)) throw std::runtime_error("onInit: "+error);
+	for (int i = 0; i <= 60; ++i) runtime.Frame(viewport,now += 1/60.0);
+	std::vector<double> enterMs, leaveMs, layout, render, compile, paths, layoutUpdates;
+	for (int cycle = 0; cycle < cycles; ++cycle) {
+		for (const auto* event : {&enter,&leave}) {
+			if (!runtime.RunEvent(*event,now,effects,error)) throw std::runtime_error(*event+": "+error);
+			for (int i = 0; i < frames; ++i) {
+				runtime.Frame(viewport,now += 1/60.0);
+				// The first cycle compiles the frame's artwork at each size.
+				if (cycle == 0) continue;
+				const auto stats = runtime.Statistics();
+				(event == &enter ? enterMs : leaveMs).push_back(stats.frameMilliseconds);
+				layout.push_back(stats.layoutMilliseconds); render.push_back(stats.renderMilliseconds);
+				compile.push_back(stats.vectorCompileMilliseconds); paths.push_back(static_cast<double>(stats.vectorPathsCompiled));
+				layoutUpdates.push_back(static_cast<double>(stats.layoutUpdates));
+			}
+		}
+	}
+	if (!host.error.empty()) throw std::runtime_error("Transition document logged an error: "+host.error);
+	if (enterMs.empty()) throw std::runtime_error("Transition needs at least two cycles");
+	double updates = 0; for (double value : layoutUpdates) updates += value;
+	std::printf("{\"scenario\":\"transition\",\"document\":\"%s\",\"enter\":\"%s\",\"leave\":\"%s\",\"cycles\":%d,\"frames\":%d,"
+		"\"enter_p50_ms\":%.6f,\"enter_p95_ms\":%.6f,\"enter_max_ms\":%.6f,\"leave_p50_ms\":%.6f,\"leave_p95_ms\":%.6f,\"leave_max_ms\":%.6f,"
+		"\"layout_p50_ms\":%.6f,\"render_p50_ms\":%.6f,\"vector_compile_p50_ms\":%.6f,\"paths_compiled_p50\":%.0f,\"layout_updates_mean\":%.3f}\n",
+		path.c_str(),enter.c_str(),leave.c_str(),cycles,frames,Percentile(enterMs,.5),Percentile(enterMs,.95),Percentile(enterMs,1),
+		Percentile(leaveMs,.5),Percentile(leaveMs,.95),Percentile(leaveMs,1),Percentile(layout,.5),Percentile(render,.5),
+		Percentile(compile,.5),Percentile(paths,.5),updates/layoutUpdates.size());
 	runtime.CloseDocument(); runtime.Shutdown();
 }
 
@@ -331,6 +391,13 @@ int main(int argc, char** argv) {
 			EventRepeats(argv[2],argv[3],repeats);
 			return 0;
 		}
+		if (argc >= 5 && std::string(argv[1]) == "--transition") {
+			if (argc > 7) throw std::runtime_error("usage: openq4-retained-ui-benchmark --transition <document.rui> <enter> <leave> [cycles=8] [frames=45]");
+			const int cycles = argc > 5 ? std::stoi(argv[5]) : 8, frames = argc > 6 ? std::stoi(argv[6]) : 45;
+			if (cycles < 2 || cycles > 10000 || frames < 1 || frames > 600) throw std::runtime_error("Invalid transition cycle or frame count");
+			Transition(argv[2],argv[3],argv[4],cycles,frames);
+			return 0;
+		}
 		if (argc >= 6 && std::string(argv[1]) == "--state") {
 			if (argc > 8) throw std::runtime_error("usage: openq4-retained-ui-benchmark --state <document.rui> <key> <a> <b> [frames=240] [event]");
 			const int frames = argc > 6 ? std::stoi(argv[6]) : 240;
@@ -338,7 +405,7 @@ int main(int argc, char** argv) {
 			StateChanges(argv[2],argv[3],argv[4],argv[5],frames,argc > 7 ? argv[7] : "");
 			return 0;
 		}
-		if (argc < 2 || argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark <vector-smoke.rui> [density=1.25] [frames=60] | --screen|--scope <document.rui> [frames] [width] [height] [event] | --state <document.rui> <key> <a> <b> [frames] [event] | --event <document.rui> <event> [repeats] | --load <document.rui> [repeats]");
+		if (argc < 2 || argc > 4) throw std::runtime_error("usage: openq4-retained-ui-benchmark <vector-smoke.rui> [density=1.25] [frames=60] | --screen|--scope <document.rui> [frames] [width] [height] [event] | --state <document.rui> <key> <a> <b> [frames] [event] | --event <document.rui> <event> [repeats] | --transition <document.rui> <enter> <leave> [cycles] [frames] | --load <document.rui> [repeats]");
 		Viewport viewport;
 		viewport.displayScale = argc > 2 ? std::stof(argv[2]) : 1.25f;
 		const int frames = argc > 3 ? std::stoi(argv[3]) : 60;

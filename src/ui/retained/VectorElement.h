@@ -52,6 +52,20 @@ public:
 private:
 	friend class VectorCompileBatch;
 	bool PrepareHitGeometry(Rml::Element& element, Rml::Vector2f& origin);
+	// The output pixels the paths' coverage can reach under `options`: their
+	// resolved control points' box (which bounds the curves they shape),
+	// widened by the widest stroke's furthest join or cap and a pixel of
+	// coverage on each side. False when there is no finite point to bound.
+	bool ArtworkExtent(const VectorOptions& options, double extent[4]);
+	// ArtworkExtent's local part for one size and path generation: the
+	// control points' box in dp and the widest stroke's parameters.
+	struct LocalExtent {
+		std::uint64_t generation = ~std::uint64_t{0};
+		double width = -1, height = -1;
+		bool valid = false, stroked = false;
+		double left = 0, top = 0, right = 0, bottom = 0;
+		double strokeDp = 0, strokePixels = 0, strokeMiter = 1;
+	} localExtent;
 	// What a deferred compilation names: this geometry while it lives, its
 	// paths as they were, and their generation (a reconfiguration drops it).
 	std::shared_ptr<VectorGeometry*> self;
