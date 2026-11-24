@@ -1804,7 +1804,9 @@ and a compose copies the cached cube into the scratch cube with
 blit each face. A cube now costs one bind of it and one back to the scene
 target, where it took one bind a face (two composing) besides those. Without the extensions, or when the
 two cubes' images differ, the faces are drawn one at a time as before, and
-`r_shadowMapPointLayered 0` forces that for comparison. Shadows are
+`r_shadowMapPointLayered 0` forces that for comparison. Vulkan followed on
+24 November, with one rendering scope a cube where it had six
+([measurements](vulkan-resource-profiling.md#shadow-map-savings-from-opengl-24-november-2026)). Shadows are
 bit-identical: hub2 with `ai_freeze 1` and `g_stopTime 1`, five views with
 the static cache off and five with it on, and four views of the combat wave
 (composing over cached cubes), each captured layered, face by face and

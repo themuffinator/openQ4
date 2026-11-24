@@ -118,6 +118,7 @@ typedef struct vkDeviceContext_s {
 	// All multisample pipelines and depth-image transitions use the same pattern.
 	VkSampleCountFlags sampleLocationCounts;
 	bool				depthClampSupported;
+	bool				shaderViewportIndexLayer;	// a vertex shader may write gl_Layer
 	// Clip-space z follows OpenGL's [-w, w] in hardware
 	// (VK_EXT_depth_clip_control negativeOneToOne on every graphics pipeline):
 	// projections are then used unmodified, and window depth rounds exactly as

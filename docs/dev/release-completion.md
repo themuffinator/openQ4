@@ -53,6 +53,26 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   way on the previous tree. Not yet run: Linux, macOS and Android builds, and a
   human session across both modes.
 
+## Point-light shadows cost less processor time on Vulkan, 24 November 2026
+
+- **Less work for every shadowed lamp.** A point light's shadow has six faces,
+  and Vulkan drew each in a pass of its own, twelve when a moving object was
+  added over a stored shadow. Where the graphics driver supports it, all six
+  now go into one pass, as on OpenGL since 18 November. With ten lamps
+  redrawn every frame the shadow pass took a fifth less processor time, and
+  less whenever a moving object stands under a stored lamp. Shadows look
+  exactly as before.
+- **What to do.** Replace the renderer modules. `r_shadowMapPointLayered 0`
+  draws the faces one at a time, for comparison, on both renderers now.
+  Drivers without the needed feature keep the old path by themselves; the log
+  says which is in use.
+- **Not changed.** OpenGL keeps the still scenery of the cascades' whole-light
+  shadow between frames (`r_shadowMapCascadeFarCache`). The same was built
+  and measured for Vulkan and left out: it saved a little processor time and
+  cost the graphics card as much or more, so Vulkan keeps redrawing that map.
+- Details: [Vulkan executor resource profiling](vulkan-resource-profiling.md#shadow-map-savings-from-opengl-24-november-2026)
+  and the roadmap under VK-06.
+
 ## Vulkan: settings that did nothing now work, and less copying every frame, 24 November 2026
 
 A pass-by-pass comparison of the Vulkan renderer with OpenGL. Automatic picks

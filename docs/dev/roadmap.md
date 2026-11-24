@@ -648,7 +648,7 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
 | VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel; OpenGL clip-space depth through `VK_EXT_depth_clip_control` removes the three stencil pixels. | The strict lighting image gate (one point-map and one projected-map shadow-filter pixel on NVIDIA, more on Intel) and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls; classic stock stages stay display-referred by decision, with a byte-identical, qualified fallback. | Tiled/out-of-frame captures and authored-post combinations of admitted (PBR) views. |
-| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. Resident static geometry is promoted: about half the per-frame geometry upload time and ring traffic on Air Defense 1, with bit-identical output. | Presented frame-time tails for the promoted optimization on a quiet machine; static index streams; the whole-light cascade cache and layered point cubes OpenGL has. |
+| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. Resident static geometry is promoted: about half the per-frame geometry upload time and ring traffic on Air Defense 1, with bit-identical output. Point shadow cubes are drawn as one layered target; the whole-light cascade cache OpenGL has was measured and left out. | Presented frame-time tails for the promoted optimizations on a quiet machine; static index streams; the cost of depth tile copies in the shadow cache phase. |
 | VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. Tiled (larger-than-window) captures, direct and through the game-owned post target, pass on OpenGL and on Vulkan with NVIDIA and Intel. The Ambient Light and Weapon FOV settings, `r_skipRender`, `r_singleTriangle`, the debug clear colours and the back-end counters now behave as on OpenGL. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix; portal fade quads, `levelshotProbe` depth, Gaussian sample-array parameters and debug object labels. |
 | VK-08 — Not started | Only an 8-bit sRGB swapchain; the RGBA16F scene, stock and PBR tone curves and automatic exposure exist (VK-05). | HDR10/scRGB swapchain and metadata, SDL3 display state with live switching, a peak-targeted output transform, paper-white interface composition, settings and calibration, SDR captures, and review on a physical HDR display. |
 
@@ -877,10 +877,31 @@ and untested drivers remain open, with no tolerance or support-tier change.
   stencil-carrying form nothing read, half the memory, bit-identical here
   through the `r_vkShadowDepthFormatTest` drill. Still open: the presented
   frame-time tails this task asks for (no quiet machine or sampling profiler
-  after the change), index streams, and two OpenGL shadow-map savings
-  Vulkan lacks: the whole-light cascade's cached still scenery
-  (`r_shadowMapCascadeFarCache`) and one layered target per point cube
-  (`r_shadowMapPointLayered`).
+  after the change) and index streams.
+  Progress, 24 November, later: the two OpenGL shadow-map savings Vulkan
+  lacked were [measured](vulkan-resource-profiling.md#shadow-map-savings-from-opengl-24-november-2026),
+  each before it was kept, and one landed. Point shadow cubes are drawn as
+  one six-layer target, the caster vertex shader naming each face
+  (`r_shadowMapPointLayered`, through `VK_EXT_shader_viewport_index_layer`; a
+  device without it keeps one rendering scope a face). On Hub 2 with ten
+  cubes redrawn a view the shadow pass's recording time fell from 0.74 to
+  0.60 ms in six pairs of six, and with three cubes composing in a frozen Air
+  Defense 1 battle its floor fell by 0.02 ms and the point pass's GPU time by
+  0.01 ms in eight pairs of eight. Frozen captures are bit-identical layered
+  and face by face, and the validation layer reports nothing, on the RTX 4060
+  and on the Intel Iris Xe. The whole-light
+  cascade's cached still scenery (`r_shadowMapCascadeFarCache`) was
+  prototyped through the cache phase and the compose scope, found
+  bit-identical, and left out: it removes 20 to 176 caster draws a view (0.01
+  to 0.04 ms of recording), but copying the tile back costs as much GPU time
+  as the drawing it replaces at Quality and more at Ultra. The shadow pass's
+  GPU time rose by 0.03 ms on Air Defense 1 and by 0.12 ms at Ultra, and did
+  not move on Convoy 1. The Vulkan shadow report gained the pass's caster
+  draws and indexes, its cube rendering scopes and its CPU time. Two costs
+  the measurements exposed stay open: a depth tile copy takes about 0.05 ms
+  on this GPU, which makes the cache phase the largest part of Hub 2's shadow
+  pass, and a light with any cutout caster draws both ownership maps in full
+  (566 caster draws a view on Convoy 1).
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,

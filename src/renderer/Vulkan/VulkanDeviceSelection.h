@@ -43,6 +43,9 @@ struct vkDeviceSelection_t {
 	bool hasPresentWait;
 	// VK_EXT_memory_budget: the driver's per-heap budget and process usage
 	bool hasMemoryBudget;
+	// VK_EXT_shader_viewport_index_layer: gl_Layer from a vertex shader, for
+	// point shadow cubes drawn as one layered target (r_shadowMapPointLayered)
+	bool hasShaderViewportIndexLayer;
 };
 
 typedef void (*vkDeviceRejection_t)( uint32_t index, const VkPhysicalDeviceProperties &properties,

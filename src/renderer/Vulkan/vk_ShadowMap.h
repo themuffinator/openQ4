@@ -62,6 +62,7 @@ typedef struct vkShadowPassState_s {
 	bool				valid;
 	vkShadowReceiverPass_t resourcePass;
 	bool				unionLocalDepth; // fresh PCSS GLOBAL stores only local casters
+	bool				copiedLocalDepth; // fresh GLOBAL started from a copy of the LOCAL block
 	bool				cacheHit;		// exact resident entry supplies this pass
 	bool				cacheUpdate;	// fresh render will publish this entry
 	bool				composeDynamic;	// the cached entry holds STATIC depth, and this
