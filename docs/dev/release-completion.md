@@ -46,15 +46,26 @@ in [Vulkan executor resource profiling](vulkan-resource-profiling.md#resident-st
 
 Fixes and speed-ups first made in openPR06, the PREY port built on openQ4,
 brought back to openQ4. Thanks to danperisse-hue, whose openPR06 pull requests
-gave the pack-read and cache-write improvements.
+gave the pack-read, cache-write, shader-startup and Ogg improvements.
 
 - **Faster pack reads.** Reading a file from a PK4 reuses an idle handle on
   that pack instead of opening the pack file again each time
   (`fs_reusePackHandles`, default 1; up to 16 idle handles per pack and 64 in
   all, so the open-file limits on macOS and the Windows C runtime are never
-  reached). Member CRC checks use a slicing-by-8 CRC-32 that gives the same
-  result on every CPU byte order. Writing a file stats its folder once,
-  instead of calling mkdir on every folder in its path.
+  reached). Members inflate and CRC-check through zlib-ng 2.3.3 instead of
+  the zlib 1.1.3 code from 1998 embedded in the engine. zlib-ng picks SIMD
+  paths for the CPU at run time and is linked statically, so packages gain no
+  new file beyond its licence notice. openPR06 measured warm loads of six maps
+  18% faster with it. Writing a file stats its folder once, instead of
+  calling mkdir on every folder in its path.
+- **The first OpenGL launch after an update no longer looks hung.** The
+  modern GL shader library builds only the GLSL tier it draws with: 14
+  programs, not up to 56. A program that fails there falls back to the next
+  tier down without failing the library. Startup says it is building before
+  the wait (`r_rendererShaderAllTiers 1` builds every tier for validation).
+- **Small Ogg sounds are inflated once.** A compressed sound up to 4 MiB is
+  read from its pack once, both for the format check and the decode (it was
+  inflated twice). A small sound that then streams reuses that read.
 - **Level-load caches are written off the load thread.** Generated caches are
   hashed with the CPU's SHA instructions where available and written by a
   background writer, so a first visit no longer waits on disk writes. It
@@ -112,8 +123,30 @@ gave the pack-read and cache-write improvements.
   0.15.0 the OpenGL reflection lost a lit wall panel and the ceiling edge that
   Vulkan drew. Now both renderers draw them and match each other, and
   `r_skipSubviewClip 1` changes nothing in that room. The logs have no errors
-  and the same warnings as 0.15.0. Not yet run: heat haze under TAA, retained
-  menu interaction in game, Linux and macOS.
+  and the same warnings as 0.15.0. Heat haze: stock world surfaces carry no
+  heat haze, so the tram car (`testmodel model_vehicle_tram_car`, whose
+  `tramglass` floor is a static heat-haze stage) was set over medlabs' floor
+  and viewed through its glass. A 5120x2880 tiled capture (off-axis tiles)
+  differed from the window-sized shot over the glass by 0.98 of 255 in
+  0.15.0's OpenGL and 0.72 now, the same as the 0.70 floor with TAA off. In
+  90-frame recordings with TAA on, the glass changes by 0.18-0.29 of 255 per
+  frame, which is invisible. (Screenshots present without TAA, so only a
+  recording shows it. Vulkan's tiled capture renders one capture-sized frame,
+  so that A/B does not reach Vulkan.) zlib-ng, shader and Ogg round:
+  - Native CRC-32, PNG, demo-block and update-core codec tests and the audio
+    decode, memory, stream and restore contracts pass.
+  - airdefense1 on OpenGL and Vulkan, cold then warm:
+    - pack reads and the 198 background cache writes are clean;
+    - Oggs stream through the single read;
+    - a cold NVIDIA shader cache built the library in 113 s (14 programs,
+      no fallbacks), 223 ms warm;
+    - the only warnings are two `non pre-cached lipSync decl` lines on one
+      Vulkan run.
+  - Load timing could not be measured: other sessions loaded the machine.
+    Interleaved warm loads against 0.15.0 showed no regression.
+
+  Not yet run: retained menu interaction in game, Linux, macOS and Android
+  builds with zlib-ng.
 
 ## Low holds 60 FPS on low-end graphics, 24 November 2026
 

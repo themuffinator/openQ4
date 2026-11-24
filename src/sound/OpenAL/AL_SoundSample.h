@@ -316,7 +316,9 @@ protected:
 	bool			FinishOggLoad( int channels, int sampleRate, unsigned int frames );
 	bool			LoadOggStream( const idStr& filename );
 	// LoadOggStream for a level load: the envelope pass runs on a job worker.
-	bool			BeginOggStreamEnvelope( const idStr& filename, idFile* file, int channels, int rate, unsigned int frames, idSoundSampleDecode** asyncDecode );
+	// preloaded, when given, is the whole file already read; it is taken over
+	// whether or not the envelope starts.
+	bool			BeginOggStreamEnvelope( const idStr& filename, idFile* file, int channels, int rate, unsigned int frames, idSoundSampleDecode** asyncDecode, byte* preloaded = NULL );
 	void			CancelDecode();
 	bool			LoadRoQ( const idStr& name );
 	bool			LoadAmplitude( const idStr& name );
