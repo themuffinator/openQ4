@@ -302,6 +302,10 @@ void	VK_Device_BlockPresentation( renderDisplayOutcome_t outcome, VkResult error
 // workload. Shadow-volume draws keep their own c_shadow* counters, which
 // is also what GL does, so they must not be passed here.
 void	VK_Device_CountDrawIndexed( int indexCount, int vertexCount );
+// The index count a surface's draw submits: all of it, or one triangle under
+// r_singleTriangle, as RB_DrawElementsWithCounters draws on OpenGL (the
+// benchmark command's "single tri" row measures the frame without its fill).
+uint32_t	VK_Device_DrawIndexCount( int numIndexes );
 
 // per-heap VMA usage, budget and live allocations (gfxInfo,
 // rendererVulkanMemoryInfo)

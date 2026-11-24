@@ -980,7 +980,7 @@ def test_vulkan_pbr_support_stays_narrow_and_fail_closed() -> None:
     )
     require(
         decomposition,
-        "const bool pbrOwnerEligible = VK_PBRHasSingleClassicInteractionTopology( surf );",
+        "const bool pbrOwnerEligible = surfaceShader->HasPBR() && VK_PBRHasSingleClassicInteractionTopology( surf );",
         "stable Vulkan packed-PBR surface owner",
     )
     if decomposition.count("VK_SubmitInteraction( &inter, false );") != 3:

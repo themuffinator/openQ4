@@ -4259,7 +4259,7 @@ static void VK_ShadowMap_CasterDraw( vkCasterPassCtx_t &ctx, const vkCasterPush_
 	vkCmdPushConstants( ctx.cmd, ctx.layout,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	VK_Device_CountDrawIndexed( (int)( casterGeo->numIndexes ), (int)( casterGeo->numVerts ) );
-	vkCmdDrawIndexed( ctx.cmd, (uint32_t)casterGeo->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( ctx.cmd, VK_Device_DrawIndexCount( casterGeo->numIndexes ), 1, 0, 0, 0 );
 }
 
 // casters draw the AMBIENT geometry (full tri->indexes), never the
@@ -6086,7 +6086,7 @@ static void VK_ShadowMap_DrawMomentChain( vkMomentPassCtx_t &ctx, const vkMoment
 			vkCmdBindDescriptorSets( ctx.cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ctx.layout, 2, 1,
 					&ctx.uniformSet, 1, &dynamicOffset );
 			VK_Device_CountDrawIndexed( (int)casterGeo->numIndexes, (int)casterGeo->numVerts );
-			vkCmdDrawIndexed( ctx.cmd, (uint32_t)casterGeo->numIndexes, 1, 0, 0, 0 );
+			vkCmdDrawIndexed( ctx.cmd, VK_Device_DrawIndexCount( casterGeo->numIndexes ), 1, 0, 0, 0 );
 			ctx.draws++;
 		}
 	}

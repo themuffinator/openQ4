@@ -17,6 +17,7 @@ before reading its counters.
 | `ringBytes`, `ringAllocs` | Bytes copied by the executor's mapped-ring allocator, excluding alignment padding and GPU-written reservations |
 | `targetChanges` | Render-target assignments |
 | `scopes`, `barriers`, `submits` | Executor dynamic-rendering scopes, synchronization2 barrier calls and queue submission attempts |
+| `Vulkan static geometry:` line | Resident vertex streams, reported whether or not profiling is enabled; see [resident static geometry](#resident-static-geometry-24-november-2026) |
 
 These are operation counts, not elapsed CPU/GPU time. They exclude commands
 recorded in other translation units, including dedicated upload and shadow
@@ -186,3 +187,86 @@ growing without limit. Only a run longer than the 48-slot layer cap could show
 the actual ceiling, and these runs do not reach it. The five-cycle report,
 `plateau-analysis.json` (per-visit allocations, resident slots and process
 memory) and engine logs are under `.tmp/vk-roadmap/nov6/soak5/`; the image-listing repeat is in `soak-imagelist/`.
+
+## Resident static geometry (24 November 2026)
+
+A CPU sampling profile of the stock Air Defense 1 skyline sweep (1920x1080,
+quality preset, RTX 4060 Laptop, 591.74) put the Vulkan back end at 24.9% of
+the client's sampled CPU. Inside it, 23.5% was `VK_Exec_UploadTriGeometry`,
+nearly all of it the copy into the frame rings: the largest single cost of
+executing the command list. `r_vkResourceProfile` counted 3.6 MB a frame in
+that sweep (2.75 MB of vertices, 0.74 MB of indexes, the rest uniforms). The
+vertex cache of the Vulkan module is CPU memory, so every stream a frame
+draws was copied again each frame, where OpenGL uploads a static stream to a
+buffer object once.
+
+Vertex streams that outlive their frame are now copied once into a persistent
+buffer and drawn from it (`r_vkStaticGeometry`, default 1; the buffer is
+`r_vkStaticGeometryMegs`, default 96 MiB, created on first use). The design
+and its limits:
+
+- **Identity.** The vertex cache recycles a freed block's header at once, so a
+  header pointer cannot identify a stream. Every static allocation now takes a
+  serial no other allocation has had (`vertCache_t::serial`; zero for frame
+  temporaries and free headers), and a resident copy is keyed on the header
+  and that serial. A recycled header is recognised at its next draw, and the
+  old copy is never drawn for it.
+- **Promotion.** A stream becomes resident when it is still the same
+  allocation 150 ms after it was first drawn. What an animated model rebuilds
+  every game tic never lasts that long and stays in the rings, as do frame
+  temporaries, the frame snapshot's copies (`r_vkRenderThread 2`) and surfaces
+  the GPU skinning pass may write.
+- **Lifetime.** Nothing is told when the cache frees a block, because the
+  front end frees them while a frame may be in flight. Streams that are no
+  longer drawn give their space back when the buffer fills, and a released
+  range returns to the allocator only after every frame that could have read
+  it has finished. A device that cannot give the buffer keeps every stream in
+  the rings and says so once.
+- **Qualification.** `r_vkStaticGeometry 2` compares every resident stream
+  with its source at every draw and streams it again on a difference. It reads
+  back from device-visible memory, so it is slow: a drill, not a mode to play
+  in.
+
+`rendererVulkanMemoryInfo` adds a line:
+
+| Field | Meaning |
+| --- | --- |
+| `resident`, `residentBytes` | Streams in the persistent buffer and their size |
+| `tracked`, `retired` | Cache blocks being watched, and released ranges still waiting for their frames to finish |
+| `hits`, `hitBytes` | Draws served from the buffer and the bytes they did not copy (once per stream and frame) |
+| `promotions`, `promotedBytes` | Streams copied into the buffer |
+| `recycled` | Headers seen again holding another allocation |
+| `evictions`, `declined` | Idle streams removed under pressure, and promotions refused because the buffer was full |
+| `mismatches` | Differences `r_vkStaticGeometry 2` found (always zero so far) |
+
+Measured in one launch, with the cache turned off and on in interleaved
+windows at the same view (the machine was shared with other work, so the
+times are relative):
+
+| Workload | Upload time per frame, off to on | Ring traffic per frame, off to on |
+| --- | ---: | ---: |
+| Air Defense 1 skyline, still (3 x 600 frames each) | 439 to 238 µs (-46%) | 2.67 to 1.27 MB |
+| Air Defense 1 skyline, 360 degree sweep (2 x 8 s each) | 527 to 262 µs (-50%) | 3.48 to 1.86 MB |
+
+The resident set is small: 118 to 233 streams, 1.8 to 2.8 MB, serving 1.35 to
+1.63 MB of draws a frame. What still goes through the rings is index data
+(OpenGL also sends client-memory indexes with every draw by default,
+`r_useIndexBuffers 0`) and per-tic animated models.
+
+Output is unchanged. Frozen captures on Air Defense 1 are bit-identical with
+the cache off, on, in the comparing mode and after a `vid_restart` that
+recreates the buffer, and on Hub 2 with it off and on. The comparing mode
+found no difference in about 60,000 compared draws, across a view sweep on each map
+and a change of map in one session, where 1,841 recycled headers were
+recognised. The validation layer reports nothing.
+`tools/tests/renderer_vulkan_static_geometry.py` runs the production functions
+against an allocator double: the promotion delay, recycled headers, the frames
+a released range waits, the exclusions, the comparing mode, eviction under
+pressure and a device that refuses the buffer.
+
+This is the first optimization promoted under VK-06. It does not yet carry
+the frame-time tail measurement VK-06 asks for: the sampling profiler and a
+quiet machine were not available after the change, so the evidence is the
+upload time above, not presented frame times. Index streams of static
+surfaces are the natural next step. They need an identity for a surface's
+index array first, which today is a bare pointer.

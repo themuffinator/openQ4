@@ -699,8 +699,19 @@ format remains a valid fallback. Vulkan 1.3's comparison feature bit prevents
 selecting a generally sampleable format that sampler*Shadow cannot use.
 Preserve candidate priority within each tier, but prefer a linearly filterable
 format before accepting the nearest-filter fallback.
+
+Nothing reads a shadow map's stencil (VK_ShadowMap_UseStencilAttachment), so
+a device without packed 24-bit depth (AMD, Apple) takes plain 32-bit float
+depth before the stencil-carrying form of it: the same depth values in half
+the memory, four bytes a texel instead of eight, which also restores the
+point cache's full slot count under r_shadowMapPointCacheMegs.
 ====================
 */
+static idCVar r_vkShadowDepthFormatTest( "r_vkShadowDepthFormatTest", "0", CVAR_RENDERER | CVAR_INTEGER,
+	"qualification drill: 1 = choose the shadow depth format as a device without packed 24-bit depth does "
+	"(AMD, Apple), 2 = that device's former stencil-carrying choice. Applies when the device is created.",
+	0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+
 static void VK_Device_SelectShadowDepthFormat( void ) {
 	vkCtx.shadowDepthFormat = VK_FORMAT_UNDEFINED;
 	vkCtx.shadowDepthHasStencil = false;
@@ -708,12 +719,13 @@ static void VK_Device_SelectShadowDepthFormat( void ) {
 
 	static const VkFormat candidates[] = {
 		VK_FORMAT_D24_UNORM_S8_UINT,
-		VK_FORMAT_D32_SFLOAT_S8_UINT,
 		VK_FORMAT_D32_SFLOAT,
+		VK_FORMAT_D32_SFLOAT_S8_UINT,
 		VK_FORMAT_X8_D24_UNORM_PACK32,
 		VK_FORMAT_D16_UNORM,
 		VK_FORMAT_D16_UNORM_S8_UINT
 	};
+	const int formatTest = r_vkShadowDepthFormatTest.GetInteger();
 	const VkFormatFeatureFlags2 requiredFeatures =
 			VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT |
 			VK_FORMAT_FEATURE_2_SAMPLED_IMAGE_BIT |
@@ -724,6 +736,13 @@ static void VK_Device_SelectShadowDepthFormat( void ) {
 	bool nearestFallbackHasStencil = false;
 
 	for ( int i = 0; i < (int)( sizeof( candidates ) / sizeof( candidates[ 0 ] ) ); i++ ) {
+		// The drill hides what such a device lacks; 2 also hides the format
+		// it now prefers, which leaves its former choice.
+		if ( formatTest != 0 && ( candidates[ i ] == VK_FORMAT_D24_UNORM_S8_UINT
+				|| candidates[ i ] == VK_FORMAT_X8_D24_UNORM_PACK32
+				|| ( formatTest == 2 && candidates[ i ] == VK_FORMAT_D32_SFLOAT ) ) ) {
+			continue;
+		}
 		VkFormatProperties3 props3;
 		memset( &props3, 0, sizeof( props3 ) );
 		props3.sType = VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_3;
@@ -1240,6 +1259,10 @@ void VK_Device_CountDrawIndexed( int indexCount, int vertexCount ) {
 	backEnd.pc.c_drawElements++;
 	backEnd.pc.c_drawIndexes += indexCount;
 	backEnd.pc.c_drawVertexes += vertexCount;
+}
+
+uint32_t VK_Device_DrawIndexCount( int numIndexes ) {
+	return static_cast<uint32_t>( r_singleTriangle.GetBool() && numIndexes > 3 ? 3 : numIndexes );
 }
 
 /*

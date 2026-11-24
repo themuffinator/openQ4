@@ -12,6 +12,36 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Vulkan: settings that did nothing now work, and less copying every frame, 24 November 2026
+
+A pass-by-pass comparison of the Vulkan renderer with OpenGL. Automatic picks
+Vulkan on desktop, so these reached most players.
+
+- **Ambient Light works on Vulkan.** The setting (`r_forceAmbient`) brightened
+  nothing there. It now lifts the picture exactly as on OpenGL.
+- **Weapon FOV works on Vulkan.** The view weapon ignored **Weapon FOV**
+  (`cl_gunfov`, `cl_gunfov_adjust`) and always followed the view's field of
+  view. It now takes its own, and temporal anti-aliasing and motion blur
+  follow it.
+- **Less work per frame on Vulkan.** Level geometry was copied to the
+  graphics card again every frame, the largest single cost of drawing a
+  frame there. It is now copied once and kept, which about halves that work
+  (measured on Air Defense 1; the picture is bit-identical). `r_vkStaticGeometry 0`
+  restores the old behaviour, and `r_vkStaticGeometryMegs` sizes the buffer
+  (96 MiB by default).
+- **Smaller shadow maps on AMD and Apple graphics.** Vulkan shadow maps took
+  a depth format with an unused stencil channel on devices without packed
+  24-bit depth. They now take half the memory there, with the same picture,
+  and the point-light shadow cache keeps its full 64 slots within its budget.
+- **Diagnostics.** `com_speeds` showed a back-end time of zero on both
+  renderers and now shows the frame's. On Vulkan, `r_skipRender`,
+  `r_singleTriangle` (the `benchmark` command's "single tri" row), the debug
+  clear colours and the renderer metrics' command counts now behave as on
+  OpenGL. `rendererVulkanMemoryInfo` reports the resident geometry.
+
+Evidence and the gaps still open are in the roadmap under VK-06 and VK-07 and
+in [Vulkan executor resource profiling](vulkan-resource-profiling.md#resident-static-geometry-24-november-2026).
+
 ## Faster pack reads and cache writes, oversized screenshots and cleaner mirrors, from openPR06, 24 November 2026
 
 Fixes and speed-ups first made in openPR06, the PREY port built on openQ4,

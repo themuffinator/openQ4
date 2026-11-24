@@ -176,6 +176,8 @@ bool				VK_Exec_BindTriGeometry( VkCommandBuffer cmd, int slot, const srfTriangl
 bool				VK_Exec_BindPreviousPositions( VkCommandBuffer cmd, int slot, const drawSurf_t *surf );
 // streams vertices into the frame's vertex ring and binds them as binding 0
 bool				VK_Exec_BindTransientVertices( VkCommandBuffer cmd, const void *data, int bytes );
+// RB_STD_ForceAmbient: r_forceAmbient's lift over the view's scissor
+bool				VK_Exec_DrawAmbientFloor( const viewDef_t *viewDef );
 void				VK_BuildSurfMVP( const viewDef_t *viewDef, const drawSurf_t *drawSurf, float outMvp[ 16 ] );
 void				VK_Exec_SetSurfScissor( VkCommandBuffer cmd, const viewDef_t *viewDef,
 							const drawSurf_t *drawSurf, int fbHeight );

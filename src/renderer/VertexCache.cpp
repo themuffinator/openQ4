@@ -100,6 +100,9 @@ static void R_ListVertexCache_f( const idCmdArgs &args ) {
 	vertexCache.List();
 }
 
+// Serial of the last static allocation (vertCache_t::serial).
+static unsigned long long vertexCacheAllocSerial = 0;
+
 /*
 ==============
 idVertexCache::ActuallyFree
@@ -115,6 +118,7 @@ void idVertexCache::ActuallyFree( vertCache_t *block ) {
 		*block->user = NULL;
 		block->user = NULL;
 	}
+	block->serial = 0;
 
 	// temp blocks are in a shared space that won't be freed
 	if ( block->tag != TAG_TEMP ) {
@@ -226,6 +230,7 @@ void idVertexCache::ReclaimHeaderList( vertCache_t *list ) {
 		}
 		block->vbo = 0;
 		block->tag = TAG_FREE;
+		block->serial = 0;
 
 		block->next->prev = block->prev;
 		block->prev->next = block->next;
@@ -269,6 +274,7 @@ void idVertexCache::ReclaimAllHeaders() {
 		block->vbo = 0;
 		block->user = NULL;
 		block->tag = TAG_FREE;
+		block->serial = 0;
 		block->next = freeStaticHeaders.next;
 		block->prev = &freeStaticHeaders;
 		block->next->prev = block;
@@ -489,6 +495,8 @@ void idVertexCache::Alloc( void *data, int size, vertCache_t **buffer, bool inde
 	block->size = size;
 	block->offset = 0;
 	block->tag = TAG_USED;
+	// never zero and never repeated, across re-initialization too
+	block->serial = ++vertexCacheAllocSerial;
 
 	// save data for debugging
 	staticAllocThisFrame += block->size;
@@ -651,6 +659,7 @@ vertCache_t *idVertexCache::AllocFrameTemp( void *data, int size, bool indexBuff
 
 		block->size = size;
 		block->tag = TAG_TEMP;
+		block->serial = 0;
 		block->indexBuffer = indexBuffer;
 		block->offset = uploadAllocation.offset;
 		block->virtMem = NULL;
@@ -703,6 +712,7 @@ vertCache_t *idVertexCache::AllocFrameTemp( void *data, int size, bool indexBuff
 
 	block->size = size;
 	block->tag = TAG_TEMP;
+	block->serial = 0;
 	block->indexBuffer = indexBuffer;
 	block->offset = legacyAllocThisFrame;
 	legacyAllocThisFrame += block->size;

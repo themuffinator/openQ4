@@ -49,6 +49,12 @@ typedef struct vertCache_s {
 	struct vertCache_s	**	user;				// will be set to zero when purged
 	struct vertCache_s *next, *prev;	// may be on the static list or one of the frame lists
 	int				frameUsed;			// it can't be purged if near the current frame
+	// openQ4: which allocation this header holds. Headers are recycled, so a
+	// pointer alone cannot tell a block from the one that held its header
+	// before. Every static allocation takes a serial no other has had; frame
+	// temporaries and free headers carry zero. The Vulkan back end keys its
+	// resident copies of static streams on the header and its serial.
+	unsigned long long	serial;
 } vertCache_t;
 
 // Position() may return a zero-valued byte offset when a VBO is bound.  Form

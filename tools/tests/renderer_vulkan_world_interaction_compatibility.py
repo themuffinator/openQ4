@@ -134,7 +134,7 @@ def validate_interaction_decomposition() -> None:
             "surfaceShader->TestMaterialFlag( MF_POLYGONOFFSET )",
             "R_GlobalPointToLocal(",
             "R_GlobalPlaneToLocal(",
-            "const bool pbrOwnerEligible = VK_PBRHasSingleClassicInteractionTopology( surf );",
+            "const bool pbrOwnerEligible = surfaceShader->HasPBR() && VK_PBRHasSingleClassicInteractionTopology( surf );",
             "if ( !lightRegs[ lightStage->conditionRegister ] )",
             "RB_BakeTextureMatrixIntoTexgen(",
             "case SL_BUMP:",
