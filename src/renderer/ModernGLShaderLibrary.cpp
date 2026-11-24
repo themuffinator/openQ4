@@ -3162,6 +3162,7 @@ static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShad
 		info.permutation.debugMode,
 		info.permutation.tier );
 
+	const int programStartMs = Sys_Milliseconds();
 	char vertexSource[16384];
 	// The clustered fragment programs embed the whole PBR kernel; keep their
 	// source off the stack.
@@ -3257,6 +3258,12 @@ static bool R_ModernGLShaderLibrary_CreateProgram( int glslVersion, modernGLShad
 	}
 	R_ModernGLShaderLibrary_MarkKindReady( kind );
 	rg_modernGLShaderLibraryStats.frameConstantsReady = true;
+	const int programMs = Sys_Milliseconds() - programStartMs;
+	if ( programMs > rg_modernGLShaderLibraryStats.slowestProgramMilliseconds ) {
+		rg_modernGLShaderLibraryStats.slowestProgramMilliseconds = programMs;
+		idStr::Copynz( rg_modernGLShaderLibraryStats.slowestProgramName, info.name, sizeof( rg_modernGLShaderLibraryStats.slowestProgramName ) );
+	}
+	common->DPrintf( "Modern GL shader library: %s built in %d ms\n", info.name, programMs );
 	return true;
 }
 
@@ -3280,12 +3287,64 @@ void R_ModernGLShaderLibrary_Init( const renderBackendCaps_t &caps, const render
 	}
 
 	rg_modernGLShaderLibraryStats.initialized = true;
-	rg_modernGLShaderLibraryStats.validatedGLSLVersionCount = versionCount;
-	for ( int i = 0; i < versionCount; ++i ) {
-		for ( int kind = 0; kind < MODERN_GL_SHADER_PROGRAM_KIND_COUNT; ++kind ) {
-			R_ModernGLShaderLibrary_CreateProgram( versions[i], static_cast<modernGLShaderProgramKind_t>( kind ) );
+	// Every lookup draws with the highest tier that linked, so only that tier
+	// is built: with a cold driver cache the whole 56-program matrix took
+	// minutes, with no log output and a window that read as hung. A kind that
+	// fails there falls back to the next tier down, the program FindProgram
+	// would have picked, and a fallback that links is not counted as a failure
+	// (its compile log is still printed). r_rendererShaderAllTiers builds the
+	// whole matrix for validation, where every failure counts. Programs are
+	// built one at a time: compiling the heavy ones concurrently ran NVIDIA's
+	// compiler out of memory.
+	const bool allTiers = r_rendererShaderAllTiers.GetBool();
+	common->Printf(
+		"Modern GL shader library: building %d programs at GLSL %d%s; a cold driver shader cache can take a minute or more\n",
+		allTiers ? MODERN_GL_SHADER_PROGRAM_KIND_COUNT * versionCount : MODERN_GL_SHADER_PROGRAM_KIND_COUNT,
+		versions[versionCount - 1],
+		allTiers ? " and every lower tier" : "" );
+	const int libraryStartMs = Sys_Milliseconds();
+	if ( allTiers ) {
+		rg_modernGLShaderLibraryStats.validatedGLSLVersionCount = versionCount;
+		for ( int i = 0; i < versionCount; ++i ) {
+			for ( int kind = 0; kind < MODERN_GL_SHADER_PROGRAM_KIND_COUNT; ++kind ) {
+				R_ModernGLShaderLibrary_CreateProgram( versions[i], static_cast<modernGLShaderProgramKind_t>( kind ) );
+			}
 		}
+	} else {
+		bool linkedVersion[4] = { false, false, false, false };
+		for ( int kind = 0; kind < MODERN_GL_SHADER_PROGRAM_KIND_COUNT; ++kind ) {
+			const modernGLShaderProgramKind_t programKind = static_cast<modernGLShaderProgramKind_t>( kind );
+			const int failedBefore = rg_modernGLShaderLibraryStats.failedProgramCount;
+			for ( int i = versionCount - 1; i >= 0; --i ) {
+				if ( !R_ModernGLShaderLibrary_CreateProgram( versions[i], programKind ) ) {
+					continue;
+				}
+				if ( i != versionCount - 1 ) {
+					rg_modernGLShaderLibraryStats.fallbackProgramCount++;
+					common->Printf( "Modern GL shader library: %s did not build at GLSL %d and falls back to GLSL %d\n",
+						ModernGLShaderProgramKind_Name( programKind ), versions[versionCount - 1], versions[i] );
+				}
+				rg_modernGLShaderLibraryStats.failedProgramCount = failedBefore;
+				linkedVersion[i] = true;
+				break;
+			}
+		}
+		int linkedVersionCount = 0;
+		for ( int i = 0; i < versionCount; ++i ) {
+			linkedVersionCount += linkedVersion[i] ? 1 : 0;
+		}
+		rg_modernGLShaderLibraryStats.validatedGLSLVersionCount = linkedVersionCount;
 	}
+	rg_modernGLShaderLibraryStats.compileMilliseconds = Sys_Milliseconds() - libraryStartMs;
+	common->Printf(
+		"Modern GL shader library: built %d programs (%s, %d fallbacks, %d failures) in %d ms (slowest %s, %d ms)\n",
+		rg_modernGLShaderLibraryStats.programCount,
+		allTiers ? "all tiers" : "drawn tier",
+		rg_modernGLShaderLibraryStats.fallbackProgramCount,
+		rg_modernGLShaderLibraryStats.failedProgramCount,
+		rg_modernGLShaderLibraryStats.compileMilliseconds,
+		rg_modernGLShaderLibraryStats.slowestProgramName[0] ? rg_modernGLShaderLibraryStats.slowestProgramName : "none",
+		rg_modernGLShaderLibraryStats.slowestProgramMilliseconds );
 
 	if ( rg_modernGLShaderLibraryStats.programCount > 0
 		&& rg_modernGLShaderLibraryStats.failedProgramCount == 0

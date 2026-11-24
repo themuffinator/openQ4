@@ -1607,6 +1607,7 @@ extern idCVar r_rendererOwnershipCompose;	// REN-02 step 5: compose the aggregat
 extern idCVar r_rendererModernAutoPromote;	// allow gated default modern-visible promotion
 extern idCVar r_rendererPromotionEvidence;	// Phase 8 evidence token required before auto-promotion
 extern idCVar r_rendererShaderReload;	// allow runtime reload of the internal modern GL shader library
+extern idCVar r_rendererShaderAllTiers;	// build the modern GL shader library at every GLSL tier, not only the drawn one
 extern idCVar r_rendererModernVisibleDepth;	// opt-in graph-backed modern depth/shadow-depth execution
 extern idCVar r_rendererModernDepthDebug;	// show graph-backed modern depth resources as a debug overlay
 extern idCVar r_rendererModernOpaque;	// opt-in graph-backed modern opaque G-buffer execution

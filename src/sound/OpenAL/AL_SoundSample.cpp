@@ -1487,6 +1487,11 @@ idCVar s_decodeMemoryMB( "s_decodeMemoryMB", "64", CVAR_SOUND | CVAR_ARCHIVE | C
 // main thread, which keeps the job queue open for the rest of the level load. A
 // finished decode stops counting once LoadSample uploads it (FinishSampleDecodes).
 static const int SOUND_SAMPLE_MAX_PENDING_DECODES = 48;
+// BeginOggLoad reads compressed files up to this size whole before peeking at
+// them. Peeking reads the whole file anyway when it is a deflated pk4 member (the
+// seek to the tail inflates everything before it), so this only bounds the
+// transient buffer.
+static const int SOUND_SAMPLE_OGG_READ_WHOLE_BYTES = 4 * 1024 * 1024;
 static int soundSamplePendingDecodes = 0;
 static uint64 soundSamplePendingDecodeBytes = 0;
 static uint64 soundSampleDecodePeakBytes = 0;
@@ -1777,34 +1782,44 @@ LoadOggStream for a level load. The track streams from its file, so only its
 fills the envelope sized here while the rest of the level loads (the full pass
 took the main thread a tenth to a third of a second per music track). Until
 FinishDecode joins the job the envelope reads silent; voices can already stream.
-False leaves the sample untouched for the synchronous path.
+False leaves the sample untouched for the synchronous path. preloaded, when not
+NULL, is the whole file BeginOggLoad already read (file->Length() bytes, from
+AllocBuffer); it is used instead of a second read and is taken over in every
+case, freed here on each path that does not hand it to the job.
 ========================
 */
 static void SoundSample_RunDecode( idSoundSampleDecode& decode, const idJobContext* context = NULL );
 static void SoundSample_DecodeJob( const idJobContext& context );
 
-bool idSoundSample_OpenAL::BeginOggStreamEnvelope( const idStr& filename, idFile* file, int channels, int rate, unsigned int frames, idSoundSampleDecode** asyncDecode )
+bool idSoundSample_OpenAL::BeginOggStreamEnvelope( const idStr& filename, idFile* file, int channels, int rate, unsigned int frames, idSoundSampleDecode** asyncDecode, byte* preloaded )
 {
 	if( asyncDecode == NULL || frames == 0 || channels < 1 || channels > 2 || rate <= 0 ||
 		soundSamplePendingDecodes >= SOUND_SAMPLE_MAX_PENDING_DECODES || !jobSystem.IsInitialized() || jobSystem.IsSynchronous() ||
 		static_cast<uint64>( frames ) * channels * sizeof( short ) > idMath::INT_MAX )
 	{
+		if( preloaded != NULL ) FreeBuffer( preloaded );
 		return false;
 	}
 	const int fileLen = file->Length();
 	SoundSampleDecodeReservation reservation;
 	if( fileLen <= 0 || !reservation.Grow( static_cast<uint64>( fileLen ) + SoundVorbisStream::ArenaBytes ) )
 	{
+		if( preloaded != NULL ) FreeBuffer( preloaded );
 		return false;
 	}
-	byte* fileData = static_cast<byte*>( AllocBuffer( fileLen, filename.c_str() ) );
+	byte* fileData = preloaded;
+	bool read = true;
 	if( fileData == NULL )
 	{
-		return false;
+		fileData = static_cast<byte*>( AllocBuffer( fileLen, filename.c_str() ) );
+		if( fileData == NULL )
+		{
+			return false;
+		}
+		file->Rewind();
+		read = file->Read( fileData, fileLen ) == fileLen;
+		file->Rewind();
 	}
-	file->Rewind();
-	const bool read = file->Read( fileData, fileLen ) == fileLen;
-	file->Rewind();
 	const int entries = static_cast<int>( ( static_cast<uint64>( frames ) * 60 + rate - 1 ) / rate );
 	if( !read || !SoundResizeAmplitude( amplitude, amplitudeReserved, entries ) )
 	{
@@ -1949,6 +1964,26 @@ bool idSoundSample_OpenAL::BeginOggLoad( const idStr& filename, idSoundSampleDec
 	{
 		return false;
 	}
+	// A file small enough to decode whole is read once, up front. Peeking at it
+	// through the file inflates a deflated pk4 member about twice: the seek to
+	// the tail inflates everything before it, and the rewind for the full read
+	// starts over. The buffer is freed on every path that does not decode it, so
+	// the s_decodeMemoryMB reservation below still bounds what stays allocated.
+	byte* fileData = NULL;
+	if( fileLen <= SOUND_SAMPLE_OGG_READ_WHOLE_BYTES )
+	{
+		fileData = ( byte* )AllocBuffer( fileLen, filename.c_str() );
+		if( fileData == NULL )
+		{
+			return false;
+		}
+		if( fileIn->Read( fileData, fileLen ) != fileLen )
+		{
+			FreeBuffer( fileData );
+			return false;
+		}
+		fileIn->Rewind();
+	}
 	// Probe only the identification and final granule pages. Large compressed
 	// files never enter the complete-input/complete-PCM allocation path.
 	if( !keepPayload && s_streamThresholdKB.GetInteger() > 0 ) {
@@ -1957,9 +1992,15 @@ bool idSoundSample_OpenAL::BeginOggLoad( const idStr& filename, idSoundSampleDec
 		const int tail = Min( fileLen - prefix, 65563 );
 		int channels = 0, rate = 0;
 		unsigned int frames = 0;
-		const bool read = fileIn->Read( peek, prefix ) == prefix &&
-			fileIn->Seek( fileLen - tail, FS_SEEK_SET ) == 0 && fileIn->Read( peek + prefix, tail ) == tail;
-		fileIn->Rewind();
+		bool read = true;
+		if( fileData != NULL ) {
+			memcpy( peek, fileData, prefix );
+			memcpy( peek + prefix, fileData + fileLen - tail, tail );
+		} else {
+			read = fileIn->Read( peek, prefix ) == prefix &&
+				fileIn->Seek( fileLen - tail, FS_SEEK_SET ) == 0 && fileIn->Read( peek + prefix, tail ) == tail;
+			fileIn->Rewind();
+		}
 		bool known = read && SoundSample_PeekOggInfo( peek, prefix + tail, channels, rate, frames );
 		uint64 decodedBytes = static_cast<uint64>( frames ) * channels * sizeof( short );
 		// A truncated stream, one followed by other bytes or one whose last page has
@@ -1973,9 +2014,21 @@ bool idSoundSample_OpenAL::BeginOggLoad( const idStr& filename, idSoundSampleDec
 		if( known && channels >= 1 && channels <= 2 && rate >= 8000 && rate <= 192000 &&
 			decodedBytes > static_cast<uint64>( s_streamThresholdKB.GetInteger() ) * 1024 ) {
 			timestamp = fileIn->Timestamp();
-			const bool streamed = BeginOggStreamEnvelope( filename, fileIn, channels, rate, frames, asyncDecode ) || LoadOggStream( filename );
+			// With a length the track is never decoded whole, so the bytes already
+			// read go to the envelope job, which takes them over, instead of being
+			// read a second time. Without one BeginOggStreamEnvelope declines and
+			// the bytes feed the whole-file decode below.
+			byte* envelopeData = NULL;
+			if( frames != 0 ) {
+				envelopeData = fileData;
+				fileData = NULL;
+			}
+			const bool streamed = BeginOggStreamEnvelope( filename, fileIn, channels, rate, frames, asyncDecode, envelopeData ) || LoadOggStream( filename );
 			// A stream with no positioned page at all cannot seek: decode it whole.
-			if( streamed || frames != 0 ) return streamed;
+			if( streamed || frames != 0 ) {
+				if( fileData != NULL ) FreeBuffer( fileData );
+				return streamed;
+			}
 			FreeData();
 		}
 	}
@@ -1983,20 +2036,22 @@ bool idSoundSample_OpenAL::BeginOggLoad( const idStr& filename, idSoundSampleDec
 	if( !reservation.Grow( static_cast<uint64>( fileLen ) + SoundVorbisStream::ArenaBytes ) )
 	{
 		idLib::Warning( "LoadOgg( %s ) : compressed input exceeds s_decodeMemoryMB", filename.c_str() );
+		if( fileData != NULL ) FreeBuffer( fileData );
 		return false;
 	}
 
-	byte* fileData = ( byte* )AllocBuffer( fileLen, filename.c_str() );
 	if( fileData == NULL )
 	{
-		return false;
-	}
-
-	const int bytesRead = fileIn->Read( fileData, fileLen );
-	if( bytesRead != fileLen )
-	{
-		FreeBuffer( fileData );
-		return false;
+		fileData = ( byte* )AllocBuffer( fileLen, filename.c_str() );
+		if( fileData == NULL )
+		{
+			return false;
+		}
+		if( fileIn->Read( fileData, fileLen ) != fileLen )
+		{
+			FreeBuffer( fileData );
+			return false;
+		}
 	}
 
 	timestamp = fileIn->Timestamp();

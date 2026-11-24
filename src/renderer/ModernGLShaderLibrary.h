@@ -208,6 +208,13 @@ typedef struct modernGLShaderLibraryStats_s {
 	int		glsl450ProgramCount;
 	int		reloadCount;
 	int		highestGLSLVersion;
+	// Wall time of the last library build and its slowest program; a cold
+	// driver shader cache makes this the bulk of GL renderer startup.
+	int		compileMilliseconds;
+	int		slowestProgramMilliseconds;
+	char	slowestProgramName[64];
+	// Kinds that failed at the drawn (highest) tier and linked one tier lower.
+	int		fallbackProgramCount;
 	char	status[96];
 } modernGLShaderLibraryStats_t;
 
