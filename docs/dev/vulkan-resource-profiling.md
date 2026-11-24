@@ -344,12 +344,24 @@ read from its stored cube: the two turning rows change by less than their
 windows differ from one another, the battle's because the fight itself
 differs from window to window.
 
+The first row was repeated after the day's other shadow work was merged in,
+at a quieter moment (four pairs): the pass's CPU median fell from 0.40 to
+0.28 ms and its floor from 0.27 to 0.22 ms, and the point pass's GPU time
+from 0.24 to 0.18 ms, each in four pairs of four.
+
 Frozen captures (`g_stopTime 1`, 1920x1080, compared above the animated HUD)
 are bit-identical layered, face by face and layered again: Hub 2 at four
 poses with the static cache off, Hub 2 at four poses with shadows stored, and
 the Air Defense 1 battle at three poses, composing. A capture with shadows
 off, taken in the same launches, differs from all of them. The validation
 layer reports nothing on either path.
+
+The laptop's Intel Iris Xe (101.5590) takes the layered path too. The
+validation layer reports nothing there, and captures at two Hub 2 poses are
+bit-identical layered and face by face with temporal anti-aliasing, motion
+blur, SSAO and bloom off. With those on, two captures of the same state
+differ on that adapter by more than the two paths do, so they say nothing
+either way.
 
 Also measured and dropped: on the face-by-face path, opening no scope for a
 composed face that no moving caster reaches. It removed 3.7 of 7.2 scopes a

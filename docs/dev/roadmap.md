@@ -888,7 +888,8 @@ and untested drivers remain open, with no tolerance or support-tier change.
   0.60 ms in six pairs of six, and with three cubes composing in a frozen Air
   Defense 1 battle its floor fell by 0.02 ms and the point pass's GPU time by
   0.01 ms in eight pairs of eight. Frozen captures are bit-identical layered
-  and face by face, and the validation layer reports nothing. The whole-light
+  and face by face, and the validation layer reports nothing, on the RTX 4060
+  and on the Intel Iris Xe. The whole-light
   cascade's cached still scenery (`r_shadowMapCascadeFarCache`) was
   prototyped through the cache phase and the compose scope, found
   bit-identical, and left out: it removes 20 to 176 caster draws a view (0.01
