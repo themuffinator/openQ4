@@ -3256,7 +3256,7 @@ def validate_shadow_contact_and_gl_robustness_contract() -> None:
             "if ( !haveGeometry )",
             "R_ShadowMapCasterTransformWinding( modelMatrix )",
             "if ( winding == 0 )",
-            "( mode == 2 || mode == 4 ) && perfectHull",
+            "( mode == 4 || ( mode == 2 && !R_ShadowMapLightStoresFarShell( vLight ) ) ) && perfectHull",
             "winding < 0 || R_ShadowMapLightOriginInsideCasterBounds( vLight,",
             "return nearShell;",
             "if ( mode == 4 )",
@@ -3309,9 +3309,10 @@ def validate_shadow_contact_and_gl_robustness_contract() -> None:
             "R_ClassifyShadowMapLight( vLight ).pointLight",
             "return false;",
             "R_ShadowMapBuildBaseClipPlanesForLight( vLight, clipPlanes );",
-            "return R_ShadowMapClipPlanesMirrorWinding( clipPlanes );",
+            "const bool mirrored = R_ShadowMapClipPlanesMirrorWinding( clipPlanes );",
+            "return R_ShadowMapLightStoresFarShell( vLight ) ? !mirrored : mirrored;",
         ),
-        "cube faces are cameras; projected maps answer from their own planes",
+        "cube faces are cameras; projected maps answer from their own planes, the synthesized ones as measured",
     )
     faces_selftest = braced_body(
         projected_cpp,
@@ -10185,10 +10186,13 @@ def validate_prelight_caster_contract() -> None:
     require_order(
         build,
         (
-            "const int first = shadowTri->numShadowIndexesNoFrontCaps;",
-            "const int count = shadowTri->numIndexes - first;",
-            "if ( first < 0 || count < 3 || count % 3 != 0 ) {",
+            "const bool folded = R_ShadowMapPrelightVolumeFoldsCaps( shadowTri );",
+            "const int first = folded ? 0 : shadowTri->numShadowIndexesNoFrontCaps;",
+            "const int range = shadowTri->numIndexes - first;",
+            "if ( first < 0 || range < 3 || range % 3 != 0",
             "return NULL;",
+            "R_ShadowMapPrelightCapOnCutout(",
+            "const int count = caps.Num() * 3;",
             "shadowTri->shadowVertexes[source].xyz.w != 1.0f",
             "R_AllocStaticTriSurfIndexes( tri, count * 2 );",
             "tri->indexes[i + 1] = b;",
@@ -10197,7 +10201,7 @@ def validate_prelight_caster_contract() -> None:
             "tri->indexes[count + i + 2] = b;",
             "R_BoundTriSurf( tri );",
         ),
-        "front caps only, on unprojected vertexes, in both windings",
+        "front caps only (recovered from a folded volume, less cutouts), on unprojected vertexes, in both windings",
     )
 
     caster = braced_body(light, "srfTriangles_t *R_ShadowMapPrelightCaster(", "per-light prelight caster")
@@ -10211,7 +10215,7 @@ def validate_prelight_caster_contract() -> None:
             "R_IsUsablePrelightModel( prelightModel )",
             "light->shadowMapPrelightCasterSource != shadowTri",
             "R_FreeStaticTriSurf( light->shadowMapPrelightCaster );",
-            "light->shadowMapPrelightCaster = R_ShadowMapBuildPrelightCaster( shadowTri );",
+            "light->shadowMapPrelightCaster = R_ShadowMapBuildPrelightCaster( shadowTri, &cutouts );",
             "return light->shadowMapPrelightCaster;",
         ),
         "rollback setting, scope, and one caster kept per light",
@@ -10254,7 +10258,7 @@ def validate_prelight_caster_contract() -> None:
             "prelightOwnsShadows && R_ShadowMapPrelightCaster( lightDef ) != NULL;",
             "const bool castsThroughPrelight =",
             "worldCastsFromPrelight &&",
-            "shadowShader->Coverage() != MC_PERFORATED &&",
+            "!R_ShadowMapPrelightKeepsCutout( lightDef, shadowShader, sint->ambientTris ) &&",
             "( allowShadowMapCaster || sint->shadowStencilEligible );",
             "if ( castsThroughPrelight ) {",
             "linkedShadowMapCaster = true;",
@@ -10303,6 +10307,26 @@ def validate_prelight_caster_contract() -> None:
     for token in ("### What the stock volumes hold", "`r_shadowMapPrelightCasters`",
                   "### A `noSelfShadow` receiver behind `noSelfShadow` world geometry"):
         require(audit, token, "the audit records the caster, its setting and the noSelfShadow image")
+
+    # 24 November: folded caps, cutouts, the far shell and its bias
+    light_source = read("src/renderer/tr_light.cpp")
+    for token in ("bool R_ShadowMapPrelightVolumeFoldsCaps(", "( tri[0] & 1 ) != 0 || ( tri[1] & 1 ) != 0 || ( tri[2] & 1 ) != 0",
+                  "bool R_ShadowMapPrelightKeepsCutout(", "r_shadowMapPrelightCutouts",
+                  "shadowTri->numIndexes * 2 + ( r_shadowMapPrelightCutouts.GetBool() ? 1 : 0 )"):
+        require(light_source, token, "folded volumes give their caps, cutouts inside the box keep their own casters")
+    require(read("src/renderer/Interaction.cpp"), "!R_ShadowMapPrelightKeepsCutout( lightDef, shadowShader, sint->ambientTris )",
+            "only the cutouts the caster leaves out cast surface by surface")
+    classification_source = read("src/renderer/ShadowMapClassification.cpp")
+    for token in ('"r_shadowMapDistantFarShell", "1"', '"r_shadowMapDistantFarShellBias", "0"',
+                  "return parms.parallel || R_ShadowMapUsesDistantPointProjection( parms );"):
+        require(classification_source, token, "distant and parallel lights store the far shell")
+    projected_source = read("src/renderer/ShadowMapProjected.cpp")
+    for token in ("return R_ShadowMapLightStoresFarShell( vLight ) ? !mirrored : mirrored;",
+                  "state.receiverBiasScale = scale;", "state.biasScale[cascadeIndex] *= scale;",
+                  "state.texelDepthBias[cascadeIndex] *= scale;",
+                  "* Max( 0.0f, state.receiverBiasScale );", "Caster face self-test FAILED: far-shell light"):
+        require(projected_source, token, "the far-shell verdict and receiver bias live in the shared projected state")
+    require(audit, "### The rest of the off-centre lights", "the audit records the folded caps, the far shell and outdoor_Main")
 
 
 def main() -> None:

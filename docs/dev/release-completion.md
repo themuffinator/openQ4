@@ -12,6 +12,40 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Sunlight shadows reach into corners and under ledges, 24 November 2026
+
+- **Shadows from sunlight and distant lamps no longer stop short of the wall
+  or ledge that casts them.** With shadow maps on (Quality and above), a
+  strip just behind a wall, under a roof or at the foot of a rock stayed lit
+  where the original shadows are dark: up to tens of units under a large
+  outdoor light. These lights now record every object the way the original
+  shadows do, by the surfaces facing away from the light, and drop the
+  safety margin that let that light through. Against the original shadows,
+  the area wrongly lit in the worst view of twelve such lights falls from 29
+  to 5 points summed, on OpenGL and Vulkan alike; Hub 2's large fill light
+  goes from 13% of a view to under half a percent.
+- **More of these lights cast the original shape of the level's shadows.**
+  About a fifth of the lamps mounted outside the area they light, those whose
+  stored shadow also holds a grating, now use that stored shadow as well.
+  A grating inside the lit area keeps the holes in its shadow; one that
+  reaches outside it casts solid, as in the original game
+  (`r_shadowMapPrelightCutouts 0` casts every grating solid).
+- **What you need to do.** Nothing. `r_shadowMapDistantFarShell 0` brings
+  back the earlier behaviour; `r_shadowMapDistantFarShellBias` (0 to 1) puts
+  part of the margin back if speckles appear in sunlight on your system. The
+  original stencil shadows and the Balanced tier are unchanged.
+- **What is not shown.** The tube lights of Network 1 still darken part of a
+  grate ring the original shadows leave lit (as before this change), and the
+  lights the map compiler gave no stored shadow keep the earlier behaviour.
+  The area the shadow map darkens where the original shadows do not rises
+  slightly on some lights (a few tenths of a percent of a view). One graphics
+  card on Windows was measured.
+- **Checks.** The stencil parity scan on OpenGL and Vulkan; the moving-door,
+  caster-cycle, Air Defense 1 outdoor and cascade-motion scenarios and the
+  continuous-motion receiver check on both; the in-engine shadow self-tests.
+- **Developer detail:** [the rest of the off-centre lights](shadowmapping-audit-2026-11-09.md#the-rest-of-the-off-centre-lights)
+  and REN-03 in the [roadmap](roadmap.md).
+
 ## Faster pack reads and cache writes, oversized screenshots and cleaner mirrors, from openPR06, 24 November 2026
 
 Fixes and speed-ups first made in openPR06, the PREY port built on openQ4,
