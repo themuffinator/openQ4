@@ -1,5 +1,11 @@
 #include "Unzip.h"
 
+#include <atomic>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include <stdint.h>
 
 /* unzip.h -- IO for uncompress .zip files using zlib 
@@ -1242,14 +1248,101 @@ static uLong unzlocal_SearchCentralDir(FILE *fin)
 	return uPosFound;
 }
 
+/*
+  Pack read-handle reuse: every member read used to open the pack file again
+  (a CreateFile, a stat and a CloseHandle per member, thousands per level
+  load). Read handles are now kept per pack path once their reader closes
+  and handed to the next reader. A handle belongs to exactly one reader at a
+  time; every read seeks before it reads, so a reused FILE needs no other
+  reset than clearerr. A generation per path retires the handles of a pack
+  that has been released (pack reload, file system restart) even if a reader
+  still holds one.
+
+  Idle handles are capped per pack and in total, so the pool never holds more
+  than a few dozen extra descriptors: the MSVC CRT allows 512 FILE streams by
+  default and macOS starts processes with a 256-descriptor soft limit.
+
+  The pool is allocated once and never freed, so a reader closed during static
+  destruction cannot touch a destroyed mutex or map.
+*/
+namespace {
+	struct unzPooledHandle_t {
+		std::string	path;
+		unsigned	generation;
+	};
+	struct unzHandlePool_t {
+		std::mutex											lock;
+		std::unordered_map<std::string, std::vector<FILE *>>	idle;
+		std::unordered_map<std::string, unsigned>			generation;
+		std::unordered_map<FILE *, unzPooledHandle_t>		owned;
+		size_t												idleTotal = 0;
+	};
+	std::atomic<bool>	unzHandleReuse( true );
+	const size_t		UNZ_MAX_IDLE_HANDLES_PER_PACK = 16;
+	const size_t		UNZ_MAX_IDLE_HANDLES_TOTAL = 64;
+
+	unzHandlePool_t &UnzHandlePool( void ) {
+		static unzHandlePool_t *pool = new unzHandlePool_t;
+		return *pool;
+	}
+}
+
+void unzSetHandleReuse( bool enable ) {
+	unzHandleReuse.store( enable, std::memory_order_relaxed );
+}
+
+void unzReleaseIdleHandles( const char *path ) {
+	unzHandlePool_t &pool = UnzHandlePool();
+	std::vector<FILE *> idle;
+	{
+		std::lock_guard<std::mutex> lock( pool.lock );
+		pool.generation[ path ]++;
+		auto entry = pool.idle.find( path );
+		if ( entry != pool.idle.end() ) {
+			idle.swap( entry->second );
+			pool.idle.erase( entry );
+		}
+		pool.idleTotal -= idle.size();
+		for ( FILE *f : idle ) {
+			pool.owned.erase( f );
+		}
+	}
+	for ( FILE *f : idle ) {
+		fclose( f );
+	}
+}
+
 extern unzFile unzReOpen (const char* path, unzFile file)
 {
 	unz_s *s;
-	FILE * fin;
+	FILE * fin = NULL;
 
-    fin=fopen(path,"rb");
-	if (fin==NULL)
-		return NULL;
+	const bool reuse = unzHandleReuse.load( std::memory_order_relaxed );
+	unsigned generation = 0;
+	if ( reuse ) {
+		unzHandlePool_t &pool = UnzHandlePool();
+		std::lock_guard<std::mutex> lock( pool.lock );
+		auto entry = pool.idle.find( path );
+		if ( entry != pool.idle.end() && !entry->second.empty() ) {
+			fin = entry->second.back();
+			entry->second.pop_back();
+			pool.idleTotal--;
+		}
+		// taken before the open, so a release racing it retires this handle
+		generation = pool.generation[ path ];
+	}
+	if ( fin != NULL ) {
+		clearerr( fin );
+	} else {
+		fin=fopen(path,"rb");
+		if (fin==NULL)
+			return NULL;
+		if ( reuse ) {
+			unzHandlePool_t &pool = UnzHandlePool();
+			std::lock_guard<std::mutex> lock( pool.lock );
+			pool.owned[ fin ] = { path, generation };
+		}
+	}
 
 	s=(unz_s*)ALLOC(sizeof(unz_s));
 	memcpy(s, (unz_s*)file, sizeof(unz_s));
@@ -1374,6 +1467,27 @@ extern int unzClose (unzFile file)
     if (s->pfile_in_zip_read!=NULL)
         unzCloseCurrentFile(file);
 
+	{
+		// a reader's handle goes back to its pack's idle list
+		unzHandlePool_t &pool = UnzHandlePool();
+		std::lock_guard<std::mutex> lock( pool.lock );
+		auto owned = pool.owned.find( s->file );
+		if ( owned != pool.owned.end() ) {
+			const auto generation = pool.generation.find( owned->second.path );
+			const bool current = generation != pool.generation.end() && generation->second == owned->second.generation;
+			if ( current && unzHandleReuse.load( std::memory_order_relaxed ) &&
+				pool.idleTotal < UNZ_MAX_IDLE_HANDLES_TOTAL ) {
+				std::vector<FILE *> &idle = pool.idle[ owned->second.path ];
+				if ( idle.size() < UNZ_MAX_IDLE_HANDLES_PER_PACK ) {
+					idle.push_back( s->file );
+					pool.idleTotal++;
+					TRYFREE(s);
+					return UNZ_OK;
+				}
+			}
+			pool.owned.erase( owned );
+		}
+	}
 	fclose(s->file);
 	TRYFREE(s);
 	return UNZ_OK;
@@ -2345,23 +2459,55 @@ const uLong * get_crc_table()
 #define DO8(buf)  DO4(buf); DO4(buf);
 
 /* ========================================================================= */
+/*
+  Slicing-by-8: eight table lookups per eight input bytes instead of one
+  lookup per byte. Same polynomial and result
+  as the byte-wise loop; every byte read from a pk4 member passes through here.
+  The words are assembled little-endian from bytes, so the result does not
+  depend on host byte order (compilers fold this into one load on x64/ARM64).
+*/
+static uint32_t crc32Slice8[ 8 ][ 256 ];
+static std::once_flag crc32Slice8Once;
+
+static void BuildCrc32Slice8( void ) {
+	for ( uint32_t n = 0; n < 256; n++ ) {
+		uint32_t c = n;
+		for ( int k = 0; k < 8; k++ ) {
+			c = ( c & 1 ) ? ( 0xedb88320u ^ ( c >> 1 ) ) : ( c >> 1 );
+		}
+		crc32Slice8[ 0 ][ n ] = c;
+	}
+	for ( uint32_t n = 0; n < 256; n++ ) {
+		uint32_t c = crc32Slice8[ 0 ][ n ];
+		for ( int t = 1; t < 8; t++ ) {
+			c = crc32Slice8[ 0 ][ c & 0xff ] ^ ( c >> 8 );
+			crc32Slice8[ t ][ n ] = c;
+		}
+	}
+}
+
 uLong crc32(uLong crc, const Byte *buf, uInt len)
 {
     if (buf == Z_NULL) return 0L;
-#ifdef DYNAMIC_CRC_TABLE
-    if (crc_table_empty)
-      make_crc_table();
-#endif
-    crc = crc ^ 0xffffffffL;
-    while (len >= 8)
-    {
-      DO8(buf);
-      len -= 8;
-    }
-    if (len) do {
-      DO1(buf);
-    } while (--len);
-    return crc ^ 0xffffffffL;
+	std::call_once( crc32Slice8Once, BuildCrc32Slice8 );
+	uint32_t c = ~(uint32_t)crc;
+	while ( len >= 8 ) {
+		uint32_t one = (uint32_t)buf[0] | ( (uint32_t)buf[1] << 8 ) |
+			( (uint32_t)buf[2] << 16 ) | ( (uint32_t)buf[3] << 24 );
+		const uint32_t two = (uint32_t)buf[4] | ( (uint32_t)buf[5] << 8 ) |
+			( (uint32_t)buf[6] << 16 ) | ( (uint32_t)buf[7] << 24 );
+		one ^= c;
+		c = crc32Slice8[ 7 ][ one & 0xff ] ^ crc32Slice8[ 6 ][ ( one >> 8 ) & 0xff ] ^
+			crc32Slice8[ 5 ][ ( one >> 16 ) & 0xff ] ^ crc32Slice8[ 4 ][ one >> 24 ] ^
+			crc32Slice8[ 3 ][ two & 0xff ] ^ crc32Slice8[ 2 ][ ( two >> 8 ) & 0xff ] ^
+			crc32Slice8[ 1 ][ ( two >> 16 ) & 0xff ] ^ crc32Slice8[ 0 ][ two >> 24 ];
+		buf += 8;
+		len -= 8;
+	}
+	while ( len-- ) {
+		c = crc32Slice8[ 0 ][ ( c ^ *buf++ ) & 0xff ] ^ ( c >> 8 );
+	}
+	return (uLong)~c;
 }
 
 /* infblock.h -- header to use infblock.c

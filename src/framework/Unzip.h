@@ -190,6 +190,16 @@ extern unzFile unzOpen (const char *path);
 extern unzFile unzReOpen (const char* path, unzFile file);
 
 /*
+  unzReOpen takes an idle read handle of the same pack path when one is
+  available, and unzClose of a reopened handle returns it to that idle list.
+  unzSetHandleReuse turns this on or off; unzReleaseIdleHandles closes a
+  pack's idle handles and retires the ones its readers still hold. Call it
+  before the pack's own handle is closed.
+*/
+extern void unzSetHandleReuse (bool enable);
+extern void unzReleaseIdleHandles (const char* path);
+
+/*
   Open a Zip file. path contain the full pathname (by example,
      on a Windows NT computer "c:\\zlib\\zlib111.zip" or on an Unix computer
 	 "zlib/zlib111.zip".

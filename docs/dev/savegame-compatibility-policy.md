@@ -173,6 +173,20 @@ present. The table is closed: every later release stamps its own build. The
 layout build is a reading of the payload, not a new claim: a build-1 payload
 whose snapshot is not listed stays at build 1 and is refused by the floor.
 
+## Builds Without Git History
+
+A source tree without git history, such as GitHub's "Download ZIP" or an
+exported tree, has no commit count and builds as build 0; Meson warns when it
+configures one. Build 0 is older than every save layout, so the floor refused
+every save such a build wrote, including the save it had just staged, and the
+build could neither save nor autosave. A payload stamped build 0 whose source
+snapshot and file count are this executable's own was written by this
+executable, so the preflight now reads it as the current layout
+(`OPENQ4_SAVEGAME_CURRENT_LAYOUT`). A build-0 payload from any other source is
+still refused, with a warning that names the missing build number, because its
+layout cannot be known. A build-0 executable also accepts no unstamped legacy
+payload. Ported from openPR06 (its issue #36).
+
 A serializer comparison of the release trees shows what this recovers. The
 first v3 build (640) and 0.10.0 share one layout; 0.11.0 adds
 `idPhysics_Player::swimSpeed`; 0.11.0 and 0.12.0 are identical; 0.13.0 adds

@@ -967,7 +967,7 @@ static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath
 	}
 
 	if ( marker != SESSION_OPENQ4_SAVEGAME_COMPATIBILITY_MAGIC ) {
-		const bool legacyCompatible = allowLegacyPayload && marker == BUILD_NUMBER &&
+		const bool legacyCompatible = allowLegacyPayload && BUILD_NUMBER > 0 && marker == BUILD_NUMBER &&
 			idStr::Icmp( Session_GetSaveGameWireABI(), SESSION_LEGACY_SAVEGAME_WIRE_ABI ) == 0;
 		if ( !legacyCompatible ) {
 			common->Warning( "Savegame '%s' has unsupported legacy payload build/marker %d (expected build %d or marker 0x%08x)",
@@ -1022,7 +1022,19 @@ static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath
 
 	if ( valid ) {
 		const openQ4SaveGameRelease_t *release = OpenQ4_FindSaveGameRelease( payloadBuild, payloadSourceStamp.c_str(), payloadSourceFileCount );
-		const int layoutBuild = OpenQ4_SaveGameLayoutBuild( payloadVersion, payloadBuild, payloadSourceStamp.c_str(), payloadSourceFileCount );
+		int layoutBuild = OpenQ4_SaveGameLayoutBuild( payloadVersion, payloadBuild, payloadSourceStamp.c_str(), payloadSourceFileCount );
+		// A source tree without git history (GitHub's "Download ZIP") builds
+		// as build 0, older than every save layout, so the floor below refused
+		// every save such a build wrote, its own included. A payload with this
+		// executable's own build and exact source stamp was written by this
+		// executable: read it as the current layout.
+		const bool unnumberedOwnPayload = BUILD_NUMBER <= 0 && payloadBuild == BUILD_NUMBER &&
+			OPENQ4_SAVEGAME_COMPAT_SOURCE_FILE_COUNT >= 0 &&
+			payloadSourceFileCount == OPENQ4_SAVEGAME_COMPAT_SOURCE_FILE_COUNT &&
+			payloadSourceStamp.Icmp( OPENQ4_SAVEGAME_COMPAT_SOURCE_HASH ) == 0;
+		if ( unnumberedOwnPayload ) {
+			layoutBuild = OPENQ4_SAVEGAME_CURRENT_LAYOUT;
+		}
 		const int minimumBuild = payloadVersion == OPENQ4_SAVEGAME_V2_VERSION ?
 			OPENQ4_SAVEGAME_V2_FIRST_RELEASE_BUILD : SESSION_OPENQ4_SAVEGAME_MINIMUM_SUPPORTED_BUILD;
 		// Version 5 loads on every build in the portable family; earlier
@@ -1039,6 +1051,10 @@ static bool Session_ValidateSaveGamePayload( idFile *file, const idStr &savePath
 			if ( payloadOut != NULL ) {
 				payloadOut->otherPlatform = true;
 			}
+			valid = false;
+		} else if ( layoutBuild < minimumBuild && payloadBuild <= 0 ) {
+			common->Warning( "Savegame '%s' was written by another openQ4 built without git history (build 0), whose save layout is unknown",
+				savePath.c_str() );
 			valid = false;
 		} else if ( layoutBuild < minimumBuild ) {
 			common->Warning( "Savegame '%s' was written by an older openQ4 (build %d, below build %d, the oldest this build can restore)",
