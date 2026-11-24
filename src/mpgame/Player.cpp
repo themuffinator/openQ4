@@ -10833,6 +10833,12 @@ idPlayer::PerformImpulse
 */
 void idPlayer::PerformImpulse( int impulse ) {
 
+	// openQ4: the weapon controls choose on an open weapon wheel, and nothing
+	// goes to the server until its release equips the choice.
+	if ( HandleWeaponWheelImpulse( impulse ) ) {
+		return;
+	}
+
 	if ( gameLocal.isClient ) {
 		idBitMsg	msg;
 		byte		msgBuf[MAX_EVENT_PARAM_SIZE];

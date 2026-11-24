@@ -93,6 +93,8 @@ The mouse controls are on **Settings → Controls → Mouse**, which starts with
 | Quick save / quick load | `F5` / `F9` |
 | Screenshot | `F12` |
 
+**Using the weapon wheel without a controller.** Hold the wheel key and move the mouse: a dot shows where you are pointing, and it never leaves the wheel, so pushing past the edge just slides it round the rim. While the wheel is open, a weapon key picks that weapon, the mouse wheel (or `[` / `]`, or the D-pad on a controller) steps to the next or previous weapon you have, and Last weapon picks the one you had before. Let go of the wheel key to switch. A controller's stick points the wheel by direction, so no dot is shown.
+
 `F1` to `F12` keep their bindings while a menu is open, so `F12` also takes a screenshot of a menu. **New in 0.15.0:** 0.14.1's new title and pause screens ignore them.
 
 ## Controllers

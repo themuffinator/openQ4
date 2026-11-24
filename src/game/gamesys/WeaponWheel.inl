@@ -40,6 +40,34 @@ static void WeaponWheel_UpperUtf8( idStr &text ) {
 	}
 }
 
+// The documents' ring, 104 to 232 dp, holds the selector's whole travel: its
+// bound of WEAPON_WHEEL_CURSOR_RADIUS lands on the plates' outer edge.
+const float WEAPON_WHEEL_RETAINED_RIM = 232.0f;
+
+// The selector never leaves the wheel. A push past the circumference holds it
+// on the rim, where further motion slides it round the ring, so reversing
+// the mouse starts back at once instead of first unwinding the overshoot.
+static void WeaponWheelBoundCursor( idVec2 &cursor ) {
+	const float cursorLength = cursor.Length();
+	if ( cursorLength > WEAPON_WHEEL_CURSOR_RADIUS ) {
+		cursor *= ( WEAPON_WHEEL_CURSOR_RADIUS / cursorLength );
+	}
+}
+
+// The selector shows as a dot while a mouse steers it. A stick or a finger
+// points the wheel by direction, and a tracked hand by the aim; those keep
+// the pointer on the hub alone.
+static bool WeaponWheelPointerShown( const usercmd_t &cmd ) {
+	return cvarSystem->GetCVarBool( "ui_retained" ) && !cvarSystem->GetCVarBool( "ui_radialStickActive" ) &&
+		!cvarSystem->GetCVarBool( "ui_radialTouchActive" ) && ( cmd.buttons & BUTTON_VRAIM ) == 0;
+}
+
+static float WeaponWheelDeadzoneRadius() {
+	if ( !cvarSystem->GetCVarBool( "ui_retained" ) ) return WEAPON_WHEEL_DEADZONE_RADIUS;
+	if ( cvarSystem->GetCVarBool( "ui_radialTouchActive" ) ) return 32.0f;
+	return cvarSystem->GetCVarBool( "ui_radialStickActive" ) ? WEAPON_WHEEL_CURSOR_RADIUS * 0.35f : 32.0f;
+}
+
 void idPlayer::InitWeaponWheel() {
 	weaponWheelActive = weaponWheelGuiActive = weaponWheelCanceled = weaponWheelDebug = weaponWheelDebugHeld = false;
 	weaponWheelHoveredSlot = weaponWheelGuiSlot = -1;
@@ -114,6 +142,11 @@ bool idPlayer::DrawRetainedWeaponWheel() {
 	weaponWheelGui->SetStateInt( "previous", GetWeaponWheelSlotForWeapon( previousWeapon ) );
 	weaponWheelGui->SetStateBool( "mp", gameLocal.isMultiplayer );
 	weaponWheelGui->SetStateInt( "team", gameLocal.isMultiplayer && gameLocal.IsTeamGame() ? team : -1 );
+	// The mouse's selector in the wheel's dp, bounded by its rim.
+	const float rim = WEAPON_WHEEL_RETAINED_RIM / WEAPON_WHEEL_CURSOR_RADIUS;
+	weaponWheelGui->SetStateFloat( "cursorX", weaponWheelCursor.x * rim );
+	weaponWheelGui->SetStateFloat( "cursorY", weaponWheelCursor.y * rim );
+	weaponWheelGui->SetStateBool( "cursorShown", weaponWheelActive && WeaponWheelPointerShown( usercmd ) );
 	for ( int slot = 0; slot < GetWeaponWheelSlotCount(); ++slot ) {
 		weaponWheelGui->SetStateString( va( "slot%d.index", slot ), va( "%d", slot + 1 ) );
 		const bool owned = HasWeaponWheelSlotWeapon( slot );
@@ -183,6 +216,19 @@ void idPlayer::DebugWeaponWheel( const idCmdArgs &args ) {
 		UpdateWeaponWheel();
 	} else if ( action == "slot" && args.Argc() > 2 && weaponWheelDebug ) {
 		weaponWheelHoveredSlot = idMath::ClampInt( 0, GetWeaponWheelSlotCount() - 1, atoi( args.Argv( 2 ) ) );
+	} else if ( action == "cursor" && args.Argc() > 3 && weaponWheelDebug ) {
+		// The mouse's selector at a point, in its own units (rim 118), and the
+		// slot it selects there, as UpdateWeaponWheel would choose it.
+		weaponWheelCursor.Set( static_cast<float>( atof( args.Argv( 2 ) ) ), static_cast<float>( atof( args.Argv( 3 ) ) ) );
+		WeaponWheelBoundCursor( weaponWheelCursor );
+		if ( weaponWheelCursor.Length() > WeaponWheelDeadzoneRadius() ) {
+			float angle = atan2f( weaponWheelCursor.x, -weaponWheelCursor.y );
+			if ( angle < 0.0f ) angle += idMath::TWO_PI;
+			weaponWheelHoveredSlot = GetClosestAvailableWeaponWheelSlot( angle );
+		}
+	} else if ( action == "step" && args.Argc() > 2 && weaponWheelDebug ) {
+		// A weapon control while the wheel is open, by impulse number.
+		HandleWeaponWheelImpulse( atoi( args.Argv( 2 ) ) );
 	} else if ( action == "release" && weaponWheelDebug ) {
 		weaponWheelDebugHeld = false; UpdateWeaponWheel(); weaponWheelDebug = false;
 	} else if ( action == "cancel" ) {
@@ -359,12 +405,6 @@ bool idPlayer::IsWeaponWheelSlotLowAmmo( int slot ) {
 	return ammoCount <= lowAmmo;
 }
 
-static float WeaponWheelDeadzoneRadius() {
-	if ( !cvarSystem->GetCVarBool( "ui_retained" ) ) return WEAPON_WHEEL_DEADZONE_RADIUS;
-	if ( cvarSystem->GetCVarBool( "ui_radialTouchActive" ) ) return 32.0f;
-	return cvarSystem->GetCVarBool( "ui_radialStickActive" ) ? WEAPON_WHEEL_CURSOR_RADIUS * 0.35f : 32.0f;
-}
-
 // The native selector uses the actual stick direction. Neutral holds the
 // weapon selection but returns the cursor to the dead zone, which quick chat
 // also uses to cancel on release. Classic retains its cursor sensitivity.
@@ -401,14 +441,55 @@ static void WeaponWheelAdvanceCursor( const usercmd_t &cmd, idVec2 &cursor, int 
 		cursor.y += lookDy * sensitivity;
 	}
 
-	const float cursorLength = cursor.Length();
-	if ( cursorLength > WEAPON_WHEEL_CURSOR_RADIUS ) {
-		cursor *= ( WEAPON_WHEEL_CURSOR_RADIUS / cursorLength );
-	}
+	WeaponWheelBoundCursor( cursor );
 }
 
 void idPlayer::UpdateWeaponWheelCursor( void ) {
 	WeaponWheelAdvanceCursor( usercmd, weaponWheelCursor, weaponWheelLastMouseX, weaponWheelLastMouseY, weaponWheelLastCmdAngles );
+}
+
+// While the wheel is open the weapon controls choose on it instead of
+// switching at once, so keyboard, mouse wheel and D-pad players have the
+// wheel too: a weapon key picks its slot, next and previous weapon step to
+// the next owned slot clockwise or back, and last weapon picks the previous
+// weapon. Releasing the wheel equips the choice as ever. A control for a
+// weapon the player does not have is used up and leaves the choice. The
+// local player's impulses alone come here, before PerformImpulse sends any.
+bool idPlayer::HandleWeaponWheelImpulse( int impulse ) {
+	if ( !weaponWheelActive || entityNumber != gameLocal.localClientNum ) return false;
+	const int count = GetWeaponWheelSlotCount();
+	int slot = -1;
+	if ( impulse >= IMPULSE_0 && impulse <= IMPULSE_12 ) {
+		slot = GetWeaponWheelSlotForWeapon( impulse - IMPULSE_0 );
+	} else if ( impulse == IMPULSE_51 ) {
+		slot = GetWeaponWheelSlotForWeapon( previousWeapon );
+	} else if ( impulse == IMPULSE_14 || impulse == IMPULSE_15 ) {
+		const int step = impulse == IMPULSE_14 ? 1 : count - 1;
+		const int from = weaponWheelHoveredSlot >= 0 ? weaponWheelHoveredSlot : 0;
+		for ( int i = 1; i <= count; ++i ) {
+			const int candidate = ( from + step * i ) % count;
+			if ( HasWeaponWheelSlotWeapon( candidate ) ) {
+				slot = candidate;
+				break;
+			}
+		}
+	} else {
+		return false;
+	}
+	if ( !HasWeaponWheelSlotWeapon( slot ) ) return true;
+	weaponWheelHoveredSlot = slot;
+	// A selector out on the ring turns to the choice, or its angle would take
+	// the selection straight back; one resting in the dead zone stays there.
+	const float reach = weaponWheelCursor.Length();
+	if ( reach > WeaponWheelDeadzoneRadius() ) {
+		const float angle = slot * idMath::TWO_PI / count;
+		weaponWheelCursor.x = sinf( angle ) * reach;
+		weaponWheelCursor.y = -cosf( angle ) * reach;
+	}
+	// A choice made with a control is deliberate: the wheel shows at once,
+	// and releasing it equips the choice rather than counting as a tap.
+	weaponWheelOpenedTime = Min( weaponWheelOpenedTime, Sys_Milliseconds() - 180 );
+	return true;
 }
 
 void idPlayer::UpdateWeaponWheelEffects( void ) {

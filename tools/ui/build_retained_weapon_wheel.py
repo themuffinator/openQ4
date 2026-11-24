@@ -164,6 +164,8 @@ def document(strogg=False, awakening=False, chat=False):
         doc.state[key]={'type':kind,'initial':initial}
     doc.state['reduced']={'type':'boolean','initial':False,'cvar':'ui_retainedReducedMotion'}
     doc.state['flashing']={'type':'boolean','initial':False,'cvar':'ui_reducedFlashing'}
+    for key,kind,initial in [('cursorX','number',0),('cursorY','number',0),('cursorShown','boolean',False)]:
+        doc.state[key]={'type':kind,'initial':initial}
     if chat:
         doc.state['selected']['initial']=-1;doc.state['mp']['initial']=True
         doc.state['channel']={'type':'number','initial':0};doc.state['zoomKey']={'type':'string','initial':''}
@@ -478,6 +480,12 @@ def document(strogg=False, awakening=False, chat=False):
         {'id':'right','op':'cubic','points':[[302,278],[302,322],[280,300]]}]
     hub['children'].append(art('hub-infinity',[infinity]));show('hub-infinity',op('==',S('ammo'),'∞'))
     show('hub-ammo-slant' if strogg else 'hub-ammo',op('!=',S('ammo'),'∞'))
+    # The mouse's selector: a dot over everything, which the player keeps
+    # inside the ring's 232 dp rim. A stick or a finger points by direction
+    # and leaves it hidden.
+    cursor=art('cursor',[circle('halo',5.5,[0,0,0,.55]),circle('dot',3.5,ui.rgb('#FFCC00' if strogg else '#FFFFFF'))],transform=ui.transform())
+    wheel.append(cursor);show('cursor',S('cursorShown'))
+    doc.bind('cursor.position','cursor','transform',[S('cursorX'),S('cursorY'),1,1,0])
     doc.timelines.add('open',open_end,opening);doc.timelines.add('close',close_end,closing);doc.timelines.add('selection',select_end,selection)
     for event in ('open','close','selection'): doc.events[event]=[{'op':'playTimeline','timeline':event}]
     if chat: doc.events['channel']=[{'op':'playTimeline','timeline':'selection'}]
@@ -486,7 +494,7 @@ def document(strogg=False, awakening=False, chat=False):
     root=full('wheel-root',[ui.group('wheel-center',props,wheel)],opacity=ui.number(0))
     doc.bind('root.blend','wheel-root','opacity',S('blend'));doc.bind('wheel.placement','wheel-center','transform',[S('offset'),0,S('fit'),S('fit'),0])
     return doc.build(root,{'extensions':{'openq4':{'reference':'ui-visual-design.md 14.6 / 14.16','family':family,'slots':n,
-        'input':'Player-owned radial selection; no pointer hit testing','placement':'ui_weaponWheelOffset percent of viewport width from center, default +27; fitted at narrow edges'}}})
+        'input':'Player-owned radial selection; no pointer hit testing; the mouse selector shows as a dot','cursor':'cursorX/cursorY in wheel dp from the center, bounded by the 232 dp rim','placement':'ui_weaponWheelOffset percent of viewport width from center, default +27; fitted at narrow edges'}}})
 
 
 # The quick-chat wheel's phrases clockwise from the top (#str_231261-231268),

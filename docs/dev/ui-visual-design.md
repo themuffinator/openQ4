@@ -1,6 +1,6 @@
 # openQ4 UI Visual Design
 
-Specification version 1.51, 23 November 2026 (1.47 to 1.50 earlier that day, 1.46 on 17 November, 1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
+Specification version 1.52, 24 November 2026 (1.51 on 23 November, 1.47 to 1.50 earlier that day, 1.46 on 17 November, 1.45 earlier that day, 1.40 to 1.44 on 13 November, 1.39 on 9 November, 1.38 on 5 November, 1.37 on 3 November, 1.36 and 1.35 on 1 November, 1.29 to 1.34 on 31 October, 1.28 on 26 October, 1.27 on 25 October, 1.26 on 24 October, 1.25 on 23 October, 1.24 on 21 October, 1.22 on 11 October, 1.19 on 7 October, 1.15 and 1.16 earlier that day, 1.14 on 1 October, 1.10 to 1.13 the same day, 1.7 to
 1.9 on 29 September, 1.6 on 28 September, 1.4 and 1.5 on 27 September, 1.1 to
 1.3 on 26 September, 1.0 on 8 September 2026). Status:
 implementation target; the replacement has not shipped. Applies to every
@@ -94,6 +94,10 @@ depth of field, and the crosshair hides while the wheel is open (section
 Version 1.51 keeps the view weapon raised under the wheel in single player,
 as multiplayer already did, so the depth of field has the weapon to focus on;
 it stops firing while the wheel is open (section 14.11).
+
+Version 1.52 shows the wheel's mouse selector as a dot bounded by the ring's
+rim, and lets the weapon keys, the mouse wheel and the D-pad choose on an open
+wheel (section 14.6).
 
 Version 1.1 added measured references from a survey of the effective retail
 GUI scripts, interface art, fonts and materials, and corrected anatomy that did
@@ -2708,11 +2712,24 @@ weapon color code, and the Marine gauge and scope constructions.
 
 **Selection.** A stick selects the segment under its angle beyond 35%
 deflection, with 4 degrees of hysteresis at boundaries; inside the dead zone
-the selection holds. The mouse moves an invisible selector from the center and
-selects once it passes 32 dp. On touch the drag starts at the weapon button.
-Releasing equips the selection; Back, or the wheel button pressed again,
-closes without switching. A tap shorter than 180 ms swaps to the previous weapon
-without opening the wheel.
+the selection holds. The mouse moves a selector from the center and selects
+once it passes 32 dp. The ring's 232 dp rim bounds it: pushed further it holds
+on the rim and slides round it, so reversing moves it back at once. While the
+mouse steers, the selector shows as a dot above everything, 3.5 dp of white
+(Strogg #FFCC00) on a 5.5 dp black halo at 0.55; a stick, a finger or a
+tracked hand points by direction and leaves it hidden. On touch the drag
+starts at the weapon button. Releasing equips the selection; Back, or the
+wheel button pressed again, closes without switching. A tap shorter than
+180 ms swaps to the previous weapon without opening the wheel.
+
+While the wheel is open the weapon controls choose on it instead of switching:
+a weapon key picks its slot, next and previous weapon (the mouse wheel, the
+D-pad, `[` and `]` by default) step clockwise or back to the next owned
+weapon, and last weapon picks the previous weapon. A choice made this way
+shows the wheel at once, turns a selector out on the ring to it, and is what
+releasing equips; a control for a weapon the player lacks leaves the choice.
+The quick-chat wheel shows the same dot. The Classic wheel draws its selector
+as a white dot for every device, since its stick moves the selector too.
 
 **Transitions.** Each family's wheel opens, selects and closes with its own
 signal: the Marine wheel as a transmission, the Strogg wheel as a translation.
@@ -4795,6 +4812,17 @@ raised under the wheel in single player as it already did in multiplayer
 (single player used to put it away), so the focus has something to rest on.
 `WID-039` already asks for the focus on the view weapon; the register only
 re-binds this specification.
+
+### Version 1.52: the wheel's mouse selector
+
+The product owner asked for the wheel's mouse selector to stay within the
+ring's circumference and show as a dot, and for keyboard and controller use to
+be considered. Section 14.6 now draws the selector the mouse steers (it was
+invisible) and bounds it by the 232 dp rim, and lets the weapon keys, next,
+previous and last weapon (mouse wheel, D-pad, keys) choose on an open wheel
+rather than switching past it. `WID-033` (the wheel and quick chat) and
+`WID-034` (the multiplayer wheel) already ask for their input and selection;
+the register only re-binds this specification.
 
 ### Version 1.39: the Awakening chaingun turret
 

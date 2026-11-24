@@ -9970,6 +9970,11 @@ idPlayer::PerformImpulse
 */
 void idPlayer::PerformImpulse( int impulse ) {
 
+	// openQ4: the weapon controls choose on an open weapon wheel.
+	if ( HandleWeaponWheelImpulse( impulse ) ) {
+		return;
+	}
+
 //RAVEN BEGIN
 // nrausch: Don't send xenon dpad impulses over the network
 #ifdef _XENON

@@ -12,6 +12,36 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The weapon wheel's mouse dot, keyboard and D-pad, 24 November 2026
+
+- **A dot bounded by the rim.** The user asked for the wheel's mouse selector
+  to stay within the circumference, show as a dot and for keyboard and
+  controller use to be considered. The selector the mouse steers was clamped
+  to the ring but invisible; the retained Marine, Strogg, Awakening and
+  quick-chat documents now draw it as a dot (`cursorX`/`cursorY`/
+  `cursorShown`, rim 118 selector units = 232 dp) only while the mouse steers,
+  hidden for a stick, touch or a tracked VR hand. The Classic wheel's cross
+  is a dot for every device (its stick moves the selector too), drawn in the
+  lines' triangle winding.
+- **Weapon controls choose on an open wheel.** Number keys, next/previous and
+  last weapon (mouse wheel, `[`/`]`, D-pad) used to switch weapon behind the
+  open wheel, and the release then overrode them. `HandleWeaponWheelImpulse`
+  now takes the local player's weapon impulses while the wheel is open:
+  direct slot, step over owned slots with wrap, previous weapon; it turns a
+  selector on the ring to the choice, shows the wheel at once and counts the
+  release as a choice rather than a tap. Nothing reaches the server until
+  the release's normal impulse. Visual spec 1.52 (register rebind only).
+- Evidence: `weapon_wheel_behavior.py` (93 checks, new bound, dot-rule and
+  stepping cases), `sp_turbo_weapon_wheel.py`, the retained-screens optics
+  and quick-chat document tests, and a Windows x64 OpenGL gameplay capture
+  (`capture_weapon_wheels.py`, new `testWeaponWheel cursor`/`step`) on
+  airdefense1, recomp and q4dm1: the dot follows, holds on the rim, turns to
+  a stepped slot and draws on Classic. The MP run stopped on an unrelated
+  `mp_escape.rui` timeline warning after its shots. Not yet run: Vulkan,
+  Linux, macOS, a real mouse and controller.
+- Found, not fixed: the Classic wheel's segment fills, inner ring and
+  selection arrow are wound against the 2D path's culling and do not draw.
+
 ## Point lights keep their shadows in crowded views on Vulkan, 23 November 2026
 
 - **Lights no longer shine through walls when a view runs out of shadow

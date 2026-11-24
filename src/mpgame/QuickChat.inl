@@ -190,6 +190,12 @@ void idPlayer::DrawQuickChat( void ) {
 	quickChatGui->SetStateInt( "selected", quickChatSelected );
 	quickChatGui->SetStateInt( "team", gameLocal.IsTeamGame() ? team : -1 );
 	quickChatGui->SetStateInt( "channel", channel );
+	// The mouse's selector as the weapon wheel shows it: inside the hub's dead
+	// zone, releasing sends nothing.
+	const float rim = WEAPON_WHEEL_RETAINED_RIM / WEAPON_WHEEL_CURSOR_RADIUS;
+	quickChatGui->SetStateFloat( "cursorX", quickChatCursor.x * rim );
+	quickChatGui->SetStateFloat( "cursorY", quickChatCursor.y * rim );
+	quickChatGui->SetStateBool( "cursorShown", quickChatActive && WeaponWheelPointerShown( usercmd ) );
 	quickChatGui->SetStateString( "zoomKey", common->KeysFromBinding( "_zoom" ) );
 	quickChatGui->StateChanged( gameLocal.time );
 	const bool justOpened = quickChatActive && !quickChatGuiActive;

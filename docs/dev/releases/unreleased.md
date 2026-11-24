@@ -584,6 +584,13 @@ the [development roadmap](../roadmap.md) for current scope.
   chat is open in multiplayer. If you had been turning just before, it used
   to swing back and forth through that turn about once a second until the
   wheel closed.
+- The weapon wheel shows where your mouse points as a dot, which stays inside
+  the wheel: pushing past the edge slides it round the rim instead of
+  wandering off. While the wheel is open, the weapon keys, the mouse wheel,
+  `[` / `]` and the D-pad choose on it (next and previous step to the
+  weapons you have) and releasing switches, instead of changing weapon behind
+  the wheel. Quick chat shows the same dot. See
+  [Keyboard and mouse](../../user/input-settings.md#keyboard-and-mouse).
 - **Depth of Field** (Settings > Display > Effects, `r_depthOfField`) turns
   the game's own depth of field on or off: the weapon wheel's focus and
   scripted cutscene focus. Enhanced, Quality, Ultra and Maximum turn it on.

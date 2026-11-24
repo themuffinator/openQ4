@@ -2215,6 +2215,14 @@ static void CheckWeaponWheels(ScreenHost& host, char** paths) {
 			const auto placement=wheel.PresentedValue("wheel-center","transform");
 			Check(placement && Near(float(placement->data[2]),float(fit),.001f) && Near(float(placement->data[3]),float(fit),.001f),"HUD scaling keeps the wheel round in wide and portrait views");
 		}
+		// The mouse's selector is a dot the player keeps inside the 232 dp rim,
+		// shown only while a mouse steers the wheel.
+		Check(wheel.PresentedValue("cursor","display")->text=="none","the selector dot hides unless a mouse steers the wheel");
+		Check(wheel.SetState({{"cursorShown",true},{"cursorX",-164.0},{"cursorY",164.0}},error,1.6),"the mouse moves the selector");
+		host.draws.clear();wheel.Frame(viewport,1.6);
+		const auto dot=wheel.PresentedValue("cursor","transform");
+		Check(wheel.PresentedValue("cursor","display")->text=="block" && dot && Near(float(dot->data[0]),-164,.001f) && Near(float(dot->data[1]),164,.001f),"the selector dot follows the mouse in wheel dp");
+		Check(wheel.SetState({{"cursorShown",false},{"cursorX",0.0},{"cursorY",0.0}},error,1.7),"a stick hides the selector");
 		Check(wheel.RunEvent("open",2,effects,error),"wheel open transition runs"); wheel.Frame(viewport,2.02);
 		if (strogg) {
 			Check(wheel.PresentedValue("slot5-entry","opacity")->data[0]==1 && wheel.PresentedValue("slot1-entry","opacity")->data[0]==0,"Strogg plates boot in scrambled order");

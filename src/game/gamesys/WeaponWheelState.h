@@ -29,6 +29,8 @@
 	void					UpdateWeaponWheel( void );
 	void					UpdateWeaponWheelEffects( void );
 	void					UpdateWeaponWheelCursor( void );
+	// A weapon control while the wheel is open chooses on it; true when used.
+	bool					HandleWeaponWheelImpulse( int impulse );
 	void					DrawWeaponWheel( void );
 	int						GetWeaponWheelSlotForWeapon( int weaponIndex ) const;
 	int						GetWeaponWheelWeaponForSlot( int slot ) const;

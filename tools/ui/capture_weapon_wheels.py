@@ -29,6 +29,12 @@ def main():
             'testWeaponWheel probe',shot('default'),
             'set ui_retainedOpaqueBacking 1','waitMsec 300',shot('focus-disabled'),
             'set ui_retainedOpaqueBacking 0','waitMsec 300',shot('focus-restored'),
+            # The mouse's selector dot, held on the rim past it, and a keyed
+            # step (next weapon) that turns it to the new choice.
+            'testWeaponWheel cursor 60 60','waitMsec 300',shot('mouse-dot'),'testWeaponWheel probe',
+            'testWeaponWheel cursor 400 0','waitMsec 300',shot('mouse-rim'),'testWeaponWheel probe',
+            'testWeaponWheel step 14','waitMsec 300',shot('keyed-next'),'testWeaponWheel probe',
+            'testWeaponWheel cursor 0 0',
             'testWeaponWheel slot 2','waitMsec 350',shot('selected-shotgun'),
             'testWeaponWheel release','waitMsec 1500','testWeaponWheel probe',shot('equipped'),
             'testWeaponWheel open','testWeaponWheel slot 1','waitMsec 200','testWeaponWheel cancel',
@@ -52,6 +58,10 @@ def main():
         assert not result['errors'] and not result['retained_warnings'], (result['errors'],result['retained_warnings'])
         assert any(t[0]=='1' and t[2]=='11' and 'weapon_wheel_' in t[8] for t in traces), 'native wheel must draw in real gameplay'
         assert any(t[0]=='0' and t[3]=='2' and t[4]=='2' for t in traces), 'release equips the selected shotgun'
+        # The rim point (118, 0) is at 90 degrees, the hyperblaster's slot;
+        # next weapon then steps clockwise to the grenade launcher.
+        rim=[i for i,t in enumerate(traces) if t[0]=='1' and t[1]=='3']
+        assert rim and any(t[0]=='1' and t[1]=='4' for t in traces[rim[0]+1:]), 'the bounded selector and a keyed step choose on the wheel'
         assert traces[-1][0]=='0' and traces[-1][3]=='2' and traces[-1][7]=='1.000', 'cancel clears wheel and transient time scale'
         if name=='mp': assert all(t[7]=='1.000' for t in traces), 'MP simulation never slows'
         config=(args.output/name/'save/baseoq4/wheel-settings.cfg').read_text(encoding='utf-8',errors='replace')

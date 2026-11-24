@@ -34,6 +34,7 @@ struct idMath {
 #define MS2SEC(v) ((v)*.001f)
 enum {PITCH,YAW,ROLL};
 constexpr int BUTTON_WEAPONWHEEL=512,BUTTON_QUICKCHAT=2048,BUTTON_VRAIM=4096,BUTTON_ZOOM=2,MAX_WEAPONS=16,SPECIAL_EFFECT_BLUR=0,CMD_EXEC_NOW=0;
+constexpr int IMPULSE_0=0,IMPULSE_12=12,IMPULSE_14=14,IMPULSE_15=15,IMPULSE_51=51;
 static int now=1000;
 int Sys_Milliseconds(){return now;}
 float SHORT2ANGLE(short s){return static_cast<unsigned short>(s)*(360.0f/65536.0f);}
@@ -110,6 +111,7 @@ static void Reset(bool mp=false) {
 static void Stick(float x,float y){vars.SetCVarFloat("ui_radialStickX",x);vars.SetCVarFloat("ui_radialStickY",y);}
 static void Slot(int slot,int count=11){const float a=slot*idMath::TWO_PI/count;Stick(std::sin(a),-std::cos(a));}
 static void Open(idPlayer& p){p.usercmd.buttons=BUTTON_WEAPONWHEEL;p.UpdateWeaponWheel();CHECK(p.weaponWheelActive);}
+static void Mouse(idPlayer& p,int dx,int dy){p.usercmd.mx+=dx;p.usercmd.my+=dy;now+=16;p.UpdateWeaponWheel();}
 int main() {
     // Touch has already qualified its 300ms hold in the overlay. Show its
     // wheel immediately, steer independently of mouse/controller settings,
@@ -193,6 +195,42 @@ int main() {
         p.usercmd.buttons=BUTTON_QUICKCHAT;p.UpdateQuickChat();Slot(2,8);p.UpdateQuickChat();p.menuOpen=true;p.UpdateQuickChat();
         CHECK(!p.quickChatActive && p.quickChatCanceled && commands.sent.empty());
     }
+    // The mouse's selector never leaves the ring: pushed past the rim it
+    // stays on it, and reversing moves it back at once. It shows as a dot
+    // for the mouse alone; a stick, a finger or a tracked hand hide it.
+    Reset();vars.SetCVarBool("ui_radialStickActive",false);{idPlayer p;Open(p);
+        CHECK(WeaponWheelPointerShown(p.usercmd));
+        Mouse(p,4000,0);CHECK(std::fabs(p.weaponWheelCursor.Length()-WEAPON_WHEEL_CURSOR_RADIUS)<.001f);
+        Mouse(p,-20,0);CHECK(std::fabs(p.weaponWheelCursor.x-(WEAPON_WHEEL_CURSOR_RADIUS-20*WEAPON_WHEEL_MOUSE_SENSITIVITY))<.001f);
+        Mouse(p,0,-4000);CHECK(std::fabs(p.weaponWheelCursor.Length()-WEAPON_WHEEL_CURSOR_RADIUS)<.001f && p.weaponWheelCursor.y<0);
+        vars.SetCVarBool("ui_radialStickActive",true);CHECK(!WeaponWheelPointerShown(p.usercmd));vars.SetCVarBool("ui_radialStickActive",false);
+        vars.SetCVarBool("ui_radialTouchActive",true);CHECK(!WeaponWheelPointerShown(p.usercmd));vars.SetCVarBool("ui_radialTouchActive",false);
+        p.usercmd.buttons|=BUTTON_VRAIM;CHECK(!WeaponWheelPointerShown(p.usercmd));p.usercmd.buttons&=~BUTTON_VRAIM;
+        vars.SetCVarBool("ui_retained",false);CHECK(!WeaponWheelPointerShown(p.usercmd));
+    }
+    // Keyboard, mouse wheel and D-pad choose on the open wheel: a weapon key
+    // picks its slot, next/previous step over unowned slots and wrap, last
+    // weapon picks the previous one. Release equips the choice, even inside
+    // the tap window, and a closed wheel leaves the controls alone.
+    Reset();{idPlayer p;p.inventory.weapons&=~(1<<4);CHECK(!p.HandleWeaponWheelImpulse(6));Open(p);
+        CHECK(p.weaponWheelHoveredSlot==2 && p.HandleWeaponWheelImpulse(IMPULSE_0+3) && p.weaponWheelHoveredSlot==3);
+        CHECK(p.HandleWeaponWheelImpulse(IMPULSE_14) && p.weaponWheelHoveredSlot==5);
+        CHECK(p.HandleWeaponWheelImpulse(IMPULSE_15) && p.weaponWheelHoveredSlot==3);
+        CHECK(p.HandleWeaponWheelImpulse(IMPULSE_0+4) && p.weaponWheelHoveredSlot==3);
+        CHECK(p.HandleWeaponWheelImpulse(IMPULSE_51) && p.weaponWheelHoveredSlot==1);
+        p.HandleWeaponWheelImpulse(IMPULSE_15);p.HandleWeaponWheelImpulse(IMPULSE_15);CHECK(p.weaponWheelHoveredSlot==10);
+        p.HandleWeaponWheelImpulse(IMPULSE_14);CHECK(p.weaponWheelHoveredSlot==0);
+        CHECK(!p.HandleWeaponWheelImpulse(13));p.HandleWeaponWheelImpulse(IMPULSE_0+7);
+        now+=16;p.UpdateWeaponWheel();CHECK(p.weaponWheelHoveredSlot==7 && p.weaponWheelBlend>0);
+        p.usercmd.buttons=0;p.UpdateWeaponWheel();CHECK(p.impulses==std::vector<int>{7});
+        CHECK(!p.HandleWeaponWheelImpulse(IMPULSE_0+3));
+    }
+    // A mouse selector out on the ring turns to a keyed choice, so its angle
+    // does not take the selection back on the next frame.
+    Reset();vars.SetCVarBool("ui_radialStickActive",false);{idPlayer p;Open(p);Mouse(p,0,-4000);CHECK(p.weaponWheelHoveredSlot==0);
+        p.HandleWeaponWheelImpulse(IMPULSE_0+6);Mouse(p,0,0);Mouse(p,0,0);CHECK(p.weaponWheelHoveredSlot==6);
+        CHECK(std::fabs(p.weaponWheelCursor.Length()-WEAPON_WHEEL_CURSOR_RADIUS)<.001f);
+    }
     std::printf("weapon/quick-chat lifecycle: %d checks passed\n",checks);
 }
 '''
@@ -217,7 +255,9 @@ def main():
         'wheel':['void idPlayer::InitWeaponWheel(','bool idPlayer::CanUseWeaponWheel(','void idPlayer::ResetWeaponWheel(',
                  'bool idPlayer::HasWeaponWheelSlotWeapon(','int idPlayer::GetDefaultWeaponWheelSlot(',
                  'int idPlayer::GetClosestAvailableWeaponWheelSlot(','static float WeaponWheelDeadzoneRadius(',
+                 'static void WeaponWheelBoundCursor(','static bool WeaponWheelPointerShown(',
                  'static void WeaponWheelAdvanceCursor(','void idPlayer::UpdateWeaponWheelCursor(',
+                 'bool idPlayer::HandleWeaponWheelImpulse(',
                  'void idPlayer::UpdateWeaponWheelEffects(','void idPlayer::UpdateWeaponWheel('],
         'chat':['void idPlayer::InitQuickChat(','bool idPlayer::CanUseQuickChat(',
                 'void idPlayer::ResetQuickChat(','void idPlayer::UpdateQuickChat(']}.items():
