@@ -31,7 +31,7 @@ No preset, and not Auto-Detect, ever changes your resolution or your resolution 
 |---|---|---|
 | `minimum` | Software renderers and systems below the minimum requirements | No anti-aliasing, no shadows, smallest textures, 30 FPS cap |
 | `lowpower` | Raspberry Pi-class boards, low-memory phones and saving battery | No anti-aliasing, no shadows, reduced textures, 30 FPS cap |
-| `low` | PCs at the [minimum requirements](getting-started.md#system-requirements) | No anti-aliasing, the original game's shadows, reduced textures, 60 FPS cap |
+| `low` | PCs at the [minimum requirements](getting-started.md#system-requirements) | No anti-aliasing, no shadows, reduced textures, 60 FPS cap |
 | `performance` | Modest desktops, laptops and handhelds such as the Steam Deck | SMAA medium, original shadows, full-size textures, 60 FPS cap |
 | `balanced` | Most desktops; the default | 2x MSAA with SMAA medium, original shadows, 120 FPS cap |
 | `enhanced` | High-refresh play with modern effects | SMAA high, shadow maps for spotlights and sunlight (other lights keep the original shadows), bloom, SSAO, tone mapping, 144 FPS cap |
@@ -81,7 +81,7 @@ Choose the preset on **Settings → Display → Graphics** and press **Apply Cha
 - A preset that changes MSAA asks you to keep or revert. When OpenGL draws MSAA into the window itself (the default on macOS, or with `r_glWindowMultisample 1`), an MSAA change restarts the renderer.
 - The sound device restarts when the speaker layout or reverb setting changes. The per-sound sample limit only changes fully when the game next starts; the page tells you when that applies.
 - Anisotropic filtering (which keeps textures sharp at an angle) and MSAA are capped at what your graphics card supports.
-- Presets turn bump maps, specular highlights and the detailed sky back on, clear any `image_picmip` reduction, and every preset from Low up turns shadows back on. [Texture replacement packs](texture-replacements.md) work at every preset.
+- Presets turn bump maps, specular highlights and the detailed sky back on, clear any `image_picmip` reduction, and every preset from Performance up turns shadows back on. [Texture replacement packs](texture-replacements.md) work at every preset.
 
 **Updating an older configuration.** Select the preset again to adopt its current values; setting `com_performancePreset` on its own does not reapply it. A configuration saved with the earlier everything-on Ultra keeps those settings until you choose again: pick **Maximum** for that look, or **Ultra** for the 75 FPS recipe.
 

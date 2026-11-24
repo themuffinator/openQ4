@@ -4029,15 +4029,16 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 	// tier maps them, and the stencil tiers keep the inert default.
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointLights", preset.shadowMapPointLights, Common_PerformancePresetIsNamed( preset, "enhanced" ) ? 0 : 1 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_crt", preset.crt, 0 );
-	// Only the two tiers below the documented minimum hardware draw no shadows
-	// and skip the light-grid indirect pass; Low restores both, and every tier
-	// above it keeps them.
-	const bool shadowlessTier = Common_PerformancePresetIsNamed( preset, "minimum" ) || Common_PerformancePresetIsNamed( preset, "lowpower" );
+	// The three tiers for the documented minimum hardware and below draw no
+	// shadows and skip the light-grid indirect pass; Performance restores both,
+	// and every tier above it keeps them.
+	const bool shadowlessTier = Common_PerformancePresetIsNamed( preset, "minimum" ) || Common_PerformancePresetIsNamed( preset, "lowpower" )
+		|| Common_PerformancePresetIsNamed( preset, "low" );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadows", preset.shadows, shadowlessTier ? 0 : 1 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_useLightGrid", preset.useLightGrid, shadowlessTier ? 0 : 1 );
 
-	if ( shadowlessTier || Common_PerformancePresetIsNamed( preset, "low" ) ) {
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_maxfps", preset.maxFps, shadowlessTier ? 30 : 60 );
+	if ( shadowlessTier ) {
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_maxfps", preset.maxFps, Common_PerformancePresetIsNamed( preset, "low" ) ? 60 : 30 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_machineSpec", preset.machineSpec, 0 );
 		passed &= Common_PerformancePresetCheckBenchmarkPreset( preset, "low" );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 0 );

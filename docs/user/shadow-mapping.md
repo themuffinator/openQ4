@@ -10,8 +10,8 @@ Choose a preset on **Settings → Display → Graphics → Performance Preset** 
 
 | Preset | Shadows |
 |---|---|
-| Minimum, Low Power | None, to save work on weak or battery-powered hardware. |
-| Low, Performance, Balanced | Quake 4's original stencil shadows. |
+| Minimum, Low Power, Low | None, to save work on weak or battery-powered hardware. Low dropped them in 0.15.0 so that it holds its 60 FPS cap on low-end graphics. |
+| Performance, Balanced | Quake 4's original stencil shadows. |
 | Enhanced | Shadow maps for spotlights and sunlight. Point lights, which are most of Quake 4's lights, keep the original shadows, because their shadow maps cost the most. |
 | Quality | Shadow maps for every light, with soft edges that harden where objects meet surfaces. Sunlight and other distant lights get cascades, so outdoor shadows stay sharp around you. |
 | Ultra | As Quality, with sharper spotlight and sunlight shadows and smoother edges. |

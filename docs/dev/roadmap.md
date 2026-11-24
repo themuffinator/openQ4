@@ -25,7 +25,7 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 15 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **45 / 163 (27.6%)** | **118 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-09 and PAD-01 through PAD-10, not partial substeps. |
+| Formally closed roadmap tasks | **46 / 167 (27.5%)** | **121 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-10 and PAD-01 through PAD-10, not partial substeps. |
 | Estimated category progress | **21 categories: 3 at 100%, 16 partial, 2 at 0%** | Governance (GOV), engine loading (CORE) and developer map tools (TOOL) are complete; the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -226,7 +226,7 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | --- | --- | --- |
 | 1. Establish the current baseline — complete | GOV-01 through GOV-03, HF-01/HF-02, Q4-01, UI-10; scope/recovery review for VR-01/VR-06 and AND-01 | Current-source ownership, clocks, compatibility inventory, tests and evidence identities agree. [Closure evidence](baseline-evidence.md) retains reproduced failures and later-stage qualification limits. |
 | 2. Close product gaps — in progress | UI-01/UI-02 plus the first UI-06 editor round trip, UI-07 measurements and UI-09 toolkit work, then UI-03/UI-04 at accepted scope; Q4-02 through Q4-05/Q4-07/Q4-08, MP-01 through MP-09, MP-12, MP-17 through MP-22, MP-24, AUD-01 through AUD-07, PAD-01 through PAD-03, PAD-05 and PAD-06; selected VR-01 and AND-01/AND-03 scope; preserve completed VR-06 | Required player flows work through the intended UI and runtime; remaining unsupported cases are explicit and fail safely. |
-| 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope, REN-01 through REN-08 and FPS-01 through FPS-09 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
+| 3. Improve motion and rendering — in progress | Preserve closed HF-03 through HF-06 and VK-03; finish HF-07/HF-08, remaining VK-01 through VK-07 scope, REN-01 through REN-08 and FPS-01 through FPS-10 | Visible gameplay meets declared correctness, latency and frame-time budgets with rollback paths intact. |
 | 4. Complete tools and broader quality | Remaining UI-06 scope, CORE-01 through CORE-06, PHYS-01 through PHYS-06, STEAM-01 through STEAM-05, IOS-01 through IOS-04, remaining P2 items, including MP-10, MP-11, MP-13 through MP-16, MP-23, MP-25, MP-26, PAD-04, PAD-07, PAD-08, PAD-10, VK-08, REN-09, REN-10 and RT-01 through RT-06 (TOOL-01 through TOOL-04 closed 6 November 2026, REN-11 on 21 November 2026) | Authoring and runtime workloads meet their stated completion gates; optimizations are justified by measurements. |
 | 5. Qualify packages and promote scope | PLAT-01 through PLAT-05, PKG-01 through PKG-05, STEAM-06, IOS-05/IOS-06, REL-01 through REL-04, UI-07/UI-08/UI-11, VR-02, RT-07, PAD-09, AND-02 and selected AND-05 scope | Exact release packages pass the selected platform, device, gameplay, visual and human acceptance matrix. |
 
@@ -2325,7 +2325,7 @@ reference hardware can hold at its declared frame rate rather than every maximum
 
 ### FPS completion checkpoints
 
-**Estimate: 40%; 4/9 tasks closed.** The suite, the two baselines, the per-feature
+**Estimate: 40%; 4/10 tasks closed.** The suite, the two baselines, the per-feature
 cost attribution and the declared per-scenario budgets exist on the reference machine
 (the RTX 4060 Laptop). Enhanced, Quality and Ultra are re-tiered to refresh classes and
 meet them on both backends; the previous Ultra is the Maximum preset. Structural work has
@@ -2346,6 +2346,7 @@ are not yet measured.
 | FPS-07 — Partial | Hitch classes recorded: 2-3 s cold draw stalls at Ultra, periodic 100 ms hub2 frames, a 393 ms storage2 frame, first-use events. Level loads and startup: one display-rate pacer, checkpoints in every long stretch and the stall sampler behind `com_loadingFrameTrace 2`; Air Defense 1 now loads at a 16.7 ms median, worst 54-60 ms against 1.6-2.3 s ([loading presentation](loading-presentation.md)). | Attribution per class, fixes or declared budgets, clean first-use catalog on both backends; for loads, retained document builds and the hand-off into the level (start-of-level autosave flush, first-frame program loads). |
 | FPS-08 — Not started | The Awakening's outdoor battle ([report section 14](performance-report.md#14-the-awakenings-outdoor-battle-fps-08-evidence-17-november-2026)): game 22% and drawing 33% of the process; two exact clip-world fixes (contents gathered by mask, sector contents refreshed lazily) cut about 10% of game time, and one-pass light-interaction cull bits (bit-identical, natively tested) cut that renderer work by about 30%. HF-07 attribution: the Quality frame is CPU-bound on one thread; Vulkan render-thread stage 1 landed and gains nothing at the GPU-bound Ultra (within 0.4 ms, longer tails). Constant material registers restored on both renderers (they were never marked constant, so every surface evaluated its registers every view): 69-87% of register set-ups now take the parse-time block, saving 5-22 µs per frame in hub2, convoy2 and the airdefense1 arena, which whole-frame timings cannot resolve; see [Constant material registers](material-constant-registers.md). | Front-end and submission cost, stage 2 overlap, game-tic cost; shared with HF-07 and REN-07. |
 | FPS-09 — Not started | Prevention plan written (report section 9). | Suite in the release checklist, budgets as gates, cvar-default diff and attribution checks in CI. |
+| FPS-10 — Partial | Low drops stencil shadows and the light grid and holds 60 fps in six timed scenes on an Intel Iris Xe at 1080p (was 44-55 in combat and outdoors); Minimum and Low Power hold 30 ([performance presets](ui/performance-presets.md#low-end-measurements-24-november-2026)). | Auto-Detect's integrated-GPU tier (Balanced at 8 GB and up); Vulkan depth-capture blit and portal-sky cost on low-end GPUs; a decade-old CPU and an older iGPU (UHD 620 class) measured; OpenGL on the iGPU. |
 
 ### FPS task evidence and acceptance
 
@@ -2857,6 +2858,20 @@ are not yet measured.
   performance cost changes without a release note, the preset self-test, and the toggle
   ladder as the required before/after evidence in commits that touch post effects,
   shadows or presentation. Close when a release candidate has been gated by it once.
+- [ ] **FPS-10 — P1, qualification: the low tiers hold their caps on low-end PCs.**
+  Minimum and Low Power must hold 30 fps and Low 60 fps at native resolution on the
+  low-end hardware of the past decade, without lowering the render scale (presets
+  never change it). Measure each tier at its own frame cap with `performance_suite.py`
+  (old and new recipes interleaved, GPU phase timestamps for attribution) on an
+  integrated GPU at 1920x1080 on both backends, and on an older iGPU (Intel UHD 620
+  class) and a decade-old quad-core CPU where available; decide which tier Auto-Detect
+  gives integrated GPUs; reduce the engine costs that every tier pays on such GPUs
+  (the Vulkan depth capture's blit, the portal-sky view). Close when every low tier
+  holds its cap in the timed scenes on that hardware and Auto-Detect recommends a tier
+  that does. Completed so far (24 November 2026): Low no longer draws stencil shadows
+  or the light grid and holds 60 fps in all six timed scenes on the Intel Iris Xe at
+  1080p on Vulkan, where it ran 44-55 fps in combat and outdoors; Minimum and Low Power
+  hold 30 fps there ([performance presets](ui/performance-presets.md#low-end-measurements-24-november-2026)).
 
 ## Virtual reality
 

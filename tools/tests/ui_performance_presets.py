@@ -157,7 +157,8 @@ int main(){
   Seed();com_machineSpec.value=std::to_string(spec);Com_ExecMachineSpec_f({{"execMachineSpec"}});
   const char* names[]={"low","performance","balanced","ultra"};
   Check(cvars.calls.size()==55&&cvars.vars.at("com_performancePreset").value==names[spec],"actual compatibility command uses complete canonical expansion only");
-  Check(cvars.vars.at("r_shadows").value=="1","every stock quality choice keeps the original shadows");
+  // Stock Low maps to Low, which keeps its 60 Hz on low-end GPUs without shadows.
+  Check(cvars.vars.at("r_shadows").value==(spec==0?"0":"1"),"stock quality choices above Low keep the original shadows");
  }
  for(const char* spec:{"-1","4","2147483647"}){
   Seed();com_machineSpec.value=spec;Com_ExecMachineSpec_f({{"execMachineSpec"}});Check(cvars.calls.empty(),"unset or invalid stock spec is nondestructive");

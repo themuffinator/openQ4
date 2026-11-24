@@ -52,7 +52,7 @@ static void Profiles(){
  const std::vector<std::vector<int>> numbers={
  {0,0,0,30,1,1,1,512,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,24,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1,0},
  {0,0,0,30,1,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1,0},
- {0,0,0,60,2,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,1,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,1,0,0,0,0,0,4,1,1,1,1,1,0},
+ {0,0,0,60,2,1,1,1024,1,1,64,256,1,1,1,0,512,1,0,0,0,0,0,0,8,3,0,1,32,512,1,1,0,0,2048,4,1,4,1,0,0,0,0,0,0,0,4,1,1,1,1,1,0},
  {1,0,1,60,2,1,0,0,0,0,64,0,0,1,0,0,1024,2,0,0,0,0,0,1,16,4,0,1,40,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1,0},
  {2,2,1,120,4,1,0,0,0,0,64,0,0,1,0,0,1024,0,0,0,0,0,0,1,16,4,0,1,48,512,5,5,0,0,2048,8,3,8,1,0,1,0,0,0,0,0,4,1,1,1,1,1,0},
  {2,0,2,144,16,1,0,0,0,0,64,0,0,1,0,1,1024,0,1,1,1,0,0,1,16,4,0,1,48,512,5,5,0,0,4096,12,5,8,0,1,1,0,0,0,0,0,4,1,1,1,1,1,1},
@@ -211,11 +211,13 @@ static void Detection(){
   if(s.explicitLowPower||s.raspberryPi)Check(result.preset<=FindPerformancePreset("lowpower"),"low-power ceiling across hardware combinations");
   Check(result.systemRamMB>=0&&result.systemRamMB<=4194304&&result.videoRamMB>=0&&result.videoRamMB<=262144,"bounded telemetry");
  }
- // Shadows are the one feature the two lowest tiers drop, and nothing above does.
+ // Shadows are the one feature the three lowest tiers drop, and nothing above does:
+ // Low keeps 60 Hz on an Iris Xe class GPU at 1080p only without them.
  for(const auto& preset:PerformancePresets()){
   const std::string name=preset.name;
-  Check(preset.shadows==(name=="minimum"||name=="lowpower"?0:1),"only Minimum and Low Power draw no shadows");
-  Check(preset.useLightGrid==(name=="minimum"||name=="lowpower"?0:1),"only Minimum and Low Power skip the light grid");
+  const bool shadowless=name=="minimum"||name=="lowpower"||name=="low";
+  Check(preset.shadows==(shadowless?0:1),"only Minimum, Low Power and Low draw no shadows");
+  Check(preset.useLightGrid==(shadowless?0:1),"only Minimum, Low Power and Low skip the light grid");
   // Their 30 Hz cap is what stands automatic temporal AA down in the renderer.
   Check((preset.maxFps<=30)==(name=="minimum"||name=="lowpower"),"only Minimum and Low Power cap at 30 Hz");
  }
@@ -408,8 +410,8 @@ static void SystemVersion(){
  for(size_t i=revision.size();i<version.size();++i)
   Check((version[i]>='0'&&version[i]<='9')||(version[i]>='a'&&version[i]<='f'),"fingerprint is lower-case hex");
  Check(PerformancePresetFingerprintMachines()==9042,"detection matrix covers every GPU class, memory band, resolution class and platform ceiling");
- if(version!="1.ac7c9a1f")std::fprintf(stderr,"preset system version is %s\n",version.c_str());
- Check(version=="1.ac7c9a1f","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
+ if(version!="1.d7f4b595")std::fprintf(stderr,"preset system version is %s\n",version.c_str());
+ Check(version=="1.d7f4b595","pinned preset system version; a preset or detection change moves it: update this pin and the release notes");
 }
 int main(){
 #if defined(_WIN32) && defined(_DEBUG)

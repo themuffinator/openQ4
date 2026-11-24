@@ -12,6 +12,30 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Low holds 60 FPS on low-end graphics, 24 November 2026
+
+- **The Low preset holds its 60 FPS cap on low-end graphics again.** Since
+  the presets stopped lowering the resolution (23 November), Low drew every
+  pixel at native resolution, and on an Intel Iris Xe at 1080p it fell to
+  44-55 FPS in battles and open areas. Low now draws no shadows and skips the
+  light grid, as Low Power and Minimum do: it is Low Power's recipe at 60 FPS
+  with 2x anisotropic filtering. Performance is the first preset with Quake
+  4's original shadows, and the classic menu's Low quality uses the same
+  preset. The preset system version moves to `1.d7f4b595`, so players are
+  offered the system check once more.
+- Evidence: Vulkan on the Iris Xe in a 1920x1080 window, each preset at its
+  own cap, the old recipe forced by CVars and interleaved with the new one.
+  Combat ran 49.8/50.2 FPS before and 58.9/60.1 after (median frame work 19.4
+  to 9.2-11.4 ms); the effects scene 49.1 to 59.2-60.0, Air Defense outdoors
+  55.4 to 59.7-60.1. All six timed scenes hold 60 on Low and 30 on Low Power
+  and Minimum. GPU timestamps priced the stencil shadows at 3.9 ms and the
+  light grid at 1.2-1.9 ms of a 17.8 ms combat frame. Native preset tests, the
+  preset model with mutations, the pin check and the in-game Vulkan preset
+  smoke (readbacks in gameplay) pass. Details: [performance
+  presets](ui/performance-presets.md#low-end-measurements-24-november-2026).
+  Not yet run: OpenGL on an integrated GPU, an older iGPU or CPU. Auto-Detect
+  still gives integrated GPUs with 8 GB or more Balanced (FPS-10).
+
 ## Your own shadow under the big outdoor lamps, 24 November 2026
 
 - **Characters cast shadows again under Quake 4's huge outdoor lamps with

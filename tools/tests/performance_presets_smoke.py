@@ -149,11 +149,11 @@ def main():
             continue
         section = match[1]
         modern = name in ('enhanced', 'quality', 'ultra', 'maximum')
-        # Only the two tiers below the documented minimum hardware draw no shadows.
+        # Only the three tiers for the documented minimum hardware and below draw no shadows.
         # No preset changes the render scale or the display mode.
         expected = {'com_performancePreset': name, 'r_fullscreen': '0',
             'r_screenFraction': str(args.expected_scale), 'r_mode': '-1',
-            'r_shadows': str(int(name not in ('minimum', 'lowpower'))),
+            'r_shadows': str(int(name not in ('minimum', 'lowpower', 'low'))),
             'r_useShadowMap': str(int(modern)), 'r_ssao': str(int(modern)), 'r_hdrSceneTarget': str(int(modern))}
         for key, value in expected.items():
             if re.findall(rf'^"{key}" is:"([^"\n]+)"', section, re.M) != [value]:

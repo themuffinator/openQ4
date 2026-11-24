@@ -8,11 +8,12 @@ namespace {
 static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 	// The three bottom recipes are for hardware at and below the documented
 	// minimum (4 GiB RAM, a 1 GiB ARB2-class GPU). No preset lowers the render
-	// scale or the display resolution, so the two lowest also draw no shadows:
+	// scale or the display resolution, so none of the three draws shadows:
 	// no shadow volumes are built, submitted or filled. They also skip the
 	// light-grid indirect pass, an openQ4 addition to retail lighting that costs a
 	// full-screen pass, a depth copy and the map's grid atlases in shared memory.
-	// Their 30 Hz cap also stands automatic temporal AA down (r_temporalAA 2).
+	// The two lowest cap at 30 Hz, which also stands automatic temporal AA down
+	// (r_temporalAA 2).
 	//
 	// Minimum is the floor: software and limited renderers, 2 GiB systems.
 	{ "minimum", 0, "low",
@@ -27,13 +28,17 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 		1, 1024, 1, 1, 1, 1,
 		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
 		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1, 0 },
-	// Low is the documented minimum PC: the original stencil shadows at 60 Hz,
-	// with Low Power's reduced texture sizes.
+	// Low is the documented minimum PC at 60 Hz: Low Power's recipe with 2x
+	// anisotropic filtering. A GPU of the Intel Iris Xe class holds 60 Hz at
+	// 1080p only without the stencil shadows and the light grid: with them that
+	// GPU held Low at 43-50 Hz in combat (docs/dev/ui/performance-presets.md,
+	// "Low-end measurements").
+	// Performance is the first tier that draws them.
 	{ "low", 0, "low",
 		0, 0, 60,
 		2, 1024, 1, 1, 1, 1,
-		0, 512, 1, 0, 0, 0, 0, 0, 1, 8, 3,
-		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 1, 1, 0 },
+		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
+		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1, 0 },
 	{ "performance", 1, "baseline",
 		0, 1, 60,
 		2, 0, 0, 0, 1, 0,

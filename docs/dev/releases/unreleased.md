@@ -483,6 +483,11 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Upgrade Notes
 
+- **Low** no longer draws shadows, so it holds its 60 FPS cap on low-end
+  graphics. Select Low again (or accept the system check's recommendation) to
+  adopt it. If your PC can afford them, turn **Shadows** back on or choose
+  **Performance**, the first preset with Quake 4's original shadows.
+
 - If an earlier preset lowered your resolution scale (Performance 85%, Low and
   Low Power 75%, Minimum 50%, or less from Auto-Detect on a large display),
   the first start returns it to 100% once. A scale you set in `autoexec.cfg`,
@@ -554,6 +559,15 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- The **Low** preset holds its 60 FPS cap on low-end graphics again. Since the
+  presets stopped lowering the resolution, Low drew every pixel and fell to
+  44-55 FPS in battles and open areas on an Intel Iris Xe at 1080p. It now
+  leaves out shadows and the baked indirect light, as Low Power and Minimum
+  do, and stays at 60 FPS in every tested scene there with time to spare.
+  **Performance** is now the first preset with Quake 4's original shadows. The
+  classic menu's Low quality uses the same preset. Because the presets
+  changed, the game offers its graphics system check once more on the next
+  start.
 - Zooming in with the machine gun, nailgun or railgun, and crewing the
   air-defence cannon, cost far less: their scope pictures are drawn once and
   reused instead of being redrawn every frame (the railgun scope went from
