@@ -76,8 +76,14 @@ gave the pack-read and cache-write improvements.
   cold then warm: the cold load wrote 198 generated caches in the background
   with none failed, the warm loads hit all 198, logs carry no errors or
   warnings, and 3840x2160 shots from a 2560x1440 window show the full-frame
-  HUD on both renderers. Not yet run: a mirror scene, heat haze under TAA,
-  retained menu interaction in game, Linux and macOS.
+  HUD on both renderers. Mirrors: the only stock mirror is in medlabs' rescue
+  room (`map game/medlabs skipall`, then `setviewpos`), captured straight on,
+  40 units from the glass and at an angle, against the 0.15.0 release. In
+  0.15.0 the OpenGL reflection lost a lit wall panel and the ceiling edge that
+  Vulkan drew. Now both renderers draw them and match each other, and
+  `r_skipSubviewClip 1` changes nothing in that room. The logs have no errors
+  and the same warnings as 0.15.0. Not yet run: heat haze under TAA, retained
+  menu interaction in game, Linux and macOS.
 
 ## Low holds 60 FPS on low-end graphics, 24 November 2026
 
