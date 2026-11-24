@@ -422,6 +422,21 @@ bool R_MaterialResourceTable_ClassicCorridorPathEligible( const materialResource
 bool R_MaterialResourceTable_ClassicCorridorOnly( const materialResourceTableRecord_t &record );
 bool R_MaterialResourceTable_ClassicFixedMaterialEligible( const idMaterial *material );
 bool R_MaterialResourceTable_ClassicDiffuseMaterialEligible( const idMaterial *material );
+// REN-02: an ambient stage ARB2 adds over the lit surface (GL_ONE, GL_ONE: a
+// glow), which commutes with the interactions and the baked term, so the
+// classic walker can draw it over the composed modern frame exactly as it
+// draws it natively. OverlayStageCount is the number of such stages when the
+// lit stages are in the fixed class and every ambient stage is one, else -1.
+int R_MaterialResourceTable_ClassicOverlayStageCount( const idMaterial *material, const char **refusal = NULL );
+// Per frame: every active stage that reads destination alpha follows an active
+// stage of the same material that writes it.
+bool R_MaterialResourceTable_ClassicOverlayFrameReady( const idMaterial *material, const float *regs );
+// Per frame: a material perforated only by conditioned ambient stages, none
+// active, which ARB2 draws as an opaque surface (solid depth fill).
+bool R_MaterialResourceTable_ClassicConditionalCutoutInactive( const idMaterial *material, const float *regs );
+// The first reason ClassicCorridorPathEligible refuses a record, for the
+// census; NULL when it is eligible. The string lives until the next call.
+const char *R_MaterialResourceTable_ClassicCorridorRefusal( const materialResourceTableRecord_t &record );
 // PBR remains a separate ownership corridor: callers must never treat this as
 // permission to run the classic material shader path for a PBR record.
 bool R_MaterialResourceTable_PBRModernPathEligible( const materialResourceTableRecord_t &record );

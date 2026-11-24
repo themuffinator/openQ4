@@ -498,6 +498,11 @@ void R_ModernGLExecutor_DrawGBufferDebugOverlay( void );
 void R_ModernGLExecutor_DrawDeferredDebugOverlay( void );
 bool R_ModernGLExecutor_SubmitForwardPlusDecalSurface( const viewDef_t *viewDef, const drawSurf_t *sourceSurface );
 void R_ModernGLExecutor_ComposeVisibleSceneForPost( void );
+// REN-02: additive overlay stages of corridor-owned classic surfaces, which the
+// classic walker draws over the composed frame while this executor owns the
+// view's ambient pass.
+bool R_ModernGLExecutor_ClassicOverlaysPending( const viewDef_t *viewDef );
+bool R_ModernGLExecutor_ClassicOverlaySurface( const drawSurf_t *surf );
 void R_ModernGLExecutor_ComposeVisibleFrame( void );
 const modernGLExecutorStats_t &R_ModernGLExecutor_Stats( void );
 bool R_ModernGLExecutor_ModernVisibleRequestedForPost( void );

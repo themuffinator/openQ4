@@ -6,7 +6,8 @@ hands a lit frame back to the classic ARB2 light loop, and compares those
 reasons with the shared corridors already implemented. It is a supporting
 reference: scheduling stays in the roadmap. Taken from source on 6 November 2026;
 Progress, the stock-view census and the ownership design were added on
-23 November 2026. Function names are given instead of line numbers, which drift.
+23 November 2026, the stock shapes and a second census on 24 November.
+Function names are given instead of line numbers, which drift.
 
 ## Where things stand
 
@@ -25,8 +26,11 @@ Progress, the stock-view census and the ownership design were added on
     diffuse stage (added 6 November, see below).
   - **Classic fixed:** one or more bump, diffuse and specular stage sets, with
     texture matrices, vertex colour and stage expressions, opaque or a cutout
-    (see Progress). This class counts only inside the classic-lighting
-    corridor view.
+    (see Progress). Since 24 November also with ambient overlay stages the
+    classic walker draws over the composed frame (glows, mask-weighted
+    reflections, stages a stage expression keeps off), and on CPU-skinned or
+    front-end-deformed geometry. This class counts only inside the
+    classic-lighting corridor view.
 
   The proof also fails on:
   - any AMBIENT light, because the ambient normalization cube is unqualified;
@@ -414,6 +418,73 @@ overflows (`ClassicInteractionDomain.h`).
   modern program cold, about nine minutes per start on this machine; run the
   first batch after such an edit with `--timeout 3000`.
 
+- **24 November 2026, the stock shapes the census named.** Three shapes the
+  corridor now owns, each behind its own rollback bit, and census
+  diagnostics that name every refusal.
+  - **Overlay stages** (bit 4). The dominant stock material is a lit material
+    plus ambient stages that only add to it: `generic_glow_mi` and its
+    variants (strip and small lights, monster and marine glows), the marine
+    helmet and visor reflections (a `maskcolor` stage writes destination
+    alpha, then a `GL_DST_ALPHA, GL_ONE` cubemap adds through it), and the
+    corpse-burn guide's stages behind `if parm7`. The forward pass draws the
+    corridor's light and baked term, as before. The classic walker then draws
+    the overlay stages of exactly those surfaces over the composed frame,
+    with its own shader-pass walk in sort order and in the same pass as the
+    current-render feedback surfaces (`RB_DrawSurfNeedsPreFogLegacyDraw`).
+    The colour of such a stage does not depend on the lit colour beneath it,
+    so drawing it after the light is exact. The class
+    (`R_MaterialResourceTable_ClassicOverlayStageCount`):
+    - colour stages whose destination factor is `GL_ONE` and whose source
+      factor is one, the stage's own alpha, or the destination alpha written
+      earlier by a replacing alpha-only stage of the same material;
+    - alpha-only stages that replace the destination alpha; `(GL_ZERO,
+      GL_ONE)` stages, which ARB2 skips;
+    - any stage behind a stage expression, which must be off in every frame
+      the corridor owns (`R_MaterialResourceTable_ClassicOverlayFrameReady`).
+      A material perforated only by such stages is filled solid by ARB2 when
+      none is active (`RB_T_FillDepthBuffer`'s `drawSolid`), so the draw and
+      submit plans then give it the opaque forward program and an untested
+      depth draw for that frame
+      (`R_MaterialResourceTable_ClassicConditionalCutoutInactive`).
+
+    Stage colour, texgen and a stage's private polygon offset are admitted
+    with the class; ARB2 evaluates them. Excluded: alpha tests on an overlay
+    that is not conditioned, programs, generated coordinates that read the
+    scene, cinematics, partial colour masks, and any blend that reads or
+    replaces the lit colour. The corridor declines a view with overlays in
+    the laboratory's linear scene, where ARB2's display-referred glow would be
+    the wrong quantity (`overlay-linear-scene`), and in a view with a fog or
+    blend light, which would not fog a glow drawn after it
+    (`overlay-fog-blend`). The record takes its blend mode from the first
+    stage, so a glow listed first no longer refuses an opaque material.
+  - **CPU-skinned and other front-end-deformed receivers** (bit 8). Their
+    vertices are finished geometry in this frame's ambient cache, which both
+    the forward command and ARB2's interactions draw. The collector already
+    requires the two to share that cache. GPU-palette skinning and
+    material deforms still decline.
+  - **Census diagnostics.** `R_MaterialResourceTable_ClassicCorridorRefusal`
+    names the first reason a classic record is outside the corridor's class.
+    It is formatted only for the telemetry; the per-draw checks never format
+    it. It follows `interaction-without-command:` and the frame blocker's
+    fallback name (`stageColor/corridor:...`), the skinned decline gives the
+    skinning and deform modes, and a new `Modern material proof:` line in
+    `gfxInfo` names the first draw `MaterialLightingProven` refused.
+  - Controls, Windows OpenGL `gl45`, RTX 4060 Laptop GPU, shared machine:
+
+    | Control | Result |
+    | --- | --- |
+    | `production-fixed-overlay-display` | Owned (`exec=1 composed=1`), one overlay surface drawn by ARB2. Specimen byte-identical to native ARB2 (mean 0, max 0; native peak 195 against 176 without the glow) |
+    | `production-fixed-overlay-condition-display` | A glow switched off by `if ( parm7 > 0.5 )` and a parm-coloured glow: byte-identical |
+    | `production-fixed-overlay-mask-display` | `maskcolor` alpha writer and a `GL_DST_ALPHA, GL_ONE` stage: byte-identical |
+    | `production-fixed-grid-overlay-display` | The glow over baked light at `r_lightGridIntensity 2`, flat bump: mean 0.02 / max 1 levels, as its baseline `production-fixed-grid-strong-display` (0.02 / 1). With the bumped glow material it read 2.6 / 22, the open bump-mapped baked-light difference (Progress, 23 November) at ten times the laboratory's intensity, on and off the glow alike |
+    | `production-fixed-overlay-linear-fallback` | Declines by name in the linear scene |
+    | `production-fixed-overlay-off-fallback` | Bit 4 cleared: the frame declines to ARB2 |
+
+    Every earlier control passes on the final build: 46 fixed, 33 light-grid
+    (with the two new ones) and 9 isolated stencil and compose controls,
+    with the 10 overlay controls, 98 in all. The nine renderer self-tests
+    pass through `renderer_validation_matrix.py` against the stock install.
+
 ## Stock views (step 6)
 
 Step 6 measures CPU and GPU benefit against ARB2 on stock gameplay views once
@@ -426,7 +497,10 @@ The corridor now names its first reason for refusing a view in the
 | Token | The corridor refused because |
 | --- | --- |
 | `no-submit-plan`, `modern-quality-off`, `gbuffer-pipeline`, `msaa`, `no-scissor`, `enhanced-or-cel`, `program` | a frame-level precondition failed |
-| `skinned-or-deformed-geometry:<material>` | a classic receiver is skinned or deformed |
+| `skinned-or-deformed-geometry:<material>` | a classic receiver is GPU-skinned or deformed, or CPU-skinned with bit 8 cleared |
+| `overlay-linear-scene:<material>` | a material with overlay stages in the laboratory's linear scene, where ARB2's display-referred glow cannot be added |
+| `overlay-frame:<material>` | this frame a stage outside the overlay class is active (a burn stage once `parm7` is set), or a stage reads destination alpha its writer did not write |
+| `overlay-fog-blend:<light>` | a view with overlay stages and a fog or blend light, which would not fog or blend a glow drawn over the composed frame |
 | `material-shape:<material>` | a classic forward material is outside the corridor's class |
 | `depth-hack`, `negative-scale`, `second-view`, `viewport` | the draw or the frame's views are outside its single full-size root view |
 | `cutout-stage`, `baked-light-stage`, `rollback-stages` | step 1's single-stage sampling cannot stand for the material, or bit 1 is cleared |
@@ -469,6 +543,44 @@ stock work is not shadows or light grids. It is skinned receivers, lit
 surfaces whose ambient draw is not a forward opaque or cutout command, and
 the `stageColor` and `stageCondition` shapes on those models, which were not
 examined further.
+
+**Census of 24 November 2026**, the same poses and settings, after the
+overlay, front-end-geometry and conditional-cutout shapes (see Progress).
+Each refusal now names its material reason, and the census walked through
+six rounds of them on the way: skinned marine heads (`skin=1,deform=1`, a
+CPU-skinned mesh is a front-end-deformed surface), glows refused on the
+record's blend mode, the helmet's `maskcolor` and reflection stages
+(`overlay-flags-0x820`, texgen), and the corpse-burn guide on the hovertank
+wreck and harvester cans (`0x18000`, polygon offset and stage colour behind
+`if parm7`). Still no frame is owned (`exec=0` at all eight):
+
+| Poses | Corridor's reason | Frame's first refusal (`Modern material proof:`) |
+| --- | --- | --- |
+| 6 | `translucent-interaction` on `textures/decals/stain01bwet`, a lit translucent decal | `support1_2` in another view: corridor-eligible, but the corridor had declined |
+| 2 | none: the corridor is ready, with 15 overlay surfaces | `models/vehicles/hovertank/nht_decal1`, an unlit `GL_DST_COLOR, GL_SRC_COLOR` decal in the corridor's view |
+
+What the census now names comes in two shapes:
+
+- **Unlit ambient surfaces in the corridor's view.** `MaterialLightingProven`
+  refuses every ambient draw outside its lit classes, and stock frames are
+  full of unlit decals, glass, sky and effects. The overlay hand-off is the
+  pattern for them: let the classic walker draw such surfaces in sort order
+  over the composed frame, pre-fog and post-fog. It needs the order against
+  the baked term (ARB2 adds baked light after the pre-fog ambient pass, so a
+  modulating decal does not darken it) and against modern-drawn fog and
+  blend lights, which the overlay rule already declines.
+- **Lit translucent receivers** (`translucent-interaction`), which the
+  corridor does not collect; the sealed interaction stream already seals
+  them (step 5).
+
+**What requesting the path costs, 24 November.** Shared machine again; same
+eight poses, 240 frames each: ARB2 4, 6, 3, 3, 4, 6, 3, 4 ms (mean 4.1), the
+modern path requested 8, 9, 6, 6, 12, 8, 8, 7 ms (mean 8.0). The two poses
+where the corridor is now ready had first cost 96 and 37 ms. For every lit
+surface of every light the corridor searched the whole submit plan for the
+surface's command, which a frame refused early had never reached. It now
+looks the command up by vertex cache (`rg_modernClassicCommandHash`), and
+those poses cost 6 ms.
 
 ## One owner per pass (step 5 design)
 
@@ -588,4 +700,7 @@ translucent receivers.
    against ARB2 and qualify the promotion tokens with real evidence, before any
    parity mask, auto-promotion or core-profile default changes. Not reached:
    no stock view is owned ([census](#stock-views-step-6)). The stock shapes
-   that census names come first.
+   that census names come first. On 24 November the lit shapes it named
+   (glow and reflection overlays, CPU-skinned receivers, the conditioned
+   burn stages) became corridor-owned. Its next names are unlit ambient
+   surfaces in the corridor's view and lit translucent receivers.
