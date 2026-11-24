@@ -2472,15 +2472,19 @@ static bool VK_PBRHasMatchingDepthCoverage( const drawSurf_t *surf ) {
 static bool VK_PBRDirectMaterial( const drawSurf_t *surf,
 		vkPBRDirectInteraction_t &out ) {
 	memset( &out, 0, sizeof( out ) );
+	// Every ambient stage and interaction draw asks this, and stock content
+	// has no PBR material: answer that before walking the material's stages.
+	if ( surf == NULL || surf->material == NULL || !surf->material->HasPBR() ) {
+		return false;
+	}
 	if ( !r_rendererModernQuality.GetBool() || !r_pbrMaterials.GetBool() || r_skipBump.GetBool()
 			|| r_skipDiffuse.GetBool() || r_skipSpecular.GetBool()
-			|| surf == NULL || surf->material == NULL
 			|| !VK_PBRHasSingleClassicInteractionTopology( surf ) ) {
 		return false;
 	}
 
 	const idMaterial *material = surf->material;
-	if ( !material->HasPBR() || !VK_PBRHasMatchingDepthCoverage( surf ) ) {
+	if ( !VK_PBRHasMatchingDepthCoverage( surf ) ) {
 		return false;
 	}
 	const materialResourceTableRecord_t *resourceRecord =
@@ -2921,7 +2925,7 @@ static void VK_PBR_SubmitPrepared( VkCommandBuffer cmd, const vkPBRPreparedDraw_
 	vkCmdSetDepthWriteEnable( cmd, VK_FALSE );
 	vkCmdSetStencilTestEnable( cmd, VK_FALSE );
 	VK_Device_CountDrawIndexed( prepared.geo->numIndexes, prepared.geo->numVerts );
-	vkCmdDrawIndexed( cmd, uint32_t( prepared.geo->numIndexes ), 1, 0, 0, 0 );
+	vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( prepared.geo->numIndexes ), 1, 0, 0, 0 );
 }
 
 bool VK_PBR_NativeOpaqueSurface( const drawSurf_t *surf ) {
@@ -3564,7 +3568,7 @@ static void VK_DrawSingleInteractionMode( const drawInteraction_t *din,
 	vkCmdPushConstants( interPass.cmd, layout,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 	VK_Device_CountDrawIndexed( geo->numIndexes, geo->numVerts );
-	vkCmdDrawIndexed( interPass.cmd, (uint32_t)geo->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( interPass.cmd, VK_Device_DrawIndexCount( geo->numIndexes ), 1, 0, 0, 0 );
 	if ( geo != din->surf->geo && din->surf->geo->numIndexes > 0 ) {
 		// Subsequent classic/material-program stages retain their own subset.
 		VK_Exec_BindTriGeometry( interPass.cmd, interPass.slot, din->surf->geo );
@@ -3728,7 +3732,7 @@ static void VK_DrawCustomLightingStage( const shaderStage_t *surfaceStage,
 					GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE | GLS_DEPTHMASK, false, &customInter ) ) { return; }
 		const srfTriangles_t *geo = customInter.surf->geo;
 		VK_Device_CountDrawIndexed( geo->numIndexes, geo->numVerts );
-		vkCmdDrawIndexed( interPass.cmd, geo->numIndexes, 1, 0, 0, 0 );
+		vkCmdDrawIndexed( interPass.cmd, VK_Device_DrawIndexCount( geo->numIndexes ), 1, 0, 0, 0 );
 		++interPass.drawCount;
 		// The stock descriptor prefix is incompatible with authored programs.
 		// The following stage may reuse this same light and space, so restore
@@ -4595,7 +4599,7 @@ static bool VK_StencilShadowPass( const drawSurf_t *drawSurfs ) {
 				continue;
 			}
 #endif
-			vkCmdDrawIndexed( cmd, (uint32_t)numIndexes, 1, 0, 0, 0 );
+			vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( numIndexes ), 1, 0, 0, 0 );
 			interPass.volumeDrawCount++;
 			backEnd.pc.c_shadowElements++;
 			backEnd.pc.c_shadowIndexes += numIndexes;
@@ -4625,7 +4629,7 @@ static bool VK_StencilShadowPass( const drawSurf_t *drawSurfs ) {
 					VK_STENCIL_OP_DECREMENT_AND_WRAP, VK_COMPARE_OP_ALWAYS );
 			vkCmdSetStencilOp( cmd, backSidedFace, VK_STENCIL_OP_KEEP, VK_STENCIL_OP_INCREMENT_AND_WRAP,
 					VK_STENCIL_OP_INCREMENT_AND_WRAP, VK_COMPARE_OP_ALWAYS );
-			vkCmdDrawIndexed( cmd, (uint32_t)numIndexes, 1, 0, 0, 0 );
+			vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( numIndexes ), 1, 0, 0, 0 );
 			interPass.volumeDrawCount++;
 			interPass.volumePreloadCount++;
 			backEnd.pc.c_shadowElements++;
@@ -4638,7 +4642,7 @@ static bool VK_StencilShadowPass( const drawSurf_t *drawSurfs ) {
 				VK_STENCIL_OP_KEEP, VK_COMPARE_OP_ALWAYS );
 		vkCmdSetStencilOp( cmd, backSidedFace, VK_STENCIL_OP_KEEP, VK_STENCIL_OP_DECREMENT_AND_WRAP,
 				VK_STENCIL_OP_KEEP, VK_COMPARE_OP_ALWAYS );
-		vkCmdDrawIndexed( cmd, (uint32_t)numIndexes, 1, 0, 0, 0 );
+		vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( numIndexes ), 1, 0, 0, 0 );
 		interPass.volumeDrawCount++;
 		backEnd.pc.c_shadowElements++;
 		backEnd.pc.c_shadowIndexes += numIndexes;
@@ -4772,7 +4776,9 @@ static void VK_CreateSingleDrawInteractions( const drawSurf_t *surf ) {
 	// Only the final decomposition submit may own a complete PBR BRDF.
 	// The topology check also makes every intermediate flush impossible for an
 	// admitted material; false admission leaves every classic draw untouched.
-	const bool pbrOwnerEligible = VK_PBRHasSingleClassicInteractionTopology( surf );
+	// Stock content has no PBR material, and VK_PBRDirectMaterial admits none
+	// without one, so such a surface skips the walk over its stages.
+	const bool pbrOwnerEligible = surfaceShader->HasPBR() && VK_PBRHasSingleClassicInteractionTopology( surf );
 	for ( int lightStageNum = 0 ; lightStageNum < lightStageCount ; lightStageNum++ ) {
 		if ( preparing && vkPBRTransparentView.failed ) {
 			break;
@@ -6978,7 +6984,7 @@ static void VK_T_BasicFog( const drawSurf_t *surf ) {
 	}
 
 	VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-	vkCmdDrawIndexed( interPass.cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( interPass.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 	interPass.fogDrawCount++;
 }
 
@@ -7165,7 +7171,7 @@ static void VK_T_BlendLight( const drawSurf_t *surf ) {
 	}
 
 	VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-	vkCmdDrawIndexed( interPass.cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( interPass.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 	interPass.blendDrawCount++;
 }
 

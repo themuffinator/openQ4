@@ -698,6 +698,11 @@ static struct {
 	VkDescriptorSet allocated[ VK_MAX_IMAGES + VK_MAX_RETIRED_SETS ];
 } vkPBRDescriptorCheckpoint;
 static bool vkGpuSkinningBackendRequested = true;
+// Set once the front end has handed any surface to the compute pass
+// (R_BackendGpuSkinning_PrepareAmbientCache, the only place a surface becomes
+// deferred). Until then a view has nothing to repair, and its surface and
+// light lists are not walked to learn that: r_gpuSkinning is off by default.
+static bool vkGpuSkinningEverDeferred = false;
 
 typedef struct vkSceneScaleState_s {
 	bool			active;
@@ -835,6 +840,8 @@ static vkPipelineTarget_t VK_Exec_SwapchainPipelineTarget( void ) {
 	return target;
 }
 
+static void VK_StaticGeo_PrintInfo( bool reset );
+
 void VK_Exec_PrintResourceInfo( bool reset ) {
 	int resident = 0, retired = 0;
 	for ( int i = 0; i < VK_MAX_IMAGES; ++i ) {
@@ -849,6 +856,7 @@ void VK_Exec_PrintResourceInfo( bool reset ) {
 		(unsigned long long)vkResourceProfile.ringAllocations, (unsigned long long)vkResourceProfile.targetChanges,
 		(unsigned long long)vkResourceProfile.renderingScopes, (unsigned long long)vkResourceProfile.barriers,
 		(unsigned long long)vkResourceProfile.submissions );
+	VK_StaticGeo_PrintInfo( reset );
 	if ( reset ) { memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) ); }
 }
 
@@ -1021,6 +1029,467 @@ static int VK_Ring_Reserve( vkRing_t &ring, size_t bytes, int alignment ) {
 	}
 	ring.cursor = static_cast<int>( offset + bytes );
 	return static_cast<int>( offset );
+}
+
+/*
+===============================================================================
+
+	Resident static geometry
+
+	The frame rings hold everything a frame draws, copied in every frame.
+	For a level's still scenery that copy is the same bytes each time, and it
+	was the largest single cost of the back end: on Air Defense 1 at 1080p
+	about 2.8 MB of vertices a frame, a fifth of the time spent executing the
+	command list. OpenGL keeps the same streams in buffer objects that are
+	uploaded once.
+
+	A vertex stream of the vertex cache that outlives its frame is therefore
+	copied once into a persistent buffer and drawn from there. Identity comes
+	from the cache header and the serial of its allocation (vertCache_t): the
+	header alone would not do, because the cache recycles headers at once.
+	A stream becomes resident when it is still the same allocation
+	VK_STATIC_GEO_PROMOTE_MSEC after it was first drawn, which keeps what an
+	animated model rebuilds every game tic in the rings. Frame temporaries,
+	the frame snapshot's copies (r_vkRenderThread 2) and surfaces the compute
+	pass may skin never qualify.
+
+	Nothing here is told when the cache frees a block: its headers are
+	released on the front end, possibly while a frame is being drawn. A
+	recycled header is recognised by its new serial at its next draw, and
+	streams that are no longer drawn give their space back when the buffer
+	fills. A released range returns to the allocator only once every frame
+	slot has opened again, which is when the frames that could have read it
+	have finished.
+
+	VK_Exec_UploadTriGeometry reports a resident stream as its offset with
+	VK_STATIC_GEO_FLAG set; VK_Exec_VertexStream turns either form into the
+	buffer and offset to bind.
+
+===============================================================================
+*/
+static idCVar r_vkStaticGeometry( "r_vkStaticGeometry", "1", CVAR_RENDERER | CVAR_INTEGER,
+	"keep vertex streams that outlive a frame in a persistent buffer instead of copying them into the frame ring "
+	"every frame: 0 = copy every frame, 1 = resident, 2 = resident and compare each one with its source at every "
+	"draw (qualification)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+static idCVar r_vkStaticGeometryMegs( "r_vkStaticGeometryMegs", "96", CVAR_RENDERER | CVAR_INTEGER,
+	"size in MiB of the buffer resident vertex streams live in; applies when the buffer is next created "
+	"(vid_restart)", 8, 512 );
+
+static const int VK_STATIC_GEO_FLAG = 0x40000000;		// the offset is in the resident buffer, not the frame ring
+static const int VK_STATIC_GEO_MAX_ENTRIES = 32768;
+static const int VK_STATIC_GEO_HASH_SIZE = 32768;		// power of two
+static const int VK_STATIC_GEO_PROMOTE_MSEC = 150;
+static const unsigned int VK_STATIC_GEO_IDLE_FRAMES = 600;	// not drawn for this long: forgotten, or evicted under pressure
+static const int VK_STATIC_GEO_SWEEP_PER_FRAME = 256;
+static const unsigned int VK_STATIC_GEO_FULL_BACKOFF_FRAMES = 30;
+
+typedef struct vkStaticGeoEntry_s {
+	const vertCache_t *		key;			// NULL: free
+	unsigned long long		serial;			// the allocation the entry describes
+	int						firstSeenMsec;
+	unsigned int			lastUsedFrame;
+	int						offset;			// in the resident buffer; -1 while streamed
+	int						bytes;
+	VmaVirtualAllocation	allocation;
+	int						hashNext;		// next in its bucket, or in the free list
+} vkStaticGeoEntry_t;
+
+typedef struct vkStaticGeoRetired_s {
+	VmaVirtualAllocation	allocation;
+	unsigned int			frame;
+} vkStaticGeoRetired_t;
+
+static struct vkStaticGeo_s {
+	VkBuffer				buffer;
+	VmaAllocation			allocation;
+	VmaVirtualBlock			block;
+	unsigned char *			mapped;
+	int						capacity;
+	bool					failed;			// no buffer this session: everything stays in the rings
+	bool					tableReady;
+	unsigned int			frame;			// executor frames begun
+	unsigned int			slotFrame[ VK_FRAMES_IN_FLIGHT ];	// the frame each slot last opened for
+	int						frameMsec;
+	int						dirtyBegin;		// host-written range not yet flushed
+	int						dirtyEnd;
+	unsigned int			fullUntilFrame;	// no promotions before this frame: the buffer had no room
+	int						pressureSlices;	// sweep slices left in which idle resident streams give way
+	int						sweepCursor;
+	int						freeHead;
+	int						numEntries;
+	int						numRetired;
+	int						residentCount;
+	long long				residentBytes;
+	// since the last report reset
+	uint64					hits, hitBytes, promotions, promotedBytes, recycled, evictions, declined, mismatches;
+	int						hash[ VK_STATIC_GEO_HASH_SIZE ];
+	vkStaticGeoEntry_t		entries[ VK_STATIC_GEO_MAX_ENTRIES ];
+	vkStaticGeoRetired_t	retired[ VK_STATIC_GEO_MAX_ENTRIES ];
+} vkStaticGeo;
+
+static void VK_StaticGeo_ResetTable( void ) {
+	for ( int i = 0; i < VK_STATIC_GEO_HASH_SIZE; i++ ) {
+		vkStaticGeo.hash[ i ] = -1;
+	}
+	for ( int i = 0; i < VK_STATIC_GEO_MAX_ENTRIES; i++ ) {
+		vkStaticGeo.entries[ i ].key = NULL;
+		vkStaticGeo.entries[ i ].offset = -1;
+		vkStaticGeo.entries[ i ].hashNext = i + 1 < VK_STATIC_GEO_MAX_ENTRIES ? i + 1 : -1;
+	}
+	vkStaticGeo.freeHead = 0;
+	vkStaticGeo.numEntries = 0;
+	vkStaticGeo.numRetired = 0;
+	vkStaticGeo.residentCount = 0;
+	vkStaticGeo.residentBytes = 0;
+	vkStaticGeo.sweepCursor = 0;
+	vkStaticGeo.pressureSlices = 0;
+	vkStaticGeo.fullUntilFrame = 0;
+	vkStaticGeo.dirtyBegin = vkStaticGeo.dirtyEnd = 0;
+	for ( int i = 0; i < VK_FRAMES_IN_FLIGHT; i++ ) {
+		vkStaticGeo.slotFrame[ i ] = vkStaticGeo.frame;
+	}
+	vkStaticGeo.tableReady = true;
+}
+
+// With the executor: every range dies with the buffer, and no frame is in flight.
+static void VK_StaticGeo_Shutdown( void ) {
+	if ( vkStaticGeo.block != VK_NULL_HANDLE ) {
+		vmaClearVirtualBlock( vkStaticGeo.block );
+		vmaDestroyVirtualBlock( vkStaticGeo.block );
+	}
+	if ( vkStaticGeo.buffer != VK_NULL_HANDLE ) {
+		vmaDestroyBuffer( vkCtx.allocator, vkStaticGeo.buffer, vkStaticGeo.allocation );
+	}
+	memset( &vkStaticGeo, 0, sizeof( vkStaticGeo ) );
+}
+
+static bool VK_StaticGeo_EnsureBuffer( void ) {
+	if ( vkStaticGeo.buffer != VK_NULL_HANDLE ) {
+		return true;
+	}
+	if ( vkStaticGeo.failed ) {
+		return false;
+	}
+	const int megs = idMath::ClampInt( 8, 512, r_vkStaticGeometryMegs.GetInteger() );
+	const int capacity = megs * 1024 * 1024;
+
+	VkBufferCreateInfo bci;
+	memset( &bci, 0, sizeof( bci ) );
+	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bci.size = (VkDeviceSize)capacity;
+	bci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	// Written from the host once per stream and read by the device from then
+	// on, like the rings it relieves.
+	VmaAllocationCreateInfo vaci;
+	memset( &vaci, 0, sizeof( vaci ) );
+	vaci.usage = VMA_MEMORY_USAGE_AUTO;
+	vaci.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
+	VmaAllocationInfo info;
+	VmaVirtualBlockCreateInfo vbci;
+	memset( &vbci, 0, sizeof( vbci ) );
+	vbci.size = (VkDeviceSize)capacity;
+	if ( vmaCreateBuffer( vkCtx.allocator, &bci, &vaci, &vkStaticGeo.buffer, &vkStaticGeo.allocation, &info ) != VK_SUCCESS
+			|| info.pMappedData == NULL
+			|| vmaCreateVirtualBlock( &vbci, &vkStaticGeo.block ) != VK_SUCCESS ) {
+		if ( vkStaticGeo.buffer != VK_NULL_HANDLE ) {
+			vmaDestroyBuffer( vkCtx.allocator, vkStaticGeo.buffer, vkStaticGeo.allocation );
+		}
+		vkStaticGeo.buffer = VK_NULL_HANDLE;
+		vkStaticGeo.allocation = VK_NULL_HANDLE;
+		vkStaticGeo.block = VK_NULL_HANDLE;
+		vkStaticGeo.failed = true;
+		common->Warning( "Vulkan: no %d MiB buffer for resident static geometry; every stream is copied each frame", megs );
+		return false;
+	}
+	vkStaticGeo.mapped = (unsigned char *)info.pMappedData;
+	vkStaticGeo.capacity = capacity;
+	common->Printf( "Vulkan: resident static geometry buffer: %d MiB\n", megs );
+	return true;
+}
+
+static ID_INLINE int VK_StaticGeo_Hash( const vertCache_t *cache ) {
+	// headers are block-allocated 72 bytes apart: mix before masking
+	const uintptr_t value = reinterpret_cast<uintptr_t>( cache ) >> 3;
+	return static_cast<int>( ( static_cast<unsigned int>( value ) * 2654435761u ) >> 17 ) & ( VK_STATIC_GEO_HASH_SIZE - 1 );
+}
+
+static vkStaticGeoEntry_t *VK_StaticGeo_Find( const vertCache_t *cache ) {
+	for ( int index = vkStaticGeo.hash[ VK_StaticGeo_Hash( cache ) ]; index >= 0;
+			index = vkStaticGeo.entries[ index ].hashNext ) {
+		if ( vkStaticGeo.entries[ index ].key == cache ) {
+			return &vkStaticGeo.entries[ index ];
+		}
+	}
+	return NULL;
+}
+
+// The range may still be read by a frame in flight: it returns to the
+// allocator from VK_StaticGeo_BeginFrame. False when the list is full, and
+// the entry must then keep its range.
+static bool VK_StaticGeo_RetireRange( vkStaticGeoEntry_t &entry ) {
+	if ( entry.offset < 0 ) {
+		return true;
+	}
+	if ( vkStaticGeo.numRetired >= VK_STATIC_GEO_MAX_ENTRIES ) {
+		return false;
+	}
+	vkStaticGeoRetired_t &retired = vkStaticGeo.retired[ vkStaticGeo.numRetired++ ];
+	retired.allocation = entry.allocation;
+	retired.frame = vkStaticGeo.frame;
+	vkStaticGeo.residentCount--;
+	vkStaticGeo.residentBytes -= entry.bytes;
+	entry.offset = -1;
+	entry.bytes = 0;
+	entry.allocation = VK_NULL_HANDLE;
+	return true;
+}
+
+static void VK_StaticGeo_Remove( vkStaticGeoEntry_t &entry ) {
+	const int index = static_cast<int>( &entry - vkStaticGeo.entries );
+	int *link = &vkStaticGeo.hash[ VK_StaticGeo_Hash( entry.key ) ];
+	while ( *link >= 0 && *link != index ) {
+		link = &vkStaticGeo.entries[ *link ].hashNext;
+	}
+	if ( *link == index ) {
+		*link = entry.hashNext;
+	}
+	entry.key = NULL;
+	entry.hashNext = vkStaticGeo.freeHead;
+	vkStaticGeo.freeHead = index;
+	vkStaticGeo.numEntries--;
+}
+
+static vkStaticGeoEntry_t *VK_StaticGeo_Insert( const vertCache_t *cache ) {
+	const int index = vkStaticGeo.freeHead;
+	if ( index < 0 ) {
+		return NULL;
+	}
+	vkStaticGeoEntry_t &entry = vkStaticGeo.entries[ index ];
+	vkStaticGeo.freeHead = entry.hashNext;
+	const int bucket = VK_StaticGeo_Hash( cache );
+	entry.key = cache;
+	entry.serial = cache->serial;
+	entry.firstSeenMsec = vkStaticGeo.frameMsec;
+	entry.lastUsedFrame = vkStaticGeo.frame;
+	entry.offset = -1;
+	entry.bytes = 0;
+	entry.allocation = VK_NULL_HANDLE;
+	entry.hashNext = vkStaticGeo.hash[ bucket ];
+	vkStaticGeo.hash[ bucket ] = index;
+	vkStaticGeo.numEntries++;
+	return &entry;
+}
+
+// Once per executor frame, after the frame slot's fence has been waited.
+static void VK_StaticGeo_BeginFrame( const int slot ) {
+	if ( !vkStaticGeo.tableReady ) {
+		VK_StaticGeo_ResetTable();
+	}
+	vkStaticGeo.frame++;
+	vkStaticGeo.frameMsec = Sys_Milliseconds();
+	if ( slot >= 0 && slot < VK_FRAMES_IN_FLIGHT ) {
+		vkStaticGeo.slotFrame[ slot ] = vkStaticGeo.frame;
+	}
+
+	// A range retired in frame R may have been drawn by R or by the frame in
+	// flight before it. A slot's fence is waited when the slot opens again,
+	// so the range is free once every slot has opened for a later frame.
+	unsigned int settledFrame = vkStaticGeo.slotFrame[ 0 ];
+	for ( int i = 1; i < VK_FRAMES_IN_FLIGHT; i++ ) {
+		settledFrame = Min( settledFrame, vkStaticGeo.slotFrame[ i ] );
+	}
+	int kept = 0;
+	for ( int i = 0; i < vkStaticGeo.numRetired; i++ ) {
+		const vkStaticGeoRetired_t &retired = vkStaticGeo.retired[ i ];
+		if ( settledFrame > retired.frame ) {
+			if ( vkStaticGeo.block != VK_NULL_HANDLE ) {
+				vmaVirtualFree( vkStaticGeo.block, retired.allocation );
+			}
+		} else {
+			vkStaticGeo.retired[ kept++ ] = retired;
+		}
+	}
+	vkStaticGeo.numRetired = kept;
+
+	// A slice of the table each frame: entries of blocks that are no longer
+	// drawn (most were freed long ago) leave it, and under pressure so do
+	// resident streams nothing has drawn for a while.
+	const bool pressure = vkStaticGeo.pressureSlices > 0;
+	if ( pressure ) {
+		vkStaticGeo.pressureSlices--;
+	}
+	for ( int i = 0; i < VK_STATIC_GEO_SWEEP_PER_FRAME; i++ ) {
+		vkStaticGeoEntry_t &entry = vkStaticGeo.entries[ vkStaticGeo.sweepCursor ];
+		vkStaticGeo.sweepCursor = ( vkStaticGeo.sweepCursor + 1 ) & ( VK_STATIC_GEO_MAX_ENTRIES - 1 );
+		if ( entry.key == NULL || vkStaticGeo.frame - entry.lastUsedFrame <= VK_STATIC_GEO_IDLE_FRAMES ) {
+			continue;
+		}
+		if ( entry.offset >= 0 ) {
+			if ( !pressure || !VK_StaticGeo_RetireRange( entry ) ) {
+				continue;
+			}
+			vkStaticGeo.evictions++;
+		}
+		VK_StaticGeo_Remove( entry );
+	}
+}
+
+// Before the queue submit that reads what this frame wrote.
+static bool VK_StaticGeo_Flush( void ) {
+	if ( vkStaticGeo.dirtyEnd <= vkStaticGeo.dirtyBegin || vkStaticGeo.buffer == VK_NULL_HANDLE ) {
+		return true;
+	}
+	const VkResult result = vmaFlushAllocation( vkCtx.allocator, vkStaticGeo.allocation,
+			(VkDeviceSize)vkStaticGeo.dirtyBegin, (VkDeviceSize)( vkStaticGeo.dirtyEnd - vkStaticGeo.dirtyBegin ) );
+	vkStaticGeo.dirtyBegin = vkStaticGeo.dirtyEnd = 0;
+	return result == VK_SUCCESS;
+}
+
+static bool VK_StaticGeo_Promote( vkStaticGeoEntry_t &entry, const vertCache_t *cache ) {
+	if ( vkStaticGeo.frame < vkStaticGeo.fullUntilFrame || cache->size <= 0 || !VK_StaticGeo_EnsureBuffer()
+			|| cache->size > vkStaticGeo.capacity ) {
+		return false;
+	}
+	VmaVirtualAllocationCreateInfo vaci;
+	memset( &vaci, 0, sizeof( vaci ) );
+	vaci.size = (VkDeviceSize)cache->size;
+	vaci.alignment = 64;
+	VmaVirtualAllocation allocation = VK_NULL_HANDLE;
+	VkDeviceSize offset = 0;
+	if ( vmaVirtualAllocate( vkStaticGeo.block, &vaci, &allocation, &offset ) != VK_SUCCESS ) {
+		// Idle streams make room over the next sweeps; until then this one
+		// is streamed like any other.
+		vkStaticGeo.pressureSlices = VK_STATIC_GEO_MAX_ENTRIES / VK_STATIC_GEO_SWEEP_PER_FRAME;
+		vkStaticGeo.fullUntilFrame = vkStaticGeo.frame + VK_STATIC_GEO_FULL_BACKOFF_FRAMES;
+		vkStaticGeo.declined++;
+		return false;
+	}
+	memcpy( vkStaticGeo.mapped + offset, static_cast<const byte *>( cache->virtMem ) + cache->offset,
+			static_cast<size_t>( cache->size ) );
+	const int begin = static_cast<int>( offset );
+	const int end = begin + cache->size;
+	if ( vkStaticGeo.dirtyEnd <= vkStaticGeo.dirtyBegin ) {
+		vkStaticGeo.dirtyBegin = begin;
+		vkStaticGeo.dirtyEnd = end;
+	} else {
+		vkStaticGeo.dirtyBegin = Min( vkStaticGeo.dirtyBegin, begin );
+		vkStaticGeo.dirtyEnd = Max( vkStaticGeo.dirtyEnd, end );
+	}
+	entry.offset = begin;
+	entry.bytes = cache->size;
+	entry.allocation = allocation;
+	vkStaticGeo.residentCount++;
+	vkStaticGeo.residentBytes += cache->size;
+	vkStaticGeo.promotions++;
+	vkStaticGeo.promotedBytes += cache->size;
+	return true;
+}
+
+// A stream whose bytes are about to change in place (the deferred-skinning
+// repair) loses its resident copy.
+static void VK_StaticGeo_Forget( const vertCache_t *cache ) {
+	if ( cache == NULL || !vkStaticGeo.tableReady ) {
+		return;
+	}
+	vkStaticGeoEntry_t *entry = VK_StaticGeo_Find( cache );
+	if ( entry != NULL && VK_StaticGeo_RetireRange( *entry ) ) {
+		VK_StaticGeo_Remove( *entry );
+	}
+}
+
+/*
+====================
+VK_StaticGeo_VertexOffset
+
+The resident form of tri's vertex stream (its offset with VK_STATIC_GEO_FLAG),
+or -1 when the caller must stream it into the frame ring. The caller has
+validated tri->ambientCache as a CPU-backed block of at least vertexBytes.
+====================
+*/
+static int VK_StaticGeo_VertexOffset( const srfTriangles_t *tri, const size_t vertexBytes ) {
+	const int mode = r_vkStaticGeometry.GetInteger();
+	const vertCache_t *cache = tri->ambientCache;
+	if ( mode == 0 || vkStaticGeo.failed || !vkStaticGeo.tableReady
+			|| cache->tag != TAG_USED || cache->serial == 0 ) {
+		return -1;
+	}
+	// The compute pass replaces such a surface's stream, or the repair after
+	// it rewrites the block in place.
+	if ( vkGpuSkinningEverDeferred ) {
+		const srfTriangles_t *owner = tri->ambientSurface != NULL ? tri->ambientSurface : tri;
+		if ( owner->gpuSkinningDeferred || R_GpuSkinning_IsCandidate( owner ) ) {
+			return -1;
+		}
+	}
+
+	vkStaticGeoEntry_t *entry = VK_StaticGeo_Find( cache );
+	if ( entry == NULL ) {
+		(void)VK_StaticGeo_Insert( cache );
+		return -1;
+	}
+	if ( entry->serial != cache->serial ) {
+		// the header was recycled: another allocation, seen for the first time
+		if ( !VK_StaticGeo_RetireRange( *entry ) ) {
+			return -1;
+		}
+		entry->serial = cache->serial;
+		entry->firstSeenMsec = vkStaticGeo.frameMsec;
+		entry->lastUsedFrame = vkStaticGeo.frame;
+		vkStaticGeo.recycled++;
+		return -1;
+	}
+	entry->lastUsedFrame = vkStaticGeo.frame;
+	if ( entry->offset < 0 ) {
+		if ( vkStaticGeo.frameMsec - entry->firstSeenMsec < VK_STATIC_GEO_PROMOTE_MSEC
+				|| !VK_StaticGeo_Promote( *entry, cache ) ) {
+			return -1;
+		}
+	} else if ( mode == 2 && memcmp( vkStaticGeo.mapped + entry->offset,
+			static_cast<const byte *>( cache->virtMem ) + cache->offset, static_cast<size_t>( entry->bytes ) ) != 0 ) {
+		// qualification: a resident stream must equal its source for as long
+		// as the allocation lives
+		const uint64 count = ++vkStaticGeo.mismatches;
+		if ( ( count & ( count - 1 ) ) == 0 ) {
+			common->Warning( "Vulkan: resident stream of %d bytes differs from its source (%llu so far); it is streamed again",
+				entry->bytes, static_cast<unsigned long long>( count ) );
+		}
+		if ( VK_StaticGeo_RetireRange( *entry ) ) {
+			entry->firstSeenMsec = vkStaticGeo.frameMsec;
+		}
+		return -1;
+	}
+	if ( vertexBytes > static_cast<size_t>( entry->bytes ) ) {
+		return -1;
+	}
+	vkStaticGeo.hits++;
+	vkStaticGeo.hitBytes += vertexBytes;
+	return VK_STATIC_GEO_FLAG | entry->offset;
+}
+
+// The buffer and offset to bind for a vertex stream VK_Exec_UploadTriGeometry
+// reported: the resident buffer or this frame's ring.
+static ID_INLINE VkBuffer VK_Exec_VertexStream( const int slot, const int vertexOffset, VkDeviceSize &bindOffset ) {
+	if ( ( vertexOffset & VK_STATIC_GEO_FLAG ) != 0 ) {
+		bindOffset = static_cast<VkDeviceSize>( vertexOffset & ~VK_STATIC_GEO_FLAG );
+		return vkStaticGeo.buffer;
+	}
+	bindOffset = static_cast<VkDeviceSize>( vertexOffset );
+	return vkExec.vertexRings[ slot ].buffer;
+}
+
+static void VK_StaticGeo_PrintInfo( const bool reset ) {
+	common->Printf( "Vulkan static geometry: mode=%d buffer=%dMiB resident=%d residentBytes=%lld tracked=%d retired=%d "
+		"hits=%llu hitBytes=%llu promotions=%llu promotedBytes=%llu recycled=%llu evictions=%llu declined=%llu mismatches=%llu\n",
+		r_vkStaticGeometry.GetInteger(), vkStaticGeo.capacity / ( 1024 * 1024 ),
+		vkStaticGeo.residentCount, vkStaticGeo.residentBytes, vkStaticGeo.numEntries, vkStaticGeo.numRetired,
+		static_cast<unsigned long long>( vkStaticGeo.hits ), static_cast<unsigned long long>( vkStaticGeo.hitBytes ),
+		static_cast<unsigned long long>( vkStaticGeo.promotions ), static_cast<unsigned long long>( vkStaticGeo.promotedBytes ),
+		static_cast<unsigned long long>( vkStaticGeo.recycled ), static_cast<unsigned long long>( vkStaticGeo.evictions ),
+		static_cast<unsigned long long>( vkStaticGeo.declined ), static_cast<unsigned long long>( vkStaticGeo.mismatches ) );
+	if ( reset ) {
+		vkStaticGeo.hits = vkStaticGeo.hitBytes = vkStaticGeo.promotions = vkStaticGeo.promotedBytes = 0;
+		vkStaticGeo.recycled = vkStaticGeo.evictions = vkStaticGeo.declined = vkStaticGeo.mismatches = 0;
+	}
 }
 
 static int VK_Exec_UniformSliceAlignment( const int sliceBytes ) {
@@ -4262,6 +4731,7 @@ void VK_GuiExecutor_Shutdown( void ) {
 			vmaDestroyBuffer( vkCtx.allocator, vkExec.uniformRings[ i ].buffer, vkExec.uniformRings[ i ].allocation );
 		}
 	}
+	VK_StaticGeo_Shutdown();
 	memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) );
 	memset( &vkExec, 0, sizeof( vkExec ) );
 }
@@ -4639,6 +5109,7 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 	vkExec.vertexRings[ slot ].cursor = 0;
 	vkExec.indexRings[ slot ].cursor = 0;
 	vkExec.uniformRings[ slot ].cursor = 0;
+	VK_StaticGeo_BeginFrame( slot );
 	VK_Exec_BakedBeginFrame( slot );
 	VK_MaterialPrograms_BeginFrame( slot );
 	if ( r_vkResourceProfile.GetBool() ) { ++vkResourceProfile.frames; }
@@ -8360,6 +8831,12 @@ static bool VK_GuiExecutor_SubmitFrame( bool present ) {
 	// consumes it, instead of once per allocation. vmaFlushAllocation rounds to
 	// nonCoherentAtomSize and clamps to the allocation, and is a no-op on the
 	// HOST_COHERENT memory VMA hands us on desktop.
+	if ( !VK_StaticGeo_Flush() ) {
+		VK_GpuFrameTiming_SubmitFailed( slot );
+		vkExec.acquireWaitPending = false; vkExec.frameOpen = false;
+		VK_Device_BlockPresentation( RDP_SUBMIT_FAILED, VK_ERROR_UNKNOWN, "static geometry flush" );
+		return false;
+	}
 	{
 		vkRing_t *frameRings[ 3 ] = {
 			&vkExec.vertexRings[ slot ], &vkExec.indexRings[ slot ], &vkExec.uniformRings[ slot ] };
@@ -8957,6 +9434,7 @@ static void VK_GpuSkinning_RepairDeferredSurface( srfTriangles_t *tri ) {
 	if ( !VK_Exec_CPUCacheValid( tri->ambientCache, false, vertexBytes ) ) {
 		return;
 	}
+	VK_StaticGeo_Forget( tri->ambientCache );
 	memcpy( vertexCache.Position( tri->ambientCache ), tri->verts, vertexBytes );
 	const unsigned int memoIndex = static_cast<unsigned int>(
 			( reinterpret_cast<uintptr_t>( tri->ambientCache ) >> 4 )
@@ -8997,7 +9475,7 @@ already holds.
 ====================
 */
 static void VK_GpuSkinning_RepairDeferredView( const viewDef_t *viewDef ) {
-	if ( viewDef == NULL ) {
+	if ( viewDef == NULL || !vkGpuSkinningEverDeferred ) {
 		return;
 	}
 	if ( viewDef->drawSurfs != NULL ) {
@@ -9100,9 +9578,14 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 			if ( !freshGui && memo.vertKey == vertKey && vertKey != NULL ) {
 				vertexOffset = memo.vertexOffset;
 			} else {
-				const idDrawVert *verts = (const idDrawVert *)vertexCache.Position( tri->ambientCache );
-				vertexOffset = VK_Ring_Alloc( vkExec.vertexRings[ slot ], verts,
-					static_cast<size_t>( tri->numVerts ) * sizeof( idDrawVert ), 64 );
+				// A stream that outlives its frame is drawn from its resident
+				// copy; everything else is copied into this frame's ring.
+				vertexOffset = freshGui ? -1 : VK_StaticGeo_VertexOffset( tri, vertexBytes );
+				if ( vertexOffset < 0 ) {
+					const idDrawVert *verts = (const idDrawVert *)vertexCache.Position( tri->ambientCache );
+					vertexOffset = VK_Ring_Alloc( vkExec.vertexRings[ slot ], verts,
+						static_cast<size_t>( tri->numVerts ) * sizeof( idDrawVert ), 64 );
+				}
 				if ( vertexOffset < 0 ) {
 					return false;
 				}
@@ -9182,10 +9665,9 @@ bool VK_Exec_BindTriGeometry( VkCommandBuffer cmd, int slot,
 		return false;
 	}
 
-	const VkDeviceSize vertexBindOffset =
-		static_cast<VkDeviceSize>( vertexOffset );
-	vkCmdBindVertexBuffers( cmd, 0, 1,
-		&vkExec.vertexRings[ slot ].buffer, &vertexBindOffset );
+	VkDeviceSize vertexBindOffset;
+	const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, vertexOffset, vertexBindOffset );
+	vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &vertexBindOffset );
 	vkCmdBindIndexBuffer( cmd, vkExec.indexRings[ slot ].buffer,
 		static_cast<VkDeviceSize>( indexOffset ), VK_INDEX_TYPE_UINT32 );
 	vkExec.boundVertexOffset = vertexOffset;	// the cube-texgen path re-binds binding 0 alongside its dir stream
@@ -9394,18 +9876,15 @@ void VK_Exec_SetViewScissor( VkCommandBuffer cmd, const viewDef_t *viewDef, int 
 	VK_Exec_SetScissorRect( cmd, viewDef, viewDef->scissor, fbHeight );
 }
 
-// mvp for a surface's space: GL projection (with the id depth hacks) times
-// the space's modelview, then the Vulkan clip-z fixup. cl_gunfov's weapon
-// projection refit is not carried into the module (rare tuner cvar).
+// mvp for a surface's space: GL projection (with the id depth hacks, and the
+// view weapon's own field of view under cl_gunfov) times the space's
+// modelview, then the Vulkan clip-z fixup. Every pass that draws a surface
+// builds its transform here or from the same helper, so the depth fill, the
+// lights and the EQUAL-tested stages of the weapon agree.
 void VK_BuildSurfMVP( const viewDef_t *viewDef, const drawSurf_t *drawSurf, float outMvp[ 16 ] ) {
 	const struct viewEntity_s *space = drawSurf->space;
 	float proj[ 16 ];
-	memcpy( proj, viewDef->projectionMatrix, sizeof( proj ) );
-	if ( space->modelDepthHack != 0.0f ) {
-		proj[ 14 ] -= space->modelDepthHack;
-	} else if ( space->weaponDepthHack ) {
-		proj[ 14 ] *= 0.25f;
-	}
+	R_GetDepthHackProjectionMatrix( viewDef, space->weaponDepthHack, space->modelDepthHack, proj );
 	float mvpGL[ 16 ];
 	myGlMultMatrix( space->modelViewMatrix, proj, mvpGL );
 	VK_FixupClipSpaceZ( outMvp, mvpGL );
@@ -9635,6 +10114,67 @@ bool VK_Exec_BindTransientVertices( VkCommandBuffer cmd, const void *data, int b
 	}
 	const VkDeviceSize bindOffset = (VkDeviceSize)offset;
 	vkCmdBindVertexBuffers( cmd, 0, 1, &vkExec.vertexRings[ slot ].buffer, &bindOffset );
+	return true;
+}
+
+/*
+====================
+VK_Exec_DrawAmbientFloor
+
+RB_STD_ForceAmbient (draw_common.cpp): r_forceAmbient, the Ambient Light
+setting, lifts the whole view once its ambient and light-grid passes are in,
+dst + ambient * ( 1 - dst ). One triangle covers the view's scissor through
+the GUI pipeline and the white image, with OpenGL's blend and neither depth
+nor stencil tested. OpenGL's other source of the floor, the 0.2 it adds while
+its ARB interaction programs are unusable, has no Vulkan counterpart. Returns
+true when it drew; the caller's next pass latches its own state, as after the
+other overlays of VK_SceneEffects_DrawPreFog.
+====================
+*/
+bool VK_Exec_DrawAmbientFloor( const viewDef_t *viewDef ) {
+	const float ambient = idMath::ClampFloat( 0.0f, 1.0f, r_forceAmbient.GetFloat() );
+	if ( ambient <= 0.0f || viewDef == NULL || viewDef->viewEntitys == NULL
+			|| !vkExec.frameOpen || !vkExec.mainScopeOpen || vkExec.cmd == VK_NULL_HANDLE ) {
+		return false;
+	}
+	VkCommandBuffer cmd = vkExec.cmd;
+	const VkDescriptorSet white = VK_GuiExecutor_GetImageDescriptor( globalImages->whiteImage->GetDeviceHandle() );
+	// a perforated surface drawn just before may have left its coverage flag set
+	vkExec.alphaToCoverageSurface = false;
+	const VkPipeline pipeline = VK_GuiExecutor_GetPipeline( GLS_SRCBLEND_ONE_MINUS_DST_COLOR | GLS_DSTBLEND_ONE );
+	if ( white == VK_NULL_HANDLE || pipeline == VK_NULL_HANDLE ) {
+		return false;
+	}
+	idDrawVert vertices[ 3 ];
+	memset( vertices, 0, sizeof( vertices ) );
+	vertices[ 0 ].xyz.Set( -1.0f, -1.0f, 0.5f );
+	vertices[ 1 ].xyz.Set( 3.0f, -1.0f, 0.5f );
+	vertices[ 2 ].xyz.Set( -1.0f, 3.0f, 0.5f );
+	if ( !VK_Exec_BindTransientVertices( cmd, vertices, sizeof( vertices ) )
+			|| !VK_Exec_SetViewViewport( cmd, viewDef, 1.0f ) ) {
+		return false;
+	}
+	// the scissor may be smaller than the viewport for subviews
+	VK_Exec_SetViewScissor( cmd, viewDef, VK_Exec_ActiveFramebufferHeight() );
+	vkCmdSetDepthTestEnable( cmd, VK_FALSE );
+	vkCmdSetDepthWriteEnable( cmd, VK_FALSE );
+	vkCmdSetDepthCompareOp( cmd, VK_COMPARE_OP_ALWAYS );
+	vkCmdSetDepthBiasEnable( cmd, VK_FALSE );
+	vkCmdSetStencilTestEnable( cmd, VK_FALSE );
+	vkCmdSetCullMode( cmd, VK_CULL_MODE_NONE );	// so mirror views also get it
+
+	vkGuiPushConstants_t push;
+	memset( &push, 0, sizeof( push ) );
+	push.mvp[ 0 ] = push.mvp[ 5 ] = push.mvp[ 10 ] = push.mvp[ 15 ] = 1.0f;
+	push.stageColor[ 0 ] = push.stageColor[ 1 ] = push.stageColor[ 2 ] = ambient;
+	push.stageColor[ 3 ] = 1.0f;
+	push.texMatrixS[ 0 ] = 1.0f;
+	push.texMatrixT[ 1 ] = 1.0f;
+	vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline );
+	vkCmdBindDescriptorSets( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkExec.pipelineLayout, 0, 1, &white, 0, NULL );
+	vkCmdPushConstants( cmd, vkExec.pipelineLayout,
+			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+	vkCmdDraw( cmd, 3, 1, 0, 0 );
 	return true;
 }
 
@@ -11255,7 +11795,7 @@ static bool VK_Exec_DrawBumpyProgramStage( const viewDef_t *viewDef,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			0, sizeof( push ), &push );
 	VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-	vkCmdDrawIndexed( vkExec.cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( vkExec.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 	return true;
 }
 
@@ -11377,7 +11917,7 @@ static bool VK_Exec_DrawRefractiveGlassStage( const viewDef_t *viewDef,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			0, sizeof( push ), &push );
 	VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-	vkCmdDrawIndexed( vkExec.cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( vkExec.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 	return true;
 }
 
@@ -11809,9 +12349,8 @@ bool VK_Exec_BuildAuthoredMaterialUniforms( const viewDef_t *viewDef, const draw
         }
     }
     memcpy( block.modelView.data(), drawSurf->space->modelViewMatrix, sizeof( float ) * 16 );
-    memcpy( block.projection.data(), viewDef->projectionMatrix, sizeof( float ) * 16 );
-    if ( drawSurf->space->modelDepthHack != 0.0f ) { block.projection[14] -= drawSurf->space->modelDepthHack; }
-    else if ( drawSurf->space->weaponDepthHack ) { block.projection[14] *= 0.25f; }
+    R_GetDepthHackProjectionMatrix( viewDef, drawSurf->space->weaponDepthHack,
+        drawSurf->space->modelDepthHack, block.projection.data() );
     myGlMultMatrix( block.modelView.data(), block.projection.data(), block.modelViewProjection.data() );
     VK_FixupClipSpaceZ( block.modelViewProjectionVulkan.data(), block.modelViewProjection.data() );
     for ( int i = 0; i < oq4material::MaxTextureMatrices; ++i ) {
@@ -11846,7 +12385,7 @@ static bool VK_Exec_DrawGLSLProgramStage( const viewDef_t *viewDef,
         if ( !VK_MaterialPrograms_Bind( newStage, block, stage->drawStateBits, separateColor ) ) { return false; }
         VK_Exec_SetProgramStageDepthState( vkExec.cmd, stage, worldDepthState );
         VK_Device_CountDrawIndexed( tri->numIndexes, tri->numVerts );
-        vkCmdDrawIndexed( vkExec.cmd, tri->numIndexes, 1, 0, 0, 0 );
+        vkCmdDrawIndexed( vkExec.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
         return true;
     }
 
@@ -12023,7 +12562,7 @@ static bool VK_Exec_DrawGLSLProgramStage( const viewDef_t *viewDef,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			0, sizeof( push ), &push );
 	VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-	vkCmdDrawIndexed( vkExec.cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( vkExec.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 
 	static bool loggedFamily[ VK_GLSL_PROGRAM_FAMILY_COUNT ];
 	if ( !loggedFamily[ family ] ) {
@@ -12645,12 +13184,8 @@ static bool VK_Exec_BuildARBMaterialUniforms( const viewDef_t *viewDef, const dr
 		}
 	}
 	memcpy( block.modelView.data(), drawSurf->space->modelViewMatrix, sizeof( float ) * 16 );
-	memcpy( block.projection.data(), viewDef->projectionMatrix, sizeof( float ) * 16 );
-	if ( drawSurf->space->modelDepthHack != 0.0f ) {
-		block.projection[ 14 ] -= drawSurf->space->modelDepthHack;
-	} else if ( drawSurf->space->weaponDepthHack ) {
-		block.projection[ 14 ] *= 0.25f;
-	}
+	R_GetDepthHackProjectionMatrix( viewDef, drawSurf->space->weaponDepthHack,
+		drawSurf->space->modelDepthHack, block.projection.data() );
 	myGlMultMatrix( block.modelView.data(), block.projection.data(), block.modelViewProjection.data() );
 	VK_FixupClipSpaceZ( block.modelViewProjectionVulkan.data(), block.modelViewProjection.data() );
 	// The ARB material path loads no texture matrix.
@@ -12703,7 +13238,7 @@ static bool VK_Exec_DrawARBProgramStage( const viewDef_t *viewDef,
 	}
 	VK_Exec_SetProgramStageDepthState( vkExec.cmd, stage, worldDepthState );
 	VK_Device_CountDrawIndexed( tri->numIndexes, tri->numVerts );
-	vkCmdDrawIndexed( vkExec.cmd, tri->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( vkExec.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 	return true;
 }
 
@@ -12812,7 +13347,7 @@ static void VK_Exec_DrawProgramStage( const viewDef_t *viewDef,
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 				0, sizeof( push ), &push );
 		VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-		vkCmdDrawIndexed( vkExec.cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+		vkCmdDrawIndexed( vkExec.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 
 		static bool loggedMonochromeProgram = false;
 		if ( !loggedMonochromeProgram ) {
@@ -13019,7 +13554,7 @@ static void VK_Exec_DrawProgramStage( const viewDef_t *viewDef,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 			0, sizeof( push ), &push );
 	VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-	vkCmdDrawIndexed( vkExec.cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+	vkCmdDrawIndexed( vkExec.cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 
 	static bool loggedHeatHazeFamily[ 4 ] = { false, false, false, false };
 	const int logIndex = family - VK_MATERIAL_PROGRAM_FAMILY_HEAT_HAZE;
@@ -13333,8 +13868,10 @@ static void VK_Exec_DrawAmbientStages( const viewDef_t *viewDef, const drawSurf_
 			if ( dirOffset < 0 ) {
 				continue;
 			}
-			VkBuffer dirBuffers[ 2 ] = { vkExec.vertexRings[ slot ].buffer, vkExec.vertexRings[ slot ].buffer };
-			VkDeviceSize dirOffsets[ 2 ] = { (VkDeviceSize)vkExec.boundVertexOffset, (VkDeviceSize)dirOffset };
+			// binding 0 is the surface's stream, resident or in the ring
+			VkDeviceSize dirOffsets[ 2 ] = { 0, (VkDeviceSize)dirOffset };
+			VkBuffer dirBuffers[ 2 ] = { VK_Exec_VertexStream( slot, vkExec.boundVertexOffset, dirOffsets[ 0 ] ),
+				vkExec.vertexRings[ slot ].buffer };
 			vkCmdBindVertexBuffers( cmd, 0, 2, dirBuffers, dirOffsets );
 		}
 
@@ -13552,7 +14089,7 @@ static void VK_Exec_DrawAmbientStages( const viewDef_t *viewDef, const drawSurf_
 		vkCmdPushConstants( cmd, stageLayout,
 				VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 		VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-		vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+		vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 
 		if ( stagePolygonOffset ) {
 			if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
@@ -13955,8 +14492,8 @@ void VK_Exec_BindPreparedTriGeometry( VkCommandBuffer cmd, int slot,
 			|| vertexOffset < 0 || indexOffset < 0 ) {
 		return;
 	}
-	const VkBuffer vertexBuffer = vkExec.vertexRings[ slot ].buffer;
-	const VkDeviceSize bindOffset = static_cast<VkDeviceSize>( vertexOffset );
+	VkDeviceSize bindOffset;
+	const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, vertexOffset, bindOffset );
 	vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &bindOffset );
 	vkCmdBindIndexBuffer( cmd, vkExec.indexRings[ slot ].buffer,
 		static_cast<VkDeviceSize>( indexOffset ), VK_INDEX_TYPE_UINT32 );
@@ -13965,8 +14502,8 @@ void VK_Exec_BindPreparedTriGeometry( VkCommandBuffer cmd, int slot,
 
 static void VK_ClassicGui_BindPreparedGeometry( VkCommandBuffer cmd, int slot,
 		const vkClassicGuiDrawPlan_t &plan ) {
-	const VkBuffer vertexBuffer = vkExec.vertexRings[ slot ].buffer;
-	const VkDeviceSize vertexOffset = static_cast<VkDeviceSize>( plan.vertexOffset );
+	VkDeviceSize vertexOffset;
+	const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, plan.vertexOffset, vertexOffset );
 	vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &vertexOffset );
 	vkCmdBindIndexBuffer( cmd, vkExec.indexRings[ slot ].buffer,
 		static_cast<VkDeviceSize>( plan.indexOffset ), VK_INDEX_TYPE_UINT32 );
@@ -15211,9 +15748,8 @@ static void VK_ClassicWorldAmbient_DrawPhase(
 		if ( drawPlan.draw->phase != phase ) {
 			continue;
 		}
-		const VkBuffer vertexBuffer = vkExec.vertexRings[slot].buffer;
-		const VkDeviceSize vertexOffset =
-			static_cast<VkDeviceSize>( drawPlan.vertexOffset );
+		VkDeviceSize vertexOffset;
+		const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, drawPlan.vertexOffset, vertexOffset );
 		vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &vertexOffset );
 		vkCmdBindIndexBuffer( cmd, vkExec.indexRings[slot].buffer,
 			static_cast<VkDeviceSize>( drawPlan.indexOffset ),
@@ -15687,7 +16223,7 @@ static bool VK_Exec_FillDepthSurface( VkCommandBuffer cmd, int slot, const viewD
 			vkCmdPushConstants( cmd, vkExec.pipelineLayout,
 					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 			VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-			vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+			vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 			if ( stagePolygonOffset ) {
 				if ( shader->TestMaterialFlag( MF_POLYGONOFFSET ) ) {
 					vkCmdSetDepthBias( cmd, r_offsetUnits.GetFloat() * shader->GetPolygonOffset(), 0.0f, r_offsetFactor.GetFloat() );
@@ -15721,7 +16257,7 @@ static bool VK_Exec_FillDepthSurface( VkCommandBuffer cmd, int slot, const viewD
 			vkCmdPushConstants( cmd, vkExec.pipelineLayout,
 					VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
 			VK_Device_CountDrawIndexed( (int)( tri->numIndexes ), (int)( tri->numVerts ) );
-			vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+			vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 		}
 	}
 
@@ -16446,6 +16982,7 @@ bool R_BackendGpuSkinning_PrepareAmbientCache( srfTriangles_t *tri,
 	}
 	if ( tri != NULL ) {
 		tri->gpuSkinningDeferred = true;
+		vkGpuSkinningEverDeferred = true;
 		vkExec.gpuSkinningDeferredSurfaces++;
 	}
 	return false;

@@ -1308,8 +1308,11 @@ def validate_shadow_depth_format_selection() -> None:
         (
             "vkCtx.shadowDepthFormat = VK_FORMAT_UNDEFINED;",
             "VK_FORMAT_D24_UNORM_S8_UINT,",
-            "VK_FORMAT_D32_SFLOAT_S8_UINT,",
+            # No shadow consumer reads stencil, so a device without packed
+            # 24-bit depth (AMD, Apple) takes four-byte float depth before the
+            # eight-byte stencil-carrying form: same depth, half the memory.
             "VK_FORMAT_D32_SFLOAT,",
+            "VK_FORMAT_D32_SFLOAT_S8_UINT,",
             "VK_FORMAT_X8_D24_UNORM_PACK32,",
             "VK_FORMAT_D16_UNORM,",
             "VK_FORMAT_FEATURE_2_DEPTH_STENCIL_ATTACHMENT_BIT",

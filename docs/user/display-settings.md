@@ -552,6 +552,8 @@ Settings ("console variables") can be typed in the console or added to your conf
 | `r_vkPresentationRecoveries` | `3` | How many times a session Vulkan restarts itself after a driver reset. |
 | `r_vkTextureMemoryLimit` | `0` | MiB of video memory Vulkan fills before it loads textures at a lower resolution. `0` uses 90% of the driver's budget. See [when textures don't fit](#when-textures-dont-fit-in-video-memory). |
 | `r_vkRenderThread` | `0` | Experimental Vulkan render thread mode (`0` to `2`). |
+| `r_vkStaticGeometry` | `1` | Vulkan keeps level geometry on the graphics card instead of copying it every frame. `0` copies every frame, as before; the picture is the same either way. |
+| `r_vkStaticGeometryMegs` | `96` | MiB set aside for that geometry (8 to 512). Applies after **Restart Renderer** or `vid_restart`. |
 | `rendererDevices` | | Lists graphics cards and their IDs. |
 | `gfxInfo` | | Prints the renderer, graphics card, anti-aliasing state and any fallback reason. |
 | `rendererMotionBlurStatus` | | Prints what motion blur did and why any views were skipped; `reset` clears the counts. |

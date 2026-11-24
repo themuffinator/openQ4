@@ -75,8 +75,17 @@ def check_frame() -> None:
     require_order(function_body(system, "static bool R_IssueRenderCommandsOnRenderThread("),
                   "if ( !R_RenderThread_Begin(", "R_ScenePackets_SealFrame();",
                   "inline reconstruction keeps previous history until retirement")
-    require_order(end, "const int previousBackEndMsec = backEnd.pc.msec;", "R_IssueRenderCommandsOnRenderThread()",
-                  "timing readback must not race the worker's counters")
+    # EndFrame reports the back-end time CompleteBackEndFrame kept on the main
+    # thread: backEnd.pc is the worker's once the frame is handed over, and
+    # CompleteBackEndFrame clears it before an inline EndFrame could read it
+    # (com_speeds' back-end column was zero on every renderer).
+    if "backEnd.pc.msec" in end:
+        raise AssertionError("timing readback must not race the worker's counters, or read them once cleared")
+    if end.count("*backEndMsec = r_completedBackEndMsec;") != 2:
+        raise AssertionError("both EndFrame paths report the completed frame's back-end time")
+    complete_frame = function_body(system, "void idRenderSystemLocal::CompleteBackEndFrame(")
+    require_order(complete_frame, "r_completedBackEndMsec = backEnd.pc.msec;", "R_PerformanceCounters();",
+                  "the back-end time is kept before the counters are cleared")
     debug = read(RENDERER / "tr_rendertools.cpp")
     for name in ("ClearDebugText", "AddDebugText", "ClearDebugLines", "AddDebugLine", "ClearDebugPolygons", "AddDebugPolygon"):
         require_sync(debug, "void RB_" + name + "(", "debug primitives shared with the backend")

@@ -648,8 +648,8 @@ and untested drivers remain open, with no tolerance or support-tier change.
 | VK-03 — Closed | Complete driver inventories, bounded automatic adapter retry, explicit-device preservation and failure/restart controls pass. | Preserve cleanup invariants; broader physical adapters remain VK-01. |
 | VK-04 — Partial | Authored GLSL/ARB, reload repair, source eviction and native resource limits pass; real uniform, pipeline and driver descriptor-refusal pressure recover on NVIDIA/Intel; OpenGL clip-space depth through `VK_EXT_depth_clip_control` removes the three stencil pixels. | The strict lighting image gate (one point-map and one projected-map shadow-filter pixel on NVIDIA, more on Intel) and broader authored-lighting/mod content. |
 | VK-05 — Partial | Exposure-domain changes, late-failure cleanup and in-frame HDR cubemap fixes pass scoped GPU controls; classic stock stages stay display-referred by decision, with a byte-identical, qualified fallback. | Tiled/out-of-frame captures and authored-post combinations of admitted (PBR) views. |
-| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. | Improved frame-time tails from a promoted optimization on a declared workload; preserve ordering and restart lifetimes before promotion. |
-| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. Tiled (larger-than-window) captures, direct and through the game-owned post target, pass on OpenGL and on Vulkan with NVIDIA and Intel. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix. |
+| VK-06 — Partial | Resource counters and measured deferral decisions exist; image reload residency is fixed; five-cycle NVIDIA/Intel/GL soaks pass, with residual image growth attributed to bounded front-end pools. Resident static geometry is promoted: about half the per-frame geometry upload time and ring traffic on Air Defense 1, with bit-identical output. | Presented frame-time tails for the promoted optimization on a quiet machine; static index streams; the whole-light cascade cache and layered point cubes OpenGL has. |
+| VK-07 — Partial | Failed-write handling, MSAA resize/restart/cubemap comparisons, 50–200% depth/intensity views, nested/legacy-cropped remote views, cropped `envshot` faces and multisampled window views (GUI `renderDef`, remote captures), stencil shadow/light-count views and prints, and the weapon depth hack pass on NVIDIA. Tiled (larger-than-window) captures, direct and through the game-owned post target, pass on OpenGL and on Vulkan with NVIDIA and Intel. The Ambient Light and Weapon FOV settings, `r_skipRender`, `r_singleTriangle`, the debug clear colours and the back-end counters now behave as on OpenGL. | Multisampled lit-geometry edges (4x) and Intel/other-vendor MSAA edge parity, other clipping combinations and bounded deferred resources across the broader matrix; portal fade quads, `levelshotProbe` depth, Gaussian sample-array parameters and debug object labels. |
 | VK-08 — Not started | Only an 8-bit sRGB swapchain; the RGBA16F scene, stock and PBR tone curves and automatic exposure exist (VK-05). | HDR10/scRGB swapchain and metadata, SDL3 display state with live switching, a peak-targeted output transform, paper-white interface composition, settings and calibration, SDR captures, and review on a physical HDR display. |
 
 ### VK task evidence and acceptance
@@ -861,6 +861,26 @@ and untested drivers remain open, with no tolerance or support-tier change.
   defects. This closes the long-session plateau evidence. What remains is
   promoting an optimization with improved frame-time tails, which the
   measured deferral decisions above do not yet justify.
+  Progress, 24 November: [resident static geometry](vulkan-resource-profiling.md#resident-static-geometry-24-november-2026)
+  is the first promoted optimization. A CPU profile of the Air Defense 1
+  sweep put 23.5% of the back end in copying geometry into the frame rings
+  every frame. Vertex streams that outlive their frame are now copied once
+  into a persistent buffer (`r_vkStaticGeometry`, default 1), keyed on the
+  vertex cache header and a new per-allocation serial so a recycled header
+  can never alias. In one launch with interleaved windows the upload time
+  fell from 439 to 238 microseconds a frame at a still view and from 527 to
+  262 in a sweep, and ring traffic about halved. Frozen captures are
+  bit-identical off, on and after a restart; the comparing mode
+  (`r_vkStaticGeometry 2`) found nothing in about 60,000 draws; a native
+  harness covers the lifetime rules. Shadow maps on devices without packed
+  24-bit depth (AMD, Apple) take plain 32-bit float depth instead of the
+  stencil-carrying form nothing read, half the memory, bit-identical here
+  through the `r_vkShadowDepthFormatTest` drill. Still open: the presented
+  frame-time tails this task asks for (no quiet machine or sampling profiler
+  after the change), index streams, and two OpenGL shadow-map savings
+  Vulkan lacks: the whole-light cascade's cached still scenery
+  (`r_shadowMapCascadeFarCache`) and one layered target per point cube
+  (`r_shadowMapPointLayered`).
 - [ ] **VK-07 — P2, qualification: capture and developer diagnostics.** Compare
   Vulkan debug views and engine captures with their GL contracts for color/depth/
   stencil interpretation, cubemap faces, nested targets, clipping/depth hacks,
@@ -930,6 +950,23 @@ and untested drivers remain open, with no tolerance or support-tier change.
   light-count images and their printed overdraw then match exactly at 0x and
   4x, and the weapon depth hack's depth view is within one level. At 4x, lit
   geometry edges still differ in up to 20 pixels, by up to 8 levels.
+  Progress, 24 November (OpenGL parity audit): a walk of the OpenGL back end
+  against Vulkan's, pass by pass and cvar by cvar, found settings and
+  diagnostics Vulkan ignored. Fixed, each compared with OpenGL in frozen
+  captures: the Ambient Light setting (`r_forceAmbient`: the lift is +66.8
+  display levels on OpenGL and +66.9 on Vulkan at the same view, where
+  Vulkan drew none); the Weapon FOV setting (`cl_gunfov`, with its temporal
+  motion vectors); `r_skipRender`; `r_singleTriangle`, which the `benchmark`
+  command's "single tri" row depends on; the frame clear colours the debug
+  tools pick (`r_clear` forms, `r_showOverDraw`, `r_lockSurfaces`,
+  `r_singleArea`); and the back end's command counts in the renderer metrics
+  and `r_debugRenderToTexture`. `com_speeds` reported a back-end time of zero
+  on both renderers, because the counters were cleared before they were read;
+  it now reports the frame's. Every render command OpenGL executes has a
+  Vulkan case. Recorded and still open: the fade quads of the opt-in
+  `r_portalsDistanceCull`, `levelshotProbe`'s depth capture, the Gaussian
+  sample-array parameters of authored GLSL blur programs, and debug object
+  labels for capture tools.
 - [ ] **VK-08 — P2, implementation: HDR display output.** Present on HDR10 and
   scRGB displays. Today the swapchain is always 8-bit sRGB
   (`VK_COLOR_SPACE_SRGB_NONLINEAR_KHR`) and both tone curves end at SDR white,

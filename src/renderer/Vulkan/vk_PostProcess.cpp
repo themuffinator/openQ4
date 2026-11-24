@@ -2381,25 +2381,39 @@ static bool VK_Post_RenderMotionVectors( const viewDef_t *viewDef, const vkPostM
 				push.params[ 1 ] = push.params[ 2 ] = push.params[ 3 ] = 0.0f;
 				vkCmdPushConstants( cmd, layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 						0, sizeof( push ), &push );
-				vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+				vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 				drew = true;
 				continue;
 			}
-			// The weapon's depth hack only rescales clip z, which the vector
-			// ignores, so last frame's plain projection still matches.
+			// The weapon's depth hack rescales clip z, which the vector ignores.
+			// cl_gunfov also replaces its field of view, the same on both
+			// frames, so last frame's projection takes this frame's refit
+			// (RB_MotionVectorPreviousProjection); without it every weapon
+			// pixel would carry a constant bogus vector.
 			vkPostMotionVectorPush_t push;
 			VK_BuildSurfMVP( viewDef, surf, push.currentMvp );
 			if ( weaponStill ) {
 				// this frame's own transform: an exact, zero vector
 				memcpy( push.previousMvp, push.currentMvp, sizeof( push.previousMvp ) );
 			} else {
+				float previousProjection[ 16 ];
+				memcpy( previousProjection, previous.projectionMatrix, sizeof( previousProjection ) );
+				if ( surf->space->weaponDepthHack ) {
+					float weaponProjection[ 16 ];
+					R_GetDepthHackProjectionMatrix( viewDef, true, 0.0f, weaponProjection );
+					if ( weaponProjection[ 0 ] != viewDef->projectionMatrix[ 0 ]
+							|| weaponProjection[ 5 ] != viewDef->projectionMatrix[ 5 ] ) {
+						previousProjection[ 0 ] = weaponProjection[ 0 ];
+						previousProjection[ 5 ] = weaponProjection[ 5 ];
+					}
+				}
 				float previousModelView[ 16 ];
 				myGlMultMatrix( previousModelMatrix, previous.worldModelViewMatrix, previousModelView );
-				myGlMultMatrix( previousModelView, previous.projectionMatrix, push.previousMvp );
+				myGlMultMatrix( previousModelView, previousProjection, push.previousMvp );
 			}
 			vkCmdPushConstants( cmd, layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
 					0, sizeof( push ), &push );
-			vkCmdDrawIndexed( cmd, (uint32_t)tri->numIndexes, 1, 0, 0, 0 );
+			vkCmdDrawIndexed( cmd, VK_Device_DrawIndexCount( tri->numIndexes ), 1, 0, 0, 0 );
 			if ( temporal ) { ++vkTemporalMotionDrawn; }
 			drew = true;
 		}
