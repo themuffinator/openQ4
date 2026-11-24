@@ -788,6 +788,7 @@ idCVar r_rendererOwnershipCompose( "r_rendererOwnershipCompose", "0", CVAR_RENDE
 idCVar r_rendererModernAutoPromote( "r_rendererModernAutoPromote", "0", CVAR_RENDERER | CVAR_BOOL, "allow r_glTier auto and r_renderer best to request the guarded modern visible path after promotion evidence and sign-off; off keeps ARB2 default" );
 idCVar r_rendererPromotionEvidence( "r_rendererPromotionEvidence", "", CVAR_RENDERER, "Phase 8 validation evidence token required with r_rendererModernAutoPromote before automatic modern visible promotion" );
 idCVar r_rendererShaderReload( "r_rendererShaderReload", "0", CVAR_RENDERER | CVAR_BOOL, "allow runtime reload of the internal modern GL shader library" );
+idCVar r_rendererShaderAllTiers( "r_rendererShaderAllTiers", "0", CVAR_RENDERER | CVAR_BOOL, "build the internal modern GL shader library at every supported GLSL tier, not only the tier it draws with (shader validation; slower startup)" );
 idCVar r_rendererModernVisibleDepth( "r_rendererModernVisibleDepth", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern depth and compatible shadow-depth passes while ARB2 remains the visible color path" );
 idCVar r_rendererModernDepthDebug( "r_rendererModernDepthDebug", "0", CVAR_RENDERER | CVAR_INTEGER, "modern depth debug overlay: 0 = off, 1 = scene depth, 2 = shadow-map depth", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar r_rendererModernOpaque( "r_rendererModernOpaque", "0", CVAR_RENDERER | CVAR_BOOL, "execute graph-backed modern opaque G-buffer passes while ARB2 remains the visible color path" );
