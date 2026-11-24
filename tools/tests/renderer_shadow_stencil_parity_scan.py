@@ -91,7 +91,25 @@ def distant_point(centre: list[float], radius: list[float]) -> bool:
     if distance <= 0.0:
         return False
     extent = sum(abs(c / distance * r) for c, r in zip(centre, radius))
-    return distance > extent + max(1.0, distance * 0.01)
+    if distance > extent + max(1.0, distance * 0.01):
+        return True
+    return wide_source(centre, radius)
+
+
+def wide_source(centre: list[float], radius: list[float], pad: float = 0.15) -> bool:
+    """R_ShadowMapWideSourceAxis with cascades on (the scan sets r_shadowMapCSM 1): a source
+    at least 1024 units off centre, standing outside one face of its box, whose box spans at
+    most 24 times that distance sideways (padded like the projection)."""
+    if sum(value * value for value in centre) ** 0.5 < 1024.0:
+        return False
+    for axis in range(3):
+        margin = abs(centre[axis]) - abs(radius[axis])
+        if margin < 1.0:
+            continue
+        lateral = max(abs(centre[o]) + abs(radius[o]) for o in range(3) if o != axis)
+        if lateral / margin * (1.0 + 2.0 * pad) <= 24.0:
+            return True
+    return False
 
 
 def map_lights(text: str) -> list[dict]:

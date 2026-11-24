@@ -34,7 +34,27 @@ typedef struct shadowMapLightClassification_s {
 
 // An off-centre point source whose complete radius box lies in front of it
 // can use a fitted perspective map instead of spending six faces on empty sky.
+// That covers the wide sources too (R_ShadowMapWideSourceAxis) while sunlight
+// is cascaded.
 bool R_ShadowMapUsesDistantPointProjection( const renderLight_t &parms );
+
+// A wide source: a large point light whose source sits just outside one face
+// of an enormous radius box, the way Quake 4 lights its outdoor areas
+// (mcc_landing's outdoor_Main: 280 units above a box 4352 by 6256 wide). Aimed
+// at the box centre, the box reaches behind the source, so it is not a distant
+// source; as a cube, a character two thousand units below it is two or three
+// texels wide and its shadow is filtered away. Seen down the axis it lies
+// outside of, the whole box is in front of the source, and the cascades fitted
+// to the view give the player's surroundings the texels a cube cannot.
+//
+// Returns the light-space axis to look down (0-2) and, in *sign, which way
+// along it (+1 or -1), or -1 when the light is not one. Only while cascades
+// are on: one map over such a fan is coarser than the cube it replaces.
+static const float SHADOWMAP_WIDE_SOURCE_MIN_DISTANCE = 1024.0f;
+static const float SHADOWMAP_WIDE_SOURCE_MAX_SPREAD = 24.0f;
+int R_ShadowMapWideSourceAxis( const renderLight_t &parms, float *sign );
+// The pure form, for the self-test: cascading on or off passed in.
+int R_ShadowMapWideSourceAxisFor( const renderLight_t &parms, bool cascaded, float *sign );
 
 // Receiver filtering is expressed in shadow texels, but a texel from a
 // distant-source projection covers substantially more world space than one

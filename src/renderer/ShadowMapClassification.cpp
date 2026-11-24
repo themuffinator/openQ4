@@ -63,10 +63,11 @@ static bool R_ShadowMapProjectedLightNeedsAuthoredSingleProjection( const viewLi
 		|| R_ShadowMapProjectedLightUsesStockFlashlightShader( vLight );
 }
 
-bool R_ShadowMapUsesDistantPointProjection( const renderLight_t &parms ) {
-	if ( !parms.pointLight || parms.parallel ) {
-		return false;
-	}
+idCVar r_shadowMapWideSources( "r_shadowMapWideSources", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL,
+	"while sunlight is cascaded, a large point light whose source sits just outside one face of its radius box "
+	"(the big outdoor lights) is shadowed through fitted cascades seen down that axis instead of one cube; 0 keeps the cube" );
+
+static bool R_ShadowMapCentreDistantPointSource( const renderLight_t &parms ) {
 	idVec3 direction = parms.lightCenter;
 	const float distance = direction.Normalize();
 	const float extent = idMath::Fabs( direction.x * parms.lightRadius.x )
@@ -75,6 +76,64 @@ bool R_ShadowMapUsesDistantPointProjection( const renderLight_t &parms ) {
 	return std::isfinite( static_cast<double>( distance ) )
 		&& std::isfinite( static_cast<double>( extent ) )
 		&& distance > extent + Max( 1.0f, distance * 0.01f );
+}
+
+int R_ShadowMapWideSourceAxisFor( const renderLight_t &parms, const bool cascaded, float *sign ) {
+	if ( sign != NULL ) {
+		*sign = 1.0f;
+	}
+	if ( !cascaded || !parms.pointLight || parms.parallel
+			|| R_ShadowMapCentreDistantPointSource( parms ) ) {
+		return -1;
+	}
+	const float distance = parms.lightCenter.Length();
+	if ( !std::isfinite( static_cast<double>( distance ) )
+			|| distance < SHADOWMAP_WIDE_SOURCE_MIN_DISTANCE ) {
+		return -1;
+	}
+	// the projection pads its fan by the same share
+	const float pad = 1.0f + 2.0f * Max( 0.0f, r_shadowMapProjectionPad.GetFloat() );	// R_ShadowMapProjectionPad
+	int bestAxis = -1;
+	float bestSpread = SHADOWMAP_WIDE_SOURCE_MAX_SPREAD;
+	for ( int axis = 0; axis < 3; ++axis ) {
+		// how far the source stands off the face it lies outside of
+		const float margin = idMath::Fabs( parms.lightCenter[axis] ) - idMath::Fabs( parms.lightRadius[axis] );
+		if ( !( margin >= 1.0f ) ) {
+			continue;
+		}
+		// the widest the box reaches sideways of the source on that face
+		float lateral = 0.0f;
+		for ( int other = 0; other < 3; ++other ) {
+			if ( other != axis ) {
+				lateral = Max( lateral, idMath::Fabs( parms.lightCenter[other] )
+					+ idMath::Fabs( parms.lightRadius[other] ) );
+			}
+		}
+		const float spread = lateral / margin * pad;
+		if ( std::isfinite( static_cast<double>( spread ) ) && spread <= bestSpread ) {
+			bestSpread = spread;
+			bestAxis = axis;
+		}
+	}
+	if ( bestAxis >= 0 && sign != NULL ) {
+		// from the source towards the box
+		*sign = parms.lightCenter[bestAxis] > 0.0f ? -1.0f : 1.0f;
+	}
+	return bestAxis;
+}
+
+int R_ShadowMapWideSourceAxis( const renderLight_t &parms, float *sign ) {
+	const bool cascaded = r_shadowMapWideSources.GetBool()
+		&& r_shadowMapCSM.GetBool() && r_shadowMapCascadeCount.GetInteger() > 1;
+	return R_ShadowMapWideSourceAxisFor( parms, cascaded, sign );
+}
+
+bool R_ShadowMapUsesDistantPointProjection( const renderLight_t &parms ) {
+	if ( !parms.pointLight || parms.parallel ) {
+		return false;
+	}
+	return R_ShadowMapCentreDistantPointSource( parms )
+		|| R_ShadowMapWideSourceAxis( parms, NULL ) >= 0;
 }
 
 shadowMapLightClassification_t R_ClassifyShadowMapLight( const viewLight_t *vLight ) {

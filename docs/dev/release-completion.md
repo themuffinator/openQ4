@@ -12,6 +12,37 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Your own shadow under the big outdoor lamps, 24 November 2026
+
+- **Characters cast shadows again under Quake 4's huge outdoor lamps with
+  shadow maps on.** Several outdoor areas are lit by one enormous point light
+  whose source sits just above the area: MCC Landing's courtyard
+  (`outdoor_Main`, 280 units above a box 4352 by 6256 wide), and the big
+  lights of Convoy, Walker, the tram yards, Air Defense 2 and Hangar 1, about
+  forty in the stock maps. Each had one cube map. A character two thousand
+  units below was two or three shadow pixels wide there, so its shadow,
+  including your own, was filtered away, and large shadows turned to soft
+  smears. These lights are not "distant" by the old rule, which aims the map
+  at the light's centre and found part of the area behind the source. Seen
+  straight down the axis the source stands off, the whole area is in front
+  of it, so they now use the fitted cascades sunlight has used since 0.15.0
+  (`r_shadowMapWideSources`, default 1). The rule asks for a source at least
+  1024 units off centre whose area spans at most 24 times its height sideways,
+  and applies only while cascades are on (Quality, Ultra, Maximum). One map
+  over such a fan would be coarser than the cube. Enhanced keeps point lights
+  on stencil shadows as before.
+- Evidence: frozen-frame comparisons against stencil on the same frame (no
+  input), up to 10 spots and 2 views each on MCC Landing, Tram 1b, Air Defense 2,
+  Walker, Convoy 1 and Hangar 1, OpenGL and Vulkan alike. Screen area
+  shadowed by stencil but lit with maps: MCC Landing 1.02% to 0.10% (worst
+  view 8.3% to 0.7%, the player's own silhouette on a crate), Air Defense 2
+  0.55% to 0.13%, Convoy 1 (OpenGL) 0.19% to 0.01%. Area the map darkened
+  that stencil did not: MCC Landing 0.44% to 0.04%, Tram 1b 1.2-2.2% to
+  0.15%; Convoy 1 rose from 0.11% to 0.17%, its worst view being the same
+  before and after. The distant-projection self-test covers the rule and the
+  new frustum. The investigation that led here found no shadow regression
+  between 0.15.0, 21 November and 24 November on these sweeps. Not yet run:
+  frame-time comparison, Linux, macOS.
 ## Stereoscopic 3D without a headset, 24 November 2026
 
 - **A stereo option for flat displays (VR-07).** The user asked for a

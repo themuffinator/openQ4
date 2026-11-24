@@ -363,6 +363,14 @@ bool R_ShadowMapBuildDistantPointClipPlanes( const viewLight_t *vLight, idPlane 
 	const renderLight_t &parms = vLight->lightDef->parms;
 	const idVec3 origin = vLight->globalLightOrigin;
 	idVec3 forward = parms.origin - origin;
+	// A wide source looks down the axis whose face it stands outside of, not
+	// at the box centre: from there the whole box lies in front of it, each
+	// corner at least the source's distance off that face.
+	float wideSign = 1.0f;
+	const int wideAxis = R_ShadowMapWideSourceAxis( parms, &wideSign );
+	if ( wideAxis >= 0 ) {
+		forward = parms.axis[wideAxis] * wideSign;
+	}
 	if ( forward.Normalize() <= idMath::FLOAT_EPSILON ) {
 		return false;
 	}
@@ -1111,7 +1119,67 @@ bool R_ShadowMapDistantPointProjectionSelfTest( void ) {
 	if ( R_ShadowMapUsesDistantPointProjection( parms ) ) {
 		return false;
 	}
-	common->Printf( "Distant point projection self-test passed: 32 receiver/blocker rays, rotation and translation\n" );
+
+	// A wide source: mcc_landing's outdoor_Main, 280 units above the top of
+	// its box and aimed at the centre a fan that crosses the source plane.
+	// It looks down its z axis, and only while sunlight is cascaded.
+	parms.parallel = false;
+	parms.axis.Identity();
+	parms.origin.Set( 6464.0f, 2816.0f, 896.0f );
+	parms.lightRadius.Set( 2176.0f, 3128.0f, 1024.0f );
+	parms.lightCenter.Set( -64.0f, 1160.0f, 1304.0f );
+	float wideSign = 0.0f;
+	if ( R_ShadowMapWideSourceAxisFor( parms, true, &wideSign ) != 2 || wideSign != -1.0f
+			|| R_ShadowMapWideSourceAxisFor( parms, false, NULL ) >= 0 ) {
+		return false;
+	}
+	// a small off-centre lamp keeps its cube (mcc_landing's light_9081)
+	renderLight_t lamp = parms;
+	lamp.lightRadius.Set( 184.0f, 160.0f, 176.0f );
+	lamp.lightCenter.Set( -40.0f, 0.0f, 184.0f );
+	// and so does a source only grazing its face: the fan would be near 180 degrees
+	renderLight_t grazing = parms;
+	grazing.lightCenter.Set( -64.0f, 1160.0f, 1040.0f );
+	if ( R_ShadowMapWideSourceAxisFor( lamp, true, NULL ) >= 0
+			|| R_ShadowMapWideSourceAxisFor( grazing, true, NULL ) >= 0 ) {
+		return false;
+	}
+	int wideRays = 0;
+	if ( R_ShadowMapWideSourceAxis( parms, NULL ) >= 0 ) {
+		// the running settings cascade: every corner of the box in the map,
+		// in front of the source, with a blocker halfway along each ray
+		// nearer and on the same texel
+		light.parallel = false;
+		light.globalLightOrigin = parms.origin + parms.lightCenter * parms.axis;
+		idPlane planes[4];
+		float farWidth = 0.0f;
+		if ( !R_ShadowMapUsesDistantPointProjection( parms )
+			|| !R_ShadowMapBuildDistantPointClipPlanes( &light, planes, &farWidth ) || farWidth <= 0.0f ) {
+			return false;
+		}
+		for ( int corner = 0; corner < 8; ++corner ) {
+			const idVec3 local( ( corner & 1 ) ? 2176.0f : -2176.0f,
+				( corner & 2 ) ? 3128.0f : -3128.0f, ( corner & 4 ) ? 1024.0f : -1024.0f );
+			const idVec3 receiver = parms.origin + local * parms.axis;
+			const idVec3 blocker = light.globalLightOrigin + ( receiver - light.globalLightOrigin ) * 0.5f;
+			idVec4 r, b;
+			R_ShadowMapTransformPointToClip( receiver, planes, r );
+			R_ShadowMapTransformPointToClip( blocker, planes, b );
+			if ( r.w <= 0.0f || b.w <= 0.0f || r.z <= 0.0f || r.z > 1.00001f
+				|| idMath::Fabs( r.x / r.w ) > 1.00001f || idMath::Fabs( r.y / r.w ) > 1.00001f
+				|| b.z <= 0.0f || b.z >= r.z
+				|| idMath::Fabs( r.x / r.w - b.x / b.w ) > 0.0001f
+				|| idMath::Fabs( r.y / r.w - b.y / b.w ) > 0.0001f ) {
+				return false;
+			}
+			wideRays++;
+		}
+		// the same handedness as every other distant source
+		if ( !R_ShadowMapClipPlanesMirrorWinding( planes ) ) {
+			return false;
+		}
+	}
+	common->Printf( "Distant point projection self-test passed: 32 receiver/blocker rays, rotation and translation; wide source down its axis (%d rays)\n", wideRays );
 	return true;
 }
 
