@@ -453,6 +453,7 @@ typedef struct vkGuiExecutor_s {
 	VkShaderModule		casterVertModule;
 	VkShaderModule		casterFragModule;
 	VkShaderModule		pointCasterVertModule;
+	VkShaderModule		pointCasterLayeredVertModule;	// writes gl_Layer; NULL without the device extension
 	VkShaderModule		pointCasterFragModule;
 	VkShaderModule		momentCasterVertModule;
 	VkShaderModule		momentCasterFragModule;
@@ -511,6 +512,7 @@ typedef struct vkGuiExecutor_s {
 	VkPipelineLayout	fogBlendPipelineLayout;
 	VkPipeline			casterPipeline[2];			// lazily built; depth-only atlas caster
 	VkPipeline			pointCasterPipeline[2];	// lazily built; depth-only cube-face caster
+	VkPipeline			pointCasterLayeredPipeline[2];	// the same into a six-layer target
 	VkPipeline			momentCasterPipeline;	// lazily built; translucent moments, projected
 	VkPipeline			pointMomentCasterPipeline;	// lazily built; translucent moments, point faces
 	// r_shadowMapTranslucentMoments: what bindings 3-5 of every shadow set
@@ -3095,6 +3097,35 @@ VkPipeline VK_Exec_PointCasterPipeline( void ) {
 	return pipeline;
 }
 
+// The point caster drawing into all six faces of a cube bound as one layered
+// attachment: the same state and fragment stage, with a vertex stage that
+// sends each draw to the face its push block names. NULL where the device
+// cannot write gl_Layer from a vertex shader; the caller then draws the faces
+// one rendering scope at a time.
+VkPipeline VK_Exec_PointCasterLayeredPipeline( void ) {
+	const bool withStencil = VK_ShadowMap_UseStencilAttachment();
+	VkPipeline &pipeline = vkExec.pointCasterLayeredPipeline[withStencil ? 1 : 0];
+	if ( pipeline != VK_NULL_HANDLE ) {
+		return pipeline;
+	}
+	if ( vkExec.pointCasterLayeredVertModule == VK_NULL_HANDLE || vkExec.pointCasterFragModule == VK_NULL_HANDLE ) {
+		return VK_NULL_HANDLE;
+	}
+
+	VkVertexInputBindingDescription binding;
+	VkVertexInputAttributeDescription attrs[ 2 ];
+	VkPipelineVertexInputStateCreateInfo vertexInput;
+	VK_Exec_CasterVertexInput( binding, attrs, vertexInput );
+
+	vkPipelineTarget_t target = {};
+	target.depthFormat = vkCtx.shadowDepthFormat;
+	target.stencilFormat = withStencil ? vkCtx.shadowDepthFormat : VK_FORMAT_UNDEFINED;
+	target.samples = VK_SAMPLE_COUNT_1_BIT;
+	pipeline = VK_Exec_CreatePipeline( vkExec.pointCasterLayeredVertModule, vkExec.pointCasterFragModule,
+			&vertexInput, 0, vkExec.pipelineLayout, true, false, target );
+	return pipeline;
+}
+
 // Translucent shadow moments (r_shadowMapTranslucentMoments, GL
 // RB_RenderTranslucentShadowMap / RB_RenderPointTranslucentShadowMap): three
 // RGBA16F moment targets with ONE/ONE blending and no depth attachment. The
@@ -4029,6 +4060,17 @@ static bool VK_GuiExecutor_Init( void ) {
 		common->Warning( "Vulkan: point shadow caster fragment shader module creation failed" );
 		return false;
 	}
+	// optional: the module declares a capability only the extension allows,
+	// and a cube without it is drawn face by face
+	vkExec.pointCasterLayeredVertModule = VK_NULL_HANDLE;
+	if ( vkCtx.shaderViewportIndexLayer ) {
+		smci.codeSize = vk_shadow_point_caster_layered_vert_spv_size;
+		smci.pCode = (const uint32_t *)vk_shadow_point_caster_layered_vert_spv;
+		if ( vkCreateShaderModule( vkCtx.device, &smci, NULL, &vkExec.pointCasterLayeredVertModule ) != VK_SUCCESS ) {
+			common->Warning( "Vulkan: layered point shadow caster vertex shader module creation failed" );
+			vkExec.pointCasterLayeredVertModule = VK_NULL_HANDLE;
+		}
+	}
 	// translucent shadow moments (r_shadowMapTranslucentMoments): optional,
 	// so a failure only leaves translucent casters on the binary path
 	{
@@ -4479,6 +4521,10 @@ void VK_GuiExecutor_Shutdown( void ) {
 		if ( pipeline != VK_NULL_HANDLE ) vkDestroyPipeline( vkCtx.device, pipeline, NULL );
 		pipeline = VK_NULL_HANDLE;
 	}
+	for ( VkPipeline &pipeline : vkExec.pointCasterLayeredPipeline ) {
+		if ( pipeline != VK_NULL_HANDLE ) vkDestroyPipeline( vkCtx.device, pipeline, NULL );
+		pipeline = VK_NULL_HANDLE;
+	}
 	if ( vkExec.momentCasterPipeline != VK_NULL_HANDLE ) {
 		vkDestroyPipeline( vkCtx.device, vkExec.momentCasterPipeline, NULL );
 	}
@@ -4675,6 +4721,9 @@ void VK_GuiExecutor_Shutdown( void ) {
 	if ( vkExec.pointCasterVertModule != VK_NULL_HANDLE ) {
 		vkDestroyShaderModule( vkCtx.device, vkExec.pointCasterVertModule, NULL );
 	}
+	if ( vkExec.pointCasterLayeredVertModule != VK_NULL_HANDLE ) {
+		vkDestroyShaderModule( vkCtx.device, vkExec.pointCasterLayeredVertModule, NULL );
+	}
 	if ( vkExec.pointCasterFragModule != VK_NULL_HANDLE ) {
 		vkDestroyShaderModule( vkCtx.device, vkExec.pointCasterFragModule, NULL );
 	}
@@ -4853,6 +4902,10 @@ bool VK_GuiExecutor_BeginFrame( void ) {
 			pipeline = VK_NULL_HANDLE;
 		}
 		for ( VkPipeline &pipeline : vkExec.pointCasterPipeline ) {
+			if ( pipeline != VK_NULL_HANDLE ) vkDestroyPipeline( vkCtx.device, pipeline, NULL );
+			pipeline = VK_NULL_HANDLE;
+		}
+		for ( VkPipeline &pipeline : vkExec.pointCasterLayeredPipeline ) {
 			if ( pipeline != VK_NULL_HANDLE ) vkDestroyPipeline( vkCtx.device, pipeline, NULL );
 			pipeline = VK_NULL_HANDLE;
 		}

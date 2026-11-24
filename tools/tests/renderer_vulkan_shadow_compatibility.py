@@ -1386,7 +1386,7 @@ def validate_shadow_depth_format_selection() -> None:
     require_compact(stencil_attachment,
         "return vkCtx.shadowDepthHasStencil && r_vkShadowStencilAttachmentReference.GetBool();",
         "reference attachment gated by actual format")
-    for pipeline in ("casterPipeline", "pointCasterPipeline"):
+    for pipeline in ("casterPipeline", "pointCasterPipeline", "pointCasterLayeredPipeline"):
         if executor.count(f"for ( VkPipeline &pipeline : vkExec.{pipeline} )") != 2:
             raise AssertionError("Both caster variants must retire on shutdown and format reconfiguration")
     aspect_mask = braced_body(
@@ -10308,6 +10308,151 @@ def validate_prelight_caster_contract() -> None:
         require(audit, token, "the audit records the caster, its setting and the noSelfShadow image")
 
 
+def validate_layered_point_cube_contract() -> None:
+    """r_shadowMapPointLayered on Vulkan, and the cascade cache that was left out.
+
+    A point cube was six rendering scopes, twelve when it publishes and composes.
+    Where the device lets a vertex stage write gl_Layer the cube is bound once as
+    a six-layer attachment and each draw names its face, so the faces are still
+    walked one at a time with their own matrices and caster culling and hold the
+    depth they held before. Measured on hub2 with ten cubes redrawn a view, the
+    recording time of the shadow pass fell from 0.74 to 0.60 ms; captures are
+    bit-identical. A device without the extension keeps one scope a face.
+
+    The other OpenGL saving, the cached still scenery of the whole-light cascade
+    (r_shadowMapCascadeFarCache), was prototyped and left out: on Vulkan it
+    saved 20 to 176 caster draws but its tile copy cost as much GPU time as the
+    drawing it replaced, and more at Ultra. The cvar stays an OpenGL switch.
+    """
+    selection = read("src/renderer/Vulkan/VulkanDeviceSelection.cpp")
+    device = read("src/renderer/Vulkan/VulkanDevice.cpp")
+    executor = read("src/renderer/Vulkan/vk_GuiExecutor.cpp")
+    shadow_map = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+    per_face = read("src/renderer/Vulkan/shaders/shadow_point_caster.vert")
+    layered = read("src/renderer/Vulkan/shaders/shadow_point_caster_layered.vert")
+
+    require(selection, "VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME ) == 0 ) { candidate.hasShaderViewportIndexLayer = true; }",
+            "the admission scan records whether a vertex stage may write gl_Layer")
+    require_compact(
+        device,
+        """vkCtx.shaderViewportIndexLayer = selected.hasShaderViewportIndexLayer;
+        if ( vkCtx.shaderViewportIndexLayer ) {
+            deviceExtensions[ deviceExtensionCount++ ] = VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME;
+        }""",
+        "the extension is enabled only where the device offers it",
+    )
+    require(device, "const char *deviceExtensions[ 8 ];", "the extension list has room for it")
+
+    # The layered stage is the per-face stage plus the layer: any other
+    # difference would let the two paths draw different depth.
+    def statements(source: str) -> list[str]:
+        body = source[source.index("layout(location = 0) in vec3 inPosition;"):]
+        return [line.strip() for line in body.splitlines()
+                if line.strip() and not line.strip().startswith("//")]
+
+    layered_statements = statements(layered)
+    require(layered, "#extension GL_ARB_shader_viewport_layer_array : require",
+            "the layered stage declares the capability it needs")
+    if layered_statements.count("gl_Layer = face;") != 1:
+        raise AssertionError("the layered caster stage must name the face exactly once")
+    layered_statements.remove("gl_Layer = face;")
+    if layered_statements != statements(per_face):
+        raise AssertionError("shadow_point_caster_layered.vert must stay shadow_point_caster.vert plus gl_Layer")
+    require(read("tools/tests/vk_shader_header_pin.py"), '"shadow_point_caster_layered.vert"',
+            "the committed SPIR-V header carries the layered stage")
+
+    # The module declares a capability only the extension allows.
+    require_compact(
+        executor,
+        """vkExec.pointCasterLayeredVertModule = VK_NULL_HANDLE;
+        if ( vkCtx.shaderViewportIndexLayer ) {
+            smci.codeSize = vk_shadow_point_caster_layered_vert_spv_size;""",
+        "the layered module is only created with the extension",
+    )
+    layered_pipeline = braced_body(executor, "VkPipeline VK_Exec_PointCasterLayeredPipeline( void ) {",
+                                   "layered point caster pipeline")
+    require_compact(
+        layered_pipeline,
+        "if ( vkExec.pointCasterLayeredVertModule == VK_NULL_HANDLE || vkExec.pointCasterFragModule == VK_NULL_HANDLE ) { return VK_NULL_HANDLE; }",
+        "no layered pipeline without the module",
+    )
+    require_compact(
+        layered_pipeline,
+        "VK_Exec_CreatePipeline( vkExec.pointCasterLayeredVertModule, vkExec.pointCasterFragModule, &vertexInput, 0, vkExec.pipelineLayout, true, false, target );",
+        "the layered pipeline differs from the per-face one in its vertex stage alone",
+    )
+
+    create_cube = braced_body(shadow_map, "static bool VK_ShadowMap_CreatePointCube(", "point cube creation")
+    require_compact(
+        create_cube,
+        """cube.layeredView = VK_NULL_HANDLE;
+        if ( vkCtx.shaderViewportIndexLayer ) {
+            ivci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+            ivci.subresourceRange.aspectMask = VK_ShadowMap_DepthAspectMask();
+            ivci.subresourceRange.baseArrayLayer = 0;
+            ivci.subresourceRange.layerCount = 6;""",
+        "a cube gets a six-layer attachment view beside its face views",
+    )
+    require_compact(
+        braced_body(shadow_map, "static void VK_ShadowMap_DestroyPointCube(", "point cube teardown"),
+        "if ( cube.layeredView != VK_NULL_HANDLE ) { vkDestroyImageView( vkCtx.device, cube.layeredView, NULL ); }",
+        "the layered view goes with its cube",
+    )
+
+    render = braced_body(shadow_map, "bool VK_ShadowMap_RenderAtlas(", "shadow render")
+    require_compact(
+        render,
+        """const VkPipeline pointCasterLayeredPipeline =
+            r_shadowMapPointLayered.GetBool()
+                ? VK_Exec_PointCasterLayeredPipeline() : VK_NULL_HANDLE;""",
+        "the cvar and the device decide the layered path",
+    )
+    require_compact(
+        render,
+        """const bool layered =
+            pointCasterLayeredPipeline != VK_NULL_HANDLE
+            && target.layeredView != VK_NULL_HANDLE;""",
+        "a cube without a layered view is drawn face by face",
+    )
+    require_order(
+        render,
+        (
+            "if ( layered ) {",
+            "depth.imageView = target.layeredView;",
+            "ri.layerCount = 6;",
+            "vkCmdBeginRendering( cmd, &ri );",
+            "for ( int cubeFace = 0 ; cubeFace < 6 ; cubeFace++ ) {",
+            "if ( !layered ) {",
+            "depth.imageView = target.faceViews[ cubeFace ];",
+            "ri.layerCount = 1;",
+            "vkCmdBeginRendering( cmd, &ri );",
+            "VK_ShadowMap_DrawPointCasterChain( ctx, vLight, faceViewMatrix,",
+            "if ( !layered ) {",
+            "vkCmdEndRendering( cmd );",
+            "if ( layered ) {",
+            "vkCmdEndRendering( cmd );",
+        ),
+        "one scope for the cube or one a face, around the same per-face caster walk",
+    )
+    # every draw still carries its face, for both walkers
+    if shadow_map.count("push.depthRow[ 3 ] = static_cast<float>( cubeFace );") != 2:
+        raise AssertionError("both the classic and the sealed point caster walks must name the face")
+
+    require(shadow_map, "cubeScopes=%d", "the report counts the rendering scopes point cubes opened")
+    require(shadow_map, "casterDraws=%d casterIndexes=%d", "the report carries the deterministic cost of the caster walk")
+    require(shadow_map, "cpuMs=%.3f/%.3f prepare/render", "the report times the shadow pass on the recording thread")
+
+    # The cascade cache stays an OpenGL mechanism: measured, and left out.
+    if "r_shadowMapCascadeFarCache" in shadow_map:
+        raise AssertionError("the Vulkan back end keeps no whole-light cascade cache")
+    require(read("src/renderer/RenderSystem_init.cpp"),
+            'idCVar r_shadowMapCascadeFarCache( "r_shadowMapCascadeFarCache", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "OpenGL: keep',
+            "the cascade cache switch is described as an OpenGL one")
+    roadmap = read("docs/dev/roadmap.md")
+    for token in ("`r_shadowMapPointLayered`", "`r_shadowMapCascadeFarCache`", "VK_EXT_shader_viewport_index_layer"):
+        require(roadmap, token, "VK-06 records what landed and what was measured and left out")
+
+
 def main() -> None:
     validate_shadow_effectiveness_image_gate()
     validate_shared_interaction_shadow_runtime_contract()
@@ -10351,6 +10496,7 @@ def main() -> None:
     validate_scratch_cube_pool_contract()
     validate_resident_projected_sampling_contract()
     validate_prelight_caster_contract()
+    validate_layered_point_cube_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

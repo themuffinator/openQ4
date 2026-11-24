@@ -63,6 +63,7 @@
 
 #include "../tr_local.h"
 #include <atomic>
+#include <chrono>
 #include "../RenderWorld_local.h"
 #include "../ShadowMapProjected.h"
 #include "../ClassicInteractionDomain.h"
@@ -120,6 +121,7 @@ void VK_Exec_BindPreparedTriGeometry( VkCommandBuffer cmd, int slot,
 VkDescriptorSet VK_Exec_ImageDescriptor( unsigned int texnum, bool require2D );
 VkPipeline VK_Exec_CasterPipeline( void );
 VkPipeline VK_Exec_PointCasterPipeline( void );
+VkPipeline VK_Exec_PointCasterLayeredPipeline( void );
 VkPipelineLayout VK_Exec_BasePipelineLayout( void );
 bool VK_Exec_BeginMainRendering( bool clearColorDepth );
 void VK_Exec_EndMainRendering( void );
@@ -173,6 +175,8 @@ typedef struct vkPointShadowCube_s {
 	VmaAllocation		allocation;
 	VkImageView			cubeSampleView;					// cube view, depth aspect (compare + raw sampling)
 	VkImageView			faceViews[ 6 ];					// per-face 2D layer views (depth attachment)
+	VkImageView			layeredView;					// all six faces as one layered depth attachment
+														// (r_shadowMapPointLayered); NULL = face by face
 	VkDescriptorSet		sets[ VK_FRAMES_IN_FLIGHT ];	// set-7 sets (cube + shadow-block ring)
 	VkImageLayout		layout;							// tracked for identity-resident cache reuse
 } vkPointShadowCube_t;
@@ -283,6 +287,13 @@ typedef struct vkShadowMapState_s {
 	int					pointFreshUpdates;
 	int					composePasses;	// cached static tiles and cubes + this view's dynamics
 	int					residentPasses;	// exact projected hits read where they live
+	int					pointCubeScopes;	// rendering scopes the point cubes opened
+	// Deterministic cost of the view's shadow pass: what the caster walks
+	// submitted, and what recording them took on this thread.
+	int					casterDraws;
+	int					casterIndexes;
+	double				cpuPrepareMs;	// VK_ShadowMap_PrepareViewLights
+	double				cpuRenderMs;	// VK_ShadowMap_RenderAtlas
 	int					budgetFallbacks;
 	int					admissionDenied;	// budget spent on higher-scoring lights
 	int					subviewFallbacks;
@@ -325,6 +336,23 @@ typedef struct vkShadowMapState_s {
 } vkShadowMapState_t;
 
 static vkShadowMapState_t vkShadow;
+
+// Adds the wall time of a scope on the recording thread to a per-view total
+// of the shadow report. Two clock reads a view; nothing waits on it.
+class vkShadowCpuTimer {
+public:
+	explicit vkShadowCpuTimer( double &total )
+		: total( total ), start( std::chrono::steady_clock::now() ) {}
+	~vkShadowCpuTimer() {
+		total += std::chrono::duration<double, std::milli>(
+				std::chrono::steady_clock::now() - start ).count();
+	}
+	vkShadowCpuTimer( const vkShadowCpuTimer & ) = delete;
+	vkShadowCpuTimer &operator=( const vkShadowCpuTimer & ) = delete;
+private:
+	double &total;
+	std::chrono::steady_clock::time_point start;
+};
 
 // View definitions and their lights live in the frame arena. An empty view
 // can skip preparation and later reuse the old view's address. Pointer identity
@@ -644,6 +672,9 @@ static void VK_ShadowMap_DestroyPointCube( vkPointShadowCube_t &cube ) {
 		if ( cube.faceViews[ f ] != VK_NULL_HANDLE ) {
 			vkDestroyImageView( vkCtx.device, cube.faceViews[ f ], NULL );
 		}
+	}
+	if ( cube.layeredView != VK_NULL_HANDLE ) {
+		vkDestroyImageView( vkCtx.device, cube.layeredView, NULL );
 	}
 	if ( cube.cubeSampleView != VK_NULL_HANDLE ) {
 		vkDestroyImageView( vkCtx.device, cube.cubeSampleView, NULL );
@@ -1320,6 +1351,19 @@ static bool VK_ShadowMap_CreatePointCube( vkPointShadowCube_t &cube ) {
 			common->Warning( "Vulkan: point shadow cube face view creation failed" );
 			VK_ShadowMap_DestroyPointCube( cube );
 			return false;
+		}
+	}
+	// The six faces again as one layered attachment, for the caster pipeline
+	// that names the face itself. A device without that pipeline, or a view
+	// that cannot be made, leaves the cube to the per-face views above.
+	cube.layeredView = VK_NULL_HANDLE;
+	if ( vkCtx.shaderViewportIndexLayer ) {
+		ivci.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+		ivci.subresourceRange.aspectMask = VK_ShadowMap_DepthAspectMask();
+		ivci.subresourceRange.baseArrayLayer = 0;
+		ivci.subresourceRange.layerCount = 6;
+		if ( vkCreateImageView( vkCtx.device, &ivci, NULL, &cube.layeredView ) != VK_SUCCESS ) {
+			cube.layeredView = VK_NULL_HANDLE;
 		}
 	}
 
@@ -3303,8 +3347,14 @@ static void VK_ShadowMap_ReportViewLights( void ) {
 				outcome[ passIndex ] = "scratch";
 			}
 		}
+		// how a fresh GLOBAL map got the LOCAL one's depth, if it did
+		const vkShadowPassState_t &globalPass =
+				light.passes[ VK_SHADOW_RECEIVER_GLOBAL ];
+		const char *seed = !globalPass.valid ? "none"
+				: ( globalPass.unionLocalDepth ? "union"
+					: ( globalPass.copiedLocalDepth ? "copy" : "none" ) );
 		common->Printf(
-				"SM pass light[%d] '%s' class=%s type=%s csm=%d cascades=%d atlasDiv=%d tile=%d LOCAL=%s GLOBAL=%s casters(static=%d dynamic=%d alpha=%d) receivers(local=%d global=%d translucent=%d)\n",
+				"SM pass light[%d] '%s' class=%s type=%s csm=%d cascades=%d atlasDiv=%d tile=%d LOCAL=%s GLOBAL=%s casters(static=%d dynamic=%d alpha=%d) receivers(local=%d global=%d translucent=%d) seed=%s\n",
 				vLight->lightDef != NULL ? vLight->lightDef->index : -1,
 				vLight->lightShader != NULL
 						? vLight->lightShader->GetName() : "<null>",
@@ -3321,7 +3371,8 @@ static void VK_ShadowMap_ReportViewLights( void ) {
 				vLight->shadowMapAlphaCasterCount,
 				vLight->localInteractions != NULL ? 1 : 0,
 				vLight->globalInteractions != NULL ? 1 : 0,
-				vLight->translucentInteractions != NULL ? 1 : 0 );
+				vLight->translucentInteractions != NULL ? 1 : 0,
+				seed );
 	}
 }
 
@@ -3354,7 +3405,7 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 			R_ShadowMapProjectedCacheTexelBudgetFor( 1,
 					r_shadowMapSize.GetInteger() ) );
 	common->Printf(
-			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d inPlace=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point projectedTiles=%.2f/%.0f scratchCubes=%d/%d casterFaces=%d/%d culled/tested\n",
+			"Vulkan shadow cache: view=%s exact=%d/%d projected/point fresh=%d/%d composed=%d inPlace=%d fallback=%d budget (%d admission)/%d subview tiles=%d/%d pointFaces=%d resident=%.1fMB slots=%d/%d projected %d/%d point projectedTiles=%.2f/%.0f scratchCubes=%d/%d casterFaces=%d/%d culled/tested casterDraws=%d casterIndexes=%d cubeScopes=%d cpuMs=%.3f/%.3f prepare/render\n",
 			( viewDef != NULL && viewDef->isSubview )
 				? "subview" : "main",
 			vkShadow.projectedCacheHits,
@@ -3378,7 +3429,10 @@ static void VK_ShadowMap_ReportViewCache( const viewDef_t *viewDef ) {
 				/ fullTileTexels,
 			VK_ShadowMap_ScratchCubesAllocated(),
 			VK_ShadowMap_ScratchCubeLimit(),
-			vkShadow.pointCasterFaceCulled, vkShadow.pointCasterFaceTests );
+			vkShadow.pointCasterFaceCulled, vkShadow.pointCasterFaceTests,
+			vkShadow.casterDraws, vkShadow.casterIndexes,
+			vkShadow.pointCubeScopes,
+			vkShadow.cpuPrepareMs, vkShadow.cpuRenderMs );
 	// GPU shadow-pass timings. The numbers are what resolved during this
 	// view, so they lag the work by a frame or more -- the same lagged
 	// attribution the OpenGL shadow stats carry.
@@ -3713,6 +3767,12 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 	vkShadow.subviewFallbacks = 0;
 	vkShadow.momentPasses = 0;
 	vkShadow.momentDropped = 0;
+	vkShadow.pointCubeScopes = 0;
+	vkShadow.casterDraws = 0;
+	vkShadow.casterIndexes = 0;
+	vkShadow.cpuPrepareMs = 0.0;
+	vkShadow.cpuRenderMs = 0.0;
+	vkShadowCpuTimer prepareTimer( vkShadow.cpuPrepareMs );
 
 	if ( viewDef == NULL || !r_useShadowMap.GetBool() || !r_shadows.GetBool() ) {
 		return 0;
@@ -4258,6 +4318,8 @@ static void VK_ShadowMap_CasterDraw( vkCasterPassCtx_t &ctx, const vkCasterPush_
 	}
 	vkCmdPushConstants( ctx.cmd, ctx.layout,
 			VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof( push ), &push );
+	vkShadow.casterDraws++;
+	vkShadow.casterIndexes += (int)casterGeo->numIndexes;
 	VK_Device_CountDrawIndexed( (int)( casterGeo->numIndexes ), (int)( casterGeo->numVerts ) );
 	vkCmdDrawIndexed( ctx.cmd, VK_Device_DrawIndexCount( casterGeo->numIndexes ), 1, 0, 0, 0 );
 }
@@ -5323,6 +5385,8 @@ static void VK_ClassicShadow_DrawCaster(
 		vkCmdDrawIndexed( ctx.cmd,
 			static_cast<uint32_t>( caster.selectedIndexCount ),
 			1, 0, 0, 0 );
+		vkShadow.casterDraws++;
+		vkShadow.casterIndexes += caster.selectedIndexCount;
 		backEnd.pc.c_shadowElements++;
 		backEnd.pc.c_shadowIndexes += caster.selectedIndexCount;
 		backEnd.pc.c_shadowVertexes += caster.vertexCount;
@@ -6273,6 +6337,7 @@ static void VK_ShadowMap_RenderMoments( VkCommandBuffer cmd, const int slot, VkD
 }
 
 bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
+	vkShadowCpuTimer renderTimer( vkShadow.cpuRenderMs );
 	const bool classicCommit = vkClassicShadowTransaction.ready
 		&& vkClassicShadowTransaction.view != NULL
 		&& vkClassicShadowTransaction.view->viewDef == viewDef;
@@ -6715,6 +6780,7 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 						&& !r_shadowMapTranslucentMoments.GetBool();
 					const bool copiedLocalDepth = reusableLocalDepth
 						&& !pass.unionLocalDepth && r_vkShadowOwnershipCopy.GetBool();
+					pass.copiedLocalDepth = copiedLocalDepth;
 					if ( pass.unionLocalDepth ) {
 						static bool reportedOwnershipUnion = false;
 						if ( !reportedOwnershipUnion ) {
@@ -7243,6 +7309,16 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 		vkGpuPhaseScope pointTiming( cmd, VK_GPU_PHASE_SHADOW_POINT, profileMainView );
 		VK_ShadowGpuTiming_BeginPhase( cmd, VK_SHADOW_TIMING_MAP_RENDER );
 		vkCmdBindPipeline( cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pointCasterPipeline );
+		// r_shadowMapPointLayered: a cube is one rendering scope over a
+		// six-layer attachment, the caster vertex stage naming the face of
+		// each draw, where it was one scope a face. The faces are still walked
+		// one at a time with their own matrices and caster culling, so each
+		// holds the depth it held before. A cube without a layered view, or a
+		// device without the pipeline, is drawn face by face.
+		const VkPipeline pointCasterLayeredPipeline =
+			r_shadowMapPointLayered.GetBool()
+				? VK_Exec_PointCasterLayeredPipeline() : VK_NULL_HANDLE;
+		VkPipeline boundPointPipeline = pointCasterPipeline;
 		vkCmdSetDepthTestEnable( cmd, VK_TRUE );
 		vkCmdSetDepthWriteEnable( cmd, VK_TRUE );
 		vkCmdSetDepthCompareOp( cmd, VK_COMPARE_OP_LESS_OR_EQUAL );
@@ -7371,8 +7447,9 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 						classicPass != NULL
 							? classicPass->pass->point.lightOrigin[ 2 ]
 							: light.pointLightOrigin[ 2 ] );
-				// Six face scopes of one cube. CLEAR starts an ownership map;
-				// LOAD keeps the depth copied into the cube and draws over it.
+				// The six faces of one cube: one layered scope, or one scope a
+				// face. CLEAR starts an ownership map; LOAD keeps the depth
+				// copied into the cube and draws over it.
 				auto drawCubeFaces = [&]( const vkPointShadowCube_t &target,
 						const VkAttachmentLoadOp loadOp,
 						const vkShadowChainSelect_t select ) {
@@ -7380,31 +7457,54 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 							select != VK_SHADOW_CHAINS_DYNAMIC_ONLY;
 					const bool drawDynamic =
 							select != VK_SHADOW_CHAINS_STATIC_ONLY;
+					const bool layered =
+							pointCasterLayeredPipeline != VK_NULL_HANDLE
+							&& target.layeredView != VK_NULL_HANDLE;
+					const VkPipeline wantedPipeline = layered
+							? pointCasterLayeredPipeline : pointCasterPipeline;
+					if ( wantedPipeline != boundPointPipeline ) {
+						// the dynamic state set above carries over: both
+						// pipelines declare the same dynamic states
+						vkCmdBindPipeline( cmd,
+								VK_PIPELINE_BIND_POINT_GRAPHICS, wantedPipeline );
+						boundPointPipeline = wantedPipeline;
+					}
+
+					VkRenderingAttachmentInfo depth;
+					memset( &depth, 0, sizeof( depth ) );
+					depth.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+					depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+					depth.loadOp = loadOp;
+					depth.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+					depth.clearValue.depthStencil.depth = 1.0f;
+					depth.clearValue.depthStencil.stencil = 0;
+
+					VkRenderingInfo ri;
+					memset( &ri, 0, sizeof( ri ) );
+					ri.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+					ri.renderArea.extent.width = (uint32_t)faceSize;
+					ri.renderArea.extent.height = (uint32_t)faceSize;
+					ri.pDepthAttachment = &depth;
+					ri.pStencilAttachment = VK_ShadowMap_UseStencilAttachment() ? &depth : NULL;
+					if ( layered ) {
+						// one scope, one clear or load, for the whole cube
+						depth.imageView = target.layeredView;
+						ri.layerCount = 6;
+						vkCmdBeginRendering( cmd, &ri );
+						vkShadow.pointCubeScopes++;
+					}
 					for ( int cubeFace = 0 ; cubeFace < 6 ; cubeFace++ ) {
 						float faceViewMatrix[ 16 ];
 						VK_ShadowMap_PointFaceViewMatrix(
 								pointOrigin, cubeFace,
 								faceViewMatrix );
 
-						VkRenderingAttachmentInfo depth;
-						memset( &depth, 0, sizeof( depth ) );
-						depth.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-						depth.imageView = target.faceViews[ cubeFace ];
-						depth.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-						depth.loadOp = loadOp;
-						depth.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-						depth.clearValue.depthStencil.depth = 1.0f;
-						depth.clearValue.depthStencil.stencil = 0;
-
-						VkRenderingInfo ri;
-						memset( &ri, 0, sizeof( ri ) );
-						ri.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-						ri.renderArea.extent.width = (uint32_t)faceSize;
-						ri.renderArea.extent.height = (uint32_t)faceSize;
-						ri.layerCount = 1;
-						ri.pDepthAttachment = &depth;
-						ri.pStencilAttachment = VK_ShadowMap_UseStencilAttachment() ? &depth : NULL;
-						vkCmdBeginRendering( cmd, &ri );
+						if ( !layered ) {
+							depth.imageView = target.faceViews[ cubeFace ];
+							ri.layerCount = 1;
+							vkCmdBeginRendering( cmd, &ri );
+							vkShadow.pointCubeScopes++;
+						}
 
 						if ( classicCommit ) {
 							drawnCasters += VK_ClassicShadow_DrawPointPass(
@@ -7432,6 +7532,11 @@ bool VK_ShadowMap_RenderAtlas( const viewDef_t *viewDef ) {
 							}
 						}
 
+						if ( !layered ) {
+							vkCmdEndRendering( cmd );
+						}
+					}
+					if ( layered ) {
 						vkCmdEndRendering( cmd );
 					}
 				};

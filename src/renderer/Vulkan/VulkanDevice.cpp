@@ -1943,9 +1943,20 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 	// enabled when they advertise it, and their optional subset features read
 	// back through the chained feature struct. Native drivers advertise neither,
 	// and every portability capability then stays at its permissive default.
-	const char *deviceExtensions[ 7 ];
+	const char *deviceExtensions[ 8 ];
 	uint32_t deviceExtensionCount = 0;
 	deviceExtensions[ deviceExtensionCount++ ] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+	// A point shadow cube is drawn as one six-layer target where the caster
+	// vertex shader may name the layer (r_shadowMapPointLayered). Enabling
+	// the extension enables both of its features; without it the cube keeps
+	// one rendering scope a face.
+	vkCtx.shaderViewportIndexLayer = selected.hasShaderViewportIndexLayer;
+	if ( vkCtx.shaderViewportIndexLayer ) {
+		deviceExtensions[ deviceExtensionCount++ ] = VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME;
+	}
+	common->Printf( "Vulkan: point shadow cubes %s\n", vkCtx.shaderViewportIndexLayer
+			? "draw as one layered target (VK_EXT_shader_viewport_index_layer)"
+			: "draw one face at a time (no VK_EXT_shader_viewport_index_layer)" );
 	// The driver's real heap budgets, so textures are reduced before video
 	// memory runs out rather than after (vk_Image.cpp, #217/#231).
 	vkCtx.memoryBudgetEnabled = selected.hasMemoryBudget;

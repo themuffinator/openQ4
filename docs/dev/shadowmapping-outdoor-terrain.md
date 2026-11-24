@@ -113,8 +113,11 @@ the whole-light cascade's planes, texel and depth contract). Each frame the cell
 is copied into the cascade's tile and only moving casters are drawn over it.
 A changed caster set, a moving light or a disabled static cache draws it fresh.
 Cached and freshly drawn frames match outside the animated HUD (3 pixels by one
-level over nine poses). Vulkan redraws the slot with the other cascades; its
-whole cascade set costs a fraction of a millisecond.
+level over nine poses). Vulkan redraws the slot with the other cascades. The
+same cache was built for Vulkan on 24 November and left out: it removed 20 to
+176 caster draws a view, but copying the tile back cost the GPU as much as
+drawing it at Quality and more at Ultra
+([measurements](vulkan-resource-profiling.md#shadow-map-savings-from-opengl-24-november-2026)).
 
 Cost, Air Defense 1 opening, view turning, per frame. Caster draws come from the
 `casterDraws=` field added to the `SM metrics` report and do not depend on load:
