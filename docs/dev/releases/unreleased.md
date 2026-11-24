@@ -591,6 +591,9 @@ the [development roadmap](../roadmap.md) for current scope.
   weapons you have) and releasing switches, instead of changing weapon behind
   the wheel. Quick chat shows the same dot. See
   [Keyboard and mouse](../../user/input-settings.md#keyboard-and-mouse).
+- The classic interface's weapon wheel draws its shaded segments, inner ring
+  and the arrow pointing at your choice again; only the spokes, icons and
+  text had been showing.
 - **Depth of Field** (Settings > Display > Effects, `r_depthOfField`) turns
   the game's own depth of field on or off: the weapon wheel's focus and
   scripted cutscene focus. Enhanced, Quality, Ultra and Maximum turn it on.

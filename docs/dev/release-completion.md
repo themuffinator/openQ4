@@ -21,8 +21,7 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   quick-chat documents now draw it as a dot (`cursorX`/`cursorY`/
   `cursorShown`, rim 118 selector units = 232 dp) only while the mouse steers,
   hidden for a stick, touch or a tracked VR hand. The Classic wheel's cross
-  is a dot for every device (its stick moves the selector too), drawn in the
-  lines' triangle winding.
+  is a dot for every device (its stick moves the selector too).
 - **Weapon controls choose on an open wheel.** Number keys, next/previous and
   last weapon (mouse wheel, `[`/`]`, D-pad) used to switch weapon behind the
   open wheel, and the release then overrode them. `HandleWeaponWheelImpulse`
@@ -39,8 +38,12 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   a stepped slot and draws on Classic. The MP run stopped on an unrelated
   `mp_escape.rui` timeline warning after its shots. Not yet run: Vulkan,
   Linux, macOS, a real mouse and controller.
-- Found, not fixed: the Classic wheel's segment fills, inner ring and
-  selection arrow are wound against the 2D path's culling and do not draw.
+- **The Classic wheel draws whole again.** Its segment fills, inner ring,
+  selected arc and the selection arrow's tip were triangles wound against the
+  2D path's culling, so only the spokes, icons and text drew. They now keep
+  the lines' winding, and the dot uses the segment fan again. Evidence: the
+  airdefense1 gameplay capture's Classic shot shows the fills, the ring, the
+  shotgun's arc and arrow. Not yet run: Vulkan.
 
 ## Point lights keep their shadows in crowded views on Vulkan, 23 November 2026
 

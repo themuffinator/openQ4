@@ -90,6 +90,8 @@ static float WeaponWheelNormalizeAngle( float angle ) {
 	return angle;
 }
 
+// Every triangle keeps the winding of the lines' quads: the 2D path culls the
+// other, which once left the segment fills, inner ring and arrow tip undrawn.
 static void DrawWeaponWheelQuad( const idVec2& p0, const idVec2& p1, const idVec2& p2, const idVec2& p3, const idMaterial* material ) {
 	if ( material == NULL ) {
 		return;
@@ -162,23 +164,8 @@ static void DrawWeaponWheelSegment( const idVec2& center, const idVec2& popoutOf
 		const idVec2 inner1 = WeaponWheelProjectPoint( center, popoutOffset + dir1 * innerRadius, aspectScale );
 		const idVec2 outer1 = WeaponWheelProjectPoint( center, popoutOffset + dir1 * outerRadius, aspectScale );
 
-		renderSystem->DrawStretchTri( inner0, outer0, outer1, idVec2( 0.0f, 0.0f ), idVec2( 1.0f, 0.0f ), idVec2( 1.0f, 1.0f ), material );
-		renderSystem->DrawStretchTri( inner0, outer1, inner1, idVec2( 0.0f, 0.0f ), idVec2( 1.0f, 1.0f ), idVec2( 0.0f, 1.0f ), material );
-	}
-}
-
-// A filled disc, fanned in the winding of DrawWeaponWheelQuad's lines: the
-// 2D path drops triangles wound the other way.
-static void DrawWeaponWheelDot( const idVec2& center, float radius, float aspectScale, const idMaterial* material ) {
-	if ( material == NULL || radius <= 0.0f ) {
-		return;
-	}
-
-	const int sides = 16;
-	for ( int side = 0; side < sides; ++side ) {
-		const idVec2 from = WeaponWheelProjectPoint( center, WeaponWheelDirection( idMath::TWO_PI * side / sides ) * radius, aspectScale );
-		const idVec2 to = WeaponWheelProjectPoint( center, WeaponWheelDirection( idMath::TWO_PI * ( side + 1 ) / sides ) * radius, aspectScale );
-		renderSystem->DrawStretchTri( center, to, from, idVec2( 0.5f, 0.5f ), idVec2( 1.0f, 1.0f ), idVec2( 0.0f, 1.0f ), material );
+		renderSystem->DrawStretchTri( inner0, outer1, outer0, idVec2( 0.0f, 0.0f ), idVec2( 1.0f, 1.0f ), idVec2( 1.0f, 0.0f ), material );
+		renderSystem->DrawStretchTri( inner0, inner1, outer1, idVec2( 0.0f, 0.0f ), idVec2( 0.0f, 1.0f ), idVec2( 1.0f, 1.0f ), material );
 	}
 }
 
@@ -218,7 +205,7 @@ static void DrawWeaponWheelArrow( const idVec2& center, const idVec2& dir, float
 			const idVec2 tip = WeaponWheelProjectPoint( center, center1Local, aspectScale );
 			const idVec2 left = WeaponWheelProjectPoint( center, center0Local + perp * halfWidth0, aspectScale );
 			const idVec2 right = WeaponWheelProjectPoint( center, center0Local - perp * halfWidth0, aspectScale );
-			renderSystem->DrawStretchTri( tip, left, right, idVec2( 0.0f, 0.0f ), idVec2( 1.0f, 0.0f ), idVec2( 0.0f, 1.0f ), material );
+			renderSystem->DrawStretchTri( tip, right, left, idVec2( 0.0f, 0.0f ), idVec2( 0.0f, 1.0f ), idVec2( 1.0f, 0.0f ), material );
 		} else {
 			const idVec2 p0 = WeaponWheelProjectPoint( center, center0Local + perp * halfWidth0, aspectScale );
 			const idVec2 p1 = WeaponWheelProjectPoint( center, center1Local + perp * halfWidth1, aspectScale );
@@ -718,10 +705,11 @@ void idPlayer::DrawLegacyWeaponWheel( void ) {
 		// Classic steers its selector with the stick's look motion too, so the
 		// dot shows for every device; it stays within the ring's rim.
 		const idVec2 cursorPos = WeaponWheelProjectPoint( center, weaponWheelCursor * transitionScale, aspectScale );
+		const idVec2 none( 0.0f, 0.0f );
 		renderSystem->SetColor4( 0.0f, 0.0f, 0.0f, blend * 0.55f );
-		DrawWeaponWheelDot( cursorPos, cursorHaloRadius, aspectScale, whiteMaterial );
+		DrawWeaponWheelSegment( cursorPos, none, 0.0f, idMath::TWO_PI, 0.0f, cursorHaloRadius, aspectScale, whiteMaterial );
 		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, lineAlpha );
-		DrawWeaponWheelDot( cursorPos, cursorDotRadius, aspectScale, whiteMaterial );
+		DrawWeaponWheelSegment( cursorPos, none, 0.0f, idMath::TWO_PI, 0.0f, cursorDotRadius, aspectScale, whiteMaterial );
 	}
 
 	if ( weaponWheelHoveredSlot >= 0 && weaponWheelHoveredSlot < WEAPON_WHEEL_SLOT_COUNT ) {
