@@ -12,6 +12,19 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The menu pointer starts in the corner of the screen, 25 November 2026
+
+- **On a widescreen display, the menu pointer now starts in the top-left corner
+  of the screen**, not at the top-left of the centred 4:3 area, where it used
+  to appear partway across the screen. A stock-interface menu that has not had
+  its cursor placed yet now starts it at the corner of its aspect-expanded
+  canvas on first activation. Once the player moves the pointer, or a save or
+  demo restores it, the cursor keeps its position as before. World-surface
+  GUIs keep the retail 0,0 start, which in-world interaction relies on.
+- Evidence: `ui_cursor_state_safety.py` pins the canvas-origin start and the
+  shared bounds helper, and the changed file compiles under MSVC. Not yet
+  checked in a running game.
+
 ## The briefing hologram hides the squad's uniform patches, 25 November 2026
 
 - **The rank patches and badges on the marines' uniforms no longer show
