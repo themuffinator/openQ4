@@ -3786,10 +3786,43 @@ static void SDL3_OpenAllControllers(void) {
 	}
 }
 
-// Use is a button press, or a stick or trigger moved past its dead zone:
-// what hands charge to a connected controller that is not the active one.
+// Whether the active controller holds anything now: a button, a trigger past
+// Trigger Press, a hat off centre, or a stick past its dead zone. Charge never
+// moves away from a controller that is being held.
+static bool SDL3_ActiveControllerHolding(void) {
+	if (s_sdlGamepad) {
+		for (int i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; ++i) {
+			if (s_gamepadButtonsDown[i]) {
+				return true;
+			}
+		}
+		if (s_gamepadLeftTriggerDown || s_gamepadRightTriggerDown) {
+			return true;
+		}
+	} else if (s_sdlJoystick) {
+		for (int i = 0; i < SDL3_MAX_JOYSTICK_BUTTONS; ++i) {
+			if (s_joystickButtonsDown[i]) {
+				return true;
+			}
+		}
+		if (s_joystickHatState != SDL_HAT_CENTERED) {
+			return true;
+		}
+	} else {
+		return false;
+	}
+	// The event thread is the only writer of the axis state. A throttle
+	// (AXIS_UP) resting off centre is not holding, as it is not use.
+	return s_joystickAxisState[AXIS_SIDE] != 0 || s_joystickAxisState[AXIS_FORWARD] != 0 ||
+		s_joystickAxisState[AXIS_YAW] != 0 || s_joystickAxisState[AXIS_PITCH] != 0;
+}
+
+// Use is a button press, or a stick or trigger moved past its dead zone. Use
+// of a waiting controller can hand charge to it (ControllerRoster says when);
+// use of the active one is reported too, so the roster knows how long it has
+// rested.
 static void SDL3_NoteControllerUse(SDL_JoystickID id, int eventTime) {
-	if (id == 0 || id == s_sdlGamepadId || id == s_sdlJoystickId) {
+	if (id == 0) {
 		return;
 	}
 	// SDL re-centres a device's axes as it disconnects; those last events are
@@ -3798,7 +3831,16 @@ static void SDL3_NoteControllerUse(SDL_JoystickID id, int eventTime) {
 	if (controller == NULL || !(controller->pad ? SDL_GamepadConnected(controller->pad) : SDL_JoystickConnected(controller->joystick))) {
 		return;
 	}
-	SDL3_ApplyControllerChange(s_controllerRoster.NoteUse(static_cast<std::uint32_t>(id)), eventTime);
+	const std::uint32_t twinBefore = s_controllerRoster.ActiveTwin();
+	const openq4::ControllerChange change = s_controllerRoster.NoteUse(static_cast<std::uint32_t>(id), eventTime, SDL3_ActiveControllerHolding());
+	const std::uint32_t twin = s_controllerRoster.ActiveTwin();
+	if (change == openq4::ControllerChange::None && twin != 0 && twin != twinBefore) {
+		const sdlController_t *active = SDL3_FindController(static_cast<SDL_JoystickID>(s_controllerRoster.Active()));
+		common->Printf("controller: '%s' moves with '%s': one controller seen as two devices (a remapper or Steam Input); '%s' keeps charge\n",
+			SDL3_ControllerName(*controller), active != NULL ? SDL3_ControllerName(*active) : "?",
+			active != NULL ? SDL3_ControllerName(*active) : "?");
+	}
+	SDL3_ApplyControllerChange(change, eventTime);
 }
 
 static bool SDL3_GamepadAxisIsUse(SDL_Gamepad *pad, Uint8 axis) {
@@ -6760,14 +6802,13 @@ bool Sys_SDL_PumpEvents(void) {
 
 			case SDL_EVENT_GAMEPAD_AXIS_MOTION:
 				if (in_joystick.GetBool()) {
-					if (event.gaxis.which != s_sdlGamepadId) {
-						const sdlController_t *waiting = SDL3_FindController(event.gaxis.which);
-						if (waiting != NULL && waiting->pad != NULL && SDL3_GamepadAxisIsUse(waiting->pad, event.gaxis.axis)) {
-							SDL3_NoteControllerUse(event.gaxis.which, eventTime);
-						}
-					}
 					if (s_sdlGamepad && event.gaxis.which == s_sdlGamepadId) {
 						SDL3_UpdateGamepadAxes(eventTime);
+					}
+					// use of any controller, the active one included: it is how the roster knows rest
+					const sdlController_t *source = SDL3_FindController(event.gaxis.which);
+					if (source != NULL && source->pad != NULL && SDL3_GamepadAxisIsUse(source->pad, event.gaxis.axis)) {
+						SDL3_NoteControllerUse(event.gaxis.which, eventTime);
 					}
 				}
 				break;
@@ -6831,14 +6872,12 @@ bool Sys_SDL_PumpEvents(void) {
 
 			case SDL_EVENT_JOYSTICK_AXIS_MOTION:
 				if (in_joystick.GetBool()) {
-					if (event.jaxis.which != s_sdlJoystickId) {
-						const sdlController_t *waiting = SDL3_FindController(event.jaxis.which);
-						if (waiting != NULL && waiting->joystick != NULL && SDL3_JoystickAxisIsUse(waiting->joystick)) {
-							SDL3_NoteControllerUse(event.jaxis.which, eventTime);
-						}
-					}
 					if (s_sdlJoystick && event.jaxis.which == s_sdlJoystickId) {
 						SDL3_UpdateJoystickAxes();
+					}
+					const sdlController_t *source = SDL3_FindController(event.jaxis.which);
+					if (source != NULL && source->joystick != NULL && SDL3_JoystickAxisIsUse(source->joystick)) {
+						SDL3_NoteControllerUse(event.jaxis.which, eventTime);
 					}
 				}
 				break;

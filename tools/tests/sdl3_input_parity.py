@@ -310,6 +310,7 @@ def validate_controller_contract() -> None:
     require(apply_change, 'in_gamepadFamily.SetString("none");', "PAD-01: a loss with no successor reaches the notice")
     require(close_controller, "s_controllerRoster.Remove(", "PAD-01: the roster picks the successor")
     require(note_use, "s_controllerRoster.NoteUse(", "PAD-01 use-to-switch")
+    require(note_use, "SDL3_ActiveControllerHolding()", "PAD-01: charge never moves from a controller being held")
     require(clamp_range, "if (!std::isfinite(value))", "SDL3 controller float clamp finite guard")
     require(clamp_unit, "return SDL3_ClampRange(value, 0.0f, 1.0f);", "SDL3 unit clamp finite guard")
     require(clamp_rumble, "if (!std::isfinite(value) || value <= 0.0f)", "SDL3 rumble value finite guard")
@@ -427,12 +428,13 @@ def validate_controller_contract() -> None:
     ):
         require(pump, token, "SDL3 controller event pump")
 
-    # PAD-01: a press, or a stick or trigger past its dead zone, on a waiting controller
+    # PAD-01: a press, or a stick or trigger past its dead zone, on any controller
+    # (the active one's use tells the roster how long it has rested)
     for token in (
         "SDL3_NoteControllerUse(event.gbutton.which, eventTime);",
-        "SDL3_GamepadAxisIsUse(waiting->pad, event.gaxis.axis)",
+        "SDL3_GamepadAxisIsUse(source->pad, event.gaxis.axis)",
         "SDL3_NoteControllerUse(event.jbutton.which, eventTime);",
-        "SDL3_JoystickAxisIsUse(waiting->joystick)",
+        "SDL3_JoystickAxisIsUse(source->joystick)",
         "SDL_EVENT_JOYSTICK_BATTERY_UPDATED",
         "(void)SDL3_OpenController(event.gdevice.which, eventTime);",
         "SDL3_CloseController(event.gdevice.which, eventTime);",

@@ -369,27 +369,6 @@ gave the pack-read, cache-write, shader-startup and Ogg improvements.
   airdefense1 gameplay capture's Classic shot shows the fills, the ring, the
   shotgun's arc and arrow. Not yet run: Vulkan.
 
-## Point lights keep their shadows in crowded views on Vulkan, 23 November 2026
-
-- **Lights no longer shine through walls when a view runs out of shadow
-  maps** (#258). Vulkan renders a view's point-light shadows into a bounded
-  pool of cubes, and some views of `mcc_landing` see 240 to 265 lights, more
-  than a hundred of them point lights that cast shadows. A light that found
-  no cube left fell back to its stencil shadows only when they were
-  complete. Most lights also cast from surfaces only shadow maps draw, such
-  as grates, so they drew with no shadow at all. They now draw the stencil
-  shadows they have: the original game's shadows, without the map-only ones.
-  On a 56-spot sweep of `mcc_landing` this cut unshadowed light-frames by 87%
-  on Maximum and 79% on Ultra, and the result matches OpenGL, which renders
-  each cube in turn and never runs out. The rest are lights in the frame they
-  switch to stencil, which has no volumes yet.
-- **Maximum's point-light shadows are 1024 pixels, not 2048.** A 2048 cube
-  is 96 MB, so the default budget held five and a Vulkan view's pool twelve.
-  The preset change brings up the System Check once.
-- Evidence: scripted camera sweeps (no input) on Vulkan and OpenGL, and
-  side-by-side captures against OpenGL. Not yet run: a frame-time
-  comparison.
-
 ## Lighter zoom scopes and cannon optics, smaller HUD files, 23 November 2026
 
 - **Scopes and the cannon draw once.** The user asked for a round of HUD
@@ -426,6 +405,27 @@ gave the pack-read, cache-write, shader-startup and Ogg improvements.
   and after (OpenGL, no input), and `enableWeapon`/`disableWeapon` from the
   console bringing the stance and the gun back and dropping them again.
   Not yet seen: Kane's Strogg body on `mcc_2`, and Vulkan.
+
+## Point lights keep their shadows in crowded views on Vulkan, 23 November 2026
+
+- **Lights no longer shine through walls when a view runs out of shadow
+  maps** (#258). Vulkan renders a view's point-light shadows into a bounded
+  pool of cubes, and some views of `mcc_landing` see 240 to 265 lights, more
+  than a hundred of them point lights that cast shadows. A light that found
+  no cube left fell back to its stencil shadows only when they were
+  complete. Most lights also cast from surfaces only shadow maps draw, such
+  as grates, so they drew with no shadow at all. They now draw the stencil
+  shadows they have: the original game's shadows, without the map-only ones.
+  On a 56-spot sweep of `mcc_landing` this cut unshadowed light-frames by 87%
+  on Maximum and 79% on Ultra, and the result matches OpenGL, which renders
+  each cube in turn and never runs out. The rest are lights in the frame they
+  switch to stencil, which has no volumes yet.
+- **Maximum's point-light shadows are 1024 pixels, not 2048.** A 2048 cube
+  is 96 MB, so the default budget held five and a Vulkan view's pool twelve.
+  The preset change brings up the System Check once.
+- Evidence: scripted camera sweeps (no input) on Vulkan and OpenGL, and
+  side-by-side captures against OpenGL. Not yet run: a frame-time
+  comparison.
 
 ## Depth of field for captures and the weapon wheel, 23 November 2026
 
@@ -560,6 +560,34 @@ gave the pack-read, cache-write, shader-startup and Ogg improvements.
   which AUD-03 and the native-resolution presets changed without re-binding.
   Human judgement while casting, 21:9 and 9:16 captures and the rosters in MVD
   playback remain.
+
+## Record video of the game, 23 November 2026
+
+- **`recordVideo`, `stopVideo` and `toggleVideo`** record the window as it is
+  presented, HUD, menus and console included, with the game's sound, to
+  `baseoq4/videos` in the save folder. `aviGame` and `aviDemo` record video
+  too, in place of their unfinished screenshot path.
+- **Smooth by default.** Single-player and demo recordings run a whole number
+  of game steps per video frame, so the video never stutters; the game slows
+  down instead if encoding falls behind. Online recordings follow the clock.
+- **Good quality out of the box.** MP4, H.264 + AAC, the window's
+  resolution, 60 frames a second, quality 80 (about 7 Mbit/s at 1280x720).
+  On Windows Media Foundation writes it with no other program, on the GPU's
+  encoder where the driver has one. MKV, WebM, MOV and GIF, and HEVC, AV1,
+  VP9 and ProRes, go through the player's own FFmpeg, which uses NVENC, AMF,
+  Quick Sync or VideoToolbox when a test encode passes. Without FFmpeg a
+  recording falls back to a built-in Motion JPEG AVI.
+- **Settings:** `com_videoFormat`, `com_videoCodec`, `com_videoFPS`,
+  `com_videoQuality`, `com_videoBitrate`, `com_videoHeight`, `com_videoAudio`,
+  `com_videoAudioBitrate`, `com_videoTiming`, `com_videoHardware`,
+  `com_videoEncoder`, `com_videoPreset`, `com_videoFFmpeg`, `com_videoFolder`;
+  `videoEncoders` lists what the system has.
+- Evidence (Windows, decoded with FFmpeg 7.1): Media Foundation MP4 on OpenGL
+  and Vulkan, FFmpeg MKV with NVENC in real time (300 of 301 frames
+  distinct), WebM with libvpx and Opus, GIF, the built-in AVI (300 distinct
+  frames, PCM) and `aviGame` at 30 fps, each with audible sound. Not yet run:
+  a multiplayer recording, `aviDemo` of a render demo, Linux and macOS.
+- Render API 37: replace the engine and the renderer modules together.
 
 ## The Classic ruleset plays by its own numbers, 23 November 2026
 
@@ -958,9 +986,11 @@ gave the pack-read, cache-write, shader-startup and Ogg improvements.
 ## Controllers: the one in your hands, aim in degrees, gyro, layouts and haptics, 22 November 2026
 
 - **The controller in your hands is the one in charge.** Every connected
-  controller is ready: press a button or push a stick on another and it takes
-  over, with the prompts changing to its buttons and anything the first one
-  held released. **Settings → Controls → Controller → Active Controller** can
+  controller is ready: put one down, press a button or push a stick on another
+  and it takes over, with the prompts changing to its buttons and anything the
+  first one held released. A remapping tool's or Steam Input's second,
+  virtual copy of the controller you are holding no longer fights it for
+  control, which made turning speed jump about. **Settings → Controls → Controller → Active Controller** can
   keep one controller in charge instead, which helps with a Steam Deck and an
   external pad, or a remapping tool's second, virtual controller.
 - **Losing your controller no longer leaves you helpless.** In single-player

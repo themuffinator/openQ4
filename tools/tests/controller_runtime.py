@@ -8,9 +8,14 @@ input is synthesised and nothing reaches another window. Needs an installed
 Quake 4 (--retail); all writable data stays under .tmp.
 
 Scenarios:
-  handover  two pads connect, use moves charge, held buttons release on
-            handover, an inactive and the active pad go away, a saved device
-            keeps charge and takes it back when it reconnects
+  handover  two pads connect, use moves charge once the pad in charge has
+            been put down (never while it holds something), held buttons
+            release on handover, an inactive and the active pad go away, a
+            saved device keeps charge and takes it back when it reconnects
+  twins     one pair of hands seen as two devices (a remapper's virtual pad
+            with its own stick curve beside the physical pad): moving both
+            keeps charge where it is and the turn rate that of the pad alone;
+            the race after a rest moves charge once and marks the pair
   pause     losing the pad in use during single-player play opens the pause
             menu; reconnecting does not resume
   battery   one notice at the low-battery threshold, one when charging starts
@@ -73,6 +78,21 @@ def step(name: str) -> list[str]:
 
 
 WAIT = "waitMsec 250"
+# longer than ControllerRoster's CONTROLLER_HANDOVER_REST_MSEC: the pad in charge has been put down
+REST = "waitMsec 1300"
+
+
+def mirrored(name: str, pads: dict[int, tuple[float, float]], frames: int = 40) -> list[str]:
+    """Pads whose right sticks report every 20 ms, each between its two values,
+    in slot order: a stick held a little unsteadily, as a real one is. The
+    turn is sampled after the first quarter and at the end."""
+    lines: list[str] = []
+    for frame in range(frames):
+        if frame == frames // 4:
+            lines += [*step(name + "_a"), "getviewpos"]
+        for slot, values in pads.items():
+            lines += [f"virtualController axis {slot} rightx {values[frame % 2]}", "waitMsec 20"]
+    return lines + [*step(name + "_b"), "getviewpos"]
 
 
 def press(direction: str) -> list[str]:
@@ -132,10 +152,13 @@ SCENARIOS = {
         "virtualController attach xbox", WAIT, *step("first"),
         "virtualController attach playstation", WAIT, *step("second_waits"),
         # use-to-switch: a press on the waiting pad, held
-        "virtualController button 1 south 1", WAIT, *step("press_hands_over"),
-        # the first pad's stick takes charge back: the held button must release
+        "virtualController button 1 south 1", "waitMsec 400", *step("press_hands_over"),
+        # the first pad's stick does not take charge from a pad holding a button
+        "virtualController axis 0 rightx 1", WAIT, *step("held_keeps_charge"),
+        "virtualController axis 0 rightx 0", "virtualController button 1 south 0", REST,
+        # put down and rested, it does
         "virtualController axis 0 rightx 1", WAIT, *step("stick_hands_over"),
-        "virtualController axis 0 rightx 0", "virtualController button 1 south 0", WAIT,
+        "virtualController axis 0 rightx 0", REST,
         # a stick inside its dead zone is not use
         "virtualController axis 1 leftx 0.1", WAIT, *step("dead_zone_is_not_use"),
         "virtualController axis 1 leftx 0", WAIT,
@@ -148,9 +171,12 @@ SCENARIOS = {
         "virtualController attach xbox", WAIT,
         "virtualController button 1 dpup 1", WAIT,
         "virtualController detach 1", WAIT, *step("active_lost_handover"),
-        # a saved device keeps charge against use, and takes it back on reconnect
+        # a saved device keeps charge against use, and takes it back on reconnect;
+        # what the outgoing pad held releases on that handover
         "virtualController attach playstation", WAIT,
+        "virtualController button 0 south 1", WAIT,
         "virtualController choose 1", WAIT, *step("chosen"),
+        "virtualController button 0 south 0", WAIT,
         "virtualController button 0 south 1", WAIT, "virtualController button 0 south 0", WAIT, *step("chosen_keeps_charge"),
         "virtualController detach 1", WAIT, *step("chosen_away"),
         "virtualController attach playstation", WAIT, *step("chosen_returns"),
@@ -158,6 +184,23 @@ SCENARIOS = {
         "virtualController choose auto", WAIT,
         "virtualController button 0 south 1", WAIT, "virtualController button 0 south 0", WAIT, *step("automatic_again"),
         "virtualController detach all", WAIT, *step("all_gone"),
+    ],
+    "twins": [
+        "virtualController attach xbox", WAIT,
+        "virtualController attach playstation", WAIT, *step("start"),
+        # the physical pad alone
+        *mirrored("alone", {0: (0.80, 0.82)}),
+        "virtualController axis 0 rightx 0", REST,
+        # with its twin: the same movement through a flatter curve, the pad in
+        # charge reporting first
+        *mirrored("together", {0: (0.80, 0.82), 1: (0.50, 0.52)}),
+        "virtualController axis 0 rightx 0", "virtualController axis 1 rightx 0", REST,
+        # after a rest the twin reports first: charge moves once, the pair is marked
+        "virtualController axis 1 rightx 0.5", "waitMsec 20", "virtualController axis 0 rightx 0.8", WAIT, *step("race_once"),
+        "virtualController axis 0 rightx 0", "virtualController axis 1 rightx 0", REST,
+        # the next race goes the other way and moves nothing
+        "virtualController axis 0 rightx 0.8", "waitMsec 20", "virtualController axis 1 rightx 0.5", WAIT, *step("race_again"),
+        "virtualController axis 0 rightx 0", "virtualController axis 1 rightx 0", WAIT,
     ],
     "pause": [
         "virtualController attach xbox", WAIT,
@@ -496,9 +539,10 @@ def check_handover(steps: Steps, failures: list[str]) -> dict:
     expect(active_slot(s["press_hands_over"]) == 1 and s["press_hands_over"]["family"] == "playstation",
            "a press on the waiting pad hands charge to it, and the prompts follow", failures)
     expect(s["press_hands_over"]["keys"] == ["JOY3"], f"the press that handed over still counts: {s['press_hands_over']['keys']}", failures)
+    expect(active_slot(s["held_keeps_charge"]) == 1 and s["held_keeps_charge"]["keys"] == ["JOY3"],
+           f"a pad holding a button keeps charge against another pad's stick: {s['held_keeps_charge']['keys']}", failures)
     expect(active_slot(s["stick_hands_over"]) == 0 and s["stick_hands_over"]["family"] == "xbox",
-           "a stick past its dead zone hands charge back", failures)
-    expect(s["stick_hands_over"]["keys"] == [], f"the outgoing pad's held button released on handover: {s['stick_hands_over']['keys']}", failures)
+           "once the pad in charge is put down, a stick past its dead zone hands charge back", failures)
     expect(s["stick_hands_over"]["look"][0] == 127, f"the incoming pad's stick is live: {s['stick_hands_over']['look']}", failures)
     expect(active_slot(s["dead_zone_is_not_use"]) == 0, "a stick inside its dead zone is not use", failures)
     expect(active_slot(s["trigger_hands_over"]) == 1 and s["trigger_hands_over"]["keys"] == ["JOY15"],
@@ -513,6 +557,7 @@ def check_handover(steps: Steps, failures: list[str]) -> dict:
     expect(lost["keys"] == [], f"what the lost pad held released: {lost['keys']}", failures)
     expect("disconnected during play" not in lost["since"], "a handover on loss does not pause", failures)
     expect(active_slot(s["chosen"]) == 1, "choosing a connected device gives it charge at once", failures)
+    expect(s["chosen"]["keys"] == [], f"the outgoing pad's held button released on handover: {s['chosen']['keys']}", failures)
     expect(active_slot(s["chosen_keeps_charge"]) == 1, "use of another pad does not take charge from the chosen device", failures)
     expect(active_slot(s["chosen_away"]) == 0, "while the chosen device is away another pad works", failures)
     expect(active_slot(s["chosen_returns"]) == 1 and s["chosen_returns"]["family"] == "playstation",
@@ -527,6 +572,28 @@ def check_handover(steps: Steps, failures: list[str]) -> dict:
     gone = s["all_gone"]
     expect(gone["family"] == "none" and gone["count"] == 0 and gone["instance"] == 0, "with every pad gone the family is none", failures)
     return {"steps": len(steps.order)}
+
+
+def check_twins(steps: Steps, failures: list[str]) -> dict:
+    s = steps
+
+    def handovers(*names: str) -> int:
+        return sum(s[name]["since"].count("is the active controller") for name in names)
+
+    alone = rate(steps, "alone_a", "alone_b")
+    together = rate(steps, "together_a", "together_b")
+    expect(alone > 50.0, f"the pad alone turns the view: {alone:.1f} deg/s", failures)
+    expect(abs(together - alone) <= alone * 0.05,
+           f"moving both devices turns at the rate of the pad alone: {together:.1f} against {alone:.1f} deg/s", failures)
+    expect(active_slot(s["together_b"]) == 0, "charge stays with the pad that had it", failures)
+    expect(handovers("together_a", "together_b") == 0,
+           f"no handover while both move: {handovers('together_a', 'together_b')}", failures)
+    expect(active_slot(s["race_once"]) == 1 and handovers("race_once") == 1,
+           f"after a rest the twin's race moves charge once: {handovers('race_once')}", failures)
+    expect("one controller seen as two devices" in s["race_once"]["since"], "the pair is logged as one controller", failures)
+    expect(active_slot(s["race_again"]) == 1 and handovers("race_again") == 0,
+           f"a later race does not move it back: {handovers('race_again')}", failures)
+    return {"alone": round(alone, 1), "together": round(together, 1), "together_handovers": handovers("together_a", "together_b")}
 
 
 def check_pause(steps: Steps, failures: list[str]) -> dict:
@@ -826,7 +893,7 @@ def check_testpanel(steps: Steps, failures: list[str]) -> dict:
     return {"motors": motors, "fill": held["test-lt-fill"]["bounds"][2] if held["test-lt-fill"] else None}
 
 
-CHECKS = {"keyboard": check_keyboard, "testpanel": check_testpanel, "menu": check_menu, "assist": check_assist, "layout": check_layout, "feedback": check_feedback, "gyro": check_gyro, "baseline": lambda steps, failures: {}, "handover": check_handover, "pause": check_pause, "battery": check_battery, "turnrate": check_turnrate}
+CHECKS = {"keyboard": check_keyboard, "testpanel": check_testpanel, "menu": check_menu, "assist": check_assist, "layout": check_layout, "feedback": check_feedback, "gyro": check_gyro, "baseline": lambda steps, failures: {}, "handover": check_handover, "twins": check_twins, "pause": check_pause, "battery": check_battery, "turnrate": check_turnrate}
 
 
 def main() -> int:
