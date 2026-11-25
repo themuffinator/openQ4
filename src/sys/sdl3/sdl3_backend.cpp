@@ -38,6 +38,7 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../DisplayModeRule.h"
 #include "../ControllerRoster.h"
 #include "../KeyEventMetadata.h"
+#include "../MouseMotionRun.h"
 #include "../EventQueueContinuity.h"
 #include "InputDisposition.h"
 #include <limits>
@@ -187,6 +188,18 @@ static SDL_AtomicInt s_sdlLifecyclePending = { 0 };
 static float s_sdlMouseWheelRemainderY = 0.0f;
 static float s_sdlRelativeMouseRemainderX = 0.0f;
 static float s_sdlRelativeMouseRemainderY = 0.0f;
+// openQ4 (HF-09): SDL_PollEvent pumps the devices once per poll cycle, so
+// every controller event of one cycle reads the same state from
+// SDL_GetGamepadAxis. The pump counts its cycles; the active controller's
+// axes are sampled once in each (SDL3_ControllerAxesCurrent).
+static unsigned s_sdlPollCycle = 0;
+static unsigned s_controllerAxesCycle = 0;
+static SDL_JoystickID s_controllerAxesDevice = 0;
+// Reports SDL3_JoinMouseMotionRun has folded into the one before (inputStats).
+static std::uint64_t s_mouseMotionReports = 0;
+static std::uint64_t s_mouseMotionReportsJoined = 0;
+static std::uint64_t s_controllerAxisEvents = 0;
+static std::uint64_t s_controllerAxisSamples = 0;
 
 static idCVar in_joystick("in_joystick", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "enable joystick/gamepad input");
 // The active controller's face layout (section 13.5), from the label SDL
@@ -1318,6 +1331,59 @@ static int SDL3_ConsumeMouseDelta(float delta, float &remainder) {
 	return whole;
 }
 
+static openq4::MouseMotionReport SDL3_MouseMotionReport(const SDL_MouseMotionEvent &motion) {
+	openq4::MouseMotionReport report;
+	report.window = static_cast<std::uint32_t>(motion.windowID);
+	report.device = static_cast<std::uint32_t>(motion.which);
+	report.timestamp = motion.timestamp;
+	report.buttons = static_cast<std::uint32_t>(motion.state);
+	report.x = motion.x;
+	report.y = motion.y;
+	report.xrel = motion.xrel;
+	report.yrel = motion.yrel;
+	return report;
+}
+
+/*
+===============
+SDL3_JoinMouseMotionRun
+
+openQ4 (HF-09): folds the motion reports queued straight behind `motion` into
+it, under the rule in MouseMotionRun.h, and returns how many reports it now
+holds. A high-rate mouse queues one report per poll, up to 8000 a second;
+joined, each run costs one SE_MOUSE event and one poll entry per axis however
+many reports it held. Only this thread takes events from SDL's queue, so the
+report seen at its head is the one the take below removes; the peek also
+skips SDL's poll sentinel, so a report the raw input thread queued since this
+cycle's pump can join and is handled a frame sooner.
+===============
+*/
+static int SDL3_JoinMouseMotionRun(SDL_MouseMotionEvent &motion) {
+	openq4::MouseMotionReport run = SDL3_MouseMotionReport(motion);
+	int reports = 1;
+	SDL_Event next;
+	while (SDL_PeepEvents(&next, 1, SDL_PEEKEVENT, SDL_EVENT_FIRST, SDL_EVENT_LAST) == 1 &&
+			next.type == SDL_EVENT_MOUSE_MOTION &&
+			openq4::MouseMotionRunAccepts(run, reports, SDL3_MouseMotionReport(next.motion))) {
+		if (SDL_PeepEvents(&next, 1, SDL_GETEVENT, SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_MOTION) != 1) {
+			break;
+		}
+		openq4::MouseMotionRunJoin(run, SDL3_MouseMotionReport(next.motion));
+		++reports;
+	}
+	if (reports > 1) {
+		motion.timestamp = run.timestamp;
+		motion.state = static_cast<SDL_MouseButtonFlags>(run.buttons);
+		motion.x = run.x;
+		motion.y = run.y;
+		motion.xrel = run.xrel;
+		motion.yrel = run.yrel;
+	}
+	s_mouseMotionReports += static_cast<std::uint64_t>(reports);
+	s_mouseMotionReportsJoined += static_cast<std::uint64_t>(reports - 1);
+	return reports;
+}
+
 typedef struct {
 	float guiWidth;
 	float guiHeight;
@@ -1425,8 +1491,14 @@ static bool SDL3_GetActiveGuiTextInputState(idRectangle &area, float &cursorOffs
 	return activeGui != NULL && activeGui->GetTextInputState(area, cursorOffset);
 }
 
+// The text input area SDL was last given, for SDL3_UpdateTextInputArea.
+static SDL_Window *s_textInputAreaWindow = NULL;
+static SDL_Rect s_textInputArea = { 0, 0, 0, 0 };
+static int s_textInputAreaCursor = 0;
+
 static void SDL3_UpdateTextInputArea(void) {
 	if (!s_sdlWindow || !s_sdlTextInputActive) {
+		s_textInputAreaWindow = NULL;
 		return;
 	}
 
@@ -1480,9 +1552,20 @@ static void SDL3_UpdateTextInputArea(void) {
 			static_cast<int>(guiCursorOffset * guiToPixelX * transform.pixelToWindowX));
 	}
 
+	// openQ4 (HF-09): this runs twice a frame while text input is on; on
+	// Windows each update is three IME calls, so pass on only a change.
+	if (s_textInputAreaWindow == s_sdlWindow && s_textInputAreaCursor == cursorOffset &&
+			SDL_memcmp(&s_textInputArea, &textArea, sizeof(textArea)) == 0) {
+		return;
+	}
 	if (!SDL_SetTextInputArea(s_sdlWindow, &textArea, cursorOffset)) {
 		common->DPrintf("SDL3: text input candidate area could not be updated: %s\n", SDL_GetError());
+		s_textInputAreaWindow = NULL;
+		return;
 	}
+	s_textInputAreaWindow = s_sdlWindow;
+	s_textInputArea = textArea;
+	s_textInputAreaCursor = cursorOffset;
 }
 
 static void SDL3_UpdateTextInputState(void) {
@@ -1500,6 +1583,8 @@ static void SDL3_UpdateTextInputState(void) {
 		if (SDL_StartTextInput(s_sdlWindow)) {
 			s_sdlTextInputActive = true;
 			s_sdlTextInputFailureLogged = false;
+			// a new session (perhaps of a new window) is always given its area
+			s_textInputAreaWindow = NULL;
 		} else if (!s_sdlTextInputFailureLogged) {
 			common->Printf("SDL3: text input could not be enabled: %s\n", SDL_GetError());
 			s_sdlTextInputFailureLogged = true;
@@ -1861,8 +1946,23 @@ static float SDL3_NormalizeSignedAxisFloat(Sint16 value) {
 // this sample before the configurable aiming dead zone, response curve and
 // inversion; applying those first would move the wheel's threshold.
 static void SDL3_PublishRadialStick(Sint16 rawX, Sint16 rawY) {
-	cvarSystem->SetCVarFloat("ui_radialStickX", SDL3_NormalizeSignedAxisFloat(rawX));
-	cvarSystem->SetCVarFloat("ui_radialStickY", SDL3_NormalizeSignedAxisFloat(rawY));
+	// openQ4 (HF-09): an axis is written only when its sample changed, or when
+	// something else rewrote the cvar since; formatting the float for the cvar
+	// cost more than the rest of the axis update.
+	static const char *const names[2] = { "ui_radialStickX", "ui_radialStickY" };
+	static bool written[2] = { false, false };
+	static Sint16 writtenRaw[2] = { 0, 0 };
+	static float writtenValue[2] = { 0.0f, 0.0f };	// what the cvar read back as
+	const Sint16 raw[2] = { rawX, rawY };
+	for (int axis = 0; axis < 2; ++axis) {
+		if (written[axis] && raw[axis] == writtenRaw[axis] && cvarSystem->GetCVarFloat(names[axis]) == writtenValue[axis]) {
+			continue;
+		}
+		cvarSystem->SetCVarFloat(names[axis], SDL3_NormalizeSignedAxisFloat(raw[axis]));
+		written[axis] = true;
+		writtenRaw[axis] = raw[axis];
+		writtenValue[axis] = cvarSystem->GetCVarFloat(names[axis]);
+	}
 }
 
 static int SDL3_AxisFloatToJoystickValue(float value) {
@@ -2242,9 +2342,23 @@ static bool SDL3_ShouldSkipRumbleUpdate(Uint16 low, Uint16 high, int now, int un
 		untilTime <= s_joystickRumbleUntilTime + SDL3_RUMBLE_DEBOUNCE_MSEC;
 }
 
+// openQ4 (HF-09): whether the active controller's axes already show this poll
+// cycle's state, so a later axis event of the same cycle has nothing to add.
+static bool SDL3_ControllerAxesCurrent(SDL_JoystickID device) {
+	return device != 0 && s_controllerAxesDevice == device && s_controllerAxesCycle == s_sdlPollCycle;
+}
+
+static void SDL3_NoteControllerAxesSampled(SDL_JoystickID device) {
+	s_controllerAxesDevice = device;
+	s_controllerAxesCycle = s_sdlPollCycle;
+	++s_controllerAxisSamples;
+}
+
 static void SDL3_ClearJoystickAxisStateUnlocked(void) {
 	memset(s_joystickAxisState, 0, sizeof(s_joystickAxisState));
 	SDL3_PublishRadialStick(0, 0);
+	// cleared axes are no longer the device's: the next axis event samples it again
+	s_controllerAxesDevice = 0;
 }
 
 static void SDL3_ClearJoystickState(void) {
@@ -2357,6 +2471,7 @@ static void SDL3_UpdateGamepadAxes(int eventTime) {
 	SDL3_UpdateTriggerButtons(leftTrigger, rightTrigger, eventTime);
 	const int activity = Max(Max(idMath::Abs(moveX), idMath::Abs(moveY)), Max(idMath::Abs(lookX), idMath::Abs(lookY)));
 	SDL3_QueueControllerActivity(eventTime, activity);
+	SDL3_NoteControllerAxesSampled(s_sdlGamepadId);
 }
 
 static void SDL3_UpdateJoystickAxes(void) {
@@ -2435,6 +2550,7 @@ static void SDL3_UpdateJoystickAxes(void) {
 	const int activity = Max(Max(idMath::Abs(moveX), idMath::Abs(moveY)),
 		Max(Max(idMath::Abs(lookX), idMath::Abs(lookY)), idMath::Abs(up)));
 	SDL3_QueueControllerActivity(Sys_Milliseconds(), activity);
+	SDL3_NoteControllerAxesSampled(s_sdlJoystickId);
 }
 
 /*
@@ -4048,6 +4164,34 @@ static void SDL3_PrintActiveJoystickDetails(void) {
 	int powerPercent = -1;
 	const SDL_PowerState powerState = SDL_GetJoystickPowerInfo(s_sdlJoystick, &powerPercent);
 	SDL3_PrintControllerPowerLine("    power: ", powerState, powerPercent);
+}
+
+/*
+===============
+SDL3_InputStats_f
+
+inputStats [reset] (HF-09): the reports the input layer received since the
+last reset against the work it did for them. A mouse's reports fold into
+runs, one SE_MOUSE event each; the active controller's axes are sampled at
+most once per poll cycle, however many axis events the cycle held.
+===============
+*/
+static void SDL3_InputStats_f(const idCmdArgs &args) {
+	if (args.Argc() > 1 && idStr::Icmp(args.Argv(1), "reset") == 0) {
+		s_mouseMotionReports = 0;
+		s_mouseMotionReportsJoined = 0;
+		s_controllerAxisEvents = 0;
+		s_controllerAxisSamples = 0;
+		common->Printf("inputStats: counts reset\n");
+		return;
+	}
+	const std::uint64_t runs = s_mouseMotionReports - s_mouseMotionReportsJoined;
+	common->Printf("inputStats: mouse reports=%llu runs=%llu (%.2f reports per run)\n",
+		static_cast<unsigned long long>(s_mouseMotionReports), static_cast<unsigned long long>(runs),
+		runs > 0 ? static_cast<double>(s_mouseMotionReports) / static_cast<double>(runs) : 0.0);
+	common->Printf("inputStats: controller axis events=%llu axis samples=%llu poll cycles=%u\n",
+		static_cast<unsigned long long>(s_controllerAxisEvents), static_cast<unsigned long long>(s_controllerAxisSamples),
+		s_sdlPollCycle);
 }
 
 static void SDL3_ListControllers_f(const idCmdArgs &args) {
@@ -6484,6 +6628,8 @@ bool Sys_SDL_PumpEvents(void) {
 	}
 
 	bool sawResizeEvent = false;
+	// The first SDL_PollEvent below pumps the devices for this cycle (HF-09).
+	++s_sdlPollCycle;
 	SDL_Event event;
 	while (SDL_PollEvent(&event)) {
 		const int eventTime = SDL3_EventMilliseconds(event.common.timestamp);
@@ -6638,6 +6784,8 @@ bool Sys_SDL_PumpEvents(void) {
 
 			case SDL_EVENT_MOUSE_MOTION:
 			{
+				// One run of reports at a time, however fast the mouse polls (HF-09).
+				(void)SDL3_JoinMouseMotionRun(event.motion);
 				// Touch synthesises no mouse events (SDL_HINT_TOUCH_MOUSE_EVENTS 0).
 				idKeyInput::NotePointerSource(false);
 				if (RetainedUI_IsOpen() && !(console && console->Active())) {
@@ -6803,7 +6951,11 @@ bool Sys_SDL_PumpEvents(void) {
 			case SDL_EVENT_GAMEPAD_AXIS_MOTION:
 				if (in_joystick.GetBool()) {
 					if (s_sdlGamepad && event.gaxis.which == s_sdlGamepadId) {
-						SDL3_UpdateGamepadAxes(eventTime);
+						++s_controllerAxisEvents;
+						// every axis event of the cycle reads the state its first one did
+						if (!SDL3_ControllerAxesCurrent(s_sdlGamepadId)) {
+							SDL3_UpdateGamepadAxes(eventTime);
+						}
 					}
 					// use of any controller, the active one included: it is how the roster knows rest
 					const sdlController_t *source = SDL3_FindController(event.gaxis.which);
@@ -6873,7 +7025,10 @@ bool Sys_SDL_PumpEvents(void) {
 			case SDL_EVENT_JOYSTICK_AXIS_MOTION:
 				if (in_joystick.GetBool()) {
 					if (s_sdlJoystick && event.jaxis.which == s_sdlJoystickId) {
-						SDL3_UpdateJoystickAxes();
+						++s_controllerAxisEvents;
+						if (!SDL3_ControllerAxesCurrent(s_sdlJoystickId)) {
+							SDL3_UpdateJoystickAxes();
+						}
 					}
 					const sdlController_t *source = SDL3_FindController(event.jaxis.which);
 					if (source != NULL && source->joystick != NULL && SDL3_JoystickAxisIsUse(source->joystick)) {
@@ -8137,6 +8292,7 @@ static bool SDL3_WindowServices_PrepareWindowSystem(void) {
 		cmdSystem->AddCommand("listDisplays", SDL3_ListDisplays_f, CMD_FL_SYSTEM, "lists SDL3 displays and monitor indices");
 		cmdSystem->AddCommand("listDisplayModes", SDL3_ListDisplayModes_f, CMD_FL_SYSTEM, "lists SDL3 fullscreen display modes (optional display index)");
 		cmdSystem->AddCommand("listControllers", SDL3_ListControllers_f, CMD_FL_SYSTEM, "lists SDL3 controller, sensor, touchpad, and battery diagnostics");
+		cmdSystem->AddCommand("inputStats", SDL3_InputStats_f, CMD_FL_SYSTEM, "shows how many mouse reports and controller axis events the input layer received and how few it processed; inputStats reset starts the count again");
 		cmdSystem->AddCommand("calibrateGyro", SDL3_CalibrateGyro_f, CMD_FL_SYSTEM, "measures the active controller's gyro bias: hold it still for two seconds");
 		cmdSystem->AddCommand("virtualController", SDL3_VirtualController_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "development: attach and drive SDL virtual controllers inside this process, so the controller layer can be tested without hardware or operating-system input; requires cheats");
 		cmdSystem->AddCommand("sdl3MouseCaptureDiagnostics", SDL3_MouseCaptureDiagnostics_f, CMD_FL_SYSTEM, "toggles SDL3 mouse capture and prints backend state; optional repeat count is clamped to 1..8");

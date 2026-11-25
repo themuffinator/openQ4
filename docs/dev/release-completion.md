@@ -12,6 +12,51 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Fast-polling mice lose nothing in a slow frame, and controllers cost less, 25 November 2026
+
+- **Mice that report up to 8000 times a second keep every movement.** Each
+  report used to become its own input event and two queued movements, so an
+  8000 Hz mouse filled the engine's event queue in any frame slower than about
+  32 ms, during a hitch, a save or a heavy fight. The oldest events were then
+  thrown away, key and button presses among them, with a console line for each
+  one, which made the slow frame slower still. Reports that arrive together are
+  now added into one movement: the same total, in the same order relative to
+  every press, at any polling rate and frame rate.
+- **Menus and the console with a fast mouse.** The menu cursor, the retained
+  menus and the console take one step per run of reports instead of one per
+  report, so a fast-polling mouse no longer makes the menus do hundreds of
+  pointer updates a frame.
+- **Controllers.** Every stick and trigger report re-read the whole controller
+  and rewrote two settings, though all reports of one frame read the same
+  state. The controller is now read once a frame. Sticks, triggers, the radial
+  selector and the active-controller switch behave exactly as before.
+- **Typing.** While the console or a text field is open, the position of the
+  system's input-method window is passed on only when it moves, not twice a
+  frame.
+- **When the queue still overflows** (a very long stall), the console says so
+  once, then reports how many events were dropped, instead of one line per
+  event.
+- **What to do.** Nothing. To see it work, play for a while and enter
+  `inputStats` in the console: it shows how many mouse reports arrived and how
+  few movements they became, and the same for controller axis events.
+- For developers: the join rule is `src/sys/MouseMotionRun.h`; the platform
+  layer joins only reports queued one straight after another, from one window
+  and one mouse, below the per-event clamp. See the roadmap under HF-09.
+- Evidence, Windows x64: `tools/tests/sdl3_input_coalescing.py` runs the
+  production joining code against a model of SDL 3.4's queue and compares every
+  flood with the report-by-report path: equal motion, in order, 9,294 reports in
+  19 runs, nine mutants rejected; `sys_event_queue_ownership.py` checks the
+  overflow report on the Windows and POSIX queues. In the game, on
+  `airdefense1` with an SDL virtual Xbox pad (inside the process, no system
+  input), six axes moved in one frame arrived as 12 axis events in one poll
+  cycle and were read once, and the sticks, triggers and radial selector showed
+  the final state exactly, then released together. The controller runtime
+  scenarios (handover, twins, turn rate, layout, aim assist, feedback, gyro)
+  pass on this build; turn rate and gyro also fail at times on a fully loaded
+  machine, and do so on the previous build too in alternating runs. Not yet run
+  on a physical high-polling-rate mouse: a hidden test window has no captured
+  mouse to drive.
+
 ## One game module for single-player and multiplayer, 24 November 2026
 
 - **One game file serves the campaign and multiplayer.** openQ4 built its game

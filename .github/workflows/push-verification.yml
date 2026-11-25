@@ -551,6 +551,7 @@ jobs:
             tools/tests/savegame_raw_inventory.py \
             tools/tests/sdl3_input_parity.py \
             tools/tests/sys_event_queue_ownership.py \
+            tools/tests/sdl3_input_coalescing.py \
             tools/tests/event_journal.py \
             tools/tests/event_disposition_storage.py \
             tools/tests/sdl3_input_disposition.py \
@@ -1140,6 +1141,7 @@ jobs:
           python tools/tests/savegame_raw_inventory.py
           python tools/tests/sdl3_input_parity.py
           python tools/tests/sys_event_queue_ownership.py
+          python tools/tests/sdl3_input_coalescing.py
           python tools/tests/event_journal.py
           python tools/tests/event_disposition_storage.py
           python tools/tests/sdl3_input_disposition.py

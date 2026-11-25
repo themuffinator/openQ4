@@ -879,6 +879,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / "ui_legacy_feedback.py", []),
         (root / "tools" / "tests" / 'renderer_native_ui_output.py', []),
         (root / "tools" / "tests" / 'sys_event_queue_ownership.py', []),
+        (root / "tools" / "tests" / 'sdl3_input_coalescing.py', []),
         (root / "tools" / "tests" / 'event_journal.py', []),
         (root / "tools" / "tests" / 'event_disposition_storage.py', []),
         (root / "tools" / "tests" / 'sdl3_input_disposition.py', []),

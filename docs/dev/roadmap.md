@@ -53,7 +53,7 @@ exact; the estimate column is deliberately approximate.
 | Category / task family | Estimated completion | Tasks closed | Principal remaining work |
 | --- | ---: | ---: | --- |
 | [Governance and baseline evidence](#governance-and-baseline-evidence) — GOV | **100%** | 3 / 3 | Maintain evidence/default alignment as later changes land. |
-| [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 8 | Reference pacing, physical latency and visual motion review. |
+| [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 9 | Reference pacing, physical latency, visual motion review and a physical high-polling-rate input check. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **60%** | 1 / 8 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks; HDR display output (VK-08, not started). |
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **65%** | 5 / 13 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, partial). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026; temporal AA and dynamic resolution (REN-04) closed 23 November 2026; depth of field (REN-12, partial) 23 November, with scripted cinematic focus to follow (REN-13). |
@@ -326,7 +326,7 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
 
 ### HF completion checkpoints
 
-**Estimate: 80%; 6/8 tasks closed.** Presentation implementation is mature within
+**Estimate: 80%; 6/9 tasks closed.** Presentation implementation is mature within
 its declared exclusions. The remaining work includes a failing performance target,
 not merely paperwork or a final screenshot.
 
@@ -340,6 +340,7 @@ not merely paperwork or a final screenshot.
 | HF-06 — Closed | Cross-system probes cover exactly-once gameplay, TAA, shadows, save/load, restart, demos, AVI and simulated stereo. | Physical motion/headset review remains HF-08/VR-02. |
 | HF-07 — Partial | Cap/policy matrix, precise wait, pacing histograms, present timing, reference runner and CPU attribution exist. | Meet the Quality every-frame floor and declared 240 Hz budgets; run foreground reference, VSync/VRR and physical display checks. 360 Hz remains experimental. |
 | HF-08 — Partial | Loopback host/client, zoom, lift, loss/jitter, rapid-turn and cockpit probes pass; sensor/review tooling exists. | Measure click-to-photon latency; review cuts, weapons/TAA, debris and ragdolls in motion; retain vehicle late-look exclusion. |
+| HF-09 — Partial | Runs of mouse reports join into one event below the per-event clamp; the active controller's axes are read once per SDL poll cycle; IME area and radial-stick writes happen only on change; queue overflow reports once per burst. Production code is compiled against a model SDL queue with mutants; a live client with a virtual pad read 12 axis events of one cycle once, and the controller runtime scenarios pass. | A physical 1–8 kHz mouse and a fast-reporting controller in play (`inputStats`). |
 
 ### HF task evidence and acceptance
 
@@ -627,6 +628,36 @@ not merely paperwork or a final screenshot.
   do not count as latency samples; resetting statistics excludes older frames
   that retire later. This corrects the engine-side instrument, not the still
   pending click-to-photon measurement or by-eye review.
+- [ ] **HF-09 — P1, implementation: high-rate input devices cost per frame, not
+  per report.** SDL 3.4 queues one motion event per mouse report (its Windows
+  raw input thread at the full polling rate, up to 8000 a second) and one event
+  per changed controller axis. The SDL3 platform layer turned each motion
+  report into an SE_MOUSE event and two mouse-poll entries, so an 8 kHz mouse
+  overflowed the 256-entry event queue in any frame over 32 ms and the
+  512-entry mouse ring over 64 ms, evicting key events and motion and printing
+  a line per dropped event; and each axis event re-read the whole controller
+  and rewrote `ui_radialStickX/Y`, though SDL pumps devices once per poll cycle
+  and every event of the cycle reads the same state. Acceptance: runs of
+  motion reports join (same window and mouse, finite, each axis within 16384
+  counts and 4096 reports) with equal totals and unchanged order relative to
+  every other event; one controller axis sample per cycle with use still
+  judged per event; no IME area or radial cvar write without a change;
+  overflow reported once per burst with the dropped count. Progress, 25
+  November: implemented (`src/sys/MouseMotionRun.h`, `sdl3_backend.cpp`,
+  `win_main.cpp`, `posix_main.cpp`) with the `inputStats` command;
+  `sdl3_input_coalescing.py` compiles the production functions against a
+  model SDL 3.4 queue (peek skips the poll sentinel) and matches every flood
+  to the report-by-report path, rejecting nine mutants of the join rule and
+  the cycle guard; `sys_event_queue_ownership.py` pins the overflow report on
+  both queues. Live client, `airdefense1`, SDL virtual Xbox pad: six axes in
+  one frame gave 12 axis events in one cycle and one sample, with the final
+  sticks, triggers and radial cvars exact and all released together; the
+  `controller_runtime.py` handover, twins, turn-rate, layout, assist, feedback
+  and gyro scenarios pass (turn rate and gyro also miss under a fully loaded
+  machine, equally on the previous build in interleaved A/B runs). Remaining: a
+  physical 1–8 kHz mouse and a fast-reporting controller in a live session,
+  read through `inputStats`; a hidden harness window has no captured mouse, so
+  the live mouse path is covered only by the compiled harness.
 
 ## Vulkan rendering
 

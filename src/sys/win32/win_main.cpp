@@ -1616,6 +1616,9 @@ static std::uint64_t eventRetirementSerials[MAX_QUED_EVENTS];
 static std::uint64_t eventRetirementHighwater = 0; // Never reset by clear/rebind.
 int			eventHead = 0;
 int			eventTail = 0;
+// openQ4: events the current overflow burst has dropped; it ends when the
+// queue drains (Sys_GetEvent), which reports the count.
+static int	eventOverflowDropped = 0;
 
 // Only pending queue entries own their payload. Dequeued slots may still hold
 // a pointer whose ownership has already transferred to the event consumer.
@@ -1647,7 +1650,11 @@ void Sys_QueEvent(int time, sysEventType_t type, int value, int value2, int ptrL
 
 	if (eventHead - eventTail >= MAX_QUED_EVENTS) {
 		Sys_InvalidateEventQueue();
-		common->Printf("Sys_QueEvent: overflow\n");
+		// openQ4: one line per burst rather than per event; a stalled frame can
+		// drop hundreds, and printing each one made the stall longer
+		if (eventOverflowDropped++ == 0) {
+			common->Printf("Sys_QueEvent: overflow, dropping the oldest events\n");
+		}
 		// we are discarding an event, but don't leak memory
 		Sys_DiscardQueuedEvent( *ev );
 		eventTail++;
@@ -1843,7 +1850,12 @@ sysEvent_t Sys_GetEvent(void) {
 		return eventQue[(eventTail - 1) & MASK_QUED_EVENTS];
 	}
 
-	// return the empty event 
+	if (eventOverflowDropped > 0) {
+		common->Printf("Sys_QueEvent: overflow dropped %d events\n", eventOverflowDropped);
+		eventOverflowDropped = 0;
+	}
+
+	// return the empty event
 	memset(&ev, 0, sizeof(ev));
 
 	return ev;
