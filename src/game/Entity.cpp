@@ -2266,7 +2266,7 @@ void idEntity::UpdatePresentationPose( void ) {
 		presentationRenderEntity.callback = NULL;
 		presentationRenderEntity.numJoints = animator->NumJoints();
 		presentationRenderEntity.joints = presentationJoints;
-		presentationRenderEntity.hModel->BoundsFromJoints( presentationJoints, presentationRenderEntity.bounds );
+		animator->GetPresentationBounds( presentationRenderEntity.hModel, presentationJoints, presentationRenderEntity.bounds );
 	}
 
 	presentationPoseHeld = true;

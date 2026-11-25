@@ -129,6 +129,7 @@ typedef struct portalArea_s {
 	idBounds		globalBounds;
 	LightGrid		lightGrid;
 	int				viewCount;		// set by R_FindViewLightsAndEntities
+	int				refCount;		// set while one entity's or light's area references are built
 	portal_t *		portals;		// never changes after load
 	areaReference_t	entityRefs;		// head/tail of doubly linked list, may change
 	areaReference_t	lightRefs;		// head/tail of doubly linked list, may change

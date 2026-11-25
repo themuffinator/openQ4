@@ -3529,6 +3529,9 @@ idAnimator::idAnimator() {
 // RAVEN END
 
 	frameBounds.Clear();
+	frameBoundsJoints		= NULL;
+	frameBoundsNumJoints	= 0;
+	frameBoundsJointsValid	= false;
 
 	AFPoseJoints.SetGranularity( 1 );
 	AFPoseJointMods.SetGranularity( 1 );
@@ -3561,7 +3564,7 @@ idAnimator::Allocated
 size_t idAnimator::Allocated( void ) const {
 	size_t	size;
 
-	size = jointMods.Allocated() + numJoints * sizeof( joints[0] ) + ( presentationJoints ? numJoints * sizeof( presentationJoints[0] ) : 0 ) + ( presentationPrevAFJoints ? numJoints * sizeof( presentationPrevAFJoints[0] ) : 0 ) + jointMods.Num() * sizeof( jointMods[ 0 ] ) + AFPoseJointMods.Allocated() + AFPoseJointFrameSize * sizeof( AFPoseJointFrame[0] ) + AFPoseJoints.Allocated();
+	size = jointMods.Allocated() + numJoints * sizeof( joints[0] ) + ( presentationJoints ? numJoints * sizeof( presentationJoints[0] ) : 0 ) + ( presentationPrevAFJoints ? numJoints * sizeof( presentationPrevAFJoints[0] ) : 0 ) + frameBoundsNumJoints * sizeof( frameBoundsJoints[0] ) + jointMods.Num() * sizeof( jointMods[ 0 ] ) + AFPoseJointMods.Allocated() + AFPoseJointFrameSize * sizeof( AFPoseJointFrame[0] ) + AFPoseJoints.Allocated();
 
 	return size;
 }
@@ -3727,6 +3730,8 @@ void idAnimator::Restore( idRestoreGame *savefile ) {
 	savefile->ReadBool( stoppedAnimatingUpdate );
 	savefile->ReadBool( forceUpdate );
 	savefile->ReadBounds( frameBounds );
+	// the pose these bounds were measured in is not saved
+	frameBoundsJointsValid = false;
 
 	savefile->ReadFloat( AFPoseBlendWeight );
 
@@ -3807,6 +3812,10 @@ void idAnimator::FreeData( void ) {
 	presentationPrevAFJoints = NULL;
 	presentationPrevAFTime = -1;
 	authoritativeFrameTime = -1;
+	Mem_Free16( frameBoundsJoints );
+	frameBoundsJoints = NULL;
+	frameBoundsNumJoints = 0;
+	frameBoundsJointsValid = false;
 	numJoints = 0;
 
 	modelDef = NULL;
@@ -4706,9 +4715,21 @@ bool idAnimator::GetBounds( int currentTime, idBounds &bounds ) {
 			}
 
 			frameBounds = bounds;
+			// keep the pose these bounds are exact for: a pose drawn between
+			// tics is bounded from them (GetPresentationBounds)
+			if ( frameBoundsNumJoints != numJoints ) {
+				Mem_Free16( frameBoundsJoints );
+				frameBoundsJoints = ( idJointMat * )Mem_Alloc16( numJoints * sizeof( frameBoundsJoints[0] ), MA_ANIM );
+				frameBoundsNumJoints = numJoints;
+			}
+			SIMDProcessor->Memcpy( frameBoundsJoints, joints, numJoints * sizeof( frameBoundsJoints[0] ) );
+			frameBoundsJointsValid = true;
 			return true;
 		}
 	}
+
+	// the envelope bounds below are not the mesh's own
+	frameBoundsJointsValid = false;
 
 	if ( AFPoseJoints.Num() ) {
 		bounds = AFPoseBounds;
@@ -4756,6 +4777,26 @@ bool idAnimator::GetBounds( int currentTime, idBounds &bounds ) {
 	frameBounds = bounds;
 
 	return true;
+}
+
+/*
+=====================
+idAnimator::GetPresentationBounds
+
+A pose drawn between two tics is within a tic's travel of the pose GetBounds
+skinned, so the model widens those bounds by that travel instead of skinning
+the mesh again for every rendered frame (idRenderModel::BoundsFromReferencePose).
+=====================
+*/
+bool idAnimator::GetPresentationBounds( const idRenderModel *model, const idJointMat *poseJoints, idBounds &bounds ) const {
+	if ( model == NULL || poseJoints == NULL ) {
+		return false;
+	}
+	if ( frameBoundsJointsValid && frameBoundsNumJoints == numJoints && modelDef != NULL && modelDef->ModelHandle() == model
+			&& model->BoundsFromReferencePose( frameBoundsJoints, frameBounds, poseJoints, bounds ) ) {
+		return true;
+	}
+	return model->BoundsFromJoints( poseJoints, bounds );
 }
 
 /*

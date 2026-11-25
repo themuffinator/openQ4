@@ -1154,6 +1154,15 @@ bool idRenderModel::BoundsFromJoints( const idJointMat *joints, idBounds &bounds
 
 /*
 ================
+idRenderModel::BoundsFromReferencePose
+================
+*/
+bool idRenderModel::BoundsFromReferencePose( const idJointMat *referenceJoints, const idBounds &referenceBounds, const idJointMat *joints, idBounds &bounds ) const {
+	return false;
+}
+
+/*
+================
 idRenderModel::HasCollisionSurface
 ================
 */

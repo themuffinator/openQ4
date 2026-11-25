@@ -6688,6 +6688,7 @@ void idRenderSystemLocal::Clear( void ) {
 	depthOfFieldRequest = renderViewDepthOfField_t();
 	depthOfFieldRequestFrame = -1;
 	viewCount = 0;
+	areaRefCount = 0;
 	videoRestartCount = 0;
 	glContextGeneration = 0;
 	staticAllocCount = 0;
@@ -6791,6 +6792,7 @@ void idRenderSystemLocal::Init( void ) {
 
 	// clear all our internal state
 	viewCount = 1;		// so cleared structures never match viewCount
+	areaRefCount = 1;	// likewise for the area reference stamp
 	// we used to memset tr, but now that it is a class, we can't, so
 	// there may be other state we need to reset
 

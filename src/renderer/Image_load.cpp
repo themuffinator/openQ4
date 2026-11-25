@@ -2230,7 +2230,7 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 		}
 	}
 
-//	backEnd.pc.c_copyFrameBuffer++;
+	backEnd.c_copyFrameBuffer++;
 	return true;
 }
 
@@ -2362,6 +2362,7 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previousDrawFbo );
 		glReadBuffer( previousReadBuffer );
 		glDrawBuffer( previousDrawBuffer );
+		backEnd.c_copyDepthBuffer++;
 		return true;
 	}
 
@@ -2475,7 +2476,7 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 		glReadBuffer( previousReadBuffer );
 	}
 
-	//backEnd.pc.c_copyFrameBuffer++;
+	backEnd.c_copyDepthBuffer++;
 	return true;
 }
 

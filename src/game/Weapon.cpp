@@ -515,7 +515,7 @@ void rvViewWeapon::UpdatePresentationModel( void ) {
 			presentationRenderEntity.callback = NULL;
 			presentationRenderEntity.numJoints = presentationAnimator->NumJoints();
 			presentationRenderEntity.joints = presentationJoints;
-			presentationRenderEntity.hModel->BoundsFromJoints( presentationJoints, presentationRenderEntity.bounds );
+			presentationAnimator->GetPresentationBounds( presentationRenderEntity.hModel, presentationJoints, presentationRenderEntity.bounds );
 		}
 	}
 	idVec3 origin;

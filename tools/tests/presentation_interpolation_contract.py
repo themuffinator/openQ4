@@ -217,6 +217,26 @@ def check_source_root(source_root: str) -> dict[str, str]:
     reject(animator_save, "presentationJoints", f"{context} animator save-format isolation")
     reject(animator_save, "presentationJointsValid", f"{context} animator save-format isolation")
 
+    # A pose drawn between tics takes its bounds from the tic pose GetBounds
+    # skinned, widened by the joints' travel. The remembered pose is draw-only
+    # state like the scratch joints: never saved, and dropped whenever
+    # frameBounds stops being the mesh's own exact bounds.
+    require(anim_h, "bool\t\t\t\t\t\tGetPresentationBounds( const idRenderModel *model, const idJointMat *poseJoints, idBounds &bounds ) const;", f"{context} presentation bounds API")
+    require(animator_constructor, "frameBoundsJointsValid\t= false;", f"{context} reference pose starts invalid")
+    require(animator_free, "Mem_Free16( frameBoundsJoints );", f"{context} reference pose free")
+    require(animator_free, "frameBoundsJointsValid = false;", f"{context} reference pose cleared with the model")
+    reject(animator_save, "frameBoundsJoints", f"{context} reference pose stays out of the save format")
+    animator_restore = function(anim_cpp, "void idAnimator::Restore( idRestoreGame *savefile )", context)
+    require_before(animator_restore, "savefile->ReadBounds( frameBounds );", "frameBoundsJointsValid = false;", f"{context} restored bounds have no reference pose")
+    get_bounds = function(anim_cpp, "bool idAnimator::GetBounds( int currentTime, idBounds &bounds )", context)
+    require_before(get_bounds, "frameBounds = bounds;", "SIMDProcessor->Memcpy( frameBoundsJoints, joints, numJoints * sizeof( frameBoundsJoints[0] ) );", f"{context} exact bounds keep their pose")
+    require_before(get_bounds, "frameBoundsJointsValid = true;", "frameBoundsJointsValid = false;", f"{context} envelope bounds drop the reference pose")
+    presentation_bounds = function(anim_cpp, "bool idAnimator::GetPresentationBounds( const idRenderModel *model, const idJointMat *poseJoints, idBounds &bounds ) const", context)
+    require(presentation_bounds, "frameBoundsJointsValid && frameBoundsNumJoints == numJoints", f"{context} reference pose must match the skeleton")
+    require(presentation_bounds, "modelDef->ModelHandle() == model", f"{context} reference bounds belong to this model")
+    require(presentation_bounds, "model->BoundsFromReferencePose( frameBoundsJoints, frameBounds, poseJoints, bounds )", f"{context} widened reference bounds")
+    require(presentation_bounds, "return model->BoundsFromJoints( poseJoints, bounds );", f"{context} exact bounds when the model declines")
+
     create_frame = function(anim_cpp, "bool idAnimator::CreateFrame( int currentTime, bool force )", context)
     require(create_frame, "presentationJointsValid = false;", f"{context} authoritative evaluation invalidates scratch")
 
@@ -315,7 +335,7 @@ def check_source_root(source_root: str) -> dict[str, str]:
     require(update_pose, "renderEntity_t presentationRenderEntity = renderEntity;", f"{context} transient skeletal render copy")
     require(update_pose, "presentationRenderEntity.callback = NULL;", f"{context} scratch joints cannot be overwritten by callback")
     require(update_pose, "presentationRenderEntity.joints = presentationJoints;", f"{context} renderer receives scratch joints")
-    require(update_pose, "BoundsFromJoints( presentationJoints, presentationRenderEntity.bounds )", f"{context} scratch joint bounds")
+    require(update_pose, "GetPresentationBounds( presentationRenderEntity.hModel, presentationJoints, presentationRenderEntity.bounds )", f"{context} scratch joint bounds")
     require(update_pose, "UpdateEntityDef", f"{context} entity render resubmission")
     require(update_pose, "UpdatePresentationClientEntities( presentationTime );", f"{context} attached client entities follow the skeletal clock")
     require(update_pose, "presentationPoseHeld = true;", f"{context} attached visuals resolve against the drawn pose")
@@ -578,7 +598,7 @@ def check_source_root(source_root: str) -> dict[str, str]:
     require(update_model, "CreatePresentationFrame( presentationTime, &presentationJoints )", f"{context} isolated viewmodel skeletal sample")
     require(update_model, "presentationRenderEntity.callback = NULL;", f"{context} viewmodel scratch callback suppression")
     require(update_model, "presentationRenderEntity.joints = presentationJoints;", f"{context} viewmodel scratch joints")
-    require(update_model, "BoundsFromJoints( presentationJoints, presentationRenderEntity.bounds )", f"{context} viewmodel scratch bounds")
+    require(update_model, "GetPresentationBounds( presentationRenderEntity.hModel, presentationJoints, presentationRenderEntity.bounds )", f"{context} viewmodel scratch bounds")
     require(update_model, "UpdateEntityDef", f"{context} viewmodel render resubmission")
     require(update_model, "UpdatePresentationClientEntities( presentationTime );", f"{context} attached client entities follow the drawn pose")
     require(update_model, "weapon->UpdatePresentationEffects();", f"{context} weapon-driven view effects follow the drawn pose")
@@ -665,7 +685,7 @@ def check_source_root(source_root: str) -> dict[str, str]:
     require(client_model_presentation, "CreatePresentationFrame( presentationTime, &presentationJoints )", f"{context} isolated client-model skeletal sample")
     require(client_model_presentation, "presentationRenderEntity.callback = NULL;", f"{context} client-model scratch callback suppression")
     require(client_model_presentation, "presentationRenderEntity.joints = presentationJoints;", f"{context} client-model scratch joints")
-    require(client_model_presentation, "BoundsFromJoints( presentationJoints, presentationRenderEntity.bounds )", f"{context} client-model scratch bounds")
+    require(client_model_presentation, "GetPresentationBounds( presentationRenderEntity.hModel, presentationJoints, presentationRenderEntity.bounds )", f"{context} client-model scratch bounds")
     require(client_model_presentation, "submittedRenderEntity = &presentationRenderEntity;", f"{context} client-model scratch submission")
     require(client_model_presentation, "animator->ClearPresentationFrame();", f"{context} client-model scratch expiry")
 

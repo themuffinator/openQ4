@@ -190,9 +190,15 @@ void R_CreateEntityRefs( idRenderEntityLocal *def ) {
 						def->referenceBounds[1][1] - def->referenceBounds[0][1] );
 	}
 
-	// bump the view count so we can tell if an
-	// area already has a reference
-	tr.viewCount++;
+	// Bump the stamp that tells whether an area already has a reference.
+	// It used to be the view count, which a view being built also keeps its
+	// visible areas, entities and lights under. References can be rebuilt in
+	// the middle of a view (effects are serviced while they are added to one,
+	// and an effect can start, move or resize a light), and that pushed the
+	// count on: every "is this in the view" test of the rest of that view
+	// would fail, culling later effects as out of sight and adding an entity
+	// or light asked for again a second time.
+	tr.areaRefCount++;
 
 	idBounds placementBounds = def->referenceBounds;
 	for ( int axis = 0; axis < 3; ++axis ) {
@@ -256,9 +262,9 @@ void R_CreateLightRefs( idRenderLightLocal *light ) {
 		light->areaNum = light->world->PointInArea( light->parms.origin );
 	}
 
-	// bump the view count so we can tell if an
-	// area already has a reference
-	tr.viewCount++;
+	// bump the area reference stamp so we can tell if an area already has
+	// a reference (its own counter, not the view count: R_CreateEntityRefs)
+	tr.areaRefCount++;
 
 	// if we have a prelight model that includes all the shadows for the major world occluders,
 	// we can limit the area references to those visible through the portals from the light center.

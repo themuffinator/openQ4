@@ -947,7 +947,9 @@ typedef struct {
 	// our OpenGL state deltas
 	glstate_t			glState;
 
+	// whole-view copies since r_debugRenderToTexture 1 last reported them
 	int					c_copyFrameBuffer;
+	int					c_copyDepthBuffer;
 } backEndState_t;
 
 
@@ -1127,6 +1129,8 @@ public:
 	int						frameCount;		// incremented every frame
 	int						viewCount;		// incremented every view (twice a scene if subviewed)
 											// and every R_MarkFragments call
+	int						areaRefCount;	// incremented for every entity or light whose area
+											// references are built (portalArea_t::refCount)
 	int						videoRestartCount; // incremented after successful vid_restart operations
 	int						glContextGeneration; // incremented only when the GL context is destroyed and recreated
 												 // (full restart); partial restarts keep the context and its

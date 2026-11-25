@@ -51,7 +51,7 @@ def validate_renderer() -> None:
     require(api, "virtual bool RequestVideoFrame( long long tag ) { (void)tag; return false; }", "the appended readback slots")
     require_order(api, ("virtual bool UploadImageRegion(", "virtual bool RequestVideoFrame(", "virtual int PollVideoFrame(",
                         "virtual void ReleaseVideoFrame()", "virtual void EndVideoCapture()"), "render API 37 slot order")
-    require(read("src/renderer/RenderModuleAPI.h"), "#define RENDER_API_VERSION\t\t\t38", "render API version")
+    require(read("src/renderer/RenderModuleAPI.h"), "#define RENDER_API_VERSION\t\t\t39", "render API version")
 
     backend = read("src/renderer/tr_backend.cpp")
     require_order(backend, ("RB_QueueSavePreview();", "RB_QueueVideoFrame();", "R_SwapBuffersWithInputTiming();"),

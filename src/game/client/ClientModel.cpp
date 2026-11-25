@@ -123,7 +123,7 @@ void rvClientModel::PresentPresentation( int presentationTime ) {
 			presentationRenderEntity.callback = NULL;
 			presentationRenderEntity.numJoints = animator->NumJoints();
 			presentationRenderEntity.joints = presentationJoints;
-			presentationRenderEntity.hModel->BoundsFromJoints( presentationJoints, presentationRenderEntity.bounds );
+			animator->GetPresentationBounds( presentationRenderEntity.hModel, presentationJoints, presentationRenderEntity.bounds );
 			submittedRenderEntity = &presentationRenderEntity;
 		}
 	}

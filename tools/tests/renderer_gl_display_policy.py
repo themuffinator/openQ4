@@ -82,7 +82,7 @@ struct RenderTexture {
     idImage* GetDepthImage(){return depth;}int GetDeviceHandle(){return 9;}
     int GetWidth(){return width;}int GetHeight(){return height;}
 };
-struct {RenderTexture* renderTexture=nullptr;} backEnd;
+struct {RenderTexture* renderTexture=nullptr;int c_copyFrameBuffer=0;int c_copyDepthBuffer=0;} backEnd;
 template<class... T> void R_BindTextureForDirectAccess(T...){}
 template<class... T> void R_AllocateCopyTextureStorage(T...){}
 template<class... T> void glTexParameterf(T...){}
@@ -174,7 +174,10 @@ int main(){
     GLEW_EXT_framebuffer_blit=false;blits=copies=readPixels=0;
     assert(depthCopy.CopyDepthbuffer(0,0,32,32));assert(readPixels==1 && copies==0);
     sourceDepth.opts.numMSAASamples=0;sampleBuffers=1;samples=4;SDL3_RecordDisplayParameters();
+    // r_debugRenderToTexture 1 reports the depth copies a frame made: each successful copy counts once.
+    const int countedDepthCopies=backEnd.c_copyDepthBuffer;
     blits=copies=readPixels=0;assert(depthCopy.CopyDepthbuffer(0,0,32,32));assert(copies==1 && readPixels==0);
+    assert(backEnd.c_copyDepthBuffer==countedDepthCopies+1);
     backEnd.renderTexture=nullptr;GLEW_EXT_framebuffer_blit=true;
     for(int suppression=0;suppression<4;++suppression){
         scaled=suppression==0;temporal=suppression==1;effects=suppression==2;modern=suppression==3;

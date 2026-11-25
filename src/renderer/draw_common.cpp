@@ -161,6 +161,29 @@ static bool RB_MaterialUsesCurrentDepth( const idMaterial *material ) {
 	return false;
 }
 
+static bool RB_MaterialUsesCurrentRender( const idMaterial *material ) {
+	if ( material == NULL ) {
+		return false;
+	}
+	if ( material->TestMaterialFlag( MF_NEED_CURRENT_RENDER ) ) {
+		return true;
+	}
+
+	const int stageCount = material->GetNumStages();
+	for ( int i = 0; i < stageCount; i++ ) {
+		if ( RB_StageUsesCurrentRender( material->GetStage( i ) ) ) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static idCVar r_postProcessCaptureOnDemand( "r_postProcessCaptureOnDemand", "1", CVAR_RENDERER | CVAR_BOOL,
+	"copy the view into _currentRender for a post-process pass only when a material in the pass samples it; 0 = copy it for every post-process pass" );
+static idCVar r_lightGridDepthOnDemand( "r_lightGridDepthOnDemand", "1", CVAR_RENDERER | CVAR_BOOL,
+	"copy the depth buffer for the light grid pass only in a 3D view of a world with a light grid, and keep that copy across the fog pass; 0 = copy it in every view and again after fog" );
+
 typedef bool ( *rbShaderPassSurfFilter_t )( const drawSurf_t *surf );
 
 static bool RB_DrawSurfNeedsLegacyFeedback( const drawSurf_t *surf ) {
@@ -7842,7 +7865,10 @@ static void RB_STD_Underwater( void ) {
 		idMath::ClampFloat( 0.0f, 2.0f, r_underwaterParticles.GetFloat() ),
 		0.0f
 	};
-	const GLfloat timeSeconds = static_cast<GLfloat>( backEnd.frameCount ) * ( 1.0f / 60.0f );
+	// The view's own clock, as its materials use: the warp, caustics and drift
+	// were counted in rendered frames, so they ran four times as fast at 240
+	// frames a second as at 60 and kept moving while the game was paused.
+	const GLfloat timeSeconds = backEnd.viewDef->floatTime;
 
 	if ( rbUnderwaterStage.shaderParmLocations[RB_UNDERWATER_UNIFORM_INV_TEX_SIZE] >= 0 ) {
 		glUniform2fvARB( rbUnderwaterStage.shaderParmLocations[RB_UNDERWATER_UNIFORM_INV_TEX_SIZE], 1, invTexSize );
@@ -13244,11 +13270,19 @@ int RB_STD_DrawShaderPasses( drawSurf_t **drawSurfs, int numDrawSurfs, rbShaderP
 			return 0;
 		}
 
+		// Sorting as post-process does not mean sampling the view: the game's
+		// own resolve, anti-aliasing and composite passes sort there and read
+		// only the targets they were given. The copy is a full view, and into
+		// a float image at that, so it is made for the materials that read it.
 		bool needsCurrentDepth = false;
-		for ( int surfIndex = 0; surfIndex < numDrawSurfs; surfIndex++ ) {
-			if ( RB_MaterialUsesCurrentDepth( drawSurfs[surfIndex]->material ) ) {
+		bool needsCurrentRender = !r_postProcessCaptureOnDemand.GetBool();
+		for ( int surfIndex = 0; surfIndex < numDrawSurfs && !( needsCurrentDepth && needsCurrentRender ); surfIndex++ ) {
+			const idMaterial *material = drawSurfs[surfIndex]->material;
+			if ( !needsCurrentDepth && RB_MaterialUsesCurrentDepth( material ) ) {
 				needsCurrentDepth = true;
-				break;
+			}
+			if ( !needsCurrentRender && RB_MaterialUsesCurrentRender( material ) ) {
+				needsCurrentRender = true;
 			}
 		}
 
@@ -13256,9 +13290,14 @@ int RB_STD_DrawShaderPasses( drawSurf_t **drawSurfs, int numDrawSurfs, rbShaderP
 		// Do not gate this on viewEntitys: world-only views may still contain post-process surfaces.
 		// Offscreen render-texture passes capture _currentRender explicitly and must keep that copy.
 		if ( RB_AutomaticCurrentRenderCaptureAllowed() ) {
-			RB_CaptureCurrentRenderImage(
-				backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1,
-				backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1 );
+			if ( needsCurrentRender ) {
+				RB_CaptureCurrentRenderImage(
+					backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1,
+					backEnd.viewDef->viewport.y2 - backEnd.viewDef->viewport.y1 + 1 );
+			} else {
+				// nothing in the pass reads the copy; let its surfaces draw
+				backEnd.currentRenderCopied = true;
+			}
 			if ( needsCurrentDepth ) {
 				RB_CaptureCurrentDepthImage(
 					backEnd.viewDef->viewport.x2 - backEnd.viewDef->viewport.x1 + 1,
@@ -16449,6 +16488,19 @@ static void RB_PrepareLightGridDepthTexture( void ) {
 		return;
 	}
 
+	// The copy is the light grid pass's depth test, and that pass draws only a
+	// 3D view of a world with a grid (RB_STD_LightGridIndirect). Once a map
+	// with a grid had created the program below, every other view paid for a
+	// copy of the whole depth buffer as well: the HUD, each of the game's
+	// fullscreen passes, and every view of a later map without a grid.
+	// Whatever samples depth later in such a view copies it when it draws.
+	if ( r_lightGridDepthOnDemand.GetBool() ) {
+		idRenderWorldLocal *gridWorld = backEnd.viewDef->renderWorld;
+		if ( backEnd.viewDef->viewEntitys == NULL || gridWorld == NULL || !gridWorld->AnyLightGridAvailable() ) {
+			return;
+		}
+	}
+
 	RB_InitLightGridIndirectStage();
 	if ( rbLightGridIndirectStage.glslProgramObject == 0 ) {
 		return;
@@ -18357,7 +18409,11 @@ void	RB_STD_DrawView( void ) {
 	} else {
 		RB_STD_FogAllLights();
 		backEnd.currentRenderCopied = false;
-		backEnd.currentDepthCopied = false;
+		// Fog and blend lights write no depth, so a depth copy made before
+		// them (the light grid's) still serves the surfaces drawn after.
+		if ( !r_lightGridDepthOnDemand.GetBool() ) {
+			backEnd.currentDepthCopied = false;
+		}
 	}
 
 	if ( sharedWorldAmbientOwned ) {

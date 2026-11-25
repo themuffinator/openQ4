@@ -35,6 +35,13 @@ If you have questions concerning this license or the applicable additional terms
 static const char *MD5_SnapshotName = "_MD5_Snapshot_";
 static const int MD5_BackSideSurfaceIdOffset = 1000;
 
+static idCVar r_posedBoundsFromReference( "r_posedBoundsFromReference", "1", CVAR_RENDERER | CVAR_INTEGER,
+	"bounds of an animated model for a pose between game tics: 0 = skin every vertex, 1 = widen the tic's exact bounds by the distance the joints travelled, 2 = as 1 and check each answer against the skinned mesh (reports every 1000 answers)",
+	0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+static idCVar r_posedBoundsReferenceLimit( "r_posedBoundsReferenceLimit", "16", CVAR_RENDERER | CVAR_FLOAT,
+	"largest joint travel, in units, that r_posedBoundsFromReference widens bounds by; a pose further from the reference is skinned for exact bounds",
+	0.0f, 1024.0f );
+
 namespace {
 	static const unsigned int MD5_MODEL_CACHE_MAGIC = 0x4d34514fU; // "OQ4M"
 	static const int MD5_MODEL_CACHE_VERSION = 1;
@@ -198,6 +205,8 @@ idRenderModelMD5::idRenderModelMD5
 */
 idRenderModelMD5::idRenderModelMD5() {
 	viewEnt = NULL;
+	posedBoundsWeightSum = 1.0f;
+	posedBoundsBuilt = false;
 }
 
 renderModelCacheType_t idRenderModelMD5::LevelLoadCachePayloadType() const {
@@ -788,6 +797,8 @@ bool idRenderModelMD5::ReadLevelLoadCachePayload( idFile &file ) {
 	skinSpaceToLocalMats.Swap( staged.skinSpaceToLocalMats );
 	meshes.Swap( staged.meshes );
 	viewEnt = NULL;
+	posedBoundsBoxes.Clear();
+	posedBoundsBuilt = false;
 	return true;
 }
 
@@ -1372,6 +1383,47 @@ idBounds idMD5Mesh::CalcBounds( const idJointMat *entJoints ) {
 
 /*
 ====================
+idMD5Mesh::AddPosedBoundsOffsets
+
+Adds the joint-space offset of every weight CalcBounds sums to the box of the
+joint it names, and raises weightSum to the largest sum of weight magnitudes
+over one vertex. Walks the weights exactly as the skinning kernels do. Returns
+false for a mesh without that weight stream, or one naming a joint the model
+does not have.
+====================
+*/
+bool idMD5Mesh::AddPosedBoundsOffsets( posedBoundsJointBox_t *boxes, int numJoints, float &weightSum ) const {
+	if ( scaledBaseVectors == NULL || weights == NULL || deformInfo == NULL ) {
+		return false;
+	}
+	for ( int j = 0, i = 0; i < deformInfo->numOutputVerts; i++, j++ ) {
+		float sum = 0.0f;
+		for ( ; ; j++ ) {
+			const idVec4 &base = scaledBaseVectors[j];
+			const int joint = weights[j].jointMatOffset / static_cast<int>( sizeof( idJointMat ) );
+			if ( joint < 0 || joint >= numJoints ) {
+				return false;
+			}
+			sum += idMath::Fabs( base.w );
+			// a zero weight scales its offset away and adds nothing to the vertex
+			if ( base.w != 0.0f ) {
+				const float invWeight = 1.0f / base.w;
+				const float offset[3] = { base.x * invWeight, base.y * invWeight, base.z * invWeight };
+				PosedBoundsCore_AddOffset( boxes[joint], offset );
+			}
+			if ( weights[j].nextVertexOffset == JOINTWEIGHT_SIZE ) {
+				break;
+			}
+		}
+		if ( sum > weightSum ) {
+			weightSum = sum;
+		}
+	}
+	return true;
+}
+
+/*
+====================
 idMD5Mesh::NearestJoint
 ====================
 */
@@ -1607,6 +1659,8 @@ void idRenderModelMD5::LoadModel() {
 	// calculate the bounds of the model
 	//
 	CalculateBounds( poseMat3 );
+	posedBoundsBoxes.Clear();
+	posedBoundsBuilt = false;
 
 	// set the timestamp for reloadmodels
 	fileSystem->ReadFile( sourceName, NULL, &timeStamp );
@@ -1724,6 +1778,100 @@ bool idRenderModelMD5::BoundsFromJoints( const idJointMat *entJoints, idBounds &
 	}
 
 	return !outBounds.IsCleared();
+}
+
+/*
+====================
+idRenderModelMD5::BuildPosedBoundsBoxes
+
+Each joint's box of the weight offsets that name it, over every mesh of the
+model. Left empty when a mesh cannot supply them; BoundsFromReferencePose then
+declines.
+====================
+*/
+void idRenderModelMD5::BuildPosedBoundsBoxes( void ) const {
+	posedBoundsBuilt = true;
+	posedBoundsBoxes.Clear();
+	posedBoundsWeightSum = 1.0f;
+	if ( joints.Num() <= 0 || meshes.Num() <= 0 ) {
+		return;
+	}
+	posedBoundsBoxes.SetNum( joints.Num() );
+	for ( int i = 0; i < posedBoundsBoxes.Num(); i++ ) {
+		PosedBoundsCore_ClearBox( posedBoundsBoxes[i] );
+	}
+	for ( int i = 0; i < meshes.Num(); i++ ) {
+		if ( !meshes[i].AddPosedBoundsOffsets( posedBoundsBoxes.Ptr(), posedBoundsBoxes.Num(), posedBoundsWeightSum ) ) {
+			posedBoundsBoxes.Clear();
+			return;
+		}
+	}
+	for ( int i = 0; i < posedBoundsBoxes.Num(); i++ ) {
+		PosedBoundsCore_FinishBox( posedBoundsBoxes[i] );
+	}
+}
+
+/*
+====================
+idRenderModelMD5::BoundsFromReferencePose
+
+BoundsFromJoints skins every vertex of the model to bound one pose. A pose
+drawn between two game tics lies within a tic's travel of a pose that was
+already bounded exactly, so its bounds are those, widened by the furthest any
+joint carried its weights (PosedBoundsCore.h).
+====================
+*/
+bool idRenderModelMD5::BoundsFromReferencePose( const idJointMat *referenceJoints, const idBounds &referenceBounds, const idJointMat *entJoints, idBounds &outBounds ) const {
+	const int mode = r_posedBoundsFromReference.GetInteger();
+	if ( mode <= 0 || referenceJoints == NULL || entJoints == NULL || referenceBounds.IsCleared() ) {
+		return false;
+	}
+	if ( !posedBoundsBuilt ) {
+		BuildPosedBoundsBoxes();
+	}
+	if ( posedBoundsBoxes.Num() <= 0 || posedBoundsBoxes.Num() != joints.Num() ) {
+		return false;
+	}
+
+	float travel[3];
+	const float furthest = PosedBoundsCore_Travel( posedBoundsBoxes.Ptr(), posedBoundsBoxes.Num(),
+		referenceJoints->ToFloatPtr(), entJoints->ToFloatPtr(), posedBoundsWeightSum, travel );
+
+	const bool accepted = furthest <= r_posedBoundsReferenceLimit.GetFloat();
+	idBounds widened = referenceBounds;
+	if ( accepted ) {
+		for ( int axis = 0; axis < 3; axis++ ) {
+			widened[0][axis] -= travel[axis];
+			widened[1][axis] += travel[axis];
+		}
+	}
+	if ( mode >= 2 ) {
+		static int checkAnswers = 0, checkDeclined = 0, checkEscaped = 0;
+		static float checkTravelSum = 0.0f, checkTravelMax = 0.0f;
+		if ( !accepted ) {
+			checkDeclined++;
+		} else {
+			idBounds exact;
+			if ( BoundsFromJoints( entJoints, exact ) && !widened.Contains( exact ) ) {
+				checkEscaped++;
+				common->Warning( "r_posedBoundsFromReference: %s leaves its widened bounds (%s) - (%s), exact (%s) - (%s)",
+					Name(), widened[0].ToString( 3 ), widened[1].ToString( 3 ), exact[0].ToString( 3 ), exact[1].ToString( 3 ) );
+			}
+			checkTravelSum += furthest;
+			checkTravelMax = Max( checkTravelMax, furthest );
+		}
+		if ( ++checkAnswers >= 1000 ) {
+			const int widenedCount = checkAnswers - checkDeclined;
+			common->Printf( "r_posedBoundsFromReference: %d answers, %d widened (travel mean %.2f, max %.2f units), %d over the limit, %d outside their bounds\n",
+				checkAnswers, widenedCount, widenedCount > 0 ? checkTravelSum / widenedCount : 0.0f, checkTravelMax, checkDeclined, checkEscaped );
+			checkAnswers = checkDeclined = checkEscaped = 0;
+			checkTravelSum = checkTravelMax = 0.0f;
+		}
+	}
+	if ( accepted ) {
+		outBounds = widened;
+	}
+	return accepted;
 }
 
 /*
@@ -2096,6 +2244,8 @@ void idRenderModelMD5::PurgeModel() {
 	skinSpaceToLocalMats.Clear();
 	meshes.Clear();
 	viewEnt = NULL;
+	posedBoundsBoxes.Clear();
+	posedBoundsBuilt = false;
 	generatedCacheContent = false;
 }
 

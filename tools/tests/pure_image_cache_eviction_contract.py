@@ -199,7 +199,7 @@ def check_renderer(loader: str, manager: str, render_system: str, header: str, a
                   "each image is checked after its forced reload")
     require(evict, "return failed == 0;", "any image left with cache pixels fails the eviction")
     require(render_system, "return globalImages->ReloadGeneratedCacheImages();", "the render system delegates")
-    require(api, "#define RENDER_API_VERSION\t\t\t38", "the eviction slots joined at render API 33; the current version is 38")
+    require(api, "#define RENDER_API_VERSION\t\t\t39", "the eviction slots joined at render API 33; the current version is 39")
 
 
 def main() -> None:

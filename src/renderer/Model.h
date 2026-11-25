@@ -549,6 +549,14 @@ public:
 	// model members across the renderer-module ABI
 	virtual void				SetBounds( const idBounds &newBounds ) = 0;
 	virtual bool				BoundsFromJoints( const idJointMat *joints, idBounds &bounds ) const;
+	// Bounds for 'joints' from the exact answer for another pose of the same
+	// model: referenceBounds must be what BoundsFromJoints returned for
+	// referenceJoints. The result holds the posed mesh, wider than its exact
+	// bounds by the distance the joints travelled between the poses, and
+	// costs a few operations a joint where BoundsFromJoints skins every
+	// vertex. Returns false when the model cannot bound a pose this way or
+	// the poses are too far apart; the caller then asks BoundsFromJoints.
+	virtual bool				BoundsFromReferencePose( const idJointMat *referenceJoints, const idBounds &referenceBounds, const idJointMat *joints, idBounds &bounds ) const;
 
 	// returns value != 0.0f if the model requires the depth hack
 	virtual float				DepthHack( void ) const = 0;

@@ -750,7 +750,7 @@ extern rvGameLog *				gameLog;
 //     decl numbering of a retail Quake 4 1.4.2 network demo (MP-22)
 // 64: one game library serves the campaign and network play; gameImport_t
 //     appends the mode the engine loads it for (CORE-07)
-const int GAME_API_VERSION		= 64;
+const int GAME_API_VERSION		= 65;
 
 // openQ4 (CORE-07): what the engine loads the game library for. The logical
 // module names game_sp and game_mp (com_activeGameModule) are these two modes of

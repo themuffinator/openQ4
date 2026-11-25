@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #define __MODEL_LOCAL_H__
 
 #include "GpuSkinning.h"
+#include "PosedBoundsCore.h"
 
 // Cache payload capabilities belong to renderer-owned concrete models.  Keep
 // them out of the public idRenderModel ABI shared with game modules.
@@ -243,6 +244,7 @@ public:
  	void						ParseMesh( idLexer &parser, int numJoints, const idJointMat *joints );
 	void						UpdateSurface( const struct renderEntity_s *ent, const idJointMat *joints, modelSurface_t *surf, bool calculateTangents = true, bool allowGpuSkinning = true );
 	idBounds					CalcBounds( const idJointMat *joints );
+	bool						AddPosedBoundsOffsets( posedBoundsJointBox_t *boxes, int numJoints, float &weightSum ) const;
 	int							NearestJoint( int a, int b, int c ) const;
 	int							NumVerts( void ) const;
 	int							NumTris( void ) const;
@@ -282,6 +284,7 @@ public:
 	virtual dynamicModel_t		IsDynamicModel() const;
 	virtual idBounds			Bounds( const struct renderEntity_s *ent ) const;
 	virtual bool				BoundsFromJoints( const idJointMat *joints, idBounds &bounds ) const;
+	virtual bool				BoundsFromReferencePose( const idJointMat *referenceJoints, const idBounds &referenceBounds, const idJointMat *joints, idBounds &bounds ) const;
 	virtual void				Print() const;
 	virtual void				List() const;
 	virtual void				TouchData();
@@ -310,7 +313,13 @@ private:
 	idList<idJointMat>			skinSpaceToLocalMats;
 	idList<idMD5Mesh>			meshes;
 	const struct viewEntity_s *	viewEnt;
+	// BoundsFromReferencePose: each joint's box of weight offsets, built from
+	// the meshes on first use and dropped with them
+	mutable idList<posedBoundsJointBox_t>	posedBoundsBoxes;
+	mutable float				posedBoundsWeightSum;
+	mutable bool				posedBoundsBuilt;
 
+	void						BuildPosedBoundsBoxes( void ) const;
 	void						CalculateBounds( const idJointMat *joints );
 	void						GetFrameBounds( const renderEntity_t *ent, idBounds &bounds ) const;
 	void						DrawJoints( const renderEntity_t *ent, const struct viewDef_s *view ) const;

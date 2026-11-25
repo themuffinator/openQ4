@@ -41,7 +41,7 @@ def main():
         assert required in region, required
     api = (ROOT / 'src/renderer/RenderSystem.h').read_text(encoding='utf-8')
     assert api.rindex('virtual bool UploadImageRegion(') > api.rindex('virtual void BeginGuiRoot()'), 'appended slot'
-    assert '#define RENDER_API_VERSION\t\t\t38' in (ROOT / 'src/renderer/RenderModuleAPI.h').read_text(encoding='utf-8')
+    assert '#define RENDER_API_VERSION\t\t\t39' in (ROOT / 'src/renderer/RenderModuleAPI.h').read_text(encoding='utf-8')
     # Vulkan stages a pitched rectangle's own rows, packed: no read past its last pixel.
     vulkan = function_body((ROOT / 'src/renderer/Vulkan/vk_Image.cpp').read_text(encoding='utf-8'), 'void idImage::SubImageUpload(')
     assert 'dataBytes = (size_t)width * height * info.bytesPerBlock;' in vulkan

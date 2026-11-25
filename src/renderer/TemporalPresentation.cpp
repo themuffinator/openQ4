@@ -286,6 +286,24 @@ static void R_TemporalPresentation_RecordFrameScale( int frameNumber,
 		( rg_temporalScaleHistoryCursor + 1 ) % TEMPORAL_SCALE_HISTORY_COUNT;
 }
 
+// com_maxfps belongs to the framework, so it is read through the cvar system.
+// The automatic temporal AA rule asks for it for every surface that keeps its
+// previous positions; finding the cvar once keeps that from being a name
+// lookup a surface.
+static int R_TemporalPresentation_MaxFps( void ) {
+	static idCVar *maxFps = NULL;
+	if ( maxFps == NULL ) {
+		if ( cvarSystem == NULL ) {
+			return 0;
+		}
+		maxFps = cvarSystem->Find( "com_maxfps" );
+		if ( maxFps == NULL ) {
+			return 0;
+		}
+	}
+	return maxFps->GetInteger();
+}
+
 static unsigned long long R_TemporalPresentation_TargetMicroseconds( void ) {
 	const float explicitMsec = r_dynamicResolutionTargetMsec.GetFloat();
 	if ( explicitMsec > 0.0f ) {
@@ -297,8 +315,8 @@ static unsigned long long R_TemporalPresentation_TargetMicroseconds( void ) {
 	if ( r_swapInterval.GetInteger() != 0 && glConfig.displayFrequency > 0 ) {
 		presentationFps = glConfig.displayFrequency;
 	}
-	if ( cvarSystem != NULL ) {
-		const int maxFps = Max( 0, cvarSystem->GetCVarInteger( "com_maxfps" ) );
+	{
+		const int maxFps = Max( 0, R_TemporalPresentation_MaxFps() );
 		if ( maxFps > 0 ) {
 			presentationFps = presentationFps > 0
 				? Min( presentationFps, maxFps ) : maxFps;
@@ -903,10 +921,7 @@ static const int TEMPORAL_AUTOMATIC_MIN_CAP_HZ = 31;
 // True when com_maxfps caps presentation below TEMPORAL_AUTOMATIC_MIN_CAP_HZ.
 // 0 is uncapped, which says nothing about the hardware.
 static bool R_TemporalPresentation_LowRateCap( void ) {
-	if ( cvarSystem == NULL ) {
-		return false;
-	}
-	const int maxFps = cvarSystem->GetCVarInteger( "com_maxfps" );
+	const int maxFps = R_TemporalPresentation_MaxFps();
 	return maxFps > 0 && maxFps < TEMPORAL_AUTOMATIC_MIN_CAP_HZ;
 }
 

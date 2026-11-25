@@ -1532,7 +1532,8 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 	R_RendererMetrics_RecordBackendCommands( c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, c_specialEffects, c_renderTargetOps );
 
 	if ( r_debugRenderToTexture.GetInteger() == 1 ) {
-		common->Printf( "3d: %i, 2d: %i, SetBuf: %i, SwpBuf: %i, CpyRenders: %i, CpyFrameBuf: %i\n", c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, backEnd.c_copyFrameBuffer );
+		common->Printf( "3d: %i, 2d: %i, SetBuf: %i, SwpBuf: %i, CpyRenders: %i, CpyFrameBuf: %i, CpyDepthBuf: %i\n", c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, backEnd.c_copyFrameBuffer, backEnd.c_copyDepthBuffer );
 		backEnd.c_copyFrameBuffer = 0;
+		backEnd.c_copyDepthBuffer = 0;
 	}
 }

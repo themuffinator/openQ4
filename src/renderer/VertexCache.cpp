@@ -33,7 +33,15 @@ If you have questions concerning this license or the applicable additional terms
 #include "RendererUpload.h"
 
 
+// The legacy frame-temp arena. OpenGL streams temp allocations through the
+// renderer upload ring instead, so only Vulkan fills this: effects, decals,
+// deforms and interface geometry of one frame, 1.8 MB of it in a stock
+// firefight. An allocation that does not fit takes a heap block of its own.
+#ifdef OPENQ4_RENDERER_VK_MODULE
+static const int	FRAME_MEMORY_BYTES = 0x800000;
+#else
 static const int	FRAME_MEMORY_BYTES = 0x200000;
+#endif
 static const int	EXPAND_HEADERS = 1024;
 
 idCVar idVertexCache::r_showVertexCache( "r_showVertexCache", "0", CVAR_INTEGER|CVAR_RENDERER, "" );
@@ -559,6 +567,17 @@ void idVertexCache::Touch( vertCache_t *block ) {
 	}
 	if ( block->tag == TAG_TEMP ) {
 		common->FatalError( "idVertexCache Touch: temporary pointer" );
+	}
+
+	// A block Free has already taken waits on the deferred list for its frames
+	// to pass, with no owner left to clear. Alloc always records an owner, so
+	// none means exactly that. A frame-temp allocation that overflows the temp
+	// arena is such a block from birth (AllocFrameTemp), and its caller cannot
+	// tell it from a static one: touching it used to pull it off the deferred
+	// list back among the static blocks, where nothing ever freed it or its
+	// memory again.
+	if ( block->user == NULL ) {
+		return;
 	}
 
 	block->frameUsed = currentFrame;

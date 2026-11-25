@@ -3589,6 +3589,10 @@ R_AddEffectSurfaces
 void R_AddEffectSurfaces(void) {
 	idRenderWorldLocal* world = tr.viewDef->renderWorld;
 	const int counterMode = bse_frameCounters.GetInteger();
+	// Servicing an effect here can start, move or resize its light, which
+	// rebuilds that light's area references in the middle of the view
+	// (R_CreateLightRefs); bse_frameCounters reports how many were.
+	const int areaRefsAtStart = tr.areaRefCount;
 	int totalDefs = 0;
 	int spawned = 0;
 	int serviced = 0;
@@ -3910,7 +3914,7 @@ void R_AddEffectSurfaces(void) {
 
 	if (counterMode > 0) {
 		common->Printf(
-			"BSE frame %d view %d mode=%d: spawned=%d serviced=%d refreshed=%d deferred=%d rendered=%d defs=%d alive=%d expired=%d surfaces=%d\n",
+			"BSE frame %d view %d mode=%d: spawned=%d serviced=%d refreshed=%d deferred=%d rendered=%d defs=%d alive=%d expired=%d surfaces=%d areaRefs=%d\n",
 			tr.frameCount,
 			tr.viewDef->renderView.viewID,
 			counterMode,
@@ -3922,7 +3926,8 @@ void R_AddEffectSurfaces(void) {
 			totalDefs,
 			alive,
 			expired,
-			renderedSurfaces);
+			renderedSurfaces,
+			tr.areaRefCount - areaRefsAtStart);
 		common->Printf(
 			"BSE drops: notConnected=%d viewSuppress=%d area=%d defFrustum=%d noModel=%d noSurfaces=%d clearedBounds=%d frustum=%d scissor=%d\n",
 			dropNotConnected,
@@ -4230,7 +4235,10 @@ void R_AddModelSurfaces( void ) {
 	for ( int i = static_cast<int>( numViewEntities ) - 1; i >= 0; --i ) {
 		viewEntity_t *vEntity = sortedEntities[i];
 
-		if ( useEntityScissors ) {
+		// An entity that is in the view only to cast a shadow has an empty
+		// rectangle already; intersecting anything into it leaves it empty,
+		// so its bounds are not projected.
+		if ( useEntityScissors && !vEntity->scissorRect.IsEmpty() ) {
 			// calculate the screen area covered by the entity
 			idScreenRect scissorRect = R_CalcEntityScissorRectangle( vEntity );
 			// intersect with the portal crossing scissor rectangle

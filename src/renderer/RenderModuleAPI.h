@@ -118,7 +118,11 @@
 // 38 - idRenderSystem appends SetViewDepthOfField: the game's depth-of-field
 //      request for the frame's main view (renderViewDepthOfField_t: the weapon
 //      wheel's focus on the view weapon, or a map script's lens).
-#define RENDER_API_VERSION			38
+// 39 - idRenderModel gains BoundsFromReferencePose after BoundsFromJoints: an
+//      animated model's bounds for a pose between game tics, from the tic's
+//      exact bounds and the distance the joints travelled (a stale module
+//      would run the next virtual in its place).
+#define RENDER_API_VERSION			39
 #define RENDER_API_ENTRY_POINT		"GetRenderAPI"
 
 class idSys;

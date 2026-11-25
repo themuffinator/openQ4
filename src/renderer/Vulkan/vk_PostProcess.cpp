@@ -4113,7 +4113,8 @@ bool VK_PostProcess_DrawUnderwater( const viewDef_t *viewDef ) {
 	block.depthInfo[ 0 ] = viewDef->projectionMatrix[ 10 ];
 	block.depthInfo[ 1 ] = viewDef->projectionMatrix[ 14 ];
 	block.depthInfo[ 2 ] = amount;
-	block.depthInfo[ 3 ] = (float)backEnd.frameCount * ( 1.0f / 60.0f );
+	// the view's own clock, not a count of rendered frames (as on OpenGL)
+	block.depthInfo[ 3 ] = viewDef->floatTime;
 	block.tint[ 0 ] = idMath::ClampFloat( 0.0f, 1.0f, tr.underwaterTint.x );
 	block.tint[ 1 ] = idMath::ClampFloat( 0.0f, 1.0f, tr.underwaterTint.y );
 	block.tint[ 2 ] = idMath::ClampFloat( 0.0f, 1.0f, tr.underwaterTint.z );

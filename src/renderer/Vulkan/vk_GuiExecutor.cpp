@@ -82,6 +82,8 @@ static idCVar r_vkCopyResolveScratchReference( "r_vkCopyResolveScratchReference"
 	"resolve color captures through an intermediate image even when no conversion is needed" );
 static idCVar r_vkDepthCaptureLayoutReference( "r_vkDepthCaptureLayoutReference", "0", CVAR_RENDERER | CVAR_BOOL,
 	"move a multisampled depth target to the sampled layout and back around each depth capture, as before" );
+static idCVar r_vkDepthTargetLayoutReference( "r_vkDepthTargetLayoutReference", "0", CVAR_RENDERER | CVAR_BOOL,
+	"move a multisampled depth target to the sampled layout whenever its render target is unbound and after each depth resolve, as before" );
 static idCVar r_vkResourceProfile( "r_vkResourceProfile", "0", CVAR_RENDERER | CVAR_BOOL,
 	"count executor resource operations for rendererVulkanMemoryInfo; reset its interval with rendererVulkanMemoryInfo reset" );
 static idCVar r_vkWindowViewMultisample( "r_vkWindowViewMultisample", "1", CVAR_RENDERER | CVAR_BOOL,
@@ -162,7 +164,7 @@ static const int VK_VERTEX_RING_BYTES = 96 * 1024 * 1024;
 static const int VK_INDEX_RING_BYTES = 8 * 1024 * 1024;
 static const int VK_GPU_SKINNING_WORKGROUP_SIZE = 64;
 static const int VK_GPU_SKINNING_MEMO_SIZE = 2048; // power of two
-static const int VK_MAX_GUI_PIPELINES = 64;
+static const int VK_MAX_GUI_PIPELINES = 256;
 static const int VK_MAX_SCREEN_PIPELINES = 64;
 static const int VK_MAX_CUBE_PIPELINES = 32;
 static const int VK_MAX_ENV_PIPELINES = 32;
@@ -545,6 +547,8 @@ typedef struct vkGuiExecutor_s {
 	vkPostPipeline_t	postPipelines[ VK_MAX_POST_PIPELINES ];
 	int					numPostPipelines;
 	VkFormat			pipelineTargetFormat;	// swapchain format the pipelines were built for
+	int					pipelineFlushFrame;		// backEnd.frameCount + 1 of the last retirement a full set asked for; 0 = none
+	int					pipelineFlushCount;		// retirements a full set has asked for
 
 	vkRing_t			vertexRings[ VK_FRAMES_IN_FLIGHT ];
 	vkRing_t			indexRings[ VK_FRAMES_IN_FLIGHT ];
@@ -858,8 +862,47 @@ void VK_Exec_PrintResourceInfo( bool reset ) {
 		(unsigned long long)vkResourceProfile.ringAllocations, (unsigned long long)vkResourceProfile.targetChanges,
 		(unsigned long long)vkResourceProfile.renderingScopes, (unsigned long long)vkResourceProfile.barriers,
 		(unsigned long long)vkResourceProfile.submissions );
+	common->Printf( "Vulkan executor pipelines: stage=%d/%d screen=%d cube=%d env=%d special=%d program=%d blendLight=%d temporal=%d sceneScale=%d post=%d fullSetRetirements=%d\n",
+		vkExec.numPipelines, VK_MAX_GUI_PIPELINES, vkExec.numScreenPipelines, vkExec.numCubePipelines,
+		vkExec.numEnvPipelines, vkExec.numSpecialPipelines, vkExec.numProgramPipelines,
+		vkExec.numBlendLightPipelines, vkExec.numTemporalResolvePipelines, vkExec.numSceneScalePipelines,
+		vkExec.numPostPipelines, vkExec.pipelineFlushCount );
 	VK_StaticGeo_PrintInfo( reset );
 	if ( reset ) { memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) ); }
+}
+
+/*
+====================
+VK_Exec_PipelineSetFull
+
+The pipeline sets are keyed on the render target's formats and sample count
+besides their own state, and nothing evicts: every anti-aliasing or HDR
+setting tried in a session leaves its pipelines behind. A set that filled up
+stayed full until the device restarted, and each surface that needed a
+pipeline it could not add was dropped (the stage set feeds the depth fill, so
+that is the whole world) or drawn with another key's pipeline.
+
+A full set now asks for every pipeline to be retired at the next frame start,
+the path a swapchain format change already takes; the pipelines in use are
+rebuilt on demand from the pipeline cache. A frame that needs more than a set
+holds would ask again at once, so a second request soon after the first is
+left to the old behaviour.
+====================
+*/
+static const int VK_PIPELINE_FLUSH_MIN_FRAMES = 600;
+
+static void VK_Exec_PipelineSetFull( const char *setName ) {
+	if ( vkExec.pipelineTargetFormat == VK_FORMAT_UNDEFINED ) {
+		return;		// already asked for
+	}
+	if ( vkExec.pipelineFlushFrame != 0
+			&& backEnd.frameCount + 1 - vkExec.pipelineFlushFrame < VK_PIPELINE_FLUSH_MIN_FRAMES ) {
+		return;
+	}
+	vkExec.pipelineFlushFrame = backEnd.frameCount + 1;
+	vkExec.pipelineFlushCount++;
+	vkExec.pipelineTargetFormat = VK_FORMAT_UNDEFINED;
+	common->Printf( "Vulkan: the %s pipeline set is full; retiring every pipeline at the next frame\n", setName );
 }
 
 static vkPipelineTarget_t VK_Exec_CurrentPipelineTarget( void ) {
@@ -1783,7 +1826,12 @@ static VkPipeline VK_GuiExecutor_GetPipeline( int stateBits, bool separateColor 
 		}
 	}
 	if ( vkExec.numPipelines >= VK_MAX_GUI_PIPELINES ) {
-		common->Warning( "Vulkan: GUI pipeline cache exhausted" );
+		VK_Exec_PipelineSetFull( "stage" );
+		static int warnedFrame = -1;
+		if ( warnedFrame != backEnd.frameCount ) {
+			warnedFrame = backEnd.frameCount;
+			common->Warning( "Vulkan: GUI pipeline cache exhausted" );
+		}
 		return VK_NULL_HANDLE;
 	}
 
@@ -1904,6 +1952,7 @@ static VkPipeline VK_GuiExecutor_GetScreenPipeline( int stateBits,
 		return VK_NULL_HANDLE;
 	}
 	if ( vkExec.numScreenPipelines >= VK_MAX_SCREEN_PIPELINES ) {
+		VK_Exec_PipelineSetFull( "screen" );
 		common->Warning( "Vulkan: screen pipeline cache exhausted" );
 		return vkExec.screenPipelines[ 0 ].pipeline;
 	}
@@ -2036,6 +2085,7 @@ static VkPipeline VK_GuiExecutor_GetCubePipeline( int stateBits, bool dirFromNor
 		}
 	}
 	if ( vkExec.numCubePipelines >= VK_MAX_CUBE_PIPELINES ) {
+		VK_Exec_PipelineSetFull( "cube" );
 		common->Warning( "Vulkan: cube pipeline cache exhausted" );
 		return vkExec.cubePipelines[ 0 ].pipeline;
 	}
@@ -2111,6 +2161,7 @@ static VkPipeline VK_GuiExecutor_GetEnvironmentPipeline( int stateBits, bool bum
 		return VK_NULL_HANDLE;
 	}
 	if ( vkExec.numEnvPipelines >= VK_MAX_ENV_PIPELINES ) {
+		VK_Exec_PipelineSetFull( "environment" );
 		common->Warning( "Vulkan: environment pipeline cache exhausted" );
 		return vkExec.envPipelines[ 0 ].pipeline;
 	}
@@ -3341,6 +3392,7 @@ VkPipeline VK_Exec_BlendLightPipeline( int stateBits ) {
 		return VK_NULL_HANDLE;
 	}
 	if ( vkExec.numBlendLightPipelines >= VK_MAX_BLEND_LIGHT_PIPELINES ) {
+		VK_Exec_PipelineSetFull( "blend-light" );
 		common->Warning( "Vulkan: blend-light pipeline cache exhausted" );
 		// The requested blend/color-mask key has no exact pipeline.  Returning
 		// an arbitrary cached variant would corrupt the sealed light-stage
@@ -5502,7 +5554,15 @@ static void VK_Exec_TransitionActiveTargetToSampled( bool sampleDepth = true ) {
 	for ( uint32_t i = 0; i < vkExec.activePipelineTarget.colorCount; i++ ) {
 		VK_Exec_TransitionImage( vkExec.activeColorEntries[ i ], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 	}
-	if ( sampleDepth ) {
+	// A multisampled depth image is never sampled: whatever reads scene depth
+	// takes a resolved copy. Unbinding its target used to move it to the
+	// sampled layout all the same, and the next frame's bind moved it back:
+	// the round trip VK_Exec_DepthResolveBarrier avoids around a capture. It
+	// now stays an attachment while unbound; every later user starts from
+	// the tracked layout.
+	if ( sampleDepth && vkExec.activeDepthEntry != NULL
+			&& ( vkExec.activeDepthEntry->samples == VK_SAMPLE_COUNT_1_BIT
+				|| r_vkDepthTargetLayoutReference.GetBool() ) ) {
 		VK_Exec_TransitionImage( vkExec.activeDepthEntry, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 	}
 }
@@ -8138,8 +8198,9 @@ bool VK_Exec_ResolveRenderTargets( idRenderTexture *sourceRenderTexture,
 				? (uint32_t)Min( sourceDepth->width, destinationDepth->width ) : 0;
 		const uint32_t depthHeight = sourceDepth != NULL && destinationDepth != NULL
 				? (uint32_t)Min( sourceDepth->height, destinationDepth->height ) : 0;
+		// the multisampled source goes back to being rendered into, not sampled
 		depthResolved = VK_Exec_ResolveDepthImage( sourceDepth, destinationDepth,
-				depthWidth, depthHeight );
+				depthWidth, depthHeight, !r_vkDepthTargetLayoutReference.GetBool() );
 		if ( !depthResolved ) {
 			static bool warnedDepthResolve = false;
 			if ( !warnedDepthResolve ) {
@@ -16729,9 +16790,10 @@ void VK_GuiExecutor_Draw3DView( const viewDef_t *viewDef ) {
 			} else {
 				VK_Fog_DrawAllLights( viewDef );
 			}
-			// Fog changes the framebuffer after any earlier lazy capture.
+			// Fog changes the colour after any earlier lazy capture. It
+			// writes no depth, so a depth capture made before it (the light
+			// grid's) still serves the surfaces drawn after it.
 			backEnd.currentRenderCopied = false;
-			backEnd.currentDepthCopied = false;
 			currentSpace = NULL;
 			weaponDepthRange = false;
 			viewport.maxDepth = 1.0f;

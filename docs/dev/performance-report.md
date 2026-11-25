@@ -2466,3 +2466,272 @@ matches two identical windows of the old build. Crops at 1:1 cannot be told apar
 Across launches the scene's animation moves 60 % of pixels even with DoF off. On
 the static fifth of the frame, the new shaders at full count match the old ones to
 1-2 levels, and the camera's frames are identical.
+
+## 22. A renderer round: copies, layouts and posed bounds (FPS-08), 25 November 2026
+
+A round of profiling and code audit across the renderer on both backends, to
+find work a frame does for nothing and defects on shipping paths. Four audits
+read the OpenGL frame path, the front end, the Vulkan frame path and the post
+chain; every finding was checked against the code before it was changed, and
+the ones that could not be measured or reproduced are listed at the end as
+leads rather than fixed.
+
+**Method.** The Visual Studio collector that section 15 used returned no CPU
+samples at all (another profiler on the shared machine held the kernel
+sampling session), so the profiles here come from `tools/debug/cpu_sampler.py`,
+which suspends the busiest thread, copies its stack and walks it offline: 300
+samples a second for 25 s in a hidden 1280x720 window, Quality preset, the
+suite's `combat_airdefense1` wave and `indoor_hub2` view under
+`benchmarkViewSweep`. Shares are of the main thread's running samples; samples
+blocked in a wait or in the hidden window's pacing spin are dropped. The walk
+cannot unwind through the graphics drivers, so driver time shows as a share
+without callers and about half the samples have no path back to the frame
+loop: engine functions are ranked by their own share, not by inclusive time
+that passes through a driver. Other sessions kept the machine at 100% load
+throughout, so nothing here is a wall-clock A/B. Each change is judged by a
+count the engine prints, a picture comparison inside one launch, a GPU
+timestamp inside one command buffer, or a sample ratio.
+
+**Where the main thread's time goes** (combat wave, Vulkan, share of running
+samples):
+
+| Work | Share | Notes |
+| --- | ---: | --- |
+| Vulkan driver | 10% or more | attributed to the driver's nearest export |
+| `memcpy` | 7.9% | 2.2% copying geometry into the frame ring (`VK_Ring_Alloc`), 0.8% frame-temp vertices for effects |
+| BSE effects (`R_AddEffectSurfaces`) | 8.4% | with their servicing in the game tic, 2.3% more |
+| Skinning for drawing | 2.5% | `TransformVertsAndTangents` |
+| Skinning for bounds | 2.3% | `TransformVertsNew` under `BoundsFromJoints`: once a tic and once a rendered frame for every animating model |
+| Legacy HUD state under the retained HUD | 1.8% | `idUserInterfaceLocal::StateChanged` from `idPlayer::DrawHUD` |
+| Receiver scan for shadow-map admission | 1.4% | `R_ShadowMapReceiversAllowMaps`, rescanned each time an interaction of the light is rebuilt |
+| Ambient caches for regenerated meshes | 1.4% | `R_CreateAmbientCache`: a new static block for every skinned surface every frame |
+| Overlays on skinned models | 1.2% | `AddOverlaySurfacesToModel` |
+
+On OpenGL the same engine rows appear under a driver share of at least 12%,
+plus 4% in the driver's locks.
+
+### 22.1 Poses between tics take their bounds from the tic
+
+`idRenderModelMD5::BoundsFromJoints` skins every vertex of a model to bound one
+pose. The game asks for it once a tic (`idAnimator::GetBounds`) and again for
+every pose drawn between two tics (`idEntity::UpdatePresentationPose`, the view
+weapon, client models), so a character's mesh was skinned for its bounds once
+a tic and once more for every rendered frame, besides the skin that draws it.
+
+A skinned vertex is a weighted sum of what each of its joints makes of a
+joint-space offset, `v = sum( w * ( R * o + t ) )`. Between two poses it
+therefore moves no further, on any model axis, than the furthest any joint
+carries any of its offsets, times the vertex's summed weights. Each joint's
+offsets lie in a box known from the mesh, and the largest of a linear function
+over a box comes from its centre and half size. So the mesh in the new pose
+lies inside its exact bounds in the old pose, widened on each axis by that
+travel: about a dozen multiplies a joint (`PosedBoundsCore.h`,
+`idRenderModel::BoundsFromReferencePose`). The animator keeps the pose its
+exact bounds were skinned from (`idAnimator::GetPresentationBounds`) and
+poses between tics are bounded from it; a pose more than
+`r_posedBoundsReferenceLimit` (16) units of travel away is skinned as before,
+and so is every tic, so nothing the game logic reads changes.
+
+Two cheaper-looking routes were measured on the stock characters first and set
+aside. The union of the posed joint boxes alone holds the mesh but is 14-20%
+longer than the exact bounds on its worst axis and 30-45% larger in volume
+(marine, Strogg marine, gladiator, grunt and gunner over their animations),
+because a vertex weighted lightly to a distant joint drags that joint's box
+with it. Skinning only the vertices whose joint boxes reach outside the bounds
+found so far is exact but skips only 12-37% of the vertices on four of five
+characters (48% at best with one vertex to a test).
+
+- **Containment.** `r_posedBoundsFromReference 2` skins every pose it answers
+  and compares. In the combat wave, 20,000 answers: none outside its widened
+  bounds, 99.8% within the limit, mean travel 0.3-1.4 units and at most 15.8.
+  `PosedBoundsCoreTest` checks 1,200 random pose pairs against a
+  double-precision skin, a quarter turn that only the box's half size can
+  bound, unnormalized weights, joints without weights and non-finite joints.
+- **Cost.** Skinning for bounds is `idSIMD_SSE2::TransformVertsNew` and skinning
+  for drawing is `TransformVertsAndTangents`, which the change does not touch
+  and which stands for how much animated geometry a profile saw. Main-thread
+  samples in 30 s profiles of the combat wave on Vulkan (300 a second, one
+  rendered frame a tic; the wave differs from launch to launch, so each
+  setting was profiled twice, alternating):
+
+  | Profile | Bounds skinning, samples | Draw skinning, samples | Bounds / draw |
+  | --- | ---: | ---: | ---: |
+  | Every pose skinned (`r_posedBoundsFromReference 0`) | 85, 110 | 97, 99 | 0.88, 1.11 |
+  | Widened | 36, 66 | 79, 84 | 0.46, 0.79 |
+
+  Bounds skinning falls from 0.99 to 0.62 of the draw skinning on
+  average, with a wide spread between launches. A third of the bounds requests
+  were for poses between tics in the baseline profile (34% by callers), and
+  what remains is the tic's own exact skin. That one runs once a tic and the
+  pose between tics once a rendered frame, so the share removed should grow
+  with the frame rate. That was not measured: a hidden window paces at 60 Hz,
+  and slowing time to get several frames a tic (`timescale 0.25`) switches the
+  interpolation off, so those profiles show no poses between tics at all.
+
+### 22.2 OpenGL copies the view only for a reader
+
+`r_debugRenderToTexture 1` now counts whole-view colour and depth copies
+(`CpyFrameBuf`, `CpyDepthBuf`).
+
+- **The post-process pass.** `RB_STD_DrawShaderPasses` copied the view into
+  `_currentRender`, a float image, whenever its first surface sorted as
+  post-process. The game's resolve, anti-aliasing and composite passes sort
+  there and sample only `_forwardRenderResolvedAlbedo` and `_postProcessAlbedo*`,
+  so every frame on every preset from Performance up paid a full-window copy
+  that nothing read. The pass now scans its surfaces for a stage that samples
+  `_currentRender` (the test the per-stage fallback already used) and copies
+  only then (`r_postProcessCaptureOnDemand`).
+- **The light grid's depth copy.** `RB_PrepareLightGridDepthTexture` ran in
+  every view once the light grid program existed, which is from the first map
+  with a grid until the renderer restarts: the HUD, each of the game's
+  fullscreen passes, and every view of later maps without a grid. It now runs
+  where the light grid pass can draw, a 3D view of a world with a grid
+  (`r_lightGridDepthOnDemand`). The fog pass, which writes no depth, no longer
+  discards the copy either; Vulkan had the same reset and loses it too.
+
+| Quality preset, hidden window, copies a frame | Colour before | Colour after | Depth before | Depth after |
+| --- | ---: | ---: | ---: | ---: |
+| `game/airdefense2` (light grid, as every multiplayer map) | 3 | 2 | 10 | 3 |
+| `game/hub2` | 2 | 1 | 3 | 3 |
+| `game/airdefense1`, combat wave | 3 | 2 | 4 | 4 |
+
+Pictures: with the world frozen (`g_stopTime 1`), captures with the old and
+new behaviour inside one launch are identical in every pixel in hub2 and in
+airdefense2.
+
+### 22.3 Vulkan leaves multisampled depth an attachment
+
+Section 19 found that moving a multisampled depth image out of its attachment
+layout and back costs about a pass over every sample, and removed that round
+trip around depth captures. Two more were left:
+
+- `VK_Exec_SetRenderTarget` moved the outgoing target's depth to the sampled
+  layout with its colour. The game unbinds its multisampled forward target once
+  a frame and the next frame's bind moved the depth back. No shader samples a
+  multisampled depth image (only colour has `sampler2DMS` readers); every
+  reader takes a resolved copy.
+- The frame's depth resolve (`VK_Exec_ResolveRenderTargets` with
+  `resolveDepth`) left its source in the sampled layout too.
+
+Both now keep a multisampled depth image in the attachment layout
+(`r_vkDepthTargetLayoutReference 1` restores the moves). Every later user
+starts from the tracked layout, so only barriers change.
+
+Two barriers a frame go (123 to 121 in `rendererVulkanMemoryInfo` at every
+sample count). Whole-frame GPU time comes from `rendererBenchmarkCapture`, 256
+frames a window, at 2560x1440 in a hidden window on hub2 with the world frozen
+(`g_stopTime 1`), Quality preset with the sample count overridden. Windows
+alternate between the two settings in one launch, and each window of the new
+layouts is paired with the reference window after it; two launches:
+
+| Anti-aliasing | Pairs | Reference minus new, median of the pairs | Reference slower in |
+| --- | ---: | ---: | ---: |
+| 2x | 8 | +0.10 ms | 6 |
+| 4x | 8 | +0.05 ms | 6 |
+| 8x | 7 | +0.28 ms | 7 |
+
+Other sessions' clients shared the GPU through both launches. The frame read
+about 6.3 ms at every sample count, where a quiet stretch earlier in the day
+read 4.6 ms at 2x and 6.3 ms at 8x, and windows of one setting moved by up to
+0.4 ms. The saving at 2x and 8x is small but repeats; the 4x figure is inside
+the noise.
+
+That quiet stretch had used `r_vkDepthCaptureLayoutReference` as the reference
+and read 0.34, 1.18 and 2.30 ms at 2x, 4x and 8x. The switch also restores the
+round trips that section 19 removed, so those figures are that change and this
+one together, at the Quality preset, whose SSAO and soft-particle captures make
+more of them than the 0.13.2 settings section 19 measured. They are not this
+change's, which is why it has a switch of its own.
+
+Pictures at 2x and 4x are identical in every pixel between the two settings
+inside one launch, and the Khronos validation layer reports nothing with the
+new layouts.
+
+### 22.4 Defects fixed
+
+- **A light updated while effects are added broke the view's visibility
+  stamps.** `R_CreateLightRefs` and `R_CreateEntityRefs` bumped `tr.viewCount`
+  to tell which areas already hold a reference. The view being built keeps its
+  visible areas, entities and lights under the same counter. Effects are
+  serviced inside `R_AddEffectSurfaces`, and an effect whose light starts,
+  moves or changes size there rebuilds that light's references in the middle
+  of the view. From then on, for the rest of that view, `R_CullEffectByArea`
+  finds no area visible and drops the effects later in the list, and an entity
+  or light asked for again gets a second view entry. Area references now have
+  their own stamp (`tr.areaRefCount`, `portalArea_t::refCount`). This one was
+  found by reading and was not seen in play: in the combat wave no light's
+  references were rebuilt while effects were added (`bse_frameCounters` now
+  prints the count as `areaRefs`), at normal speed or with `timescale 0.25`,
+  and the effects culled by area are as many on the old build as on the new
+  (11.7 and 11.3 a view).
+- **A freed frame-temp overflow block was revived and never freed again.** When
+  a frame's temp allocations overflow the legacy arena, `AllocFrameTemp` hands
+  out a static block that is already on the deferred free list.
+  `R_TouchVertexCache` cannot tell it from a live static block, and
+  `idVertexCache::Touch` moved it back among the live ones, where nothing owned
+  it: the header and its memory leaked for the rest of the session. `Touch`
+  now leaves a block without an owner alone. Only Vulkan fills that arena
+  (OpenGL streams temp data through the upload ring), and a stock firefight
+  filled 1.8 MB of its 2 MB, so Vulkan's arena is now 8 MB.
+- **The underwater view was timed in frames.** Its warp, caustics and particle
+  drift read `backEnd.frameCount / 60`, so they ran at the frame rate's
+  multiple of their authored speed and through a pause. Both backends now pass
+  the view's `floatTime`, as materials do.
+- **A full Vulkan pipeline set stayed full.** The sets are keyed on the scene
+  target's formats and sample count, and nothing evicted. A full stage set
+  returned no pipeline for every new key, which drops the surface; the other
+  sets returned another key's pipeline. A full set now asks for every pipeline
+  to be retired at the next frame start (the path a swapchain format change
+  takes), at most once in 600 frames, and the stage set holds 256 instead of
+  64. Cycling sixteen anti-aliasing and HDR settings in one session did not
+  fill the old set in hub2, so no failure was reproduced.
+  `rendererVulkanMemoryInfo` now prints each set's count.
+
+### 22.5 Smaller savings
+
+- The automatic temporal anti-aliasing rule read `com_maxfps` through the cvar
+  system by name, and is asked for every surface that keeps its previous
+  positions; it now finds the cvar once.
+- `R_AddModelSurfaces` projected the bounds of every view entity for its
+  scissor, including entities that are in the view only to cast a shadow and
+  whose rectangle is already empty. Intersecting into an empty rectangle
+  leaves it empty, so those are skipped.
+
+### 22.6 Leads, not changed
+
+In rough order of what they look worth. None is measured unless it says so.
+
+- **Vulkan copies stencil shadow volumes into the frame ring every frame**
+  (`VK_Exec_BindShadowGeometry`), where ambient geometry is resident. Balanced
+  and Performance draw all shadows as volumes. In hub2 at
+  Balanced the frame ring takes 1.49 MB a frame with stencil shadows and
+  0.50 MB with `r_shadows 0` (`rendererVulkanMemoryInfo`, 331 frames each): about
+  1 MB a frame, some 0.14 ms of copying at the rate the static geometry work
+  measured.
+- **The receiver scan** above rescans a light's whole interaction list each
+  time one of its interactions is rebuilt (1.4% of the combat wave on Vulkan).
+  Keeping the verdict across a change needs the entity-side inputs it reads
+  (view entities, remembered models) to invalidate it too.
+- **Regenerated skinned surfaces take a new static vertex block every frame**,
+  and a second for stencil shadow casters. Frame-temp blocks for surfaces
+  regenerated this frame would do, once every holder of the pointer drops it
+  when the snapshot is kept into the next frame.
+- **OpenGL's light grid pass** sets about 90 pieces of state per receiver
+  surface (25 uniforms, six texture units bound and unbound) for one draw.
+- **OpenGL's soft-particle stage** rebinds its program and uploads nine
+  uniforms for every stage; six are constant for the view.
+- **The game's post chain** makes two or three plain full-screen copies a
+  frame (the resolve into the SMAA source, SMAA's normalize pass, and a
+  resolve that is a copy when anti-aliasing is off).
+- **SSAO copies the finished depth into its own image** even when
+  `_currentDepth` already holds it.
+- **Subviews and the resolution scale.** Read from the code, not reproduced:
+  with Resolution Scale below 100% on OpenGL, a remote camera's crop is sized
+  against the window, not the scaled target, and direct mirrors draw at native
+  scale into it.
+- **Back sides of two-sided skinned surfaces** re-derive their tangents every
+  frame; the front side's, with the normal negated, are the same basis.
+- **Every draw surface zeroes a 296-byte deformation record** that only the
+  shared deformation path reads.
+- **The legacy HUD's state** is still evaluated every frame under the retained
+  HUD (1.8% of the combat wave).

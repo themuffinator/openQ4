@@ -12,6 +12,85 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Fewer wasted copies every frame, cheaper bounds for animated characters, and Vulkan fixes, 25 November 2026
+
+- **OpenGL copies the screen and the depth buffer only for something that reads
+  the copy.** The post-process pass copied the whole view into a float image
+  whenever its first surface sorted as post-process, though the game's own
+  resolve, anti-aliasing and composite passes sort there and read only their
+  own targets: one full-window copy a frame on every preset from Performance
+  up. And once a map with a light grid had been loaded, every view copied the
+  depth buffer for the light grid pass, the HUD and each of the game's
+  fullscreen passes included. On a light grid map (every multiplayer map) a
+  Quality frame now makes 3 depth copies and 2 colour copies where it made 10
+  and 3; a campaign map loses the one colour copy. Pictures are identical.
+  `r_postProcessCaptureOnDemand 0` and `r_lightGridDepthOnDemand 0` restore the
+  old copies. Neither renderer repeats its depth copy after the fog pass any
+  more, which writes no depth.
+- **Animated characters are no longer skinned a second time each frame for
+  their bounds.** A pose drawn between two game tics had every vertex of its
+  model skinned just to find its bounds, on every rendered frame. Its bounds
+  are now the tic's exact bounds, widened by the distance the joints travelled
+  since: a few operations a joint. A pose further than 16 units from the tic's
+  is still skinned, and so is every tic, so nothing the game logic reads has
+  changed. In the stock firefight at one rendered frame a tic, the main
+  thread's skinning for bounds fell from 0.99 to 0.62 of what it spends
+  skinning for drawing; the tic's own skin is what remains, so the saving
+  should grow with the frame rate (not measured). The widened bounds always
+  hold the mesh (checked against the skinned mesh for 20,000 poses in play,
+  none outside) and are about one unit wider on average, which only makes
+  culling slightly more cautious.
+  `r_posedBoundsFromReference 0` skins every pose again, `2` checks every
+  answer, and `r_posedBoundsReferenceLimit` sets the distance.
+- **Underwater shimmer runs at the same speed at any frame rate.** The warp,
+  caustics and drifting particles of the underwater view were timed in rendered
+  frames, so they ran four times as fast at 240 frames a second as at 60, half
+  as fast under a 30 frame cap, and kept moving while the game was paused. They
+  now follow the view's clock on both renderers.
+- **Vulkan keeps multisampled depth where it is drawn.** Unbinding the scene
+  target moved its multisampled depth image to the sampled layout and the next
+  frame's bind moved it back, though nothing samples a multisampled depth image
+  (every reader takes a resolved copy); the frame's depth resolve left its
+  source there too. It now stays an attachment: two fewer layout changes a
+  frame, identical pictures and a clean validation layer. At 2560x1440 on
+  the RTX 4060 Laptop the frame is about 0.1 ms shorter on the GPU at 2x
+  anti-aliasing and 0.3 ms at 8x; at 4x the difference (0.05 ms) is inside the
+  noise of a GPU that other sessions were using.
+  `r_vkDepthTargetLayoutReference 1` restores the old layouts.
+- **Vulkan can no longer leak memory when a busy frame overflows its staging
+  arena.** A frame whose effects, decals and interface geometry overflowed the
+  shared 2 MB arena gave each overflowing allocation a block of its own that
+  was freed at birth. Touching such a block, which the effect pass does, moved
+  it back among the live blocks, and nothing freed it or its memory again. A
+  freed block now stays freed, and Vulkan's arena is 8 MB: the stock firefight
+  filled 1.8 MB of the old one without overflowing it.
+- **Vulkan recovers when a pipeline set fills up.** Pipelines are keyed on the
+  scene target's format and sample count and nothing evicted them, so each
+  anti-aliasing or HDR setting tried in a session left its pipelines behind. A
+  full set dropped every surface that needed a new pipeline, the depth fill
+  among them, until the renderer restarted. A full set now retires every
+  pipeline at the next frame and rebuilds the ones in use, and the stage set
+  holds 256. Sixteen setting changes in one session did not fill the old set of
+  64, so this is a safeguard; `rendererVulkanMemoryInfo` now prints the counts.
+- **A light that changes while effects are drawn can no longer upset the
+  view.** Effects are serviced while a view's effects are being added, and an
+  effect whose light started, moved or changed size there rebuilt that light's
+  area references. That bumped the counter the view keeps its visible areas,
+  entities and lights under, so for the rest of the view every "is this in the
+  view" test failed: later effects would be culled as out of sight, and an
+  entity or light asked for again added a second time. Area references now
+  have a stamp of their own. Found by reading the code; the stock firefight
+  used for the measurements never triggered it.
+- Smaller: the automatic temporal anti-aliasing rule no longer looks a cvar up
+  by name for every animated surface; an entity that is in a view only to cast
+  a shadow no longer has its bounds projected for a scissor it cannot use;
+  `r_debugRenderToTexture 1` counts colour and depth copies on OpenGL, and
+  `bse_frameCounters` the area references rebuilt while effects are added.
+- Evidence, and the list of what was read and left for later:
+  [performance report section 22](performance-report.md#22-a-renderer-round-copies-layouts-and-posed-bounds-fps-08-25-november-2026).
+  Renderer module ABI 39 and game module ABI 65 (a model method for the
+  widened bounds).
+
 ## Depth of field costs about a third less, 25 November 2026
 
 - **The game's depth of field takes the samples its blur needs** (REN-12,
