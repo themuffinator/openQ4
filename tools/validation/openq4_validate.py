@@ -801,6 +801,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "renderer_vulkan_gui_upload.py",
         root / "tools" / "tests" / "renderer_mp_flat_items.py",
         root / "tools" / "tests" / "renderer_pbr_materials.py",
+        root / "tools" / "tests" / "renderer_gles_symbol_closure.py",
         root / "tools" / "tests" / "parallax_occlusion_contract.py",
         root / "tools" / "tests" / "material_constant_registers_contract.py",
         root / "tools" / "tests" / "material_quality_reparse_contract.py",

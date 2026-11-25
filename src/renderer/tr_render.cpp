@@ -853,60 +853,6 @@ void RB_BeginDrawingView (void) {
 }
 
 /*
-==================
-R_SetDrawInteractions
-==================
-*/
-void R_SetDrawInteraction( const shaderStage_t *surfaceStage, const float *surfaceRegs,
-						  idImage **image, idVec4 matrix[2], float color[4] ) {
-	*image = surfaceStage->texture.image;
-	if ( surfaceStage->texture.hasMatrix ) {
-		matrix[0][0] = surfaceRegs[surfaceStage->texture.matrix[0][0]];
-		matrix[0][1] = surfaceRegs[surfaceStage->texture.matrix[0][1]];
-		matrix[0][2] = 0;
-		matrix[0][3] = surfaceRegs[surfaceStage->texture.matrix[0][2]];
-
-		matrix[1][0] = surfaceRegs[surfaceStage->texture.matrix[1][0]];
-		matrix[1][1] = surfaceRegs[surfaceStage->texture.matrix[1][1]];
-		matrix[1][2] = 0;
-		matrix[1][3] = surfaceRegs[surfaceStage->texture.matrix[1][2]];
-
-		// we attempt to keep scrolls from generating incredibly large texture values, but
-		// center rotations and center scales can still generate offsets that need to be > 1
-		if ( matrix[0][3] < -40 || matrix[0][3] > 40 ) {
-			matrix[0][3] -= (int)matrix[0][3];
-		}
-		if ( matrix[1][3] < -40 || matrix[1][3] > 40 ) {
-			matrix[1][3] -= (int)matrix[1][3];
-		}
-	} else {
-		matrix[0][0] = 1;
-		matrix[0][1] = 0;
-		matrix[0][2] = 0;
-		matrix[0][3] = 0;
-
-		matrix[1][0] = 0;
-		matrix[1][1] = 1;
-		matrix[1][2] = 0;
-		matrix[1][3] = 0;
-	}
-
-	if ( color ) {
-		for ( int i = 0 ; i < 4 ; i++ ) {
-			color[i] = surfaceRegs[surfaceStage->color.registers[i]];
-			// clamp here, so card with greater range don't look different.
-			// we could perform overbrighting like we do for lights, but
-			// it doesn't currently look worth it.
-			if ( color[i] < 0 ) {
-				color[i] = 0;
-			} else if ( color[i] > 1.0 ) {
-				color[i] = 1.0;
-			}
-		}
-	}
-}
-
-/*
 =================
 RB_SubmittInteraction
 =================
