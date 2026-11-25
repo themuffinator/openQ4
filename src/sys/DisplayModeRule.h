@@ -22,6 +22,15 @@ inline int DisplayRefreshHertz(float refresh) {
 	return static_cast<int>(std::floor(static_cast<double>(refresh) + 0.5));
 }
 
+// Whether a desktop fullscreen window of width x height physical pixels fits
+// the display's desktop mode. The window system owns that window's size, and it
+// can be smaller than the display: macOS keeps the strip beside the camera
+// housing of a notched MacBook out of a fullscreen Space, so a 3456x2234
+// display gives a 3456x2168 window (#260). It never exceeds the desktop mode.
+inline bool DesktopFullscreenPixelsFit(int width, int height, int desktopWidth, int desktopHeight) {
+	return width > 0 && height > 0 && width <= desktopWidth && height <= desktopHeight;
+}
+
 // The index of the mode an exclusive request for exactly width x height pixels
 // selects, or -1. read(i, mode) fills mode i of count, in SDL's list order
 // (SDL_GetFullscreenDisplayModes), and returns false for a mode the caller

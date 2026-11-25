@@ -70,7 +70,7 @@ exact; the estimate column is deliberately approximate.
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
 | [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
-| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **95%** | 6 / 7 | CORE-07: the unified game module on Linux, macOS and Android, and a human session across both modes. |
+| [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **95%** | 6 / 7 | CORE-07: the unified game module on macOS, an Android emulator or device run, and a human session across both modes. |
 | [Developer map tools](#tool-completion-checkpoints) — TOOL | **100%** | 4 / 4 | None; macOS evidence stays with the platform gate. |
 | [Release qualification](#release-qualification-and-completion-rules) — REL | **55%** | 0 / 4 | Packages and runs for the platforms other than Windows x64, human/device reviews, hardware lifecycle cases, signing and the promotion decision. |
 | [Deferred design decisions](#deferred-design-decisions) — OPT | **Not scored** | 9 decisions | Select scope and prerequisites before creating an implementation denominator. |
@@ -8207,7 +8207,8 @@ fixes and the UI visual editor have their own items.
 
 **Estimate: 95%; 6/7 tasks closed.** CORE-01, CORE-02 (not promoted), CORE-03,
 CORE-04, CORE-05 and CORE-06 are closed. CORE-07, one game module for
-single-player and multiplayer, is implemented and qualified on Windows x64.
+single-player and multiplayer, is implemented and qualified on Windows x64 and
+Linux x64, and builds and packages for Linux ARM64 and Android.
 macOS, a preview platform, is qualified through its own evidence gate rather
 than CORE-01.
 
@@ -8219,7 +8220,7 @@ than CORE-01.
 | CORE-04 — Closed | Strict strings; configure warnings fixed (RmlUi's not reproduced); diagnostics reviewed; collision contents decoding fixed; MSVC ASan gameplay (dedicated tour, SP combat, compilers, malformed and fuzzed AAS data) with no report; T-junction ASan/UBSan fixture. | — |
 | CORE-05 — Closed | `hub2` sliver and silhouette repairs; #209's maps profiled and compiling in minutes with byte-identical output; collision contents decoded as retail; rebuilt maps load, render and navigate (AI take cover) in SP with compile memory recorded. | — |
 | CORE-06 — Closed | Tactical features generated as Quake 4 does (98.8% of 7,422 retail features reproduced exactly); `runAASTactical`; rebuilt `airdefense1` AI takes cover as on retail data; malformed data dropped or rejected, fuzzed. | — |
-| CORE-07 — Open | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64; campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. | Linux, macOS and Android builds and smokes; a human session across both modes; then the follow-ups below. |
+| CORE-07 — Open | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64; campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. Linux x64: dedicated, client-demo, save and mode-switch smokes, saves cross-loading with Windows, the module really unloaded at each mode change. Linux ARM64 cross build validated and packaged; Android build and verified APK. | macOS build and smoke; an Android emulator or device run; a human session across both modes; then the follow-ups below. |
 
 ### CORE task evidence and acceptance
 
@@ -8393,8 +8394,19 @@ than CORE-01.
   campaign again. Packaging, staging, CI and the test suite expect the single
   module; staging and the Windows installer remove the retired
   `game-sp`/`game-mp` files.
-  Remaining: the unified module built and smoke-tested on Linux, macOS and
-  Android; a human session across both modes. Follow-ups once closed: keep one
+  Progress, 25 November: Linux x64 builds `game_x64.so`, which exports only
+  its entry points. The dedicated smoke and all 22 client-demo checks pass.
+  Linux and Windows restore each other's campaign saves with identical object
+  tables. One process switches campaign, network play and campaign again, and
+  the dynamic loader shows the module finalised and loaded fresh at each
+  change. The Linux ARM64 cross build passes the workflow's ELF and export
+  checks, the stage validator and packaging, and its dedicated smoke passes
+  under qemu. The Android build produces `libgame_arm64.so`, and its release
+  APK passes `verify_android_apk.py`. To link, the APK needed a scratch fix for
+  a GLES renderer link break on main that is not part of this item. macOS was
+  not run: no Apple hardware here, and the hosted lanes need a push.
+  Remaining: the macOS build and smoke; an Android emulator or device run; a
+  human session across both modes. Follow-ups once closed: keep one
   loaded library across a mode change, and remove the engine's workarounds for
   the split (the multiplayer menu cvars it declares for the campaign module).
 

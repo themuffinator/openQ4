@@ -57,6 +57,80 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   on a physical high-polling-rate mouse: a hidden test window has no captured
   mouse to drive.
 
+## The menu pointer starts in the corner of the screen, 25 November 2026
+
+- **On a widescreen display, the menu pointer now starts in the top-left corner
+  of the screen**, not at the top-left of the centred 4:3 area, where it used
+  to appear partway across the screen. A stock-interface menu that has not had
+  its cursor placed yet now starts it at the corner of its aspect-expanded
+  canvas on first activation. Once the player moves the pointer, or a save or
+  demo restores it, the cursor keeps its position as before. World-surface
+  GUIs keep the retail 0,0 start, which in-world interaction relies on.
+- Evidence: `ui_cursor_state_safety.py` pins the canvas-origin start and the
+  shared bounds helper, and the changed file compiles under MSVC. Not yet
+  checked in a running game.
+
+## The briefing hologram hides the squad's uniform patches, 25 November 2026
+
+- **The rank patches and badges on the marines' uniforms no longer show
+  through the reconnaissance briefing hologram on the MCC** (#256). The
+  hologram is a see-through screen in front of the squad, and Quake 4 draws
+  screens like it before decals. Raven's own map script works around that: when
+  the hologram starts, it moves the uniform decals ahead of the screen
+  (`sys.setMatSort ... SS_PREGUI`), and puts them back when the table closes.
+  An early port had disabled that sort in the campaign, and the unified game
+  module carried it over as multiplayer-only, so in single-player the script
+  was ignored and the patches drew on top of the hologram on every renderer.
+  `setMatSort` now applies every sort it names in both modes, as the Quake 4
+  SDK does.
+- Evidence: the briefing played through its own cinematic camera on Windows
+  shows the patches over the hologram before the fix and behind it after, on
+  OpenGL and Vulkan. The retail decompile draws GUIs before decals in one
+  ordered pass, so the script's re-sort is what keeps retail correct.
+  `script_set_mat_sort_contract.py` pins the mapping. Not yet run on a Mac.
+
+## Maps compiled with dmap keep their sky, 25 November 2026
+
+- **A map rebuilt with openQ4's `dmap` no longer has a black sky** (#255).
+  Quake 4's outdoor maps draw their sky as a portal sky, seen through
+  `textures/common/skycaulk` faces, and the `.proc` marks each area where
+  such a face is visible as a sky area. The renderer draws the portal sky only
+  through marked areas. openQ4's `dmap` wrote no marks, so a rebuilt Air
+  Defense 1 drew a black sky and lost its distant towers. It now marks every
+  area that holds a visible face of a `sky` material.
+- **What to do.** Rebuild any map compiled with an earlier openQ4 `dmap`.
+  Maps that were not rebuilt are unaffected.
+- Evidence: retail Air Defense 1 flags `_area1`, `_area5`, `_area6` and
+  `_area39`; the fixed `dmap` flags the same four. On Vulkan with the
+  reporter's sky faces, the reporter's rebuilt map draws black and a map
+  compiled by the fixed `dmap` draws the sky and towers as retail does.
+  `dmap_sky_areas.py` pins the marking.
+
+## Graphics presets apply in fullscreen on notched MacBooks, and a steadier OpenGL 2.1 scene, 25 November 2026
+
+- **Changing a preset or display setting no longer stops at "Settings need
+  attention" on a MacBook with a notch** (#260). In fullscreen, macOS keeps
+  the strip beside the camera out of the game's window, so a 16-inch MacBook
+  Pro's 3456x2234 display gives a 3456x2168 window. Before applying anything,
+  openQ4 records the current display so it can put it back, and that record
+  required a fullscreen window exactly the display's size, so every change
+  was refused. A desktop fullscreen window may now be smaller than its
+  display, never larger, in that record, in the check after a change, and in
+  the window service. Evidence: the reporter's 0.15.0 log
+  (`Recorded display mode does not match available exact pixel modes`);
+  `ui_system_display.py` models that display and fails without the fix;
+  `sdl3_strict_window.py` passes. Not yet run on a Mac.
+- **Macs on the OpenGL 2.1 path stop rebuilding the HDR scene every frame**
+  (#257). That context cannot make multisampled textures, but its window
+  carries MSAA, so the HDR scene target kept asking for them. Each image
+  dropped the samples as it was made, never matched the request, and was made
+  again on the next frame, with two warnings each time: about 20,000 pairs in
+  one reporter's session. The target now asks the same capability question
+  first and stays single-sample, which is what it already drew with. Evidence:
+  the reporter's 0.15.0 log; `renderer_gl_display_policy.py` covers a context
+  without multisample textures and `macos_apple_gl21_arb2_corridor.py` pins the
+  shared check. Not yet run on a Mac.
+
 ## One game module for single-player and multiplayer, 24 November 2026
 
 - **One game file serves the campaign and multiplayer.** openQ4 built its game
@@ -5595,7 +5669,6 @@ there is no double-click word selection.
   with clean logs, a dedicated-server connect, 334 of 337 native tests (the other
   three fail on unrelated in-progress or older work), and the affected Python
   contract tests.
-
 
 ## Rebuilt maps keep their textures where patches meet (CORE-05, #209), 9 November 2026
 

@@ -2323,10 +2323,16 @@ static bool RB_EnsureSceneRenderTexture( const viewDef_t *sceneTargetView ) {
 	// Any non-native scene target already requires a resolve. Keep it
 	// single-sample instead of stacking an MSAA FP16 FBO on top of the scale
 	// transition; temporal AA owns antialiasing when enabled.
+	// A context without multisample textures (macOS's OpenGL 2.1 legacy
+	// context, whose window still carries MSAA) cannot multisample the target.
+	// idImage::AllocImage would drop the samples itself, but the image then
+	// never equals the request, so ScratchImage reallocated both images and
+	// warned twice on every frame (#257).
 	const int sceneSamples = ( !scaledScene && requestedSamples > 1
 		&& !R_TemporalPresentation_TemporalAARequested()
 		&& !R_TemporalPresentation_ScreenSpaceEffectsRequested()
-		&& !R_ModernGLExecutor_ModernVisibleRequestedForPost() ) ? requestedSamples : 0;
+		&& !R_ModernGLExecutor_ModernVisibleRequestedForPost()
+		&& R_GLMultisampleTexturesAvailable() ) ? requestedSamples : 0;
 
 	if ( targetWidth <= 0 || targetHeight <= 0 ) {
 		return false;

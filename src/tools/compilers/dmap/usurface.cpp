@@ -603,6 +603,22 @@ static int CheckWindingInAreas_r( const idWinding *w, node_t *node ) {
 
 /*
 ====================
+MarkSkyArea
+
+Quake 4 marks every area that holds a visible fragment of a "sky" side
+(textures/common/skycaulk) as a sky area in the .proc. The renderer draws the
+map's portal sky only through such areas, and those sides make no triangles,
+so without the mark the sky and everything seen through it stayed black (#255).
+====================
+*/
+static void MarkSkyArea( uEntity_t *e, const side_t *side, int area ) {
+	if ( area >= 0 && area < e->numAreas && side->material != NULL && side->material->TestMaterialFlag( MF_SKY ) ) {
+		e->areas[area].sky = true;
+	}
+}
+
+/*
+====================
 PutWindingIntoAreas_r
 
 Clips a winding down into the bsp tree, then converts
@@ -637,6 +653,7 @@ static void PutWindingIntoAreas_r( uEntity_t *e, const idWinding *w, side_t *sid
 				mapTri_t	*tri;
 
 				// put in single area
+				MarkSkyArea( e, side, area );
 				tri = TriListForSide( side, w );
 				AddTriListToArea( e, tri, side->planenum, area, &side->texVec, TEXVEC_SIDE );
 				return;
@@ -662,6 +679,7 @@ static void PutWindingIntoAreas_r( uEntity_t *e, const idWinding *w, side_t *sid
 	if ( node->area >= 0 && !node->opaque ) {
 		mapTri_t	*tri;
 
+		MarkSkyArea( e, side, node->area );
 		tri = TriListForSide( side, w );
 		AddTriListToArea( e, tri, side->planenum, node->area, &side->texVec, TEXVEC_SIDE );
 	}

@@ -483,8 +483,9 @@ static void WriteOutputSurfaces( int entityNum, int areaNum ) {
 
 	if ( entityNum == 0 ) {
 // jmarshall - quake 4 proc format
-		procFile->WriteFloatString( "model { /* name = */ \"_area%i\" /* numSurfaces = */ %i /* sky */ 0\n\n", 
-			areaNum, numSurfaces );
+		// The sky flag: a skycaulk side is visible in this area (MarkSkyArea).
+		procFile->WriteFloatString( "model { /* name = */ \"_area%i\" /* numSurfaces = */ %i /* sky */ %i\n\n",
+			areaNum, numSurfaces, area->sky ? 1 : 0 );
 // jmarshall end
 	} else {
 		const char *name;

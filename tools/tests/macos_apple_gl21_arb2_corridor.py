@@ -647,11 +647,19 @@ def validate_multisample_gates_ask_the_context() -> None:
 
     image_source = read("src/renderer/OpenGL/gl_Image.cpp")
     alloc_image = function_body(image_source, "void idImage::AllocImage() {")
-    require(
-        alloc_image,
+    require(alloc_image, "R_GLMultisampleTexturesAvailable()", "multisample texture allocation gate")
+    texture_gate = function_body(image_source, "bool R_GLMultisampleTexturesAvailable( void ) {")
+    for token in (
+        "glTexImage2DMultisample != NULL",
+        "glConfig.backendCaps.glVersion >= 3.2f",
         'GLCapabilityProbe_HasExtension( "GL_ARB_texture_multisample" )',
-        "multisample texture allocation gate",
-    )
+    ):
+        require(texture_gate, token, "multisample texture capability")
+    # The HDR scene target asks the same question before it requests samples:
+    # on that context AllocImage dropped them, the image never equalled the
+    # request, and ScratchImage reallocated it every frame (#257).
+    scene_target = function_body(read("src/renderer/draw_common.cpp"), "static bool RB_EnsureSceneRenderTexture(")
+    require(scene_target, "R_GLMultisampleTexturesAvailable()", "HDR scene target multisample gate")
 
     # gfxInfo printed "MSAA ... effective=8 reason=active" on that context while
     # the same log said every multisample texture had been refused.
@@ -676,6 +684,7 @@ def validate_multisample_gates_ask_the_context() -> None:
     for body, context in (
         (graph_init, "render graph multisample limit gate"),
         (alloc_image, "multisample texture allocation gate"),
+        (texture_gate, "multisample texture capability"),
         (gfxinfo_aa, "gfxInfo texture MSAA gate"),
         (gfxinfo_max_samples, "gfxInfo GL_MAX_SAMPLES gate"),
     ):

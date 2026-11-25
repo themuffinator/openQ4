@@ -285,7 +285,11 @@ bool MatchesDisplay(const SystemDisplayPlan& plan, const rendererDisplayState_t&
 		w.fullscreen!=expected.fullscreen || w.fullscreenDesktop!=expected.fullscreenDesktop ||
 		(!w.fullscreen && w.borderless!=expected.borderless) || w.hidden!=expected.hidden || w.maximized!=expected.maximized ||
 		(!w.fullscreen && (w.logicalWidth!=expected.logicalWidth || w.logicalHeight!=expected.logicalHeight)) ||
-		(plan.checkPixels && (w.pixelWidth!=expected.pixelWidth || w.pixelHeight!=expected.pixelHeight)) ||
+		// A desktop fullscreen window takes the size the window system gives it
+		// within the display's desktop mode (DesktopFullscreenPixelsFit).
+		(plan.checkPixels && (expected.fullscreenDesktop ?
+			!DesktopFullscreenPixelsFit(w.pixelWidth,w.pixelHeight,expected.modePixelWidth,expected.modePixelHeight) :
+			(w.pixelWidth!=expected.pixelWidth || w.pixelHeight!=expected.pixelHeight))) ||
 		(plan.checkPosition && (!w.positionValid || w.windowX!=expected.windowX || w.windowY!=expected.windowY)) ||
 		observed.presentation.samples!=plan.request.parms.multiSamples || observed.presentation.swapInterval!=plan.request.swapInterval)
 		return Fail(error,"Actual display policy, dimensions, placement or renderer parameters differ from the request");
@@ -345,7 +349,7 @@ bool RecoveryPlan(const SystemDisplayPlan& plan,const SystemDisplayTopology& top
 	}
 	if (e.modePixelWidth!=mode.width || e.modePixelHeight!=mode.height || double(e.refreshRate)!=mode.refresh ||
 		(e.fullscreen && (e.pixelWidth!=p.width || e.pixelHeight!=p.height)) ||
-		(e.fullscreenDesktop && (p.width!=selected.desktop.width || p.height!=selected.desktop.height)))
+		(e.fullscreenDesktop && !DesktopFullscreenPixelsFit(p.width,p.height,selected.desktop.width,selected.desktop.height)))
 		return Fail(error,"Recorded display mode does not match available exact pixel modes");
 	if (!e.fullscreen && e.borderless) {
 		int x,y,width,height;

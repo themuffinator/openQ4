@@ -40,7 +40,11 @@ typedef struct primitive_s {
 
 typedef struct {
 	struct optimizeGroup_s	*groups;
-	// we might want to add other fields later
+	// A side whose material is marked "sky" (textures/common/skycaulk) has a
+	// visible fragment in this area. Quake 4's .proc records it as the area
+	// model's sky flag, which makes the renderer draw the portal sky there.
+	// Those sides draw nothing themselves, so no surface carries it.
+	bool					sky;
 } uArea_t;
 
 typedef struct {
