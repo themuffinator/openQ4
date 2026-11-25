@@ -12,7 +12,7 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
-## Graphics presets apply in fullscreen on notched MacBooks, 25 November 2026
+## Graphics presets apply in fullscreen on notched MacBooks, and a steadier OpenGL 2.1 scene, 25 November 2026
 
 - **Changing a preset or display setting no longer stops at "Settings need
   attention" on a MacBook with a notch** (#260). In fullscreen, macOS keeps
@@ -26,6 +26,16 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   (`Recorded display mode does not match available exact pixel modes`);
   `ui_system_display.py` models that display and fails without the fix;
   `sdl3_strict_window.py` passes. Not yet run on a Mac.
+- **Macs on the OpenGL 2.1 path stop rebuilding the HDR scene every frame**
+  (#257). That context cannot make multisampled textures, but its window
+  carries MSAA, so the HDR scene target kept asking for them. Each image
+  dropped the samples as it was made, never matched the request, and was made
+  again on the next frame, with two warnings each time: about 20,000 pairs in
+  one reporter's session. The target now asks the same capability question
+  first and stays single-sample, which is what it already drew with. Evidence:
+  the reporter's 0.15.0 log; `renderer_gl_display_policy.py` covers a context
+  without multisample textures and `macos_apple_gl21_arb2_corridor.py` pins the
+  shared check. Not yet run on a Mac.
 
 ## One game module for single-player and multiplayer, 24 November 2026
 
