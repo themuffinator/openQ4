@@ -8234,7 +8234,7 @@ than CORE-01.
 | CORE-04 — Closed | Strict strings; configure warnings fixed (RmlUi's not reproduced); diagnostics reviewed; collision contents decoding fixed; MSVC ASan gameplay (dedicated tour, SP combat, compilers, malformed and fuzzed AAS data) with no report; T-junction ASan/UBSan fixture. | — |
 | CORE-05 — Closed | `hub2` sliver and silhouette repairs; #209's maps profiled and compiling in minutes with byte-identical output; collision contents decoded as retail; rebuilt maps load, render and navigate (AI take cover) in SP with compile memory recorded. | — |
 | CORE-06 — Closed | Tactical features generated as Quake 4 does (98.8% of 7,422 retail features reproduced exactly); `runAASTactical`; rebuilt `airdefense1` AI takes cover as on retail data; malformed data dropped or rejected, fuzzed. | — |
-| CORE-07 — Open | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64; campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. Linux x64: dedicated, client-demo, save and mode-switch smokes, saves cross-loading with Windows, the module really unloaded at each mode change. Linux ARM64 cross build validated and packaged; Android build and verified APK. | macOS build and smoke; an Android emulator or device run; a human session across both modes; then the follow-ups below. |
+| CORE-07 — Open | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64; campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. Linux x64: dedicated, client-demo, save and mode-switch smokes, saves cross-loading with Windows, the module really unloaded at each mode change. Linux ARM64 cross build validated and packaged; Android build and verified APK. Every official map A/B against the pre-merge build; eleven cross-mode leaks gated. | macOS build and smoke; an Android emulator or device run; a human session across both modes; then the follow-ups below. |
 
 ### CORE task evidence and acceptance
 
@@ -8419,6 +8419,14 @@ than CORE-01.
   APK passes `verify_android_apk.py`. To link, the APK needed a scratch fix for
   a GLES renderer link break on main that is not part of this item. macOS was
   not run: no Apple hardware here, and the hosted lanes need a push.
+  Also 25 November: every official map against the pre-merge build: 42
+  campaign maps, and 49 multiplayer maps in each listed game type, on servers
+  and listen clients. The A/B found eleven places where merged text had
+  reached the other mode. They are now gated and pinned by
+  `unified_game_mode_parity_contract.py`. Since then, campaign saves match the
+  old build byte for byte apart from the documented server-info keys and
+  fields neither build initialises. Every map logs the old build's warnings
+  exactly, and server and client entity lists match on every multiplayer case.
   Remaining: the macOS build and smoke; an Android emulator or device run; a
   human session across both modes. Follow-ups once closed: keep one
   loaded library across a mode change, and remove the engine's workarounds for

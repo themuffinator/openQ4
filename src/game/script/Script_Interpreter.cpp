@@ -10,6 +10,7 @@ idInterpreter::idInterpreter()
 ================
 */
 idInterpreter::idInterpreter() {
+	localstackLimit = gameLocal.IsMultiplayerMode() ? LOCALSTACK_SIZE_MULTIPLAYER : LOCALSTACK_SIZE;
 	localstackUsed = 0;
 	terminateOnExit = true;
 	debug = 0;
@@ -682,7 +683,7 @@ void idInterpreter::EnterFunction( const function_t *func, bool clearStack ) {
 	c = func->locals - func->parmTotal;
 	assert( c >= 0 );
 
-	if ( localstackUsed + c > LOCALSTACK_SIZE ) {
+	if ( localstackUsed + c > localstackLimit ) {
 		Error( "EnterFuncton: locals stack overflow\n" );
 	}
 
@@ -796,7 +797,9 @@ void idInterpreter::CallEvent( const function_t *func, int argsize ) {
 				const char *lastVarName = LastScriptVariable->Name();
 				// Map-authored entity symbols use '$name'. Local script vars (for example
 				// function args like 'vehicle') may legitimately be null in guard logic.
-				if ( lastVarName != NULL && lastVarName[0] == '$' && idStr::Cmp( "$null_entity", lastVarName ) ) {
+				// The multiplayer library warned for every name but $null_entity.
+				const bool warnName = gameLocal.isMultiplayer || ( lastVarName != NULL && lastVarName[0] == '$' );
+				if ( lastVarName != NULL && warnName && idStr::Cmp( "$null_entity", lastVarName ) ) {
 					Warning( "Entity '%s' is a null entity", lastVarName );
 				}
 			} else {

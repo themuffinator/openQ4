@@ -195,7 +195,8 @@ def check_weapons() -> None:
     projectile = read("src/game/Projectile.cpp")
     require(projectile, 'spawnArgs.GetString("def_impactEntity", spawnArgs.GetString("impactEntity",""))',
             "Projectile.cpp")
-    require(projectile, 'applyRotation		= spawnArgs.GetBool( "applyRotation", "1" );', "Projectile.cpp")
+    require(projectile, 'applyRotation		= gameLocal.isMultiplayer || spawnArgs.GetBool( "applyRotation", "1" );',
+            "Projectile.cpp")
     force = function_body(projectile, "void idProjectile::ApplyImpactForce(", "Projectile.cpp")
     require_order(force, ('spawnArgs.GetFloat( "impactForce", "0" )', "force == 0.0f"),
                   "idProjectile::ApplyImpactForce")

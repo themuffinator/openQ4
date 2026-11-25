@@ -72,6 +72,26 @@ merged code follows, and the compatibility guarantees and their evidence.
   work behind the mode: the match session, evidence and live-event logs,
   identities, function-key migration and the Arena pause menu run only for
   `game_mp`.
+- A behaviour only one library had stays in that library's mode. The
+  every-map A/B of 25 November (see [Evidence](#every-official-map-against-the-pre-merge-build-25-november-2026))
+  found eleven places where merged text had reached the other mode, and each is
+  now gated:
+  - Campaign only, as the single-player library had them: The Awakening's
+    content keys `impactEntity` (projectile spawn and map precache),
+    `impactForce`, `applyRotation`, `velscale` (`trigger_hurt`),
+    `fx_altmuzzleflash[_world]`, `globalLight` in
+    `ParseSpawnArgsToRenderLight`, and a persona keeping its entity's
+    `classname`. No retail multiplayer map or def uses them; custom ones now
+    behave as they did on a multiplayer server.
+  - Network play only, as the multiplayer library had them: the 6,144-byte
+    script locals stack (the campaign keeps 12,288), the "is a null entity"
+    script warning for every name, and freeing a failed `script` command's
+    partial definitions.
+  - Campaign saves keep the single-player library's `entityDefBits` (negated)
+    and its `player_idealweapon` HUD-state spelling, so a save holds the same
+    bytes as before. The HUD reads the key either way.
+
+  `tools/tests/unified_game_mode_parity_contract.py` pins these gates.
 - No new compile-time mode switches. `GAME_MPAPI` and the second idlib flavour
   are gone; a single idlib archive is compiled with the game module's flags.
 
@@ -234,6 +254,71 @@ A module swap also resets two engine testing cvars set on the command line,
 defaults. A scripted run that changes mode must set them again before its next
 map. The pre-merge Windows build does the same in the same three-phase run, so
 this is not new.
+
+### Every official map against the pre-merge build (25 November 2026)
+
+Windows x64, `debugoptimized`, three runtimes built side by side: the
+pre-merge build (`45c7c4fc7`, both old libraries), the merge commit itself
+(`22159d559`, so nothing else differs), and the merge commit with the gates
+above. Every run used the retail packs alone. The Steam folder's loose
+recompiled map files were left out, and The Awakening's content came from the
+local expansion install. Clients ran with a hidden window, no sound and no
+input. Multiplayer servers ran on the dedicated server.
+
+- **Maps.** All 29 Quake 4 campaign maps, all 13 Awakening maps, and all 49
+  multiplayer maps (the 33 retail and 16 community-pack maps), each multiplayer
+  map in every game type its map definition lists: 105 server cases.
+- **Campaign play.** Each map loads and plays 300 fixed tics, then saves, on
+  both builds. Every map passes on both. The warnings and errors each one logs
+  are identical, line for line, on all 42 maps.
+- **Campaign state, byte for byte.** A live save differs even between two runs
+  of one build, because the AI and animation depend on timing. So each map
+  was also saved with game time stopped, twice per build. The saves were split at
+  their sync markers, and a part counted only if both builds were stable in
+  it and still disagreed. Before the gates, that found the `entityDefBits` and
+  HUD-key differences on every map. With the gates, all 42 maps write the same
+  object table and the same bytes as the pre-merge build except:
+  - the server-info dictionary: 43 added multiplayer `si_*` keys,
+    `si_useReady` 1 instead of 0, and the build stamp;
+  - the save's length field, which grows by exactly that much;
+  - fields both builds save without initialising. These are
+    `rvClientEntity::worldVelocity`, an animator's joints before its first
+    update, and a few AI and vehicle-effect members. In four maps their bytes
+    were stable within each build but different between them. The same build
+    wrote different bytes once its heap layout moved: `0xCC` fill, text
+    fragments, `0xFF` runs. So they are leftover memory, not behaviour, and
+    the pre-merge build has them too.
+- **Network play, server.** All 105 cases start, run 600 frames and list their
+  entities on both builds. Each entity list (102 to 1,168 entities) is identical,
+  and so are the warnings. The one exception is a timing-dependent "forcing down
+  tourney history", which both builds print on different Tourney runs.
+- **Network play, client.** A listen server with its own player joined, on each
+  of the 49 maps: identical entity lists and warnings on all 49.
+- **Current main.** `main` (`58f23d2ef`) with the gates gives the same result:
+  all 42 campaign maps pass and log exactly the pre-merge build's warnings, and
+  all 105 server cases pass with the pre-merge build's entity lists.
+- **Issues the maps report.** No map logs an error or a fatal on either build.
+  The warnings are developer-level reports of retail content: entities and
+  rigid bodies in solid, unknown joints, overlapping locations, uncached
+  declarations, and The Awakening's redefined declarations. The pre-merge build
+  prints the same ones. A separate openQ4 defect, present in both builds,
+  shows up in every network session: `guis/menu/mp_escape.rui` names a
+  missing timeline node, so the stock escape menu is used.
+- **One stall.** Once, under six concurrent clients, the merge build stopped
+  advancing frames on core2 after loading. The same map then passed on its
+  retry, four times on the current build and four times on the pre-merge
+  build. It was not reproduced.
+
+Differences that remain by design: every cvar now registers in both modes, so
+a campaign save's server info lists the multiplayer settings, and the
+multiplayer-only console commands answer "multiplayer only" in the campaign
+instead of being unknown (`pause` is bound by default). Some differences remain
+in network play, none of which retail content reaches:
+- the campaign's developer cheat commands now exist there;
+- `SetCamera` no longer dereferences a missing local player (the old
+  multiplayer library crashed on a dedicated server);
+- double vision skips a missing material;
+- `g_skill` accepts 0 to 4 and is still clamped to 3 at map load.
 
 Not yet run: macOS, an Android emulator or device run, an Awakening campaign
 playthrough beyond loading saves, and a human play session.

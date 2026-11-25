@@ -4241,8 +4241,9 @@ void idGameLocal::CacheDictionaryMedia( const idDict *dict ) {
 			declManager->MediaPrint( "Precaching skin %s\n", kv->GetValue().c_str() );
 			declManager->FindType( DECL_SKIN, kv->GetValue() );
 			OpenQ4_EndMapMediaPrecacheCall( MAP_MEDIA_SKIN, mediaProfileStart );
-		} else if ( MATCH( "def_" ) || !kv->GetKey().Icmp( "impactEntity" ) ) {
+		} else if ( MATCH( "def_" ) || ( !IsMultiplayerMode() && !kv->GetKey().Icmp( "impactEntity" ) ) ) {
 			// openQ4: The Awakening's projectiles name their burst "impactEntity"
+			// (campaign only, as idProjectile reads it)
 			TIME_THIS_SCOPE( __FUNCLINE__);
 			
 			MEM_SCOPED_TAG(tag,MA_DECL);

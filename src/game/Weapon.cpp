@@ -3771,9 +3771,11 @@ void rvWeapon::Attack( bool altAttack, int num_attacks, float spread, float fuse
 	// Muzzle flash effect
 	// openQ4: a zoomed (alternate) attack uses "fx_altmuzzleflash" when the weapon
 	// has one, as The Awakening's game code did: its goob gun's flamethrower mod
-	// fires unseen projectiles and the flame is this effect
-	const char *flashKey = ( wsfl.zoom && weaponDef->dict.GetString( "fx_altmuzzleflash" )[0] ) ? "fx_altmuzzleflash" : "fx_muzzleflash";
-	const char *worldFlashKey = ( wsfl.zoom && weaponDef->dict.GetString( "fx_altmuzzleflash_world" )[0] ) ? "fx_altmuzzleflash_world" : "fx_muzzleflash_world";
+	// fires unseen projectiles and the flame is this effect. Campaign only: the
+	// multiplayer library always used the plain flash.
+	const bool altFlash = wsfl.zoom && !gameLocal.isMultiplayer;
+	const char *flashKey = ( altFlash && weaponDef->dict.GetString( "fx_altmuzzleflash" )[0] ) ? "fx_altmuzzleflash" : "fx_muzzleflash";
+	const char *worldFlashKey = ( altFlash && weaponDef->dict.GetString( "fx_altmuzzleflash_world" )[0] ) ? "fx_altmuzzleflash_world" : "fx_muzzleflash_world";
 	bool muzzleTint = spawnArgs.GetBool( "muzzleTint" );
 	rvClientEffect* muzzleFlashEffect = viewModel->PlayEffect( flashKey, flashJointView, false, vec3_origin, false, false, EC_IGNORE, muzzleTint ? owner->GetHitscanTint() : vec4_one );
 	DisableViewEffectWeaponDepthHack( muzzleFlashEffect );

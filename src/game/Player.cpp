@@ -4760,7 +4760,9 @@ void idPlayer::UpdateHudWeapon( int displayWeapon ) {
  	hud->SetStateInt( "player_weapon", currentWeapon );
 	hud->SetStateInt( "player_lastweapon", previousWeapon );
 	int hud_idealWeapon = ( displayWeapon != -1 ) ? displayWeapon : idealWeapon;
-	hud->SetStateInt( "player_idealWeapon", hud_idealWeapon );
+	// The HUD state is case-insensitive; each library's own spelling keeps its
+	// saves' HUD state byte for byte.
+	hud->SetStateInt( gameLocal.isMultiplayer ? "player_idealWeapon" : "player_idealweapon", hud_idealWeapon );
 	// unused in q4mp hud.gui; the single-player HUDs read it
 	if ( !gameLocal.isMultiplayer ) {
 		hud->SetStateInt( "player_idealIndex", idealIndex );

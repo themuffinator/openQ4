@@ -290,6 +290,7 @@ jobs:
             tools/tests/filesystem_write_qpath_safety.py \
             tools/tests/game_class_allocator_alignment.py \
             tools/tests/game_module_completion_safety.py \
+            tools/tests/unified_game_mode_parity_contract.py \
             tools/tests/game_type_module_selection.py \
             tools/tests/gamelibs_staging.py \
             tools/tests/gamelibs_layer_staging.py \
@@ -913,6 +914,7 @@ jobs:
           python tools/tests/filesystem_write_qpath_safety.py
           python tools/tests/game_class_allocator_alignment.py
           python tools/tests/game_module_completion_safety.py
+          python tools/tests/unified_game_mode_parity_contract.py
           python tools/tests/game_type_module_selection.py
           python tools/tests/gamelibs_staging.py
           python tools/tests/gamelibs_layer_staging.py

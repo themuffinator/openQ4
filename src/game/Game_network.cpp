@@ -92,6 +92,11 @@ void idGameLocal::InitAsyncNetwork( void ) {
 
 	// we used to have some special case -1 value, but we don't anymore so this is always >= 0 now
 	entityDefBits = idMath::BitsForInteger( declManager->GetNumDecls( DECL_ENTITYDEF ) ) + 1;
+	// The campaign never sends entity defs, but its saves record the value the
+	// single-player library stored: Doom 3's negated (signed-bits) form.
+	if ( !IsMultiplayerMode() ) {
+		entityDefBits = -entityDefBits;
+	}
 	localClientNum = 0; // on a listen server SetLocalUser will set this right
 	realClientTime = 0;
 	clientSnapshotTime = 0;

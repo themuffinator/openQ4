@@ -640,6 +640,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "filesystem_write_qpath_safety.py",
         root / "tools" / "tests" / "game_class_allocator_alignment.py",
         root / "tools" / "tests" / "game_module_completion_safety.py",
+        root / "tools" / "tests" / "unified_game_mode_parity_contract.py",
         root / "tools" / "tests" / "game_type_module_selection.py",
         root / "tools" / "tests" / "gamelibs_staging.py",
         root / "tools" / "tests" / "gamelibs_layer_staging.py",

@@ -2189,8 +2189,9 @@ bool idProgram::CompileText( const char *source, const char *text, bool console,
 	}
 	
 	catch( idCompileError &err ) {
-		// attempt to recover by deleting anything new in the script
-		for( i = 0; i < varDefs.Num(); i++ ) {
+		// attempt to recover by deleting anything new in the script (the
+		// multiplayer library did; the campaign library kept it)
+		for( i = 0; gameLocal.IsMultiplayerMode() && i < varDefs.Num(); i++ ) {
 			def = varDefs[ i ];
 
 			if ( def->compileStamp == compileStamp ) {

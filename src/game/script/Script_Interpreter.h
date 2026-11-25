@@ -6,6 +6,8 @@
 
 // RB: doubled local stack size
 #define LOCALSTACK_SIZE 	(6144 * 2)
+// The multiplayer library's interpreters overflowed at 6144 bytes of locals.
+#define LOCALSTACK_SIZE_MULTIPLAYER	6144
 // RB end
 
 typedef struct prstack_s {
@@ -21,6 +23,7 @@ private:
 	int 				maxStackDepth;
 
 	byte				localstack[ LOCALSTACK_SIZE ];
+	int 				localstackLimit;	// LOCALSTACK_SIZE, or the multiplayer library's size in network play (not saved)
 	int 				localstackUsed;
 	int 				localstackBase;
 	int 				maxLocalstackUsed;
@@ -124,7 +127,7 @@ idInterpreter::Push
 ====================
 */
 ID_INLINE void idInterpreter::Push( int value ) {
-	if ( localstackUsed + sizeof( int ) > LOCALSTACK_SIZE ) {
+	if ( localstackUsed + static_cast<int>( sizeof( int ) ) > localstackLimit ) {
 		Error( "Push: locals stack overflow\n" );
 	}
 	*( int * )&localstack[ localstackUsed ]	= value;
@@ -137,7 +140,7 @@ idInterpreter::PushVector
 ====================
 */
 ID_INLINE void idInterpreter::PushVector( const idVec3 &vector ) {
-	if ( localstackUsed + sizeof( idVec3 ) > LOCALSTACK_SIZE ) {
+	if ( localstackUsed + static_cast<int>( sizeof( idVec3 ) ) > localstackLimit ) {
 		Error( "Push: locals stack overflow\n" );
 	}
 	Push( *reinterpret_cast<const int *>( &vector.x ) );
@@ -151,7 +154,7 @@ idInterpreter::PushString
 ====================
 */
 ID_INLINE void idInterpreter::PushString( const char *string ) {
-	if ( localstackUsed + MAX_STRING_LEN > LOCALSTACK_SIZE ) {
+	if ( localstackUsed + MAX_STRING_LEN > localstackLimit ) {
 		Error( "PushString: locals stack overflow\n" );
 	}
 	idStr::Copynz( ( char * )&localstack[ localstackUsed ], string, MAX_STRING_LEN );

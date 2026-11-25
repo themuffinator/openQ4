@@ -585,10 +585,11 @@ void idEntity::Spawn( void ) {
 	const idDict* dict;
 	dict = gameLocal.FindEntityDefDict ( spawnArgs.GetString ( "def_persona", "" ), false );
 	if ( dict ) {
-		// Persona defs are entityDef-based, so preserve the spawned entity classname.
+		// Persona defs are entityDef-based, so preserve the spawned entity
+		// classname (campaign; the multiplayer library let the persona's replace it).
 		idStr originalClassname = spawnArgs.GetString( "classname", "" );
 		spawnArgs.Copy ( *dict );
-		if ( originalClassname.Length() ) {
+		if ( originalClassname.Length() && !gameLocal.isMultiplayer ) {
 			spawnArgs.Set( "classname", originalClassname );
 		}
 	}

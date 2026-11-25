@@ -477,8 +477,10 @@ void idProjectile::Launch( const idVec3 &start, const idVec3 &dir, const idVec3 
 	
 	//spawn impact entity information
 	// openQ4: The Awakening's projectiles name it "impactEntity" (the goob gun's
-	// glob burst); its game code read that key only
-	impactEntity				= spawnArgs.GetString("def_impactEntity", spawnArgs.GetString("impactEntity",""));
+	// glob burst); its game code read that key only. Network play keeps the
+	// multiplayer library's def_impactEntity alone.
+	impactEntity				= gameLocal.isMultiplayer ? spawnArgs.GetString("def_impactEntity","")
+		: spawnArgs.GetString("def_impactEntity", spawnArgs.GetString("impactEntity",""));
 	numImpactEntities			= spawnArgs.GetInt("numImpactEntities","0");
 	ieMinPitch					= spawnArgs.GetInt("ieMinPitch","0");
 	ieMaxPitch					= spawnArgs.GetInt("ieMaxPitch","0");
@@ -1300,8 +1302,8 @@ read at launch and again after a restore, so they are not saved.
 */
 void idProjectile::ReadStickSettings( void ) {
 	// openQ4: The Awakening's spike sets "applyRotation" "0" to keep its
-	// launch orientation
-	applyRotation		= spawnArgs.GetBool( "applyRotation", "1" );
+	// launch orientation; network play always turns, as the multiplayer library did
+	applyRotation		= gameLocal.isMultiplayer || spawnArgs.GetBool( "applyRotation", "1" );
 	sticky				= spawnArgs.GetBool( "sticky" );
 	passThroughActors	= spawnArgs.GetBool( "passThroughActors" );
 	maxPinDistance		= spawnArgs.GetFloat( "maxPinDistance", "0" );
@@ -1431,10 +1433,13 @@ openQ4: "impactForce" pushes whatever the projectile hits along its flight,
 as The Awakening's game code did (the spike gun knocks bodies back towards
 the wall it pins them to). An articulated figure takes the push on the body
 that was hit, anything else at the middle of its bounds. No retail def sets
-the key.
+the key. Campaign only: the multiplayer library never read it.
 ================
 */
 void idProjectile::ApplyImpactForce( idEntity *ent, const trace_t &collision, const idVec3 &dir ) {
+	if ( gameLocal.isMultiplayer ) {
+		return;
+	}
 	const float force = spawnArgs.GetFloat( "impactForce", "0" );
 	if ( force == 0.0f || ent == NULL || ent == gameLocal.world || gameLocal.isClient ) {
 		return;
