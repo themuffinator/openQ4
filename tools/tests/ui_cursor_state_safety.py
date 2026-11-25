@@ -42,22 +42,39 @@ def main() -> None:
     for token in (
         "!std::isfinite( cursorX )",
         "!std::isfinite( cursorY )",
-        "std::isfinite( desktop->forceAspectWidth )",
-        "std::isfinite( desktop->forceAspectHeight )",
-        "std::isfinite( xExpand ) && xExpand >= 0.0f",
-        "std::isfinite( yExpand ) && yExpand >= 0.0f",
+        "GetCursorBounds( minX, minY, maxX, maxY );",
         "idMath::ClampFloat( minX, maxX, cursorX )",
         "idMath::ClampFloat( minY, maxY, cursorY )",
     ):
         require(clamp_cursor, token, "GUI cursor normalization")
+    bounds = between(source, "void idUserInterfaceLocal::GetCursorBounds(", "void idUserInterfaceLocal::ClampCursor( void )")
+    for token in (
+        "std::isfinite( desktop->forceAspectWidth )",
+        "std::isfinite( desktop->forceAspectHeight )",
+        "std::isfinite( xExpand ) && xExpand >= 0.0f",
+        "std::isfinite( yExpand ) && yExpand >= 0.0f",
+    ):
+        require(bounds, token, "GUI cursor bounds")
     # A menu's widescreen bounds must not depend on the aspect mode the shared
     # device context was last drawn with (PR #173).
-    require(clamp_cursor, "dc.GetAspectCorrectedScreenExpansion( maxX, maxY, xExpand, yExpand )", "menu cursor widescreen bounds")
-    if "dc.GetVirtualScreenExpansion(" in clamp_cursor:
+    require(bounds, "dc.GetAspectCorrectedScreenExpansion( maxX, maxY, xExpand, yExpand )", "menu cursor widescreen bounds")
+    if "dc.GetVirtualScreenExpansion(" in bounds:
         raise AssertionError("menu cursor bounds read the shared device context's last-drawn aspect mode")
     device_context = read("src/ui/DeviceContext.cpp")
     corrected = between(device_context, "void idDeviceContext::GetAspectCorrectedScreenExpansion", "\n}\n")
     require(corrected, "windowWidth, windowHeight, true, xExpand, yExpand", "aspect-corrected expansion helper")
+
+    # A menu GUI's cursor starts at the canvas's top-left corner, not at 0,0 of
+    # the centred 4:3 virtual screen, until something places it.
+    require(header, "bool						cursorPlaced = false;", "GUI cursor placement flag")
+    require(set_cursor, "cursorPlaced = true;", "GUI absolute cursor placement")
+    activate = between(source, "const char *idUserInterfaceLocal::Activate(", "void idUserInterfaceLocal::Trigger(")
+    for token in (
+        "activate && !cursorPlaced && desktop != NULL && ( desktop->GetFlags() & WIN_MENUGUI )",
+        "GetCursorBounds( minX, minY, maxX, maxY );",
+        "SetCursor( minX, minY );",
+    ):
+        require(activate, token, "menu cursor canvas-origin start")
 
     demo_restore = between(source, "void idUserInterfaceLocal::ReadFromDemoFile", "void idUserInterfaceLocal::WriteToDemoFile")
     require(demo_restore, "SetCursor( restoredCursorX, restoredCursorY );", "GUI demo cursor restore")

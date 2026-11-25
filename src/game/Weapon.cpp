@@ -1989,6 +1989,14 @@ void rvWeapon::Think ( void ) {
 	if ( worldModel && worldModel->GetRenderEntity() ) {
 		const int suppressShadowLightId = GetFirstPersonShadowSuppressLightId();
 
+		// openQ4 (#237): the gun in the player's hands asks for noSelfShadow as
+		// the body and head do (idPlayer::Spawn), so r_shadowMapCharacterSelfShadow
+		// promotes neither.  Without it the skinned gun alone cast onto
+		// noSelfShadow props such as crates while the body holding it did not,
+		// and it could shadow the view weapon.  Set here as well as in
+		// InitWorldModel so a world model restored from a save follows the rule.
+		worldModel->GetRenderEntity()->noSelfShadow = true;
+
 		// always show your own weapon
 		if( owner->entityNumber == gameLocal.localClientNum ) {
 			worldModel->GetRenderEntity()->suppressLOD = 1;
@@ -2107,6 +2115,8 @@ void rvWeapon::InitWorldModel( void ) {
 		worldModelRenderEntity = ent->GetRenderEntity();
 		if ( worldModelRenderEntity ) {
 			worldModelRenderEntity->suppressSurfaceInViewID = owner->entityNumber+1;
+			// openQ4 (#237): the gun keeps its owner's shadow rule (see Think)
+			worldModelRenderEntity->noSelfShadow = true;
 			worldModelRenderEntity->suppressShadowInViewID = owner->entityNumber+1;
 			worldModelRenderEntity->suppressShadowInLightID = GetFirstPersonShadowSuppressLightId();
 			if ( gameLocal.isMultiplayer ) {

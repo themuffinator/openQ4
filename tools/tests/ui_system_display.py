@@ -427,6 +427,26 @@ int main() {
     assert(!BuildDisplayRequest(changed,actual,dense,plan,error));
     changed["r_mode"]=-2.0;dense.displays[1].desktop={3840,2160,60};assert(BuildDisplayRequest(changed,actual,dense,plan,error) && plan.request.parms.width==3840);
     changed["r_fullscreenDesktop"]=true;assert(BuildDisplayRequest(changed,actual,topology,plan,error) && plan.expected.fullscreenDesktop);Portable(plan,topology);
+    // A notched MacBook's fullscreen Space leaves out the strip beside the
+    // camera, so its desktop fullscreen window is shorter than the display
+    // (#260). Its restore is captured, and a request accepts that window, but
+    // never one larger than the desktop mode.
+    {SystemDisplayTopology mac;mac.primary=1;mac.absolutePlacement=true;
+     SystemDisplayDescriptor d;d.id=1;d.name="Built-in Retina Display";d.width=1728;d.height=1117;d.desktop={3456,2234,120};
+     d.modes={{3456,2234,120},{2880,1864,120}};mac.displays.push_back(d);
+     auto notch=Actual();auto& w=notch.window;w.displayId=1;w.displayIndex=0;w.windowX=w.windowY=0;w.fullscreen=w.fullscreenDesktop=true;
+     w.logicalWidth=1728;w.logicalHeight=1084;w.pixelWidth=3456;w.pixelHeight=2168;
+     w.modeWidth=1728;w.modeHeight=1117;w.modePixelWidth=3456;w.modePixelHeight=2234;w.refreshRate=120;
+     w.displayScale=w.pixelDensityX=w.pixelDensityY=w.modePixelDensity=2;
+     SystemDisplayPlan held;assert(BuildDisplayRestore(notch,mac,held,error) && MatchesDisplay(held,notch,error));
+     StateValues saved;assert(CaptureDisplayRecovery(held,mac,saved,error));Portable(held,mac);
+     auto desktop=values;desktop["r_fullscreen"]=true;desktop["r_fullscreenDesktop"]=true;
+     SystemDisplayPlan request;assert(BuildDisplayRequest(desktop,notch,mac,request,error) && request.expected.fullscreenDesktop);
+     assert(MatchesDisplay(request,notch,error));
+     auto whole=notch;whole.window.pixelHeight=2234;whole.window.logicalHeight=1117;assert(MatchesDisplay(request,whole,error));
+     auto taller=notch;taller.window.pixelHeight=2236;assert(!MatchesDisplay(request,taller,error));
+     auto wider=notch;wider.window.pixelWidth=3458;assert(!MatchesDisplay(request,wider,error));
+     auto larger=held;larger.request.parms.height=2236;larger.expected.pixelHeight=2236;assert(!CaptureDisplayRecovery(larger,mac,saved,error));}
     changed["r_multiScreen"]=1.0;assert(BuildDisplayRequest(changed,actual,topology,plan,error));
     assert(plan.request.spanDisplays && !plan.expected.fullscreen && plan.expected.borderless && plan.expected.logicalWidth==3840 && plan.expected.windowX==0);
     Portable(plan,topology);assert(!BuildDisplayRequest(changed,actual,wayland,plan,error));

@@ -115,6 +115,8 @@ static bool RB_ComputeScaledSceneSize(const viewDef_t*,int& w,int& h){w=640;h=36
 static bool R_TemporalPresentation_TemporalAARequested(){return temporal;}
 static bool R_TemporalPresentation_ScreenSpaceEffectsRequested(){return effects;}
 static bool R_ModernGLExecutor_ModernVisibleRequestedForPost(){return modern;}
+static bool textureMSAA=true;
+bool R_GLMultisampleTexturesAvailable(){return textureMSAA;}
 static idImage sceneColor,sceneDepth,*rbSceneColorImage=nullptr,*rbSceneDepthStencilImage=nullptr;
 static RenderTexture sceneTexture,*rbSceneRenderTexture=nullptr;
 static int rbSceneRenderTextureSamples=0,rbBackendTemporalHistoryFrame=0,rbSceneRenderTargetClearedFrame=0;
@@ -159,6 +161,11 @@ int main(){
     sampleBuffers=1;samples=4;r_multiSamples.value=0;SDL3_RecordDisplayParameters();
     blits=copies=readPixels=0;assert(depthCopy.CopyDepthbuffer(0,0,32,32));assert(blits==1 && copies==0 && readPixels==0);
     assert(RB_EnsureSceneRenderTexture(&view));assert(sceneColor.opts.numMSAASamples==4 && sceneDepth.opts.numMSAASamples==4);
+    // A context without multisample textures (macOS's GL 2.1 legacy context,
+    // whose window carries MSAA) keeps the target single-sample, so the images
+    // equal the request and are not reallocated every frame (#257).
+    textureMSAA=false;assert(RB_EnsureSceneRenderTexture(&view));
+    assert(sceneColor.opts.numMSAASamples==0 && sceneDepth.opts.numMSAASamples==0);textureMSAA=true;
     sampleBuffers=0;samples=8;r_multiSamples.value=8;SDL3_RecordDisplayParameters();
     blits=copies=0;assert(depthCopy.CopyDepthbuffer(0,0,32,32));assert(copies==1 && blits==0);
     assert(RB_EnsureSceneRenderTexture(&view));assert(sceneColor.opts.numMSAASamples==0);

@@ -8306,6 +8306,22 @@ def validate_point_cache_parity_and_receiver_cost_contract() -> None:
         "if ( !material->TestMaterialFlag( MF_NOSELFSHADOW ) ) { return false; }",
         "a material without noSelfShadow never takes its ownership",
     )
+    # #237: the world gun in a player's hands asks for the entity-level
+    # noSelfShadow its owner's body and head ask for, or the self-shadow
+    # option promotes the gun alone onto noSelfShadow props.
+    weapon = read("src/game/Weapon.cpp")
+    require(
+        braced_body(weapon, "void rvWeapon::InitWorldModel( void ) {", "world model setup"),
+        "worldModelRenderEntity->noSelfShadow = true;",
+        "a player's world gun keeps its owner's noSelfShadow rule when it is set up",
+    )
+    require(
+        braced_body(weapon, "void rvWeapon::Think ( void ) {", "weapon think"),
+        "worldModel->GetRenderEntity()->noSelfShadow = true;",
+        "a player's world gun keeps its owner's noSelfShadow rule after a restore",
+    )
+    require(read("src/game/Player.cpp"), "renderEntity.noSelfShadow = true;",
+        "a player's body keeps the entity-level noSelfShadow rule")
     require_compact(
         read("src/game/gamesys/SysCvar.cpp"),
         """return cvarSystem->GetCVarBool( "r_useShadowMap" )

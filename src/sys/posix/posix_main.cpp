@@ -475,6 +475,9 @@ static sysEventDispositionTag_t eventDispositionTags[MAX_QUED_EVENTS];
 static std::uint64_t eventRetirementSerials[MAX_QUED_EVENTS];
 static std::uint64_t eventRetirementHighwater = 0; // Never reset by clear/rebind.
 static int eventHead, eventTail;
+// openQ4: events the current overflow burst has dropped; it ends when the
+// queue drains (Sys_GetEvent), which reports the count.
+static int eventOverflowDropped = 0;
 
 // Only pending queue entries own their payload. Dequeued slots may still hold
 // a pointer whose ownership has already transferred to the event consumer.
@@ -505,7 +508,11 @@ void Posix_QueEvent( sysEventType_t type, int value, int value2,
 	ev = &eventQue[eventHead & MASK_QUED_EVENTS];
 	if (eventHead - eventTail >= MAX_QUED_EVENTS) {
 		Sys_InvalidateEventQueue();
-		common->Printf( "Posix_QueEvent: overflow\n" );
+		// openQ4: one line per burst rather than per event; a stalled frame can
+		// drop hundreds, and printing each one made the stall longer
+		if ( eventOverflowDropped++ == 0 ) {
+			common->Printf( "Posix_QueEvent: overflow, dropping the oldest events\n" );
+		}
 		// we are discarding an event, but don't leak memory
 		// TTimo: verbose dropped event types?
 		Sys_DiscardQueuedEvent( *ev );
@@ -607,6 +614,10 @@ sysEvent_t Sys_GetEvent(void) {
 		}
 		eventTail++;
 		return eventQue[(eventTail - 1) & MASK_QUED_EVENTS];
+	}
+	if ( eventOverflowDropped > 0 ) {
+		common->Printf( "Posix_QueEvent: overflow dropped %d events\n", eventOverflowDropped );
+		eventOverflowDropped = 0;
 	}
 	// return the empty event with the current time
 	memset(&ev, 0, sizeof(ev));

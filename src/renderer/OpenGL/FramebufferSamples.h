@@ -9,6 +9,11 @@ bool R_WindowCarriesMultisampling( void );
 // gl_RenderTexture.cpp: the colour samples of the stand-in for the window, 0 for
 // a single-sample one or none.
 int R_DefaultRenderTargetSamples( void );
+// gl_Image.cpp: this context can allocate multisample textures, the test
+// idImage::AllocImage makes before it allocates one. GLEW cannot answer it:
+// macOS resolves the GL 3.2 entry points for its GL 2.1 legacy context, which
+// has none, while its window can still carry MSAA.
+bool R_GLMultisampleTexturesAvailable( void );
 
 // Include after tr_local.h. Returns -1 when the context is unavailable. A
 // render texture's samples belong to that image and must be queried separately.

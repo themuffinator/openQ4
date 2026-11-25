@@ -53,6 +53,7 @@ GLES module through the same branches rather than duplicating them.
 #define OPENQ4_GL_SWIZZLED_LEGACY_FORMATS 1
 #endif
 #include "../GLPixelTransferScope.h"
+#include "FramebufferSamples.h"
 
 // RGBA16F images (the backend-owned temporal history) read back clamped to
 // [0,1], which glGetTexImage does when asked for unsigned bytes.
@@ -570,6 +571,13 @@ void idImage::RefreshSamplerState() {
 	SetTexParameters();
 }
 
+// Declared in FramebufferSamples.h: the one test for multisample textures, so
+// a target that would ask for them can stay single-sample instead.
+bool R_GLMultisampleTexturesAvailable( void ) {
+	return glTexImage2DMultisample != NULL && ( glConfig.backendCaps.glVersion >= 3.2f ||
+		GLCapabilityProbe_HasExtension( "GL_ARB_texture_multisample" ) );
+}
+
 /*
 ========================
 idImage::AllocImage
@@ -791,8 +799,7 @@ void idImage::AllocImage() {
 	int uploadTarget;
 	bool wantsMSAA = ( opts.textureType == TT_2D && opts.numMSAASamples > 0 );
 	if ( wantsMSAA ) {
-		if ( glTexImage2DMultisample == NULL || !( glConfig.backendCaps.glVersion >= 3.2f ||
-			GLCapabilityProbe_HasExtension( "GL_ARB_texture_multisample" ) ) ) {
+		if ( !R_GLMultisampleTexturesAvailable() ) {
 			R_ImagePolicyObserveError( "Requested GL image capability is unsupported" );
 			common->Warning( "MSAA textures not supported, disabling for %s", GetName() );
 			opts.numMSAASamples = 0;
