@@ -20,7 +20,7 @@ Android has no dedicated-server target. Desktop defaults remain unchanged.
 Meson is the engine's build entry point on Android as on desktop. The port's
 older standalone engine CMake file is superseded by the current Meson source
 lists, generated version/savegame headers and renderer/game export maps.
-The engine embeds BSE and each game mode keeps its own idlib archive.
+The engine embeds BSE, and the game module links its own idlib archive.
 
 The [standalone Android application](../../mobile/android/README.md) packages
 these native outputs using Gradle and SDLActivity. It supports ordinary SDL
