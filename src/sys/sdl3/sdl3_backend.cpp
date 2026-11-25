@@ -8835,8 +8835,9 @@ static bool SDL3_WindowServices_ApplyScreenParmsStrict(const renderWindowRequest
 		actual.pixelWidth != parms.width || actual.pixelHeight != parms.height ||
 		(parms.displayHz > 0 && std::floor(actual.refreshRate + 0.5f) != parms.displayHz)))
 		return SDL3_StrictWindowFailure("Observed exclusive display mode does not match the request",error,errorSize);
+	// The window itself may be smaller than the display, as on a notched MacBook.
 	if (desktopFullscreen && (!actual.currentModeValid || actual.modePixelWidth != desktopPixelWidth || actual.modePixelHeight != desktopPixelHeight ||
-		actual.pixelWidth != desktopPixelWidth || actual.pixelHeight != desktopPixelHeight))
+		!openq4::DesktopFullscreenPixelsFit(actual.pixelWidth,actual.pixelHeight,desktopPixelWidth,desktopPixelHeight)))
 		return SDL3_StrictWindowFailure("Observed desktop fullscreen mode does not match the display",error,errorSize);
 	win32.cdsFullscreen = parms.fullScreen;
 	SDL3_SetFullscreenState(parms.fullScreen);

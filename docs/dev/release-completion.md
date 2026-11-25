@@ -12,6 +12,21 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Graphics presets apply in fullscreen on notched MacBooks, 25 November 2026
+
+- **Changing a preset or display setting no longer stops at "Settings need
+  attention" on a MacBook with a notch** (#260). In fullscreen, macOS keeps
+  the strip beside the camera out of the game's window, so a 16-inch MacBook
+  Pro's 3456x2234 display gives a 3456x2168 window. Before applying anything,
+  openQ4 records the current display so it can put it back, and that record
+  required a fullscreen window exactly the display's size, so every change
+  was refused. A desktop fullscreen window may now be smaller than its
+  display, never larger, in that record, in the check after a change, and in
+  the window service. Evidence: the reporter's 0.15.0 log
+  (`Recorded display mode does not match available exact pixel modes`);
+  `ui_system_display.py` models that display and fails without the fix;
+  `sdl3_strict_window.py` passes. Not yet run on a Mac.
+
 ## One game module for single-player and multiplayer, 24 November 2026
 
 - **One game file serves the campaign and multiplayer.** openQ4 built its game
