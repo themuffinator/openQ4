@@ -12,6 +12,25 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The briefing hologram hides the squad's uniform patches, 25 November 2026
+
+- **The rank patches and badges on the marines' uniforms no longer show
+  through the reconnaissance briefing hologram on the MCC** (#256). The
+  hologram is a see-through screen in front of the squad, and Quake 4 draws
+  screens like it before decals. Raven's own map script works around that: when
+  the hologram starts, it moves the uniform decals ahead of the screen
+  (`sys.setMatSort ... SS_PREGUI`), and puts them back when the table closes.
+  An early port had disabled that sort in the campaign, and the unified game
+  module carried it over as multiplayer-only, so in single-player the script
+  was ignored and the patches drew on top of the hologram on every renderer.
+  `setMatSort` now applies every sort it names in both modes, as the Quake 4
+  SDK does.
+- Evidence: the briefing played through its own cinematic camera on Windows
+  shows the patches over the hologram before the fix and behind it after, on
+  OpenGL and Vulkan. The retail decompile draws GUIs before decals in one
+  ordered pass, so the script's re-sort is what keeps retail correct.
+  `script_set_mat_sort_contract.py` pins the mapping. Not yet run on a Mac.
+
 ## Maps compiled with dmap keep their sky, 25 November 2026
 
 - **A map rebuilt with openQ4's `dmap` no longer has a black sky** (#255).

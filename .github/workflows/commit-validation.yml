@@ -191,6 +191,7 @@ jobs:
             tools/tests/console_completion_contract.py \
             tools/tests/console_input_contract.py \
             tools/tests/arb_color_zero_floor_contract.py \
+            tools/tests/script_set_mat_sort_contract.py \
             tools/tests/renderer_show_shadows_color_contract.py \
             tools/tests/renderer_md5r_conversion_contract.py \
             tools/tests/competitive_match_layer.py \
@@ -836,6 +837,7 @@ jobs:
           python tools/tests/console_completion_contract.py
           python tools/tests/console_input_contract.py
           python tools/tests/arb_color_zero_floor_contract.py
+          python tools/tests/script_set_mat_sort_contract.py
           python tools/tests/renderer_show_shadows_color_contract.py
           python tools/tests/renderer_md5r_conversion_contract.py
           python tools/tests/competitive_match_layer.py
