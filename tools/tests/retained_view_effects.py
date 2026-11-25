@@ -15,7 +15,23 @@ SUPPORT = r'''
 #include <map>
 #include <string>
 template<class T> T Max(T a,T b){return std::max(a,b);}
-struct idMath {static float ClampFloat(float a,float b,float v){return std::clamp(v,a,b);}};
+template<class T> T Min(T a,T b){return std::min(a,b);}
+struct idMath {
+ static float ClampFloat(float a,float b,float v){return std::clamp(v,a,b);}
+ static float Exp(float f){return std::exp(f);}
+};
+// idlib's vector and matrix, reduced to what the lens uses (idVec3 * idVec3 is the dot product).
+struct idVec3 {
+ float x=0,y=0,z=0;
+ idVec3 operator-(const idVec3&o)const{return {x-o.x,y-o.y,z-o.z};}
+ float operator*(const idVec3&o)const{return x*o.x+y*o.y+z*o.z;}
+};
+struct idMat3 {
+ idVec3 mat[3]{{1,0,0},{0,1,0},{0,0,1}};
+ const idVec3& operator[](int i)const{return mat[i];}idVec3& operator[](int i){return mat[i];}
+};
+// RenderWorld.h renderView_t: the fields the view effects read.
+struct renderView_t {idVec3 vieworg;idMat3 viewaxis;bool asymmetricFov=false;};
 struct idStr {
  std::string s; idStr(const char* v):s(v){}
  void StripFileExtension(){auto i=s.rfind('.');if(i!=s.npos)s.resize(i);}
@@ -29,7 +45,9 @@ struct Vehicle {const char* GetName()const{return "mcc2_playerBed";}};
 struct Controller {Vehicle vehicle;Vehicle* GetVehicle(){return &vehicle;}};
 struct Player {
  int health=100;bool spectating=false,inBed=false;float wheel=0;Controller controller;
+ bool guiFocus=false;idVec3 guiPoint; // Player.h: focusType == FOCUS_GUI with focusUI, at focusGuiPoint
  float GetWeaponWheelBlend(){return wheel;}bool IsInVehicle(){return inBed;}
+ bool GetFocusGuiPoint(idVec3& point)const{if(!guiFocus)return false;point=guiPoint;return true;}
  Controller& GetVehicleController(){return controller;}
 };
 struct Game {
@@ -53,21 +71,32 @@ struct Manager {
  void DeAlloc(idUserInterface*g){++frees;delete g;}
 } manager;
 auto* uiManager=&manager;
-const int VIEW_DOF_FOCUS_VIEW_WEAPON=1;
-struct renderViewDepthOfField_t {float amount=0;int flags=0;float focusDistance=0,fStop=2.8f,focalLength=0,focusRange=0,maxBlur=0;};
+// RenderSystem.h, as declared there.
+static const int VIEW_DOF_FOCUS_VIEW_WEAPON = 1 << 0;
+static const int VIEW_DOF_SHARP_VIEW_WEAPON = 1 << 1;
+typedef struct renderViewDepthOfField_s {
+ float amount = 0.0f;
+ int flags = 0;
+ float focusDistance = 0.0f;
+ float fStop = 2.8f;
+ float focalLength = 0.0f;
+ float focusRange = 0.0f;
+ float maxBlur = 0.0f;
+} renderViewDepthOfField_t;
 struct RenderSystem {
- bool available=true;float amount=-1;int flags=0;float focus=0;
- bool SetViewDepthOfField(const renderViewDepthOfField_t& d){amount=d.amount;flags=d.flags;focus=d.focusDistance;return d.amount<=.001f||available;}
+ bool available=true;float amount=-1;int flags=0;float focus=0;renderViewDepthOfField_t last;
+ bool SetViewDepthOfField(const renderViewDepthOfField_t& d){last=d;amount=d.amount;flags=d.flags;focus=d.focusDistance;return d.amount<=.001f||available;}
 } renderer;
 auto* renderSystem=&renderer;
 struct idPlayerView {
  Player* player=nullptr;idUserInterface* presentationFx=nullptr;
  int deathFxStart=-1,recoveryFxUntil=0,crashFxStart=-1,crashFxDuration=0;
  bool recoverySequence=false,crashFxClosing=false,wheelSceneFocus=false;
+ float guiFocusBlend=0,guiFocusDistance=0;int guiFocusTime=-1;
  ~idPlayerView();void ResetRetainedViewEffects();void RetainedRecoveryFade(const idVec4&,int);
  void ResetSubtitles(){} // subtitle state is covered by audio_subtitles.py
  void DrawRetainedViewEffects(bool wheelOnly=false);
- void RequestRetainedWheelFocus(bool allowed,bool headset,const renderViewDepthOfField_t& scene);
+ void RequestViewDepthOfField(bool allowed,const renderView_t& view,const renderViewDepthOfField_t& scene);
  float value(const char*k){return presentationFx?presentationFx->state[k]:0;}
 };
 '''
@@ -85,19 +114,68 @@ int main(){
  assert(v.value("wheel_blur")==1);
  // The renderer's depth of field focuses the view weapon in place of the blur.
  const renderViewDepthOfField_t none{};renderViewDepthOfField_t lens{};lens.amount=.5f;lens.focusDistance=200;
- v.RequestRetainedWheelFocus(true,false,lens);v.DrawRetainedViewEffects(true);
+ renderView_t flat{},headset{};headset.asymmetricFov=true;
+ v.RequestViewDepthOfField(true,flat,lens);v.DrawRetainedViewEffects(true);
  assert(renderer.amount==1 && renderer.flags==VIEW_DOF_FOCUS_VIEW_WEAPON && v.wheelSceneFocus);
  assert(v.value("wheel_amount")==1 && v.value("wheel_blur")==0);
  // A headset eye, a declined pass or a hidden view keeps the blur and asks for nothing.
- v.RequestRetainedWheelFocus(true,true,lens);v.DrawRetainedViewEffects(true);
+ v.RequestViewDepthOfField(true,headset,lens);v.DrawRetainedViewEffects(true);
  assert(renderer.amount==0 && !v.wheelSceneFocus && v.value("wheel_blur")==1);
- renderer.available=false;v.RequestRetainedWheelFocus(true,false,none);v.DrawRetainedViewEffects(true);
+ renderer.available=false;v.RequestViewDepthOfField(true,flat,none);v.DrawRetainedViewEffects(true);
  assert(renderer.amount==1 && !v.wheelSceneFocus && v.value("wheel_blur")==1);
- renderer.available=true;v.RequestRetainedWheelFocus(false,false,none);assert(renderer.amount==0 && !v.wheelSceneFocus);
+ renderer.available=true;v.RequestViewDepthOfField(false,flat,none);assert(renderer.amount==0 && !v.wheelSceneFocus);
  // With the wheel closed a map script's lens goes through untouched.
- p.wheel=0;v.RequestRetainedWheelFocus(true,false,lens);
+ p.wheel=0;v.RequestViewDepthOfField(true,flat,lens);
  assert(renderer.amount==.5f && renderer.flags==0 && renderer.focus==200 && !v.wheelSceneFocus);
- p.wheel=1;
+ {
+  // A focused in-world screen becomes the focus plane of a thin 50 mm f/2 lens.
+  // It runs on game time, in steps of at most 100 ms, and wins over a script's lens.
+  renderViewDepthOfField_t script{};script.amount=.7f;script.focusDistance=500;script.fStop=8;
+  const auto near=[](float a,float b,float e){return std::fabs(a-b)<=e;};
+  const auto isScript=[&]{const auto& d=renderer.last;return d.amount==.7f && d.flags==0 && d.focusDistance==500 && d.fStop==8;};
+  const auto isScreen=[&]{const auto& d=renderer.last;return d.flags==VIEW_DOF_SHARP_VIEW_WEAPON && d.focalLength==50 && d.fStop==2 && d.maxBlur==12;};
+  const auto step=[&](int ms,const renderView_t& view=renderView_t{}){gameLocal.time+=ms;v.RequestViewDepthOfField(true,view,script);};
+  step(0);assert(isScript() && !v.wheelSceneFocus);
+  // The screen is 100 units down the view axis; the sideways offset does not count.
+  p.guiFocus=true;p.guiPoint={100,30,0};step(0);assert(isScript());
+  step(50);step(50);const float early=renderer.last.amount;assert(isScreen() && early>0 && early<.5f);
+  step(0);assert(renderer.last.amount==early); // a paused game holds the lens
+  step(50);step(50);assert(isScreen() && renderer.last.amount>.85f && renderer.last.amount<.95f);
+  step(50);assert(isScreen() && renderer.last.amount>.999f && !v.wheelSceneFocus); // in over 0.25 s
+  assert(near(renderer.last.focusDistance,100,.001f) && renderer.last.focusRange==24); // 0.3 x 100, clamped to 24
+  // Focus pulls toward a new distance instead of jumping, and the kept-sharp range follows it.
+  p.guiPoint={50,0,0};step(100);assert(renderer.last.focusDistance>50.5f && renderer.last.focusDistance<99);
+  for(int i=0;i<30;++i)step(100);
+  assert(near(renderer.last.focusDistance,50,.01f) && near(renderer.last.focusRange,15,.01f));
+  p.guiPoint={10,0,0};for(int i=0;i<30;++i)step(100);
+  assert(near(renderer.last.focusDistance,10,.01f) && renderer.last.focusRange==8); // clamped to 8
+  // Distance is measured from the eye along its axis, never closer than 4 units.
+  renderView_t moved{};moved.vieworg={-30,0,0};for(int i=0;i<30;++i)step(100,moved);
+  assert(near(renderer.last.focusDistance,40,.01f) && near(renderer.last.focusRange,12,.01f));
+  p.guiPoint={-50,0,0};for(int i=0;i<30;++i)step(100);assert(near(renderer.last.focusDistance,4,.01f));
+  p.guiPoint={100,0,0};for(int i=0;i<30;++i)step(100);
+  // The weapon wheel wins over the screen; closing it hands focus straight back.
+  p.wheel=1;step(50);
+  assert(renderer.last.amount==1 && renderer.last.flags==VIEW_DOF_FOCUS_VIEW_WEAPON && renderer.last.focusDistance==0 && v.wheelSceneFocus);
+  p.wheel=0;step(50);assert(isScreen() && renderer.last.amount>.999f && !v.wheelSceneFocus);
+  // Looking away eases it out over 0.4 s, after which the script's lens returns.
+  p.guiFocus=false;for(int i=0;i<4;++i)step(50);
+  assert(isScreen() && near(renderer.last.amount,.5f,.02f) && near(renderer.last.focusDistance,100,.01f));
+  for(int i=0;i<3;++i)step(50);assert(isScreen() && renderer.last.amount>0);
+  step(50);step(50);assert(isScript());
+  // A long frame advances it by at most 100 ms.
+  p.guiFocus=true;step(1000);assert(isScreen() && near(v.guiFocusBlend,.4f,.001f));
+  for(int i=0;i<3;++i)step(100);assert(renderer.last.amount>.999f);
+  // A headset view drops it at once and asks for no depth of field at all.
+  step(50,headset);assert(renderer.last.amount==0 && v.guiFocusBlend==0);
+  step(50);assert(isScreen() && renderer.last.amount<.2f); // and it eases in again afterwards
+  for(int i=0;i<5;++i)step(50);
+  // A spectator, or a view that declines the effects, gets no screen lens: the script's passes.
+  p.spectating=true;step(50);assert(isScript() && v.guiFocusBlend==0);p.spectating=false;
+  for(int i=0;i<5;++i)step(50);assert(isScreen());
+  gameLocal.time+=50;v.RequestViewDepthOfField(false,flat,script);assert(isScript() && v.guiFocusBlend==0);
+  p.guiFocus=false;step(50);assert(isScript());
+ }
  p.wheel=0;p.health=100;v.DrawRetainedViewEffects();assert(v.deathFxStart==-1);
  for(const char* setting:{"ui_retainedReducedMotion","ui_reducedFlashing"}){
   cv.values[setting]=true;p.health=0;v.DrawRetainedViewEffects();gameLocal.time+=320;v.DrawRetainedViewEffects();
@@ -133,7 +211,7 @@ int main(){
  gameLocal.camera=nullptr;gameLocal.map="game/mcc_2";p.inBed=true;v.RetainedRecoveryFade(white,2000);
  v.DrawRetainedViewEffects();assert(v.value("recovery_amount")==1 && v.value("crash_focus")==0);
  p.inBed=false;v.RetainedRecoveryFade(white,2000);assert(!v.recoverySequence);
- std::puts("retained view effects: death, wheel focus, accessibility, crash sequence, cleanup and treatment passed");
+ std::puts("retained view effects: death, wheel focus, screen focus, accessibility, crash sequence, cleanup and treatment passed");
 }
 '''
 
