@@ -63,8 +63,10 @@ static bool RB_ImageIsCurrentRender( const idImage *image ) {
 		return true;
 	}
 
+	// asked for every image of every stage drawn: every name it can match
+	// starts with the underscore of an engine-made image
 	const char *name = image->GetName();
-	if ( name == NULL ) {
+	if ( name == NULL || name[0] != '_' ) {
 		return false;
 	}
 
@@ -81,7 +83,7 @@ static bool RB_ImageIsCurrentDepth( const idImage *image ) {
 	}
 
 	const char *name = image->GetName();
-	if ( name == NULL ) {
+	if ( name == NULL || name[0] != '_' ) {
 		return false;
 	}
 
@@ -10643,11 +10645,16 @@ static void RB_ResolveSSAOWorldDepth( void ) {
 			|| rbSSAOWorldDepthPendingView != backEnd.viewDef || rbSSAOWorldDepthPendingFrame != backEnd.frameCount ) {
 		return;
 	}
-	// CopyDepthbuffer resolves from backEnd.renderTexture.
+	// CopyDepthbuffer resolves from backEnd.renderTexture; the scene target
+	// stays bound, and is what the copy has to leave bound.
 	idRenderTexture *sceneTarget = backEnd.renderTexture;
 	backEnd.renderTexture = rbSSAOWorldDepthRenderTexture;
+	backEnd.copyBoundTarget = sceneTarget;
+	backEnd.copyKeepsBoundTarget = true;
 	target->CopyDepthbuffer( rbSSAOWorldDepthPendingRect[0], rbSSAOWorldDepthPendingRect[1],
 		rbSSAOWorldDepthPendingRect[2], rbSSAOWorldDepthPendingRect[3] );
+	backEnd.copyKeepsBoundTarget = false;
+	backEnd.copyBoundTarget = NULL;
 	backEnd.renderTexture = sceneTarget;
 }
 

@@ -66,4 +66,7 @@ extern BOOL ( WINAPI * qwglRealizeLayerPalette)(HDC, int, BOOL);
 extern BOOL ( WINAPI * qwglSwapLayerBuffers)(HDC, UINT);
 #endif
 
+// OpenGL state the renderer set is answered without the driver (OpenGL module only)
+#include "GLQueryShadow.h"
+
 #endif

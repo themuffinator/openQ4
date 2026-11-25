@@ -308,9 +308,15 @@ typedef struct viewLight_s {
 	int						shadowMapPrelightStencilReadyMask;
 	const struct drawSurf_s	*translucentInteractions;	// get shadows from everything
 	// Front end only (Vulkan): the receiver scan of R_ShadowMapLightWillUseShadowMaps
-	// for this view, kept until one of the light's interactions changes state.
+	// for this view. An interaction of the light that changes state corrects it
+	// in place (R_ShadowMapReceiverScanChanged); the blocker is the interaction
+	// the scan stopped at when its verdict keeps the light on stencil.
 	bool					shadowMapReceiverScanValid;
 	bool					shadowMapReceiverScanAllowsMaps;
+	// r_shadowMapReceiverScanIncremental 2: the verdict a whole scan after every change gives
+	bool					shadowMapReceiverScanReferenceValid;
+	bool					shadowMapReceiverScanReferenceAllowsMaps;
+	const class idInteraction *shadowMapReceiverScanBlocker;
 	// The edge of this light's projected atlas tile in this view, set once the
 	// view's lights are final (R_ShadowMapAssignAtlasTiles) so every atlas light
 	// of the view fits. 0 for a point cube light or one that was not assigned;
@@ -950,6 +956,11 @@ typedef struct {
 	// whole-view copies since r_debugRenderToTexture 1 last reported them
 	int					c_copyFrameBuffer;
 	int					c_copyDepthBuffer;
+	// A copy reads backEnd.renderTexture. A caller that points that at a source
+	// it has not bound, for the length of one copy, names the target that stays
+	// bound here: it is what the copy puts back (idImage::CopyDepthbuffer).
+	bool				copyKeepsBoundTarget;
+	idRenderTexture *	copyBoundTarget;
 } backEndState_t;
 
 
@@ -1704,6 +1715,11 @@ extern idCVar r_shadowMapSkipStencilShadows;	// 1 = skip stencil volume generati
 bool R_ShadowMapLightWillUseShadowMaps( const idRenderLightLocal *lightDef, const bool applySubviewPolicy = true );
 // remembers, for the Vulkan receiver scan, whether the model an entity's interactions are built from has a surface only stencil can shadow
 void R_ShadowMapNoteEntityModel( idRenderEntityLocal *def, const idRenderModel *model );
+// an interaction of the light changed state, or (leavingList) is about to leave the light's list:
+// keeps the Vulkan receiver scan's verdict for the view current (tr_light.cpp)
+void R_ShadowMapReceiverScanChanged( const idRenderLightLocal *lightDef, const class idInteraction *inter, const bool leavingList );
+// rendererVulkanMemoryInfo: how the receiver scan's verdicts were reached since the last reset
+void R_ShadowMapReceiverScanPrintInfo( const bool reset );
 // sizes the projected atlas tiles of a finished view so its lights all fit (tr_light.cpp)
 void R_ShadowMapAssignAtlasTiles( viewDef_t *viewDef );
 // backend-published: shadow-map resources were successfully prepared this video generation (draw_arb2.cpp)

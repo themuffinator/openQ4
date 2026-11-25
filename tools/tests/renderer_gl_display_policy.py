@@ -31,7 +31,8 @@ struct Cvar {
     int value=0,writes=0;bool modified=false;
     int GetInteger()const{return value;}bool IsModified()const{return modified;}
     void ClearModified(){modified=false;}void SetInteger(int v){value=v;modified=true;++writes;}
-} r_swapInterval,r_multiSamples;
+} r_swapInterval,r_multiSamples,r_glCopyTargetState;
+using uint64=unsigned long long;
 static bool bypass=false,contextOkay=true,swapOkay=true,setOkay=true,readOkay=true,ignoreSet=false;
 static int interval=0,sampleBuffers=0,samples=0,setCalls=0,swaps=0;
 static int R_GetEffectiveSwapInterval(){return bypass?0:r_swapInterval.GetInteger();}
@@ -64,6 +65,9 @@ GL_CONSTANTS
 enum {TT_2D,TT_CUBIC,FMT_DEPTH,FMT_DEPTH_STENCIL,FMT_RGBA16F,TF_LINEAR,TF_NEAREST,TR_CLAMP,TD_DEFAULT,TD_DEPTH};
 static bool GLEW_EXT_framebuffer_blit=true,GLEW_ARB_framebuffer_object=false,GLEW_VERSION_3_0=false,GLEW_EXT_framebuffer_object=false;
 static GLint drawBinding=0,readBinding=0;
+// FPS-08: what a copy asks OpenGL for before it changes it (0x0405 is GL_BACK)
+static GLint readBufferState=0x0405,drawBufferState=0x0405;
+static int stateQueries=0;
 static GLuint r_copyDepthbufferFbo=0;
 static int blits=0,copies=0,readPixels=0;
 template<class T> struct idList {std::vector<T> values;void SetNum(int n,bool){values.resize(n);}T* Ptr(){return values.data();}};
@@ -78,18 +82,20 @@ struct idImage {
 static int msaaResolves=0;
 void R_CountMSAAResolve(bool){++msaaResolves;}
 struct RenderTexture {
-    idImage* depth=nullptr;int width=1280,height=720;
-    idImage* GetDepthImage(){return depth;}int GetDeviceHandle(){return 9;}
+    idImage* depth=nullptr;int width=1280,height=720,handle=9,colors=0;
+    idImage* GetDepthImage(){return depth;}int GetDeviceHandle(){return handle;}int GetNumColorImages()const{return colors;}
     int GetWidth(){return width;}int GetHeight(){return height;}
 };
-struct {RenderTexture* renderTexture=nullptr;int c_copyFrameBuffer=0;int c_copyDepthBuffer=0;} backEnd;
+using idRenderTexture=RenderTexture;
+struct {RenderTexture* renderTexture=nullptr;int c_copyFrameBuffer=0;int c_copyDepthBuffer=0;
+    bool copyKeepsBoundTarget=false;RenderTexture* copyBoundTarget=nullptr;} backEnd;
 template<class... T> void R_BindTextureForDirectAccess(T...){}
 template<class... T> void R_AllocateCopyTextureStorage(T...){}
 template<class... T> void glTexParameterf(T...){}
 static void glBindFramebuffer(GLenum target,GLuint buffer){if(target==GL_READ_FRAMEBUFFER)readBinding=buffer;else drawBinding=buffer;}
 static void glBindFramebufferEXT(GLenum,GLuint buffer){readBinding=drawBinding=buffer;}
-template<class... T> void glReadBuffer(T...){}
-template<class... T> void glDrawBuffer(T...){}
+static void glReadBuffer(GLenum buffer){readBufferState=(GLint)buffer;}
+static void glDrawBuffer(GLenum buffer){drawBufferState=(GLint)buffer;}
 template<class... T> void glFramebufferTexture2D(T...){}
 template<class... T> void glDisable(T...){}
 template<class... T> void glEnable(T...){}
@@ -106,6 +112,9 @@ static void glGetIntegerv(GLenum name,GLint* out){
     if(name==GL_SAMPLES)*out=drawBinding?16:samples;
     if(name==GL_DRAW_FRAMEBUFFER_BINDING || name==GL_FRAMEBUFFER_BINDING_EXT)*out=drawBinding;
     if(name==GL_READ_FRAMEBUFFER_BINDING)*out=readBinding;
+    if(name==GL_READ_BUFFER)*out=readBufferState;
+    if(name==GL_DRAW_BUFFER)*out=drawBufferState;
+    if(name==GL_DRAW_FRAMEBUFFER_BINDING || name==GL_READ_FRAMEBUFFER_BINDING || name==GL_READ_BUFFER || name==GL_DRAW_BUFFER)++stateQueries;
 }
 static void glGenFramebuffers(int,GLuint* out){*out=7;}
 static bool glIsEnabled(GLenum){return false;}
@@ -127,6 +136,7 @@ struct Images {
     }
 } images,*globalImages=&images;
 struct Renderer {
+    int glContextGeneration=0;
     void DestroyRenderTexture(RenderTexture*){}
     RenderTexture* CreateRenderTexture(idImage* color,idImage* depth){sceneTexture.depth=depth;sceneTexture.width=color->opts.width;sceneTexture.height=color->opts.height;return &sceneTexture;}
 } tr;
@@ -226,6 +236,184 @@ int main(){
     standInSamples=8;assert(R_DefaultFramebufferSamples()==8 && R_ViewFramebufferSamples()==8);
     standInSamples=-1;
     assert(!r_multiSamples.writes);
+    // FPS-08: a copy takes the state it has to put back from the target the back end has bound instead of
+    // asking OpenGL. A target is compared with OpenGL the first time it is seen; after that a copy asks nothing.
+    {
+        idImage copyDepth,boundDepth;RenderTexture bound;bound.depth=&boundDepth;bound.handle=21;bound.colors=1;
+        glConfig.isInitialized=true;GLEW_EXT_framebuffer_blit=true;backEnd.renderTexture=&bound;
+        const GLint first=(GLint)GL_COLOR_ATTACHMENT0;	// what a target with a colour image draws to and reads from
+        drawBinding=readBinding=21;readBufferState=drawBufferState=first;
+        r_glCopyTargetState.value=1;
+        stateQueries=0;blits=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(blits==1 && stateQueries==4);
+        assert(drawBinding==21 && readBinding==21 && readBufferState==first && drawBufferState==first);
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==0);
+        assert(drawBinding==21 && readBinding==21 && readBufferState==first && drawBufferState==first);
+        // a target without a colour image has none selected
+        RenderTexture depthOnly;depthOnly.depth=&boundDepth;depthOnly.handle=24;backEnd.renderTexture=&depthOnly;
+        drawBinding=readBinding=24;readBufferState=drawBufferState=(GLint)GL_NONE;
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==4);
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==0 && readBufferState==(GLint)GL_NONE && drawBufferState==(GLint)GL_NONE);
+        backEnd.renderTexture=&bound;drawBinding=readBinding=21;readBufferState=drawBufferState=first;
+        // A caller that reads a source it has not bound names the target that stays bound.
+        RenderTexture other;other.depth=&boundDepth;other.handle=22;
+        backEnd.renderTexture=&other;backEnd.copyBoundTarget=&bound;backEnd.copyKeepsBoundTarget=true;
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==0 && drawBinding==21 && readBinding==21);
+        backEnd.copyKeepsBoundTarget=false;backEnd.copyBoundTarget=nullptr;
+        // A target OpenGL disagrees about is asked from then on, and what OpenGL answered is what is put back.
+        drawBinding=21;readBinding=23;
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==4 && drawBinding==21 && readBinding==23);
+        drawBinding=readBinding=22;
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==4 && drawBinding==22 && readBinding==22);
+        // The trusted target is still not asked about, a new context forgets every target, and 0 always asks.
+        backEnd.renderTexture=&bound;drawBinding=readBinding=21;
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==0);
+        ++tr.glContextGeneration;
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==4);
+        r_glCopyTargetState.value=0;
+        stateQueries=0;assert(copyDepth.CopyDepthbuffer(0,0,32,32));assert(stateQueries==4 && drawBinding==21 && readBinding==21);
+        backEnd.renderTexture=nullptr;
+    }
+}
+'''
+
+# FPS-08: the OpenGL state query shadow (GLQueryShadow.h, tr_backend.cpp) against a counted driver.
+# The driver below keeps the same state the shadow tracks, with OpenGL's own rules for the
+# attribute stack, clamped viewports and rejected scissor sizes, and counts every query it answers.
+SHADOW_DRIVER = r'''
+#include <algorithm>
+#include <cassert>
+#include <cstdlib>
+#include <cstring>
+using GLenum=unsigned;using GLuint=unsigned;using GLint=int;using GLsizei=int;using GLboolean=unsigned char;
+using GLbitfield=unsigned;using GLclampf=float;using GLfloat=float;
+#define ID_INLINE inline
+template<class T> T Max(T a,T b){return std::max(a,b);}
+enum : unsigned {GL_FALSE=0,GL_TRUE=1,GL_POLYGON_BIT=0x8,GL_DEPTH_BUFFER_BIT=0x100,GL_STENCIL_BUFFER_BIT=0x400,GL_VIEWPORT_BIT=0x800,
+    GL_ENABLE_BIT=0x2000,GL_COLOR_BUFFER_BIT=0x4000,GL_SCISSOR_BIT=0x80000,GL_ALL_ATTRIB_BITS=0xFFFFFFFFu,
+    GL_CULL_FACE=0x0B44,GL_DEPTH_TEST=0x0B71,GL_STENCIL_TEST=0x0B90,GL_VIEWPORT=0x0BA2,GL_BLEND=0x0BE2,GL_SCISSOR_BOX=0x0C10,
+    GL_SCISSOR_TEST=0x0C11,GL_COLOR_CLEAR_VALUE=0x0C22,GL_MAX_VIEWPORT_DIMS=0x0D3A,GL_TEXTURE_2D=0x0DE1,GL_ARRAY_BUFFER_BINDING_ARB=0x8894};
+enum {CVAR_RENDERER=1,CVAR_INTEGER=2};
+struct idCmdSystem {template<int,int> static void ArgCompletion_Integer(){}};
+struct idCVar {
+    int value;
+    template<class... T> idCVar(const char*,const char* v,T...):value(std::atoi(v)){}
+    int GetInteger()const{return value;}
+};
+static int warnings=0,prints=0;
+struct Common {template<class... T> void Printf(const char*,T...){++prints;} template<class... T> void Warning(const char*,T...){++warnings;}} commonObject,*common=&commonObject;
+struct {int glContextGeneration=0;} tr;
+static bool cacheKnows=false;static unsigned cacheBuffer=0;static int cacheInvalidations=0;
+struct idVertexCache {
+    static bool BoundArrayBuffer(unsigned& vbo){if(!cacheKnows)return false;vbo=cacheBuffer;return true;}
+    static void InvalidateBufferBindings(){cacheKnows=false;++cacheInvalidations;}
+};
+// the driver
+struct DriverState {bool blend=false,scissorTest=false,stencil=false,cull=false,depth=false,texture=false;int scissor[4]={0,0,640,480},viewport[4]={0,0,640,480};float clear[4]={0,0,0,0};};
+static DriverState driver;static DriverState driverStack[64];static GLbitfield driverMask[64];static int driverDepth=0;
+static unsigned arrayBuffer=0;static int queries=0;
+static bool* driverEnable(GLenum cap){switch(cap){case GL_BLEND:return &driver.blend;case GL_SCISSOR_TEST:return &driver.scissorTest;
+    case GL_STENCIL_TEST:return &driver.stencil;case GL_CULL_FACE:return &driver.cull;case GL_DEPTH_TEST:return &driver.depth;default:return &driver.texture;}}
+static void glEnable(GLenum cap){*driverEnable(cap)=true;}
+static void glDisable(GLenum cap){*driverEnable(cap)=false;}
+static GLboolean glIsEnabled(GLenum cap){++queries;return *driverEnable(cap)?GL_TRUE:GL_FALSE;}
+static void glScissor(GLint x,GLint y,GLsizei w,GLsizei h){if(w<0||h<0)return;driver.scissor[0]=x;driver.scissor[1]=y;driver.scissor[2]=w;driver.scissor[3]=h;}
+static void glViewport(GLint x,GLint y,GLsizei w,GLsizei h){if(w<0||h<0)return;driver.viewport[0]=x;driver.viewport[1]=y;driver.viewport[2]=std::min(w,4096);driver.viewport[3]=std::min(h,2048);}
+static void glClearColor(GLclampf r,GLclampf g,GLclampf b,GLclampf a){const float in[4]={r,g,b,a};for(int i=0;i<4;++i)driver.clear[i]=std::min(1.0f,std::max(0.0f,in[i]));}
+static void glPushAttrib(GLbitfield mask){assert(driverDepth<64);driverMask[driverDepth]=mask;driverStack[driverDepth++]=driver;}
+static void glPopAttrib(){assert(driverDepth>0);const DriverState& s=driverStack[--driverDepth];const GLbitfield m=driverMask[driverDepth];
+    if(m&(GL_ENABLE_BIT|GL_COLOR_BUFFER_BIT))driver.blend=s.blend;
+    if(m&(GL_ENABLE_BIT|GL_SCISSOR_BIT))driver.scissorTest=s.scissorTest;
+    if(m&(GL_ENABLE_BIT|GL_STENCIL_BUFFER_BIT))driver.stencil=s.stencil;
+    if(m&(GL_ENABLE_BIT|GL_POLYGON_BIT))driver.cull=s.cull;
+    if(m&(GL_ENABLE_BIT|GL_DEPTH_BUFFER_BIT))driver.depth=s.depth;
+    if(m&GL_ENABLE_BIT)driver.texture=s.texture;
+    if(m&GL_SCISSOR_BIT)std::memcpy(driver.scissor,s.scissor,sizeof(s.scissor));
+    if(m&GL_VIEWPORT_BIT)std::memcpy(driver.viewport,s.viewport,sizeof(s.viewport));
+    if(m&GL_COLOR_BUFFER_BIT)std::memcpy(driver.clear,s.clear,sizeof(s.clear));}
+static void glGetIntegerv(GLenum name,GLint* out){
+    if(name==GL_MAX_VIEWPORT_DIMS){out[0]=4096;out[1]=2048;return;}	// asked once a context, not a state query of the frame
+    ++queries;
+    if(name==GL_SCISSOR_BOX)std::memcpy(out,driver.scissor,sizeof(driver.scissor));
+    else if(name==GL_VIEWPORT)std::memcpy(out,driver.viewport,sizeof(driver.viewport));
+    else if(name==GL_ARRAY_BUFFER_BINDING_ARB)out[0]=(GLint)arrayBuffer;
+    else out[0]=77;
+}
+static void glGetFloatv(GLenum name,GLfloat* out){++queries;if(name==GL_COLOR_CLEAR_VALUE)std::memcpy(out,driver.clear,sizeof(driver.clear));else out[0]=7.0f;}
+static void glGetBooleanv(GLenum,GLboolean* out){++queries;out[0]=GL_TRUE;}
+static GLenum glGetError(){++queries;return 0;}
+'''
+
+SHADOW_CASES = r'''
+static bool box(GLenum name,int a,int b,int c,int d){GLint v[4]={-1,-1,-1,-1};glGetIntegerv(name,v);return v[0]==a&&v[1]==b&&v[2]==c&&v[3]==d;}
+static bool clear(float r,float g,float b,float a){GLfloat v[4]={-1,-1,-1,-1};glGetFloatv(GL_COLOR_CLEAR_VALUE,v);return v[0]==r&&v[1]==g&&v[2]==b&&v[3]==a;}
+int main(){
+    // A new context: nothing is remembered, each value is asked for once and then known.
+    assert(r_glStateQueries.GetInteger()==1);
+    queries=0;assert(glIsEnabled(GL_BLEND)==GL_FALSE && queries==1);assert(glIsEnabled(GL_BLEND)==GL_FALSE && queries==1);
+    assert(box(GL_SCISSOR_BOX,0,0,640,480) && queries==2);assert(box(GL_SCISSOR_BOX,0,0,640,480) && queries==2);
+    assert(box(GL_VIEWPORT,0,0,640,480) && queries==3);assert(clear(0,0,0,0) && queries==4);assert(clear(0,0,0,0) && queries==4);
+    // What the renderer sets is answered without the driver.
+    queries=0;
+    glEnable(GL_SCISSOR_TEST);glEnable(GL_STENCIL_TEST);glEnable(GL_CULL_FACE);glEnable(GL_DEPTH_TEST);glEnable(GL_BLEND);glDisable(GL_STENCIL_TEST);
+    assert(glIsEnabled(GL_SCISSOR_TEST)==GL_TRUE && glIsEnabled(GL_STENCIL_TEST)==GL_FALSE && glIsEnabled(GL_CULL_FACE)==GL_TRUE
+        && glIsEnabled(GL_DEPTH_TEST)==GL_TRUE && glIsEnabled(GL_BLEND)==GL_TRUE);
+    glScissor(10,20,300,200);glViewport(5,6,1280,720);glClearColor(0.25f,0.5f,0.75f,1.0f);
+    assert(box(GL_SCISSOR_BOX,10,20,300,200) && box(GL_VIEWPORT,5,6,1280,720) && clear(0.25f,0.5f,0.75f,1.0f));
+    assert(queries==0 && driver.scissorTest && driver.blend && !driver.stencil && driver.viewport[2]==1280);
+    // An attribute group that was pushed comes back with its pop; a group that was not pushed stays as set.
+    glPushAttrib(GL_ENABLE_BIT|GL_SCISSOR_BIT);
+    glDisable(GL_SCISSOR_TEST);glDisable(GL_BLEND);glScissor(0,0,8,8);glViewport(0,0,64,64);glClearColor(1,1,1,1);
+    assert(glIsEnabled(GL_SCISSOR_TEST)==GL_FALSE && box(GL_SCISSOR_BOX,0,0,8,8));
+    glPopAttrib();
+    assert(glIsEnabled(GL_SCISSOR_TEST)==GL_TRUE && glIsEnabled(GL_BLEND)==GL_TRUE && box(GL_SCISSOR_BOX,10,20,300,200));
+    assert(box(GL_VIEWPORT,0,0,64,64) && clear(1,1,1,1) && queries==0);
+    glPushAttrib(GL_VIEWPORT_BIT|GL_COLOR_BUFFER_BIT);glViewport(1,2,3,4);glClearColor(0,0,0,0);glDisable(GL_BLEND);glDisable(GL_CULL_FACE);glScissor(7,7,7,7);glPopAttrib();
+    assert(box(GL_VIEWPORT,0,0,64,64) && clear(1,1,1,1) && glIsEnabled(GL_BLEND)==GL_TRUE && glIsEnabled(GL_CULL_FACE)==GL_FALSE && queries==0);
+    assert(box(GL_SCISSOR_BOX,7,7,7,7) && driver.scissor[0]==7 && queries==0);glScissor(10,20,300,200);
+    glPushAttrib(GL_STENCIL_BUFFER_BIT);glPushAttrib(GL_POLYGON_BIT|GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_STENCIL_TEST);glEnable(GL_CULL_FACE);glDisable(GL_DEPTH_TEST);
+    glPopAttrib();assert(glIsEnabled(GL_CULL_FACE)==GL_FALSE && glIsEnabled(GL_DEPTH_TEST)==GL_TRUE && glIsEnabled(GL_STENCIL_TEST)==GL_TRUE);
+    glPopAttrib();assert(glIsEnabled(GL_STENCIL_TEST)==GL_FALSE && queries==0);
+    glPushAttrib(GL_ALL_ATTRIB_BITS);glDisable(GL_BLEND);glScissor(9,9,9,9);glViewport(9,9,9,9);glClearColor(0,1,0,1);glPopAttrib();
+    assert(glIsEnabled(GL_BLEND)==GL_TRUE && box(GL_SCISSOR_BOX,10,20,300,200) && box(GL_VIEWPORT,0,0,64,64) && clear(1,1,1,1) && queries==0);
+    // A value the driver may not keep as given is not remembered: a rejected size, a clamped one, a colour out of range.
+    glScissor(1,1,-5,5);assert(box(GL_SCISSOR_BOX,10,20,300,200) && queries==1);
+    glViewport(0,0,8192,8192);assert(box(GL_VIEWPORT,0,0,4096,2048) && queries==2);assert(box(GL_VIEWPORT,0,0,4096,2048) && queries==2);
+    glViewport(0,0,-1,4);assert(box(GL_VIEWPORT,0,0,4096,2048) && queries==3);
+    glClearColor(2.0f,0,0,1);assert(clear(1,0,0,1) && queries==4);assert(clear(1,0,0,1) && queries==4);
+    // Everything else is passed on, every time.
+    queries=0;glEnable(GL_TEXTURE_2D);assert(glIsEnabled(GL_TEXTURE_2D)==GL_TRUE && glIsEnabled(GL_TEXTURE_2D)==GL_TRUE && queries==2);
+    GLint other[4];glGetIntegerv(0x1234,other);GLboolean flag;glGetBooleanv(0x1234,&flag);assert(other[0]==77 && glGetError()==0 && queries==5);
+    // The array buffer is the vertex cache's own record, while the cache has one.
+    queries=0;arrayBuffer=31;glGetIntegerv(GL_ARRAY_BUFFER_BINDING_ARB,other);assert(other[0]==31 && queries==1);
+    cacheKnows=true;cacheBuffer=31;glGetIntegerv(GL_ARRAY_BUFFER_BINDING_ARB,other);assert(other[0]==31 && queries==1);
+    // More pushes than are kept: the pops that cannot be matched forget, they do not guess.
+    glEnable(GL_BLEND);
+    for(int i=0;i<20;++i)glPushAttrib(GL_ENABLE_BIT);
+    glDisable(GL_BLEND);
+    for(int i=0;i<4;++i)glPopAttrib();
+    queries=0;assert(glIsEnabled(GL_BLEND)==GL_TRUE && queries==1);
+    for(int i=0;i<16;++i)glPopAttrib();
+    assert(glIsEnabled(GL_BLEND)==GL_TRUE && driverDepth==0);
+    // 2 answers, asks as well and reports a difference: state changed where the wrappers cannot see it.
+    r_glStateQueries.value=2;warnings=0;
+    glEnable(GL_SCISSOR_TEST);glScissor(1,2,3,4);
+    queries=0;assert(glIsEnabled(GL_SCISSOR_TEST)==GL_TRUE && box(GL_SCISSOR_BOX,1,2,3,4) && queries==2 && warnings==0);
+    driver.scissorTest=false;driver.scissor[0]=50;driver.viewport[0]=3;driver.clear[0]=0.5f;arrayBuffer=32;
+    assert(glIsEnabled(GL_SCISSOR_TEST)==GL_FALSE && box(GL_SCISSOR_BOX,50,2,3,4) && warnings==2);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING_ARB,other);assert(other[0]==32 && cacheInvalidations==1);
+    r_glStateQueries.value=1;queries=0;
+    assert(glIsEnabled(GL_SCISSOR_TEST)==GL_FALSE && box(GL_SCISSOR_BOX,50,2,3,4) && queries==0);	// corrected, and known again
+    // 0 asks the driver for everything, as before.
+    r_glStateQueries.value=0;queries=0;glEnable(GL_BLEND);
+    assert(glIsEnabled(GL_BLEND)==GL_TRUE && box(GL_SCISSOR_BOX,50,2,3,4) && queries==2);
+    // A new context starts from its own defaults.
+    r_glStateQueries.value=1;driver=DriverState();++tr.glContextGeneration;queries=0;
+    assert(glIsEnabled(GL_BLEND)==GL_FALSE && box(GL_SCISSOR_BOX,0,0,640,480) && queries==2);
+    // The report counts what was answered and what reached the driver.
+    r_glStateQueryReport.value=1;prints=0;R_GLShadow_EndFrame();assert(prints>=1);
+    r_glStateQueryReport.value=0;
+    return 0;
 }
 '''
 
@@ -236,13 +424,19 @@ def main():
     draw = (ROOT / 'src/renderer/draw_common.cpp').read_text(encoding='utf-8')
     samples = (ROOT / 'src/renderer/OpenGL/FramebufferSamples.h').read_text(encoding='utf-8')
     depth = function_body(image, 'bool idImage::CopyDepthbuffer(')
+    # the state a copy puts back (FPS-08): compiled with the copy, from its type to its report
+    copy_state = image[image.index('struct glCopySavedState_t {'):image.index('// r_debugRenderToTexture: how the copies')]
+    assert 'glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING' not in depth and 'glIsEnabled( GL_SCISSOR_TEST )' not in depth
+    for call in ('R_GLCopy_SaveTargetState( saved, true );', 'R_GLCopy_DisableScissor( saved );',
+                 'R_GLCopy_RestoreScissor( saved );', 'R_GLCopy_RestoreTargetState( saved, true );'):
+        assert call in depth, call
     scene = function_body(draw, 'static bool RB_EnsureSceneRenderTexture(')
-    constants = 'enum : unsigned {' + ','.join(sorted(set(re.findall(r'\bGL_[A-Z0-9_]+', depth + samples)))) + '};'
+    constants = 'enum : unsigned {' + ','.join(sorted(set(re.findall(r'\bGL_[A-Z0-9_]+', depth + samples + copy_state)))) + '};'
     source = SUPPORT.replace('GL_CONSTANTS', constants)
     source += gl[gl.index('static bool s_strictSwapIntervalActive'):gl.index('static void SDL3_RecordDisplayParameters')]
     for signature in ('static void SDL3_RecordDisplayParameters()', 'static bool SDL3_ApplyStrictSwapInterval()', 'static bool SDL3_ApplySwapInterval(void)', 'void GLimp_SwapBuffers(void)'):
         source += function_body(gl, signature) + '\n'
-    source += '#include "src/renderer/OpenGL/FramebufferSamples.h"\n' + depth + '\n' + scene + '\n' + CASES
+    source += '#include "src/renderer/OpenGL/FramebufferSamples.h"\n' + copy_state + '\n' + depth + '\n' + scene + '\n' + CASES
     for signature in ('bool GLimp_Init(', 'void GLimp_Shutdown('):
         body = function_body(gl, signature)
         assert 's_strictSwapIntervalActive = false;' in body
@@ -260,6 +454,27 @@ def main():
     view = function_body(draw, 'void\tRB_STD_DrawView( void )')
     assert view.index('backEnd.renderTexture->MakeCurrent();') < view.index('RB_BeginSceneRenderTargetFrame();') \
         < view.index('RB_DrawPortalSkyBackdrop( portalSkyBackdrop );')
+    # The state query shadow: the production wrappers and macros over the counted driver above. Every
+    # source of the OpenGL module has to see the macros, so the header comes with the entry points.
+    begin = backend.index('static idCVar r_glStateQueries(')
+    shadow = backend[begin:backend.index('#endif /* OPENQ4_RENDERER_GL_MODULE */', begin)]
+    assert '(glIsEnabled)( cap )' in shadow and '(glGetIntegerv)( pname, data )' in shadow
+    swap = function_body(backend, 'const void\tRB_SwapBuffers(')
+    assert 'R_GLShadow_EndFrame();' in swap
+    # a headset's runtime works in the context between frames: nothing is remembered across its frame
+    assert swap.index('if ( !RB_VR_PresentFrame() ) {') < swap.index('R_GLShadow_Forget();')
+    qgl = (ROOT / 'src/renderer/qgl.h').read_text(encoding='utf-8')
+    assert qgl.index('glew.h') < qgl.index('#include "GLQueryShadow.h"')
+    header = (ROOT / 'src/renderer/GLQueryShadow.h').read_text(encoding='utf-8')
+    for name in ('glEnable', 'glDisable', 'glIsEnabled', 'glScissor', 'glViewport', 'glClearColor', 'glPushAttrib',
+                 'glPopAttrib', 'glGetIntegerv', 'glGetFloatv', 'glGetBooleanv', 'glGetError'):
+        assert re.search(r'#undef %s\n#define %s\(' % (name, name), header), name
+    assert header.count('#if defined( OPENQ4_RENDERER_GL_MODULE )') == 1
+    # no source of the module reaches these entry points around the header
+    for path in sorted((ROOT / 'src/renderer').rglob('*.cpp')) + sorted((ROOT / 'src/renderer').rglob('*.h')):
+        text = path.read_text(encoding='utf-8', errors='replace')
+        assert 'glew.h' not in text or path.name in ('qgl.h',) or 'GLES' in path.parts or 'external' in path.parts, path
+    shadow_source = SHADOW_DRIVER + '#include "src/renderer/GLQueryShadow.h"\n' + shadow + SHADOW_CASES
     compiler = next((path for name in ('clang++', 'g++', 'c++') if (path := shutil.which(name))), None)
     if not compiler:
         raise RuntimeError('C++ compiler required')
@@ -272,7 +487,12 @@ def main():
         for defines in (['-DUSE_SDL3'], []):
             subprocess.run([compiler, '-std=c++20', *defines, '-I', str(ROOT), str(cpp), str(ROOT / 'src/renderer/DisplayPresentation.cpp'), '-o', str(exe)], check=True)
             subprocess.run([str(exe)], check=True)
-    print('GL display policy: strict interval survives bypass, legacy value edits release, actual context/texture samples govern depth copy and scene targets; passed')
+        shadow_cpp = temp / 'shadow.cpp'
+        shadow_exe = temp / ('shadow.exe' if os.name == 'nt' else 'shadow')
+        shadow_cpp.write_text(shadow_source, encoding='utf-8')
+        subprocess.run([compiler, '-std=c++20', '-DOPENQ4_RENDERER_GL_MODULE', '-I', str(ROOT), str(shadow_cpp), '-o', str(shadow_exe)], check=True)
+        subprocess.run([str(shadow_exe)], check=True)
+    print('GL display policy: strict interval survives bypass, legacy value edits release, actual context/texture samples govern depth copy and scene targets, copies and state queries are answered without the driver; passed')
 
 
 if __name__ == '__main__':

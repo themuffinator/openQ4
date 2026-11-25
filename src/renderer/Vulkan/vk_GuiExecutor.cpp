@@ -94,6 +94,10 @@ static idCVar r_vkWindowViewMultisample( "r_vkWindowViewMultisample", "1", CVAR_
 static struct {
 	uint64 frames, descriptorHits, descriptorUpdates, descriptorRetirements;
 	uint64 ringBytes, ringAllocations, targetChanges, renderingScopes, barriers, submissions;
+	// what the geometry rings were filled with: vertex streams that are not
+	// resident, index lists, the index lists of surfaces whose vertices are
+	// resident, and the two streams of stencil shadow volumes
+	uint64 vertexStreamBytes, indexBytes, residentSurfaceIndexBytes, shadowVertexBytes, shadowIndexBytes;
 } vkResourceProfile;
 
 // vk_Interactions.cpp: the Phase F1 per-light interaction pass, inserted
@@ -867,7 +871,12 @@ void VK_Exec_PrintResourceInfo( bool reset ) {
 		vkExec.numEnvPipelines, vkExec.numSpecialPipelines, vkExec.numProgramPipelines,
 		vkExec.numBlendLightPipelines, vkExec.numTemporalResolvePipelines, vkExec.numSceneScalePipelines,
 		vkExec.numPostPipelines, vkExec.pipelineFlushCount );
+	common->Printf( "Vulkan executor geometry rings: vertexStreamBytes=%llu indexBytes=%llu residentSurfaceIndexBytes=%llu shadowVertexBytes=%llu shadowIndexBytes=%llu\n",
+		(unsigned long long)vkResourceProfile.vertexStreamBytes, (unsigned long long)vkResourceProfile.indexBytes,
+		(unsigned long long)vkResourceProfile.residentSurfaceIndexBytes, (unsigned long long)vkResourceProfile.shadowVertexBytes,
+		(unsigned long long)vkResourceProfile.shadowIndexBytes );
 	VK_StaticGeo_PrintInfo( reset );
+	R_ShadowMapReceiverScanPrintInfo( reset );
 	if ( reset ) { memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) ); }
 }
 
@@ -7370,8 +7379,10 @@ static bool VK_Exec_ImageIsCurrentRender( const idImage *image ) {
 			|| image == globalImages->originalCurrentRenderImage ) {
 		return true;
 	}
+	// asked for every image of every stage drawn: every name it can match
+	// starts with the underscore of an engine-made image
 	const char *name = image->GetName();
-	return name != NULL && idStr::Icmpn( name, "_currentRender", 14 ) == 0;
+	return name != NULL && name[0] == '_' && idStr::Icmpn( name, "_currentRender", 14 ) == 0;
 }
 
 static bool VK_Exec_ImageIsCurrentDepth( const idImage *image ) {
@@ -7382,7 +7393,7 @@ static bool VK_Exec_ImageIsCurrentDepth( const idImage *image ) {
 		return true;
 	}
 	const char *name = image->GetName();
-	return name != NULL && idStr::Icmpn( name, "_currentDepth", 13 ) == 0;
+	return name != NULL && name[0] == '_' && idStr::Icmpn( name, "_currentDepth", 13 ) == 0;
 }
 
 static bool VK_Exec_StageUsesCurrentRender( const shaderStage_t *stage ) {
@@ -9699,6 +9710,9 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 					const idDrawVert *verts = (const idDrawVert *)vertexCache.Position( tri->ambientCache );
 					vertexOffset = VK_Ring_Alloc( vkExec.vertexRings[ slot ], verts,
 						static_cast<size_t>( tri->numVerts ) * sizeof( idDrawVert ), 64 );
+					if ( vertexOffset >= 0 && r_vkResourceProfile.GetBool() ) {
+						vkResourceProfile.vertexStreamBytes += static_cast<size_t>( tri->numVerts ) * sizeof( idDrawVert );
+					}
 				}
 				if ( vertexOffset < 0 ) {
 					return false;
@@ -9758,6 +9772,12 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 			}
 			if ( indexOffset < 0 ) {
 				return false;
+			}
+			if ( r_vkResourceProfile.GetBool() ) {
+				vkResourceProfile.indexBytes += indexBytes;
+				if ( ( vertexOffset & VK_STATIC_GEO_FLAG ) != 0 ) {
+					vkResourceProfile.residentSurfaceIndexBytes += indexBytes;
+				}
 			}
 			if ( idxKey != NULL ) {
 				memo.idxKey = idxKey;
@@ -9851,6 +9871,9 @@ bool VK_Exec_BindShadowGeometry( VkCommandBuffer cmd, int slot, const srfTriangl
 			if ( vertexOffset < 0 ) {
 				return false;
 			}
+			if ( r_vkResourceProfile.GetBool() ) {
+				vkResourceProfile.shadowVertexBytes += vertexBytes;
+			}
 			memo.vertKey = vertKey;
 			memo.vertexOffset = vertexOffset;
 		}
@@ -9866,6 +9889,9 @@ bool VK_Exec_BindShadowGeometry( VkCommandBuffer cmd, int slot, const srfTriangl
 				indexBytes, 4 );
 			if ( indexOffset < 0 ) {
 				return false;
+			}
+			if ( r_vkResourceProfile.GetBool() ) {
+				vkResourceProfile.shadowIndexBytes += indexBytes;
 			}
 			memo.idxKey = idxKey;
 			memo.indexOffset = indexOffset;

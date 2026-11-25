@@ -911,7 +911,11 @@ static bool R_ShouldSkipPointLightEmitterCaster( const idMaterial *shadowShader,
 	if ( shadowShader == NULL || ambientTris == NULL ) {
 		return false;
 	}
-	if ( shadowShader->GetName() == NULL || idStr::Icmpn( shadowShader->GetName(), "textures/common_lights/", 23 ) != 0 ) {
+	// Asked for every surface of every interaction that is built, which for an
+	// animating model is every frame: settle the common case on the first letter.
+	const char *shadowShaderName = shadowShader->GetName();
+	if ( shadowShaderName == NULL || ( shadowShaderName[0] | 0x20 ) != 't'
+			|| idStr::Icmpn( shadowShaderName, "textures/common_lights/", 23 ) != 0 ) {
 		return false;
 	}
 	if ( ambientTris->numIndexes < 3 ) {
@@ -1461,20 +1465,10 @@ idInteraction::idInteraction( void ) {
 	shadowVolumesSuppressed	= false;
 }
 
-/*
-===============
-R_InvalidateShadowMapReceiverScan
-
-R_ShadowMapLightWillUseShadowMaps memoizes the Vulkan receiver scan of a light
-on its view light for the current view. Any change to the set or state of the
-light's interactions can change that verdict.
-===============
-*/
-static void R_InvalidateShadowMapReceiverScan( const idRenderLightLocal *lightDef ) {
-	if ( lightDef != NULL && lightDef->viewCount == tr.viewCount && lightDef->viewLight != NULL ) {
-		lightDef->viewLight->shadowMapReceiverScanValid = false;
-	}
-}
+// R_ShadowMapLightWillUseShadowMaps memoizes the Vulkan receiver scan of a
+// light on its view light for the current view. Any change to the set or
+// state of the light's interactions can change that verdict, so each one is
+// reported with the interaction it happened to (R_ShadowMapReceiverScanChanged).
 
 /*
 ===============
@@ -1538,7 +1532,7 @@ idInteraction *idInteraction::AllocAndLink( idRenderEntityLocal *edef, idRenderL
 	}
 
 	// an unbuilt interaction leaves the light's receivers unknown
-	R_InvalidateShadowMapReceiverScan( ldef );
+	R_ShadowMapReceiverScanChanged( ldef, interaction, false );
 
 	return interaction;
 }
@@ -1585,7 +1579,7 @@ void idInteraction::FreeSurfaces( void ) {
 	this->buildModel = NULL;
 	this->unbuiltVisitView = -1;
 	this->shadowVolumesSuppressed = false;
-	R_InvalidateShadowMapReceiverScan( this->lightDef );
+	R_ShadowMapReceiverScanChanged( this->lightDef, this, false );
 }
 
 /*
@@ -1595,7 +1589,8 @@ idInteraction::Unlink
 */
 void idInteraction::Unlink( void ) {
 
-	R_InvalidateShadowMapReceiverScan( this->lightDef );
+	// before it leaves the list: the scan may be resting on this interaction
+	R_ShadowMapReceiverScanChanged( this->lightDef, this, true );
 
 	// unlink from the entity's list
 	if ( this->entityPrev ) {
@@ -1910,7 +1905,7 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 	// covers every surface of the model (R_ShadowMapLightWillUseShadowMaps).
 	buildModel = model;
 	stencilReceiverGeneration = -1;
-	R_InvalidateShadowMapReceiverScan( lightDef );
+	R_ShadowMapReceiverScanChanged( lightDef, this, false );
 	shadowVolumesSuppressed = false;
 
 	// The model handed in is the entity's instantiated snapshot, which is
@@ -2113,7 +2108,7 @@ void idInteraction::CreateInteraction( const idRenderModel *model ) {
 	// the slots are final: only the filled ones are receivers from now on
 	buildModel = NULL;
 	stencilReceiverGeneration = -1;
-	R_InvalidateShadowMapReceiverScan( lightDef );
+	R_ShadowMapReceiverScanChanged( lightDef, this, false );
 
 	// if none of the surfaces generated anything, don't even bother checking?
 	if ( !interactionGenerated ) {
@@ -2246,7 +2241,7 @@ void idInteraction::AddActiveInteraction( void ) {
 		~unbuiltVisitMark_t() {
 			if ( inter->IsDeferred() ) {
 				inter->unbuiltVisitView = tr.viewCount;
-				R_InvalidateShadowMapReceiverScan( inter->lightDef );
+				R_ShadowMapReceiverScanChanged( inter->lightDef, inter, false );
 			}
 		}
 	} unbuiltVisitMark = { this };

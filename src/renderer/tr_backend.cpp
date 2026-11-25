@@ -69,6 +69,374 @@ static ID_INLINE GLint R_SafeStencilClearValue() {
 }
 
 
+#if defined( OPENQ4_RENDERER_GL_MODULE )
+/*
+===============================================================================
+
+	OpenGL state queries answered from what the renderer set (GLQueryShadow.h)
+
+===============================================================================
+*/
+static idCVar r_glStateQueries( "r_glStateQueries", "1", CVAR_RENDERER | CVAR_INTEGER,
+	"OpenGL: how the back end learns state it set itself (the scissor test and box, the viewport, the clear colour, "
+	"blending, the stencil, cull and depth tests, the array buffer): 0 = ask the driver every time, as before (a state "
+	"query makes a driver that queues its commands for a worker thread finish them all first), 1 = answer from what "
+	"the renderer set, 2 = answer, ask as well and report a difference (qualification)", 0, 2,
+	idCmdSystem::ArgCompletion_Integer<0,2> );
+static idCVar r_glStateQueryReport( "r_glStateQueryReport", "0", CVAR_RENDERER | CVAR_INTEGER,
+	"OpenGL: every N frames print how many state queries a frame were answered without the driver and the call sites "
+	"of those that reached it; 0 = off", 0, 100000 );
+
+enum glShadowEnable_t {
+	GLSHADOW_BLEND,
+	GLSHADOW_SCISSOR_TEST,
+	GLSHADOW_STENCIL_TEST,
+	GLSHADOW_CULL_FACE,
+	GLSHADOW_DEPTH_TEST,
+	GLSHADOW_NUM_ENABLES
+};
+
+// the attribute group that saves each enable besides GL_ENABLE_BIT
+static const GLbitfield glShadowEnableGroups[GLSHADOW_NUM_ENABLES] = {
+	GL_COLOR_BUFFER_BIT, GL_SCISSOR_BIT, GL_STENCIL_BUFFER_BIT, GL_POLYGON_BIT, GL_DEPTH_BUFFER_BIT
+};
+
+struct glShadowState_t {
+	bool		enableKnown[GLSHADOW_NUM_ENABLES];
+	bool		enabled[GLSHADOW_NUM_ENABLES];
+	bool		scissorKnown;
+	GLint		scissor[4];
+	bool		viewportKnown;
+	GLint		viewport[4];
+	bool		clearColorKnown;
+	GLfloat		clearColor[4];
+};
+
+static const int GLSHADOW_STACK_DEPTH = 16;		// the least an implementation offers
+static const int GLSHADOW_REPORT_SITES = 64;
+
+static struct glShadow_t {
+	glShadowState_t	state;
+	int				contextGeneration;
+	// what glPushAttrib saved: popped entries above the depth kept here forget everything
+	int				stackDepth;
+	GLbitfield		stackMask[GLSHADOW_STACK_DEPTH];
+	glShadowState_t	stackState[GLSHADOW_STACK_DEPTH];
+	// the largest viewport the implementation keeps as given; 0 = not asked yet
+	GLint			maxViewport[2];
+	// since the last report
+	int				frames;
+	int				answered;
+	int				asked;
+	int				numSites;
+	struct site_t {
+		const char *	file;
+		int				line;
+		int				count;
+	}				sites[GLSHADOW_REPORT_SITES];
+	// since the context was created
+	unsigned int	mismatches;
+} glShadow = { {}, -1 };
+
+void R_GLShadow_Forget( void ) {
+	memset( &glShadow.state, 0, sizeof( glShadow.state ) );
+	glShadow.stackDepth = 0;
+}
+
+// a new context starts from its own defaults, whatever the old one was left in
+static ID_INLINE void R_GLShadow_FollowContext( void ) {
+	if ( glShadow.contextGeneration != tr.glContextGeneration ) {
+		glShadow.contextGeneration = tr.glContextGeneration;
+		glShadow.maxViewport[0] = glShadow.maxViewport[1] = 0;
+		R_GLShadow_Forget();
+	}
+}
+
+static ID_INLINE int R_GLShadow_EnableIndex( const GLenum cap ) {
+	switch ( cap ) {
+		case GL_BLEND:			return GLSHADOW_BLEND;
+		case GL_SCISSOR_TEST:	return GLSHADOW_SCISSOR_TEST;
+		case GL_STENCIL_TEST:	return GLSHADOW_STENCIL_TEST;
+		case GL_CULL_FACE:		return GLSHADOW_CULL_FACE;
+		case GL_DEPTH_TEST:		return GLSHADOW_DEPTH_TEST;
+		default:				return -1;
+	}
+}
+
+// a query that reached the driver
+static void R_GLShadow_NoteAsked( const char *file, const int line ) {
+	glShadow.asked++;
+	if ( r_glStateQueryReport.GetInteger() <= 0 ) {
+		return;
+	}
+	for ( int i = 0; i < glShadow.numSites; i++ ) {
+		if ( glShadow.sites[i].line == line && glShadow.sites[i].file == file ) {
+			glShadow.sites[i].count++;
+			return;
+		}
+	}
+	if ( glShadow.numSites < GLSHADOW_REPORT_SITES ) {
+		glShadow.sites[glShadow.numSites].file = file;
+		glShadow.sites[glShadow.numSites].line = line;
+		glShadow.sites[glShadow.numSites].count = 1;
+		glShadow.numSites++;
+	}
+}
+
+static void R_GLShadow_ReportMismatch( const char *what, const char *file, const int line ) {
+	const unsigned int count = ++glShadow.mismatches;
+	if ( ( count & ( count - 1 ) ) == 0 ) {
+		common->Warning( "OpenGL state shadow: %s differs from the driver's at %s:%d (%u so far); the driver's value is used",
+			what, file, line, count );
+	}
+}
+
+void R_GLShadow_Enable( GLenum cap ) {
+	R_GLShadow_FollowContext();
+	const int index = R_GLShadow_EnableIndex( cap );
+	if ( index >= 0 ) {
+		glShadow.state.enableKnown[index] = true;
+		glShadow.state.enabled[index] = true;
+	}
+	(glEnable)( cap );
+}
+
+void R_GLShadow_Disable( GLenum cap ) {
+	R_GLShadow_FollowContext();
+	const int index = R_GLShadow_EnableIndex( cap );
+	if ( index >= 0 ) {
+		glShadow.state.enableKnown[index] = true;
+		glShadow.state.enabled[index] = false;
+	}
+	(glDisable)( cap );
+}
+
+GLboolean R_GLShadow_IsEnabled( GLenum cap, const char *file, int line ) {
+	R_GLShadow_FollowContext();
+	const int mode = r_glStateQueries.GetInteger();
+	const int index = R_GLShadow_EnableIndex( cap );
+	if ( index >= 0 && mode != 0 && glShadow.state.enableKnown[index] ) {
+		const GLboolean remembered = glShadow.state.enabled[index] ? GL_TRUE : GL_FALSE;
+		if ( mode == 2 ) {
+			const GLboolean driver = (glIsEnabled)( cap );
+			if ( driver != remembered ) {
+				R_GLShadow_ReportMismatch( "an enable", file, line );
+				glShadow.state.enabled[index] = driver != GL_FALSE;
+				return driver;
+			}
+		}
+		glShadow.answered++;
+		return remembered;
+	}
+	R_GLShadow_NoteAsked( file, line );
+	const GLboolean driver = (glIsEnabled)( cap );
+	if ( index >= 0 ) {
+		glShadow.state.enableKnown[index] = true;
+		glShadow.state.enabled[index] = driver != GL_FALSE;
+	}
+	return driver;
+}
+
+void R_GLShadow_Scissor( GLint x, GLint y, GLsizei width, GLsizei height ) {
+	R_GLShadow_FollowContext();
+	// a negative size is an error that leaves the box as it was
+	glShadow.state.scissorKnown = width >= 0 && height >= 0;
+	glShadow.state.scissor[0] = x;
+	glShadow.state.scissor[1] = y;
+	glShadow.state.scissor[2] = width;
+	glShadow.state.scissor[3] = height;
+	(glScissor)( x, y, width, height );
+}
+
+void R_GLShadow_Viewport( GLint x, GLint y, GLsizei width, GLsizei height ) {
+	R_GLShadow_FollowContext();
+	if ( glShadow.maxViewport[0] <= 0 ) {
+		// once a context: a larger size is clamped to this without an error
+		glShadow.maxViewport[0] = glShadow.maxViewport[1] = 0;
+		(glGetIntegerv)( GL_MAX_VIEWPORT_DIMS, glShadow.maxViewport );
+	}
+	glShadow.state.viewportKnown = width >= 0 && height >= 0 && glShadow.maxViewport[0] > 0
+		&& width <= glShadow.maxViewport[0] && height <= glShadow.maxViewport[1];
+	glShadow.state.viewport[0] = x;
+	glShadow.state.viewport[1] = y;
+	glShadow.state.viewport[2] = width;
+	glShadow.state.viewport[3] = height;
+	(glViewport)( x, y, width, height );
+}
+
+void R_GLShadow_ClearColor( GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha ) {
+	R_GLShadow_FollowContext();
+	// outside [0,1] a context may keep the value or clamp it, by its version
+	glShadow.state.clearColorKnown = red >= 0.0f && red <= 1.0f && green >= 0.0f && green <= 1.0f
+		&& blue >= 0.0f && blue <= 1.0f && alpha >= 0.0f && alpha <= 1.0f;
+	glShadow.state.clearColor[0] = red;
+	glShadow.state.clearColor[1] = green;
+	glShadow.state.clearColor[2] = blue;
+	glShadow.state.clearColor[3] = alpha;
+	(glClearColor)( red, green, blue, alpha );
+}
+
+void R_GLShadow_PushAttrib( GLbitfield mask ) {
+	R_GLShadow_FollowContext();
+	if ( glShadow.stackDepth >= 0 && glShadow.stackDepth < GLSHADOW_STACK_DEPTH ) {
+		glShadow.stackMask[glShadow.stackDepth] = mask;
+		glShadow.stackState[glShadow.stackDepth] = glShadow.state;
+	}
+	glShadow.stackDepth++;
+	(glPushAttrib)( mask );
+}
+
+void R_GLShadow_PopAttrib( void ) {
+	R_GLShadow_FollowContext();
+	(glPopAttrib)();
+	glShadow.stackDepth--;
+	if ( glShadow.stackDepth < 0 || glShadow.stackDepth >= GLSHADOW_STACK_DEPTH ) {
+		// a pop without its push here, or one too deep to have been kept
+		const int depth = Max( 0, glShadow.stackDepth );
+		R_GLShadow_Forget();
+		glShadow.stackDepth = depth;
+		return;
+	}
+	const GLbitfield mask = glShadow.stackMask[glShadow.stackDepth];
+	const glShadowState_t &saved = glShadow.stackState[glShadow.stackDepth];
+	for ( int i = 0; i < GLSHADOW_NUM_ENABLES; i++ ) {
+		if ( ( mask & ( GL_ENABLE_BIT | glShadowEnableGroups[i] ) ) != 0 ) {
+			glShadow.state.enableKnown[i] = saved.enableKnown[i];
+			glShadow.state.enabled[i] = saved.enabled[i];
+		}
+	}
+	if ( ( mask & GL_SCISSOR_BIT ) != 0 ) {
+		glShadow.state.scissorKnown = saved.scissorKnown;
+		memcpy( glShadow.state.scissor, saved.scissor, sizeof( saved.scissor ) );
+	}
+	if ( ( mask & GL_VIEWPORT_BIT ) != 0 ) {
+		glShadow.state.viewportKnown = saved.viewportKnown;
+		memcpy( glShadow.state.viewport, saved.viewport, sizeof( saved.viewport ) );
+	}
+	if ( ( mask & GL_COLOR_BUFFER_BIT ) != 0 ) {
+		glShadow.state.clearColorKnown = saved.clearColorKnown;
+		memcpy( glShadow.state.clearColor, saved.clearColor, sizeof( saved.clearColor ) );
+	}
+}
+
+void R_GLShadow_GetIntegerv( GLenum pname, GLint *data, const char *file, int line ) {
+	R_GLShadow_FollowContext();
+	const int mode = r_glStateQueries.GetInteger();
+	const GLint *remembered = NULL;
+	GLint arrayBuffer[1];
+	int count = 0;
+	if ( mode != 0 ) {
+		if ( pname == GL_SCISSOR_BOX && glShadow.state.scissorKnown ) {
+			remembered = glShadow.state.scissor;
+			count = 4;
+		} else if ( pname == GL_VIEWPORT && glShadow.state.viewportKnown ) {
+			remembered = glShadow.state.viewport;
+			count = 4;
+		} else if ( pname == GL_ARRAY_BUFFER_BINDING_ARB ) {
+			// the vertex cache's own record of the binding (idVertexCache::BindArrayBuffer)
+			unsigned int bound = 0;
+			if ( idVertexCache::BoundArrayBuffer( bound ) ) {
+				arrayBuffer[0] = static_cast<GLint>( bound );
+				remembered = arrayBuffer;
+				count = 1;
+			}
+		}
+	}
+	if ( remembered != NULL ) {
+		if ( mode == 2 ) {
+			GLint driver[4] = { 0, 0, 0, 0 };
+			(glGetIntegerv)( pname, driver );
+			if ( memcmp( driver, remembered, count * sizeof( GLint ) ) != 0 ) {
+				R_GLShadow_ReportMismatch( pname == GL_SCISSOR_BOX ? "the scissor box"
+					: pname == GL_VIEWPORT ? "the viewport" : "the array buffer binding", file, line );
+				if ( pname == GL_SCISSOR_BOX ) {
+					memcpy( glShadow.state.scissor, driver, sizeof( glShadow.state.scissor ) );
+				} else if ( pname == GL_VIEWPORT ) {
+					memcpy( glShadow.state.viewport, driver, sizeof( glShadow.state.viewport ) );
+				} else {
+					idVertexCache::InvalidateBufferBindings();
+				}
+				memcpy( data, driver, count * sizeof( GLint ) );
+				return;
+			}
+		}
+		glShadow.answered++;
+		memcpy( data, remembered, count * sizeof( GLint ) );
+		return;
+	}
+	R_GLShadow_NoteAsked( file, line );
+	(glGetIntegerv)( pname, data );
+	if ( pname == GL_SCISSOR_BOX ) {
+		glShadow.state.scissorKnown = true;
+		memcpy( glShadow.state.scissor, data, sizeof( glShadow.state.scissor ) );
+	} else if ( pname == GL_VIEWPORT ) {
+		glShadow.state.viewportKnown = true;
+		memcpy( glShadow.state.viewport, data, sizeof( glShadow.state.viewport ) );
+	}
+}
+
+void R_GLShadow_GetFloatv( GLenum pname, GLfloat *data, const char *file, int line ) {
+	R_GLShadow_FollowContext();
+	const int mode = r_glStateQueries.GetInteger();
+	if ( pname == GL_COLOR_CLEAR_VALUE && mode != 0 && glShadow.state.clearColorKnown ) {
+		if ( mode == 2 ) {
+			GLfloat driver[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+			(glGetFloatv)( pname, driver );
+			if ( memcmp( driver, glShadow.state.clearColor, sizeof( driver ) ) != 0 ) {
+				R_GLShadow_ReportMismatch( "the clear colour", file, line );
+				memcpy( glShadow.state.clearColor, driver, sizeof( driver ) );
+				memcpy( data, driver, sizeof( driver ) );
+				return;
+			}
+		}
+		glShadow.answered++;
+		memcpy( data, glShadow.state.clearColor, sizeof( glShadow.state.clearColor ) );
+		return;
+	}
+	R_GLShadow_NoteAsked( file, line );
+	(glGetFloatv)( pname, data );
+	if ( pname == GL_COLOR_CLEAR_VALUE ) {
+		glShadow.state.clearColorKnown = true;
+		memcpy( glShadow.state.clearColor, data, sizeof( glShadow.state.clearColor ) );
+	}
+}
+
+void R_GLShadow_GetBooleanv( GLenum pname, GLboolean *data, const char *file, int line ) {
+	R_GLShadow_NoteAsked( file, line );
+	(glGetBooleanv)( pname, data );
+}
+
+GLenum R_GLShadow_GetError( const char *file, int line ) {
+	R_GLShadow_NoteAsked( file, line );
+	return (glGetError)();
+}
+
+void R_GLShadow_EndFrame( void ) {
+	const int every = r_glStateQueryReport.GetInteger();
+	if ( every <= 0 ) {
+		glShadow.frames = glShadow.answered = glShadow.asked = glShadow.numSites = 0;
+		return;
+	}
+	if ( ++glShadow.frames < every ) {
+		return;
+	}
+	const float frames = static_cast<float>( glShadow.frames );
+	common->Printf( "OpenGL state queries: mode=%d frames=%d answered=%.2f/frame asked=%.2f/frame mismatches=%u\n",
+		r_glStateQueries.GetInteger(), glShadow.frames, glShadow.answered / frames, glShadow.asked / frames,
+		glShadow.mismatches );
+	for ( int i = 0; i < glShadow.numSites; i++ ) {
+		const char *name = glShadow.sites[i].file;
+		for ( const char *c = name; *c != '\0'; c++ ) {
+			if ( *c == '/' || *c == '\\' ) {
+				name = c + 1;
+			}
+		}
+		common->Printf( "  asked %7.2f/frame at %s:%d\n", glShadow.sites[i].count / frames, name, glShadow.sites[i].line );
+	}
+	glShadow.frames = glShadow.answered = glShadow.asked = glShadow.numSites = 0;
+}
+#endif /* OPENQ4_RENDERER_GL_MODULE */
+
 /*
 ======================
 RB_SetDefaultGLState
@@ -733,6 +1101,9 @@ static void RB_ForceOpaquePresentAlpha( void ) {
 }
 
 const void	RB_SwapBuffers( const void *data ) {
+#if defined( OPENQ4_RENDERER_GL_MODULE )
+	R_GLShadow_EndFrame();
+#endif
 	// texture swapping test
 	if ( r_showImages.GetInteger() != 0 ) {
 		RB_ShowImages();
@@ -756,6 +1127,13 @@ const void	RB_SwapBuffers( const void *data ) {
 			RB_ApplyCRTToBackBuffer();
 			RB_ApplyColorMappingsToBackBuffer();
 		}
+#if defined( OPENQ4_RENDERER_GL_MODULE )
+		else {
+			// a headset's runtime works in this context between frames, and what
+			// it leaves set is its own business: start the frame from the driver
+			R_GLShadow_Forget();
+		}
+#endif
 		R_RendererMetrics_EndPresentPhase( RENDERER_PRESENT_FINAL_POST, begin );
 	}
 
@@ -902,7 +1280,20 @@ static void RB_ResolveMSAA(const void* data) {
 		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	}
 
-	GL_CheckErrors();
+	// Reading the error flag is a state query: a driver that queues its commands
+	// for a worker thread has to draw the whole scene before it can answer. It
+	// is read here where the answer is used: before a depth resolve, whose own
+	// check must not find an older error, and while errors are being reported.
+	// Otherwise whatever is pending is found at the end of the frame
+	// (idRenderSystemLocal::EndFrame).
+#if defined( OPENQ4_RENDERER_GL_MODULE )
+	const bool readErrorFlag = cmd->resolveDepth || !r_ignoreGLErrors.GetBool() || r_glStateQueries.GetInteger() == 0;
+#else
+	const bool readErrorFlag = true;
+#endif
+	if ( readErrorFlag ) {
+		GL_CheckErrors();
+	}
 
 	// Resolve the depth buffer only when explicitly requested.
 	if ( cmd->resolveDepth ) {
@@ -1535,5 +1926,7 @@ void RB_ExecuteBackEndCommands( const emptyCommand_t *cmds ) {
 		common->Printf( "3d: %i, 2d: %i, SetBuf: %i, SwpBuf: %i, CpyRenders: %i, CpyFrameBuf: %i, CpyDepthBuf: %i\n", c_draw3d, c_draw2d, c_setBuffers, c_swapBuffers, c_copyRenders, backEnd.c_copyFrameBuffer, backEnd.c_copyDepthBuffer );
 		backEnd.c_copyFrameBuffer = 0;
 		backEnd.c_copyDepthBuffer = 0;
+		extern void R_GLCopy_PrintTargetStateInfo( void );
+		R_GLCopy_PrintTargetStateInfo();
 	}
 }

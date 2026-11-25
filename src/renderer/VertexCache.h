@@ -98,6 +98,8 @@ public:
 	// targets behind our back (modern executor / GL state cache) must call
 	// InvalidateBufferBindings() before the legacy backend draws again.
 	static void		BindArrayBuffer( unsigned int vbo );
+	// the array buffer last bound through BindArrayBuffer; false while that is not known
+	static bool		BoundArrayBuffer( unsigned int &vbo );
 	static void		BindIndexBuffer( unsigned int vbo );
 	static void		InvalidateBufferBindings();
 

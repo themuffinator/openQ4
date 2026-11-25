@@ -52,6 +52,10 @@ int VK_Ring_Alloc(Ring& ring,const void* data,size_t bytes,int align){
     if(bytes>size_t(ring.capacity)||size_t(offset)+bytes>size_t(ring.capacity))return -1;
     std::memcpy(ring.bytes.data()+offset,data,bytes);ring.used=offset+int(bytes);++ring.uploads;return offset;
 }
+// r_vkResourceProfile: what the rings were filled with (rendererVulkanMemoryInfo)
+struct {bool GetBool()const{return true;}} r_vkResourceProfile;
+struct {unsigned long long vertexStreamBytes=0,indexBytes=0,residentSurfaceIndexBytes=0;} vkResourceProfile;
+constexpr int VK_STATIC_GEO_FLAG=0x40000000;
 '''
     for signature in ('static bool VK_Exec_CPUCacheValid(', 'static bool VK_Exec_UploadTriGeometry('):
         fixture += function_body(source, signature) + '\n'
@@ -66,6 +70,9 @@ int main(){
     viewDef_t view;backEnd.viewDef=&view;
     int v0,i0,v1,i1;
     assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0));
+    // The ring profile counts what was copied: a streamed vertex stream and its index list.
+    assert(vkResourceProfile.vertexStreamBytes==sizeof(vertices) && vkResourceProfile.indexBytes==sizeof(indices)
+        && vkResourceProfile.residentSurfaceIndexBytes==0);
     // The screen-update allocator reuses headers and payload addresses.
     // The new rectangle must not inherit the old white full-screen quad.
     for(auto& v:vertices){v.x+=370;v.y+=67;v.color[1]=v.color[2]=0;}

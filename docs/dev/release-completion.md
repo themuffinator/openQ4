@@ -12,6 +12,44 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## OpenGL stops questioning its driver every frame, and Vulkan's shadow-map bookkeeping gets lighter, 25 November 2026
+
+- **OpenGL no longer asks the graphics driver for state the game set itself.**
+  To turn the scissor test off around a clear or a copy and back on afterwards,
+  to put the viewport back after a pass into another target, or to restore
+  blending after a shadow map, the renderer asked the driver what the current
+  value was: 49 questions a frame at the Quality preset, about 70 in a
+  firefight. A driver that hands the game's commands to a worker thread
+  (NVIDIA's threaded optimisation, Mesa's glthread) has to finish everything
+  queued before it can answer one, so each question made the game wait for
+  the driver, and where such a driver was seen at work a fifth to a third of
+  the game's own thread went on that wait. The renderer now remembers what it
+  set and answers those questions itself; between one and two a frame still
+  reach the driver.
+  Pictures are identical, and a check mode that asks the driver as well found
+  no difference in any preset. What this is worth in frames a second depends on
+  the driver and was not measured: with a driver that draws on the game's
+  thread, as the test machine's did in every timed launch, the cost is
+  unchanged. `r_glStateQueries 0` and `r_glCopyTargetState 0` restore the
+  questions, `2` checks every answer, and `r_glStateQueryReport 300` prints
+  which call sites still ask.
+- **Vulkan decides faster whether a shadow-mapped light can leave its stencil
+  volumes out.** That depends on every receiver of the light, and the answer
+  was thrown away whenever one of the light's interactions changed, which an
+  animating character makes happen for every light it touches in every frame.
+  The answer is now corrected from the interaction that changed. In the
+  benchmark firefight a frame tests 651 interactions where it tested 4,948,
+  and the verdicts are the same (206,899 compared, none different).
+  `r_shadowMapReceiverScanIncremental 0` restores the whole scans, `2`
+  compares every answer.
+- Smaller: both renderers settle "is this image the screen copy" and the
+  light-panel test on the first letter of the name before comparing the rest;
+  `rendererVulkanMemoryInfo` says what Vulkan's frame rings were filled with
+  and how the receiver verdicts were reached.
+- Evidence, and what became of each lead of the first round:
+  [performance report section 23](performance-report.md#23-the-renderer-round-continued-state-queries-and-the-receiver-scan-fps-08-25-november-2026).
+  No ABI change.
+
 ## Fewer wasted copies every frame, cheaper bounds for animated characters, and Vulkan fixes, 25 November 2026
 
 - **OpenGL copies the screen and the depth buffer only for something that reads

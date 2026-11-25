@@ -2043,6 +2043,202 @@ static void R_AllocateCopyTextureStorage( bool isCube, GLenum copyTarget,
 }
 
 /*
+================================================================================
+
+	The state a screen or depth copy puts back
+
+	A copy binds its source and a framebuffer of its own, selects a read
+	buffer and turns the scissor test off, and has to leave all of that as
+	it found it. It used to ask OpenGL for each value first: four to six
+	state queries a copy, and a frame makes three to thirteen copies. A
+	query is answered from the driver's own state, so a driver that runs
+	its commands on a worker thread has to finish everything it has queued
+	before it can answer. Every copy made the main thread wait for the
+	driver.
+
+	The values are known without asking. The back end binds a render
+	target to both framebuffer bindings and selects its buffers every time
+	it makes one current (idRenderTexture::MakeCurrent and BindNull), and
+	records it in backEnd.renderTexture, which the copies already trust
+	for their source. A framebuffer object draws to and reads from its
+	first colour attachment, or none without a colour image; the default
+	framebuffer uses R_DefaultColorBuffer(). The scissor test and its box
+	are answered from what the renderer set (GLQueryShadow.h).
+
+	Each target is compared with OpenGL the first time a copy sees it and
+	every 64th copy after that; r_glCopyTargetState 2 compares at every
+	copy. A target that differs is reported once and asked about from then
+	on, and the copy that found the difference uses what OpenGL answered.
+
+================================================================================
+*/
+static idCVar r_glCopyTargetState( "r_glCopyTargetState", "1", CVAR_RENDERER | CVAR_INTEGER,
+	"OpenGL: how a screen or depth copy learns the framebuffer state it has to put back: 0 = ask OpenGL before every "
+	"copy, as before (a state query makes a driver that queues its commands for a worker thread finish them all "
+	"first), 1 = take it from the render target the back end has bound, compared with OpenGL the first time a target "
+	"is seen and every 64th copy, 2 = compare at every copy (qualification)", 0, 2,
+	idCmdSystem::ArgCompletion_Integer<0,2> );
+
+struct glCopySavedState_t {
+	GLint		readFbo;
+	GLint		drawFbo;
+	GLint		readBuffer;
+	GLint		drawBuffer;
+	GLboolean	scissorWasEnabled;
+	GLint		scissorBox[4];
+};
+
+static const int GLCOPY_KNOWN_TARGETS = 16;
+static const unsigned int GLCOPY_RECHECK_MASK = 63;
+
+struct glCopyKnownTarget_t {
+	const idRenderTexture *	target;		// NULL: the default framebuffer
+	GLint					handle;
+	GLint					buffer;
+	bool					used;
+	bool					ask;		// differed from OpenGL once: never trusted again
+};
+
+static struct glCopyKnownState_t {
+	int					contextGeneration;
+	unsigned int		copies;
+	int					nextSlot;
+	glCopyKnownTarget_t	targets[GLCOPY_KNOWN_TARGETS];
+	// since the last report
+	uint64				known, asked, compared, differed;
+} glCopyKnown = { -1 };
+
+static void R_GLCopy_AskTargetState( glCopySavedState_t &saved, const bool drawSide ) {
+	saved.readFbo = saved.drawFbo = 0;
+	saved.readBuffer = saved.drawBuffer = GL_BACK;
+	glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &saved.readFbo );
+	if ( drawSide ) {
+		glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &saved.drawFbo );
+	}
+	glGetIntegerv( GL_READ_BUFFER, &saved.readBuffer );
+	if ( drawSide ) {
+		glGetIntegerv( GL_DRAW_BUFFER, &saved.drawBuffer );
+	}
+}
+
+static void R_GLCopy_SaveTargetState( glCopySavedState_t &saved, const bool drawSide ) {
+	saved.scissorWasEnabled = GL_FALSE;
+
+	const int mode = r_glCopyTargetState.GetInteger();
+	if ( mode == 0 ) {
+		glCopyKnown.asked++;
+		R_GLCopy_AskTargetState( saved, drawSide );
+		return;
+	}
+	if ( glCopyKnown.contextGeneration != tr.glContextGeneration ) {
+		// names and conventions of another context say nothing about this one
+		memset( glCopyKnown.targets, 0, sizeof( glCopyKnown.targets ) );
+		glCopyKnown.contextGeneration = tr.glContextGeneration;
+		glCopyKnown.nextSlot = 0;
+	}
+
+	// a caller that reads a source it has not bound names what stays bound
+	idRenderTexture *target = backEnd.copyKeepsBoundTarget ? backEnd.copyBoundTarget : backEnd.renderTexture;
+	const GLint handle = static_cast<GLint>( target != NULL ? target->GetDeviceHandle() : R_DefaultFramebufferHandle() );
+	const GLint buffer = static_cast<GLint>( target != NULL
+		? ( target->GetNumColorImages() > 0 ? GL_COLOR_ATTACHMENT0 : GL_NONE )
+		: R_DefaultColorBuffer() );
+	if ( target != NULL && handle == 0 ) {
+		// a render target without a framebuffer object of this context
+		glCopyKnown.asked++;
+		R_GLCopy_AskTargetState( saved, drawSide );
+		return;
+	}
+
+	glCopyKnownTarget_t *entry = NULL;
+	for ( int i = 0; i < GLCOPY_KNOWN_TARGETS; i++ ) {
+		glCopyKnownTarget_t &candidate = glCopyKnown.targets[i];
+		if ( candidate.used && candidate.target == target && candidate.handle == handle && candidate.buffer == buffer ) {
+			entry = &candidate;
+			break;
+		}
+	}
+	bool compare = mode == 2 || ( ++glCopyKnown.copies & GLCOPY_RECHECK_MASK ) == 0;
+	if ( entry == NULL ) {
+		entry = &glCopyKnown.targets[glCopyKnown.nextSlot];
+		glCopyKnown.nextSlot = ( glCopyKnown.nextSlot + 1 ) % GLCOPY_KNOWN_TARGETS;
+		entry->target = target;
+		entry->handle = handle;
+		entry->buffer = buffer;
+		entry->used = true;
+		entry->ask = false;
+		compare = true;
+	}
+	if ( entry->ask ) {
+		glCopyKnown.asked++;
+		R_GLCopy_AskTargetState( saved, drawSide );
+		return;
+	}
+
+	saved.readFbo = saved.drawFbo = handle;
+	saved.readBuffer = saved.drawBuffer = buffer;
+	if ( !compare ) {
+		glCopyKnown.known++;
+		return;
+	}
+
+	glCopySavedState_t asked;
+	R_GLCopy_AskTargetState( asked, true );
+	glCopyKnown.compared++;
+	if ( asked.readFbo != handle || asked.drawFbo != handle || asked.readBuffer != buffer || asked.drawBuffer != buffer ) {
+		glCopyKnown.differed++;
+		entry->ask = true;
+		common->Warning( "OpenGL copy: the %s is recorded as framebuffer %d with buffer 0x%x, but OpenGL has "
+			"read %d / draw %d with buffers 0x%x / 0x%x; copies ask for its state from now on",
+			target != NULL ? "bound render target" : "default framebuffer", handle, buffer,
+			asked.readFbo, asked.drawFbo, asked.readBuffer, asked.drawBuffer );
+		saved.readFbo = asked.readFbo;
+		saved.drawFbo = asked.drawFbo;
+		saved.readBuffer = asked.readBuffer;
+		saved.drawBuffer = asked.drawBuffer;
+		return;
+	}
+	glCopyKnown.known++;
+}
+
+static void R_GLCopy_RestoreTargetState( const glCopySavedState_t &saved, const bool drawSide ) {
+	glBindFramebuffer( GL_READ_FRAMEBUFFER, saved.readFbo );
+	if ( drawSide ) {
+		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, saved.drawFbo );
+	}
+	glReadBuffer( saved.readBuffer );
+	if ( drawSide ) {
+		glDrawBuffer( saved.drawBuffer );
+	}
+}
+
+// glBlitFramebuffer and the copies obey the scissor test: a copy must not be
+// clipped by the scissor of the light that was drawn last
+static void R_GLCopy_DisableScissor( glCopySavedState_t &saved ) {
+	saved.scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
+	if ( saved.scissorWasEnabled ) {
+		glGetIntegerv( GL_SCISSOR_BOX, saved.scissorBox );
+		glDisable( GL_SCISSOR_TEST );
+	}
+}
+
+static void R_GLCopy_RestoreScissor( const glCopySavedState_t &saved ) {
+	if ( saved.scissorWasEnabled ) {
+		glScissor( saved.scissorBox[0], saved.scissorBox[1], saved.scissorBox[2], saved.scissorBox[3] );
+		glEnable( GL_SCISSOR_TEST );
+	}
+}
+
+// r_debugRenderToTexture: how the copies since the last report found their state
+void R_GLCopy_PrintTargetStateInfo( void ) {
+	common->Printf( "OpenGL copy target state: mode=%d known=%llu asked=%llu compared=%llu differed=%llu\n",
+		r_glCopyTargetState.GetInteger(), static_cast<unsigned long long>( glCopyKnown.known ),
+		static_cast<unsigned long long>( glCopyKnown.asked ), static_cast<unsigned long long>( glCopyKnown.compared ),
+		static_cast<unsigned long long>( glCopyKnown.differed ) );
+	glCopyKnown.known = glCopyKnown.asked = glCopyKnown.compared = glCopyKnown.differed = 0;
+}
+
+/*
 ====================
 CopyFramebuffer
 ====================
@@ -2111,15 +2307,8 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 
 	if ( ( readingFromRenderTexture || readingFromMultisampledStandIn )
 			&& ( GLEW_EXT_framebuffer_blit || GLEW_ARB_framebuffer_object || GLEW_VERSION_3_0 ) ) {
-		GLint previousReadFbo = 0;
-		GLint previousDrawFbo = 0;
-		GLint previousReadBuffer = GL_BACK;
-		GLint previousDrawBuffer = GL_BACK;
-
-		glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previousReadFbo );
-		glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFbo );
-		glGetIntegerv( GL_READ_BUFFER, &previousReadBuffer );
-		glGetIntegerv( GL_DRAW_BUFFER, &previousDrawBuffer );
+		glCopySavedState_t saved;
+		R_GLCopy_SaveTargetState( saved, true );
 
 		if ( r_copyFramebufferFbo == 0 ) {
 			glGenFramebuffers( 1, &r_copyFramebufferFbo );
@@ -2146,12 +2335,7 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 		glDrawBuffer( GL_COLOR_ATTACHMENT0 );
 
 		// glBlitFramebuffer obeys scissor state; ensure the copy is not clipped by a prior light scissor.
-		const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
-		GLint previousScissorBox[4] = { 0, 0, 0, 0 };
-		if ( scissorWasEnabled ) {
-			glGetIntegerv( GL_SCISSOR_BOX, previousScissorBox );
-			glDisable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_DisableScissor( saved );
 
 		glBlitFramebuffer( x, y, x + imageWidth, y + imageHeight, 0, 0, imageWidth, imageHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST );
 		{
@@ -2164,22 +2348,14 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 				R_CountMSAAResolve( false );
 			}
 		}
-		if ( scissorWasEnabled ) {
-			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
-			glEnable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_RestoreScissor( saved );
 
 		glFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, copyTarget, 0, 0 );
 
-		glBindFramebuffer( GL_READ_FRAMEBUFFER, previousReadFbo );
-		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previousDrawFbo );
-		glReadBuffer( previousReadBuffer );
-		glDrawBuffer( previousDrawBuffer );
+		R_GLCopy_RestoreTargetState( saved, true );
 	} else {
-		GLint previousReadFbo = 0;
-		GLint previousReadBuffer = GL_BACK;
-		glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previousReadFbo );
-		glGetIntegerv( GL_READ_BUFFER, &previousReadBuffer );
+		glCopySavedState_t saved;
+		R_GLCopy_SaveTargetState( saved, false );
 
 		if ( readingFromRenderTexture ) {
 			glBindFramebuffer( GL_READ_FRAMEBUFFER, backEnd.renderTexture->GetDeviceHandle() );
@@ -2189,12 +2365,7 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 			glReadBuffer( R_DefaultColorBuffer() );
 		}
 
-		const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
-		GLint previousScissorBox[4] = { 0, 0, 0, 0 };
-		if ( scissorWasEnabled ) {
-			glGetIntegerv( GL_SCISSOR_BOX, previousScissorBox );
-			glDisable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_DisableScissor( saved );
 
 		// ES 3.0 constrains glCopyTexImage2D's internalformat more tightly than
 		// desktop does. Allocating the level with glTexImage2D and then copying
@@ -2214,13 +2385,9 @@ bool idImage::CopyFramebuffer( int x, int y, int imageWidth, int imageHeight,
 			glCopyTexSubImage2D( copyTarget, 0, 0, 0, x, y, imageWidth, imageHeight );
 		}
 
-		if ( scissorWasEnabled ) {
-			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
-			glEnable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_RestoreScissor( saved );
 
-		glBindFramebuffer( GL_READ_FRAMEBUFFER, previousReadFbo );
-		glReadBuffer( previousReadBuffer );
+		R_GLCopy_RestoreTargetState( saved, false );
 
 		if ( needsStorageResize ) {
 			glTexParameterf( textureTarget, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
@@ -2291,15 +2458,8 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 	// Prefer depth blits when sampling depth for SSAO, especially for MSAA sources.
 	// glReadPixels from multisampled depth buffers is invalid on many drivers.
 	if ( canBlitDepth && ( readingFromRenderTexture || sourceDepthIsMSAA ) ) {
-		GLint previousReadFbo = 0;
-		GLint previousDrawFbo = 0;
-		GLint previousReadBuffer = GL_BACK;
-		GLint previousDrawBuffer = GL_BACK;
-
-		glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previousReadFbo );
-		glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFbo );
-		glGetIntegerv( GL_READ_BUFFER, &previousReadBuffer );
-		glGetIntegerv( GL_DRAW_BUFFER, &previousDrawBuffer );
+		glCopySavedState_t saved;
+		R_GLCopy_SaveTargetState( saved, true );
 
 		if ( r_copyDepthbufferFbo == 0 ) {
 			glGenFramebuffers( 1, &r_copyDepthbufferFbo );
@@ -2338,12 +2498,7 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 		glReadBuffer( GL_NONE );
 		glDrawBuffer( GL_NONE );
 
-		const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
-		GLint previousScissorBox[4] = { 0, 0, 0, 0 };
-		if ( scissorWasEnabled ) {
-			glGetIntegerv( GL_SCISSOR_BOX, previousScissorBox );
-			glDisable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_DisableScissor( saved );
 
 		glBlitFramebuffer( x, y, x + imageWidth, y + imageHeight, 0, 0, imageWidth, imageHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST );
 		if ( sourceDepthIsMSAA ) {
@@ -2351,17 +2506,11 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 			R_CountMSAAResolve( true );	// FPS-05
 		}
 
-		if ( scissorWasEnabled ) {
-			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
-			glEnable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_RestoreScissor( saved );
 
 		glFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, copyTarget, 0, 0 );
 
-		glBindFramebuffer( GL_READ_FRAMEBUFFER, previousReadFbo );
-		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previousDrawFbo );
-		glReadBuffer( previousReadBuffer );
-		glDrawBuffer( previousDrawBuffer );
+		R_GLCopy_RestoreTargetState( saved, true );
 		backEnd.c_copyDepthBuffer++;
 		return true;
 	}
@@ -2378,14 +2527,8 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 			return false;
 		}
 
-		GLint previousReadFbo = 0;
-		GLint previousDrawFbo = 0;
-		GLint previousReadBuffer = GL_BACK;
-		GLint previousDrawBuffer = GL_BACK;
-		glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previousReadFbo );
-		glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, &previousDrawFbo );
-		glGetIntegerv( GL_READ_BUFFER, &previousReadBuffer );
-		glGetIntegerv( GL_DRAW_BUFFER, &previousDrawBuffer );
+		glCopySavedState_t saved;
+		R_GLCopy_SaveTargetState( saved, true );
 
 		if ( readingFromRenderTexture ) {
 			glBindFramebuffer( GL_READ_FRAMEBUFFER, backEnd.renderTexture->GetDeviceHandle() );
@@ -2394,21 +2537,13 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 			glReadBuffer( R_DefaultColorBuffer() );
 		}
 
-		const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
-		GLint previousScissorBox[4] = { 0, 0, 0, 0 };
-		if ( scissorWasEnabled ) {
-			glGetIntegerv( GL_SCISSOR_BOX, previousScissorBox );
-			glDisable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_DisableScissor( saved );
 
 		static idList<float> resolvedDepthBuffer;
 		resolvedDepthBuffer.SetNum( pixelCount, false );
 		glReadPixels( x, y, imageWidth, imageHeight, GL_DEPTH_COMPONENT, GL_FLOAT, resolvedDepthBuffer.Ptr() );
 
-		if ( scissorWasEnabled ) {
-			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
-			glEnable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_RestoreScissor( saved );
 
 		// The readback buffer always holds GL_FLOAT depth values regardless of
 		// the texture's preferred upload type.
@@ -2431,15 +2566,10 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 			glTexParameterf( textureTarget, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
 		}
 
-		glBindFramebuffer( GL_READ_FRAMEBUFFER, previousReadFbo );
-		glBindFramebuffer( GL_DRAW_FRAMEBUFFER, previousDrawFbo );
-		glReadBuffer( previousReadBuffer );
-		glDrawBuffer( previousDrawBuffer );
+		R_GLCopy_RestoreTargetState( saved, true );
 	} else {
-		GLint previousReadFbo = 0;
-		GLint previousReadBuffer = GL_BACK;
-		glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, &previousReadFbo );
-		glGetIntegerv( GL_READ_BUFFER, &previousReadBuffer );
+		glCopySavedState_t saved;
+		R_GLCopy_SaveTargetState( saved, false );
 
 		if ( readingFromRenderTexture ) {
 			glBindFramebuffer( GL_READ_FRAMEBUFFER, backEnd.renderTexture->GetDeviceHandle() );
@@ -2447,12 +2577,7 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 			glBindFramebuffer( GL_READ_FRAMEBUFFER, R_DefaultFramebufferHandle() );
 		}
 
-		const GLboolean scissorWasEnabled = glIsEnabled( GL_SCISSOR_TEST );
-		GLint previousScissorBox[4] = { 0, 0, 0, 0 };
-		if ( scissorWasEnabled ) {
-			glGetIntegerv( GL_SCISSOR_BOX, previousScissorBox );
-			glDisable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_DisableScissor( saved );
 
 		if ( needsStorageResize && !isCube ) {
 			glCopyTexImage2D( copyTarget, 0, internalFormat != 0 ? internalFormat : GL_DEPTH_COMPONENT, x, y, imageWidth, imageHeight, 0 );
@@ -2467,13 +2592,9 @@ bool idImage::CopyDepthbuffer( int x, int y, int imageWidth, int imageHeight,
 			glCopyTexSubImage2D( copyTarget, 0, 0, 0, x, y, imageWidth, imageHeight );
 		}
 
-		if ( scissorWasEnabled ) {
-			glScissor( previousScissorBox[0], previousScissorBox[1], previousScissorBox[2], previousScissorBox[3] );
-			glEnable( GL_SCISSOR_TEST );
-		}
+		R_GLCopy_RestoreScissor( saved );
 
-		glBindFramebuffer( GL_READ_FRAMEBUFFER, previousReadFbo );
-		glReadBuffer( previousReadBuffer );
+		R_GLCopy_RestoreTargetState( saved, false );
 	}
 
 	backEnd.c_copyDepthBuffer++;

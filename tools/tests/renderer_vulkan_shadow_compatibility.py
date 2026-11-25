@@ -7838,7 +7838,8 @@ def validate_vulkan_receiver_scan_contract() -> None:
     # slot (no geometry, no shader, outside the light) receives nothing and must
     # not keep them; an unbuilt interaction stays unknown; an interaction being
     # built answers for every surface of its model. The verdict is memoized per
-    # view light, so every interaction state change must invalidate it.
+    # view light, so every interaction state change must reach the memo: it is
+    # corrected from the interaction that changed (FPS-08), never left stale.
     light = read("src/renderer/tr_light.cpp")
     admission = braced_body(light, "bool R_ShadowMapLightWillUseShadowMaps(",
                             "front-end shadow-map stencil-elision admission")
@@ -7855,19 +7856,51 @@ def validate_vulkan_receiver_scan_contract() -> None:
     # the model it last drew when it animates.
     require_order(scan, ("vLight->shadowMapReceiverScanValid", "return vLight->shadowMapReceiverScanAllowsMaps;",
                          "VK_MaterialPrograms_NeedsStencilGeneration()",
-                         "if ( inter->IsDeferred() ) {",
-                         "if ( entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {",
-                         "continue;",
-                         "if ( entityDef->viewEntity == NULL || entityDef->viewEntity->scissorRect.IsEmpty() ) {",
-                         "continue;",
-                         "if ( hModel != NULL && hModel->IsDynamicModel() == DM_STATIC && entityDef->parms.callback == NULL ) {",
-                         "R_ShadowMapNoteEntityModel( entityDef, hModel );",
-                         "if ( R_EntityReceiverVerdict( entityDef, generation, entityNeedsStencil )",
-                         "&& !entityNeedsStencil ) {",
-                         "continue;", "allowsMaps = false;",
-                         "if ( R_InteractionReceiverNeedsStencil( inter, generation ) ) {", "allowsMaps = false;",
-                         "vLight->shadowMapReceiverScanValid = true;"),
-                  "memoized Vulkan receiver scan keeps unbuilt interactions that may still gain receivers unknown")
+                         "const idInteraction *blocker = R_ShadowMapReceiverScanBlocker( lightDef, generation );",
+                         "const bool allowsMaps = blocker == NULL;",
+                         "vLight->shadowMapReceiverScanValid = true;",
+                         "vLight->shadowMapReceiverScanAllowsMaps = allowsMaps;",
+                         "vLight->shadowMapReceiverScanBlocker = blocker;"),
+                  "memoized Vulkan receiver scan remembers the interaction its verdict rests on")
+    whole = braced_body(light, "static const idInteraction *R_ShadowMapReceiverScanBlocker(", "whole receiver scan")
+    require_order(whole, ("inter = lightDef->firstInteraction; inter != NULL; inter = inter->lightNext",
+                          "if ( R_ShadowMapInteractionBlocksMaps( inter, generation ) ) {", "return inter;", "return NULL;"),
+                  "the whole scan stops at the first interaction that blocks maps")
+    blocks = braced_body(light, "static bool R_ShadowMapInteractionBlocksMaps(", "one interaction's receiver verdict")
+    require_order(blocks, ("if ( inter->IsDeferred() ) {",
+                           "if ( entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {",
+                           "return false;",
+                           "if ( entityDef->viewEntity == NULL || entityDef->viewEntity->scissorRect.IsEmpty() ) {",
+                           "return false;",
+                           "if ( hModel != NULL && hModel->IsDynamicModel() == DM_STATIC && entityDef->parms.callback == NULL ) {",
+                           "R_ShadowMapNoteEntityModel( entityDef, hModel );",
+                           "if ( R_EntityReceiverVerdict( entityDef, generation, entityNeedsStencil )",
+                           "&& !entityNeedsStencil ) {",
+                           "return false;", "return true;",
+                           "return R_InteractionReceiverNeedsStencil( inter, generation );"),
+                  "an unbuilt interaction that may still gain receivers in the view keeps its light unknown")
+    # One interaction changing corrects the memo in place. Allowed: only that
+    # interaction can block. Blocked: the verdict stands while its blocker still
+    # blocks, and is given up (never guessed) once it does not, or when the
+    # blocker leaves the list. Outside a view's front end it is simply dropped.
+    changed = braced_body(light, "void R_ShadowMapReceiverScanChanged(", "receiver scan correction")
+    require_order(changed, ("lightDef->viewCount != tr.viewCount", "#ifdef OPENQ4_RENDERER_VK_MODULE",
+                            "if ( tr.viewDef == NULL || inter == NULL || r_shadowMapReceiverScanIncremental.GetInteger() == 0 ) {",
+                            "vLight->shadowMapReceiverScanValid = false;",
+                            "const bool listed = !leavingList && ( inter->lightPrev != NULL || lightDef->firstInteraction == inter );",
+                            "if ( vLight->shadowMapReceiverScanAllowsMaps ) {",
+                            "if ( listed ) {",
+                            "if ( R_ShadowMapInteractionBlocksMaps( inter, generation ) ) {",
+                            "vLight->shadowMapReceiverScanAllowsMaps = false;",
+                            "vLight->shadowMapReceiverScanBlocker = inter;",
+                            "bool stillBlocked = blocker != NULL && ( blocker != inter || listed );",
+                            "stillBlocked = R_ShadowMapInteractionBlocksMaps( blocker, generation );",
+                            "if ( !stillBlocked ) {",
+                            "vLight->shadowMapReceiverScanValid = false;",
+                            "#else", "vLight->shadowMapReceiverScanValid = false;"),
+                  "a changed interaction corrects the memoized verdict or gives it up")
+    if "shadowMapReceiverScanAllowsMaps = true" in changed:
+        raise AssertionError("only a whole scan may conclude that a light's receivers allow maps")
     model_verdict = braced_body(light, "static bool R_ModelReceiverNeedsStencil(", "whole-model receiver verdict")
     require_order(model_verdict, ("surf->geometry == NULL",
                                   "R_RemapShaderBySkin( surf->shader, parms.customSkin, parms.customShader ), NULL )",
@@ -7897,25 +7930,43 @@ def validate_vulkan_receiver_scan_contract() -> None:
             "a visible entity whose interactions are all culled still records its model")
 
     interaction = read("src/renderer/Interaction.cpp")
-    for marker, context in (("idInteraction *idInteraction::AllocAndLink(", "new unbuilt interaction"),
-                            ("void idInteraction::FreeSurfaces(", "freed surfaces"),
-                            ("void idInteraction::Unlink(", "unlinked or emptied interaction")):
-        require(braced_body(interaction, marker, context), "R_InvalidateShadowMapReceiverScan(",
-                f"{context} invalidates the memoized receiver scan")
+    for marker, context, report in (
+            ("idInteraction *idInteraction::AllocAndLink(", "new unbuilt interaction",
+             "R_ShadowMapReceiverScanChanged( ldef, interaction, false );"),
+            ("void idInteraction::FreeSurfaces(", "freed surfaces",
+             "R_ShadowMapReceiverScanChanged( this->lightDef, this, false );"),
+            ("void idInteraction::Unlink(", "unlinked or emptied interaction",
+             "R_ShadowMapReceiverScanChanged( this->lightDef, this, true );")):
+        require(braced_body(interaction, marker, context), report,
+                f"{context} reports itself to the memoized receiver scan")
+    if "shadowMapReceiverScanValid" in interaction:
+        raise AssertionError("only tr_light.cpp may write the receiver scan memo")
+    # The scan may rest on the interaction that leaves: it has to hear before
+    # the links go, and an allocation only once the interaction is on the list.
+    require_order(braced_body(interaction, "void idInteraction::Unlink(", "unlinked or emptied interaction"),
+                  ("R_ShadowMapReceiverScanChanged( this->lightDef, this, true );",
+                   "this->lightDef->firstInteraction = this->lightNext;", "this->lightNext = this->lightPrev = NULL;"),
+                  "an interaction leaving its light's list is reported while it is still on it")
+    require_order(braced_body(interaction, "idInteraction *idInteraction::AllocAndLink(", "new unbuilt interaction"),
+                  ("ldef->firstInteraction = interaction;", "R_ShadowMapReceiverScanChanged( ldef, interaction, false );"),
+                  "a new interaction is reported once it is on its light's list")
     # Only an interaction AddActiveInteraction leaves unbuilt in this view may be
     # skipped; freeing its surfaces makes it unknown again.
     active = braced_body(interaction, "void idInteraction::AddActiveInteraction(", "interaction submission")
     require_order(active, ("struct unbuiltVisitMark_t {", "if ( inter->IsDeferred() ) {",
-                           "inter->unbuiltVisitView = tr.viewCount;", "R_InvalidateShadowMapReceiverScan( inter->lightDef );",
+                           "inter->unbuiltVisitView = tr.viewCount;",
+                           "R_ShadowMapReceiverScanChanged( inter->lightDef, inter, false );",
                            "} unbuiltVisitMark = { this };", "CreateInteraction( model );"),
                   "unbuilt-visit mark is recorded on every return of the only interaction builder")
-    require(braced_body(interaction, "void idInteraction::FreeSurfaces(", "freed surfaces"), "this->unbuiltVisitView = -1;",
-            "freed surfaces forget the unbuilt visit")
+    require_order(braced_body(interaction, "void idInteraction::FreeSurfaces(", "freed surfaces"),
+                  ("this->numSurfaces = -1;", "this->unbuiltVisitView = -1;",
+                   "R_ShadowMapReceiverScanChanged( this->lightDef, this, false );"),
+                  "freed surfaces forget the unbuilt visit before the scan is told")
     create = braced_body(interaction, "void idInteraction::CreateInteraction(", "interaction creation")
     require_order(create, ("R_ShadowMapNoteEntityModel( entityDef, model );",
-                           "buildModel = model;", "R_InvalidateShadowMapReceiverScan( lightDef );",
+                           "buildModel = model;", "R_ShadowMapReceiverScanChanged( lightDef, this, false );",
                            "const bool suppressRegeneratedShadowVolume =", "buildModel = NULL;",
-                           "R_InvalidateShadowMapReceiverScan( lightDef );", "MakeEmpty();"),
+                           "R_ShadowMapReceiverScanChanged( lightDef, this, false );", "MakeEmpty();"),
                   "interaction creation brackets its slots with the build model")
 
     programs = read("src/renderer/Vulkan/vk_MaterialPrograms.cpp")

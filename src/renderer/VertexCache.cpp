@@ -77,6 +77,14 @@ void idVertexCache::BindArrayBuffer( GLuint vbo ) {
 idVertexCache::BindIndexBuffer
 ==============
 */
+bool idVertexCache::BoundArrayBuffer( unsigned int &vbo ) {
+	if ( vc_boundArrayBuffer == VERTCACHE_BIND_UNKNOWN ) {
+		return false;
+	}
+	vbo = vc_boundArrayBuffer;
+	return true;
+}
+
 void idVertexCache::BindIndexBuffer( GLuint vbo ) {
 	if ( glBindBufferARB == NULL ) {
 		vc_boundIndexBuffer = VERTCACHE_BIND_UNKNOWN;

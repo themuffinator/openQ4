@@ -2700,6 +2700,8 @@ new layouts.
 ### 22.6 Leads, not changed
 
 In rough order of what they look worth. None is measured unless it says so.
+[Section 23](#23-the-renderer-round-continued-state-queries-and-the-receiver-scan-fps-08-25-november-2026) takes them up one by one and says what
+became of each.
 
 - **Vulkan copies stencil shadow volumes into the frame ring every frame**
   (`VK_Exec_BindShadowGeometry`), where ambient geometry is resident. Balanced
@@ -2735,3 +2737,212 @@ In rough order of what they look worth. None is measured unless it says so.
   shared deformation path reads.
 - **The legacy HUD's state** is still evaluated every frame under the retained
   HUD (1.8% of the combat wave).
+
+## 23. The renderer round continued: state queries and the receiver scan (FPS-08), 25 November 2026
+
+The leads section 22 ranked were taken up one by one: each was measured first,
+with the profiles and the kit of that section, and only what held up was
+changed. Two changes came of it, one of them from a profile rather than from
+the list, and most of the list turned out smaller than it read (23.4). The
+method and the machine are section 22's: a hidden 1280x720 window that paces
+at 60 Hz, the Quality preset, the suite's `combat_airdefense1` wave and
+`indoor_hub2` view, other sessions sharing the machine, and so counts and
+comparisons inside one launch rather than wall-clock frame rates.
+
+### 23.1 OpenGL asks the driver for nothing it set itself
+
+**The cost.** A state query (`glIsEnabled`, `glGetIntegerv`, `glGetError`) is
+answered from the driver's own state. A driver that queues an application's
+commands for a worker thread (NVIDIA's threaded optimisation, Mesa's glthread)
+has to finish every queued command before it can answer, so each query makes
+the calling thread wait for the driver. A profile of the light grid map for
+lead four showed it: a third of the main thread's running samples sat in the
+driver's wait for its own thread, called from `idImage::CopyDepthbuffer`,
+`CopyFramebuffer` and the shadow map passes, where section 22's profiles of a
+driver without a worker thread had the same share inside the driver's drawing
+code.
+
+**The count.** A wrapper that notes the call site of every state query that
+reaches the driver (`r_glStateQueryReport`) counted 49 a frame in hub2 at the
+Quality preset:
+
+| Queries a frame | Asked by | For |
+| ---: | --- | --- |
+| 24 | the four copies of the screen and the depth buffer | both framebuffer bindings, the read and draw buffers, the scissor test and its box, to put them back |
+| 7 | render target clears | the scissor test, to turn it off and back on |
+| 9 | three shadow map passes | blending, the scissor and stencil tests and the clear colour, to put them back |
+| 3 | the SSAO occlusion pass | the viewport, the scissor box and the scissor test |
+| 3 | full-screen passes | the array buffer binding |
+| 1 | the multisample resolve | the scissor test |
+| 2 | the error flag | once at the end of the frame, once in the resolve |
+
+Every one of those values had been set by the renderer. The combat wave, with
+six or seven copies and about seven shadow map passes a frame, asked 68 to 73
+as the fight went on.
+
+**What changed.**
+
+- *State the renderer set is remembered* (`GLQueryShadow.h`,
+  `r_glStateQueries`). In the OpenGL module, macros replace `glEnable`,
+  `glDisable`, `glScissor`, `glViewport`, `glClearColor`, `glPushAttrib` and
+  `glPopAttrib` and the queries for every source file, which is every caller
+  there is. The setters record what they set (the enables of blending and the
+  scissor, stencil, cull and depth tests, the scissor box, the viewport, the
+  clear colour); a pushed attribute group comes back with its pop; a query of a
+  recorded value is answered without the driver. A value nothing has set yet is
+  asked for once. A value the driver may not keep as given is not recorded: a
+  scissor box with a negative size, a viewport larger than the implementation's
+  limit, a clear colour outside [0,1]. The array buffer binding is answered
+  from the vertex cache's own record. The call sites are unchanged.
+- *A copy takes the state it puts back from the bound target*
+  (`r_glCopyTargetState`). The back end binds a render target to both
+  framebuffer bindings and selects its buffers every time it makes one current,
+  and records it in `backEnd.renderTexture`, which the copies already trusted
+  for their source. A target is compared with OpenGL the first time a copy sees
+  it and every 64th copy after that; one that differs is reported and asked
+  about from then on, and the copy that found the difference uses the driver's
+  answer. The check found one such caller at once: the SSAO pass points
+  `backEnd.renderTexture` at its world depth target for one copy without
+  binding it. It now names the target that stays bound
+  (`backEnd.copyBoundTarget`).
+- *The resolve reads the error flag only when the answer is used*: before a
+  depth resolve, whose own check must not find an older error, or while errors
+  are being reported (`r_ignoreGLErrors 0`). The check at the end of the frame
+  still finds whatever is pending. What differs is the rare frame with an
+  error in it: an error raised while the scene was drawn now stays pending
+  through the post chain, where a buffer storage operation would count it as
+  its own failure, as it already did for any error raised after the resolve.
+
+| Queries reaching the driver, a frame (Quality) | Before | After |
+| --- | ---: | ---: |
+| `game/hub2` | 49.0 | 1.24 |
+| `game/airdefense2` (light grid) | 49.0 | 1.31 |
+| `game/airdefense1`, combat wave | 68 to 73 | 1.4 |
+
+What is left in these scenes is the error flag at the end of the frame and,
+once in 64 copies, the four values a copy compares. Paths they do not run may
+still ask, and an image upload still reads the error flag (a preset switch
+that reloads textures shows as up to 19 reads a frame while it lasts);
+`r_glStateQueryReport` names the call site of every query that reaches the
+driver.
+
+**Exactness.** Both changes have a mode that answers, asks the driver as well
+and reports a difference (`r_glStateQueries 2`, `r_glCopyTargetState 2`). With
+both on, no difference in hub2, in airdefense2, in the combat wave, or in hub2
+under each of the nine presets from Minimum to Maximum. Screenshots with the
+world frozen are identical in every pixel between the old and the new path
+inside one launch, in hub2 and in airdefense2. `renderer_gl_display_policy`
+compiles both pieces against a driver that counts the queries it answers and
+keeps OpenGL's rules for the attribute stack, clamped viewports and rejected
+sizes; all 25 deliberate breakages of the two pieces fail it.
+
+**What it buys depends on the driver, and was not measured where it matters.**
+With a driver that draws on the calling thread a query is cheap, and the
+main thread's CPU time is the same (hub2 view sweep, CPU seconds a second of
+the main thread over 25 s, a launch each):
+
+| | Launch 1 | 2 | 3 | 4 | 5 | Mean |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Queries asked (`r_glStateQueries 0`, `r_glCopyTargetState 0`) | 0.325 | 0.311 | 0.292 | 0.318 | 0.221 | 0.293 |
+| Answered | 0.289 | 0.318 | 0.291 | 0.305 | 0.281 | 0.297 |
+
+In those launches no other thread of the process used more than 0.011 CPU
+seconds a second: the driver was not using a worker thread, with either path.
+It had been in two earlier profiles of the old path, where its wait for that
+thread was 21% (hub2, 12 s) and 33% (airdefense2, 25 s) of the main thread's
+running samples; in the hub2 launch it stopped using the thread before the
+next window. Whether NVIDIA's driver uses its worker thread is its own
+decision ("Threaded optimisation: Auto") and cannot be set from the
+application, so the frame time with the thread in use and the queries gone was
+not measured. The claim that stands is the count.
+
+**Not covered.** The state record belongs to the OpenGL module; the OpenGL ES
+module keeps its queries except in the copies, whose code is shared.
+On Linux both pieces pass GCC's syntax check in all three renderer modules
+(every file of the OpenGL module, the changed files of the other two) and
+Clang's for the changed OpenGL files; nothing was run there, and macOS was not
+compiled. A frame handed to a headset ends with the record forgotten, since
+the compositor's calls are not the renderer's; that path was not run on a
+headset.
+
+### 23.2 Vulkan's receiver scan follows its interactions
+
+A light that renders shadow maps may leave its stencil volumes out only if
+none of its receivers needs them (`R_ShadowMapReceiversAllowMaps`: authored
+GLSL lighting has no shadow map sampler). The verdict for a view was memoized
+on the view light and thrown away whenever one of the light's interactions
+changed state. An animating entity frees and rebuilds its interaction with
+every light it touches in every view, so each of those cost a walk of that
+light's whole interaction list: 1.4% of the combat wave on Vulkan in section
+22's profile.
+
+The memo is now corrected from the interaction that changed
+(`R_ShadowMapReceiverScanChanged`, `r_shadowMapReceiverScanIncremental`). While
+it allows maps, every interaction on the list passed, so the one that changed
+decides alone. While it does not, the scan stopped at the interaction that
+blocked it and read nothing after it: nothing that happens to another
+interaction changes the verdict while that one still blocks, and once it does
+not, or leaves the list, the list is read again at the next question. Only a
+whole scan ever concludes that a light's receivers allow maps. An interaction
+that is being built also takes the verdict its entity recorded from the same
+model a moment earlier instead of walking the model's surfaces again for every
+light.
+
+| Combat wave, Vulkan, Quality | Whole scan after any change | Corrected in place |
+| --- | ---: | ---: |
+| Whole scans of a light's list, a frame | 50.0 | 6.1 |
+| Interactions tested, a frame | 4,948 | 651 (546 in whole scans, 105 one at a time) |
+| The scan and its upkeep, of the main thread's running samples | 1.66% (49 of 2,955) | 0.61% (35 of 5,745) |
+
+A second launch of the new path tested 761 interactions a frame and sampled
+0.63% (36 of 5,712); the old path's second launch was lost to a stall of the
+sampler. Other sessions loaded the machine unevenly across the launches (1,801
+frames in the old path's window, 1,410 and 1,524 in the new path's), so it is
+the shares that compare, not the sample counts, and frame time was not
+compared at all.
+
+`r_shadowMapReceiverScanIncremental 2` keeps the old protocol's verdict beside
+the new one and compares them at every question: 206,899 answers in the
+combat wave and 106,350 in hub2, none different.
+`rendererVulkanMemoryInfo` prints the counts.
+
+### 23.3 Smaller
+
+- `_currentRender` and `_currentDepth` are recognised by image name for every
+  image of every stage drawn, and the emitter-panel test by material name for
+  every surface of every interaction built. Each now looks at the first
+  character before it compares the prefix (0.5% of the combat wave on Vulkan,
+  0.3% on OpenGL, in string compares).
+- `rendererVulkanMemoryInfo` splits what Vulkan's frame rings were filled with:
+  vertex streams that are not resident, index lists, the index lists of
+  surfaces whose vertices are resident, and the two streams of stencil shadow
+  volumes (`r_vkResourceProfile 1`).
+
+### 23.4 Section 22's leads, measured
+
+| Lead | What the measurement says | Now |
+| --- | --- | --- |
+| Vulkan copies stencil shadow volumes into the frame ring | hub2 view sweep, kB a frame: 1,223 into the rings at Performance, of them 482 of volume vertices and 425 of volume indexes; 1,177 at Balanced, 467 and 368. At Quality the view's lights render shadow maps and no volume is uploaded | left: resident copies of static volumes need a key that outlives the frame, and the upload memo is keyed on pointers and lives one frame. The largest piece of Vulkan's uploads at the presets that draw volumes |
+| The receiver scan | 23.2 | done |
+| A static vertex block a frame for every skinned surface | 1.4% of the combat wave on Vulkan, of which about 0.4% is the allocation and 0.4% the copy; frame-temp blocks would save the first | left: a snapshot kept into the next frame holds the pointer |
+| OpenGL's light grid state per receiver | 0.36% of the main thread's running samples with 45 receivers in view (`game/airdefense2`), about 0.02 ms a frame | set aside |
+| OpenGL's soft-particle uniforms | the stage is 3.0% of the combat wave on OpenGL, 1.1% of it the draws themselves and 0.4% the depth capture | left |
+| The post chain's plain copies, SSAO's own depth copy | not measured: GPU time, and a `_currentDepth` taken earlier in the view is not known to be the finished depth | left |
+| Subviews under Resolution Scale | not reproduced. Both stock render maps are 512x256, a subview's crop is taken in the virtual units of the crop around it, so it always fits; the camera feeds of `game/storage1` and `game/mcc_1` show nothing at the start of the map | open, unverified |
+| Back-side tangents | `R_DeriveTangents` is 0.03% of the combat wave | set aside |
+| The 296-byte deformation record | every `memset` on the main thread together is 0.27%; five shared domains read the zeroed record without asking whether it was initialised | set aside |
+| The legacy HUD's state under the retained HUD | 1.2% on Vulkan, 0.4% on OpenGL; the stock windows' scripts still run their time events from that state under the retained HUD | left to the interface work |
+
+New from this round:
+
+- **Vulkan copies every index list into the frame ring every frame**, the
+  lists of surfaces whose vertices are resident included: 164 of 188 kB a
+  frame at Performance and 319 of 441 kB at Quality in the hub2 sweep.
+  Resident index lists need an identity for an index array first; a vertex
+  stream has its cache block's.
+- **At Quality the same sweep uploads 441 kB of vertex streams that are not
+  resident a frame**, against 94 kB at Performance. Not looked into.
+- **The error flag at the end of the frame is the one state query left on
+  OpenGL** (`GL_CheckErrors`), and a depth resolve for temporal anti-aliasing
+  adds one in the middle of the frame. It is how a driver error reaches the
+  log today; reading it less often would remove the last forced wait.

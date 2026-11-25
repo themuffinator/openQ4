@@ -2106,7 +2106,21 @@ static bool R_InteractionReceiverNeedsStencil( const idInteraction *inter, const
 	}
 	bool needed = false;
 	if ( inter->buildModel != NULL ) {
-		needed = R_ModelReceiverNeedsStencil( inter->buildModel, inter->entityDef->parms );
+		// CreateInteraction takes the entity's verdict from this very model just
+		// before it sets buildModel (R_ShadowMapNoteEntityModel), and builds an
+		// interaction from it for every light the entity touches: the walk of the
+		// model's surfaces is the same one each time.
+		const idRenderEntityLocal *def = inter->entityDef;
+		if ( def->stencilReceiverGeneration == generation
+				&& def->stencilReceiverInstance == inter->buildModel
+				&& def->stencilReceiverInstanceFrame == def->dynamicModelFrameCount
+				&& def->stencilReceiverModel == def->parms.hModel
+				&& def->stencilReceiverSkin == def->parms.customSkin
+				&& def->stencilReceiverShader == def->parms.customShader ) {
+			needed = def->stencilReceiverNeeded;
+		} else {
+			needed = R_ModelReceiverNeedsStencil( inter->buildModel, inter->entityDef->parms );
+		}
 	} else {
 		for ( int i = 0; i < inter->numSurfaces && !needed; ++i ) {
 			needed = VK_MaterialPrograms_NeedsStencil( inter->surfaces[i].shader, NULL );
@@ -2140,56 +2154,209 @@ It stays unknown only for an animating entity that has drawn none; that only
 costs volumes, never a missing shadow.
 
 The verdict is asked once per surface while interactions are built and
-linked, so it is memoized on the view light and recomputed only after one of
-the light's interactions changes state (idInteraction invalidates it).
+linked, so it is memoized on the view light. An interaction that changes
+state afterwards corrects the memo instead of discarding it
+(R_ShadowMapReceiverScanChanged): an animating entity frees and rebuilds its
+interaction with every light it touches in every view, and each of those
+used to cost a walk of that light's whole interaction list.
 =================
 */
+static idCVar r_shadowMapReceiverScanIncremental( "r_shadowMapReceiverScanIncremental", "1", CVAR_RENDERER | CVAR_INTEGER,
+	"Vulkan: how a light's receiver verdict follows its interactions within a view: 0 = read the light's whole "
+	"interaction list again after any of them changes, 1 = test only the interaction that changed and the one the "
+	"verdict rests on, 2 = as 1, and compare every answer with what 0 would give (qualification)", 0, 2,
+	idCmdSystem::ArgCompletion_Integer<0,2> );
+
+static struct shadowMapReceiverScanStats_t {
+	uint64	queries;		// verdicts asked for
+	uint64	scans;			// answered by reading the light's list
+	uint64	scanVisits;		// interactions those scans tested
+	uint64	changes;		// interaction changes that found a verdict to correct
+	uint64	changeTests;	// interactions those corrections tested
+	uint64	discards;		// corrections that had to give the verdict up
+	uint64	compared;		// mode 2: answers compared with the whole-list protocol
+	uint64	mismatches;		// mode 2: answers that differed
+} shadowMapReceiverScanStats;
+
+/*
+=================
+R_ShadowMapInteractionBlocksMaps
+
+One interaction's part of the receiver scan: whether it keeps its light on
+the stencil chain in this view.
+=================
+*/
+static bool R_ShadowMapInteractionBlocksMaps( const idInteraction *inter, const int generation ) {
+	if ( inter->IsDeferred() ) {
+		idRenderEntityLocal *entityDef = inter->entityDef;
+		if ( entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {
+			return false;
+		}
+		// An entity the view does not see links no receivers, whatever its
+		// interaction goes on to build: AddActiveInteraction links light
+		// surfaces only inside the entity's scissor, which never grows.
+		// The player's own body and head are such entities in every
+		// first-person frame, and they touch every light near the camera.
+		if ( entityDef->viewEntity == NULL || entityDef->viewEntity->scissorRect.IsEmpty() ) {
+			return false;
+		}
+		// A static model is the model its interactions are built from.
+		const idRenderModel *hModel = entityDef->parms.hModel;
+		if ( hModel != NULL && hModel->IsDynamicModel() == DM_STATIC && entityDef->parms.callback == NULL ) {
+			R_ShadowMapNoteEntityModel( entityDef, hModel );
+		}
+		bool entityNeedsStencil = false;
+		if ( R_EntityReceiverVerdict( entityDef, generation, entityNeedsStencil )
+				&& !entityNeedsStencil ) {
+			return false;
+		}
+		return true;
+	}
+	return R_InteractionReceiverNeedsStencil( inter, generation );
+}
+
+// the whole scan: the first interaction on the light's list that blocks maps, or NULL
+static const idInteraction *R_ShadowMapReceiverScanBlocker( const idRenderLightLocal *lightDef, const int generation ) {
+	for ( const idInteraction *inter = lightDef->firstInteraction; inter != NULL; inter = inter->lightNext ) {
+		shadowMapReceiverScanStats.scanVisits++;
+		if ( R_ShadowMapInteractionBlocksMaps( inter, generation ) ) {
+			return inter;
+		}
+	}
+	return NULL;
+}
+
 static bool R_ShadowMapReceiversAllowMaps( const idRenderLightLocal *lightDef ) {
 	viewLight_t *vLight = lightDef->viewCount == tr.viewCount ? lightDef->viewLight : NULL;
-	if ( vLight != NULL && vLight->shadowMapReceiverScanValid ) {
+	shadowMapReceiverScanStats.queries++;
+	const bool qualify = vLight != NULL && r_shadowMapReceiverScanIncremental.GetInteger() == 2;
+	if ( vLight != NULL && vLight->shadowMapReceiverScanValid && !qualify ) {
 		return vLight->shadowMapReceiverScanAllowsMaps;
 	}
 	const int generation = VK_MaterialPrograms_NeedsStencilGeneration();
-	bool allowsMaps = true;
-	for ( const idInteraction *inter = lightDef->firstInteraction; inter != NULL; inter = inter->lightNext ) {
-		if ( inter->IsDeferred() ) {
-			idRenderEntityLocal *entityDef = inter->entityDef;
-			if ( entityDef->viewCount != tr.viewCount || inter->unbuiltVisitView == tr.viewCount ) {
-				continue;
-			}
-			// An entity the view does not see links no receivers, whatever its
-			// interaction goes on to build: AddActiveInteraction links light
-			// surfaces only inside the entity's scissor, which never grows.
-			// The player's own body and head are such entities in every
-			// first-person frame, and they touch every light near the camera.
-			if ( entityDef->viewEntity == NULL || entityDef->viewEntity->scissorRect.IsEmpty() ) {
-				continue;
-			}
-			// A static model is the model its interactions are built from.
-			const idRenderModel *hModel = entityDef->parms.hModel;
-			if ( hModel != NULL && hModel->IsDynamicModel() == DM_STATIC && entityDef->parms.callback == NULL ) {
-				R_ShadowMapNoteEntityModel( entityDef, hModel );
-			}
-			bool entityNeedsStencil = false;
-			if ( R_EntityReceiverVerdict( entityDef, generation, entityNeedsStencil )
-					&& !entityNeedsStencil ) {
-				continue;
-			}
-			allowsMaps = false;
-			break;
+	if ( qualify ) {
+		// What mode 0 answers here: its memo, read again after any change.
+		if ( !vLight->shadowMapReceiverScanReferenceValid ) {
+			vLight->shadowMapReceiverScanReferenceAllowsMaps =
+				R_ShadowMapReceiverScanBlocker( lightDef, generation ) == NULL;
+			vLight->shadowMapReceiverScanReferenceValid = true;
 		}
-		if ( R_InteractionReceiverNeedsStencil( inter, generation ) ) {
-			allowsMaps = false;
-			break;
+		if ( vLight->shadowMapReceiverScanValid ) {
+			shadowMapReceiverScanStats.compared++;
+			if ( vLight->shadowMapReceiverScanAllowsMaps != vLight->shadowMapReceiverScanReferenceAllowsMaps ) {
+				const uint64 count = ++shadowMapReceiverScanStats.mismatches;
+				if ( ( count & ( count - 1 ) ) == 0 ) {
+					common->Warning( "receiver scan: light %d kept verdict %d where a whole scan gives %d (%llu so far)",
+						lightDef->index, vLight->shadowMapReceiverScanAllowsMaps ? 1 : 0,
+						vLight->shadowMapReceiverScanReferenceAllowsMaps ? 1 : 0,
+						static_cast<unsigned long long>( count ) );
+				}
+				vLight->shadowMapReceiverScanValid = false;
+			}
+		}
+		if ( vLight->shadowMapReceiverScanValid ) {
+			return vLight->shadowMapReceiverScanReferenceAllowsMaps;
 		}
 	}
+	shadowMapReceiverScanStats.scans++;
+	const idInteraction *blocker = R_ShadowMapReceiverScanBlocker( lightDef, generation );
+	const bool allowsMaps = blocker == NULL;
 	if ( vLight != NULL ) {
 		vLight->shadowMapReceiverScanValid = true;
 		vLight->shadowMapReceiverScanAllowsMaps = allowsMaps;
+		vLight->shadowMapReceiverScanBlocker = blocker;
 	}
 	return allowsMaps;
 }
 #endif
+
+/*
+=================
+R_ShadowMapReceiverScanChanged
+
+An interaction of the light was allocated, built, freed or left unbuilt by
+its visit, or (leavingList) is about to leave the light's list. The Vulkan
+receiver scan's memo for the view is corrected from that one interaction.
+
+While the memo allows maps every interaction on the list passed, so the one
+that changed decides alone. While it does not, the scan stopped at its
+blocker and read nothing after it: nothing that happens to another
+interaction changes the verdict as long as the blocker still blocks, and
+once it does not the list has to be read again at the next question.
+
+Between views the game frees and allocates interactions by the thousand and
+nothing asks for a verdict, so the memo is simply dropped there.
+=================
+*/
+void R_ShadowMapReceiverScanChanged( const idRenderLightLocal *lightDef, const idInteraction *inter, const bool leavingList ) {
+	if ( lightDef == NULL || lightDef->viewCount != tr.viewCount || lightDef->viewLight == NULL ) {
+		return;
+	}
+	viewLight_t *vLight = lightDef->viewLight;
+#ifdef OPENQ4_RENDERER_VK_MODULE
+	vLight->shadowMapReceiverScanReferenceValid = false;
+	if ( !vLight->shadowMapReceiverScanValid ) {
+		return;
+	}
+	if ( tr.viewDef == NULL || inter == NULL || r_shadowMapReceiverScanIncremental.GetInteger() == 0 ) {
+		vLight->shadowMapReceiverScanValid = false;
+		vLight->shadowMapReceiverScanBlocker = NULL;
+		return;
+	}
+	shadowMapReceiverScanStats.changes++;
+	// an interaction off the light's list is no part of the verdict
+	const bool listed = !leavingList && ( inter->lightPrev != NULL || lightDef->firstInteraction == inter );
+	const int generation = VK_MaterialPrograms_NeedsStencilGeneration();
+	if ( vLight->shadowMapReceiverScanAllowsMaps ) {
+		if ( listed ) {
+			shadowMapReceiverScanStats.changeTests++;
+			if ( R_ShadowMapInteractionBlocksMaps( inter, generation ) ) {
+				vLight->shadowMapReceiverScanAllowsMaps = false;
+				vLight->shadowMapReceiverScanBlocker = inter;
+			}
+		}
+		return;
+	}
+	const idInteraction *blocker = vLight->shadowMapReceiverScanBlocker;
+	bool stillBlocked = blocker != NULL && ( blocker != inter || listed );
+	if ( stillBlocked ) {
+		shadowMapReceiverScanStats.changeTests++;
+		stillBlocked = R_ShadowMapInteractionBlocksMaps( blocker, generation );
+	}
+	if ( !stillBlocked ) {
+		shadowMapReceiverScanStats.discards++;
+		vLight->shadowMapReceiverScanValid = false;
+		vLight->shadowMapReceiverScanBlocker = NULL;
+	}
+#else
+	(void)inter;
+	(void)leavingList;
+	vLight->shadowMapReceiverScanValid = false;
+#endif
+}
+
+/*
+=================
+R_ShadowMapReceiverScanPrintInfo
+=================
+*/
+void R_ShadowMapReceiverScanPrintInfo( const bool reset ) {
+#ifdef OPENQ4_RENDERER_VK_MODULE
+	const shadowMapReceiverScanStats_t &stats = shadowMapReceiverScanStats;
+	common->Printf( "Vulkan receiver scan: mode=%d queries=%llu scans=%llu scanVisits=%llu changes=%llu changeTests=%llu "
+		"discards=%llu compared=%llu mismatches=%llu\n",
+		r_shadowMapReceiverScanIncremental.GetInteger(),
+		static_cast<unsigned long long>( stats.queries ), static_cast<unsigned long long>( stats.scans ),
+		static_cast<unsigned long long>( stats.scanVisits ), static_cast<unsigned long long>( stats.changes ),
+		static_cast<unsigned long long>( stats.changeTests ), static_cast<unsigned long long>( stats.discards ),
+		static_cast<unsigned long long>( stats.compared ), static_cast<unsigned long long>( stats.mismatches ) );
+	if ( reset ) {
+		memset( &shadowMapReceiverScanStats, 0, sizeof( shadowMapReceiverScanStats ) );
+	}
+#else
+	(void)reset;
+#endif
+}
 
 /*
 =================
