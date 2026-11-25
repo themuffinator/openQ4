@@ -1474,6 +1474,9 @@ diagnostics establish whole-frame ownership or production performance.
   (off by default) lets skinned models ignore noSelfShadow ownership under
   shadow-mapped lights; verified on both backends, stencil unchanged. See
   [character self-shadows](release-completion.md#characters-can-shadow-themselves-238-17-november-2026).
+  25 November (#237): the player's world gun now keeps the entity-level rule
+  with the body, so the option no longer casts a lone gun shadow on props. See
+  [gun shadow](release-completion.md#your-guns-shadow-follows-your-bodys-25-november-2026).
   Remaining: physical-platform breadth; combat-crowd cost of weapon-light
   shadows on Quality (FPS-03). The DISPLAY page's IMAGE QUALITY tab has a
   Character Self-Shadows row (17 November).

@@ -12,6 +12,35 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Your gun's shadow follows your body's, 25 November 2026
+
+- **No more floating gun shadow on crates** (#237). With **Character
+  Self-Shadows** on, the gun in your hands cast its shadow onto crates,
+  consoles and other props that your body's shadow stays off, so a gun
+  silhouette appeared on a crate with no body attached. The gun now follows
+  the same rule as the body holding it: both shadow the floor, walls and
+  scenery, and neither lands on those props. Monsters and marines still
+  shadow them with the option on.
+- **What to do.** Nothing. With Character Self-Shadows off (the default), and
+  with the original stencil shadows, nothing changes.
+- Why the body stays off those props: Quake 4 marks characters and many props
+  so their shadows keep off each other, and openQ4 keeps that rule for your own
+  body and weapons because they sit around your first-person view. Your body's
+  shadow on those props would also fall on the gun and arms in your view.
+- Development: `rvWeapon::InitWorldModel` and `rvWeapon::Think` set the world
+  model's entity-level `noSelfShadow`, as `idPlayer::Spawn` does for the body
+  and head, so `R_InteractionMaterialNoSelfShadow` no longer promotes the gun
+  alone under `r_shadowMapCharacterSelfShadow`. `Think` covers a world model
+  restored from a save. Contract: `tools/tests/renderer_vulkan_shadow_compatibility.py`.
+- Evidence (25 November, Windows x64, Vulkan, Ultra, retail packs only, Air
+  Defense 1 at the reporter's open crate, one fixed test light with
+  `r_singleLight`, the player's own shadow isolated by toggling
+  `g_showPlayerShadow`): before, a gun-shaped shadow lay on the crate's front
+  and back walls only with Character Self-Shadows on; after, the crate shows
+  no player shadow in any mode, and the floor and view frames are otherwise
+  unchanged. Stencil and shadow maps agree that the body's shadow stops at the
+  crate. No new log warnings.
+
 ## Maps compiled with dmap keep their sky, 25 November 2026
 
 - **A map rebuilt with openQ4's `dmap` no longer has a black sky** (#255).
