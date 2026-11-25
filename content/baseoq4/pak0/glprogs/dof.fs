@@ -46,6 +46,7 @@ uniform vec4 dofParams[10];
 #define dilateTiles			dofParams[8].y
 #define viewInvSize			dofParams[8].zw
 #define tileUVScale			dofParams[9].xy
+#define minSamples			dofParams[9].z
 
 const float kUnitsToMm = 25.4;
 const float kGoldenAngle = 2.39996323;
@@ -209,9 +210,14 @@ float ApertureScale( float angle ) {
 	return mix( polygon, 1.0, bladeRoundness );
 }
 
-float HighlightGain( vec3 color ) {
-	float luma = dot( color, kLuma );
-	return highlightBoost * clamp( ( luma - highlightThreshold ) / max( 1.0 - highlightThreshold, 0.05 ), 0.0, 4.0 );
+// The samples a disc of this radius (gather texels) takes: the full count at
+// the largest blur, and for a smaller disc the same spacing between samples,
+// so a disc of half the radius takes a quarter of them, never fewer than
+// minSamples. The r_dof camera sends minSamples = sampleCount: every blurred
+// pixel takes them all.
+int GatherCount( float radius ) {
+	float share = radius / max( maxRadius * gatherScale, 0.5 );
+	return int( clamp( ceil( sampleCount * share * share ), minSamples, sampleCount ) + 0.5 );
 }
 
 vec4 GatherPass( vec2 uv ) {
@@ -223,12 +229,14 @@ vec4 GatherPass( vec2 uv ) {
 		return vec4( center.rgb, 0.0 );
 	}
 	float centerSize = abs( centerCoc ) * gatherScale;
-	int count = int( sampleCount + 0.5 );
+	int count = GatherCount( radius );
 	float invCount = 1.0 / float( count );
+	// sample i lies at sqrt( ( i + 0.5 ) / count ) of the radius
+	float spiralScale = radius * sqrt( invCount );
+	float highlightRange = 1.0 / max( 1.0 - highlightThreshold, 0.05 );
 	float turnCos = cos( kGoldenAngle );
 	float turnSin = sin( kGoldenAngle );
 	vec2 dir = vec2( 1.0, 0.0 );
-	float angle = 0.0;
 	vec3 accum = center.rgb;
 	float total = 1.0;
 	float nearCover = 0.0;
@@ -236,34 +244,33 @@ vec4 GatherPass( vec2 uv ) {
 		if ( i >= count ) {
 			break;
 		}
-		float r = sqrt( ( float( i ) + 0.5 ) * invCount ) * radius;
-		vec4 s = texture2D( Scene, uv + dir * ( r * ApertureScale( angle ) ) * srcInvSize );
+		float r = sqrt( float( i ) + 0.5 ) * spiralScale;
+		vec4 s = texture2D( Scene, uv + dir * ( r * ApertureScale( float( i ) * kGoldenAngle ) ) * srcInvSize );
 		float sampleSize = abs( s.a ) * gatherScale;
 		if ( s.a > centerCoc ) {
 			sampleSize = min( sampleSize, centerSize * 2.0 );
 		}
-		float m = smoothstep( r - 0.5, r + 0.5, sampleSize );
-		float w = 1.0 + m * HighlightGain( s.rgb );
+		// smoothstep( r - 0.5, r + 0.5, sampleSize ), its unit width folded in
+		float m = clamp( sampleSize - r + 0.5, 0.0, 1.0 );
+		m = m * m * ( 3.0 - 2.0 * m );
+		float highlight = clamp( ( dot( s.rgb, kLuma ) - highlightThreshold ) * highlightRange, 0.0, 4.0 );
+		float w = 1.0 + m * highlightBoost * highlight;
 		accum += mix( accum / total, s.rgb, m ) * w;
 		total += w;
 		if ( s.a < centerCoc - 0.5 ) {
 			nearCover += m;
 		}
 		dir = vec2( dir.x * turnCos - dir.y * turnSin, dir.x * turnSin + dir.y * turnCos );
-		angle = mod( angle + kGoldenAngle, kTwoPi );
 	}
 	return vec4( accum / total, clamp( nearCover * invCount * 2.0, 0.0, 1.0 ) );
 }
 
-// A tent over the gather settles the spiral's sampling.
+// A tent over the gather settles the spiral's sampling: the 3x3 [1 2 1]
+// tent, as four bilinear taps half a texel off the centre.
 vec4 PostfilterPass( vec2 uv ) {
-	vec2 t = srcInvSize;
-	vec4 color = texture2D( Scene, uv ) * 4.0;
-	color += ( texture2D( Scene, uv + vec2( t.x, 0.0 ) ) + texture2D( Scene, uv - vec2( t.x, 0.0 ) )
-		+ texture2D( Scene, uv + vec2( 0.0, t.y ) ) + texture2D( Scene, uv - vec2( 0.0, t.y ) ) ) * 2.0;
-	color += texture2D( Scene, uv + t ) + texture2D( Scene, uv - t )
-		+ texture2D( Scene, uv + vec2( t.x, -t.y ) ) + texture2D( Scene, uv + vec2( -t.x, t.y ) );
-	return color * ( 1.0 / 16.0 );
+	vec2 h = 0.5 * srcInvSize;
+	return 0.25 * ( texture2D( Scene, uv - h ) + texture2D( Scene, uv + h )
+		+ texture2D( Scene, uv + vec2( h.x, -h.y ) ) + texture2D( Scene, uv + vec2( -h.x, h.y ) ) );
 }
 
 vec3 DebugColor( vec3 scene, float coc, vec2 uv ) {
@@ -282,14 +289,19 @@ vec3 DebugColor( vec3 scene, float coc, vec2 uv ) {
 }
 
 vec4 CompositePass( vec2 uv ) {
-	vec4 sharp = texture2D( Scene, uv * sceneUVScale );
 	float coc = CircleOfConfusion( RawDepth( uv ), FocusDistance() );
 	if ( dofDebug > 0.5 ) {
-		return vec4( DebugColor( sharp.rgb, coc, uv ), sharp.a );
+		vec4 scene = texture2D( Scene, uv * sceneUVScale );
+		return vec4( DebugColor( scene.rgb, coc, uv ), scene.a );
 	}
 	vec4 blurred = texture2D( AuxB, uv );
 	float blend = smoothstep( 0.5, 0.5 + 1.0 / max( gatherScale, 0.25 ), abs( coc ) );
 	blend = max( blend, blurred.a );
+	if ( blend <= 0.0 ) {
+		// in focus: the scene under this pass already holds the pixel
+		discard;
+	}
+	vec4 sharp = texture2D( Scene, uv * sceneUVScale );
 	return vec4( mix( sharp.rgb, blurred.rgb, blend ), sharp.a );
 }
 

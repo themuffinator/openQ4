@@ -2768,6 +2768,7 @@ static bool VK_Post_DepthOfField( const viewDef_t *viewDef, idRenderTexture *sce
 			return false;
 		}
 	}
+	vkGpuPhaseScope timing( VK_Exec_ActiveCmd(), VK_GPU_PHASE_DOF );
 	// Both captures come from the scene target, before any pass moves off it.
 	idImage *depthImage = VK_Post_FinalDepth( viewDef );
 	idImage *scene = VK_Post_CaptureScene( viewDef );

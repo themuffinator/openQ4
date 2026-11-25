@@ -58,6 +58,15 @@ static const float DOF_WEAPON_FOCUS_RANGE = 80.0f;
 static const float DOF_WEAPON_MAX_BLUR = 14.0f;			// pixels at the reference height
 static const float DOF_SCRIPTED_MAX_BLUR = 24.0f;		// a script's default largest blur
 static const int DOF_SCRIPTED_QUALITY = 2;
+// The game's own focus (the weapon wheel, a focused screen, a map script)
+// takes the samples its blur needs: over each pixel's disc they sit
+// DOF_GATHER_SPACING gather texels apart, or as far apart as the quality's
+// count puts them on the largest disc, whichever is wider, and number at
+// least DOF_MIN_GATHER_SAMPLES. Closer samples only overlap the bilinear taps.
+// The r_dof camera, a capture tool, gives every blurred pixel its full count,
+// as does r_dofFixedSamples, the reference for comparisons.
+static const float DOF_GATHER_SPACING = 1.5f;
+static const int DOF_MIN_GATHER_SAMPLES = 16;
 
 // The game's request (idRenderSystem::SetViewDepthOfField flags).
 static const int DOF_REQUEST_FOCUS_VIEW_WEAPON = 1 << 0;
@@ -91,6 +100,7 @@ struct depthOfFieldInputs_t {
 	float	highlights;				// r_dofHighlights
 	float	highlightThreshold;		// r_dofHighlightThreshold
 	int		debug;					// r_dofDebug
+	bool	fixedSamples;			// r_dofFixedSamples: the game's focus takes the full count everywhere
 	float	fovX;					// the view's horizontal field of view, degrees
 	int		viewWidth;
 	int		viewHeight;
@@ -101,7 +111,8 @@ struct depthOfFieldSettings_t {
 	bool	weaponFocus;			// the weapon depth range stays sharp
 	bool	autoFocus;				// the focus pass measures the focus point
 	bool	fullResolution;			// gather at view resolution instead of half
-	int		samples;
+	int		samples;				// the gather's samples on the largest disc
+	int		minSamples;				// the fewest a blurred pixel takes; = samples: every one takes them all
 	int		gatherWidth;
 	int		gatherHeight;
 	int		tileWidth;
@@ -146,6 +157,17 @@ inline int DepthOfFieldCore_SampleCount( int quality ) {
 	return counts[ DepthOfFieldCore_ClampInt( quality, 0, 3 ) ];
 }
 
+// The game's focus on its largest disc (radius in gather texels): samples
+// DOF_GATHER_SPACING apart, at most the quality's count and at least
+// DOF_MIN_GATHER_SAMPLES.
+inline int DepthOfFieldCore_SpacedSamples( float gatherRadius, int qualitySamples ) {
+	const float area = 3.14159265358979f * gatherRadius * gatherRadius;
+	const float spaced = std::ceil( area / ( DOF_GATHER_SPACING * DOF_GATHER_SPACING ) );
+	const int count = spaced < static_cast<float>( qualitySamples ) ? static_cast<int>( spaced ) : qualitySamples;
+	return DepthOfFieldCore_ClampInt( count, DOF_MIN_GATHER_SAMPLES < qualitySamples ? DOF_MIN_GATHER_SAMPLES : qualitySamples,
+		qualitySamples );
+}
+
 // The focal length that gives this horizontal field of view on the sensor.
 inline float DepthOfFieldCore_FocalLengthForFov( float fovXDegrees ) {
 	const float fov = DepthOfFieldCore_Clamp( fovXDegrees, 1.0f, 170.0f );
@@ -187,6 +209,20 @@ inline float DepthOfFieldCore_CircleOfConfusion( const depthOfFieldSettings_t &s
 	return DepthOfFieldCore_Clamp( coc, -settings.maxRadius, settings.maxRadius );
 }
 
+// The samples a blurred pixel takes for a disc of this radius in gather
+// texels (mirrors GatherCount in the shaders): the largest disc's count by
+// this disc's share of its area, so the spacing holds, within
+// minSamples..samples.
+inline int DepthOfFieldCore_GatherCount( const depthOfFieldSettings_t &settings, float radius ) {
+	const float largest = settings.maxRadius * settings.gatherScale;
+	const float share = radius / ( largest > 0.5f ? largest : 0.5f );
+	const float count = std::ceil( static_cast<float>( settings.samples ) * share * share );
+	if ( !( count < static_cast<float>( settings.samples ) ) ) {
+		return settings.samples;
+	}
+	return count > static_cast<float>( settings.minSamples ) ? static_cast<int>( count ) : settings.minSamples;
+}
+
 // How far this frame's autofocus moves toward the measured distance.
 inline float DepthOfFieldCore_FocusBlend( float speed, float elapsedSeconds ) {
 	if ( speed <= 0.0f ) {
@@ -206,7 +242,9 @@ inline bool DepthOfFieldCore_Resolve( const depthOfFieldInputs_t &in, depthOfFie
 	const float heightScale = static_cast<float>( in.viewHeight ) / DOF_REFERENCE_HEIGHT;
 	const float request = DepthOfFieldCore_Clamp( in.requestAmount, 0.0f, 1.0f );
 	const bool weaponRequest = request > 0.001f && ( in.requestFlags & DOF_REQUEST_FOCUS_VIEW_WEAPON ) != 0;
+	bool spacedSamples = false;		// the game's focus; the r_dof camera keeps its full count
 	if ( weaponRequest ) {
+		spacedSamples = !in.fixedSamples;
 		out.weaponFocus = true;
 		out.autoFocus = false;
 		out.focusDistance = DOF_WEAPON_FOCUS_DISTANCE;
@@ -246,6 +284,7 @@ inline bool DepthOfFieldCore_Resolve( const depthOfFieldInputs_t &in, depthOfFie
 	} else if ( request > 0.001f ) {
 		// A script's lens: the r_dof camera's model with the script's values,
 		// its blur scaled by the request so a blend fades it in and out.
+		spacedSamples = !in.fixedSamples;
 		out.autoFocus = in.requestFocusDistance <= 0.0f;
 		out.focusDistance = out.autoFocus ? 0.0f : DepthOfFieldCore_Clamp( in.requestFocusDistance, 1.0f, 65536.0f );
 		out.focalMm = in.requestFocalLength > 0.0f ? DepthOfFieldCore_Clamp( in.requestFocalLength, 4.0f, 1200.0f )
@@ -274,6 +313,10 @@ inline bool DepthOfFieldCore_Resolve( const depthOfFieldInputs_t &in, depthOfFie
 	out.gatherWidth = out.fullResolution ? in.viewWidth : ( in.viewWidth + 1 ) / 2;
 	out.gatherHeight = out.fullResolution ? in.viewHeight : ( in.viewHeight + 1 ) / 2;
 	out.gatherScale = static_cast<float>( out.gatherWidth ) / static_cast<float>( in.viewWidth );
+	if ( spacedSamples ) {
+		out.samples = DepthOfFieldCore_SpacedSamples( out.maxRadius * out.gatherScale, out.samples );
+	}
+	out.minSamples = spacedSamples && DOF_MIN_GATHER_SAMPLES < out.samples ? DOF_MIN_GATHER_SAMPLES : out.samples;
 	out.tileWidth = ( out.gatherWidth + DOF_TILE_SIZE - 1 ) / DOF_TILE_SIZE;
 	out.tileHeight = ( out.gatherHeight + DOF_TILE_SIZE - 1 ) / DOF_TILE_SIZE;
 	const float reach = out.maxRadius * out.gatherScale / static_cast<float>( DOF_TILE_SIZE );
@@ -326,7 +369,7 @@ inline void DepthOfFieldCore_PassSizes( const depthOfFieldSettings_t &s, int vie
 //   6 x highlight boost, y highlight threshold, z weapon focus, w gather scale
 //   7 xy focus point, z focus blend, w focus history valid
 //   8 x tile size, y dilate tiles, zw 1/view size
-//   9 xy tile UV scale (the tile grid overhangs the gather target)
+//   9 xy tile UV scale (the tile grid overhangs the gather target), z the fewest gather samples
 inline void DepthOfFieldCore_FillBlock( depthOfFieldBlock_t &block, const depthOfFieldSettings_t &s,
 		depthOfFieldPass_t pass, int viewWidth, int viewHeight, const float depthProjection[2],
 		const float sceneUVScale[2], const float depthUVScale[2], float focusBlend, bool focusHistoryValid ) {
@@ -375,6 +418,7 @@ inline void DepthOfFieldCore_FillBlock( depthOfFieldBlock_t &block, const depthO
 	const float tileCoverHeight = static_cast<float>( ( s.tileHeight > 0 ? s.tileHeight : 1 ) * DOF_TILE_SIZE );
 	block.v[9][0] = static_cast<float>( s.gatherWidth ) / tileCoverWidth;
 	block.v[9][1] = static_cast<float>( s.gatherHeight ) / tileCoverHeight;
+	block.v[9][2] = static_cast<float>( s.minSamples );
 }
 
 #endif // __DEPTH_OF_FIELD_CORE_H__

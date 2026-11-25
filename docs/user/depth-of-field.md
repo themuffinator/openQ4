@@ -152,5 +152,10 @@ console `r_dof` camera, when on, takes over from a script.
 - It sits in front of motion blur and bloom, so blurred highlights still
   glow. The HUD, menus and console stay sharp.
 - `r_skipPostProcess 1` turns it off, along with the other post effects.
+- The game's own depth of field (the weapon wheel, a screen you are using,
+  scripted focus) takes only the samples its blur needs: a smaller blur, or
+  a lower resolution, takes fewer. The `r_dof` camera always takes the full
+  count `r_dofQuality` sets. To compare, `r_dofFixedSamples 1` (a cheat)
+  gives the game's depth of field the full count everywhere too.
 - `r_dofQuality 3` with a large blur is the most expensive post effect in the
   game. That is fine for captures; turn it off for play.

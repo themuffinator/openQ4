@@ -1262,7 +1262,7 @@ diagnostics establish whole-frame ownership or production performance.
 | REN-09 — Partial | Per-light shadowed scattering replaces the REN-06 leaf on GL and Vulkan: falloff/projection images, point, projected and cascaded-sun maps, stencil-light policy (none by default), composite before fog and translucents, status reporting, exact rollback; frozen outdoor/indoor captures pass under TAA and 4x MSAA. 23 November 2026: moving casters and a moving flashlight, temporal history, resolution scale and dynamic resolution, mirrors and remote cameras, a backend decline and VR stereo pass on GL and Vulkan; scratch targets are pooled by view size. Evidence: [volumetric lighting](volumetric-lighting.md). | Per-tier cost against FPS-01 on a quiet reference machine (a shared-machine ladder is recorded), the owner's visual review of the defaults (contact sheets captured, no default changed; 12 whites out the Tram 1 opening), and physical Linux/macOS/Android runs with the Apple GL 2.1 and GLES declines (PLAT). |
 | REN-10 — Closed | HBAO (`r_ssaoMethod 1`), GTAO (`2`) and a brute-force reference (`3`) beside SSAO on GL and Vulkan, sharing SSAO's occlusion target, separable filter, resolve and indirect-only PBR field; native PBR's multi-bounce and specular occlusion; classic multi-bounce; temporal pattern turn under TAA. GTAO closer to the reference than SSAO with fewer halos, HBAO as close as SSAO; backend parity, exact rollback, cost at or near SSAO ([evidence](presentation-owners.md#ground-truth-ambient-occlusion-ren-10-21-november-2026)). | VR headset and GLES/mobile hardware runs; a preset decision. |
 | REN-11 — Closed | Ray-marched parallax occlusion for the PBR `heightMap` keyword on GL and Vulkan: one shared kernel, refinement, distance fade, gradient-correct sampling, optional self-shadow; every lighting pass traces the same ray (per-light, shadow-mapped, ambient, environment, probes, grids, diagnostics). The retail `Parallaxbump` stage upgrades on Vulkan. Default off with byte-identical rollback; backend parity within the flat-surface noise; cost priced at 2560x1440 ([evidence](parallax-occlusion.md#qualification-21-november-2026)). Stock content has no parallax surface. | Linux (Mesa GL and Vulkan) and the Android emulator (GLES declines cleanly) pass. VR headset confirmation and physical Linux GPUs, macOS and Android devices belong to platform qualification; a preset decision waits for authored content. |
-| REN-12 — Partial | Depth of field on GL and Vulkan from one lens model (`DepthOfFieldCore.h`): thin-lens CoC from the view's field of view on a 36 mm sensor, autofocus with an eased pull, tile-dilated scatter-as-gather bokeh (round or bladed, highlight weighting) at half or full resolution, before motion blur and bloom. The `r_dof*` promotional camera is cheat-only with no menu entry. The game asks through `SetViewDepthOfField` (render API 38, a `renderViewDepthOfField_t`): the weapon wheel's view-weapon focus, a focused in-world GUI (a thin lens on the cursor's point, view weapon kept sharp by `VIEW_DOF_SHARP_VIEW_WEAPON`), and map scripts (`sys.setDepthOfField`, `setDepthOfFieldFocus`, `setDepthOfFieldLens`, `clearDepthOfField`, declared by the compiler on first use, state saved in the worldspawn's spawn args). The player's **Depth of Field** setting (`r_depthOfField`, SYSTEM catalog V8) gates both and is on from Enhanced up. Windows captures on both backends; `DepthOfFieldCore` native test. | Cost not priced against FPS-01; Linux, macOS and Android (GLES declines) not run; capture-tool review of the bokeh on authored character shots; the campaign's cinematics (REN-13). |
+| REN-12 — Partial | Depth of field on GL and Vulkan from one lens model (`DepthOfFieldCore.h`): thin-lens CoC from the view's field of view on a 36 mm sensor, autofocus with an eased pull, tile-dilated scatter-as-gather bokeh (round or bladed, highlight weighting) at half or full resolution, before motion blur and bloom. The `r_dof*` promotional camera is cheat-only with no menu entry. The game asks through `SetViewDepthOfField` (render API 38, a `renderViewDepthOfField_t`): the weapon wheel's view-weapon focus, a focused in-world GUI (a thin lens on the cursor's point, view weapon kept sharp by `VIEW_DOF_SHARP_VIEW_WEAPON`), and map scripts (`sys.setDepthOfField`, `setDepthOfFieldFocus`, `setDepthOfFieldLens`, `clearDepthOfField`, declared by the compiler on first use, state saved in the worldspawn's spawn args). The player's **Depth of Field** setting (`r_depthOfField`, SYSTEM catalog V8) gates both and is on from Enhanced up. Windows captures on both backends; `DepthOfFieldCore` native test. Priced and trimmed 25 November (performance report section 21): the game's focus spaces its gather samples, about a third off its Vulkan cost. | No declared FPS budget for this situational pass; the OpenGL saving unmeasured (no GL timer query around the pass, whole-frame time too noisy); Linux, macOS and Android (GLES declines) not run; capture-tool review of the bokeh on authored character shots; the campaign's cinematics (REN-13). |
 | REN-13 — Not started | REN-12's scripted lens is in place for cinematics to use. | Dynamic depth of field across the campaign's cinematics: engine-driven focus for cinematic cameras on stock assets first, then per-scene direction where it needs it; see the task below. |
 
 ### REN task evidence and acceptance
@@ -2367,8 +2367,7 @@ diagnostics establish whole-frame ownership or production performance.
   OpenGL and Vulkan at 2560x1440 on airdefense2 (autofocus, telephoto with
   six blades, the CoC debug view, the open wheel), the
   `openq4-depth-of-field-core` native test, `retained_view_effects.py` and the
-  retained-screens wheel checks. Remaining: price the cost against FPS-01's
-  budgets, run Linux, macOS and the Android emulator (GLES declines by
+  retained-screens wheel checks. Remaining: run Linux, macOS and the Android emulator (GLES declines by
   design), and review the bokeh on authored character shots.
   Progress, 23 November (second round): map scripts drive the same lens
   (`src/game/gamesys/ScriptedDepthOfField.h`): `sys.setDepthOfField( focus,
@@ -2391,7 +2390,19 @@ diagnostics establish whole-frame ownership or production performance.
   interactive in-world GUI the player view focuses a 50 mm f/2 lens on the
   cursor's point (eased in and out, the view weapon kept sharp), gated by
   the same setting, in both game modules; airdefense1 captures on Vulkan
-  and OpenGL.
+  and OpenGL. Fourth round (25 November): priced and made cheaper
+  ([performance report section 21](performance-report.md#21-depth-of-field-ren-12-25-november-2026)).
+  The game's focus (wheel, screen, script) now takes the samples its blur
+  needs. They sit 1.5 gather texels apart (`DOF_GATHER_SPACING`), or wider
+  where the quality's count is sparser, and a smaller disc takes
+  proportionally fewer, down to 16. The `r_dof` camera keeps its full count, as does
+  the game's focus under `r_dofFixedSamples 1`. Exact changes alongside:
+  the 3x3 tent as four bilinear taps, the composite discarding in-focus
+  pixels, a lighter gather loop. Vulkan gains a `dof` GPU phase. At
+  2538x1312 on the reference laptop the Vulkan phase went from 1.93 to
+  1.34 ms for the screen-focus lens, from 1.85 to 1.18 ms for a cinematic
+  85 mm lens and from 0.89 to 0.67 ms for the camera. Same-launch pictures differ by at
+  most 6-8 levels at the 99.9th percentile (PSNR 44 dB).
 - [ ] **REN-13 — P2, implementation: dynamic depth of field in the
   campaign's cinematics.** Not started; the user's direction (23 November
   2026) once REN-12's scripted lens exists. Stock assets stay the baseline:

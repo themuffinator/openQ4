@@ -33,6 +33,7 @@ enum vkGpuPhase_t {
 	// multisample resolve, then the copy into the sampled image.
 	VK_GPU_PHASE_FEEDBACK_DEPTH_RESOLVE, VK_GPU_PHASE_FEEDBACK_DEPTH_COPY,
 	VK_GPU_PHASE_FEEDBACK_COLOR,		// the frame's first colour copy out of the active target
+	VK_GPU_PHASE_DOF,					// depth of field: its captures, passes and composite
 	VK_GPU_PHASE_COUNT
 };
 bool VK_GpuPhaseTiming_Begin( VkCommandBuffer commandBuffer, vkGpuPhase_t phase );

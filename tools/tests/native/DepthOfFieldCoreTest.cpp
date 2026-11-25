@@ -223,6 +223,58 @@ static void TestPlan() {
 		"the tile grid's overhang is scaled out" );
 	DepthOfFieldCore_FillBlock( block, s, DOF_PASS_COMPOSITE, 1920, 1080, depthProjection, one, one, 1.0f, false );
 	Check( Near( block.v[0][0], 1.0f / 1920.0f, 1.0e-7f ), "the composite writes the view" );
+	Check( block.v[9][2] == static_cast<float>( s.samples ), "the r_dof camera sends its full count as the fewest" );
+}
+
+// The gather's samples: the r_dof camera keeps its full count on every
+// blurred pixel; the game's own focus spaces its samples DOF_GATHER_SPACING
+// apart over each pixel's disc.
+static void TestGatherSamples() {
+	depthOfFieldSettings_t s;
+	depthOfFieldInputs_t in = Camera();
+	DepthOfFieldCore_Resolve( in, s );
+	Check( s.samples == 128 && s.minSamples == 128, "the camera takes its quality's samples everywhere" );
+	Check( DepthOfFieldCore_GatherCount( s, 1.0f ) == 128, "even on a small disc" );
+
+	// The weapon wheel at 1080p: a 7-texel disc already spaces 64 samples
+	// further apart than DOF_GATHER_SPACING, so the largest blur keeps them all.
+	in.requestAmount = 1.0f;
+	in.requestFlags = DOF_REQUEST_FOCUS_VIEW_WEAPON;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( s.samples == 64 && s.minSamples == DOF_MIN_GATHER_SAMPLES, "the wheel keeps 64 samples at its largest blur" );
+	const float largest = s.maxRadius * s.gatherScale;
+	Check( DepthOfFieldCore_GatherCount( s, largest ) == 64, "the largest disc takes them all" );
+	Check( DepthOfFieldCore_GatherCount( s, largest * 0.75f ) == 36, "a smaller disc keeps their spacing" );
+	Check( DepthOfFieldCore_GatherCount( s, 0.5f ) == DOF_MIN_GATHER_SAMPLES, "never fewer than the floor" );
+	in.requestAmount = 0.5f;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( s.samples == 18, "while the wheel fades in, its smaller blur takes fewer samples" );
+
+	// A focused screen at 1080p: a 6-texel disc would put 128 samples 0.94
+	// texels apart; spaced 1.5 apart it takes 51. At 4K the disc is 12 texels
+	// and needs all 128.
+	in = Camera();
+	in.enabled = false;
+	in.requestAmount = 1.0f;
+	in.requestFlags = DOF_REQUEST_SHARP_VIEW_WEAPON;
+	in.requestFocusDistance = 48.0f;
+	in.requestFStop = 2.0f;
+	in.requestFocalLength = 50.0f;
+	in.requestMaxBlur = 12.0f;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( s.samples == 51 && s.minSamples == DOF_MIN_GATHER_SAMPLES, "a screen's small blur takes the samples it needs" );
+	in.viewWidth = 3840;
+	in.viewHeight = 2160;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( s.samples == DepthOfFieldCore_SampleCount( DOF_SCRIPTED_QUALITY ), "a 4K view's larger blur takes them all" );
+
+	in.fixedSamples = true;
+	in.viewWidth = 1920;
+	in.viewHeight = 1080;
+	DepthOfFieldCore_Resolve( in, s );
+	Check( s.samples == DepthOfFieldCore_SampleCount( DOF_SCRIPTED_QUALITY ) && s.minSamples == s.samples,
+		"r_dofFixedSamples gives every blurred pixel the full count" );
+	Check( DepthOfFieldCore_GatherCount( s, 1.0f ) == s.samples, "whatever its size" );
 }
 
 int main() {
@@ -232,6 +284,7 @@ int main() {
 	TestScriptedLens();
 	TestGuiFocusLens();
 	TestPlan();
+	TestGatherSamples();
 	if ( failures != 0 ) {
 		std::fprintf( stderr, "DepthOfFieldCoreTest: %d failure(s)\n", failures );
 		return 1;

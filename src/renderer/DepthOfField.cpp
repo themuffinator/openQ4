@@ -58,6 +58,8 @@ idCVar r_dofHighlightThreshold( "r_dofHighlightThreshold", "0.7", CVAR_RENDERER 
 	"brightness above which a point counts as a highlight", 0.0f, 16.0f );
 idCVar r_dofDebug( "r_dofDebug", "0", CVAR_RENDERER | CVAR_CHEAT | CVAR_BOOL,
 	"show the circle of confusion instead of the image: orange in front of focus, blue behind, and a ring at the autofocus point" );
+idCVar r_dofFixedSamples( "r_dofFixedSamples", "0", CVAR_RENDERER | CVAR_CHEAT | CVAR_BOOL,
+	"1 = the game's depth of field (weapon wheel, focused screen, map scripts) takes its full sample count on every blurred pixel, as the r_dof camera does; the reference for comparing its spaced samples" );
 
 /*
 ====================
@@ -136,6 +138,7 @@ bool R_DepthOfField_ResolveView( const viewDef_t *viewDef, int viewWidth, int vi
 	in.highlights = r_dofHighlights.GetFloat();
 	in.highlightThreshold = r_dofHighlightThreshold.GetFloat();
 	in.debug = r_dofDebug.GetBool() ? 1 : 0;
+	in.fixedSamples = r_dofFixedSamples.GetBool();
 	in.fovX = viewDef->renderView.fov_x;
 	in.viewWidth = viewWidth;
 	in.viewHeight = viewHeight;

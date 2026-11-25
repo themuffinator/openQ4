@@ -12,6 +12,33 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Depth of field costs about a third less, 25 November 2026
+
+- **The game's depth of field takes the samples its blur needs** (REN-12,
+  priced). The weapon wheel, a focused in-world screen and scripted focus
+  used to take their full sample count on every blurred pixel. Now the
+  samples sit 1.5 gather texels apart on the largest blur (or as far as the
+  quality's count puts them, if that is wider), a smaller blur takes
+  proportionally fewer, down to 16. A focused screen takes 51 samples at 1080p
+  instead of 128; the wheel keeps 64 from 1080p up. The `r_dof` capture camera
+  keeps its full count. The cheat `r_dofFixedSamples 1` restores the full count
+  for comparisons.
+- Exact changes on both backends: the 3x3 tent after the gather is four
+  bilinear taps, the composite skips the pixels it would not change, and the
+  gather loop is lighter. Vulkan's `r_vkGpuPhaseProfile` gains a `dof` phase.
+- Evidence: hidden-window ladders on airdefense1 (2538x1312, RTX 4060 Laptop,
+  frozen, lens driven by `script` with no input). The Vulkan `dof` phase went
+  from 1.93 to 1.34 ms for the screen-focus lens, from 1.85 to 1.18 ms for an
+  85 mm cinematic lens, from 0.89 to 0.67 ms for the camera at quality 2 and
+  from 2.41 to 1.88 ms at quality 3. Spaced against full samples in one launch:
+  at most 6-8 levels at the 99.9th percentile, PSNR 44 dB, crops
+  indistinguishable. At the full count the new shaders match the old ones to
+  1-2 levels on the static part of the frame. The OpenGL saving was not
+  resolved: whole-frame GPU time moved more between windows than the change,
+  and OpenGL has no phase timer for the pass. `DepthOfFieldCoreTest`,
+  `vk_shader_header_pin.py` and `renderer_gpu_frame_timing.py` pass. Details:
+  [performance report section 21](performance-report.md#21-depth-of-field-ren-12-25-november-2026).
+
 ## One game module for single-player and multiplayer, 24 November 2026
 
 - **One game file serves the campaign and multiplayer.** openQ4 built its game

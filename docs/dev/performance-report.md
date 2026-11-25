@@ -2396,3 +2396,73 @@ HUD state before the event runs.
 **Left alone.** The vehicle HUD's gauges (16k uncached vertices) have moving
 fills, where a cached layer would be invalidated as they move; the Awakening
 speeder's race pips (23k in the bench) were not measured in the engine.
+
+## 21. Depth of field (REN-12), 25 November 2026
+
+REN-12's depth of field had not been priced. It is situational rather than part of
+the always-on chain: the weapon wheel, a focused in-world screen, scripted cinematic
+focus and the `r_dof` capture camera.
+
+**Method.** Hidden-window ladders on airdefense1's reference pose, frozen
+(`g_stopTime 1`), Ultra with `r_depthOfField 1`, view 2538x1312 (a 2560x1440 window),
+RTX 4060 Laptop. Each variant sits between DoF-off windows. The game's lens is driven
+through the `script` console command with no input: the screen-focus lens is
+`sys.setDepthOfFieldLens( 50, 12, 12 )` plus `sys.setDepthOfField( 48, 2, 0 )`
+(the focused screen's 50 mm f/2 at 12 px), the cinematic lens
+`sys.setDepthOfFieldLens( 85, 0, 0 )` plus autofocus at f/2. Vulkan gains a `dof`
+GPU phase (`r_vkGpuPhaseProfile`) around the captures, passes and composite. It is
+timed inside one command buffer, so CPU contention on the shared machine does not
+reach it. The phase includes the drain of the work before it, so it reads higher
+than the whole-frame delta. OpenGL has only the whole-frame GPU time, read at the
+25th percentile of each window's own frames. A first OpenGL run, taken while peers
+compiled, stalled 100-800 ms a frame and was discarded.
+
+**Where the time went.** The bokeh gather took every blurred pixel through the
+quality's full spiral: 128 samples for a script or a focused screen, 64 for the
+wheel, whatever the pixel's blur. At 1080p the screen-focus lens's 6-texel disc put
+128 samples 0.94 texels apart, three times denser than the wheel's 1.55. The
+other passes are small by comparison, but the 3x3 tent read nine taps and the
+composite rewrote every in-focus pixel unchanged.
+
+**The change.**
+- The game's focus (wheel, screen, script) now takes the samples its blur needs.
+  On the largest disc they sit 1.5 gather texels apart (`DOF_GATHER_SPACING`), or
+  as far apart as the quality's count puts them, whichever is wider. A smaller
+  disc keeps that spacing with fewer samples, in proportion to its area, but never
+  fewer than 16. The screen-focus lens takes 51 samples at 1080p, 75 at this view
+  and still 128 at 4K. The wheel keeps 64 from 1080p up and takes 31 at 720p.
+  The `r_dof` capture camera keeps its quality's full count on every pixel, and so
+  does the game's focus under `r_dofFixedSamples 1`, the reference toggle.
+- The tent is four bilinear taps half a texel off centre, the same filter
+  exactly. The composite discards pixels it would leave unchanged. The gather
+  loop no longer carries an angle for round apertures and folds the per-pass
+  terms out of the loop.
+
+| Vulkan `dof` phase, ms | Before | After | After, `r_dofFixedSamples 1` |
+| --- | ---: | ---: | ---: |
+| Screen-focus lens | 1.93 | 1.34 | 1.88 |
+| Cinematic lens | 1.85 | 1.18 | 1.61 |
+| `r_dof` camera, quality 2 | 0.89 | 0.67 | - |
+| `r_dof` camera, quality 3 | 2.41 | 1.88 | - |
+
+At 1920x1080 the laptop GPU shifted clocks between windows (DoF-off windows
+3.0-7.5 ms), so only same-launch figures are firm: the screen-focus lens took
+0.92 ms against 1.33 with the full count, and before the change it took 1.40-1.70.
+
+OpenGL was not resolved. Three ladders of each build at 2560x1440, run once the
+machine was quiet, still found the GPU clock moving between windows (DoF-off
+windows 5.2-15.4 ms), several times the difference being measured. In the one
+stretch where the off windows on both sides agree within 0.1 ms, after the
+change, the screen-focus and cinematic lenses each add 0.84 ms of whole-frame
+time. Before the change, the screen-focus lens reads 0.71-0.84 ms in its
+least-disturbed windows. These figures are inside the noise, so they show
+neither a saving nor a cost. Both backends run the same shader algorithm. Timing
+OpenGL properly needs a timer query around the pass, like the Vulkan phase.
+
+**Pictures.** Inside one launch, spaced samples against the full count differ by
+at most 6 levels (screen) and 8 levels (cinematic) at the 99.9th percentile. Both
+are at PSNR 44 dB, and the share of pixels off by more than 8 levels (0.09 %)
+matches two identical windows of the old build. Crops at 1:1 cannot be told apart.
+Across launches the scene's animation moves 60 % of pixels even with DoF off. On
+the static fifth of the frame, the new shaders at full count match the old ones to
+1-2 levels, and the camera's frames are identical.
