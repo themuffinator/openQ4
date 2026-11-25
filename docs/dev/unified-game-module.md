@@ -219,10 +219,13 @@ byte-identical to the Windows build's. Neither change touches the game module.
   configured as `build_android_release.sh` does) produces `libgame_arm64.so`.
   All six libraries pass `android_elf.py` (API 24, 16 KiB alignment). Gradle
   builds the release APK; signed with a throwaway rehearsal key, it passes
-  `verify_android_apk.py`. The GLES renderer does not link on main as it
-  stands: two calls reach desktop-only sources (from `0106c7c7b` and
-  `ecb274b19`). That break is outside CORE-07, so the APK was built with those
-  two calls compiled out in a scratch copy. Nothing ran on a device.
+  `verify_android_apk.py`. The GLES renderer did not link on main then: two
+  calls reached desktop-only sources (from `0106c7c7b` and `ecb274b19`), so
+  that APK was built with them compiled out in a scratch copy. The renderer
+  fix, the same day, made the scratch copy unnecessary: `librenderer-gles_arm64.so`
+  links in the same NDK r30 configuration, and
+  `renderer_gles_symbol_closure.py` now fails a new call from the ES module
+  into a source it does not build. Nothing ran on a device.
 - **macOS.** Not run. No Apple hardware or VM is reachable from the build
   machine, and the hosted macOS lanes run only on a pushed branch.
 
