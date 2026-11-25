@@ -716,8 +716,18 @@ static void RB_VR_PresentDesktopStereo( void ) {
 			images[i] = target->GetColorImage( 0 );
 		}
 	}
-	if ( !RB_DesktopStereo_Composite( images[0], images[1], images[2], tr.desktopStereoLayout,
-			windowWidth, windowHeight, tr.vrFrame.eyeHeight, eyesDrawn, rb_vrCleared[0] ) ) {
+#if defined( OPENQ4_VR_GLES_PRESENTATION )
+	// the composite is a desktop GLSL program in draw_common.cpp, which the
+	// GLES module does not build; R_VR_BackendCanPresentDesktopStereo already
+	// refuses stereo here, so this only keeps the module linking
+	const bool composited = false;
+	(void)images;
+	(void)eyesDrawn;
+#else
+	const bool composited = RB_DesktopStereo_Composite( images[0], images[1], images[2], tr.desktopStereoLayout,
+			windowWidth, windowHeight, tr.vrFrame.eyeHeight, eyesDrawn, rb_vrCleared[0] );
+#endif
+	if ( !composited ) {
 		RB_VR_ClearBound( 1.0f );
 		static bool warned = false;
 		if ( !warned ) {

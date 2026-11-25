@@ -89,6 +89,24 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   ordered pass, so the script's re-sort is what keeps retail correct.
   `script_set_mat_sort_contract.py` pins the mapping. Not yet run on a Mac.
 
+## Android builds link their renderer again, 25 November 2026
+
+- **The Android build, and desktop builds with the OpenGL ES renderer,
+  compile again.** Two recent features, the modern renderer's alpha-tested
+  surface matching and desktop stereoscopic 3D (`r_stereo3D`), each added a
+  call that the OpenGL ES renderer could not link, so neither an APK nor
+  `-Dbuild_renderer_gles=enabled` could be built from the source. The shared
+  texture-matrix helper now lives where the ES renderer builds it, so
+  alpha-tested surfaces match there as on desktop OpenGL; the stereo composite,
+  which the ES renderer has never offered, is left out of it. Desktop OpenGL
+  and Vulkan are unchanged.
+- **What to do.** Nothing; this affects builds from source, not 0.15.0.
+- Evidence: `librenderer-gles_arm64.so` links with `-z defs` in the Android
+  arm64 NDK r30 configuration. `renderer_gles_symbol_closure.py`, run by the
+  validation profiles and both workflows, reports exactly these two calls on
+  the previous tree and fails any new call from the ES renderer into a source
+  it does not build, since no push lane builds that renderer.
+
 ## Maps compiled with dmap keep their sky, 25 November 2026
 
 - **A map rebuilt with openQ4's `dmap` no longer has a black sky** (#255).
