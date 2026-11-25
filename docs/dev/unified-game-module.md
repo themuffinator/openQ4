@@ -169,8 +169,74 @@ separate runtime).
   fail also fail on the unmodified tree (most on the 23 November video-capture
   symbols).
 
-Not yet run: Linux, macOS and Android builds of the unified module, an
-Awakening campaign playthrough beyond loading saves, and a human play session.
+### Linux, ARM64 and Android (25 November 2026)
+
+Built from `1328be2da` in WSL Ubuntu 24.04 (GCC 13.3, Meson through
+`tools/build/meson_setup.sh`, `debugoptimized`, desktop GL only) and stamped
+`0.15.0-dev+g1328be2d`, build 2761. Runs used the Quake 4 1.4.2 retail packs
+alone, with no loose files. To keep the build small, the light-grid and
+load-screen pack sources were cut to their required files, so `pak1` and `pak2`
+hold only q4dm1's light grid and the generic load screen. `pak0` is
+byte-identical to the Windows build's. Neither change touches the game module.
+
+- **Linux x64 module.** `game_x64.so` exports only `GetGameAPI` and
+  `openQ4_Mem_GetModuleStats`. It has no `STB_GNU_UNIQUE` symbol and no
+  `NODELETE` flag, so `dlclose` can unload it.
+- **Dedicated server.** `linux_dedicated_server_smoke.py` passes: `game_mp`
+  loads from `game_x64.so`, initialises, passes the IPv4 self-test, runs DM and
+  shuts down cleanly.
+- **Campaign saves.** `savegame_cross_load.py` runs at a fixed tic under Xvfb
+  with llvmpipe. Linux writes an airdefense1 save and restores it. It also
+  restores a save written by the Windows unified build (`0.15.0-dev+ge9fd6e6a`),
+  and that Windows build restores the Linux save. Every restore rebuilds its
+  input's object table exactly (1,886 and 1,888 objects, none created by the
+  restore), with no unresolved reference. Every save is payload v5,
+  `le64-portable1`. Restored from the same Linux save and saved again before
+  any game time passed, the Linux and Windows saves are the same length and
+  differ in 42 of 8,271,709 state bytes.
+- **Network play and demos.** `mp_client_demo_smoke.py` passes all 22 checks.
+  A pure dedicated server runs two bots, and a joined client records its own
+  view. The checks then cover playback, step, seek and rewind, `timeDemo`,
+  export with sound, recovery, and refusing a recording made with other game
+  data.
+- **Mode switches.** One client process loads airdefense1 (`game_sp`), then a
+  listen server on q4dm1 (`game_mp`), then hub1 (`game_sp`), each from
+  `game_x64.so`, without an error. The dynamic loader's own log
+  (`LD_DEBUG=files`) shows the module initialised three times and finalised,
+  with its link map destroyed, at each mode change, so each mode starts from a
+  fresh module. The mode-dependent defaults follow the mode: `si_pure` and
+  `pm_usecylinder` default to 0, then 1, then 0 again.
+- **Linux ARM64 cross build.** The `linux-arm64-cross.yml` configuration
+  (Wayland only, `tools/cross/linux-arm64.ini`) builds `openQ4-client_arm64`,
+  `openQ4-ded_arm64` and `baseoq4/game_arm64.so`. All three are AArch64 ELF64
+  with no X11 or GLX dependency. The module exports only `GetGameAPI` and
+  `openQ4_Mem_GetModuleStats`, with RELRO, BIND_NOW and a non-executable stack.
+  The push validator accepts the stage. `package_release.py` packages it, and
+  both the full and the update archive carry `baseoq4/game_arm64.so` and no
+  retired module name. The assetless dedicated smoke passes under qemu user
+  mode; that runs on the CPU only and is not sign-off evidence.
+- **Android.** The arm64-v8a build (NDK r30, SDL 3.4.18, OpenAL Soft 1.25.2,
+  configured as `build_android_release.sh` does) produces `libgame_arm64.so`.
+  All six libraries pass `android_elf.py` (API 24, 16 KiB alignment). Gradle
+  builds the release APK; signed with a throwaway rehearsal key, it passes
+  `verify_android_apk.py`. The GLES renderer did not link on main then: two
+  calls reached desktop-only sources (from `0106c7c7b` and `ecb274b19`), so
+  that APK was built with them compiled out in a scratch copy. The renderer
+  fix, the same day, made the scratch copy unnecessary: `librenderer-gles_arm64.so`
+  links in the same NDK r30 configuration, and
+  `renderer_gles_symbol_closure.py` now fails a new call from the ES module
+  into a source it does not build. Nothing ran on a device.
+- **macOS.** Not run. No Apple hardware or VM is reachable from the build
+  machine, and the hosted macOS lanes run only on a pushed branch.
+
+A module swap also resets two engine testing cvars set on the command line,
+`com_skipLoadingContinue` and `com_loadingContinueAutoAdvance`, to their
+defaults. A scripted run that changes mode must set them again before its next
+map. The pre-merge Windows build does the same in the same three-phase run, so
+this is not new.
+
+Not yet run: macOS, an Android emulator or device run, an Awakening campaign
+playthrough beyond loading saves, and a human play session.
 
 ## Follow-ups
 

@@ -41,6 +41,101 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   unchanged. Stencil and shadow maps agree that the body's shadow stops at the
   crate. No new log warnings.
 
+## Fast-polling mice lose nothing in a slow frame, and controllers cost less, 25 November 2026
+
+- **Mice that report up to 8000 times a second keep every movement.** Each
+  report used to become its own input event and two queued movements, so an
+  8000 Hz mouse filled the engine's event queue in any frame slower than about
+  32 ms, during a hitch, a save or a heavy fight. The oldest events were then
+  thrown away, key and button presses among them, with a console line for each
+  one, which made the slow frame slower still. Reports that arrive together are
+  now added into one movement: the same total, in the same order relative to
+  every press, at any polling rate and frame rate.
+- **Menus and the console with a fast mouse.** The menu cursor, the retained
+  menus and the console take one step per run of reports instead of one per
+  report, so a fast-polling mouse no longer makes the menus do hundreds of
+  pointer updates a frame.
+- **Controllers.** Every stick and trigger report re-read the whole controller
+  and rewrote two settings, though all reports of one frame read the same
+  state. The controller is now read once a frame. Sticks, triggers, the radial
+  selector and the active-controller switch behave exactly as before.
+- **Typing.** While the console or a text field is open, the position of the
+  system's input-method window is passed on only when it moves, not twice a
+  frame.
+- **When the queue still overflows** (a very long stall), the console says so
+  once, then reports how many events were dropped, instead of one line per
+  event.
+- **What to do.** Nothing. To see it work, play for a while and enter
+  `inputStats` in the console: it shows how many mouse reports arrived and how
+  few movements they became, and the same for controller axis events.
+- For developers: the join rule is `src/sys/MouseMotionRun.h`; the platform
+  layer joins only reports queued one straight after another, from one window
+  and one mouse, below the per-event clamp. See the roadmap under HF-09.
+- Evidence, Windows x64: `tools/tests/sdl3_input_coalescing.py` runs the
+  production joining code against a model of SDL 3.4's queue and compares every
+  flood with the report-by-report path: equal motion, in order, 9,294 reports in
+  19 runs, nine mutants rejected; `sys_event_queue_ownership.py` checks the
+  overflow report on the Windows and POSIX queues. In the game, on
+  `airdefense1` with an SDL virtual Xbox pad (inside the process, no system
+  input), six axes moved in one frame arrived as 12 axis events in one poll
+  cycle and were read once, and the sticks, triggers and radial selector showed
+  the final state exactly, then released together. The controller runtime
+  scenarios (handover, twins, turn rate, layout, aim assist, feedback, gyro)
+  pass on this build; turn rate and gyro also fail at times on a fully loaded
+  machine, and do so on the previous build too in alternating runs. Not yet run
+  on a physical high-polling-rate mouse: a hidden test window has no captured
+  mouse to drive.
+
+## The menu pointer starts in the corner of the screen, 25 November 2026
+
+- **On a widescreen display, the menu pointer now starts in the top-left corner
+  of the screen**, not at the top-left of the centred 4:3 area, where it used
+  to appear partway across the screen. A stock-interface menu that has not had
+  its cursor placed yet now starts it at the corner of its aspect-expanded
+  canvas on first activation. Once the player moves the pointer, or a save or
+  demo restores it, the cursor keeps its position as before. World-surface
+  GUIs keep the retail 0,0 start, which in-world interaction relies on.
+- Evidence: `ui_cursor_state_safety.py` pins the canvas-origin start and the
+  shared bounds helper, and the changed file compiles under MSVC. Not yet
+  checked in a running game.
+
+## The briefing hologram hides the squad's uniform patches, 25 November 2026
+
+- **The rank patches and badges on the marines' uniforms no longer show
+  through the reconnaissance briefing hologram on the MCC** (#256). The
+  hologram is a see-through screen in front of the squad, and Quake 4 draws
+  screens like it before decals. Raven's own map script works around that: when
+  the hologram starts, it moves the uniform decals ahead of the screen
+  (`sys.setMatSort ... SS_PREGUI`), and puts them back when the table closes.
+  An early port had disabled that sort in the campaign, and the unified game
+  module carried it over as multiplayer-only, so in single-player the script
+  was ignored and the patches drew on top of the hologram on every renderer.
+  `setMatSort` now applies every sort it names in both modes, as the Quake 4
+  SDK does.
+- Evidence: the briefing played through its own cinematic camera on Windows
+  shows the patches over the hologram before the fix and behind it after, on
+  OpenGL and Vulkan. The retail decompile draws GUIs before decals in one
+  ordered pass, so the script's re-sort is what keeps retail correct.
+  `script_set_mat_sort_contract.py` pins the mapping. Not yet run on a Mac.
+
+## Android builds link their renderer again, 25 November 2026
+
+- **The Android build, and desktop builds with the OpenGL ES renderer,
+  compile again.** Two recent features, the modern renderer's alpha-tested
+  surface matching and desktop stereoscopic 3D (`r_stereo3D`), each added a
+  call that the OpenGL ES renderer could not link, so neither an APK nor
+  `-Dbuild_renderer_gles=enabled` could be built from the source. The shared
+  texture-matrix helper now lives where the ES renderer builds it, so
+  alpha-tested surfaces match there as on desktop OpenGL; the stereo composite,
+  which the ES renderer has never offered, is left out of it. Desktop OpenGL
+  and Vulkan are unchanged.
+- **What to do.** Nothing; this affects builds from source, not 0.15.0.
+- Evidence: `librenderer-gles_arm64.so` links with `-z defs` in the Android
+  arm64 NDK r30 configuration. `renderer_gles_symbol_closure.py`, run by the
+  validation profiles and both workflows, reports exactly these two calls on
+  the previous tree and fails any new call from the ES renderer into a source
+  it does not build, since no push lane builds that renderer.
+
 ## Maps compiled with dmap keep their sky, 25 November 2026
 
 - **A map rebuilt with openQ4's `dmap` no longer has a black sky** (#255).
@@ -5621,7 +5716,6 @@ there is no double-click word selection.
   with clean logs, a dedicated-server connect, 334 of 337 native tests (the other
   three fail on unrelated in-progress or older work), and the affected Python
   contract tests.
-
 
 ## Rebuilt maps keep their textures where patches meet (CORE-05, #209), 9 November 2026
 

@@ -62,6 +62,8 @@ The mouse controls are on **Settings → Controls → Mouse**, which starts with
 
 **High-resolution mice.** `m_maxMouseDelta 0` (the default) never limits a large mouse movement. Set a positive value only if a faulty mouse or driver makes the camera jump.
 
+**High polling rates.** Mice that report 1000 to 8000 times a second work at any frame rate: reports that arrive together are added into one movement, so a slow frame loses neither movement nor key presses. The console command `inputStats` shows how many mouse reports arrived and how many movements they became (`inputStats reset` starts the count again).
+
 **Mouse buttons.** `Mouse1` to `Mouse8` can all be bound by name, and the wheel is `MWHEELUP` and `MWHEELDOWN`.
 
 ### Default keyboard and mouse bindings

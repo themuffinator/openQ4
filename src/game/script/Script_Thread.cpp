@@ -2322,17 +2322,17 @@ idThread::Event_SetMatSort
 void idThread::Event_SetMatSort( const char *name, const char *val ) const {
 	const idMaterial *mat = declManager->FindMaterial( name );
 	if ( mat ) {
+		// Every name maps to its own sort in both modes, as in the SDK. The
+		// mcc_1 briefing re-sorts the marines' uniform decals to SS_PREGUI so
+		// they draw before the see-through hologram GUI in front of them
+		// (#256); ignoring that in single-player drew them over the hologram.
 		int srt = SS_DECAL;
 		if ( idStr::Icmp( val, "SS_MIN" ) == 0 ) {
-			if ( gameLocal.IsMultiplayerMode() ) {
-				srt = SS_MIN;		
-			}
+			srt = SS_MIN;
 		} else if ( idStr::Icmp( val, "SS_SUBVIEW" ) == 0 ) {
-			srt = SS_SUBVIEW;		
+			srt = SS_SUBVIEW;
 		} else if ( idStr::Icmp( val, "SS_PREGUI" ) == 0 ) {
-			if ( gameLocal.IsMultiplayerMode() ) {
-				srt = SS_PREGUI;		
-			}
+			srt = SS_PREGUI;
 		} else if ( idStr::Icmp( val, "SS_GUI" ) == 0 ) {
 			srt = SS_GUI;		
 		} else if ( idStr::Icmp( val, "SS_BAD" ) == 0 ) {

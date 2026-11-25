@@ -219,6 +219,11 @@ private:
 
 	float						cursorX;
 	float						cursorY;
+	// openQ4: false until something places the cursor. A menu GUI's first
+	// activation then starts it at the canvas origin (the aspect-expanded
+	// top-left), not at 0,0 of the centred 4:3 virtual screen.
+	bool						cursorPlaced = false;
+	void						GetCursorBounds( float &minX, float &minY, float &maxX, float &maxY ) const;
 	void						ClampCursor( void );
 
 	int							time;

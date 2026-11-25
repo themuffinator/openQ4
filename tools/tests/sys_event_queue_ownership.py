@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 SUPPORT = r'''
 #include <algorithm>
+#include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -35,10 +36,14 @@ static void Check(bool value,const char* message) {
     ++checks;
     if(!value) { std::fprintf(stderr,"FAIL: %s\n",message); std::exit(1); }
 }
+static int lastDropped=-1;
 struct Common {
     void Printf(const char* format,...) {
         Check(std::string(format).find("overflow")!=std::string::npos,"only expected queue warning");
         ++warnings;
+        if(std::string(format).find("%d")!=std::string::npos) {
+            va_list args; va_start(args,format); lastDropped=va_arg(args,int); va_end(args);
+        }
     }
 } commonObject,*common=&commonObject;
 struct Block {
@@ -201,7 +206,9 @@ static void OverflowOrder() {
         pointers.push_back(Allocate(10));
         Queue(i%2?SE_RETAINED_UI:SE_CONSOLE,i,10,pointers.back());
     }
-    Check(warnings==previousWarnings+extra,"each overflow discards exactly one oldest entry");
+    // One line opens the burst however many it drops: a line per dropped
+    // event lengthened the stalled frame that caused the overflow.
+    Check(warnings==previousWarnings+1,"an overflow burst warns once");
     Check(Sys_EventQueueToken()==previousToken+extra,"every loss advances continuity before surviving events can be used");
     for(int i=0;i<extra;++i) {
         Check(Freed(pointers[i]),"overflow releases evicted oldest payload");
@@ -213,7 +220,12 @@ static void OverflowOrder() {
         Check(!Freed(event.evPtr),"overflow retains each remaining payload for consumer");
         ExpectBytes(event.evPtr,false); Mem_Free(event.evPtr);
     }
-    Empty(); Sys_ClearEvents(); CheckCleared();
+    Check(warnings==previousWarnings+1,"the burst stays open until the queue drains");
+    Empty();
+    Check(warnings==previousWarnings+2 && lastDropped==extra,"the drained queue reports exactly the events the burst dropped");
+    Empty();
+    Check(warnings==previousWarnings+2,"the report closes the burst");
+    Sys_ClearEvents(); CheckCleared();
 }
 static void ContinuityCases() {
     openq4::EventQueueContinuity local(3), unavailable(0);
