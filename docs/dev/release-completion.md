@@ -12,6 +12,23 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Maps compiled with dmap keep their sky, 25 November 2026
+
+- **A map rebuilt with openQ4's `dmap` no longer has a black sky** (#255).
+  Quake 4's outdoor maps draw their sky as a portal sky, seen through
+  `textures/common/skycaulk` faces, and the `.proc` marks each area where
+  such a face is visible as a sky area. The renderer draws the portal sky only
+  through marked areas. openQ4's `dmap` wrote no marks, so a rebuilt Air
+  Defense 1 drew a black sky and lost its distant towers. It now marks every
+  area that holds a visible face of a `sky` material.
+- **What to do.** Rebuild any map compiled with an earlier openQ4 `dmap`.
+  Maps that were not rebuilt are unaffected.
+- Evidence: retail Air Defense 1 flags `_area1`, `_area5`, `_area6` and
+  `_area39`; the fixed `dmap` flags the same four. On Vulkan with the
+  reporter's sky faces, the reporter's rebuilt map draws black and a map
+  compiled by the fixed `dmap` draws the sky and towers as retail does.
+  `dmap_sky_areas.py` pins the marking.
+
 ## Graphics presets apply in fullscreen on notched MacBooks, and a steadier OpenGL 2.1 scene, 25 November 2026
 
 - **Changing a preset or display setting no longer stops at "Settings need
