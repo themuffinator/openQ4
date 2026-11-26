@@ -472,6 +472,33 @@ def check_engine() -> None:
     require(read("src/game/gamesys/WeaponWheel.inl"),
             '( trackedAim || !cvarSystem->GetCVarBool( "ui_retained" ) ) ) {',
             "turning the weapon hand steers the wheel under either interface")
+    # the weapon-hand stick picks on an open wheel without moving the gun, and neither turns nor pages meanwhile
+    require(read("src/game/gamesys/WeaponWheel.inl"), "if ( trackedAim && WeaponWheelVRStick( vrStick ) ) {",
+            "a tracked hand's stick points the open wheel")
+    require(read("src/sys/openxr/OpenXRSystem.cpp"),
+            'const bool radialOpen = cvarSystem->GetCVarInteger( "ui_radialOwner" ) != 0;',
+            "the engine hands the weapon-hand stick to an open radial instead of turning")
+    # stock view models are built at about half life size: the hand-held one is drawn larger, its grip with it
+    require(read("src/game/Weapon.cpp"), "return axis * owner->GetVRWeaponScale();",
+            "the hand-held view model is drawn at vr_weaponScale")
+    require(read("src/game/Player.cpp"), "barrel, grip * GetVRWeaponScale(), origin, axis );",
+            "the scaled gun still meets the hand at its grip")
+    for call in ("VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );\n\t\t\tShortenVRViewForearm( arm, scale, vrArmJoints );",
+                 "VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );\n\t\t\tShortenVRViewForearm( arm, scale, vrArmJoints );\n\t\t}\n\t}\n\treturn vrArmJoints;"):
+        require(read("src/game/Weapon.cpp"), call, "each scaled forearm is pressed back to the length its elbow was solved for")
+    # the menu pointer is a controller: its motion and clicks keep controller prompts
+    key_input = read("src/framework/KeyInput.cpp")
+    require(key_input, "key_lastInputFamily = VR_HasInputFocus() ? KEY_INPUT_FAMILY_CONTROLLER : KEY_INPUT_FAMILY_DESKTOP;",
+            "pointer motion under VR focus keeps controller prompts")
+    require(key_input, "const bool vrPointer = Key_IsMouseKey( keynum ) && VR_HasInputFocus();",
+            "pointer clicks under VR focus keep controller prompts")
+    require(read("src/sys/sdl3/sdl3_backend.cpp"), "\tidKeyInput::PreliminaryJoystickEvent(127);\n\tif (RetainedUI_IsOpen()) {",
+            "a retained menu's VR pointer marks the controller")
+    # the HUD hangs below the line of sight by default, and an archived old default moves once
+    require(read("src/framework/VRSystem.cpp"), 'idCVar vr_hudHeightOffset( "vr_hudHeightOffset", "-0.3",',
+            "the HUD hangs below the line of sight")
+    require(read("src/framework/Common.cpp"), "\tCommon_MigrateLegacyVRWeaponOffsets();\n\tCommon_MigrateLegacyVRHudHeight();\n",
+            "an archived HUD height at the old default moves once")
     require(read("src/framework/UsercmdGen.cpp"), "\tClearAngles();\n\t// openQ4 VR: the tracked aim starts again from the zeroed angles\n\tVR_UsercmdAnglesCleared();",
             "a new map takes the body's yaw again, so its start is not turned by the level before")
     # a seat's turret follows the head, so the HUD hangs on the line of sight

@@ -8049,6 +8049,10 @@ bool Sys_PostVRPointer(bool onScreen, float u, float v) {
 	}
 	const float windowX = (transform.drawAreaX + idMath::ClampFloat(0.0f, 1.0f, u) * transform.drawAreaWidth) * transform.pixelToWindowX;
 	const float windowY = (transform.drawAreaY + idMath::ClampFloat(0.0f, 1.0f, v) * transform.drawAreaHeight) * transform.pixelToWindowY;
+	// The pointer is a controller in the player's hand: prompts name its
+	// buttons, never a keyboard's (a retained menu's pointer and clicks bypass
+	// the main event loop that otherwise tells the families apart).
+	idKeyInput::PreliminaryJoystickEvent(127);
 	if (RetainedUI_IsOpen()) {
 		SDL3_QueueRetainedPointer(windowX, windowY, eventTime);
 		return true;

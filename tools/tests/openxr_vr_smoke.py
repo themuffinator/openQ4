@@ -36,7 +36,9 @@ Checks:
 - the weapon wheel: the off-hand grip squeezed away from the gun opens it,
   raising the weapon hand hovers the blaster at its top and releasing the grip
   switches to it (under the retained interface the hand's turn once went
-  unread, so the wheel could only ever keep the weapon in hand);
+  unread, so the wheel could only ever keep the weapon in hand); with the
+  hand held still, pushing the weapon-hand stick up hovers the blaster too,
+  without paging weapons, and the choice outlasts the stick's return;
 - room scale: half a metre's step forward walks the body after the head, so
   the head ends up within a few units of the tracking origin, while with
   vr_roomScale 0 the same step leaves the whole distance as a lean;
@@ -283,6 +285,10 @@ def main(argv: list[str] | None = None) -> None:
         f"when {marker('wheel_point')} hand right 0.2 1.25 -0.35 0 20 0",
         f"when {marker('wheel_close')} button left squeeze 0",
         f"when {marker('wheel_done')} hand right {LASER_HAND_POSE}",
+        f"when {marker('wheel_stick_open')} button left squeeze 1",
+        f"when {marker('wheel_stick_push')} stick right 0 1",
+        f"when {marker('wheel_stick_let_go')} stick right 0 0",
+        f"when {marker('wheel_stick_close')} button left squeeze 0",
         f"when {marker('unfocus')} focus 0",
         f"when {marker('refocus')} focus 1",
         f"when {marker('exit')} exit",
@@ -335,6 +341,15 @@ def main(argv: list[str] | None = None) -> None:
         "condump vr_marker_wheel_point.txt", "waitMsec 600", "echo VR_WHEEL_POINTED", "testWeaponWheel",
         "condump vr_marker_wheel_close.txt", "waitMsec 1500", "echo VR_WHEEL_AFTER", "testWeaponWheel",
         "condump vr_marker_wheel_done.txt", "_impulse1", "waitMsec 2500",
+        # the wheel by the weapon-hand stick: the hand stays on its target, the
+        # stick pushed up hovers the blaster, letting the stick go keeps it, and
+        # releasing the grip takes it; the stick neither pages weapons nor turns
+        "echo VR_WHEEL_STICK_BEFORE", "testWeaponWheel",
+        "condump vr_marker_wheel_stick_open.txt", "waitMsec 600",
+        "condump vr_marker_wheel_stick_push.txt", "waitMsec 600",
+        "condump vr_marker_wheel_stick_let_go.txt", "waitMsec 400", "echo VR_WHEEL_STICK_POINTED", "testWeaponWheel",
+        "condump vr_marker_wheel_stick_close.txt", "waitMsec 1500", "echo VR_WHEEL_STICK_AFTER", "testWeaponWheel",
+        "_impulse1", "waitMsec 2500",
         # room scale: a step forward walks the body; without it the step is a lean
         "vr_roomScale 1", "condump vr_marker_room_walk.txt", "waitMsec 1200", "echo VR_ROOM_WALKED", "vr_status",
         "vr_roomScale 0", "condump vr_marker_room_lean.txt", "waitMsec 1000", "echo VR_ROOM_LEANED", "vr_status",
@@ -767,6 +782,17 @@ def main(argv: list[str] | None = None) -> None:
     assert wheel_pointed["slot"] == 0, f"raising the weapon hand should hover the blaster at the wheel's top: {wheel_pointed}"
     assert wheel_after["active"] == 0 and wheel_after["ideal"] == 0, \
         f"releasing the grip should switch to the hovered blaster: {wheel_after}"
+    # the same choice by the weapon-hand stick, the hand held still on its target
+    stick_before, stick_pointed = wheel("VR_WHEEL_STICK_BEFORE"), wheel("VR_WHEEL_STICK_POINTED")
+    stick_after = wheel("VR_WHEEL_STICK_AFTER")
+    assert stick_before["active"] == 0 and stick_before["current"] > 0, f"the stick stage should start on the machinegun: {stick_before}"
+    assert stick_pointed["active"] == 1 and stick_pointed["slot"] == 0, \
+        f"the weapon-hand stick pushed up should hover the blaster, and keep it once let go: {stick_pointed}"
+    assert stick_after["active"] == 0 and stick_after["ideal"] == 0, \
+        f"releasing the grip should switch to the blaster the stick chose: {stick_after}"
+    stick_log = text.partition("VR_WHEEL_STICK_BEFORE")[2].partition("VR_WHEEL_STICK_AFTER")[0]
+    assert "OpenXR: JOY12 down" not in stick_log and "OpenXR: JOY11 down" not in stick_log, \
+        "the weapon-hand stick paged weapons while the wheel was open"
 
     # losing the controllers to the runtime pauses single player: the pause
     # menu's opaque, world-locked screen replaces the HUD, and it is still there

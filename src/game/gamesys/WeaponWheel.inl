@@ -407,8 +407,17 @@ bool idPlayer::IsWeaponWheelSlotLowAmmo( int slot ) {
 // weapon selection but returns the cursor to the dead zone, which quick chat
 // also uses to cancel on release. Classic retains its cursor sensitivity.
 // openQ4 VR: a tracked aim (BUTTON_VRAIM) steers either selector by turning
-// the weapon hand. Its buttons arrive as a controller's, but it has no stick
-// deflection to read, so it keeps the cursor that follows the aim.
+// the weapon hand, or, without moving the gun off its target, by pushing the
+// weapon-hand stick towards a slot (the engine hands that push over as
+// vr_wheelStickX/Y only while a selector is open). A push past the stick's
+// own threshold points the selector the way a gamepad's does; let go, and the
+// hand steers on from there.
+static bool WeaponWheelVRStick( idVec2 &stick ) {
+	stick.x = cvarSystem->GetCVarFloat( "vr_wheelStickX" );
+	stick.y = cvarSystem->GetCVarFloat( "vr_wheelStickY" );
+	return stick.Length() >= 0.35f;
+}
+
 static void WeaponWheelAdvanceCursor( const usercmd_t &cmd, idVec2 &cursor, int &lastMouseX, int &lastMouseY, idAngles &lastAngles ) {
 	const int mouseDx = cmd.mx - lastMouseX;
 	const int mouseDy = cmd.my - lastMouseY;
@@ -426,7 +435,11 @@ static void WeaponWheelAdvanceCursor( const usercmd_t &cmd, idVec2 &cursor, int 
 
 	cursor.x += mouseDx * WEAPON_WHEEL_MOUSE_SENSITIVITY;
 	cursor.y += mouseDy * WEAPON_WHEEL_MOUSE_SENSITIVITY;
-	if ( cvarSystem->GetCVarBool( "ui_radialTouchActive" ) ) {
+	idVec2 vrStick;
+	if ( trackedAim && WeaponWheelVRStick( vrStick ) ) {
+		cursor.x = vrStick.x * WEAPON_WHEEL_CURSOR_RADIUS;
+		cursor.y = vrStick.y * WEAPON_WHEEL_CURSOR_RADIUS;
+	} else if ( cvarSystem->GetCVarBool( "ui_radialTouchActive" ) ) {
 		cursor.x = cvarSystem->GetCVarFloat( "ui_radialTouchX" ) * WEAPON_WHEEL_CURSOR_RADIUS;
 		cursor.y = cvarSystem->GetCVarFloat( "ui_radialTouchY" ) * WEAPON_WHEEL_CURSOR_RADIUS;
 	} else if ( !trackedAim && mouseDx == 0 && mouseDy == 0 && cvarSystem->GetCVarBool( "ui_retained" ) && cvarSystem->GetCVarBool( "ui_radialStickActive" ) ) {

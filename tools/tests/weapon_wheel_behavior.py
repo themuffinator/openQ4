@@ -233,6 +233,17 @@ int main() {
         p.HandleWeaponWheelImpulse(IMPULSE_0+6);Mouse(p,0,0);Mouse(p,0,0);CHECK(p.weaponWheelHoveredSlot==6);
         CHECK(std::fabs(p.weaponWheelCursor.Length()-WEAPON_WHEEL_CURSOR_RADIUS)<.001f);
     }
+    // A tracked hand also points the wheel with its stick, without turning the
+    // gun off its target; let go, and the choice stays where the stick left it.
+    Reset();{idPlayer p;p.usercmd.buttons=BUTTON_WEAPONWHEEL|BUTTON_VRAIM;p.UpdateWeaponWheel();CHECK(p.weaponWheelActive);
+        const float a=5*idMath::TWO_PI/11;
+        vars.SetCVarFloat("vr_wheelStickX",std::sin(a));vars.SetCVarFloat("vr_wheelStickY",-std::cos(a));
+        now+=200;p.UpdateWeaponWheel();CHECK(p.weaponWheelHoveredSlot==5 && p.weaponWheelBlend>0);
+        vars.SetCVarFloat("vr_wheelStickX",0);vars.SetCVarFloat("vr_wheelStickY",0);now+=16;p.UpdateWeaponWheel();
+        CHECK(p.weaponWheelHoveredSlot==5);
+        vars.SetCVarFloat("vr_wheelStickX",.2f);now+=16;p.UpdateWeaponWheel();CHECK(p.weaponWheelHoveredSlot==5);
+        p.usercmd.buttons=BUTTON_VRAIM;p.UpdateWeaponWheel();CHECK(p.impulses==std::vector<int>{5});
+    }
     std::printf("weapon/quick-chat lifecycle: %d checks passed\n",checks);
 }
 '''
@@ -257,7 +268,7 @@ def main():
         'wheel':['void idPlayer::InitWeaponWheel(','bool idPlayer::CanUseWeaponWheel(','void idPlayer::ResetWeaponWheel(',
                  'bool idPlayer::HasWeaponWheelSlotWeapon(','int idPlayer::GetDefaultWeaponWheelSlot(',
                  'int idPlayer::GetClosestAvailableWeaponWheelSlot(','static float WeaponWheelDeadzoneRadius(',
-                 'static void WeaponWheelBoundCursor(','static bool WeaponWheelPointerShown(',
+                 'static void WeaponWheelBoundCursor(','static bool WeaponWheelPointerShown(','static bool WeaponWheelVRStick(',
                  'static void WeaponWheelAdvanceCursor(','void idPlayer::UpdateWeaponWheelCursor(',
                  'bool idPlayer::HandleWeaponWheelImpulse(',
                  'void idPlayer::UpdateWeaponWheelEffects(','void idPlayer::UpdateWeaponWheel('],

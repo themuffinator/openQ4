@@ -196,6 +196,7 @@ static idCVar net_rateDefaultMigrated( "net_rateDefaultMigrated", "0", CVAR_SYST
 static idCVar r_screenFractionPresetMigrated( "r_screenFractionPresetMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for render scales lowered by older performance presets" );
 static idCVar ui_autoSwitchDefaultMigrated( "ui_autoSwitchDefaultMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the smart weapon switch default" );
 static idCVar vr_weaponOffsetDefaultMigrated( "vr_weaponOffsetDefaultMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the VR weapon offsets that held weapons replaced" );
+static idCVar vr_hudHeightDefaultMigrated( "vr_hudHeightDefaultMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "one-time migration flag for the VR HUD height that moved below the line of sight" );
 static idCVar s_audioDefaultsMigrated( "s_audioDefaultsMigrated", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "number of one-time audio default migrations already applied" );
 
 static void Common_MigrateLegacyConsoleAllowCVar( void ) {
@@ -322,6 +323,28 @@ static void Common_MigrateLegacyVRWeaponOffsets( void ) {
 		cvarSystem->SetCVarFloat( "vr_weaponOffsetZ", 0.0f, CVAR_ARCHIVE );
 	}
 	vr_weaponOffsetDefaultMigrated.SetBool( true );
+}
+
+/*
+==================
+Common_MigrateLegacyVRHudHeight
+
+The head-locked HUD used to hang 0.1 m below eye level, which left its
+panels round the middle of the view, over whatever the player was aiming at.
+It now hangs below the line of sight by default. Every archived setting is
+saved, so a configuration still holding the old default moves to the new
+one, once; any other height was chosen and stays.
+==================
+*/
+static void Common_MigrateLegacyVRHudHeight( void ) {
+	if ( vr_hudHeightDefaultMigrated.GetBool() ) {
+		return;
+	}
+	if ( cvarSystem->GetCVarFloat( "vr_hudHeightOffset" ) == -0.1f ) {
+		common->Printf( "Migrating legacy VR config: the HUD hangs below the line of sight, vr_hudHeightOffset -0.1 -> -0.3\n" );
+		cvarSystem->SetCVarFloat( "vr_hudHeightOffset", -0.3f, CVAR_ARCHIVE );
+	}
+	vr_hudHeightDefaultMigrated.SetBool( true );
 }
 
 /*
@@ -8375,6 +8398,7 @@ void idCommonLocal::InitGame( void ) {
 	Common_MigrateLegacyBorderlessWindowDefault();
 	Common_MigrateLegacyNetworkRateCaps();
 	Common_MigrateLegacyVRWeaponOffsets();
+	Common_MigrateLegacyVRHudHeight();
 	Common_MigrateLegacyAutoSwitchDefault();
 	Common_MigrateLegacyAudioDefaults();
 

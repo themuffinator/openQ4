@@ -742,6 +742,11 @@ public:
 	// The view weapon at the weapon hand: from the interpolated eye for
 	// drawing, from the simulated eye for the tic. False outside hand aim.
 	bool					GetVRWeaponTransform( idVec3 &origin, idMat3 &axis, bool presentation ) const;
+	// How much larger than modelled the view model is drawn in the weapon
+	// hand (vr_weaponScale): stock guns and hands are built at about half life
+	// size for a flat screen. The axis GetVRWeaponTransform returns stays
+	// unscaled; rvWeapon::ForeshortenAxis applies this.
+	float					GetVRWeaponScale( void ) const;
 	// Where shots leave the weapon hand, pulled back out of solid geometry.
 	bool					GetVRAimOrigin( idVec3 &origin ) const;
 	// Where this frame's shot from the weapon hand lands, for the aim

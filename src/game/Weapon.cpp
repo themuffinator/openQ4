@@ -1766,7 +1766,12 @@ const idJointMat *rvWeapon::PoseVRArms( const idJointMat *joints, int numJoints,
 		vrArmJointCount = numJoints;
 	}
 	memcpy( vrArmJoints, joints, numJoints * sizeof( vrArmJoints[0] ) );
-	const idMat3 toModel = axis.Transpose();
+	// The model is drawn larger than built (vr_weaponScale, ForeshortenAxis):
+	// axis carries that scale, so world points come back into the model by its
+	// inverse and world turns by the unscaled axis.
+	const float scale = Max( axis[ 0 ].Length(), 1e-3f );
+	const idMat3 toModel = axis.Transpose() * ( 1.0f / ( scale * scale ) );
+	const idMat3 toModelAxis = axis.Transpose() * ( 1.0f / scale );
 	const int *parents = viewAnimator->ModelDef()->JointParents();
 
 	// the weapon hand
@@ -1775,6 +1780,7 @@ const idJointMat *rvWeapon::PoseVRArms( const idJointMat *joints, int numJoints,
 		idVec3 elbow;
 		if ( owner->SolveVRViewArm( weaponHand, origin + vrArmJoints[ arm.wrist ].ToVec3() * axis, arm.length, elbow ) ) {
 			VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );
+			ShortenVRViewForearm( arm, scale, vrArmJoints );
 		}
 	}
 
@@ -1809,8 +1815,9 @@ const idJointMat *rvWeapon::PoseVRArms( const idJointMat *joints, int numJoints,
 				heldAxis[i].y = -heldAxis[i].y;
 			}
 			heldAxis[0] = -heldAxis[0];
-			const idVec3 freeOrigin = ( palm + held * aimAxis - origin ) * toModel;
-			const idMat3 freeAxis = heldAxis * aimAxis * toModel;
+			// held is in the model's units, drawn scale times larger
+			const idVec3 freeOrigin = ( palm + ( held * scale ) * aimAxis - origin ) * toModel;
+			const idMat3 freeAxis = heldAxis * aimAxis * toModelAxis;
 
 			const idVec3 animatedOrigin = vrArmJoints[ arm.wrist ].ToVec3();
 			const idMat3 animatedAxis = vrArmJoints[ arm.wrist ].ToMat3();
@@ -1828,9 +1835,52 @@ const idJointMat *rvWeapon::PoseVRArms( const idJointMat *joints, int numJoints,
 		idVec3 elbow;
 		if ( owner->SolveVRViewArm( offHand, origin + vrArmJoints[ arm.wrist ].ToVec3() * axis, arm.length, elbow ) ) {
 			VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );
+			ShortenVRViewForearm( arm, scale, vrArmJoints );
 		}
 	}
 	return vrArmJoints;
+}
+
+/*
+================
+rvWeapon::ShortenVRViewForearm
+
+openQ4 VR: the view model's forearms are built long and thin, at full length
+behind hands half life size. Drawn scale times larger (vr_weaponScale), the
+hands match the player's own, and each forearm is pressed back along itself,
+towards its wrist, to the length the body's arm solver reached its elbow
+with (SolveVRViewArm takes the forearm's modelled length in world units).
+Only the forearm's joints change, so the hand and the gun keep their size.
+================
+*/
+void rvWeapon::ShortenVRViewForearm( const vrViewArm_t &arm, float scale, idJointMat *joints ) {
+	if ( scale <= 1.001f && scale >= 0.999f ) {
+		return;
+	}
+	const idVec3 wrist = joints[ arm.wrist ].ToVec3();
+	idVec3 along = VRBody_ViewArmElbow( arm, joints ) - wrist;
+	if ( along.Normalize() < 1e-4f ) {
+		return;
+	}
+	// squash = identity - ( 1 - 1 / scale ) * along * along^T: points keep
+	// their distance across the forearm and lose 1 - 1 / scale along it
+	const float shorten = 1.0f - 1.0f / scale;
+	idMat3 squash;
+	for ( int i = 0; i < 3; i++ ) {
+		for ( int j = 0; j < 3; j++ ) {
+			squash[ i ][ j ] = ( i == j ? 1.0f : 0.0f ) - shorten * along[ i ] * along[ j ];
+		}
+	}
+	const int forearmJoints[ 2 ] = { arm.forearm, arm.elbow };
+	for ( int n = 0; n < 2; n++ ) {
+		const int joint = forearmJoints[ n ];
+		if ( joint < 0 ) {
+			continue;
+		}
+		const idVec3 position = wrist + ( joints[ joint ].ToVec3() - wrist ) * squash;
+		joints[ joint ].SetRotation( joints[ joint ].ToMat3() * squash );
+		joints[ joint ].SetTranslation( position );
+	}
 }
 
 /*
@@ -3386,9 +3436,11 @@ rvWeapon::ForeshortenAxis
 ================
 */
 idMat3 rvWeapon::ForeshortenAxis( const idMat3& axis ) const {
-	// openQ4 VR: a gun held in the hand keeps its true length
+	// openQ4 VR: a gun held in the hand keeps its true proportions, scaled from
+	// the half life size the flat screen's view models are built at to match
+	// the player's own hands (vr_weaponScale)
 	if ( owner != NULL && owner->IsVRHandAiming() ) {
-		return axis;
+		return axis * owner->GetVRWeaponScale();
 	}
 	return idMat3( axis[0] * viewModelForeshorten, axis[1], axis[2] );
 }

@@ -388,6 +388,7 @@ def main():
                  function(read(GAME / "src/game/gamesys/WeaponWheelLegacy.inl"), "float WeaponWheelNormalizeAngle(") + "\n" +
                  function(player, "static float WeaponWheelDeadzoneRadius(") + "\n" +
                  function(player, "static void WeaponWheelBoundCursor(") + "\n" +
+                 function(player, "static bool WeaponWheelVRStick(") + "\n" +
                  function(player, "static void WeaponWheelAdvanceCursor(") + "\n" +
                  function(player, "void idPlayer::UpdateWeaponWheelCursor(") + "\n" +
                  function(player, "int idPlayer::GetClosestAvailableWeaponWheelSlot("),

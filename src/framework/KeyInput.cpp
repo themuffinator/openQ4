@@ -1458,7 +1458,10 @@ void idKeyInput::PreliminaryKeyEvent( int keynum, bool down ) {
 
 	keys[keynum].down = down;
 	if ( down ) {
-		key_lastInputFamily = Key_IsControllerKey( keynum ) ? KEY_INPUT_FAMILY_CONTROLLER : KEY_INPUT_FAMILY_DESKTOP;
+		// openQ4 VR: the headset's menu pointer clicks as the mouse does, but it
+		// is a controller in the player's hand, and prompts must name its buttons
+		const bool vrPointer = Key_IsMouseKey( keynum ) && VR_HasInputFocus();
+		key_lastInputFamily = ( Key_IsControllerKey( keynum ) || vrPointer ) ? KEY_INPUT_FAMILY_CONTROLLER : KEY_INPUT_FAMILY_DESKTOP;
 	}
 
 #ifdef ID_DOOM_LEGACY
@@ -1485,7 +1488,9 @@ idKeyInput::PreliminaryMouseEvent
 */
 void idKeyInput::PreliminaryMouseEvent( int deltaX, int deltaY ) {
 	if ( deltaX != 0 || deltaY != 0 ) {
-		key_lastInputFamily = KEY_INPUT_FAMILY_DESKTOP;
+		// openQ4 VR: while the headset has the controllers, cursor motion is the
+		// weapon hand pointing at a menu (Sys_PostVRPointer), not a desk mouse
+		key_lastInputFamily = VR_HasInputFocus() ? KEY_INPUT_FAMILY_CONTROLLER : KEY_INPUT_FAMILY_DESKTOP;
 	}
 }
 

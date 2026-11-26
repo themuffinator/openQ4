@@ -3096,17 +3096,40 @@ void idVRSystemOpenXR::SyncInput( float frameSeconds ) {
 		UpdateKey( VR_SLOT_MENU_STICK_Y, stickY > 0.0f ? K_JOY9 : K_JOY10, idMath::Fabs( stickY ) > ( heldY ? 0.35f : 0.75f ) );
 		UpdateKey( VR_SLOT_MENU_STICK_X, stickX > 0.0f ? K_JOY11 : K_JOY12, idMath::Fabs( stickX ) > ( heldX ? 0.35f : 0.75f ) );
 		snapTurn.latched = true;
+		if ( vr_wheelStickX.GetFloat() != 0.0f || vr_wheelStickY.GetFloat() != 0.0f ) {
+			vr_wheelStickX.SetFloat( 0.0f );
+			vr_wheelStickY.SetFloat( 0.0f );
+		}
 	} else {
 		UpdateKey( VR_SLOT_MENU_STICK_X, 0, false );
 		UpdateKey( VR_SLOT_MENU_STICK_Y, 0, false );
-		// weapon stick up / down pages weapons (JOY12 next, JOY11 previous)
-		const int held = heldKeys[VR_SLOT_WEAPON_STICK_Y];
-		UpdateKey( VR_SLOT_WEAPON_STICK_Y, weapon.stickY > 0.0f ? K_JOY12 : K_JOY11, idMath::Fabs( weapon.stickY ) > ( held ? 0.35f : 0.75f )
-			&& idMath::Fabs( weapon.stickY ) > idMath::Fabs( weapon.stickX ) );
-		if ( vr_turnMode.GetInteger() == 1 ) {
-			turn = VR_SmoothTurn( weapon.stickX, vr_smoothTurnSpeed.GetFloat(), frameSeconds, deadzone );
+		// While the weapon wheel (or multiplayer's quick chat) is open, the
+		// weapon-hand stick points at a slot, as a gamepad's stick does, so a
+		// weapon can be picked without swinging the gun off its target. It
+		// neither turns nor pages weapons meanwhile, and a snap turn waits for
+		// the stick to come back to the middle after the wheel closes.
+		const bool radialOpen = cvarSystem->GetCVarInteger( "ui_radialOwner" ) != 0;
+		const float wheelX = radialOpen ? idMath::ClampFloat( -1.0f, 1.0f, weapon.stickX ) : 0.0f;
+		const float wheelY = radialOpen ? idMath::ClampFloat( -1.0f, 1.0f, -weapon.stickY ) : 0.0f;
+		if ( vr_wheelStickX.GetFloat() != wheelX ) {
+			vr_wheelStickX.SetFloat( wheelX );
+		}
+		if ( vr_wheelStickY.GetFloat() != wheelY ) {
+			vr_wheelStickY.SetFloat( wheelY );
+		}
+		if ( radialOpen ) {
+			UpdateKey( VR_SLOT_WEAPON_STICK_Y, 0, false );
+			snapTurn.latched = true;
 		} else {
-			turn = VR_SnapTurn( snapTurn, weapon.stickX, vr_snapTurnAngle.GetFloat() );
+			// weapon stick up / down pages weapons (JOY12 next, JOY11 previous)
+			const int held = heldKeys[VR_SLOT_WEAPON_STICK_Y];
+			UpdateKey( VR_SLOT_WEAPON_STICK_Y, weapon.stickY > 0.0f ? K_JOY12 : K_JOY11, idMath::Fabs( weapon.stickY ) > ( held ? 0.35f : 0.75f )
+				&& idMath::Fabs( weapon.stickY ) > idMath::Fabs( weapon.stickX ) );
+			if ( vr_turnMode.GetInteger() == 1 ) {
+				turn = VR_SmoothTurn( weapon.stickX, vr_smoothTurnSpeed.GetFloat(), frameSeconds, deadzone );
+			} else {
+				turn = VR_SnapTurn( snapTurn, weapon.stickX, vr_snapTurnAngle.GetFloat() );
+			}
 		}
 	}
 
@@ -3567,16 +3590,31 @@ void idVRSystemOpenXR::DrawMenuPointer( void ) {
 	if ( pointerMaterial == NULL ) {
 		pointerMaterial = declManager->FindMaterial( "_white" );
 	}
-	// the 640x480 canvas stretches over the screen: keep the dot square
+	// the 640x480 canvas stretches over the screen: keep the dot round
 	const float aspect = static_cast<float>( screenSwapchain.width ) / static_cast<float>( screenSwapchain.height );
-	const float height = 7.0f;
-	const float width = height * ( 4.0f / 3.0f ) / aspect;
+	const float radiusY = 7.0f;
+	const float radiusX = radiusY * ( 4.0f / 3.0f ) / aspect;
 	const float x = pointerU * static_cast<float>( SCREEN_WIDTH );
 	const float y = pointerV * static_cast<float>( SCREEN_HEIGHT );
-	renderSystem->SetColor4( 0.0f, 0.0f, 0.0f, 0.8f );
-	renderSystem->DrawStretchPic( x - width, y - height, width * 2.0f, height * 2.0f, 0.0f, 0.0f, 1.0f, 1.0f, pointerMaterial );
+	// a dark ring around a white dot, both drawn as fans
+	const int segments = 20;
+	const float rings[2] = { 1.0f, 0.5f };
+	const float shades[2][4] = { { 0.0f, 0.0f, 0.0f, 0.8f }, { 1.0f, 1.0f, 1.0f, 1.0f } };
+	const idVec2 centre( x, y );
+	for ( int ring = 0; ring < 2; ring++ ) {
+		renderSystem->SetColor4( shades[ring][0], shades[ring][1], shades[ring][2], shades[ring][3] );
+		idVec2 previous( x + radiusX * rings[ring], y );
+		for ( int i = 1; i <= segments; i++ ) {
+			float s, c;
+			idMath::SinCos( idMath::TWO_PI * static_cast<float>( i ) / static_cast<float>( segments ), s, c );
+			// the canvas runs down the screen: going round the other way in it
+			// keeps the winding the 2D pass draws (as VR_DrawEyeDisc does)
+			const idVec2 next( x + radiusX * rings[ring] * c, y - radiusY * rings[ring] * s );
+			renderSystem->DrawStretchTri( centre, previous, next, vec2_origin, vec2_origin, vec2_origin, pointerMaterial );
+			previous = next;
+		}
+	}
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
-	renderSystem->DrawStretchPic( x - width * 0.5f, y - height * 0.5f, width, height, 0.0f, 0.0f, 1.0f, 1.0f, pointerMaterial );
 }
 
 // The virtual screen hangs straight ahead of the head's current heading, at

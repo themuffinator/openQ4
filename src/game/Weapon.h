@@ -328,6 +328,7 @@ public:
 	// openQ4 VR: this draw's view model joints with its arms meeting the
 	// body the headset shows (vr_body); NULL to draw the model as it is.
 	const idJointMat *	PoseVRArms					( const idJointMat *joints, int numJoints, const idVec3 &origin, const idMat3 &axis, int &hideSurfaces );
+	static void			ShortenVRViewForearm		( const vrViewArm_t &arm, float scale, idJointMat *joints );
 	bool				VROffHandBusy				( void ) const;
 
 	// Script state management

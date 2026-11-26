@@ -12,6 +12,52 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## VR: adult-sized hands, a HUD out of your line of fire, and a quicker weapon wheel, 26 November 2026
+
+From a player's first report on a real headset (Steam Frame over SteamVR):
+
+- **Your hands are full size.** Quake 4 builds its first-person guns and
+  the hands holding them at about half life size, which a flat screen never
+  shows; in VR the hands looked like a child's next to your body's arms. They
+  are now drawn 1.75 times as large, and so are the guns, so a hand is about
+  17 cm long and the machinegun about 76 cm. The forearms keep their length,
+  so your elbows bend where they did. `vr_weaponScale` sets the size; 1 draws
+  them as modelled. A long gun reaches further back too: held about 35 cm
+  in front of your eyes, the rocket launcher's rear now comes up to your face,
+  where at the old size it stopped about 12 cm short.
+- **The HUD hangs below your line of sight.** It used to sit 0.1 m below eye
+  level, with its panels round the middle of your view, over what you were
+  aiming at. It now hangs 0.3 m below, its top edge at about eye level; glance
+  down for health and ammunition. A configuration still holding the old
+  default moves to the new one once; any other height stays.
+  `vr_hudHeightOffset -0.1` restores the old placement.
+- **Pick a weapon without swinging your gun.** With the weapon wheel open,
+  push the weapon-hand stick towards a weapon and let go of the grip; turning
+  the gun hand still works too. The stick doesn't turn you or page weapons
+  while the wheel is open, and multiplayer's quick chat takes the stick the
+  same way.
+- **Menu prompts name your controller's buttons.** Pointing at a menu used to
+  switch every button prompt to keyboard keys, because the pointer moves and
+  clicks like a mouse. The menu pointer is also a round dot now, not a square.
+- **What to do.** Nothing. Players who set their own HUD height keep it.
+- Not changed: shots already leave the hand along the laser's line in single
+  player, so the report's "aiming feels off" has no separate cause found in
+  code; the half-size hands, which put the visible grip well inside the real
+  hand, are the likely one. Still unverified on a headset.
+- Development: `rvWeapon::ForeshortenAxis` scales the hand-held view model by
+  `idPlayer::GetVRWeaponScale`, `GetVRWeaponTransform` scales the grip with
+  it, and `rvWeapon::PoseVRArms` maps world points back by the scaled axis's
+  inverse and presses each forearm back to its modelled length along itself
+  (`ShortenVRViewForearm`), so `SolveVRViewArm` is unchanged. The engine
+  publishes the weapon-hand stick as `vr_wheelStickX/Y` while `ui_radialOwner`
+  is set; `WeaponWheelAdvanceCursor` takes a push past 35% under
+  `BUTTON_VRAIM`. `idKeyInput::PreliminaryMouseEvent` and mouse buttons count
+  as controller input while `VR_HasInputFocus()`, and `Sys_PostVRPointer`
+  marks the controller for retained menus, whose pointer bypasses the event
+  loop. `Common_MigrateLegacyVRHudHeight` moves an archived -0.1 once. No ABI
+  change. Contracts: `tools/tests/weapon_wheel_behavior.py` (VR stick case),
+  `tools/tests/openxr_vr_contract.py`.
+
 ## Vulkan keeps the level's index lists on the graphics card too, 26 November 2026
 
 - **Vulkan no longer re-sends the triangle lists of static geometry every

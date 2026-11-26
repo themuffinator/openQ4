@@ -46,8 +46,9 @@ idCVar vr_hudDistance( "vr_hudDistance", "1.4", CVAR_SYSTEM | CVAR_ARCHIVE | CVA
 	"distance of the head-locked HUD in metres", 0.5f, 5.0f );
 idCVar vr_hudWidth( "vr_hudWidth", "1.2", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"width of the head-locked HUD in metres", 0.3f, 4.0f );
-idCVar vr_hudHeightOffset( "vr_hudHeightOffset", "-0.1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
-	"vertical offset of the head-locked HUD from eye level in metres", -1.0f, 1.0f );
+idCVar vr_hudHeightOffset( "vr_hudHeightOffset", "-0.3", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
+	"vertical offset of the head-locked HUD from eye level in metres, while aiming with the controller; the default "
+	"hangs it below the line of sight, its top edge at about eye level", -1.0f, 1.0f );
 idCVar vr_screenDistance( "vr_screenDistance", "2.5", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"distance of the virtual screen for menus, loading and cinematics in metres", 0.8f, 10.0f );
 idCVar vr_screenWidth( "vr_screenWidth", "3.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
@@ -62,6 +63,13 @@ idCVar vr_weaponOffsetZ( "vr_weaponOffsetZ", "0", CVAR_SYSTEM | CVAR_ARCHIVE | C
 	"moves the held view weapon up, in game units", -40.0f, 40.0f );
 idCVar vr_weaponPitch( "vr_weaponPitch", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"view weapon pitch relative to the controller's aim, in degrees (positive tilts down)", -60.0f, 60.0f );
+idCVar vr_weaponScale( "vr_weaponScale", "1.75", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
+	"size of the gun and the hands holding it in the weapon hand: Quake 4 builds its first-person guns and hands at about "
+	"half life size for a flat screen, so 1.75 matches them to your body; 1 draws them as modelled", 0.5f, 3.0f );
+idCVar vr_wheelStickX( "vr_wheelStickX", "0", CVAR_SYSTEM | CVAR_FLOAT | CVAR_ROM | CVAR_NOCHEAT,
+	"set while the weapon wheel is open: the weapon-hand stick's push to the right, -1 to 1, which picks a slot" );
+idCVar vr_wheelStickY( "vr_wheelStickY", "0", CVAR_SYSTEM | CVAR_FLOAT | CVAR_ROM | CVAR_NOCHEAT,
+	"set while the weapon wheel is open: the weapon-hand stick's push down, -1 to 1, which picks a slot" );
 idCVar vr_comfortVignette( "vr_comfortVignette", "0.5", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"comfort vignette while the stick moves or smoothly turns you: 0 off, up to 1 for a black edge and a 60 degree clear centre", 0.0f, 1.0f );
 idCVar vr_physicalCrouch( "vr_physicalCrouch", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,

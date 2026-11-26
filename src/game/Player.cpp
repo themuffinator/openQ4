@@ -14910,11 +14910,24 @@ bool idPlayer::GetVRWeaponTransform( idVec3 &origin, idMat3 &axis, bool presenta
 		GetPresentationViewPos( eyeOrigin, eyeAxis );
 	}
 	eyeOrigin.z += VRCrouchLift( frame );
-	// the gun sits in the hand the way its own model holds it
+	// the gun sits in the hand the way its own model holds it, at the size it
+	// is drawn (ForeshortenAxis scales the model about its origin, so the grip
+	// is that much further from it)
 	idVec3 barrel;
 	idVec3 grip;
 	weapon->GetVRHold( barrel, grip, frame.weaponHand == VR_HAND_LEFT );
-	return VR_WeaponTransform( frame, eyeOrigin, trackingYaw, barrel, grip, origin, axis );
+	return VR_WeaponTransform( frame, eyeOrigin, trackingYaw, barrel, grip * GetVRWeaponScale(), origin, axis );
+}
+
+/*
+===============
+idPlayer::GetVRWeaponScale
+===============
+*/
+float idPlayer::GetVRWeaponScale( void ) const {
+	const float scale = cvarSystem->GetCVarFloat( "vr_weaponScale" );
+	// an engine without the setting draws the model as built
+	return scale > 0.0f ? idMath::ClampFloat( 0.5f, 3.0f, scale ) : 1.0f;
 }
 
 /*
