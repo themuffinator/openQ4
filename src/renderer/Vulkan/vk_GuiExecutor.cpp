@@ -96,8 +96,10 @@ static struct {
 	uint64 ringBytes, ringAllocations, targetChanges, renderingScopes, barriers, submissions;
 	// what the geometry rings were filled with: vertex streams that are not
 	// resident, index lists, the index lists of surfaces whose vertices are
-	// resident, and the two streams of stencil shadow volumes
-	uint64 vertexStreamBytes, indexBytes, residentSurfaceIndexBytes, shadowVertexBytes, shadowIndexBytes;
+	// resident (and of those, the lists of the surfaces that own the resident
+	// block: light interactions draw subsets of their own over it), and the
+	// two streams of stencil shadow volumes
+	uint64 vertexStreamBytes, indexBytes, residentSurfaceIndexBytes, ownedSurfaceIndexBytes, shadowVertexBytes, shadowIndexBytes;
 } vkResourceProfile;
 
 // vk_Interactions.cpp: the Phase F1 per-light interaction pass, inserted
@@ -871,10 +873,10 @@ void VK_Exec_PrintResourceInfo( bool reset ) {
 		vkExec.numEnvPipelines, vkExec.numSpecialPipelines, vkExec.numProgramPipelines,
 		vkExec.numBlendLightPipelines, vkExec.numTemporalResolvePipelines, vkExec.numSceneScalePipelines,
 		vkExec.numPostPipelines, vkExec.pipelineFlushCount );
-	common->Printf( "Vulkan executor geometry rings: vertexStreamBytes=%llu indexBytes=%llu residentSurfaceIndexBytes=%llu shadowVertexBytes=%llu shadowIndexBytes=%llu\n",
+	common->Printf( "Vulkan executor geometry rings: vertexStreamBytes=%llu indexBytes=%llu residentSurfaceIndexBytes=%llu ownedSurfaceIndexBytes=%llu shadowVertexBytes=%llu shadowIndexBytes=%llu\n",
 		(unsigned long long)vkResourceProfile.vertexStreamBytes, (unsigned long long)vkResourceProfile.indexBytes,
-		(unsigned long long)vkResourceProfile.residentSurfaceIndexBytes, (unsigned long long)vkResourceProfile.shadowVertexBytes,
-		(unsigned long long)vkResourceProfile.shadowIndexBytes );
+		(unsigned long long)vkResourceProfile.residentSurfaceIndexBytes, (unsigned long long)vkResourceProfile.ownedSurfaceIndexBytes,
+		(unsigned long long)vkResourceProfile.shadowVertexBytes, (unsigned long long)vkResourceProfile.shadowIndexBytes );
 	VK_StaticGeo_PrintInfo( reset );
 	R_ShadowMapReceiverScanPrintInfo( reset );
 	if ( reset ) { memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) ); }
@@ -1119,17 +1121,45 @@ static int VK_Ring_Reserve( vkRing_t &ring, size_t bytes, int alignment ) {
 	VK_STATIC_GEO_FLAG set; VK_Exec_VertexStream turns either form into the
 	buffer and offset to bind.
 
+	Stencil shadow volumes are streams of the same kind, and at the presets
+	that draw every shadow as a volume they were two thirds of everything
+	the rings took. A volume's vertex stream is a block of the vertex cache
+	like any other (the projected vertices of a prelight volume, or the
+	paired vertices of the surface it is cast from, which every light's
+	volume of that surface shares) and becomes resident the same way.
+
+	An index list is not in the vertex cache and has no serial of its own.
+	It becomes resident where it shares the life of a block: the index list
+	of the surface that owns the block was allocated with that surface and
+	is freed with it, and the surface frees its block when it goes
+	(R_GeoFreeVertexCaches), so the block's header and serial identify the
+	list as well. That is the case for a volume that owns its projected
+	vertices (every prelight volume: half to three quarters of the volume
+	bytes in hub2). It is not the case for a volume cast from a surface
+	whose paired vertices it borrows: those lists stay in the ring, a new
+	one for every light and every time the interaction is built again. A
+	resident list is kept under its block's header with
+	VK_STATIC_GEO_INDEX_KEY set, with the list's address and length beside
+	the serial, so that a block whose surface were ever given another list
+	would start again.
+	VK_Exec_IndexStream decodes an index offset as VK_Exec_VertexStream
+	does a vertex offset.
+
 ===============================================================================
 */
 static idCVar r_vkStaticGeometry( "r_vkStaticGeometry", "1", CVAR_RENDERER | CVAR_INTEGER,
 	"keep vertex streams that outlive a frame in a persistent buffer instead of copying them into the frame ring "
 	"every frame: 0 = copy every frame, 1 = resident, 2 = resident and compare each one with its source at every "
 	"draw (qualification)", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+static idCVar r_vkStaticShadowVolumes( "r_vkStaticShadowVolumes", "1", CVAR_RENDERER | CVAR_BOOL,
+	"with r_vkStaticGeometry: keep the vertex streams of stencil shadow volumes, and the index lists of the volumes "
+	"that own their vertices, resident as well; 0 copies every volume into the frame rings every frame, as before" );
 static idCVar r_vkStaticGeometryMegs( "r_vkStaticGeometryMegs", "96", CVAR_RENDERER | CVAR_INTEGER,
 	"size in MiB of the buffer resident vertex streams live in; applies when the buffer is next created "
 	"(vid_restart)", 8, 512 );
 
 static const int VK_STATIC_GEO_FLAG = 0x40000000;		// the offset is in the resident buffer, not the frame ring
+static const uintptr_t VK_STATIC_GEO_INDEX_KEY = 1;		// key: the index list of the surface that owns the block
 static const int VK_STATIC_GEO_MAX_ENTRIES = 32768;
 static const int VK_STATIC_GEO_HASH_SIZE = 32768;		// power of two
 static const int VK_STATIC_GEO_PROMOTE_MSEC = 150;
@@ -1138,8 +1168,10 @@ static const int VK_STATIC_GEO_SWEEP_PER_FRAME = 256;
 static const unsigned int VK_STATIC_GEO_FULL_BACKOFF_FRAMES = 30;
 
 typedef struct vkStaticGeoEntry_s {
-	const vertCache_t *		key;			// NULL: free
+	const void *			key;			// NULL: free; a block's header, or that with VK_STATIC_GEO_INDEX_KEY
 	unsigned long long		serial;			// the allocation the entry describes
+	const void *			list;			// an index list's address and length (NULL, 0 for the block's own bytes)
+	int						listBytes;
 	int						firstSeenMsec;
 	unsigned int			lastUsedFrame;
 	int						offset;			// in the resident buffer; -1 while streamed
@@ -1176,6 +1208,7 @@ static struct vkStaticGeo_s {
 	long long				residentBytes;
 	// since the last report reset
 	uint64					hits, hitBytes, promotions, promotedBytes, recycled, evictions, declined, mismatches;
+	uint64					volumeVertexHitBytes, volumeIndexHitBytes;	// of hitBytes: stencil shadow volumes
 	int						hash[ VK_STATIC_GEO_HASH_SIZE ];
 	vkStaticGeoEntry_t		entries[ VK_STATIC_GEO_MAX_ENTRIES ];
 	vkStaticGeoRetired_t	retired[ VK_STATIC_GEO_MAX_ENTRIES ];
@@ -1231,7 +1264,8 @@ static bool VK_StaticGeo_EnsureBuffer( void ) {
 	memset( &bci, 0, sizeof( bci ) );
 	bci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	bci.size = (VkDeviceSize)capacity;
-	bci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	// vertex streams, and the index lists that share a block's life
+	bci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
 	// Written from the host once per stream and read by the device from then
 	// on, like the rings it relieves.
 	VmaAllocationCreateInfo vaci;
@@ -1261,16 +1295,24 @@ static bool VK_StaticGeo_EnsureBuffer( void ) {
 	return true;
 }
 
-static ID_INLINE int VK_StaticGeo_Hash( const vertCache_t *cache ) {
-	// headers are block-allocated 72 bytes apart: mix before masking
-	const uintptr_t value = reinterpret_cast<uintptr_t>( cache ) >> 3;
+// The key of a block's own bytes is its header; that of the index list riding
+// on it sets the low bit, which no header's address has.
+static ID_INLINE const void *VK_StaticGeo_IndexListKey( const vertCache_t *cache ) {
+	return reinterpret_cast<const void *>( reinterpret_cast<uintptr_t>( cache ) | VK_STATIC_GEO_INDEX_KEY );
+}
+
+static ID_INLINE int VK_StaticGeo_Hash( const void *key ) {
+	// headers are block-allocated 72 bytes apart: mix before masking. The low
+	// bits are kept, so a block and its index list hash apart.
+	const uintptr_t address = reinterpret_cast<uintptr_t>( key );
+	const uintptr_t value = ( address >> 3 ) ^ ( ( address & 7 ) << 28 );
 	return static_cast<int>( ( static_cast<unsigned int>( value ) * 2654435761u ) >> 17 ) & ( VK_STATIC_GEO_HASH_SIZE - 1 );
 }
 
-static vkStaticGeoEntry_t *VK_StaticGeo_Find( const vertCache_t *cache ) {
-	for ( int index = vkStaticGeo.hash[ VK_StaticGeo_Hash( cache ) ]; index >= 0;
+static vkStaticGeoEntry_t *VK_StaticGeo_Find( const void *key ) {
+	for ( int index = vkStaticGeo.hash[ VK_StaticGeo_Hash( key ) ]; index >= 0;
 			index = vkStaticGeo.entries[ index ].hashNext ) {
-		if ( vkStaticGeo.entries[ index ].key == cache ) {
+		if ( vkStaticGeo.entries[ index ].key == key ) {
 			return &vkStaticGeo.entries[ index ];
 		}
 	}
@@ -1313,16 +1355,19 @@ static void VK_StaticGeo_Remove( vkStaticGeoEntry_t &entry ) {
 	vkStaticGeo.numEntries--;
 }
 
-static vkStaticGeoEntry_t *VK_StaticGeo_Insert( const vertCache_t *cache ) {
+static vkStaticGeoEntry_t *VK_StaticGeo_Insert( const void *key, const unsigned long long serial,
+		const void *list, const int listBytes ) {
 	const int index = vkStaticGeo.freeHead;
 	if ( index < 0 ) {
 		return NULL;
 	}
 	vkStaticGeoEntry_t &entry = vkStaticGeo.entries[ index ];
 	vkStaticGeo.freeHead = entry.hashNext;
-	const int bucket = VK_StaticGeo_Hash( cache );
-	entry.key = cache;
-	entry.serial = cache->serial;
+	const int bucket = VK_StaticGeo_Hash( key );
+	entry.key = key;
+	entry.serial = serial;
+	entry.list = list;
+	entry.listBytes = listBytes;
 	entry.firstSeenMsec = vkStaticGeo.frameMsec;
 	entry.lastUsedFrame = vkStaticGeo.frame;
 	entry.offset = -1;
@@ -1399,14 +1444,14 @@ static bool VK_StaticGeo_Flush( void ) {
 	return result == VK_SUCCESS;
 }
 
-static bool VK_StaticGeo_Promote( vkStaticGeoEntry_t &entry, const vertCache_t *cache ) {
-	if ( vkStaticGeo.frame < vkStaticGeo.fullUntilFrame || cache->size <= 0 || !VK_StaticGeo_EnsureBuffer()
-			|| cache->size > vkStaticGeo.capacity ) {
+static bool VK_StaticGeo_Promote( vkStaticGeoEntry_t &entry, const void *source, const int bytes ) {
+	if ( vkStaticGeo.frame < vkStaticGeo.fullUntilFrame || bytes <= 0 || source == NULL || !VK_StaticGeo_EnsureBuffer()
+			|| bytes > vkStaticGeo.capacity ) {
 		return false;
 	}
 	VmaVirtualAllocationCreateInfo vaci;
 	memset( &vaci, 0, sizeof( vaci ) );
-	vaci.size = (VkDeviceSize)cache->size;
+	vaci.size = (VkDeviceSize)bytes;
 	vaci.alignment = 64;
 	VmaVirtualAllocation allocation = VK_NULL_HANDLE;
 	VkDeviceSize offset = 0;
@@ -1418,10 +1463,9 @@ static bool VK_StaticGeo_Promote( vkStaticGeoEntry_t &entry, const vertCache_t *
 		vkStaticGeo.declined++;
 		return false;
 	}
-	memcpy( vkStaticGeo.mapped + offset, static_cast<const byte *>( cache->virtMem ) + cache->offset,
-			static_cast<size_t>( cache->size ) );
+	memcpy( vkStaticGeo.mapped + offset, source, static_cast<size_t>( bytes ) );
 	const int begin = static_cast<int>( offset );
-	const int end = begin + cache->size;
+	const int end = begin + bytes;
 	if ( vkStaticGeo.dirtyEnd <= vkStaticGeo.dirtyBegin ) {
 		vkStaticGeo.dirtyBegin = begin;
 		vkStaticGeo.dirtyEnd = end;
@@ -1430,12 +1474,12 @@ static bool VK_StaticGeo_Promote( vkStaticGeoEntry_t &entry, const vertCache_t *
 		vkStaticGeo.dirtyEnd = Max( vkStaticGeo.dirtyEnd, end );
 	}
 	entry.offset = begin;
-	entry.bytes = cache->size;
+	entry.bytes = bytes;
 	entry.allocation = allocation;
 	vkStaticGeo.residentCount++;
-	vkStaticGeo.residentBytes += cache->size;
+	vkStaticGeo.residentBytes += bytes;
 	vkStaticGeo.promotions++;
-	vkStaticGeo.promotedBytes += cache->size;
+	vkStaticGeo.promotedBytes += bytes;
 	return true;
 }
 
@@ -1449,6 +1493,73 @@ static void VK_StaticGeo_Forget( const vertCache_t *cache ) {
 	if ( entry != NULL && VK_StaticGeo_RetireRange( *entry ) ) {
 		VK_StaticGeo_Remove( *entry );
 	}
+}
+
+/*
+====================
+VK_StaticGeo_StreamOffset
+
+The resident form of a stream that shares the life of a vertex cache block
+(its offset with VK_STATIC_GEO_FLAG), or -1 when the caller must copy it into
+the frame ring. With list NULL the stream is the block's own bytes, all of
+them. Otherwise it is the listBytes at list: the index list of the surface
+that owns the block. The caller has validated cache as a CPU-backed block and
+passes the r_vkStaticGeometry mode it read.
+====================
+*/
+static int VK_StaticGeo_StreamOffset( const vertCache_t *cache, const void *list, const int listBytes,
+		const size_t requiredBytes, const int mode ) {
+	if ( mode == 0 || vkStaticGeo.failed || !vkStaticGeo.tableReady
+			|| cache->tag != TAG_USED || cache->serial == 0 ) {
+		return -1;
+	}
+	const void *key = list != NULL ? VK_StaticGeo_IndexListKey( cache ) : static_cast<const void *>( cache );
+	vkStaticGeoEntry_t *entry = VK_StaticGeo_Find( key );
+	if ( entry == NULL ) {
+		(void)VK_StaticGeo_Insert( key, cache->serial, list, listBytes );
+		return -1;
+	}
+	if ( entry->serial != cache->serial || entry->list != list || entry->listBytes != listBytes ) {
+		// the header was recycled, or its surface shows another index list:
+		// another allocation, seen for the first time
+		if ( !VK_StaticGeo_RetireRange( *entry ) ) {
+			return -1;
+		}
+		entry->serial = cache->serial;
+		entry->list = list;
+		entry->listBytes = listBytes;
+		entry->firstSeenMsec = vkStaticGeo.frameMsec;
+		entry->lastUsedFrame = vkStaticGeo.frame;
+		vkStaticGeo.recycled++;
+		return -1;
+	}
+	entry->lastUsedFrame = vkStaticGeo.frame;
+	const void *source = list != NULL ? list
+			: static_cast<const void *>( static_cast<const byte *>( cache->virtMem ) + cache->offset );
+	if ( entry->offset < 0 ) {
+		if ( vkStaticGeo.frameMsec - entry->firstSeenMsec < VK_STATIC_GEO_PROMOTE_MSEC
+				|| !VK_StaticGeo_Promote( *entry, source, list != NULL ? listBytes : cache->size ) ) {
+			return -1;
+		}
+	} else if ( mode == 2 && memcmp( vkStaticGeo.mapped + entry->offset, source, static_cast<size_t>( entry->bytes ) ) != 0 ) {
+		// qualification: a resident stream must equal its source for as long
+		// as the allocation lives
+		const uint64 count = ++vkStaticGeo.mismatches;
+		if ( ( count & ( count - 1 ) ) == 0 ) {
+			common->Warning( "Vulkan: resident %s of %d bytes differs from its source (%llu so far); it is streamed again",
+				list != NULL ? "index list" : "stream", entry->bytes, static_cast<unsigned long long>( count ) );
+		}
+		if ( VK_StaticGeo_RetireRange( *entry ) ) {
+			entry->firstSeenMsec = vkStaticGeo.frameMsec;
+		}
+		return -1;
+	}
+	if ( requiredBytes > static_cast<size_t>( entry->bytes ) ) {
+		return -1;
+	}
+	vkStaticGeo.hits++;
+	vkStaticGeo.hitBytes += requiredBytes;
+	return VK_STATIC_GEO_FLAG | entry->offset;
 }
 
 /*
@@ -1475,49 +1586,49 @@ static int VK_StaticGeo_VertexOffset( const srfTriangles_t *tri, const size_t ve
 			return -1;
 		}
 	}
+	return VK_StaticGeo_StreamOffset( cache, NULL, 0, vertexBytes, mode );
+}
 
-	vkStaticGeoEntry_t *entry = VK_StaticGeo_Find( cache );
-	if ( entry == NULL ) {
-		(void)VK_StaticGeo_Insert( cache );
+/*
+====================
+VK_StaticGeo_VolumeVertexOffset
+VK_StaticGeo_VolumeIndexOffset
+
+The resident forms of a stencil shadow volume's two streams, each -1 where it
+has to be copied into the frame ring. The caller has validated
+tri->shadowCache as a CPU-backed block of vertexBytes.
+
+The vertex stream is the block. The index list is resident only for a volume
+that owns its block: tri->shadowVertexes is what R_CreatePrivateShadowCache
+copied into it, with &tri->shadowCache as the block's owner, so the block
+lives exactly as long as this surface keeps this list. A volume without
+projected vertices borrows the block of the surface it is cast from, and its
+list is one of many over that block.
+====================
+*/
+static int VK_StaticGeo_VolumeVertexOffset( const srfTriangles_t *tri, const size_t vertexBytes ) {
+	const int mode = r_vkStaticGeometry.GetInteger();
+	if ( mode == 0 || !r_vkStaticShadowVolumes.GetBool() ) {
 		return -1;
 	}
-	if ( entry->serial != cache->serial ) {
-		// the header was recycled: another allocation, seen for the first time
-		if ( !VK_StaticGeo_RetireRange( *entry ) ) {
-			return -1;
-		}
-		entry->serial = cache->serial;
-		entry->firstSeenMsec = vkStaticGeo.frameMsec;
-		entry->lastUsedFrame = vkStaticGeo.frame;
-		vkStaticGeo.recycled++;
+	const int offset = VK_StaticGeo_StreamOffset( tri->shadowCache, NULL, 0, vertexBytes, mode );
+	if ( offset >= 0 ) {
+		vkStaticGeo.volumeVertexHitBytes += vertexBytes;
+	}
+	return offset;
+}
+
+static int VK_StaticGeo_VolumeIndexOffset( const srfTriangles_t *tri, const size_t indexBytes ) {
+	const int mode = r_vkStaticGeometry.GetInteger();
+	if ( mode == 0 || !r_vkStaticShadowVolumes.GetBool()
+			|| tri->shadowVertexes == NULL || tri->shadowCache->user != &tri->shadowCache ) {
 		return -1;
 	}
-	entry->lastUsedFrame = vkStaticGeo.frame;
-	if ( entry->offset < 0 ) {
-		if ( vkStaticGeo.frameMsec - entry->firstSeenMsec < VK_STATIC_GEO_PROMOTE_MSEC
-				|| !VK_StaticGeo_Promote( *entry, cache ) ) {
-			return -1;
-		}
-	} else if ( mode == 2 && memcmp( vkStaticGeo.mapped + entry->offset,
-			static_cast<const byte *>( cache->virtMem ) + cache->offset, static_cast<size_t>( entry->bytes ) ) != 0 ) {
-		// qualification: a resident stream must equal its source for as long
-		// as the allocation lives
-		const uint64 count = ++vkStaticGeo.mismatches;
-		if ( ( count & ( count - 1 ) ) == 0 ) {
-			common->Warning( "Vulkan: resident stream of %d bytes differs from its source (%llu so far); it is streamed again",
-				entry->bytes, static_cast<unsigned long long>( count ) );
-		}
-		if ( VK_StaticGeo_RetireRange( *entry ) ) {
-			entry->firstSeenMsec = vkStaticGeo.frameMsec;
-		}
-		return -1;
+	const int offset = VK_StaticGeo_StreamOffset( tri->shadowCache, tri->indexes, static_cast<int>( indexBytes ), indexBytes, mode );
+	if ( offset >= 0 ) {
+		vkStaticGeo.volumeIndexHitBytes += indexBytes;
 	}
-	if ( vertexBytes > static_cast<size_t>( entry->bytes ) ) {
-		return -1;
-	}
-	vkStaticGeo.hits++;
-	vkStaticGeo.hitBytes += vertexBytes;
-	return VK_STATIC_GEO_FLAG | entry->offset;
+	return offset;
 }
 
 // The buffer and offset to bind for a vertex stream VK_Exec_UploadTriGeometry
@@ -1531,6 +1642,16 @@ static ID_INLINE VkBuffer VK_Exec_VertexStream( const int slot, const int vertex
 	return vkExec.vertexRings[ slot ].buffer;
 }
 
+// The same for an index list: the resident buffer or this frame's index ring.
+static ID_INLINE VkBuffer VK_Exec_IndexStream( const int slot, const int indexOffset, VkDeviceSize &bindOffset ) {
+	if ( ( indexOffset & VK_STATIC_GEO_FLAG ) != 0 ) {
+		bindOffset = static_cast<VkDeviceSize>( indexOffset & ~VK_STATIC_GEO_FLAG );
+		return vkStaticGeo.buffer;
+	}
+	bindOffset = static_cast<VkDeviceSize>( indexOffset );
+	return vkExec.indexRings[ slot ].buffer;
+}
+
 static void VK_StaticGeo_PrintInfo( const bool reset ) {
 	common->Printf( "Vulkan static geometry: mode=%d buffer=%dMiB resident=%d residentBytes=%lld tracked=%d retired=%d "
 		"hits=%llu hitBytes=%llu promotions=%llu promotedBytes=%llu recycled=%llu evictions=%llu declined=%llu mismatches=%llu\n",
@@ -1540,9 +1661,13 @@ static void VK_StaticGeo_PrintInfo( const bool reset ) {
 		static_cast<unsigned long long>( vkStaticGeo.promotions ), static_cast<unsigned long long>( vkStaticGeo.promotedBytes ),
 		static_cast<unsigned long long>( vkStaticGeo.recycled ), static_cast<unsigned long long>( vkStaticGeo.evictions ),
 		static_cast<unsigned long long>( vkStaticGeo.declined ), static_cast<unsigned long long>( vkStaticGeo.mismatches ) );
+	common->Printf( "Vulkan static shadow volumes: enabled=%d vertexHitBytes=%llu indexHitBytes=%llu\n",
+		r_vkStaticShadowVolumes.GetBool() ? 1 : 0, static_cast<unsigned long long>( vkStaticGeo.volumeVertexHitBytes ),
+		static_cast<unsigned long long>( vkStaticGeo.volumeIndexHitBytes ) );
 	if ( reset ) {
 		vkStaticGeo.hits = vkStaticGeo.hitBytes = vkStaticGeo.promotions = vkStaticGeo.promotedBytes = 0;
 		vkStaticGeo.recycled = vkStaticGeo.evictions = vkStaticGeo.declined = vkStaticGeo.mismatches = 0;
+		vkStaticGeo.volumeVertexHitBytes = vkStaticGeo.volumeIndexHitBytes = 0;
 	}
 }
 
@@ -9777,6 +9902,9 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 				vkResourceProfile.indexBytes += indexBytes;
 				if ( ( vertexOffset & VK_STATIC_GEO_FLAG ) != 0 ) {
 					vkResourceProfile.residentSurfaceIndexBytes += indexBytes;
+					if ( tri->indexes != NULL && tri->ambientCache->user == &tri->ambientCache ) {
+						vkResourceProfile.ownedSurfaceIndexBytes += indexBytes;
+					}
 				}
 			}
 			if ( idxKey != NULL ) {
@@ -9835,9 +9963,11 @@ bool VK_Exec_BindPreviousPositions( VkCommandBuffer cmd, int slot,
 // stencil-shadow-volume variant of the memoized upload (Phase G1): streams
 // the shadowCache_t vec4 stream (tri->shadowCache holds CPU pointers via
 // the CPU-backed vertex cache; the shadow tri's numVerts IS the cache
-// vertex count) plus the volume indexes. The memo keys share the ambient
-// tables — cache handles and index arrays never alias across the two
-// families, and a direct-mapped collision just re-uploads.
+// vertex count) plus the volume indexes. Either stream is drawn from its
+// resident copy once it has one (VK_StaticGeo_VolumeVertexOffset). The memo
+// keys share the ambient tables — cache handles and index arrays never alias
+// across the two families, and a direct-mapped collision just looks the
+// stream up or uploads it again.
 bool VK_Exec_BindShadowGeometry( VkCommandBuffer cmd, int slot, const srfTriangles_t *tri ) {
 	if ( tri == NULL || slot < 0 || slot >= VK_FRAMES_IN_FLIGHT ) {
 		return false;
@@ -9865,14 +9995,19 @@ bool VK_Exec_BindShadowGeometry( VkCommandBuffer cmd, int slot, const srfTriangl
 		if ( memo.vertKey == vertKey ) {
 			vertexOffset = memo.vertexOffset;
 		} else {
-			const shadowCache_t *verts = (const shadowCache_t *)vertexCache.Position( tri->shadowCache );
-			vertexOffset = VK_Ring_Alloc( vkExec.vertexRings[ slot ], verts,
-				vertexBytes, 16 );
+			// A volume that outlives its frame is drawn from its resident
+			// copy, like the surface it is cast from.
+			vertexOffset = VK_StaticGeo_VolumeVertexOffset( tri, vertexBytes );
 			if ( vertexOffset < 0 ) {
-				return false;
-			}
-			if ( r_vkResourceProfile.GetBool() ) {
-				vkResourceProfile.shadowVertexBytes += vertexBytes;
+				const shadowCache_t *verts = (const shadowCache_t *)vertexCache.Position( tri->shadowCache );
+				vertexOffset = VK_Ring_Alloc( vkExec.vertexRings[ slot ], verts,
+					vertexBytes, 16 );
+				if ( vertexOffset < 0 ) {
+					return false;
+				}
+				if ( r_vkResourceProfile.GetBool() ) {
+					vkResourceProfile.shadowVertexBytes += vertexBytes;
+				}
 			}
 			memo.vertKey = vertKey;
 			memo.vertexOffset = vertexOffset;
@@ -9885,27 +10020,34 @@ bool VK_Exec_BindShadowGeometry( VkCommandBuffer cmd, int slot, const srfTriangl
 		if ( memo.idxKey == idxKey ) {
 			indexOffset = memo.indexOffset;
 		} else {
-			indexOffset = VK_Ring_Alloc( vkExec.indexRings[ slot ], tri->indexes,
-				indexBytes, 4 );
+			indexOffset = VK_StaticGeo_VolumeIndexOffset( tri, indexBytes );
 			if ( indexOffset < 0 ) {
-				return false;
-			}
-			if ( r_vkResourceProfile.GetBool() ) {
-				vkResourceProfile.shadowIndexBytes += indexBytes;
+				indexOffset = VK_Ring_Alloc( vkExec.indexRings[ slot ], tri->indexes,
+					indexBytes, 4 );
+				if ( indexOffset < 0 ) {
+					return false;
+				}
+				if ( r_vkResourceProfile.GetBool() ) {
+					vkResourceProfile.shadowIndexBytes += indexBytes;
+				}
 			}
 			memo.idxKey = idxKey;
 			memo.indexOffset = indexOffset;
 		}
 	}
 
-	VkDeviceSize vertexBindOffset = (VkDeviceSize)vertexOffset;
-	vkCmdBindVertexBuffers( cmd, 0, 1, &vkExec.vertexRings[ slot ].buffer, &vertexBindOffset );
-	vkCmdBindIndexBuffer( cmd, vkExec.indexRings[ slot ].buffer, (VkDeviceSize)indexOffset, VK_INDEX_TYPE_UINT32 );
+	VkDeviceSize vertexBindOffset;
+	const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, vertexOffset, vertexBindOffset );
+	vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &vertexBindOffset );
+	VkDeviceSize indexBindOffset;
+	const VkBuffer indexBuffer = VK_Exec_IndexStream( slot, indexOffset, indexBindOffset );
+	vkCmdBindIndexBuffer( cmd, indexBuffer, indexBindOffset, VK_INDEX_TYPE_UINT32 );
 	vkExec.boundVertexOffset = vertexOffset;
 	return true;
 }
 
-// Shared stencil-interaction preflight retains the exact ring offsets produced
+// Shared stencil-interaction preflight retains the exact offsets (ring or
+// resident, VK_STATIC_GEO_FLAG telling which) produced
 // by the ordinary CPU-authored shadow-cache bridge.  The bind performed here is
 // limited to ring upload/bind command recording; no framebuffer write occurs
 // until the complete view has reconciled and selected shared ownership.
@@ -14635,8 +14777,10 @@ void VK_Exec_BindPreparedTriGeometry( VkCommandBuffer cmd, int slot,
 	VkDeviceSize bindOffset;
 	const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, vertexOffset, bindOffset );
 	vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &bindOffset );
-	vkCmdBindIndexBuffer( cmd, vkExec.indexRings[ slot ].buffer,
-		static_cast<VkDeviceSize>( indexOffset ), VK_INDEX_TYPE_UINT32 );
+	// a prepared shadow volume's index list may be resident too
+	VkDeviceSize indexBindOffset;
+	const VkBuffer indexBuffer = VK_Exec_IndexStream( slot, indexOffset, indexBindOffset );
+	vkCmdBindIndexBuffer( cmd, indexBuffer, indexBindOffset, VK_INDEX_TYPE_UINT32 );
 	vkExec.boundVertexOffset = vertexOffset;
 }
 

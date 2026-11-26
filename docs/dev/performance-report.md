@@ -2933,6 +2933,8 @@ combat wave and 106,350 in hub2, none different.
 | The 296-byte deformation record | every `memset` on the main thread together is 0.27%; five shared domains read the zeroed record without asking whether it was initialised | set aside |
 | The legacy HUD's state under the retained HUD | 1.2% on Vulkan, 0.4% on OpenGL; the stock windows' scripts still run their time events from that state under the retained HUD | left to the interface work |
 
+[Section 24](#24-resident-stencil-shadow-volumes-on-vulkan-fps-08-26-november-2026) takes up the first row.
+
 New from this round:
 
 - **Vulkan copies every index list into the frame ring every frame**, the
@@ -2946,3 +2948,166 @@ New from this round:
   OpenGL** (`GL_CheckErrors`), and a depth resolve for temporal anti-aliasing
   adds one in the middle of the frame. It is how a driver error reaches the
   log today; reading it less often would remove the last forced wait.
+
+## 24. Resident stencil shadow volumes on Vulkan (FPS-08), 26 November 2026
+
+Section 23.4 left one lead as the largest piece of Vulkan's uploads: at
+Performance and Balanced, which draw every shadow as a stencil volume, both
+streams of every volume were copied into the frame rings every frame.
+(Enhanced still draws its point lights' shadows that way; the three presets
+below Performance draw no shadows.) This section takes it up. The method is section 22's (hidden 1280x720 window paced
+at 60 Hz, `indoor_hub2`, other sessions sharing the machine), with one
+addition: where a setting can be switched inside a launch, the two settings
+alternate in phases of the same launch and the main thread's CPU time is read
+at each phase boundary, so that both see the same map, driver state and load.
+
+### 24.1 What the copies were made of
+
+Counted over one whole revolution of the hub2 view sweep (22 s, 1,321
+frames), the rings took 1,465 kB a frame, 965 kB of it shadow volumes: 508 kB
+of volume vertices and 457 kB of volume index lists. Balanced and Performance
+give the same numbers; at Quality the view's lights render shadow maps and no
+volume is uploaded. (Section 23's figures were eight-second windows of the
+same sweep, which is why they differ from these and between the two presets.)
+
+A temporary counter in the upload path, since removed, split two 600-frame
+windows of that sweep by what a volume is:
+
+| Share of the volume bytes | Window A | Window B |
+| --- | ---: | ---: |
+| Vertices of volumes that own their projected vertices (prelight volumes) | 77% | 59% |
+| Index lists of those volumes | 76% | 53% |
+| ... of which the same bytes as the frame before | 100% | 100% |
+| Vertices of volumes cast from an entity's surface, in a block that persists | about 46% of the rest | about 23% of the rest |
+| Index lists of such volumes that repeat | 59% of the rest | 31% of the rest |
+| Index bytes a draw actually reads (caps left out when the view is outside) | 84% | 72% |
+
+So most of the copying moved bytes that never change: dmap's combined volume
+of the static world for each static light. What does change is cast from
+models that animate. Copying only the index range a draw reads was the other
+idea; at a sixth to a quarter of the index bytes that still have to be copied
+it was not worth a second code path.
+
+### 24.2 What changed
+
+Vulkan already keeps the vertex streams of surfaces that outlive their frame
+in a persistent buffer (`r_vkStaticGeometry`): a stream is identified by its
+vertex cache block and the serial of that block's allocation, and is copied
+once when it has been the same allocation for 150 ms.
+
+- *A volume's vertex stream is such a block.* A prelight volume's projected
+  vertices have a block of their own; a volume cast from an entity's surface
+  borrows the block of that surface's paired vertices, which every light's
+  volume of the surface shares. Either becomes resident the same way, in the
+  same buffer.
+- *An index list becomes resident where it shares a block's life.* An index
+  list is not in the vertex cache and has no serial. But the surface that owns
+  a block was allocated with its index list and frees the block when it is
+  freed (`R_GeoFreeVertexCaches`), so for that surface the block's header and
+  serial identify the list too. A volume qualifies when it has projected
+  vertices and the block names the surface's own `shadowCache` field as its
+  owner: every prelight volume. Its list is kept under the block's key with
+  one bit set, with the list's address and length beside the serial, so that
+  a surface that ever showed another list under the same block would start
+  again. A volume that borrows its block does not qualify: its list is one of
+  many over that block, a new one for each light and each time the
+  interaction is built again, and it stays in the ring.
+- The buffer takes index lists as well as vertices, and an index offset is
+  decoded like a vertex offset (`VK_Exec_IndexStream`) wherever a volume is
+  bound, including the shared interaction domain's prepared volumes.
+
+`r_vkStaticShadowVolumes 0` copies every volume as before.
+`rendererVulkanMemoryInfo` prints the volume bytes drawn from resident copies.
+
+### 24.3 Result
+
+| hub2 view sweep, one revolution, kB a frame (Balanced and Performance alike) | Copied | Resident |
+| --- | ---: | ---: |
+| Into the frame rings, everything | 1,465 | 781 |
+| Volume vertices into the rings | 508 | 113 |
+| Volume index lists into the rings | 457 | 162 |
+| Volume bytes drawn from resident copies | 0 | 685 |
+
+Seven tenths of the volume bytes and nearly half of everything the rings took
+no longer move. At Enhanced, which draws only its point lights' shadows as
+volumes, the same revolution copied 848 kB of volumes a frame and copies 186.
+In the combat wave at Balanced, where sixteen animated
+characters cast volumes that are rebuilt every tic, 606 of 1,284 kB of volume
+bytes a frame come from resident copies. It depends on the map: at the player
+start of four others (Balanced, one revolution, kB a frame),
+
+| Map | Volume bytes still copied | Drawn from resident copies |
+| --- | ---: | ---: |
+| `game/mcc_1` | 125 | 706 |
+| `game/airdefense2` | 97 | 128 |
+| `game/storage2` | 0 | 66 |
+| `game/medlabs` | 439 | 106 |
+
+`medlabs` draws few prelight volumes there: its volumes are cast from entity
+surfaces, whose lists stay in the ring.
+
+**What it costs to copy.** Main thread CPU time a frame at a static hub2 view
+where the old path copies 1,050 kB of volumes a frame and the new one 267 kB,
+phases of 900 frames alternating in one launch, four of each:
+
+| ms of main-thread CPU a frame | Copied | Resident | Difference |
+| --- | ---: | ---: | ---: |
+| Balanced | 3.18 (2.95 to 3.30) | 2.68 (2.59 to 2.78) | 0.50 |
+| Performance | 3.31 (3.04 to 3.63) | 3.00 (2.62 to 3.21) | 0.31 |
+| Balanced, a quieter machine | 2.87 (2.81 to 3.00) | 2.19 (2.10 to 2.27) | 0.68 |
+
+Each of the twelve adjacent pairs is lower with the volumes resident, by 0.07
+to 0.90 ms. That is 0.4 to 0.9 ms for each megabyte no longer copied, several
+times the 0.14 ms section 22 assumed. The rings are memory mapped for the
+device to read, and by this measurement writing them is slow; the same then
+holds for what the rings still take (24.4). Two later launches at Enhanced,
+on a machine whose load moved a phase by a millisecond either way, did not
+resolve the difference: 3.73 against 3.64 ms and 3.16 against 3.05 ms, six of
+eight pairs lower.
+
+**Exactness.** `r_vkStaticGeometry 2` compares every resident stream with its
+source at every draw. With it on: 212,939 draws of resident streams in hub2 at
+three presets, the combat wave and the four maps above, none different. (The
+comparison reads the resident buffer back, and those runs drew 3 to 43 frames
+a second; hub2 and the combat wave draw 60 without it.) Pictures of a frozen world are identical in every
+pixel with volumes resident and copied, with the scene drawn normally and with
+the volumes themselves drawn in colour (`r_showShadows 2`).
+`renderer_vulkan_static_geometry` runs the real functions against an
+allocator double: promotion, a recycled header, another list under the same
+block, a borrowed block, a copy of the surface, both switches and the
+comparison mode; all 22 deliberate breakages of the new code fail it.
+
+**Not covered.** The render thread modes (`r_vkRenderThread 1` and `2`) were
+not run; in mode 2 the snapshot's copies never qualify, as before. The buffer
+(96 MiB) held 2 to 4 MB of resident streams in these scenes, so its eviction
+under pressure, which volumes now share with surfaces, was exercised only by
+the test. On Linux the executor passes GCC's and Clang's syntax checks and the
+two tests pass; the game was not run there.
+
+### 24.4 What the rings still take
+
+hub2 view sweep, one revolution, kB a frame:
+
+| | Performance | Balanced | Quality |
+| --- | ---: | ---: | ---: |
+| Everything | 780 | 781 | 813 |
+| Volume vertices (models that animate) | 113 | 113 | 0 |
+| Volume index lists (volumes cast from entity surfaces) | 162 | 162 | 0 |
+| Vertex streams that are not resident | 177 | 178 | 427 |
+| Index lists | 277 | 277 | 320 |
+| ... of surfaces whose vertices are resident | 222 | 223 | 226 |
+| ... of which the surface's own list | 122 | 122 | 122 |
+
+Leads, in the order the numbers suggest:
+
+- **A surface's own index list could ride on its vertex block as a prelight
+  volume's does**: the surface owns the block and the list alike. That is the
+  last row, more than half of the index bytes of resident surfaces. Light
+  interactions draw subsets of their own over the same block and would stay.
+- **The index lists of static volumes cast from entity surfaces** (a static
+  model under a light that never moved keeps its volume) repeat every frame
+  and are still copied: a third to a half of that row in play, all of it
+  while the world stands still. They need an identity of their own, for
+  instance an index cache block given to a volume once it has lasted.
+- **At Quality 0.4 MB a frame of vertex streams are not resident**, as section
+  23 noted; still not looked into.

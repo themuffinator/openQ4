@@ -12,6 +12,28 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Vulkan stops copying static shadows to the graphics card every frame, 26 November 2026
+
+- **Vulkan keeps the shadow volumes of the static world on the graphics card.**
+  At Performance and Balanced, which draw every shadow as a stencil volume,
+  each volume's vertices and indexes were copied into the frame's upload
+  buffers again every frame, although most of them never change: the
+  level's own precomputed volume for each static light. Those now sit beside
+  the level geometry in the buffer that already held it, and so do the
+  vertices of volumes cast by anything that does not animate. In the hub level
+  the upload each frame falls from 1.5 MB to 0.8 MB, and the game's own thread
+  spends 0.3 to 0.7 ms less on a frame there (9 to 24% of its time in that
+  view). Maps whose shadows come mostly from animated characters and props
+  gain less. Enhanced, which still draws its point lights' shadows as volumes,
+  uploads less in the same way; its gain in time was too small to tell from
+  the test machine's noise. Pictures are identical. Presets that use shadow
+  maps for every light (Quality and above) draw no volumes in such scenes and
+  gain nothing; OpenGL is not changed. `r_vkStaticShadowVolumes 0` restores
+  the copying.
+- Evidence and what the upload buffers still carry:
+  [performance report section 24](performance-report.md#24-resident-stencil-shadow-volumes-on-vulkan-fps-08-26-november-2026).
+  No ABI change.
+
 ## OpenGL stops questioning its driver every frame, and Vulkan's shadow-map bookkeeping gets lighter, 25 November 2026
 
 - **OpenGL no longer asks the graphics driver for state the game set itself.**

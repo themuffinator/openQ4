@@ -31,7 +31,7 @@ typedef uint64_t uint64;
 typedef uint64_t VkDeviceSize;
 typedef int VkResult;
 enum { VK_SUCCESS = 0, VK_ERROR_OUT_OF_DEVICE_MEMORY = -2 };
-enum { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO = 12, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT = 0x80 };
+enum { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO = 12, VK_BUFFER_USAGE_INDEX_BUFFER_BIT = 0x40, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT = 0x80 };
 enum { VMA_MEMORY_USAGE_AUTO = 7, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT = 0x400,
        VMA_ALLOCATION_CREATE_MAPPED_BIT = 0x4 };
 typedef uintptr_t VkBuffer;
@@ -49,9 +49,13 @@ template<class T> T Min( T a, T b ) { return std::min( a, b ); }
 template<class T> T Max( T a, T b ) { return std::max( a, b ); }
 struct idMath { static int ClampInt( int lo, int hi, int v ) { return v < lo ? lo : ( v > hi ? hi : v ); } };
 
-struct vertCache_t { int tag = TAG_USED; unsigned long long serial = 0; int size = 0; int offset = 0; void *virtMem = nullptr; };
+struct vertCache_t { int tag = TAG_USED; unsigned long long serial = 0; int size = 0; int offset = 0; void *virtMem = nullptr;
+                     vertCache_t **user = nullptr; };
+typedef int glIndex_t;
+struct shadowCache_t { float xyzw[ 4 ]; };
 struct srfTriangles_t { vertCache_t *ambientCache = nullptr; const srfTriangles_t *ambientSurface = nullptr;
-                        bool gpuSkinningDeferred = false; bool candidate = false; };
+                        bool gpuSkinningDeferred = false; bool candidate = false;
+                        vertCache_t *shadowCache = nullptr; shadowCache_t *shadowVertexes = nullptr; glIndex_t *indexes = nullptr; };
 bool R_GpuSkinning_IsCandidate( const srfTriangles_t *tri ) { return tri->candidate; }
 bool vkGpuSkinningEverDeferred = false;
 
@@ -61,14 +65,17 @@ struct Common {
     void Printf( const char *, ... ) { ++prints; }
 } commonStore, *common = &commonStore;
 struct CVarInt { int value; int GetInteger() const { return value; } };
+struct CVarBool { bool value; bool GetBool() const { return value; } };
 CVarInt r_vkStaticGeometry{ 1 }, r_vkStaticGeometryMegs{ 8 };
+CVarBool r_vkStaticShadowVolumes{ true };
 int clockMsec = 1000;
 int Sys_Milliseconds() { return clockMsec; }
 
 // the device double
 struct { int allocator = 1; } vkCtx;
 struct Ring { VkBuffer buffer = 77; };
-struct { Ring vertexRings[ VK_FRAMES_IN_FLIGHT ]; } vkExec;
+struct IndexRing { VkBuffer buffer = 78; };
+struct { Ring vertexRings[ VK_FRAMES_IN_FLIGHT ]; IndexRing indexRings[ VK_FRAMES_IN_FLIGHT ]; } vkExec;
 std::vector<unsigned char> deviceBytes;
 bool refuseBuffer = false;
 int buffersCreated = 0, buffersDestroyed = 0, blocksDestroyed = 0;
@@ -79,7 +86,9 @@ VkDeviceSize blockSize = 0;
 
 VkResult vmaCreateBuffer( int, const VkBufferCreateInfo *bci, const VmaAllocationCreateInfo *vaci,
         VkBuffer *buffer, VmaAllocation *allocation, VmaAllocationInfo *info ) {
-    assert( bci->usage == VK_BUFFER_USAGE_VERTEX_BUFFER_BIT && ( vaci->flags & VMA_ALLOCATION_CREATE_MAPPED_BIT ) != 0 );
+    // vertex streams and the index lists that ride on a block share the buffer
+    assert( bci->usage == ( VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT )
+            && ( vaci->flags & VMA_ALLOCATION_CREATE_MAPPED_BIT ) != 0 );
     if ( refuseBuffer ) { return VK_ERROR_OUT_OF_DEVICE_MEMORY; }
     deviceBytes.assign( static_cast<size_t>( bci->size ), 0xCD );
     *buffer = 4242; *allocation = 4243; info->pMappedData = deviceBytes.data();
@@ -284,6 +293,137 @@ int main() {
     Frame( VK_STATIC_GEO_PROMOTE_MSEC );
     assert( VK_StaticGeo_VertexOffset( &hugeTri, 64 ) == -1 );
 
+    // Stencil shadow volumes. A volume that owns its block (a prelight volume:
+    // its projected vertices were copied into the block, whose owner is the
+    // surface's own shadowCache field) keeps both streams resident: the block,
+    // and the index list that shares its life.
+    {
+        std::vector<unsigned char> volumeVerts = Payload( 3200, 17 ), borrowedVerts = Payload( 1600, 29 );
+        std::vector<glIndex_t> listA( 300 ), listB( 300 ), listC( 150 ), borrowedList( 60 );
+        for ( size_t i = 0; i < listA.size(); i++ ) {
+            listA[ i ] = static_cast<glIndex_t>( i * 3 );
+            listB[ i ] = static_cast<glIndex_t>( i * 5 + 1 );
+        }
+        for ( size_t i = 0; i < listC.size(); i++ ) { listC[ i ] = static_cast<glIndex_t>( i + 9 ); }
+        const size_t listBytes = listA.size() * sizeof( glIndex_t );
+        shadowCache_t projected[ 1 ];
+        vertCache_t volumeHeader; volumeHeader.serial = nextSerial++; volumeHeader.size = 3200; volumeHeader.virtMem = volumeVerts.data();
+        srfTriangles_t volume; volume.shadowCache = &volumeHeader; volume.shadowVertexes = projected; volume.indexes = listA.data();
+        volumeHeader.user = &volume.shadowCache;
+
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == -1 && VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == -1 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC - 20 );
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == -1 && VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == -1 );
+        assert( vkStaticGeo.volumeVertexHitBytes == 0 && vkStaticGeo.volumeIndexHitBytes == 0 );
+        Frame( 40 );
+        const int volumeVertex = VK_StaticGeo_VolumeVertexOffset( &volume, 3200 );
+        const int volumeIndex = VK_StaticGeo_VolumeIndexOffset( &volume, listBytes );
+        assert( volumeVertex >= 0 && volumeIndex >= 0 && volumeVertex != volumeIndex );
+        assert( !std::memcmp( deviceBytes.data() + ( volumeVertex & ~VK_STATIC_GEO_FLAG ), volumeVerts.data(), 3200 ) );
+        assert( !std::memcmp( deviceBytes.data() + ( volumeIndex & ~VK_STATIC_GEO_FLAG ), listA.data(), listBytes ) );
+        assert( ( volumeIndex & ~VK_STATIC_GEO_FLAG ) % 4 == 0 );
+        assert( vkStaticGeo.volumeVertexHitBytes == 3200 && vkStaticGeo.volumeIndexHitBytes == listBytes );
+        // the block and the list that rides on it are two entries of one table
+        vkStaticGeoEntry_t *blockEntry = VK_StaticGeo_Find( &volumeHeader );
+        vkStaticGeoEntry_t *listEntry = VK_StaticGeo_Find( VK_StaticGeo_IndexListKey( &volumeHeader ) );
+        assert( blockEntry != NULL && listEntry != NULL && blockEntry != listEntry );
+        assert( blockEntry->list == NULL && listEntry->list == listA.data() && listEntry->listBytes == (int)listBytes );
+        // each keeps its own length: the block all of its bytes, the list only its own
+        assert( blockEntry->bytes == 3200 && listEntry->bytes == (int)listBytes );
+        // either form of an index offset decodes to the buffer and offset to bind
+        VkDeviceSize volumeBind = 0;
+        assert( VK_Exec_IndexStream( 0, volumeIndex, volumeBind ) == vkStaticGeo.buffer
+                && volumeBind == (VkDeviceSize)( volumeIndex & ~VK_STATIC_GEO_FLAG ) );
+        assert( VK_Exec_IndexStream( 1, 512, volumeBind ) == vkExec.indexRings[ 1 ].buffer && volumeBind == 512
+                && vkExec.indexRings[ 1 ].buffer != vkExec.vertexRings[ 1 ].buffer );
+        assert( VK_StaticGeo_Flush() );
+        Frame();
+        const uint64 volumePromotions = vkStaticGeo.promotions;
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == volumeVertex
+                && VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == volumeIndex && vkStaticGeo.promotions == volumePromotions );
+
+        // The surface shows another list under the same block. It never does
+        // (the list is allocated with the surface and freed with it), and if
+        // it did the old list must not be drawn for the new one; the vertex
+        // stream is untouched. The same list at another length is another list.
+        uint64 recycledBefore = vkStaticGeo.recycled;
+        volume.indexes = listB.data();
+        assert( VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == -1 && vkStaticGeo.recycled == recycledBefore + 1 );
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == volumeVertex );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        const int volumeIndexB = VK_StaticGeo_VolumeIndexOffset( &volume, listBytes );
+        assert( volumeIndexB >= 0 && !std::memcmp( deviceBytes.data() + ( volumeIndexB & ~VK_STATIC_GEO_FLAG ), listB.data(), listBytes ) );
+        assert( VK_StaticGeo_VolumeIndexOffset( &volume, listBytes / 2 ) == -1 && vkStaticGeo.recycled == recycledBefore + 2 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        assert( VK_StaticGeo_VolumeIndexOffset( &volume, listBytes / 2 ) >= 0 );
+        assert( VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == -1 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        assert( VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) >= 0 );
+
+        // The cache recycles the header: both streams start again, and the new
+        // allocation is never served from the old one's copies.
+        recycledBefore = vkStaticGeo.recycled;
+        std::vector<unsigned char> volumeVertsB = Payload( 3200, 101 );
+        volumeHeader.serial = nextSerial++; volumeHeader.virtMem = volumeVertsB.data();
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == -1 && VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == -1 );
+        assert( vkStaticGeo.recycled == recycledBefore + 2 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        const int volumeVertexB = VK_StaticGeo_VolumeVertexOffset( &volume, 3200 );
+        assert( volumeVertexB >= 0 && !std::memcmp( deviceBytes.data() + ( volumeVertexB & ~VK_STATIC_GEO_FLAG ), volumeVertsB.data(), 3200 ) );
+        assert( VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) >= 0 );
+
+        // A volume that borrows the block of the surface it is cast from (no
+        // projected vertices; the block belongs to that surface) shares one
+        // resident vertex stream with every other light's volume of the
+        // surface. Its index list is one of many over that block and stays
+        // in the ring: nothing is tracked for it.
+        vertCache_t borrowedHeader; borrowedHeader.serial = nextSerial++; borrowedHeader.size = 1600; borrowedHeader.virtMem = borrowedVerts.data();
+        srfTriangles_t caster; caster.shadowCache = &borrowedHeader; borrowedHeader.user = &caster.shadowCache;
+        srfTriangles_t lightA, lightB;
+        lightA.shadowCache = lightB.shadowCache = &borrowedHeader;
+        lightA.indexes = borrowedList.data(); lightB.indexes = listC.data();
+        const int trackedBefore = vkStaticGeo.numEntries;
+        assert( VK_StaticGeo_VolumeVertexOffset( &lightA, 1600 ) == -1 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        const int shared = VK_StaticGeo_VolumeVertexOffset( &lightA, 1600 );
+        assert( shared >= 0 && VK_StaticGeo_VolumeVertexOffset( &lightB, 1600 ) == shared );
+        const uint64 indexHitsBefore = vkStaticGeo.volumeIndexHitBytes;
+        for ( int i = 0; i < 3; i++ ) {
+            assert( VK_StaticGeo_VolumeIndexOffset( &lightA, borrowedList.size() * sizeof( glIndex_t ) ) == -1
+                    && VK_StaticGeo_VolumeIndexOffset( &lightB, listC.size() * sizeof( glIndex_t ) ) == -1 );
+            Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        }
+        assert( vkStaticGeo.numEntries == trackedBefore + 1 && VK_StaticGeo_Find( VK_StaticGeo_IndexListKey( &borrowedHeader ) ) == NULL );
+        assert( vkStaticGeo.volumeIndexHitBytes == indexHitsBefore );
+        // Projected vertices do not make a copy of the surface the block's
+        // owner, and owning a block without projected vertices is the cast-from
+        // surface itself, which is not a volume.
+        srfTriangles_t copy = volume;
+        assert( VK_StaticGeo_VolumeIndexOffset( &copy, listBytes ) == -1 );
+        caster.indexes = listC.data();
+        assert( VK_StaticGeo_VolumeIndexOffset( &caster, listC.size() * sizeof( glIndex_t ) ) == -1 );
+        assert( VK_StaticGeo_Find( VK_StaticGeo_IndexListKey( &borrowedHeader ) ) == NULL );
+
+        // r_vkStaticShadowVolumes 0 copies every volume as before; r_vkStaticGeometry 0
+        // does too; 2 notices a resident index list that no longer equals its source.
+        r_vkStaticShadowVolumes.value = false;
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == -1 && VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == -1 );
+        r_vkStaticShadowVolumes.value = true;
+        r_vkStaticGeometry.value = 0;
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == -1 && VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == -1 );
+        r_vkStaticGeometry.value = 2;
+        const uint64 mismatchesBefore = vkStaticGeo.mismatches;
+        const int volumeWarnings = common->warnings;
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == volumeVertexB && VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) >= 0 );
+        assert( vkStaticGeo.mismatches == mismatchesBefore );
+        listB[ 7 ] ^= 2;
+        assert( VK_StaticGeo_VolumeIndexOffset( &volume, listBytes ) == -1 && vkStaticGeo.mismatches == mismatchesBefore + 1
+                && common->warnings == volumeWarnings + 1 );
+        assert( VK_StaticGeo_VolumeVertexOffset( &volume, 3200 ) == volumeVertexB );
+        r_vkStaticGeometry.value = 1;
+        assert( VK_StaticGeo_Flush() );
+    }
+
     // Shutdown releases the buffer and its ranges; the next device starts empty.
     VK_StaticGeo_Shutdown();
     assert( buffersDestroyed == 1 && blocksDestroyed == 1 && vkStaticGeo.buffer == 0 && !vkStaticGeo.tableReady );
@@ -301,7 +441,8 @@ int main() {
     Frame( VK_STATIC_GEO_PROMOTE_MSEC );
     assert( VK_StaticGeo_VertexOffset( &tris[ 0 ], streamBytes ) == -1 && common->warnings == warningsBefore + 1 && buffersCreated == 1 );
 
-    std::puts( "Vulkan static geometry: promotion delay, recycled headers, retirement, exclusions, verify mode, eviction and device refusal passed" );
+    std::puts( "Vulkan static geometry: promotion delay, recycled headers, retirement, exclusions, verify mode, eviction, "
+               "shadow volume streams and owned index lists, and device refusal passed" );
     return 0;
 }
 '''
@@ -313,9 +454,53 @@ def main():
     end = source.index('static void VK_StaticGeo_PrintInfo( const bool reset ) {')
     production = source[start:end]
     for needed in ('static int VK_StaticGeo_VertexOffset(', 'static void VK_StaticGeo_BeginFrame(',
-                   'static ID_INLINE VkBuffer VK_Exec_VertexStream(', 'static void VK_StaticGeo_Forget('):
+                   'static ID_INLINE VkBuffer VK_Exec_VertexStream(', 'static void VK_StaticGeo_Forget(',
+                   'static int VK_StaticGeo_StreamOffset(', 'static int VK_StaticGeo_VolumeVertexOffset(',
+                   'static int VK_StaticGeo_VolumeIndexOffset(', 'static ID_INLINE VkBuffer VK_Exec_IndexStream('):
         if needed not in production:
             raise AssertionError(f'missing {needed!r} in the resident static geometry section')
+
+    # Stencil shadow volumes: the per-frame memo answers first, the ring takes
+    # only what has no resident copy, and both streams are bound through the
+    # decoders, here and where a prepared volume is bound later.
+    unix = source.replace('\r\n', '\n')
+    shadow = unix[unix.index('bool VK_Exec_BindShadowGeometry('):]
+    shadow = shadow[:shadow.index('bool VK_Exec_PrepareShadowGeometry(')]
+    if not ( shadow.index('memo.vertKey == vertKey') < shadow.index('vertexOffset = VK_StaticGeo_VolumeVertexOffset( tri, vertexBytes );')
+             < shadow.index('if ( vertexOffset < 0 ) {') < shadow.index('VK_Ring_Alloc( vkExec.vertexRings[ slot ], verts,') ):
+        raise AssertionError('a volume\'s vertex stream goes to the ring only when the memo and the resident cache have none')
+    if not ( shadow.index('memo.idxKey == idxKey') < shadow.index('indexOffset = VK_StaticGeo_VolumeIndexOffset( tri, indexBytes );')
+             < shadow.index('if ( indexOffset < 0 ) {') < shadow.index('VK_Ring_Alloc( vkExec.indexRings[ slot ], tri->indexes,') ):
+        raise AssertionError('a volume\'s index list goes to the ring only when the memo and the resident cache have none')
+    if 'VK_Exec_VertexStream( slot, vertexOffset, vertexBindOffset )' not in shadow \
+            or 'VK_Exec_IndexStream( slot, indexOffset, indexBindOffset )' not in shadow \
+            or 'vkExec.indexRings[ slot ].buffer, (VkDeviceSize)indexOffset' in shadow \
+            or '&vkExec.vertexRings[ slot ].buffer, &vertexBindOffset' in shadow:
+        raise AssertionError('a volume binds whichever buffer its offsets name')
+    prepared = unix[unix.index('void VK_Exec_BindPreparedTriGeometry('):]
+    prepared = prepared[:prepared.index('\n}\n')]
+    if 'VK_Exec_IndexStream( slot, indexOffset, indexBindOffset )' not in prepared \
+            or 'VK_Exec_VertexStream( slot, vertexOffset, bindOffset )' not in prepared:
+        raise AssertionError('a prepared volume binds whichever buffer its offsets name')
+    for path in sorted((ROOT / 'src/renderer/Vulkan').glob('*.cpp')):
+        text = path.read_text(encoding='utf-8')
+        if path.name != 'vk_GuiExecutor.cpp' and ('VK_STATIC_GEO_FLAG' in text or 'indexRings[' in text):
+            raise AssertionError(f'{path.name} would have to decode resident offsets itself')
+    # What an owned index list relies on: the block is allocated for the
+    # surface's own field, and the surface frees it when it goes.
+    light = (ROOT / 'src/renderer/tr_light.cpp').read_text(encoding='utf-8')
+    if 'vertexCache.Alloc( tri->shadowVertexes, tri->numVerts * sizeof( *tri->shadowVertexes ), &tri->shadowCache );' not in light:
+        raise AssertionError('a private shadow cache is owned by its surface\'s shadowCache field')
+    hooks = (ROOT / 'src/renderer/tr_main.cpp').read_text(encoding='utf-8').replace('\r\n', '\n')
+    free_hook = hooks[hooks.index('static void R_GeoFreeVertexCaches( srfTriangles_t *tri ) {'):]
+    free_hook = free_hook[:free_hook.index('\n}\n')]
+    if 'if ( tri->shadowCache && ( tri->shadowVertexes != NULL || tri->verts != NULL ) ) {' not in free_hook \
+            or 'R_GeoFreeTriSurfVertCache( tri->shadowCache );' not in free_hook:
+        raise AssertionError('a surface frees the shadow cache it owns when it is freed')
+    geometry = (ROOT / 'src/rendergeo/RenderGeometryTriSurf.cpp').read_text(encoding='utf-8').replace('\r\n', '\n')
+    really_free = geometry[geometry.index('void R_ReallyFreeStaticTriSurf( srfTriangles_t *tri ) {'):]
+    if not ( really_free.index('R_FreeStaticTriSurfVertexCaches( tri );') < really_free.index('triIndexAllocator.Free( tri->indexes );') ):
+        raise AssertionError('the block is released no later than the index list that rides on it')
 
     # The wiring the functions rely on.
     upload = source[source.index('static bool VK_Exec_UploadTriGeometry('):]
@@ -340,6 +525,8 @@ def main():
     cache = (ROOT / 'src/renderer/VertexCache.cpp').read_text(encoding='utf-8')
     if 'block->serial = ++vertexCacheAllocSerial;' not in cache or cache.count('block->serial = 0;') < 5:
         raise AssertionError('static allocations take a fresh serial; temporaries and freed headers carry none')
+    if 'block->user = buffer;' not in cache or '\tblock->user = NULL;' not in cache.replace('\r\n', '\n'):
+        raise AssertionError('a static block names the field that owns it until it is freed')
 
     compiler = next((path for name in ('clang++', 'g++', 'c++') if (path := shutil.which(name))), None)
     if not compiler:
