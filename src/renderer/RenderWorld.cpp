@@ -903,6 +903,21 @@ void idRenderWorldLocal::FreeLightDef( qhandle_t lightHandle ) {
 	}
 
 	if ( light->referencedFrameNum == tr.frameCount || R_RenderThread_InFlight() ) {
+		// The frame still draws this light, so its interactions live until the
+		// frame ends. Take them out of the interaction table now: the handle can
+		// be reused this frame, and a table built before the frame ends (the
+		// first game frame's GenerateAllInteractions, after a load) walks
+		// lightDefs and would never see them. Either way their table slots would
+		// not be theirs when FreeDeferredLightDefs unlinks them.
+		if ( interactionTable ) {
+			for ( idInteraction *inter = light->firstInteraction; inter != NULL; inter = inter->lightNext ) {
+				const int index = light->index * interactionTableWidth + inter->entityDef->index;
+				if ( interactionTable[index] == inter ) {
+					interactionTable[index] = NULL;
+				}
+			}
+		}
+		light->interactionTableDetached = true;
 		deferredFreeLightDefs.Append( light );
 		lightDefs[lightHandle] = NULL;
 		return;

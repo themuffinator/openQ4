@@ -12,6 +12,22 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Loading a save no longer closes the game when a light goes out at that moment, 26 November 2026
+
+- **Saves that closed the game on loading now load.** A save made at the
+  opening of The Awakening's first level, by 0.15.0 or any later build,
+  loaded, then closed the game silently (0.15.0 itself froze) a moment after
+  play resumed. Any load, or a level start, whose first moment of play turns
+  off a light could do the same: the renderer kept the switched-off light's
+  lighting records past the point where the level's lighting table was built,
+  then found them missing from it and stopped with a fatal error. The light's
+  records now leave the table as soon as it goes out. No save needs fixing:
+  the same saves load and play on.
+- Evidence: the first level's saves from 0.15.0, the pre-merge build and the
+  current build each restore, play on and save again; every campaign level's
+  save made by the current build loads in it again (42 of 42)
+  (`renderer_deferred_light_interaction_table.py` pins the fix).
+
 ## Vulkan keeps lights' triangle lists on the graphics card as well, 26 November 2026
 
 - **Vulkan no longer re-sends the triangle lists that belong to a light.**

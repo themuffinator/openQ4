@@ -1094,7 +1094,7 @@ void idRenderWorldLocal::CreateLightDefInteractions( idRenderLightLocal *ldef ) 
 
 			// if any of the edef's interaction match this light, we don't
 			// need to consider it. 
-			if ( r_useInteractionTable.GetBool() && this->interactionTable ) {
+			if ( r_useInteractionTable.GetBool() && this->interactionTable && !ldef->interactionTableDetached ) {
 				// allocating these tables may take several megs on big maps, but it saves 3% to 5% of
 				// the CPU time.  The table is updated at interaction::AllocAndLink() and interaction::UnlinkAndFree()
 				int index = ldef->index * this->interactionTableWidth + edef->index;

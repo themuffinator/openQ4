@@ -5069,6 +5069,13 @@ Completion substeps must keep three forms of evidence distinct:
   since 23 November: the hover tank's retained gun sight had been edited, and a
   retained GUI saved from an earlier revision of its document refused the load.
   Such a GUI is now rebuilt from its saved state.
+  Later on 26 November: saves of The Awakening's first level made by any build
+  since 0.15.0 restored and then closed the game as play resumed. A light
+  switched off in that first frame left stale entries for the renderer's
+  interaction table, a fatal error since 4 November; it now leaves the table
+  when it goes out. Every campaign level's save from the current build
+  [resumes in it](savegame-reliability.md#resuming-at-a-lights-switch-off-26-november-2026)
+  (42 of 42).
 - [ ] **Q4-08 — P2, investigation and qualification: save cost and durability.**
   Measure large-save CRC/sync time and fault behavior across target filesystems.
   Directory synchronization is implemented as recorded below; actual power-cut

@@ -664,6 +664,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         root / "tools" / "tests" / "lightgrid_bake_contract.py",
         root / "tools" / "tests" / "renderer_render_thread_contract.py",
         root / "tools" / "tests" / "renderer_render_thread_runtime.py",
+        root / "tools" / "tests" / "renderer_deferred_light_interaction_table.py",
         root / "tools" / "tests" / "renderer_input_latency.py",
         root / "tools" / "tests" / "renderer_special_effect_snapshot.py",
         root / "tools" / "tests" / "renderer_frame_identity.py",

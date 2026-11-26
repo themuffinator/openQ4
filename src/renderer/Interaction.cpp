@@ -1573,8 +1573,9 @@ idInteraction *idInteraction::AllocAndLink( idRenderEntityLocal *edef, idRenderL
 		edef->lastInteraction = interaction;
 	}
 
-	// update the interaction table
-	if ( renderWorld->interactionTable ) {
+	// update the interaction table (a freed light awaiting its frame's end has
+	// left it, and its handle may already belong to another light)
+	if ( renderWorld->interactionTable && !ldef->interactionTableDetached ) {
 		int index = ldef->index * renderWorld->interactionTableWidth + edef->index;
 		if ( renderWorld->interactionTable[index] != NULL ) {
 			common->Error( "idInteraction::AllocAndLink: non NULL table entry" );
@@ -1681,7 +1682,8 @@ void idInteraction::UnlinkAndFree( void ) {
 
 	// clear the table pointer
 	idRenderWorldLocal *renderWorld = this->lightDef->world;
-	if ( renderWorld->interactionTable ) {
+	// a light freed while its frame draws left the table when it was freed
+	if ( renderWorld->interactionTable && !this->lightDef->interactionTableDetached ) {
 		int index = this->lightDef->index * renderWorld->interactionTableWidth + this->entityDef->index;
 		if ( renderWorld->interactionTable[index] != this ) {
 			common->Error( "idInteraction::UnlinkAndFree: interactionTable wasn't set" );

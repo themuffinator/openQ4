@@ -178,6 +178,7 @@ public:
 													// in the cached memory
 	int					referencedFrameNum;	// last frame where a viewLight captured this light
 	bool					archived;				// for demo writing
+	bool					interactionTableDetached;	// freed, awaiting the frame's end: its interactions are in no table slot
 
 
 	// derived information

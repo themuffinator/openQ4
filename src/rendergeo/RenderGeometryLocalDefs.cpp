@@ -115,6 +115,7 @@ idRenderLightLocal::idRenderLightLocal() {
 	lastModifiedFrameNum	= 0;
 	referencedFrameNum	= -1;
 	archived				= false;
+	interactionTableDetached	= false;
 	lightShader				= NULL;
 	falloffImage			= NULL;
 	globalLightOrigin		= vec3_zero;

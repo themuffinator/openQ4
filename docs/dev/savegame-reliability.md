@@ -1908,3 +1908,25 @@ no raw-copied structure changed layout, and no serialized `.gui` changed. Two
 runs that failed while another session re-staged `.install` under them passed
 when repeated. The nail gun's and railgun's retained scopes, which the same
 code reads, did not appear in any 0.15.0 save the sweep made.
+
+### Resuming at a light's switch-off, 26 November 2026
+
+A check of the unified game module found saves of The Awakening's first level
+(`m01_stranarus_trench1`, 300 tics in) that restored with an exact object
+table and then closed the client the moment game time resumed; 0.15.0 froze on
+the same saves. The writer did not matter beyond the moment it saved: saves by
+the pre-merge build and by the current build failed in either build, while
+0.15.0's own save of the level resumed. A debugger showed the cause in the
+renderer, not in the save. The first resumed game frame switches a light off,
+and `FreeLightDef` defers a light that frame still draws (since `8ed86d2d9`,
+4 November); later in the same frame the game's first-frame
+`GenerateAllInteractions` builds the interaction table from `lightDefs`, which
+no longer lists that light; at the frame's end `FreeDeferredLightDefs` frees
+its interactions, finds table slots that are not theirs, and raises a fatal
+error, whose shutdown then fails the same way.
+
+A deferred light now clears its table slots and is marked detached, and no
+table read or write touches a detached light
+(`renderer_deferred_light_interaction_table.py`). All three saves of that
+level resume, play 120 tics and save again; every campaign level's save made
+by the current build does the same in it (42 of 42).
