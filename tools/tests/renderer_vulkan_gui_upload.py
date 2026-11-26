@@ -26,7 +26,8 @@ using glIndex_t = unsigned int;
 constexpr int VK_FRAMES_IN_FLIGHT=2, VK_TRI_MEMO_SIZE=16, TAG_FREE=0;
 struct idDrawVert {float x,y; unsigned char color[4];};
 struct vertCache_t {int tag=1; bool indexBuffer=false; int offset=0,size=0,vbo=0; void* virtMem=nullptr; vertCache_t** user=nullptr;};
-struct srfTriangles_t {vertCache_t* ambientCache=nullptr; int numVerts=0,numIndexes=0; glIndex_t* indexes=nullptr; vertCache_t* indexCache=nullptr;};
+struct srfTriangles_t {vertCache_t* ambientCache=nullptr; int numVerts=0,numIndexes=0; glIndex_t* indexes=nullptr; vertCache_t* indexCache=nullptr;
+    srfTriangles_t* ambientSurface=nullptr; bool deformedSurface=false;};
 struct viewDef_t {void* viewEntitys=nullptr;};
 struct {viewDef_t* viewDef=nullptr;} backEnd;
 struct {void* Position(const vertCache_t* c){return static_cast<unsigned char*>(c->virtMem)+c->offset;}} vertexCache;
@@ -57,7 +58,7 @@ int VK_Ring_Alloc(Ring& ring,const void* data,size_t bytes,int align){
 }
 // r_vkResourceProfile: what the rings were filled with (rendererVulkanMemoryInfo)
 struct {bool GetBool()const{return true;}} r_vkResourceProfile;
-struct {unsigned long long vertexStreamBytes=0,indexBytes=0,residentSurfaceIndexBytes=0,ownedSurfaceIndexBytes=0;} vkResourceProfile;
+struct {unsigned long long vertexStreamBytes=0,indexBytes=0,residentSurfaceIndexBytes=0,ownedSurfaceIndexBytes=0,deformedVertexBytes=0;} vkResourceProfile;
 constexpr int VK_STATIC_GEO_FLAG=0x40000000;
 '''
     for signature in ('static bool VK_Exec_CPUCacheValid(', 'static bool VK_Exec_UploadTriGeometry('):
@@ -75,7 +76,8 @@ int main(){
     assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0));
     // The ring profile counts what was copied: a streamed vertex stream and its index list.
     assert(vkResourceProfile.vertexStreamBytes==sizeof(vertices) && vkResourceProfile.indexBytes==sizeof(indices)
-        && vkResourceProfile.residentSurfaceIndexBytes==0 && vkResourceProfile.ownedSurfaceIndexBytes==0);
+        && vkResourceProfile.residentSurfaceIndexBytes==0 && vkResourceProfile.ownedSurfaceIndexBytes==0
+        && vkResourceProfile.deformedVertexBytes==0);
     // The screen-update allocator reuses headers and payload addresses.
     // The new rectangle must not inherit the old white full-screen quad.
     for(auto& v:vertices){v.x+=370;v.y+=67;v.color[1]=v.color[2]=0;}
@@ -143,6 +145,23 @@ int main(){
         && surfaceIndexQueries==2);
     view.viewEntitys=&view;
     staticGeoVertexAnswer=-1;surfaceIndexAnswer=-1;
+    // The profile says how much of the streamed vertices belonged to a model
+    // generated anew each frame: a skinned mesh, or the subset a light draws
+    // over one. A resident stream is not counted at all.
+    vkExec=State{};vkResourceProfile={};tri.deformedSurface=true;
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0));
+    assert(vkResourceProfile.vertexStreamBytes==sizeof(vertices) && vkResourceProfile.deformedVertexBytes==sizeof(vertices));
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && vkResourceProfile.deformedVertexBytes==sizeof(vertices));
+    srfTriangles_t lightTri{&vertexHeader,4,6,indices.data(),nullptr};lightTri.ambientSurface=&tri;
+    vkExec=State{};vkResourceProfile={};
+    assert(VK_Exec_UploadTriGeometry(0,&lightTri,v0,i0) && vkResourceProfile.deformedVertexBytes==sizeof(vertices));
+    tri.deformedSurface=false;vkExec=State{};vkResourceProfile={};
+    assert(VK_Exec_UploadTriGeometry(0,&lightTri,v0,i0));
+    assert(vkResourceProfile.vertexStreamBytes==sizeof(vertices) && vkResourceProfile.deformedVertexBytes==0);
+    tri.deformedSurface=true;staticGeoVertexAnswer=VK_STATIC_GEO_FLAG|4096;vkExec=State{};vkResourceProfile={};
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0));
+    assert(vkResourceProfile.vertexStreamBytes==0 && vkResourceProfile.deformedVertexBytes==0);
+    tri.deformedSurface=false;staticGeoVertexAnswer=-1;
     tri.indexes=nullptr;tri.indexCache=&indexHeader;
 
     view.viewEntitys=nullptr;vkExec=State{};

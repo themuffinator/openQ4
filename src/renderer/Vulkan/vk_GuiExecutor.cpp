@@ -97,9 +97,12 @@ static struct {
 	// what the geometry rings were filled with: vertex streams that are not
 	// resident, index lists, the index lists of surfaces whose vertices are
 	// resident (and of those, the lists of the surfaces that own the resident
-	// block: light interactions draw subsets of their own over it), and the
-	// two streams of stencil shadow volumes
+	// block: light interactions draw subsets of their own over it), the two
+	// streams of stencil shadow volumes, and how much of the vertex streams
+	// belonged to models generated anew each frame (skinned meshes, liquids):
+	// those can never be resident
 	uint64 vertexStreamBytes, indexBytes, residentSurfaceIndexBytes, ownedSurfaceIndexBytes, shadowVertexBytes, shadowIndexBytes;
+	uint64 deformedVertexBytes;
 } vkResourceProfile;
 
 // vk_Interactions.cpp: the Phase F1 per-light interaction pass, inserted
@@ -873,10 +876,11 @@ void VK_Exec_PrintResourceInfo( bool reset ) {
 		vkExec.numEnvPipelines, vkExec.numSpecialPipelines, vkExec.numProgramPipelines,
 		vkExec.numBlendLightPipelines, vkExec.numTemporalResolvePipelines, vkExec.numSceneScalePipelines,
 		vkExec.numPostPipelines, vkExec.pipelineFlushCount );
-	common->Printf( "Vulkan executor geometry rings: vertexStreamBytes=%llu indexBytes=%llu residentSurfaceIndexBytes=%llu ownedSurfaceIndexBytes=%llu shadowVertexBytes=%llu shadowIndexBytes=%llu\n",
+	common->Printf( "Vulkan executor geometry rings: vertexStreamBytes=%llu indexBytes=%llu residentSurfaceIndexBytes=%llu ownedSurfaceIndexBytes=%llu shadowVertexBytes=%llu shadowIndexBytes=%llu deformedVertexBytes=%llu\n",
 		(unsigned long long)vkResourceProfile.vertexStreamBytes, (unsigned long long)vkResourceProfile.indexBytes,
 		(unsigned long long)vkResourceProfile.residentSurfaceIndexBytes, (unsigned long long)vkResourceProfile.ownedSurfaceIndexBytes,
-		(unsigned long long)vkResourceProfile.shadowVertexBytes, (unsigned long long)vkResourceProfile.shadowIndexBytes );
+		(unsigned long long)vkResourceProfile.shadowVertexBytes, (unsigned long long)vkResourceProfile.shadowIndexBytes,
+		(unsigned long long)vkResourceProfile.deformedVertexBytes );
 	VK_StaticGeo_PrintInfo( reset );
 	R_ShadowMapReceiverScanPrintInfo( reset );
 	if ( reset ) { memset( &vkResourceProfile, 0, sizeof( vkResourceProfile ) ); }
@@ -9880,7 +9884,12 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 					vertexOffset = VK_Ring_Alloc( vkExec.vertexRings[ slot ], verts,
 						static_cast<size_t>( tri->numVerts ) * sizeof( idDrawVert ), 64 );
 					if ( vertexOffset >= 0 && r_vkResourceProfile.GetBool() ) {
-						vkResourceProfile.vertexStreamBytes += static_cast<size_t>( tri->numVerts ) * sizeof( idDrawVert );
+						vkResourceProfile.vertexStreamBytes += vertexBytes;
+						// a light interaction draws its subset over the surface it lights
+						const srfTriangles_t *owner = tri->ambientSurface != NULL ? tri->ambientSurface : tri;
+						if ( owner->deformedSurface ) {
+							vkResourceProfile.deformedVertexBytes += vertexBytes;
+						}
 					}
 				}
 				if ( vertexOffset < 0 ) {

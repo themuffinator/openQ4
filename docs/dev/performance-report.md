@@ -3222,3 +3222,94 @@ long as neither its light nor its entity changes. Giving such a list an index
 cache block of its own once the interaction has lasted would let both become
 resident; that is a change to the front end, for Vulkan only. The 0.4 MB of
 vertex streams that are not resident at Quality is still not looked into.
+[Section 26](#26-the-vertex-streams-quality-copies-every-frame-fps-08-26-november-2026) looks into it.
+
+## 26. The vertex streams Quality copies every frame (FPS-08), 26 November 2026
+
+Section 25.3's last line, looked into with section 24's method and machine.
+It ends in a finding and one counter; nothing in what is drawn changes.
+
+### 26.1 What they are
+
+Models that are built anew every frame: skinned meshes, almost all of it.
+
+| hub2 view sweep, one revolution, a frame | Balanced | Quality | Quality, `r_shadowMapConservativeCasters 0` |
+| --- | ---: | ---: | ---: |
+| Vertex streams copied into the ring, kB | 183 | 427 | 318 |
+| ... of models generated anew each frame, kB | 156 | 401 | 292 |
+| Streams of such models | 3.2 | 8.4 | 7.5 |
+
+What is left at Quality is 24 kB of frame-temporary geometry (deforms and
+effects), up to 18 kB of streams still inside the 150 ms before they become
+resident, 1.5 kB of 2D and under 1 kB of small rigid surfaces rebuilt each
+frame.
+
+A counter in the upload, taken out again afterwards, sorted every stream that
+went to the ring by the reason the resident cache gave for refusing it:
+
+- *The cache is right to refuse them.* Every one of these streams sat in a
+  block whose header had been seen with another serial. A skinned mesh frees
+  its vertex caches and takes new ones each time it is posed
+  (`idMD5Mesh::UpdateSurface`), so no block of it lives the 150 ms a resident
+  copy asks for, and none should.
+- *None is copied twice.* Of 11,167 such streams in the Quality window, none
+  had been copied earlier in its frame: the per-frame memo holds between the
+  shadow-map passes and the view.
+- *Most of them really move.* A hash of each stream against the same
+  surface's previous one: 83% of the bytes at Quality differed (88% at
+  Balanced). The other 17%, 70 kB a frame, are meshes posed again into the
+  pose they already had.
+- *Why Quality has more.* A shadow map draws the caster itself, where a
+  stencil shadow draws a volume built from it. A skinned mesh whose shadow is
+  in view while the mesh is not reaches the card as a volume at Balanced (the
+  113 kB of volume vertices in 25.3, 32 bytes a vertex) and as the mesh's
+  whole vertex stream at Quality (64 bytes a vertex). On top of that,
+  `r_shadowMapConservativeCasters` (on by default) submits casters whose own
+  interaction is not visible: 109 kB a frame of the 427, and a larger share
+  of the meshes that did not move (about 30% of those bytes were unchanged).
+
+In the combat wave at Quality, three windows at different moments of the
+fight: 1,103 of 2,024 kB a frame, 738 of 1,627 and 541 of 783 belonged to
+generated models. The rest was not broken down there.
+
+### 26.2 What was decided
+
+Nothing is wasted in the way the earlier sections found waste: this is
+geometry that changes, copied once. By section 24's price for a megabyte it
+costs 0.16 to 0.36 ms a frame at Quality in this sweep and 0.06 to 0.14 at
+Balanced. Three ways to make it smaller were weighed and none was taken:
+
+- *Position-only caster streams.* A mesh that only shadow maps draw needs its
+  positions, 12 bytes of the 64 (and texture coordinates where its material
+  is perforated). By the difference between the presets about 245 kB a frame
+  are such meshes, so the bound is about 200 kB, 0.08 to 0.18 ms. It needs a
+  second vertex layout in the caster pipelines and the knowledge, at the
+  first upload, that the view will not draw the mesh later in the frame.
+- *The conservative caster rule.* 109 kB a frame here, with the skinning and
+  the shadow-map draws of those meshes. It is a rule about which shadows are
+  right, not about uploads, and was left as it is; the figure is what it
+  costs in this view.
+- *Meshes posed into the same pose.* 70 kB a frame at Quality. Skipping them
+  means the front end knowing a pose has not changed before it skins, which
+  would save the skinning as well; the entities concerned were not
+  identified.
+
+Skinning on the graphics card (`r_gpuSkinning`) is what would take the whole
+row away, and has prerequisites of its own.
+
+### 26.3 The counter that stays
+
+With `r_vkResourceProfile 1`, `rendererVulkanMemoryInfo` prints
+`deformedVertexBytes` beside `vertexStreamBytes`: of the vertex streams copied
+into the ring, those of models generated anew each frame, the subsets a light
+interaction draws over one included. It is the "generated" row above, so the
+split can be read on any map without the temporary counter.
+`renderer_vulkan_gui_upload` runs the real upload for it (a generated model,
+a light's subset over one, a rigid surface, a resident stream); with three
+more deliberate breakages, all 37 of sections 24 to 26 fail one of the two
+tests. GCC's and Clang's syntax checks and both tests pass on Linux.
+
+**Not covered.** The classification is one view sweep in one map; the combat
+wave has only the counter's two numbers. The 17% and the 245 kB are read from
+one launch each, and the second is a difference between two presets, not a
+count of caster-only meshes.
