@@ -12,6 +12,22 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Vulkan keeps the level's index lists on the graphics card too, 26 November 2026
+
+- **Vulkan no longer re-sends the triangle lists of static geometry every
+  frame.** The vertices of level geometry and of anything else that does not
+  animate were already kept on the graphics card; the list that says which
+  vertices make up each triangle was still copied into the frame's upload
+  buffer every frame. A surface's own list now sits beside its vertices. In
+  the hub level the upload each frame falls from 0.8 MB to 0.7 MB, at
+  Balanced and at Quality alike, on top of the shadow volume change below.
+  The time this saves is small (an estimated 0.05 to 0.1 ms a frame there)
+  and was not measured apart from the test machine's noise. Pictures are
+  identical. `r_vkStaticSurfaceIndexes 0` restores the copying.
+- Evidence and what the upload buffers still carry:
+  [performance report section 25](performance-report.md#25-a-surfaces-own-index-list-on-vulkan-fps-08-26-november-2026).
+  No ABI change.
+
 ## Vulkan stops copying static shadows to the graphics card every frame, 26 November 2026
 
 - **Vulkan keeps the shadow volumes of the static world on the graphics card.**

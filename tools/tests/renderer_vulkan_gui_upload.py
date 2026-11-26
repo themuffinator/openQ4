@@ -45,8 +45,11 @@ int VK_GpuSkinning_FindMemo(const void* key,bool,bool& found){
 }
 // Resident static geometry is asked only for world streams: a 2D surface's
 // header is recycled within the presentation and must reach the ring.
-int staticGeoQueries=0;
-int VK_StaticGeo_VertexOffset(const srfTriangles_t*,size_t){++staticGeoQueries;return -1;}
+int staticGeoQueries=0,staticGeoVertexAnswer=-1;
+int VK_StaticGeo_VertexOffset(const srfTriangles_t*,size_t){++staticGeoQueries;return staticGeoVertexAnswer;}
+// A surface's own index list is offered to it only beside a resident vertex stream.
+int surfaceIndexQueries=0,surfaceIndexAnswer=-1;
+int VK_StaticGeo_SurfaceIndexOffset(const srfTriangles_t*,size_t){++surfaceIndexQueries;return surfaceIndexAnswer;}
 int VK_Ring_Alloc(Ring& ring,const void* data,size_t bytes,int align){
     const int offset=(ring.used+align-1)&~(align-1);
     if(bytes>size_t(ring.capacity)||size_t(offset)+bytes>size_t(ring.capacity))return -1;
@@ -105,6 +108,43 @@ int main(){
     assert(VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && v1==1024 && i1==i0);
     assert(vkExec.vertexRings[0].uploads==1);
 
+    // Nothing above offered an index list to the resident cache: every vertex
+    // stream was streamed, and a list held in an index cache block never is.
+    assert(surfaceIndexQueries==0);
+    staticGeoVertexAnswer=VK_STATIC_GEO_FLAG|4096;
+    vkExec=State{};
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && v0==(VK_STATIC_GEO_FLAG|4096) && surfaceIndexQueries==0);
+    // A surface whose vertex stream is resident offers the list it draws itself
+    // with: after the per-frame memo, once a frame. While the list is not
+    // resident yet the ring takes it, and the profile says whose it was.
+    tri.indexes=indices.data();tri.indexCache=nullptr;vertexHeader.user=&tri.ambientCache;
+    vkExec=State{};vkResourceProfile={};
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && v0==(VK_STATIC_GEO_FLAG|4096) && surfaceIndexQueries==1);
+    assert(i0>=0 && (i0&VK_STATIC_GEO_FLAG)==0 && vkExec.indexRings[0].uploads==1 && vkExec.vertexRings[0].uploads==0);
+    assert(vkResourceProfile.indexBytes==sizeof(indices) && vkResourceProfile.residentSurfaceIndexBytes==sizeof(indices)
+        && vkResourceProfile.ownedSurfaceIndexBytes==sizeof(indices));
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && i1==i0 && surfaceIndexQueries==1 && vkExec.indexRings[0].uploads==1);
+    // A resident list costs the ring nothing and is not counted as copied.
+    surfaceIndexAnswer=VK_STATIC_GEO_FLAG|8192;
+    vkExec=State{};vkResourceProfile={};
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && i0==(VK_STATIC_GEO_FLAG|8192) && surfaceIndexQueries==2);
+    assert(vkExec.indexRings[0].uploads==0 && vkExec.vertexRings[0].uploads==0);
+    assert(vkResourceProfile.indexBytes==0 && vkResourceProfile.residentSurfaceIndexBytes==0
+        && vkResourceProfile.ownedSurfaceIndexBytes==0);
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && v1==v0 && i1==i0 && surfaceIndexQueries==2);
+    // A streamed vertex stream keeps its list in the ring without asking,
+    // and a 2D surface never asks, whatever the caches would answer.
+    staticGeoVertexAnswer=-1;
+    vkExec=State{};
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && (i0&VK_STATIC_GEO_FLAG)==0 && surfaceIndexQueries==2);
+    staticGeoVertexAnswer=VK_STATIC_GEO_FLAG|4096;
+    vkExec=State{};view.viewEntitys=nullptr;
+    assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && (v0&VK_STATIC_GEO_FLAG)==0 && (i0&VK_STATIC_GEO_FLAG)==0
+        && surfaceIndexQueries==2);
+    view.viewEntitys=&view;
+    staticGeoVertexAnswer=-1;surfaceIndexAnswer=-1;
+    tri.indexes=nullptr;tri.indexCache=&indexHeader;
+
     view.viewEntitys=nullptr;vkExec=State{};
     vertexHeader.tag=TAG_FREE;
     assert(!VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && v1==-1 && i1==-1);
@@ -117,7 +157,7 @@ int main(){
     assert(!VK_Exec_UploadTriGeometry(0,&tri,v1,i1));
     vkExec=State{};vkExec.indexRings[0].capacity=1;
     assert(!VK_Exec_UploadTriGeometry(0,&tri,v1,i1));
-    std::puts("Vulkan GUI uploads: recycled vertex/index/GPU memos, world reuse and invalid/exhausted caches passed");
+    std::puts("Vulkan GUI uploads: recycled vertex/index/GPU memos, world reuse, resident index lists and invalid/exhausted caches passed");
 }
 '''
     compiler = next((path for name in ('clang++', 'g++', 'c++') if (path := shutil.which(name))), None)

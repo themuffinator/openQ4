@@ -1145,6 +1145,15 @@ static int VK_Ring_Reserve( vkRing_t &ring, size_t bytes, int alignment ) {
 	VK_Exec_IndexStream decodes an index offset as VK_Exec_VertexStream
 	does a vertex offset.
 
+	A model surface's own index list shares the life of its vertex block in
+	the same way: the surface owns the block (the block names the surface's
+	ambientCache field) and the list alike, and whatever rebuilds a
+	surface's geometry in place frees its vertex caches first, as OpenGL's
+	buffer objects need it to. So once a surface's vertex stream is
+	resident, the list it draws itself with becomes resident under that
+	block. The lists of light interactions do not: they share the surface's
+	block without owning it, each a subset of its own.
+
 ===============================================================================
 */
 static idCVar r_vkStaticGeometry( "r_vkStaticGeometry", "1", CVAR_RENDERER | CVAR_INTEGER,
@@ -1154,6 +1163,9 @@ static idCVar r_vkStaticGeometry( "r_vkStaticGeometry", "1", CVAR_RENDERER | CVA
 static idCVar r_vkStaticShadowVolumes( "r_vkStaticShadowVolumes", "1", CVAR_RENDERER | CVAR_BOOL,
 	"with r_vkStaticGeometry: keep the vertex streams of stencil shadow volumes, and the index lists of the volumes "
 	"that own their vertices, resident as well; 0 copies every volume into the frame rings every frame, as before" );
+static idCVar r_vkStaticSurfaceIndexes( "r_vkStaticSurfaceIndexes", "1", CVAR_RENDERER | CVAR_BOOL,
+	"with r_vkStaticGeometry: keep the index list of a surface whose vertex stream is resident there as well; "
+	"0 copies every surface's index list into the frame ring every frame, as before" );
 static idCVar r_vkStaticGeometryMegs( "r_vkStaticGeometryMegs", "96", CVAR_RENDERER | CVAR_INTEGER,
 	"size in MiB of the buffer resident vertex streams live in; applies when the buffer is next created "
 	"(vid_restart)", 8, 512 );
@@ -1209,6 +1221,7 @@ static struct vkStaticGeo_s {
 	// since the last report reset
 	uint64					hits, hitBytes, promotions, promotedBytes, recycled, evictions, declined, mismatches;
 	uint64					volumeVertexHitBytes, volumeIndexHitBytes;	// of hitBytes: stencil shadow volumes
+	uint64					surfaceIndexHitBytes;						// of hitBytes: surfaces' own index lists
 	int						hash[ VK_STATIC_GEO_HASH_SIZE ];
 	vkStaticGeoEntry_t		entries[ VK_STATIC_GEO_MAX_ENTRIES ];
 	vkStaticGeoRetired_t	retired[ VK_STATIC_GEO_MAX_ENTRIES ];
@@ -1631,6 +1644,34 @@ static int VK_StaticGeo_VolumeIndexOffset( const srfTriangles_t *tri, const size
 	return offset;
 }
 
+/*
+====================
+VK_StaticGeo_SurfaceIndexOffset
+
+The resident form of the index list a surface draws itself with, or -1 when
+the caller must copy it into the frame ring. The caller has validated
+tri->ambientCache and found the surface's vertex stream resident, which
+already says that the block has lasted and that no compute pass rewrites it.
+
+The list rides on that block only for the surface that owns it: the block
+names the surface's own ambientCache field. Light interactions draw the same
+block with index subsets of their own and are refused here; so is a copy of
+the surface made for a frame.
+====================
+*/
+static int VK_StaticGeo_SurfaceIndexOffset( const srfTriangles_t *tri, const size_t indexBytes ) {
+	const int mode = r_vkStaticGeometry.GetInteger();
+	if ( mode == 0 || !r_vkStaticSurfaceIndexes.GetBool()
+			|| tri->indexes == NULL || tri->ambientCache->user != &tri->ambientCache ) {
+		return -1;
+	}
+	const int offset = VK_StaticGeo_StreamOffset( tri->ambientCache, tri->indexes, static_cast<int>( indexBytes ), indexBytes, mode );
+	if ( offset >= 0 ) {
+		vkStaticGeo.surfaceIndexHitBytes += indexBytes;
+	}
+	return offset;
+}
+
 // The buffer and offset to bind for a vertex stream VK_Exec_UploadTriGeometry
 // reported: the resident buffer or this frame's ring.
 static ID_INLINE VkBuffer VK_Exec_VertexStream( const int slot, const int vertexOffset, VkDeviceSize &bindOffset ) {
@@ -1664,10 +1705,13 @@ static void VK_StaticGeo_PrintInfo( const bool reset ) {
 	common->Printf( "Vulkan static shadow volumes: enabled=%d vertexHitBytes=%llu indexHitBytes=%llu\n",
 		r_vkStaticShadowVolumes.GetBool() ? 1 : 0, static_cast<unsigned long long>( vkStaticGeo.volumeVertexHitBytes ),
 		static_cast<unsigned long long>( vkStaticGeo.volumeIndexHitBytes ) );
+	common->Printf( "Vulkan static surface indexes: enabled=%d hitBytes=%llu\n",
+		r_vkStaticSurfaceIndexes.GetBool() ? 1 : 0, static_cast<unsigned long long>( vkStaticGeo.surfaceIndexHitBytes ) );
 	if ( reset ) {
 		vkStaticGeo.hits = vkStaticGeo.hitBytes = vkStaticGeo.promotions = vkStaticGeo.promotedBytes = 0;
 		vkStaticGeo.recycled = vkStaticGeo.evictions = vkStaticGeo.declined = vkStaticGeo.mismatches = 0;
 		vkStaticGeo.volumeVertexHitBytes = vkStaticGeo.volumeIndexHitBytes = 0;
+		vkStaticGeo.surfaceIndexHitBytes = 0;
 	}
 }
 
@@ -9861,6 +9905,7 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 			}
 
 			const glIndex_t *indexSource = tri->indexes;
+			bool residentIndexes = false;
 #if defined( _MD5R_SUPPORT ) || defined( Q4SDK_MD5R )
 			const rvMD5RMesh *packedMesh = R_MD5R_GetMeshForTri( tri );
 			const bool headeredLightIndexes =
@@ -9884,8 +9929,17 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 			} else
 #endif
 			if ( indexSource != NULL ) {
-				indexOffset = VK_Ring_Alloc( vkExec.indexRings[ slot ],
-						indexSource, indexBytes, 4 );
+				// The list a surface draws itself with is resident beside its
+				// resident vertex stream; every other list is copied into the ring.
+				if ( !freshGui && ( vertexOffset & VK_STATIC_GEO_FLAG ) != 0 ) {
+					indexOffset = VK_StaticGeo_SurfaceIndexOffset( tri, indexBytes );
+				}
+				if ( indexOffset >= 0 ) {
+					residentIndexes = true;
+				} else {
+					indexOffset = VK_Ring_Alloc( vkExec.indexRings[ slot ],
+							indexSource, indexBytes, 4 );
+				}
 			} else if ( VK_Exec_CPUCacheValid( tri->indexCache, true,
 					indexBytes ) ) {
 				const glIndex_t *cachedIndexes =
@@ -9898,7 +9952,7 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 			if ( indexOffset < 0 ) {
 				return false;
 			}
-			if ( r_vkResourceProfile.GetBool() ) {
+			if ( !residentIndexes && r_vkResourceProfile.GetBool() ) {
 				vkResourceProfile.indexBytes += indexBytes;
 				if ( ( vertexOffset & VK_STATIC_GEO_FLAG ) != 0 ) {
 					vkResourceProfile.residentSurfaceIndexBytes += indexBytes;
@@ -9930,8 +9984,9 @@ bool VK_Exec_BindTriGeometry( VkCommandBuffer cmd, int slot,
 	VkDeviceSize vertexBindOffset;
 	const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, vertexOffset, vertexBindOffset );
 	vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &vertexBindOffset );
-	vkCmdBindIndexBuffer( cmd, vkExec.indexRings[ slot ].buffer,
-		static_cast<VkDeviceSize>( indexOffset ), VK_INDEX_TYPE_UINT32 );
+	VkDeviceSize indexBindOffset;
+	const VkBuffer indexBuffer = VK_Exec_IndexStream( slot, indexOffset, indexBindOffset );
+	vkCmdBindIndexBuffer( cmd, indexBuffer, indexBindOffset, VK_INDEX_TYPE_UINT32 );
 	vkExec.boundVertexOffset = vertexOffset;	// the cube-texgen path re-binds binding 0 alongside its dir stream
 	return true;
 }
@@ -14789,8 +14844,9 @@ static void VK_ClassicGui_BindPreparedGeometry( VkCommandBuffer cmd, int slot,
 	VkDeviceSize vertexOffset;
 	const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, plan.vertexOffset, vertexOffset );
 	vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &vertexOffset );
-	vkCmdBindIndexBuffer( cmd, vkExec.indexRings[ slot ].buffer,
-		static_cast<VkDeviceSize>( plan.indexOffset ), VK_INDEX_TYPE_UINT32 );
+	VkDeviceSize indexOffset;
+	const VkBuffer indexBuffer = VK_Exec_IndexStream( slot, plan.indexOffset, indexOffset );
+	vkCmdBindIndexBuffer( cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32 );
 }
 
 static void VK_ClassicGui_SetPushTextureMatrix(
@@ -16035,9 +16091,9 @@ static void VK_ClassicWorldAmbient_DrawPhase(
 		VkDeviceSize vertexOffset;
 		const VkBuffer vertexBuffer = VK_Exec_VertexStream( slot, drawPlan.vertexOffset, vertexOffset );
 		vkCmdBindVertexBuffers( cmd, 0, 1, &vertexBuffer, &vertexOffset );
-		vkCmdBindIndexBuffer( cmd, vkExec.indexRings[slot].buffer,
-			static_cast<VkDeviceSize>( drawPlan.indexOffset ),
-			VK_INDEX_TYPE_UINT32 );
+		VkDeviceSize indexOffset;
+		const VkBuffer indexBuffer = VK_Exec_IndexStream( slot, drawPlan.indexOffset, indexOffset );
+		vkCmdBindIndexBuffer( cmd, indexBuffer, indexOffset, VK_INDEX_TYPE_UINT32 );
 		vkCmdSetScissorClamped( cmd, 0, 1, &drawPlan.scissor );
 		for ( int localPass = 0; localPass < drawPlan.passCount; ++localPass ) {
 			const vkClassicWorldAmbientPassPlan_t &passPlan =

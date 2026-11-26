@@ -3111,3 +3111,114 @@ Leads, in the order the numbers suggest:
   instance an index cache block given to a volume once it has lasted.
 - **At Quality 0.4 MB a frame of vertex streams are not resident**, as section
   23 noted; still not looked into.
+
+[Section 25](#25-a-surfaces-own-index-list-on-vulkan-fps-08-26-november-2026) takes up the first of these.
+
+## 25. A surface's own index list on Vulkan (FPS-08), 26 November 2026
+
+Section 24.4's first lead, taken up with section 24's method and machine.
+Vulkan copied every index list into the frame's index ring every frame, the
+lists of surfaces whose vertices are resident included: 223 kB a frame over a
+revolution of the hub2 view sweep at every preset, 122 kB of it the list a
+surface draws itself with. Section 24 priced a megabyte copied into the rings
+at 0.4 to 0.9 ms.
+
+### 25.1 What changed
+
+A model surface's own index list shares the life of its vertex block exactly
+as a prelight volume's does (24.2): the surface owns the block (the block
+names the surface's `ambientCache` field as its owner) and the list alike, and
+frees the block when it is freed. So once a surface's vertex stream is
+resident, the list it draws itself with is kept in the same buffer under that
+block's key (`VK_StaticGeo_SurfaceIndexOffset`), with the list's address and
+length checked at every draw.
+
+- *Only beside a resident vertex stream.* That one condition leaves out
+  everything that should be left out: 2D surfaces, whose blocks are recycled
+  inside a frame; surfaces the compute pass may skin; and whatever is rebuilt
+  every tic, which never stays long enough to become resident.
+- *Only for the surface that owns the block.* A light interaction draws the
+  same block with an index subset of its own, a new one for each light; it is
+  refused, and so is a copy of the surface made for a frame. When an
+  interaction lies wholly inside its light and points at the surface's own
+  list, the per-frame memo already serves it from the surface's copy.
+- *What keeps the list true.* No code was found that changes a kept surface's
+  index list alone. What rebuilds a kept surface's geometry in place
+  (overlays, beams, a re-posed skinned mesh and its reversed back side) frees
+  its vertex caches first, as OpenGL's buffer objects need it to, and the
+  block's new serial starts the list again.
+- The three places that bound an uploaded surface's index list straight from
+  the ring (`VK_Exec_BindTriGeometry`, the planned world-ambient draws and the
+  planned 2D draws) decode the offset like the others. Two binds remain on the
+  ring: the raw shadow batch and the special-effects quad, which bind what
+  they have just put there.
+
+`r_vkStaticSurfaceIndexes 0` copies every surface's list as before.
+`rendererVulkanMemoryInfo` prints the list bytes drawn from resident copies.
+
+### 25.2 Result
+
+| hub2 view sweep, one revolution, kB a frame | Copied | Resident |
+| --- | ---: | ---: |
+| Balanced: into the frame rings, everything | 789 | 671 |
+| Balanced: index lists into the ring | 287 | 167 |
+| Quality: into the frame rings, everything | 810 | 691 |
+| Quality: index lists into the ring | 317 | 197 |
+| Index lists drawn from resident copies, either preset | 0 | 122 |
+
+At a static hub2 view the rings take 285 kB a frame at Quality where they
+took 470, and 543 at Balanced where they took 678. In the combat wave at
+Quality 407 kB of index lists a frame are drawn from resident copies, and at
+the player start of four other maps 29 (`game/airdefense2`), 38
+(`game/storage2`), 90 (`game/medlabs`) and 108 kB (`game/mcc_1`).
+
+**Time.** Not resolved. At the static view at Quality, phases of 900 frames
+alternating in one launch, the two pairs that ran undisturbed were each 0.035
+ms a frame lower with the lists resident (4.10 against 4.13 and 4.24 against
+4.27), which is two steps of that clock at this phase length. Other sessions
+then loaded the machine until the client drew 17 frames a second, and the
+rest of that launch and the Balanced one are void. A later launch, read by
+the thread's cycle count instead (exact where the accounted time moves in
+steps), did not resolve it on the busy machine either: 6.16 against 6.18 ms,
+with phases of either kind moving by 0.7 ms. Section 24's price for a
+megabyte puts the 0.12 MB of the sweep at 0.05 to 0.11 ms a frame.
+
+**Exactness.** With `r_vkStaticGeometry 2`, which compares every resident
+stream with its source at every draw: 329,735 draws of resident streams,
+none different, in hub2 at Balanced and Quality, the combat wave, the player
+start of four other maps and a second map loaded in the same launch, where
+every block of the first map is freed and its headers come back with new
+serials. Pictures of a frozen world are identical in every pixel with the
+lists resident and copied, at Quality and at Balanced.
+`renderer_vulkan_static_geometry` and `renderer_vulkan_gui_upload` run the
+real functions: the delay, the owner, a light interaction's triangles (with a
+subset and with the surface's own list), a frame's copy, a surface without a
+list, another list under the same block, a recycled header, both switches,
+the comparison mode, the gate on the vertex stream and the 2D case; all
+34 deliberate breakages of sections 24 and 25 fail one of the two.
+
+**Not covered.** As in section 24: the render thread modes were not run, the
+buffer's eviction under pressure was exercised only by the test, and nothing
+was run on Linux beyond the two tests and GCC's and Clang's syntax checks.
+
+### 25.3 What the rings still take
+
+hub2 view sweep, one revolution, kB a frame:
+
+| | Balanced | Quality |
+| --- | ---: | ---: |
+| Everything | 671 | 691 |
+| Volume vertices (models that animate) | 113 | 0 |
+| Volume index lists (volumes cast from entity surfaces) | 162 | 0 |
+| Vertex streams that are not resident | 177 | 428 |
+| Index lists | 167 | 197 |
+| ... of light interactions over a resident surface | 107 | 102 |
+
+The two index rows that remain have one thing in common: a light
+interaction's index subset and the index list of a volume cast from an
+entity's surface both belong to an interaction, not to a surface, and no
+vertex cache block shares their life. A static interaction keeps both for as
+long as neither its light nor its entity changes. Giving such a list an index
+cache block of its own once the interaction has lasted would let both become
+resident; that is a change to the front end, for Vulkan only. The 0.4 MB of
+vertex streams that are not resident at Quality is still not looked into.
