@@ -50,12 +50,13 @@ template<class T> T Max( T a, T b ) { return std::max( a, b ); }
 struct idMath { static int ClampInt( int lo, int hi, int v ) { return v < lo ? lo : ( v > hi ? hi : v ); } };
 
 struct vertCache_t { int tag = TAG_USED; unsigned long long serial = 0; int size = 0; int offset = 0; void *virtMem = nullptr;
-                     vertCache_t **user = nullptr; };
+                     vertCache_t **user = nullptr; bool indexBuffer = false; };
 typedef int glIndex_t;
 struct shadowCache_t { float xyzw[ 4 ]; };
 struct srfTriangles_t { vertCache_t *ambientCache = nullptr; const srfTriangles_t *ambientSurface = nullptr;
                         bool gpuSkinningDeferred = false; bool candidate = false;
-                        vertCache_t *shadowCache = nullptr; shadowCache_t *shadowVertexes = nullptr; glIndex_t *indexes = nullptr; };
+                        vertCache_t *shadowCache = nullptr; shadowCache_t *shadowVertexes = nullptr; glIndex_t *indexes = nullptr;
+                        vertCache_t *indexCache = nullptr; };
 bool R_GpuSkinning_IsCandidate( const srfTriangles_t *tri ) { return tri->candidate; }
 bool vkGpuSkinningEverDeferred = false;
 
@@ -67,7 +68,7 @@ struct Common {
 struct CVarInt { int value; int GetInteger() const { return value; } };
 struct CVarBool { bool value; bool GetBool() const { return value; } };
 CVarInt r_vkStaticGeometry{ 1 }, r_vkStaticGeometryMegs{ 8 };
-CVarBool r_vkStaticShadowVolumes{ true }, r_vkStaticSurfaceIndexes{ true };
+CVarBool r_vkStaticShadowVolumes{ true }, r_vkStaticSurfaceIndexes{ true }, r_vkStaticInteractionIndexes{ true };
 int clockMsec = 1000;
 int Sys_Milliseconds() { return clockMsec; }
 
@@ -122,6 +123,14 @@ void vmaVirtualFree( VmaVirtualBlock, VmaVirtualAllocation allocation ) {
 VkResult vmaFlushAllocation( int, VmaAllocation, VkDeviceSize offset, VkDeviceSize size ) {
     flushedBegin = offset; flushedEnd = offset + size; ++flushes; return VK_SUCCESS;
 }
+'''
+
+# What the front end's rule for an interaction's lists reads (Interaction.cpp).
+FRONT_END = r'''
+struct surfaceInteraction_t { int firstLinkMsec = 0; };
+struct { int frameCount = 0; } tr;
+bool renderThreadOverlap = false;
+bool R_RenderThread_OverlapRequested( void ) { return renderThreadOverlap; }
 '''
 
 CASES = r'''
@@ -519,8 +528,162 @@ int main() {
         assert( VK_StaticGeo_Flush() );
     }
 
+    // An index list that belongs to a light interaction: the part of a surface
+    // the light reaches, or a volume cast from an entity's surface. No vertex
+    // block shares its life, so the front end gives a lasting one an index
+    // block of its own, and that block's serial is the list's identity.
+    {
+        std::vector<glIndex_t> subset( 180 ), blockCopy, later( 180 );
+        for ( size_t i = 0; i < subset.size(); i++ ) {
+            subset[ i ] = static_cast<glIndex_t>( i * 3 + 2 );
+            later[ i ] = static_cast<glIndex_t>( i * 11 + 4 );
+        }
+        blockCopy = subset;
+        const size_t subsetBytes = subset.size() * sizeof( glIndex_t );
+        std::vector<unsigned char> litVerts = Payload( 2560, 53 );
+        vertCache_t litHeader; litHeader.serial = nextSerial++; litHeader.size = 2560; litHeader.virtMem = litVerts.data();
+        srfTriangles_t lit; lit.ambientCache = &litHeader; litHeader.user = &lit.ambientCache;
+        vertCache_t listHeader; listHeader.serial = nextSerial++; listHeader.size = (int)subsetBytes; listHeader.virtMem = blockCopy.data();
+        listHeader.indexBuffer = true;
+        srfTriangles_t lightTris; lightTris.ambientCache = &litHeader; lightTris.ambientSurface = &lit; lightTris.indexes = subset.data();
+
+        // Without a block of its own the list stays in the ring, and nothing is tracked for it.
+        const int trackedBefore = vkStaticGeo.numEntries;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 && vkStaticGeo.numEntries == trackedBefore );
+        lightTris.indexCache = &listHeader; listHeader.user = &lightTris.indexCache;
+        assert( VK_StaticGeo_InteractionIndexesWanted() );
+
+        // With one it is resident after the block's own delay, whether or not
+        // the vertices it indexes are.
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 && vkStaticGeo.numEntries == trackedBefore + 1 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC - 20 );
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 && vkStaticGeo.interactionIndexHitBytes == 0 );
+        Frame( 40 );
+        const int listOffset = VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes );
+        assert( listOffset >= 0 && ( listOffset & VK_STATIC_GEO_FLAG ) != 0 && ( listOffset & ~VK_STATIC_GEO_FLAG ) % 4 == 0 );
+        assert( !std::memcmp( deviceBytes.data() + ( listOffset & ~VK_STATIC_GEO_FLAG ), subset.data(), subsetBytes ) );
+        assert( vkStaticGeo.interactionIndexHitBytes == subsetBytes );
+        // it is the block's own entry: no list rides on an index block
+        assert( VK_StaticGeo_Find( &listHeader ) != NULL && VK_StaticGeo_Find( &listHeader )->list == NULL
+                && VK_StaticGeo_Find( VK_StaticGeo_IndexListKey( &listHeader ) ) == NULL );
+        // the surface's own list is another matter and is still refused to the light's triangles
+        assert( VK_StaticGeo_SurfaceIndexOffset( &lightTris, subsetBytes ) == -1 );
+        assert( VK_StaticGeo_Flush() );
+        Frame();
+        const uint64 listPromotions = vkStaticGeo.promotions;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == listOffset && vkStaticGeo.promotions == listPromotions );
+
+        // Only the surface that owns the block is served, only for all of the
+        // block, and only where the block is a CPU-backed index block that
+        // holds a copy of a list the surface still has.
+        const uint64 hitsBefore = vkStaticGeo.interactionIndexHitBytes, recycledBefore = vkStaticGeo.recycled;
+        srfTriangles_t frameCopy = lightTris;
+        assert( VK_StaticGeo_InteractionIndexOffset( &frameCopy, subsetBytes ) == -1 );
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes / 2 ) == -1 );
+        lightTris.indexes = nullptr;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 );
+        lightTris.indexes = subset.data();
+        listHeader.indexBuffer = false;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 );
+        listHeader.indexBuffer = true; listHeader.virtMem = nullptr;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 );
+        listHeader.virtMem = blockCopy.data(); listHeader.tag = TAG_TEMP;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 );
+        listHeader.tag = TAG_USED;
+        assert( vkStaticGeo.interactionIndexHitBytes == hitsBefore && vkStaticGeo.recycled == recycledBefore );
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == listOffset );
+
+        // The interaction is rebuilt: its surface is freed, the block with it,
+        // and the header comes back with another serial for another list.
+        subset = later; blockCopy = later;
+        listHeader.serial = nextSerial++; listHeader.virtMem = blockCopy.data();
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 && vkStaticGeo.recycled == recycledBefore + 1 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        const int laterOffset = VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes );
+        assert( laterOffset >= 0 && !std::memcmp( deviceBytes.data() + ( laterOffset & ~VK_STATIC_GEO_FLAG ), later.data(), subsetBytes ) );
+
+        // A stencil volume cast from an entity's surface borrows the surface's
+        // vertex block; its list is refused as a volume's own and served as
+        // the interaction's.
+        std::vector<glIndex_t> castList( 96 ), castCopy;
+        for ( size_t i = 0; i < castList.size(); i++ ) { castList[ i ] = static_cast<glIndex_t>( i * 5 ); }
+        castCopy = castList;
+        const size_t castBytes = castList.size() * sizeof( glIndex_t );
+        vertCache_t castHeader; castHeader.serial = nextSerial++; castHeader.size = (int)castBytes; castHeader.virtMem = castCopy.data();
+        castHeader.indexBuffer = true;
+        srfTriangles_t cast; cast.shadowCache = &litHeader; cast.indexes = castList.data(); cast.indexCache = &castHeader;
+        castHeader.user = &cast.indexCache;
+        assert( VK_StaticGeo_VolumeIndexOffset( &cast, castBytes ) == -1 && VK_StaticGeo_InteractionIndexOffset( &cast, castBytes ) == -1 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        const int castOffset = VK_StaticGeo_InteractionIndexOffset( &cast, castBytes );
+        assert( VK_StaticGeo_VolumeIndexOffset( &cast, castBytes ) == -1 && castOffset >= 0 && castOffset != laterOffset );
+        assert( !std::memcmp( deviceBytes.data() + ( castOffset & ~VK_STATIC_GEO_FLAG ), castList.data(), castBytes ) );
+
+        // r_vkStaticInteractionIndexes 0 copies these lists as before and asks
+        // the front end for no further blocks; r_vkStaticGeometry 0 does too.
+        r_vkStaticInteractionIndexes.value = false;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 && !VK_StaticGeo_InteractionIndexesWanted() );
+        r_vkStaticInteractionIndexes.value = true;
+        r_vkStaticGeometry.value = 0;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 && !VK_StaticGeo_InteractionIndexesWanted() );
+        // 2 notices a resident copy that no longer equals the block, and a
+        // block that no longer equals the list drawn from; the second drops
+        // the block's entry, so the list starts again.
+        r_vkStaticGeometry.value = 2;
+        uint64 mismatchesBefore = vkStaticGeo.mismatches;
+        assert( VK_StaticGeo_InteractionIndexesWanted() );
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == laterOffset && vkStaticGeo.mismatches == mismatchesBefore );
+        subset[ 5 ] ^= 8;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 && vkStaticGeo.mismatches == mismatchesBefore + 1 );
+        assert( VK_StaticGeo_Find( &listHeader ) == NULL );
+        subset[ 5 ] ^= 8;
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) == -1 );
+        Frame( VK_STATIC_GEO_PROMOTE_MSEC );
+        assert( VK_StaticGeo_InteractionIndexOffset( &lightTris, subsetBytes ) >= 0 );
+        mismatchesBefore = vkStaticGeo.mismatches;
+        castCopy[ 9 ] ^= 1; castList[ 9 ] ^= 1;
+        assert( VK_StaticGeo_InteractionIndexOffset( &cast, castBytes ) == -1 && vkStaticGeo.mismatches == mismatchesBefore + 1 );
+        r_vkStaticGeometry.value = 1;
+        assert( VK_StaticGeo_Flush() );
+
+        // The front end's rule. A surface interaction is stamped when it is
+        // first linked and is due its blocks once it has lasted; one rebuilt
+        // every tic starts from an empty record each time and never is.
+        surfaceInteraction_t lasting;
+        const int clockBefore = clockMsec;
+        tr.frameCount = 100; clockMsec = 5000;
+        assert( !R_InteractionIndexBlockDue( &lasting ) && lasting.firstLinkMsec == 5000 );
+        tr.frameCount++; clockMsec += INTERACTION_INDEX_BLOCK_MSEC - 1;
+        assert( !R_InteractionIndexBlockDue( &lasting ) && lasting.firstLinkMsec == 5000 );
+        // the time is read once a frame: every view of a frame answers alike
+        clockMsec += 50;
+        assert( !R_InteractionIndexBlockDue( &lasting ) );
+        tr.frameCount++;
+        assert( R_InteractionIndexBlockDue( &lasting ) && lasting.firstLinkMsec == 5000 );
+        for ( int i = 0; i < 40; i++ ) {
+            surfaceInteraction_t rebuilt;
+            tr.frameCount++; clockMsec += 16;
+            assert( !R_InteractionIndexBlockDue( &rebuilt ) && !R_InteractionIndexBlockDue( &rebuilt ) );
+        }
+        // Not while a frame snapshot would copy the block, nor while the
+        // executor would not use it: no record is started either.
+        surfaceInteraction_t unasked;
+        renderThreadOverlap = true;
+        assert( !R_InteractionIndexBlockDue( &unasked ) && !R_InteractionIndexBlockDue( &lasting ) && unasked.firstLinkMsec == 0 );
+        renderThreadOverlap = false;
+        r_vkStaticInteractionIndexes.value = false;
+        assert( !R_InteractionIndexBlockDue( &unasked ) && !R_InteractionIndexBlockDue( &lasting ) && unasked.firstLinkMsec == 0 );
+        r_vkStaticInteractionIndexes.value = true;
+        assert( R_InteractionIndexBlockDue( &lasting ) );
+        // a clock that reads zero still leaves a record
+        tr.frameCount++; clockMsec = 0;
+        assert( !R_InteractionIndexBlockDue( &unasked ) && unasked.firstLinkMsec == 1 );
+        clockMsec = clockBefore;
+    }
+
     // Shutdown releases the buffer and its ranges; the next device starts empty.
     VK_StaticGeo_Shutdown();
+    assert( !VK_StaticGeo_InteractionIndexesWanted() );
     assert( buffersDestroyed == 1 && blocksDestroyed == 1 && vkStaticGeo.buffer == 0 && !vkStaticGeo.tableReady );
     assert( VK_StaticGeo_VertexOffset( &tris[ 0 ], streamBytes ) == -1 );
     Frame();
@@ -533,11 +696,14 @@ int main() {
     assert( VK_StaticGeo_VertexOffset( &tris[ 0 ], streamBytes ) == -1 );
     Frame( VK_STATIC_GEO_PROMOTE_MSEC );
     assert( VK_StaticGeo_VertexOffset( &tris[ 0 ], streamBytes ) == -1 && vkStaticGeo.failed && common->warnings == warningsBefore + 1 );
+    // and the front end is asked for no blocks it could not use
+    assert( vkStaticGeo.tableReady && !VK_StaticGeo_InteractionIndexesWanted() );
     Frame( VK_STATIC_GEO_PROMOTE_MSEC );
     assert( VK_StaticGeo_VertexOffset( &tris[ 0 ], streamBytes ) == -1 && common->warnings == warningsBefore + 1 && buffersCreated == 1 );
 
     std::puts( "Vulkan static geometry: promotion delay, recycled headers, retirement, exclusions, verify mode, eviction, "
-               "shadow volume streams and owned index lists, surfaces' own index lists, and device refusal passed" );
+               "shadow volume streams and owned index lists, surfaces' own index lists, interactions' index lists and the "
+               "front end's rule for them, and device refusal passed" );
     return 0;
 }
 '''
@@ -552,9 +718,42 @@ def main():
                    'static ID_INLINE VkBuffer VK_Exec_VertexStream(', 'static void VK_StaticGeo_Forget(',
                    'static int VK_StaticGeo_StreamOffset(', 'static int VK_StaticGeo_VolumeVertexOffset(',
                    'static int VK_StaticGeo_VolumeIndexOffset(', 'static ID_INLINE VkBuffer VK_Exec_IndexStream(',
-                   'static int VK_StaticGeo_SurfaceIndexOffset('):
+                   'static int VK_StaticGeo_SurfaceIndexOffset(', 'static int VK_StaticGeo_InteractionIndexOffset(',
+                   'bool VK_StaticGeo_InteractionIndexesWanted( void ) {'):
         if needed not in production:
             raise AssertionError(f'missing {needed!r} in the resident static geometry section')
+
+    # The front end's half: the rule that gives a lasting interaction's lists
+    # their blocks is compiled as it stands, and its two uses are pinned.
+    interaction = (ROOT / 'src/renderer/Interaction.cpp').read_text(encoding='utf-8').replace('\r\n', '\n')
+    rule_start = interaction.index('#ifdef OPENQ4_RENDERER_VK_MODULE\nstatic const int INTERACTION_INDEX_BLOCK_MSEC = ')
+    rule_end = interaction.index('#else\nstatic ID_INLINE bool R_InteractionIndexBlockDue( surfaceInteraction_t * ) {\n\treturn false;\n}\n#endif', rule_start)
+    front_end_rule = interaction[rule_start + len('#ifdef OPENQ4_RENDERER_VK_MODULE\n'):rule_end]
+    if 'static bool R_InteractionIndexBlockDue( surfaceInteraction_t *sint ) {' not in front_end_rule:
+        raise AssertionError('the front end decides which interactions are due index blocks')
+    shadow_site = ('\tif ( !shadowTris->indexCache && shadowTris->numIndexes > 0 && shadowTris->indexes != NULL\n'
+                   '\t\t\t&& ( R_StaticIndexCacheAllowed( entityDef )\n'
+                   '\t\t\t\t|| ( !shadowTris->shadowVertexes && R_InteractionIndexBlockDue( sint ) ) ) ) {\n'
+                   '\t\tvertexCache.Alloc(\n\t\t\tshadowTris->indexes,\n'
+                   '\t\t\tshadowTris->numIndexes * sizeof( shadowTris->indexes[0] ),\n\t\t\t&shadowTris->indexCache,\n\t\t\ttrue );')
+    light_site = ('&& ( R_StaticIndexCacheAllowed( entityDef )\n'
+                  '\t\t\t\t\t\t\t\t\t\t// a light that reaches the whole surface draws the surface\'s\n'
+                  '\t\t\t\t\t\t\t\t\t\t// own list, which rides on the surface\'s vertex block\n'
+                  '\t\t\t\t\t\t\t\t\t\t|| ( lightTris->indexes != ambientTris->indexes && R_InteractionIndexBlockDue( sint ) ) ) ) {\n'
+                  '\t\t\t\t\t\t\t\tvertexCache.Alloc(\n\t\t\t\t\t\t\t\t\tlightTris->indexes,\n'
+                  '\t\t\t\t\t\t\t\t\tlightTris->numIndexes * sizeof( lightTris->indexes[0] ),\n'
+                  '\t\t\t\t\t\t\t\t\t&lightTris->indexCache,\n\t\t\t\t\t\t\t\t\ttrue );')
+    if shadow_site not in interaction or light_site not in interaction or interaction.count('R_InteractionIndexBlockDue( sint )') != 2:
+        raise AssertionError('a lasting interaction\'s own lists get blocks owned by the surfaces that hold them: a volume without '
+                             'projected vertices, and light triangles that are not the surface\'s own list')
+    # A packed surface's light triangles are a frame's copy and take a frame's block.
+    if not ( interaction.index('lightTris = frameTris;') < interaction.index(light_site) ):
+        raise AssertionError('the frame copy of a packed surface\'s light triangles is handled before the lasting case')
+    # The record starts empty with the surfaces and dies with them.
+    header = (ROOT / 'src/renderer/Interaction.h').read_text(encoding='utf-8')
+    if 'int\t\t\t\t\t\tfirstLinkMsec;' not in header \
+            or 'surfaces = (surfaceInteraction_t *)R_ClearedStaticAlloc( sizeof( *surfaces ) * numSurfaces );' not in interaction:
+        raise AssertionError('a surface interaction\'s first-link record starts at zero with its surfaces')
 
     # Stencil shadow volumes: the per-frame memo answers first, the ring takes
     # only what has no resident copy, and both streams are bound through the
@@ -568,6 +767,15 @@ def main():
     if not ( shadow.index('memo.idxKey == idxKey') < shadow.index('indexOffset = VK_StaticGeo_VolumeIndexOffset( tri, indexBytes );')
              < shadow.index('if ( indexOffset < 0 ) {') < shadow.index('VK_Ring_Alloc( vkExec.indexRings[ slot ], tri->indexes,') ):
         raise AssertionError('a volume\'s index list goes to the ring only when the memo and the resident cache have none')
+    volume_chain = ('indexOffset = VK_StaticGeo_VolumeIndexOffset( tri, indexBytes );\n'
+                    '\t\t\tif ( indexOffset < 0 ) {\n'
+                    '\t\t\t\t// a volume cast from an entity\'s surface: the interaction\'s list\n'
+                    '\t\t\t\tindexOffset = VK_StaticGeo_InteractionIndexOffset( tri, indexBytes );\n'
+                    '\t\t\t}\n'
+                    '\t\t\tif ( indexOffset < 0 ) {\n'
+                    '\t\t\t\tindexOffset = VK_Ring_Alloc( vkExec.indexRings[ slot ], tri->indexes,')
+    if volume_chain not in shadow or shadow.count('VK_StaticGeo_InteractionIndexOffset(') != 1:
+        raise AssertionError('a volume that does not own its vertices offers its list as the interaction\'s before the ring takes it')
     if 'VK_Exec_VertexStream( slot, vertexOffset, vertexBindOffset )' not in shadow \
             or 'VK_Exec_IndexStream( slot, indexOffset, indexBindOffset )' not in shadow \
             or 'vkExec.indexRings[ slot ].buffer, (VkDeviceSize)indexOffset' in shadow \
@@ -599,6 +807,14 @@ def main():
     if surface_upload.index('flattened.Ptr(), indexBytes, 4 );') > surface_upload.index(lookup) \
             or surface_upload.index(lookup) > surface_upload.index('cachedIndexes, indexBytes, 4 );'):
         raise AssertionError('flattened packed lists and cached lists are never offered to the resident cache')
+    # A list the surface does not own is offered as an interaction's, after the
+    # surface's own lookup and never for a 2D surface.
+    interaction_lookup = ('if ( indexOffset < 0 && !freshGui ) {\n'
+                          '\t\t\t\t\tindexOffset = VK_StaticGeo_InteractionIndexOffset( tri, indexBytes );\n\t\t\t\t}')
+    if surface_upload.count('VK_StaticGeo_InteractionIndexOffset(') != 1 or interaction_lookup not in surface_upload \
+            or not ( surface_upload.index(lookup) < surface_upload.index(interaction_lookup)
+                     < surface_upload.index('residentIndexes = true;') ):
+        raise AssertionError('an interaction\'s index list is offered to the resident cache after the surface\'s own, before the ring')
     if 'if ( !residentIndexes && r_vkResourceProfile.GetBool() ) {' not in surface_upload:
         raise AssertionError('the ring profile counts only what the ring took')
     # Every bind of an offset the upload reported decodes it. The two that
@@ -627,6 +843,8 @@ def main():
     if 'if ( tri->shadowCache && ( tri->shadowVertexes != NULL || tri->verts != NULL ) ) {' not in free_hook \
             or 'R_GeoFreeTriSurfVertCache( tri->shadowCache );' not in free_hook:
         raise AssertionError('a surface frees the shadow cache it owns when it is freed')
+    if 'R_GeoFreeTriSurfVertCache( tri->indexCache );' not in free_hook:
+        raise AssertionError('a surface frees the index block it owns when it is freed')
     geometry = (ROOT / 'src/rendergeo/RenderGeometryTriSurf.cpp').read_text(encoding='utf-8').replace('\r\n', '\n')
     really_free = geometry[geometry.index('void R_ReallyFreeStaticTriSurf( srfTriangles_t *tri ) {'):]
     if not ( really_free.index('R_FreeStaticTriSurfVertexCaches( tri );') < really_free.index('triIndexAllocator.Free( tri->indexes );') ):
@@ -674,7 +892,7 @@ def main():
     (ROOT / '.tmp').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='vulkan-static-geometry-', dir=ROOT / '.tmp') as folder:
         cpp, binary = Path(folder) / 'static_geometry.cpp', Path(folder) / 'static_geometry.exe'
-        cpp.write_text(SUPPORT + production.replace('\r\n', '\n') + CASES, encoding='utf-8')
+        cpp.write_text(SUPPORT + production.replace('\r\n', '\n') + FRONT_END + front_end_rule + CASES, encoding='utf-8')
         subprocess.run([compiler, '-std=c++17', '-Wall', '-Wno-unused-function', str(cpp), '-o', str(binary)], check=True)
         subprocess.run([str(binary)], check=True)
 

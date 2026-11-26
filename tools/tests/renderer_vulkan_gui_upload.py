@@ -51,6 +51,9 @@ int VK_StaticGeo_VertexOffset(const srfTriangles_t*,size_t){++staticGeoQueries;r
 // A surface's own index list is offered to it only beside a resident vertex stream.
 int surfaceIndexQueries=0,surfaceIndexAnswer=-1;
 int VK_StaticGeo_SurfaceIndexOffset(const srfTriangles_t*,size_t){++surfaceIndexQueries;return surfaceIndexAnswer;}
+// A list that is not the surface's own may be a lasting interaction's, with a block of its own.
+int interactionIndexQueries=0,interactionIndexAnswer=-1;
+int VK_StaticGeo_InteractionIndexOffset(const srfTriangles_t*,size_t){++interactionIndexQueries;return interactionIndexAnswer;}
 int VK_Ring_Alloc(Ring& ring,const void* data,size_t bytes,int align){
     const int offset=(ring.used+align-1)&~(align-1);
     if(bytes>size_t(ring.capacity)||size_t(offset)+bytes>size_t(ring.capacity))return -1;
@@ -145,6 +148,29 @@ int main(){
         && surfaceIndexQueries==2);
     view.viewEntitys=&view;
     staticGeoVertexAnswer=-1;surfaceIndexAnswer=-1;
+    // An interaction's list. It is asked for when the surface's own lookup has
+    // no answer, whether or not the vertex stream is resident, once a frame
+    // after the memo; a resident one costs the ring nothing and is not counted
+    // as copied. A surface whose own list was found is not asked again, and a
+    // 2D surface never is.
+    {
+        const int asked=interactionIndexQueries;
+        assert(asked>0);
+        vkExec=State{};vkResourceProfile={};interactionIndexAnswer=VK_STATIC_GEO_FLAG|12288;
+        assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && (v0&VK_STATIC_GEO_FLAG)==0 && i0==(VK_STATIC_GEO_FLAG|12288));
+        assert(interactionIndexQueries==asked+1 && vkExec.indexRings[0].uploads==0 && vkExec.vertexRings[0].uploads==1);
+        assert(vkResourceProfile.indexBytes==0 && vkResourceProfile.vertexStreamBytes==sizeof(vertices));
+        assert(VK_Exec_UploadTriGeometry(0,&tri,v1,i1) && i1==i0 && interactionIndexQueries==asked+1);
+        staticGeoVertexAnswer=VK_STATIC_GEO_FLAG|4096;vkExec=State{};vkResourceProfile={};
+        assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && i0==(VK_STATIC_GEO_FLAG|12288) && interactionIndexQueries==asked+2);
+        assert(vkResourceProfile.indexBytes==0 && vkResourceProfile.residentSurfaceIndexBytes==0);
+        surfaceIndexAnswer=VK_STATIC_GEO_FLAG|8192;vkExec=State{};
+        assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && i0==(VK_STATIC_GEO_FLAG|8192) && interactionIndexQueries==asked+2);
+        surfaceIndexAnswer=-1;staticGeoVertexAnswer=-1;
+        vkExec=State{};view.viewEntitys=nullptr;
+        assert(VK_Exec_UploadTriGeometry(0,&tri,v0,i0) && (i0&VK_STATIC_GEO_FLAG)==0 && interactionIndexQueries==asked+2);
+        view.viewEntitys=&view;interactionIndexAnswer=-1;
+    }
     // The profile says how much of the streamed vertices belonged to a model
     // generated anew each frame: a skinned mesh, or the subset a light draws
     // over one. A resident stream is not counted at all.

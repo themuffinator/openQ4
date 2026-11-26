@@ -88,6 +88,12 @@ typedef struct {
 	bool					pointEmitterCasterVerdictValid;
 	bool					pointEmitterCasterSkip;
 
+	// When this surface interaction was first linked into a view, in real
+	// milliseconds; 0 before that. One that has lasted is given index cache
+	// blocks for its own lists (R_InteractionIndexBlockDue, Vulkan). Freeing
+	// the interaction's surfaces frees this record with them.
+	int						firstLinkMsec;
+
 	int						expCulled;			// only for the experimental shadow buffer renderer
 
 	srfCullInfo_t			cullInfo;

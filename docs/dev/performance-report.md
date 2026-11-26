@@ -3313,3 +3313,130 @@ tests. GCC's and Clang's syntax checks and both tests pass on Linux.
 wave has only the counter's two numbers. The 17% and the 245 kB are read from
 one launch each, and the second is a difference between two presets, not a
 count of caster-only meshes.
+
+## 27. An interaction's index lists on Vulkan (FPS-08), 26 November 2026
+
+Section 25.3's lead, taken up with section 24's method and machine. Two kinds
+of index list belong to a light interaction, not to a surface: the part of a
+surface a light reaches (its light triangles), and a stencil volume cast from
+an entity's surface, which borrows that surface's vertex block. Vulkan copied
+both into the frame's index ring every frame, about 105 kB a frame of light
+triangles over resident surfaces in the hub2 view sweep at either preset.
+
+### 27.1 What changed
+
+Such a list has no identity the executor can trust. It lives on the heap, and
+when its interaction is rebuilt the same address can come back with the same
+length and other triangles. Sections 24 and 25 got an identity from the
+vertex block a list shares its life with; these lists share none.
+
+The front end has always had a place for one: a surface's `indexCache`, a
+vertex cache block for its index list, filled only where `r_useIndexBuffers`
+says a buffer object draws faster, which is off by default and means nothing
+to Vulkan, whose vertex cache is plain memory. So in the Vulkan module a
+surface interaction that has lasted is given such blocks for its own lists
+(`R_InteractionIndexBlockDue`), and the executor keeps a resident copy under
+the block exactly as it does for a vertex stream
+(`VK_StaticGeo_InteractionIndexOffset`): the block's serial is the list's
+identity, and the block is freed with the surface that holds the list.
+
+- *Lasting.* A surface interaction is stamped when it is first linked into a
+  view and is due its blocks 150 ms later. One that is rebuilt every tic (a
+  moving light, an animated model) has its surfaces freed, the stamp with
+  them, before that, so nothing is allocated and freed again for it each
+  frame. The time is read once a frame, so every view of a frame answers
+  alike. With the executor's own 150 ms a list is resident about 0.3 s after
+  its interaction is first drawn.
+- *Only lists nothing else covers.* A volume with projected vertices owns its
+  vertex block and its list rides on that (24.2). A light that reaches the
+  whole surface draws the surface's own list (25.1). A packed surface's light
+  triangles are a frame's copy with a frame's block. None of the three is
+  given a block.
+- *Only while it would be used.* No blocks while a frame snapshot for the
+  render thread would copy them (its copies are not served), with
+  `r_vkStaticGeometry 0`, or when the device refused the resident buffer.
+- *Only the surface that owns the block*, and only for the whole block: a
+  frame's copy of the surface is refused, as in 25.1. The lookup comes after
+  the per-frame memo, after the surface's own (25.1) in the upload and after
+  the volume's own (24.2) in the shadow bind.
+- The block holds a copy of the list. `r_vkStaticGeometry 2` therefore
+  compares the resident copy with the block and the block with the list
+  drawn from, at every draw.
+
+`r_vkStaticInteractionIndexes 0` copies these lists as before and gives no
+further list a block; blocks already given stay until their interactions go.
+`rendererVulkanMemoryInfo` prints the bytes drawn from resident copies.
+
+### 27.2 Result
+
+| hub2 view sweep, one revolution, kB a frame | Copied | Resident |
+| --- | ---: | ---: |
+| Balanced: into the frame rings, everything | 656 | 535 |
+| Balanced: surfaces' index lists into the ring | 154 | 56 |
+| Balanced: volumes' index lists into the ring | 163 | 138 |
+| Quality: into the frame rings, everything | 687 | 589 |
+| Quality: index lists into the ring | 194 | 96 |
+| Interactions' lists drawn from resident copies, Balanced | 0 | 124 |
+| ... at Quality | 0 | 100 |
+
+Of the volumes' lists only 25 kB a frame become resident while the world
+plays: the rest belong to models that animate. With the world frozen all of them do,
+and the rings take 186 kB a frame at Balanced where they took 556, and 180
+at Quality where they took 282.
+
+Elsewhere, interactions' lists drawn from resident copies, kB a frame: 171
+to 181 in the combat wave at Quality, and at the player start of four other
+maps 82 (`game/airdefense2`), 0 (`game/storage2`), 54 (`game/medlabs`) and
+400 (`game/mcc_1`).
+
+**Memory.** After one revolution of the sweep at Balanced 521 blocks hold
+0.26 MB of lists a second time in main memory, and the resident buffer holds
+3.10 MB where it held 2.83, of 96.
+
+**Time.** Not measured. Other sessions' builds held the machine at full load
+for most of this work, and sections 24 and 25 showed that an effect of this
+size does not come out of that. Section 24's price for a megabyte puts the
+0.10 to 0.12 MB of the sweep at 0.04 to 0.11 ms a frame. Against it stand one
+touch of each block's place in the vertex cache's list a frame and a lookup
+in the resident table where a copy was made; neither was priced.
+
+**Exactness.** With `r_vkStaticGeometry 2`: 285,610 draws of resident
+streams, none different, in hub2 at Balanced and Quality, the combat wave,
+the player start of four other maps and a second map loaded in the same
+launch. Pictures of a frozen world are identical in every pixel with the
+lists resident, copied and resident again, at Quality and at Balanced.
+`renderer_vulkan_static_geometry` runs the real lookup and the front end's
+real rule: the delay on both sides, the owner, a frame's copy, part of a
+block, a block that is not an index block, a recycled header, a volume cast
+from a surface, the switches, both comparisons, the clock read once a frame,
+an interaction rebuilt every tic, the render thread and a refused buffer;
+`renderer_vulkan_gui_upload` runs the real upload for the order of the three
+answers. All 62 deliberate breakages of sections 24 to 27 fail one of the
+two. GCC's and Clang's syntax checks of the front end in the OpenGL, OpenGL
+ES and Vulkan modules pass on Linux, with both tests, and a hidden OpenGL
+session in hub2 ran as before.
+
+**Not covered.** The render thread modes were not run: the rule stands down
+there by reading, and by the test. The lists' blocks are never purged while
+their interactions live (the vertex cache purges nothing), so a level in
+which very many static interactions are each drawn once keeps them all; hub2
+is the only total that was read. Nothing was run on Linux beyond the tests
+and the syntax checks.
+
+### 27.3 What the rings still take
+
+hub2 view sweep, one revolution, kB a frame:
+
+| | Balanced | Quality |
+| --- | ---: | ---: |
+| Everything | 535 | 589 |
+| Volume vertices (models that animate) | 113 | 0 |
+| Volume index lists (models that animate) | 138 | 0 |
+| Vertex streams (models that animate, section 26) | 177 | 428 |
+| Index lists | 56 | 96 |
+
+What is left is geometry that is built anew every frame or every tic, with
+the lists that go with it: the meshes of section 26, their shadow volumes at
+Balanced, and the light triangles of interactions that are rebuilt. Nothing
+static of any size is copied in this view any more. The ways further down
+are section 26.2's, and skinning on the graphics card.

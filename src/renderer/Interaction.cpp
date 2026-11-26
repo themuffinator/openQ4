@@ -1392,6 +1392,52 @@ Packed MD5R prim-batch shadows manage their own geometry stream, so they don't
 go through the classic cache upload path here.
 ===================
 */
+/*
+====================
+R_InteractionIndexBlockDue
+
+Vulkan draws a stream that outlives its frame from a resident copy, and knows
+such a stream by the vertex cache block it lives in. The index lists that
+belong to an interaction (the part of a surface a light reaches, a stencil
+volume cast from an entity's surface) live in no block: r_useIndexBuffers
+gives them one only where a buffer object draws faster, which is not here.
+So a surface interaction that has lasted is given blocks for those lists, and
+one that is rebuilt every tic (a moving light, an animated model) never is:
+its surfaces are freed, this record with them, before the time has passed.
+
+The time is read once a frame, so every view of a frame answers alike.
+====================
+*/
+#ifdef OPENQ4_RENDERER_VK_MODULE
+static const int INTERACTION_INDEX_BLOCK_MSEC = 150;
+
+static bool R_InteractionIndexBlockDue( surfaceInteraction_t *sint ) {
+	extern bool VK_StaticGeo_InteractionIndexesWanted( void );
+	// a frame snapshot copies what a block holds, and its copy is not served
+	if ( R_RenderThread_OverlapRequested() || !VK_StaticGeo_InteractionIndexesWanted() ) {
+		return false;
+	}
+	static int clockFrame = -1;
+	static int clockMsec = 1;
+	if ( clockFrame != tr.frameCount ) {
+		clockFrame = tr.frameCount;
+		clockMsec = Sys_Milliseconds();
+		if ( clockMsec == 0 ) {
+			clockMsec = 1;
+		}
+	}
+	if ( sint->firstLinkMsec == 0 ) {
+		sint->firstLinkMsec = clockMsec;
+		return false;
+	}
+	return clockMsec - sint->firstLinkMsec >= INTERACTION_INDEX_BLOCK_MSEC;
+}
+#else
+static ID_INLINE bool R_InteractionIndexBlockDue( surfaceInteraction_t * ) {
+	return false;
+}
+#endif
+
 static bool R_EnsureInteractionShadowCache( surfaceInteraction_t *sint, const idRenderEntityLocal *entityDef ) {
 	srfTriangles_t *shadowTris = sint->shadowTris;
 
@@ -1427,7 +1473,12 @@ static bool R_EnsureInteractionShadowCache( surfaceInteraction_t *sint, const id
 
 	R_TouchVertexCache( shadowTris->shadowCache );
 
-	if ( !shadowTris->indexCache && shadowTris->numIndexes > 0 && R_StaticIndexCacheAllowed( entityDef ) ) {
+	// A volume with projected vertices owns its vertex block, and its list
+	// already rides on that; one cast from an entity's surface borrows the
+	// surface's block and needs a block for its list.
+	if ( !shadowTris->indexCache && shadowTris->numIndexes > 0 && shadowTris->indexes != NULL
+			&& ( R_StaticIndexCacheAllowed( entityDef )
+				|| ( !shadowTris->shadowVertexes && R_InteractionIndexBlockDue( sint ) ) ) ) {
 		vertexCache.Alloc(
 			shadowTris->indexes,
 			shadowTris->numIndexes * sizeof( shadowTris->indexes[0] ),
@@ -2491,7 +2542,11 @@ void idInteraction::AddActiveInteraction( void ) {
 								} else {
 									lightTris->indexCache = NULL;
 								}
-							} else if ( !lightTris->indexCache && lightTris->indexes != NULL && lightTris->numIndexes > 0 && R_StaticIndexCacheAllowed( entityDef ) ) {
+							} else if ( !lightTris->indexCache && lightTris->indexes != NULL && lightTris->numIndexes > 0
+									&& ( R_StaticIndexCacheAllowed( entityDef )
+										// a light that reaches the whole surface draws the surface's
+										// own list, which rides on the surface's vertex block
+										|| ( lightTris->indexes != ambientTris->indexes && R_InteractionIndexBlockDue( sint ) ) ) ) {
 								vertexCache.Alloc(
 									lightTris->indexes,
 									lightTris->numIndexes * sizeof( lightTris->indexes[0] ),

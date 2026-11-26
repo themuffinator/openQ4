@@ -12,6 +12,24 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Vulkan keeps lights' triangle lists on the graphics card as well, 26 November 2026
+
+- **Vulkan no longer re-sends the triangle lists that belong to a light.**
+  For every surface a light touches, the engine keeps a list of just the
+  triangles that light reaches, and for static shadows cast by map objects a
+  list of the shadow's triangles. Both were copied into the frame's upload
+  buffer every frame. Once such a pairing of light and surface has lasted a
+  moment, its lists now stay on the graphics card. In the hub level the
+  upload each frame falls from 0.69 MB to 0.59 MB at Quality and from 0.66 MB
+  to 0.54 MB at Balanced, on top of the two Vulkan changes further down; what remains is
+  geometry that really moves. The time this saves is small (an estimated
+  0.04 to 0.11 ms a frame there) and was not measured on the busy test
+  machine. Pictures are identical. `r_vkStaticInteractionIndexes 0` restores
+  the copying.
+- Evidence and what the upload buffers still carry:
+  [performance report section 27](performance-report.md#27-an-interactions-index-lists-on-vulkan-fps-08-26-november-2026).
+  No ABI change.
+
 ## Saves from 0.15.0 load on every campaign level, the hover-tank levels included, 26 November 2026
 
 - **Your 0.15.0 saves keep working.** Development builds since 23 November

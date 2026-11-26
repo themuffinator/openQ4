@@ -1170,6 +1170,10 @@ static idCVar r_vkStaticShadowVolumes( "r_vkStaticShadowVolumes", "1", CVAR_REND
 static idCVar r_vkStaticSurfaceIndexes( "r_vkStaticSurfaceIndexes", "1", CVAR_RENDERER | CVAR_BOOL,
 	"with r_vkStaticGeometry: keep the index list of a surface whose vertex stream is resident there as well; "
 	"0 copies every surface's index list into the frame ring every frame, as before" );
+static idCVar r_vkStaticInteractionIndexes( "r_vkStaticInteractionIndexes", "1", CVAR_RENDERER | CVAR_BOOL,
+	"with r_vkStaticGeometry: keep the index lists that belong to a lasting light interaction resident as well (the "
+	"part of a surface a light reaches, a stencil volume cast from an entity's surface); 0 copies them into the "
+	"frame ring every frame, as before, and gives no further list a block of its own" );
 static idCVar r_vkStaticGeometryMegs( "r_vkStaticGeometryMegs", "96", CVAR_RENDERER | CVAR_INTEGER,
 	"size in MiB of the buffer resident vertex streams live in; applies when the buffer is next created "
 	"(vid_restart)", 8, 512 );
@@ -1226,6 +1230,7 @@ static struct vkStaticGeo_s {
 	uint64					hits, hitBytes, promotions, promotedBytes, recycled, evictions, declined, mismatches;
 	uint64					volumeVertexHitBytes, volumeIndexHitBytes;	// of hitBytes: stencil shadow volumes
 	uint64					surfaceIndexHitBytes;						// of hitBytes: surfaces' own index lists
+	uint64					interactionIndexHitBytes;					// of hitBytes: interactions' index lists
 	int						hash[ VK_STATIC_GEO_HASH_SIZE ];
 	vkStaticGeoEntry_t		entries[ VK_STATIC_GEO_MAX_ENTRIES ];
 	vkStaticGeoRetired_t	retired[ VK_STATIC_GEO_MAX_ENTRIES ];
@@ -1676,6 +1681,56 @@ static int VK_StaticGeo_SurfaceIndexOffset( const srfTriangles_t *tri, const siz
 	return offset;
 }
 
+/*
+====================
+VK_StaticGeo_InteractionIndexOffset
+
+The resident form of an index list that belongs to a light interaction, or -1
+when the caller must copy it into the frame ring: the part of a surface a
+light reaches, or a stencil volume cast from an entity's surface. Such a list
+is one of many over its vertex block and no vertex block shares its life, so
+the front end gives a lasting one an index cache block of its own
+(R_InteractionIndexBlockDue). The block's serial is then the list's identity,
+and the block is freed with the surface that holds the list.
+
+Only the surface that owns the block is served: a copy of it made for a frame
+is not. The block holds a copy of the list, so the comparison mode checks the
+list drawn from against the block as well as the block against its resident
+copy.
+====================
+*/
+static int VK_StaticGeo_InteractionIndexOffset( const srfTriangles_t *tri, const size_t indexBytes ) {
+	const int mode = r_vkStaticGeometry.GetInteger();
+	const vertCache_t *cache = tri->indexCache;
+	if ( mode == 0 || !r_vkStaticInteractionIndexes.GetBool() || tri->indexes == NULL || cache == NULL
+			|| cache->user != &tri->indexCache || !cache->indexBuffer || cache->virtMem == NULL
+			|| static_cast<size_t>( cache->size ) != indexBytes ) {
+		return -1;
+	}
+	const int offset = VK_StaticGeo_StreamOffset( cache, NULL, 0, indexBytes, mode );
+	if ( offset < 0 ) {
+		return -1;
+	}
+	if ( mode == 2 && memcmp( tri->indexes, static_cast<const byte *>( cache->virtMem ) + cache->offset, indexBytes ) != 0 ) {
+		const uint64 count = ++vkStaticGeo.mismatches;
+		if ( ( count & ( count - 1 ) ) == 0 ) {
+			common->Warning( "Vulkan: an interaction's index list of %d bytes differs from its block (%llu so far); it is streamed again",
+				static_cast<int>( indexBytes ), static_cast<unsigned long long>( count ) );
+		}
+		VK_StaticGeo_Forget( cache );
+		return -1;
+	}
+	vkStaticGeo.interactionIndexHitBytes += indexBytes;
+	return offset;
+}
+
+// Whether the front end should give lasting interactions' lists their blocks:
+// only while the lookup above would use them.
+bool VK_StaticGeo_InteractionIndexesWanted( void ) {
+	return r_vkStaticGeometry.GetInteger() != 0 && r_vkStaticInteractionIndexes.GetBool()
+		&& vkStaticGeo.tableReady && !vkStaticGeo.failed;
+}
+
 // The buffer and offset to bind for a vertex stream VK_Exec_UploadTriGeometry
 // reported: the resident buffer or this frame's ring.
 static ID_INLINE VkBuffer VK_Exec_VertexStream( const int slot, const int vertexOffset, VkDeviceSize &bindOffset ) {
@@ -1711,11 +1766,14 @@ static void VK_StaticGeo_PrintInfo( const bool reset ) {
 		static_cast<unsigned long long>( vkStaticGeo.volumeIndexHitBytes ) );
 	common->Printf( "Vulkan static surface indexes: enabled=%d hitBytes=%llu\n",
 		r_vkStaticSurfaceIndexes.GetBool() ? 1 : 0, static_cast<unsigned long long>( vkStaticGeo.surfaceIndexHitBytes ) );
+	common->Printf( "Vulkan static interaction indexes: enabled=%d hitBytes=%llu\n",
+		r_vkStaticInteractionIndexes.GetBool() ? 1 : 0, static_cast<unsigned long long>( vkStaticGeo.interactionIndexHitBytes ) );
 	if ( reset ) {
 		vkStaticGeo.hits = vkStaticGeo.hitBytes = vkStaticGeo.promotions = vkStaticGeo.promotedBytes = 0;
 		vkStaticGeo.recycled = vkStaticGeo.evictions = vkStaticGeo.declined = vkStaticGeo.mismatches = 0;
 		vkStaticGeo.volumeVertexHitBytes = vkStaticGeo.volumeIndexHitBytes = 0;
 		vkStaticGeo.surfaceIndexHitBytes = 0;
+		vkStaticGeo.interactionIndexHitBytes = 0;
 	}
 }
 
@@ -9939,9 +9997,14 @@ static bool VK_Exec_UploadTriGeometry( int slot, const srfTriangles_t *tri,
 #endif
 			if ( indexSource != NULL ) {
 				// The list a surface draws itself with is resident beside its
-				// resident vertex stream; every other list is copied into the ring.
+				// resident vertex stream, and a lasting interaction's list under
+				// the block the front end gave it; every other list is copied
+				// into the ring.
 				if ( !freshGui && ( vertexOffset & VK_STATIC_GEO_FLAG ) != 0 ) {
 					indexOffset = VK_StaticGeo_SurfaceIndexOffset( tri, indexBytes );
+				}
+				if ( indexOffset < 0 && !freshGui ) {
+					indexOffset = VK_StaticGeo_InteractionIndexOffset( tri, indexBytes );
 				}
 				if ( indexOffset >= 0 ) {
 					residentIndexes = true;
@@ -10085,6 +10148,10 @@ bool VK_Exec_BindShadowGeometry( VkCommandBuffer cmd, int slot, const srfTriangl
 			indexOffset = memo.indexOffset;
 		} else {
 			indexOffset = VK_StaticGeo_VolumeIndexOffset( tri, indexBytes );
+			if ( indexOffset < 0 ) {
+				// a volume cast from an entity's surface: the interaction's list
+				indexOffset = VK_StaticGeo_InteractionIndexOffset( tri, indexBytes );
+			}
 			if ( indexOffset < 0 ) {
 				indexOffset = VK_Ring_Alloc( vkExec.indexRings[ slot ], tri->indexes,
 					indexBytes, 4 );
