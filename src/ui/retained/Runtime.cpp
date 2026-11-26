@@ -3819,6 +3819,24 @@ static bool SnapshotSourceMatches(const Json::Value& saved, const std::string& s
 		if (text[a++] != source[b++]) return false;
 	}
 }
+bool Runtime::SnapshotNamesOtherRevision(const std::string& snapshot) const {
+	if (!impl->canonical || !impl->document || snapshot.empty() || snapshot.size() > MaxSnapshotBytes) return false;
+	try {
+		if (!SnapshotLexicalForms(snapshot)) return false;
+		Json::CharReaderBuilder builder;
+		builder["collectComments"] = false; builder["allowComments"] = false; builder["allowTrailingCommas"] = false;
+		builder["strictRoot"] = true; builder["failIfExtra"] = true; builder["rejectDupKeys"] = true;
+		builder["allowSpecialFloats"] = false; builder["stackLimit"] = 32; builder["skipBom"] = false;
+		std::unique_ptr<Json::CharReader> reader(builder.newCharReader()); Json::Value root;
+		if (!reader->parse(snapshot.data(),snapshot.data()+snapshot.size(),&root,nullptr) || !root.isObject()) return false;
+		if (root["format"] != "retained-ui-instance" && root["format"] != "openq4-ui-instance") return false;
+		const auto& identity = root["document"];
+		return identity.isObject() && SnapshotFields(identity,{"version","id","path","source"}) &&
+			identity["version"].isUInt() && identity["version"].asUInt() == 1 &&
+			identity["id"] == impl->canonical->Model().id && identity["path"] == impl->sourcePath &&
+			identity["source"].isString() && !SnapshotSourceMatches(identity["source"],impl->canonical->Source());
+	} catch (const std::exception&) { return false; }
+}
 bool Runtime::RestoreSnapshot(const std::string& snapshot, std::string& error, double seconds) {
     if(!Mutate())return false;
 

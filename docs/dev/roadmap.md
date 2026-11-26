@@ -4396,7 +4396,7 @@ historical saves and recovering safely from damage.
 | Q4-04 — Partial | Thirteen-map integration; targeted freeze, speeder, boss, corpse-pin, isolation and occupied turret/walker save checks; bounded M01/M02 repairs recorded. | All thirteen ordered playthroughs; complete boss kills, walker repair/unlock/demolition, squad/extraction routes, sustained turret effects and actual Awakening-to-Arena switch. |
 | Q4-05 — Partial | Recovery UI and object/handle/reference/animation/AF/event cleanup hardened; corruption/reload and historical-save regressions pass scoped tests. | Broader owning graphs and interruption boundaries across target platforms; maintain valid saves and explicit refusal without inventing header-only recovery. |
 | Q4-06 — Partial; optional P3 | Raw inventory and field codecs restored; v5 portable stamp/encoding implemented; Windows/Linux bidirectional stock/Awakening cross-loads pass. | Confirm outstanding CI/Apple codec runs; macOS and another ARM64 runtime cross-load/resave directions; publish player migration guidance with accepted scope. |
-| Q4-07 — Partial | Original-writer Windows corpus substantially qualified; v2 stamp reporting repaired; exact HiDef fixture investigated. | Resolve #123 against the reporter's actual GUI/content; other ABIs; recover/reproduce absent stage-two artifacts before claiming independently reviewable acceptance. |
+| Q4-07 — Partial | Original-writer Windows corpus substantially qualified; v2 stamp reporting repaired; exact HiDef fixture investigated; every campaign map's 0.15.0 saves load (26 November). | Resolve #123 against the reporter's actual GUI/content; other ABIs; recover/reproduce absent stage-two artifacts before claiming independently reviewable acceptance. |
 | Q4-08 — Partial | Durable commit/recovery implemented; 56 process-interruption points, locked-file failure and NTFS/ext4/WSL 9p checks recorded. | APFS result, removable/network filesystems and actual power-cut behavior; retain measured CRC/sync costs and last-valid-save preservation. |
 | Q4-09 — Partial | Render demo v11: one recording spans levels, save loads, death reloads and restarts as self-contained segments; gameplay-only frames; level loads, continuous timeline and level markers in playback; campaign-aware library and gate; whole retained HUD and in-world screens recorded. Render demo v12 predicts animated-entity joints exactly, a quarter smaller. Render demo v13 records every frame at the played frame rate instead of 30 Hz. Render demo v14 carries the stream in checked, packed blocks with keyframes: 40% of v13's size, files past 2 GiB, seeks in about a second, and playback of what is intact of a cut or damaged file. Windows checks pass with stock and Awakening content: GL recording, GL and Vulkan playback. | Vulkan recording, Linux and macOS, a session that is really hours long, a multiplayer recording in the block container, a listening pass, a smaller exact joint coding (joints are now most of a recording), the masked retained HUD groups that replay unmasked, and local sounds already playing at a segment start. |
 
@@ -5036,6 +5036,12 @@ Completion substeps must keep three forms of evidence distinct:
   which has no wire-ABI string. It had reported object-table bytes as an ABI.
   Bounded v2–v5 parser fixtures now run with its existing CI self-test; this is a
   reporting correction, not a change to historical save admission.
+  Progress, 26 November: the official 0.15.0 package's own saves of every
+  campaign map, 300 and 3,000 tics in, [restore, resave and replay](savegame-reliability.md#original-release-writer-0150-26-november-2026)
+  in the current build with identical object tables (84 of 84). Five had failed
+  since 23 November: the hover tank's retained gun sight had been edited, and a
+  retained GUI saved from an earlier revision of its document refused the load.
+  Such a GUI is now rebuilt from its saved state.
 - [ ] **Q4-08 — P2, investigation and qualification: save cost and durability.**
   Measure large-save CRC/sync time and fault behavior across target filesystems.
   Directory synchronization is implemented as recorded below; actual power-cut

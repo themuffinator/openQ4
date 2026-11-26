@@ -334,6 +334,10 @@ public:
 	static constexpr size_t MaxSnapshotBytes = 128u * 1024u * 1024u;
 	bool SaveSnapshot(std::string& snapshot, std::string& error, double monotonicSeconds) const;
 	bool RestoreSnapshot(const std::string& snapshot, std::string& error, double monotonicSeconds);
+	// True when a well-formed snapshot names this document's id and path but
+	// other source text: it was saved from an earlier revision of the document,
+	// so RestoreSnapshot refuses it although the instance itself is valid.
+	bool SnapshotNamesOtherRevision(const std::string& snapshot) const;
 	bool PlayTimeline(const std::string& id, double monotonicSeconds);
 	void PauseTimeline(const std::string& id, double monotonicSeconds);
 	void ResumeTimeline(const std::string& id, double monotonicSeconds);

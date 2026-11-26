@@ -2113,7 +2113,22 @@ bool idUserInterfaceRetained::ReadFromSaveGame(idFile* file) {
 	// Snapshot validation is atomic; outer dictionary/flags follow on success.
 	const auto textDocument = UI_NextTextLifetime();
 	if (!textDocument) { impl->Error("GUI text lifetime exhausted"); return false; }
-	if (!impl->RuntimeView()->RestoreSnapshot(snapshot,error,RetainedUI_PresentationTime())) { impl->Error(error); return false; }
+	if (!impl->RuntimeView()->RestoreSnapshot(snapshot,error,RetainedUI_PresentationTime())) {
+		// A save made before this document was last edited names the same
+		// document at other source text: a 0.15.0 save of a hover-tank level holds
+		// the tank's machine-gun scope from before its 23 November restructuring.
+		// That revision's presentation cannot be replayed here, so rebuild the
+		// GUI from its saved state dictionary, as reloading a changed document
+		// does, rather than refusing the whole save.
+		StateValues application;
+		std::string rebuildError;
+		if (!impl->RuntimeView()->SnapshotNamesOtherRevision(snapshot) ||
+			!ApplicationState(impl->document.Model(),state,application,rebuildError) ||
+			!impl->RuntimeView()->SetState(application,rebuildError,RetainedUI_PresentationTime())) {
+			impl->Error(error); return false;
+		}
+		common->Printf("retained GUI %s: saved with an earlier revision of its document; restored from its saved state\n", Name());
+	}
 	openq4::NativeInputBeforeUiChange(0,impl->textBackend);
 	impl->textDocument = textDocument;
 	impl->Quarantine(false,false,true); impl->state = state; impl->state.Set("name",Name());

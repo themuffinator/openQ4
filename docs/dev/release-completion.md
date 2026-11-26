@@ -12,6 +12,28 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Saves from 0.15.0 load on every campaign level, the hover-tank levels included, 26 November 2026
+
+- **Your 0.15.0 saves keep working.** Development builds since 23 November
+  refused a 0.15.0 save of a level with a hover tank (Convoy, Convoy 2, the
+  second half of Convoy 2, Core 2, and The Awakening's final level) and
+  returned you to the menu: the tank's machine-gun sight had been reorganised,
+  and the save's copy of that screen no longer matched it. A save holding the
+  machine gun's, nail gun's or railgun's scope screen would have failed the
+  same way. Such saves now load with the sight as it was saved; only an
+  animation it was running restarts. Saves of every campaign level, Quake 4
+  and The Awakening, made by the released 0.15.0 now load, play on and save
+  again.
+- For modders and developers: a retained (`.rui`) GUI saved from an earlier
+  revision of its document is rebuilt from its saved state instead of failing
+  the load, so editing such a document no longer breaks older saves. See the
+  [savegame compatibility policy](savegame-compatibility-policy.md#retained-gui-document-revisions).
+- Evidence: the official 0.15.0 package saved every campaign map (29 Quake 4,
+  13 Awakening) 300 tics in, and the current build restored each with the same
+  saved objects, played on and saved again; five of them (convoy1, convoy2,
+  convoy2b, core2, m09) needed the fix. See
+  [savegame reliability](savegame-reliability.md#original-release-writer-0150-26-november-2026).
+
 ## VR: adult-sized hands, a HUD out of your line of fire, and a quicker weapon wheel, 26 November 2026
 
 From a player's first report on a real headset (Steam Frame over SteamVR):

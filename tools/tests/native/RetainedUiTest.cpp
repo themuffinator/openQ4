@@ -2255,9 +2255,21 @@ int main(int argc, char** argv) {
 			Check(otherEndings != actionBindingSource && third.LoadDocument(otherEndings,"snapshot-bindings.rui",diagnostics),
 				"load the snapshot document with the other line endings");
 			Check(third.RestoreSnapshot(snapshot,error,30),"another checkout's line endings keep the snapshot's document identity");
+			Check(!third.SnapshotNamesOtherRevision(snapshot),"other line endings are the same revision of the document");
 		}
 		Check(second.LoadDocument(bindingSource+"\n","snapshot-bindings.rui",diagnostics),"load source revision with unchanged IDs");
 		Check(!second.RestoreSnapshot(snapshot,error,30),"exact source changes require an explicit snapshot migration");
+		// A save made before the document was edited (0.15.0's weapon scopes):
+		// the caller rebuilds from its state rather than refusing the save.
+		Check(second.SnapshotNamesOtherRevision(snapshot),"a snapshot of an earlier revision of this document is recognized as one");
+		Check(!second.SnapshotNamesOtherRevision("{\"format\":\"retained-ui-instance\"}") && !second.SnapshotNamesOtherRevision("not json") &&
+			!second.SnapshotNamesOtherRevision(replace(snapshot,"\"path\":\"snapshot-bindings.rui\"","\"path\":\"elsewhere.rui\"")),
+			"only a well-formed snapshot of this document's id and path names a revision of it");
+		{
+			Runtime other(host);
+			Check(other.LoadDocument(bindingSource+"\n","other-bindings.rui",diagnostics) && !other.SnapshotNamesOtherRevision(snapshot),
+				"another document's snapshot is not a revision of this one");
+		}
 		std::string replacementSnapshot;
 		Check(second.SaveSnapshot(replacementSnapshot,error,30) && second.RestoreSnapshot(replacementSnapshot,error,31),
 			"document replacement refreshes cached snapshot source identity");

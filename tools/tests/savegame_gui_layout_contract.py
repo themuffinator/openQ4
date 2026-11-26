@@ -465,6 +465,47 @@ def validate_external_definitions() -> None:
             raise AssertionError(f"UserInterface.cpp lacks {token!r}: {why}")
 
 
+def validate_retained_revisions() -> None:
+    """A retained GUI saved by an earlier revision of its document still loads.
+
+    Its snapshot embeds the document source and RestoreSnapshot refuses any other
+    text, so every edit to a retained document that saves capture (the weapon
+    scopes, restructured after 0.15.0, which the hover tank's gun keeps) would
+    otherwise refuse all older saves after map teardown. The record is length-prefixed, so the reader keeps its byte
+    stream and rebuilds the GUI from the saved state dictionary instead.
+    """
+    retained = read(ROOT / "src" / "ui" / "UserInterfaceRetained.cpp")
+    reader = function_body(retained, "bool idUserInterfaceRetained::ReadFromSaveGame(")
+    restore = reader.find("RestoreSnapshot(snapshot,error,RetainedUI_PresentationTime())")
+    fallback = reader.find("SnapshotNamesOtherRevision(snapshot)", restore)
+    rebuild = reader.find("ApplicationState(impl->document.Model(),state,application,rebuildError)", fallback)
+    apply = reader.find("SetState(application,rebuildError,RetainedUI_PresentationTime())", rebuild)
+    consumed = reader.find("payload.Tell() != payload.Length()")
+    if min(restore, fallback, rebuild, apply, consumed) < 0 or not consumed < restore < fallback < rebuild < apply:
+        raise AssertionError("a retained GUI saved by an earlier document revision must rebuild from its saved state, "
+                             "after its whole record is read, instead of refusing the save")
+    runtime = read(ROOT / "src" / "ui" / "retained" / "Runtime.cpp")
+    names = function_body(runtime, "bool Runtime::SnapshotNamesOtherRevision(")
+    for token in ('identity["id"] == impl->canonical->Model().id', 'identity["path"] == impl->sourcePath',
+                  "!SnapshotSourceMatches(identity[\"source\"],impl->canonical->Source())"):
+        if token not in names:
+            raise AssertionError(f"SnapshotNamesOtherRevision lacks {token!r}: only this document's own earlier "
+                                 "revision may skip its snapshot")
+
+
+def function_body(source: str, signature: str) -> str:
+    start = source.find(signature)
+    if start < 0:
+        raise AssertionError(f"missing {signature}")
+    brace = source.index("{", start)
+    depth = 0
+    for index in range(brace, len(source)):
+        depth += {"{": 1, "}": -1}.get(source[index], 0)
+        if depth == 0:
+            return source[brace:index + 1]
+    raise AssertionError(f"unterminated {signature}")
+
+
 def main() -> None:
     guis = shipped_guis()
     validate_classification(guis)
@@ -474,6 +515,7 @@ def main() -> None:
     validate_engine_migration()
     validate_eval_transfer()
     validate_external_definitions()
+    validate_retained_revisions()
     print("savegame_gui_layout_contract: ok")
 
 

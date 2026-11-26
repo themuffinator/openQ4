@@ -330,6 +330,30 @@ bounds the search. The saved definitions are copies of `38bdc6872^` and must not
 be edited. A future edit to a GUI that saves adds a row and a saved definition,
 or avoids changing the saved structure.
 
+## Retained GUI Document Revisions
+
+A retained (`.rui`) GUI saves one length-prefixed record: its state
+dictionary, interaction flags, cursor and a snapshot of its runtime. The
+snapshot embeds the document's source, and `Runtime::RestoreSnapshot` refuses
+any other source text (line endings aside). Unlike a `.gui` record, the restore
+can always step over the record, but before 26 November 2026 a refused snapshot
+failed the whole load after map teardown. Editing a retained document that saves
+capture therefore broke every earlier save holding it: once the machine gun,
+nail gun and railgun scope documents were restructured to cache their static
+art (`d038da03c`, 23 November), every 0.15.0 save of a level with a hover tank
+stopped loading, because the tank's machine gun keeps the retained scope.
+
+When a snapshot names the same document id and path at other source text
+(`Runtime::SnapshotNamesOtherRevision`), the reader now rebuilds the GUI from the
+record's saved state dictionary, as reloading a changed document does, and logs
+`retained GUI <name>: saved with an earlier revision of its document; restored
+from its saved state`. The application state, interaction flags and cursor carry
+over; presentation in progress, such as a running transition or timeline,
+restarts. A malformed snapshot, or one of another document, still refuses the
+save. `savegame_gui_layout_contract.py` and the retained runtime's native test
+pin this. Editing a retained document that saves capture therefore needs no
+saved copy of the earlier revision, unlike a `.gui`.
+
 ## Non-Finite GUI Values
 
 A GUI variable can hold a non-finite expression result. Since `40922f767`
