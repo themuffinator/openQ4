@@ -296,8 +296,11 @@ void idPlayer::ResetWeaponWheel( bool instantRestore ) {
 		weaponWheelBlend = 0.0f;
 		weaponWheelGuiActive = false;
 		if ( weaponWheelGui ) weaponWheelGui->HandleNamedEvent( "close" );
-		if ( !gameLocal.isMultiplayer ) {
+		// the multiplayer library had no game-side blur to clear, even outside a map
+		if ( !gameLocal.IsMultiplayerMode() ) {
 			gameLocal.SetSpecialEffect( SPECIAL_EFFECT_BLUR, false );
+		}
+		if ( !gameLocal.isMultiplayer ) {
 			common->SetGameTimeScale( 1.0f );
 		}
 	}

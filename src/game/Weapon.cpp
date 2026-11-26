@@ -4109,7 +4109,7 @@ void rvWeapon::Hitscan( const idDict& dict, const idVec3& muzzleOrigin, const id
 		} else {
 			hit = gameLocal.HitScan( dict, muzzleOrigin, dir, fxOrigin, owner, false, 1.0f, NULL, areas );
 		}
-		if ( i == 0 && net_mpHitscanDebug.GetBool() ) {
+		if ( i == 0 && gameLocal.isMultiplayer && net_mpHitscanDebug.GetBool() ) {
 			LogHitscanDebug( predicted ? "predicted" : "server", hitscanAttackDef, fxOrigin, dir, spreadSeed, hit );
 		}
 		if ( predicted ) {

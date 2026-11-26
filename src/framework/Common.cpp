@@ -8259,10 +8259,10 @@ void idCommonLocal::InitGame( void ) {
 	PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104343" ) );
 
 #ifndef ID_DEDICATED
-	// The multiplayer menu edits settings only game_mp declares. Declare them
-	// before the configs run, so a saved value lands on the declaration rather
-	// than on a bare console cvar (Session.cpp). Session::Init skips them for a
-	// dedicated server, as this does.
+	// The multiplayer menu edits game settings, and the configs run before the
+	// game module loads and declares them. Declare them first, so a saved value
+	// lands on the declaration rather than on a bare console cvar (Session.cpp).
+	// Session::Init skips them for a dedicated server, as this does.
 	if ( idAsyncNetwork::serverDedicated.GetInteger() != 1 ) {
 		Session_DeclareMultiplayerMenuGameCVars();
 	}

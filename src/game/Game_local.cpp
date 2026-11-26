@@ -422,6 +422,10 @@ static bool OpenQ4_IsConvoy2bActorClassname( const char *classname ) {
 }
 
 static bool OpenQ4_ShouldSuppressConvoy2bActorSpawn( const idDict &spawnArgs ) {
+	// a campaign map's developer switch; the multiplayer library never looked
+	if ( gameLocal.IsMultiplayerMode() ) {
+		return false;
+	}
 	const bool noActorsEnabled = g_openQ4Convoy2bNoActors.GetBool() ||
 		( cvarSystem != NULL && cvarSystem->GetCVarBool( "g_openQ4Convoy2bNoActors" ) );
 	if ( !noActorsEnabled ) {
@@ -1139,8 +1143,9 @@ void idGameLocal::Shutdown( void ) {
 		return;
 	}
 
-	// openQ4: the declarations outlive this module; game-sp reads some of the same ones
-	// (weapon_blaster), so the Classic overlay must never survive the unload.
+	// openQ4: the declarations outlive this module; the next load, in either mode, reads
+	// some of the same ones (weapon_blaster), so the Classic overlay must never survive
+	// the unload.
 	rvClassicRules::RevertDefinitions();
 
 	// Fatal startup failures can arrive before the runtime is complete.  Release
@@ -1291,6 +1296,7 @@ void idGameLocal::ShutdownAfterDecls( void ) {
 	}
 	if ( cvarSystem != NULL ) {
 		cvarSystem->RemoveFlaggedAutoCompletion( CVAR_GAME );
+		idModeCVar::ReleaseModuleMode();
 	}
 
 	if ( animationLib != NULL ) {
@@ -5094,7 +5100,9 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEdito
 		// The per-section timers below were written for the airdefense1 skip probe.
 		// They are equally useful for ordinary slow-frame triage, so g_frametime
 		// turns them on too; the probe keeps its own accumulation separate.
-		const bool profileFrameSections = ( airDefense1SkipProbeProfileActive && s_openq4AirDefense1SkipProbe.skipRequested ) || g_frametime.GetBool();
+		// (The campaign's frame print shows them; network play prints its own.)
+		const bool profileFrameSections = ( airDefense1SkipProbeProfileActive && s_openq4AirDefense1SkipProbe.skipRequested ) ||
+			( g_frametime.GetBool() && !isMultiplayer );
 		if ( airDefense1SkipProbeActive ) {
 			const int wallTimeNow = Sys_Milliseconds();
 			const char *cameraName = openQ4_AirDefense1SkipProbeCameraName( camera );
@@ -7918,11 +7926,16 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 			if ( profileMapSpawn ) {
 				mapMediaTimer.Start();
 			}
-			idDict mediaArgs = mapEnt->epairs;
-			Awakening_CorrectM05M06Entity( mediaArgs );
-			Awakening_CorrectLateMissionMedia( mediaArgs );
-			Awakening_CorrectEntitySounds( mediaArgs );
-			CacheDictionaryMedia( &mediaArgs );
+			if ( IsMultiplayerMode() ) {
+				// network play has no Awakening media corrections to apply first
+				CacheDictionaryMedia( &mapEnt->epairs );
+			} else {
+				idDict mediaArgs = mapEnt->epairs;
+				Awakening_CorrectM05M06Entity( mediaArgs );
+				Awakening_CorrectLateMissionMedia( mediaArgs );
+				Awakening_CorrectEntitySounds( mediaArgs );
+				CacheDictionaryMedia( &mediaArgs );
+			}
 			if ( profileMapSpawn ) {
 				mapMediaTimer.Stop();
 			}

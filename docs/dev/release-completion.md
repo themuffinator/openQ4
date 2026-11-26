@@ -343,9 +343,12 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   multiple times" warnings the split caused are gone.
 - **Upgrade note:** packages, the Windows installer and local staging remove the
   old `game-sp_<arch>` and `game-mp_<arch>` files. An in-game update from
-  0.15.0 cannot delete them; they are never loaded and can be deleted by hand.
-  Mods that ship their own game code must rebuild it as one `game_<arch>`
-  module (game API 64); content-only mods are unaffected.
+  0.15.0 cannot delete them, because 0.15.0 plans that update. They are never
+  loaded, the next in-game update moves them to its backup folder, and you can
+  also delete them by hand. Mods that ship their own game code must rebuild it
+  as one `game_<arch>` module for the current game API; until then such a mod
+  runs on openQ4's own game code, and the console says so. Content-only mods
+  are unaffected.
 - For developers: `src/mpgame/` is merged into `src/game/`. Behaviour that
   differs between the modes is a runtime gate (`gameLocal.isMultiplayer`, or
   `gameLocal.IsMultiplayerMode()` outside a map), and the few cvars whose
@@ -360,7 +363,19 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   against the pre-merge build, the retail 1.4.2 netdemo smoke (64/64), MVDs
   across builds and a campaign, network play and campaign switch in one
   process pass. 315 of 326 native tests pass and the remaining 11 fail the same
-  way on the previous tree. Not yet run: Linux, macOS and Android builds, and a
+  way on the previous tree.
+- Evidence, 25 November: Linux x64 smokes and saves crossing between Linux and
+  Windows; the Linux ARM64 and Android builds and packages; every official map
+  (42 campaign, 49 multiplayer in each game type) against the previous build,
+  with eleven cross-mode leaks found and gated. A third review compared every
+  cvar, command and merged hunk with both old trees: seven more minor leaks are
+  gated, five game regression tests the merge had broken pass again, and the
+  mode-dependent settings follow the mode even where the system keeps the game
+  module loaded between modes. Switching between the campaign and multiplayer
+  no longer logs "declared multiple times" warnings for the settings whose
+  defaults differ by mode. Campaign maps, servers and a listen server checked
+  again against the previous build log the same warnings and hold the same
+  entities and saved objects. Not yet run: macOS, an Android device, and a
   human session across both modes.
 
 ## Point-light shadows cost less processor time on Vulkan, 24 November 2026
@@ -13491,10 +13506,10 @@ Complete this section before release notes claim macOS support beyond the curren
 - [ ] Each bridge report includes `renderer-smoke`, `renderer-mp-smoke`, and `renderer-matrix` evidence.
 - [ ] The release follows `docs/dev/macos-renderer-backend-policy.md` and `docs/dev/macos-native-backend-containment-policy.md`: OpenGL and Metal bridge evidence are kept separate, the Metal package is not described as native Metal, and native Cocoa/OpenGL backend results are not counted as release support evidence.
 - [ ] SP entered an in-game map on real Apple hardware.
-- [ ] MP loaded `game-mp`, started `mp/q4dm1`, connected a local client, and exited cleanly.
+- [ ] MP loaded the game module as `game_mp`, started `mp/q4dm1`, connected a local client, and exited cleanly.
 - [ ] Dedicated server startup was covered or explicitly documented as unsupported for this release.
 - [ ] Finder or Desktop launcher startup and terminal startup were both checked.
-- [ ] The package layout contract in `docs/dev/macos-package-layout-and-release-policy.md` was followed: app data was under `Contents/Resources/baseoq4`, signed SP/MP modules were under `Contents/Frameworks`, and no adjacent `baseoq4` duplicate shipped.
+- [ ] The package layout contract in `docs/dev/macos-package-layout-and-release-policy.md` was followed: app data was under `Contents/Resources/baseoq4`, the signed game module was under `Contents/Frameworks`, and no adjacent `baseoq4` duplicate shipped.
 - [ ] Runtime macOS packages contain `SYMBOLS.txt`, do not contain `.dSYM` bundles, and have matching `openq4-<version>-macos-arm64-<bridge>-symbols.tar.xz` artifacts recorded for crash symbolication.
 - [ ] Launch from a mounted signed/notarized DMG was checked, or unsigned archive behavior was recorded as an unsigned-package exception.
 - [ ] Dragging only `openQ4.app` to `/Applications` or another user-writable location was checked.

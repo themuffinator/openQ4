@@ -199,7 +199,7 @@ public:
 	const char *			GetDamageGroup( int location );
 
 							// Scales on the damage this actor deals and takes (1 = unchanged).
-							// Not saved: whatever buffs an actor re-applies it after a restore.
+							// AI status modifiers are composed by the virtual accessors.
 	void					SetDamageScales( float dealt, float taken ) { damageDealtScale = dealt; damageTakenScale = taken; }
 	virtual float			GetDamageDealtScale( void ) const { return damageDealtScale; }
 	virtual float			GetDamageTakenScale( void ) const { return damageTakenScale; }

@@ -4,11 +4,12 @@
 
 Two properties are pinned here.
 
-1. It is MULTIPLAYER ONLY, and not by convention: single player loads game-sp,
-   which links no part of mp/HitFeedback.cpp and registers no hud_damageNumber*
-   cvar.  Mirroring any of it into src/game/ would put a multiplayer HUD feature
-   into the campaign, so the SP tree is asserted to be clean and each entry
-   point inside game-mp carries its own gameLocal.isMultiplayer gate.
+1. It is MULTIPLAYER ONLY, and not by convention.  Since CORE-07 one game
+   module serves the campaign and network play, so mp/HitFeedback.cpp is linked
+   and the hud_damageNumber* cvars register in both modes (as the old
+   single-player library never did).  Every entry point - staging, drawing and
+   sending - therefore carries its own gameLocal.isMultiplayer gate, which is
+   always false in the campaign, and the one draw call site sits under another.
 
 2. The wire message is written and read in the same field order.  It is an
    unreliable message with no self-describing framing, so a one-sided edit
@@ -26,15 +27,6 @@ MP_CVARS = ROOT / "src/game/gamesys/SysCvar.cpp"
 MP_CVARS_HEADER = ROOT / "src/game/gamesys/SysCvar.h"
 HITFEEDBACK = ROOT / "src/game/mp/HitFeedback.cpp"
 PLAYERVIEW = ROOT / "src/game/PlayerView.cpp"
-SP_TREE = ROOT / "src/game"
-
-SP_FORBIDDEN = (
-    "hud_damageNumbers",
-    "hud_damageNumberStyle",
-    "hud_damageNumberScale",
-    "rvDamageNumbers",
-    "GAME_UNRELIABLE_MESSAGE_HITINFO",
-)
 
 
 def read(path: Path) -> str:
@@ -84,30 +76,6 @@ def validate_defaults(cvars: str, header: str) -> None:
     for token in ("hud_damageNumberStyle", "hud_damageNumberScale"):
         require(cvars, f'idCVar {token}(', "damage number cvar block")
         require(header, f"extern idCVar\t{token};", "SysCvar.h")
-
-
-def validate_single_player_has_none() -> None:
-    if not SP_TREE.is_dir():
-        raise AssertionError(f"single player source tree not found: {SP_TREE}")
-
-    offenders: list[str] = []
-    for path in sorted(SP_TREE.rglob("*")):
-        if not path.is_file() or path.suffix.lower() not in (".cpp", ".h"):
-            continue
-        text = path.read_text(encoding="utf-8", errors="ignore")
-        for token in SP_FORBIDDEN:
-            if token in text:
-                offenders.append(f"{path.relative_to(ROOT)}: {token}")
-
-    if offenders:
-        raise AssertionError(
-            "damage numbers are a multiplayer-only feature and must not appear in the "
-            "single player tree:\n  " + "\n  ".join(offenders)
-        )
-
-    for stray in ("HitFeedback.cpp", "HitFeedback.h"):
-        for path in SP_TREE.rglob(stray):
-            raise AssertionError(f"{path.relative_to(ROOT)} must not exist in the SP tree")
 
 
 def validate_multiplayer_gates(hitfeedback: str, playerview: str) -> None:
@@ -163,7 +131,6 @@ def main() -> None:
     playerview = read(PLAYERVIEW)
 
     validate_defaults(cvars, header)
-    validate_single_player_has_none()
     validate_multiplayer_gates(hitfeedback, playerview)
     validate_wire_symmetry(hitfeedback)
 

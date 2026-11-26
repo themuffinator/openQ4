@@ -227,7 +227,7 @@ Example:
 }
 ```
 
-Game modules are optional. openQ4 first looks for `game_<arch>` in the mod's directory and otherwise uses the one in `baseoq4/`, so a content-only mod needs just its `mod.json` and content files. Mods with their own game code can ship their own module, which serves both single-player and multiplayer; modules named `game-sp_<arch>` or `game-mp_<arch>`, as openQ4 0.15.0 and earlier used, are no longer loaded.
+Game modules are optional. openQ4 first looks for `game_<arch>` in the mod's directory and otherwise uses the one in `baseoq4/`, so a content-only mod needs just its `mod.json` and content files. Mods with their own game code can ship their own module, which serves both single-player and multiplayer; modules named `game-sp_<arch>` or `game-mp_<arch>`, as openQ4 0.15.0 and earlier used, are no longer loaded. A mod that ships only those runs on `baseoq4/`'s module, and the console warns once, naming the file to rebuild.
 
 A mod built on the retail base (`fs_game_base` other than `baseoq4`) still gets openQ4's runtime content: the filesystem searches `baseoq4/` between the mod and `q4base/`, so openQ4's shaders, GUIs and fonts remain available.
 

@@ -668,7 +668,7 @@ void idProjectile::Think( void ) {
 		// the flight time that displacement implies, minus the flight time actually elapsed.  Both
 		// ends derive it from the same replicated launchOrig/launchTime/launchDir, so the server's
 		// figure and a client's are directly comparable with nothing added to the wire.
-		if ( g_projectilePredictionDebug.GetInteger() > 0 && state == LAUNCHED && launchSpeed > 1.0f ) {
+		if ( gameLocal.isMultiplayer && g_projectilePredictionDebug.GetInteger() > 0 && state == LAUNCHED && launchSpeed > 1.0f ) {
 			const float along = ( GetPhysics()->GetOrigin() - launchOrig ) * launchDir;
 			const int offsetMS = idMath::Ftoi( ( along / launchSpeed ) * 1000.0f ) - ( gameLocal.time - launchTime );
 			gameLocal.Printf( "MPProj: %s ent=%d client=%d offsetMS=%d prestep=%d\n",

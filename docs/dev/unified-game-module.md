@@ -36,6 +36,15 @@ merged code follows, and the compatibility guarantees and their evidence.
   registered cvars and `idGameLocal::Init` run as they did for the separate
   libraries. Keeping one loaded library across a mode change is possible later
   (see [Follow-ups](#follow-ups)) but is not part of this contract.
+- **An image the platform keeps.** A platform may keep the library's image
+  loaded after the engine unloads it: dyld never unloads an image with
+  thread-local variables, and this module has some. The next load then serves
+  the other mode from the same image, whose static cvars are already
+  registered, so `idModeCVar` registers the mode cvars again itself and their
+  defaults and flags still follow the mode, as after a fresh load. The rest of
+  the module's state is reset by `Shutdown` and `Init`, as the old libraries'
+  was when one was entered twice in a session. This path has not yet run on
+  macOS.
 - **MVD headers.** Format 1.2+ MVDs carry their own game schema version, not the
   API version, so the API bump does not affect them. Legacy 1.0/1.1 MVDs carry
   API 39-44 and stay accepted.
@@ -104,7 +113,7 @@ merged code follows, and the compatibility guarantees and their evidence.
 | Network demos (`.netdemo`, retail `.ndmo85`) and MVDs | Play as before | Read paths keep the multiplayer text; MVD schema versioning is independent of the API version. |
 | Render demos (`.demo`) | Unaffected | Recorded and played by the engine. |
 | Configurations | Same cvars, same archived values | Mode-specific defaults are `idModeCVar`s; every cvar now registers in both modes, so the other mode's settings are no longer bare console cvars between sessions. |
-| Mods with their own game code | Must rebuild | Game API 64 and the single `game_<arch>` name; content-only mods are unaffected. |
+| Mods with their own game code | Must rebuild | The single `game_<arch>` name and the current game API (64 added the mode; 65 since 25 November). A mod that still ships only `game-sp_<arch>`/`game-mp_<arch>` runs on `baseoq4`'s module, and the console warns once, naming the file. Content-only mods are unaffected. |
 
 ## Build and packaging
 
@@ -115,9 +124,11 @@ merged code follows, and the compatibility guarantees and their evidence.
 - Packages carry `baseoq4/game_<arch>` (and its `.pdb` or dSYM). The retired
   `game-sp_<arch>`/`game-mp_<arch>` files are removed by staging, packaging and
   the Windows installer, and validators reject a stage that still has them. The
-  engine never loads them. An in-game update from 0.15.0 leaves them in place
-  (its manifest has no retired-file list, and 0.15.0's own updater plans that
-  update); they are harmless and can be deleted by hand.
+  engine never loads them. An in-game update from 0.15.0 leaves them in place,
+  because 0.15.0's own updater plans that update. The next in-game update,
+  planned by a build with the unified module, moves them and their debug files
+  to the update's backup folder, as it does packs a release no longer lists;
+  until then they are harmless and can be deleted by hand.
 - The legacy game-layer tooling (`tools/build/game_layer.py`,
   `stage_gamelibs.py`) builds a layer's `shared` and `game` sources into the one
   module and refuses the retired `mpgame` tree.
@@ -322,6 +333,74 @@ in network play, none of which retail content reaches:
 
 Not yet run: macOS, an Android emulator or device run, an Awakening campaign
 playthrough beyond loading saves, and a human play session.
+
+### Third review (25 November 2026)
+
+A source review of the whole merge against both pre-merge trees, for what the
+every-map A/B cannot reach: player input, weapons, vehicles, menus, console
+commands and the multiplayer main menu.
+
+- **Cvars and commands, mechanically.** Every static cvar declaration (507 in
+  the single-player tree, 582 in the multiplayer tree, 612 merged) and every
+  console command registration was compared by name, default and flags. The
+  only differences are the documented ones above and the single-player tree's
+  dropped bot fork (its `bot_*` cvars, `g_spectatorChat` and `fillBots`).
+- **Five hunk-by-hunk reviews.** The campaign side in three parts (player,
+  movement and HUD; the game core, menus, scripts and animation; entities,
+  weapons, projectiles, vehicles and AI) and the network side in two
+  (gameplay and prediction; the core, the main menu with no map loaded, and the
+  single-player-only sources now compiled into network play). None found a
+  difference in gameplay, saves, the wire format or anything visible. They
+  found these minor ones, now gated to the mode whose library had them:
+  - network play's hitscan and projectile-prediction debug prints, the
+    vehicle branch of the `teleport` cheat, the convoy2b actor switch's
+    lookup on every spawn, the campaign's per-entity media dictionary copy at
+    map load, the frame-section timers behind `g_frametime`, and the weapon
+    wheel clearing a blur the multiplayer library never had;
+  - two header comments that described save code wrongly.
+
+  Left as they are, with no effect on stock content: Quake 4's AI and vehicle
+  keys on a custom multiplayer map that spawns monsters or vehicles, the ban
+  list's log wording and a few no-op calls the campaign now makes each frame.
+- **Recovered game regressions.** Five of the 74 tests in
+  `game_regression_suite.py` failed after the merge: they pinned code the merge
+  moved, compiled extracted functions without the stubs the merged code needs,
+  or required the damage numbers to be absent from `src/game/`. The suite had
+  already failed before the merge on another test, so the native-test
+  comparison counted it as unchanged. All five now follow the merged code; the
+  damage-number test pins the network-play gates instead of the old tree's
+  absence.
+- **Re-entering a kept image.** `idModeCVar::ApplyModuleMode` used to change
+  the declarations only for network play and relied on a fresh image for the
+  campaign's. It now applies each mode's own and registers again when the
+  image was already registered, and `unified_game_mode_parity_contract.py`
+  runs it against a stand-in cvar system through a campaign, network play and
+  campaign sequence in one image (the old code fails it).
+- **No warnings about the mode's own defaults.** At every mode change, both the
+  pre-merge and the unified build still reported `pm_usecylinder` and `si_pure`
+  as "declared multiple times with different initial value": the cvar system
+  kept the previous module's declaration as current. As the module finalizes,
+  `idModeCVar::ReleaseModuleMode` now drops that mark from the mode cvars, so
+  the next mode's declaration is a first one. A campaign, network play and
+  campaign run in one process now logs none of these warnings (the pre-merge
+  build logs seven), and its other 158 warnings are the pre-merge build's,
+  line for line.
+- **Retired modules.** The in-game updater retires leftover `game-sp_*` and
+  `game-mp_*` files (`UpdateCoreTest`), and the module search warns once when a
+  mod ships only those (a headless dedicated server run with a mod that ships
+  only `game-sp_x64.dll` warns once; one without stays quiet).
+- **Runtime, against the pre-merge build.** Six campaign maps (airdefense1,
+  hub1, walker, convoy1, and The Awakening's m01 trench and m07 race) play 300
+  tics and save on both builds, with the same warnings. Eight server cases on
+  q4dm1, q4ctf1 and q4dm7 and a listen server on q4dm1 give the same entity
+  lists. In saves taken with game time stopped, airdefense1 and hub1 hold the
+  same object tables as the pre-merge build, and the bytes match a build of
+  `main` without this review's changes exactly, outside run-to-run noise. They
+  differ from the pre-merge build in a few places that later work changed on
+  purpose: the player's gun keeps `noSelfShadow` (#237), and the renderer
+  round's extra joint buffer per animator moves the heap, which changes the
+  fields neither build initialises. The dedicated-server smoke and the
+  campaign, network play and campaign switch pass.
 
 ## Follow-ups
 

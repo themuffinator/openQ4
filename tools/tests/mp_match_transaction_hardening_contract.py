@@ -75,12 +75,23 @@ def lifecycle_contracts(header: str, source: str) -> None:
     )
     require(begin, "reservedSessionRange = UINT64_C( 1 ) << 32", "session id reserve")
 
+    # The unified game module (CORE-07) runs Reset for campaign maps too, so the
+    # match-session half lives in ResetMatchSession, which only network play runs.
     reset = function(source, "void idMultiplayerGame::Reset()", "map reset")
     require_order(
         reset,
         (
+            "const bool matchSession = gameLocal.IsMultiplayerMode();",
             "if ( !FinalizeMatchEvidence( true ) )",
             "Clear();",
+            "if ( matchSession ) {\n\t\tResetMatchSession();",
+        ),
+        "reset finalization/recovery transaction",
+    )
+    session = function(source, "void idMultiplayerGame::ResetMatchSession(", "match-session reset")
+    require_order(
+        session,
+        (
             "bool recoveryAvailable = true;",
             "recoveryAvailable = RestoreCompetitionSeriesIfRequested();",
             "recoveryAvailable && !BeginMatchSession()",

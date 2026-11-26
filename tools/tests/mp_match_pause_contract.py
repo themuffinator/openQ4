@@ -65,9 +65,17 @@ def central_frame_contracts() -> None:
     entity = read("src/game/Entity.cpp")
 
     frame = body(game_local, "gameReturn_t idGameLocal::RunFrame")
+    # one game frame of engine time (CORE-07 names it frameMsec, the campaign's
+    # cinematic skip also uses it)
     require_before(
         frame,
-        "time += GetMSec();",
+        "const int frameMsec = GetMSec();",
+        "time += frameMsec;",
+        "the frame's engine time is GetMSec()",
+    )
+    require_before(
+        frame,
+        "time += frameMsec;",
         "mpGame.BeginCompetitiveFrame();",
         "engine clock precedes authoritative pause boundary",
     )

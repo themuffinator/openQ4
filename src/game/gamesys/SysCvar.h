@@ -31,12 +31,17 @@ public:
 
 	// Call once per module load, before idCVar::RegisterStaticVars().
 	static void				ApplyModuleMode( bool multiplayer );
+	// Call as the module finalizes, while the cvar system is still there.
+	static void				ReleaseModuleMode( void );
 
 private:
+	const char *			spValue;
+	int						spFlags;
 	const char *			mpValue;
 	int						mpFlags;
 	idModeCVar *			nextModeCVar;
 	static idModeCVar *		modeCVars;
+	static bool				registeredInImage;	// RegisterStaticVars has run in this loaded image
 };
 extern idCVar	developer;
 

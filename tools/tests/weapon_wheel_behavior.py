@@ -64,6 +64,8 @@ struct Game {
     int localClientNum=0;
     usercmd_t usercmds[1];
     bool IsTeamGame()const{return teamGame;}
+    // the module's load mode; every network-play case here has a map loaded
+    bool IsMultiplayerMode()const{return isMultiplayer;}
     void* GetCamera()const{return nullptr;}
     void SetSpecialEffect(int,bool enabled){blur=enabled;}
     void SetSpecialEffectParm(int,int,float){}

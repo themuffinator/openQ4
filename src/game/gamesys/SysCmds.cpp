@@ -2097,7 +2097,8 @@ void Cmd_Teleport_f( const idCmdArgs &args ) {
 	// openQ4: a driver's position follows its vehicle, so teleporting only the
 	// player left the vehicle behind and the separated driver died (walker,
 	// The Awakening's speeder races). Move the vehicle with its driver instead.
-	if ( player->IsInVehicle() && player->GetVehicleController().GetVehicle() ) {
+	// (Campaign only, as the single-player library had it.)
+	if ( !gameLocal.IsMultiplayerMode() && player->IsInVehicle() && player->GetVehicleController().GetVehicle() ) {
 		rvVehicle *vehicle = player->GetVehicleController().GetVehicle();
 		vehicle->Teleport( origin, angles, ent );
 		gameLocal.Printf( "teleport: moved vehicle '%s' with its driver\n", vehicle->GetName() );

@@ -95,6 +95,8 @@ struct idGameLocal {
     bool InhibitEntitySpawn(idDict& args);
     template<class... A> void Warning(const char*,A...) {}
 } gameLocal;
+// convoy2b's campaign-only actor suppression (a developer cvar, off by default)
+static bool OpenQ4_ShouldSuppressConvoy2bActorSpawn(const idDict&) { return false; }
 struct idEntity {};
 struct idMultiplayerGame {
     idEntity* flagEntities[MAX_CTF_FLAGS] = {};

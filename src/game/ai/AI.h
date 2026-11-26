@@ -885,7 +885,8 @@ public:
 	rvAIPain_t				pain;
 	rvAIFuncs_t				funcs;
 
-	// Freezing. None of it is saved: a restored AI has thawed.
+	// Persistent Awakening status. Freeze visuals take priority over a buff,
+	// while both compose with the actor's original appearance and damage scales.
 	float					freezeFactor;			// 0..1, slows animation
 	int						frozenSolidTime;		// when lethal freezing damage turned it to ice
 	int						frozenLocation;			// where that damage landed, for the shatter

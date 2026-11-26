@@ -137,7 +137,7 @@ def validate_user_docs_and_package_readme() -> None:
     )
     require(
         getting_started,
-        "The app contains openQ4's `baseoq4` data and signed SP/MP modules",
+        "The app contains openQ4's `baseoq4` data and the signed game module",
         "getting started self-contained app contract",
     )
     require(
@@ -147,7 +147,7 @@ def validate_user_docs_and_package_readme() -> None:
     )
     require(
         package_readme,
-        "The app contains openQ4's runtime data and signed SP/MP modules",
+        "The app contains openQ4's runtime data and the signed game module",
         "packaged README self-contained app contract",
     )
     require(

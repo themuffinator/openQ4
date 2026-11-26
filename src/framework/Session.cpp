@@ -11266,17 +11266,20 @@ void idSessionLocal::RunGameTic() {
 ===============
 Session_DeclareMultiplayerMenuGameCVars
 
-The create-server menu and Player Setup edit multiplayer settings that only game_mp declares,
-but it is reachable while game_sp is loaded - the module is not swapped until
-spawnServer. A GUI widget resolves its cvar once, when the gui is parsed, and
-idChoiceWindow::InitVars warns and then does nothing at all when the name is
-absent, so those rows would be inert for anyone who reaches multiplayer from a
-cold start or straight out of single player.
+The create-server menu and Player Setup edit multiplayer settings, and the
+menu is reachable while the game module runs as game_sp - it is not reloaded
+as game_mp until spawnServer. A GUI widget resolves its cvar once, when the gui
+is parsed, and idChoiceWindow::InitVars warns and then does nothing at all when
+the name is absent. The split single-player library never declared these, so
+the rows were inert for anyone who reached multiplayer from a cold start or
+straight out of single player.
 
-Declare them here instead, with the same defaults game_mp uses so its later
-static registration matches. That registration keeps the current value and only
-adopts the reset value and range, so whatever the player picked in the menu is
-what the match starts with.
+Since CORE-07 the one game module declares them in both modes, and the menu is
+parsed after it loads, so this declaration is now a safety net for the time
+before the module loads (removing it is a CORE-07 follow-up). It keeps the
+module's defaults so the static registration matches. That registration keeps
+the current value and only adopts the reset value and range, so whatever the
+player picked in the menu is what the match starts with.
 
 Common::Init declares them before it executes the configs, so a saved value
 lands on this declaration. Declared afterwards, the config's seta created a bare

@@ -227,10 +227,10 @@ Stages one number.  The caller has already decided the hit is worth showing.
 void rvDamageNumbers::Add( const idVec3 &origin, int damage, int weapon, int flags ) {
 	damageNumber_t *number;
 
-	// Multiplayer only, and not merely by convention: single player runs game-sp,
-	// which links none of this and registers no hud_damageNumber* cvar.  The test
-	// is here so the same is true of any future caller inside game-mp - the Arena
-	// campaign aside, nothing in this module should stage a plum outside a match.
+	// Multiplayer only, and not merely by convention: the campaign never stages
+	// one (the single-player library did not link this), and the test keeps it so
+	// for any future caller - the Arena campaign aside, nothing should stage a
+	// plum outside a network match.
 	if ( !gameLocal.isMultiplayer || damage <= 0 ) {
 		return;
 	}

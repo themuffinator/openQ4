@@ -1609,8 +1609,8 @@ private:
 	void					BuildModList( void );
 
 public:
-	// openQ4: server side hitscan lag compensation, ported from the single
-	// player tree where it was unreachable (only game-mp loads in multiplayer).
+	// openQ4: server side hitscan lag compensation, ported from the old single
+	// player tree where it was unreachable (its library never ran multiplayer).
 	// Public because the weapons that run their own traces - the lightning gun
 	// and the gauntlet - have to bracket them with Begin/End themselves.
 	enum { MP_PREDICTED_HITSCANS = 16 };

@@ -103,7 +103,7 @@ Current release checklist:
 - [ ] `renderer-matrix` output exists for OpenGL.
 - [ ] `renderer-matrix` output exists for Metal.
 - [ ] SP entered an in-game map on real Apple hardware.
-- [ ] MP loaded `game-mp`, started `mp/q4dm1`, connected a local client, and exited cleanly.
+- [ ] MP loaded the game module as `game_mp`, started `mp/q4dm1`, connected a local client, and exited cleanly.
 - [ ] Dedicated server startup was covered or explicitly documented as unsupported for this release.
 - [ ] Finder or Desktop launcher startup was checked.
 - [ ] Terminal startup was checked.
@@ -116,7 +116,7 @@ Current release checklist:
 - [ ] Controller hotplug/rumble was checked, or unavailable hardware was recorded as an exception.
 - [ ] Audio output, volume changes, and at least one device switch or reconnect were checked.
 - [ ] Windowed, fullscreen, selected-display, and HiDPI/Retina behavior were checked.
-- [ ] The app contained data under `Contents/Resources/baseoq4` and signed SP/MP modules under `Contents/Frameworks`, with no adjacent `baseoq4` duplicate.
+- [ ] The app contained data under `Contents/Resources/baseoq4` and the signed game module under `Contents/Frameworks`, with no adjacent `baseoq4` duplicate.
 - [ ] Matching `openq4-<version>-macos-arm64-<bridge>-symbols.tar.xz` dSYM archives were recorded and matched against package `SYMBOLS.txt` manifests.
 - [ ] First-class macOS release artifacts are signed/notarized DMGs, or the release stays a preview and unsigned artifacts are labeled as fallback output.
 - [ ] Architecture policy, CPU architecture, and OS matrix role were recorded.

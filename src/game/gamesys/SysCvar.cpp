@@ -251,9 +251,8 @@ idCVar ui_joined(					"ui_joined",				"0",			CVAR_GAME | CVAR_USERINFO | CVAR_BO
 idCVar ui_chat(						"ui_chat",					"0",			CVAR_GAME | CVAR_USERINFO | CVAR_BOOL | CVAR_ROM | CVAR_CHEAT, "player is chatting" );
 idCVar ui_handicap(					"ui_handicap",				"100",			CVAR_GAME | CVAR_USERINFO | CVAR_INTEGER | CVAR_ARCHIVE, "player damage output handicap" );
 
-// Voice-chat user settings are bound directly by the stock multiplayer GUI.
-// Keep these declarations identical to game-sp so game-mp also owns them when
-// it is the first (or only) module loaded by the unified client.
+// Voice-chat user settings are bound directly by the stock multiplayer GUI,
+// which the main menu shows in either mode, so they register in both.
 idCVar s_voiceChatSend(				"s_voiceChatSend",			"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "allow sending voice chat" );
 idCVar s_voiceChatReceive(			"s_voiceChatReceive",		"1",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "allow receiving voice chat" );
 idCVar s_voiceChatEcho(				"s_voiceChatEcho",			"0",			CVAR_GAME | CVAR_USERINFO | CVAR_ARCHIVE | CVAR_BOOL, "echo microphone back to speakers" );
@@ -980,9 +979,9 @@ idCVar net_serverDownload(					"net_serverDownload",				"0",			CVAR_GAME | CVAR_
 idCVar net_serverDlBaseURL(					"net_serverDlBaseURL",				"",				CVAR_GAME | CVAR_ARCHIVE, "base URL for the download redirection.  also overrides the URL when net_serverDownload is set to 3 (built-in HTTP server)." );
 idCVar net_serverDlTable(					"net_serverDlTable",				"",				CVAR_GAME | CVAR_ARCHIVE, "pak names for which download is provided, seperated by ; - use a * to mark all paks" );
 
-// Stock mainmenu.gui binds these directly while configuring a server. Mirror
-// the game-sp declarations so a direct game-mp launch never creates typeless
-// placeholder CVars from GUI state.
+// Stock mainmenu.gui binds these directly while configuring a server. They
+// register in both modes, so no launch creates typeless placeholder CVars from
+// GUI state.
 idCVar net_menulanserver(					"net_menulanserver",				"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "treat menu server list as LAN only" );
 idCVar net_serverMenuDedicated(				"net_serverMenuDedicated",			"0",			CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL, "menu dedicated server toggle" );
 
@@ -1000,8 +999,8 @@ idCVar g_playerLean(						"g_playerLean",						"1",			CVAR_GAME | CVAR_FLOAT | C
 idCVar net_clientPredictWeaponSwitch(		"net_clientPredictWeaponSwitch",	"1",			CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "predict weapon switches locally (most noticeable on high ping servers)" );
 
 // openQ4: server side hitscan lag compensation.  Same names, flags and ranges as the
-// single player tree it was ported from - but NOT the same default: the SP copy is
-// dead code (game-sp never runs multiplayer) and still declares "1".
+// single player tree it was ported from - but NOT the same default: that tree's copy
+// was dead code (its library never ran multiplayer) and declared "1".
 // This one ships OFF.  The machinery is complete and guarded.  A client in mode 1
 // extrapolates remote players forward from the relayed user commands rather than
 // interpolating between snapshots; it advertises that (net_mpRemoteExtrapolation)
@@ -1078,10 +1077,13 @@ idCVar bot_profile(						"bot_profile",						"0",			CVAR_GAME | CVAR_INTEGER | C
 */
 
 idModeCVar *idModeCVar::modeCVars = NULL;
+bool idModeCVar::registeredInImage = false;
 
 idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, const char *mpValue, int mpFlags,
 						const char *description, argCompletion_t valueCompletion ) :
 	idCVar( name, spValue, spFlags, description, valueCompletion ),
+	spValue( spValue ),
+	spFlags( spFlags ),
 	mpValue( mpValue ),
 	mpFlags( mpFlags ),
 	nextModeCVar( modeCVars ) {
@@ -1091,6 +1093,8 @@ idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, cons
 idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, const char *mpValue, int mpFlags,
 						const char *description, const char **valueStrings, argCompletion_t valueCompletion ) :
 	idCVar( name, spValue, spFlags, description, valueStrings, valueCompletion ),
+	spValue( spValue ),
+	spFlags( spFlags ),
 	mpValue( mpValue ),
 	mpFlags( mpFlags ),
 	nextModeCVar( modeCVars ) {
@@ -1101,18 +1105,46 @@ idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, cons
 ================
 idModeCVar::ApplyModuleMode
 
-The constructor declared the single-player default and flags. A multiplayer
-load swaps in its own before idCVar::RegisterStaticVars hands the declarations
-to the cvar system, which keeps a value the player has set and takes these as
-the reset value.
+Gives each mode cvar the default and flags of the mode this load serves, before
+idCVar::RegisterStaticVars hands the declarations to the cvar system, which
+keeps a value the player has set and takes these as the reset value.
+
+RegisterStaticVars registers once per loaded image. The engine unloads the
+module at a mode change, so the next load starts a fresh image, but a platform
+may keep the image loaded (dyld never unloads one with thread-local variables,
+and this module has some). The next Init then serves the other mode from the
+same image, its declarations already registered, so hand the mode cvars to the
+cvar system again here, exactly as a fresh load's registration would.
 ================
 */
 void idModeCVar::ApplyModuleMode( bool multiplayer ) {
-	if ( !multiplayer ) {
+	for ( idModeCVar *cvar = modeCVars; cvar != NULL; cvar = cvar->nextModeCVar ) {
+		cvar->value = multiplayer ? cvar->mpValue : cvar->spValue;
+		cvar->flags = ( multiplayer ? cvar->mpFlags : cvar->spFlags ) | CVAR_STATIC;
+		if ( registeredInImage ) {
+			cvarSystem->Register( cvar );
+		}
+	}
+	registeredInImage = true;
+}
+
+/*
+================
+idModeCVar::ReleaseModuleMode
+
+This module's declarations go with it. Drop their static mark from the cvar
+system's copies, so the next load's declaration - the other mode's default, in
+a fresh image or a kept one - is a first declaration again, not a second one
+that the cvar system reports as "declared multiple times with different
+initial value" at every mode change. The value, the reset value and the other
+flags stay until that declaration arrives.
+================
+*/
+void idModeCVar::ReleaseModuleMode( void ) {
+	if ( !registeredInImage ) {
 		return;
 	}
 	for ( idModeCVar *cvar = modeCVars; cvar != NULL; cvar = cvar->nextModeCVar ) {
-		cvar->value = cvar->mpValue;
-		cvar->flags = cvar->mpFlags | CVAR_STATIC;
+		cvar->RemoveFlag( CVAR_STATIC );
 	}
 }

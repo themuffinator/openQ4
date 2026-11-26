@@ -794,6 +794,21 @@ bool StageInto( const StageRequest &request, UpdatePlan &plan, const FetchFn &fe
 			plan.removals.push_back( "baseoq4/" + name );
 		}
 	}
+	// One game module, game_<arch>, replaced the split game-sp_<arch> and
+	// game-mp_<arch> modules (CORE-07). The engine never loads them, and an
+	// update planned by 0.15.0 left them in place, so retire them and their
+	// debug files unless this update itself carries the name.
+	std::vector<std::string> retiredModules;
+	for ( std::filesystem::directory_iterator it( request.install / "baseoq4", ec ), end; !ec && it != end; it.increment( ec ) ) {
+		const std::string name = PathToUtf8( it->path().filename() );
+		const bool split = name.compare( 0, 8, "game-sp_" ) == 0 || name.compare( 0, 8, "game-mp_" ) == 0;
+		if ( split && it->is_regular_file( ec ) && !std::binary_search( files.begin(), files.end(), "baseoq4/" + name ) ) {
+			retiredModules.push_back( "baseoq4/" + name );
+		}
+	}
+	ec.clear();
+	std::sort( retiredModules.begin(), retiredModules.end() );
+	plan.removals.insert( plan.removals.end(), retiredModules.begin(), retiredModules.end() );
 
 	std::filesystem::remove_all( download, ec );
 	return WriteFileAtomically( updateDir / PLAN_FILE, FormatPlan( plan ), result.error );

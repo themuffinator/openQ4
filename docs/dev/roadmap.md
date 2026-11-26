@@ -5099,7 +5099,7 @@ Completion substeps must keep three forms of evidence distinct:
 
 ## Rigid-body and ragdoll physics
 
-Sources: `src/game/physics/` and `src/mpgame/physics/` (`Physics_RigidBody`,
+Sources: `src/game/physics/` (`Physics_RigidBody`,
 `Physics_AF`, `Clip`), `src/game/AF.cpp`, `src/game/AFEntity.cpp`, the `af_*` and
 `rb_*` CVars in `gamesys/SysCvar.cpp`.
 
@@ -5873,7 +5873,7 @@ Completion substeps:
   and swimming as a remote client: the harness cannot place one at a pool without
   input, so client prediction while swimming is unexercised.
 - [ ] **MP-07 — P1, implementation and qualification: coupled prediction and
-  rewind.** In `src/mpgame/gamesys/SysCvar.cpp` both enhanced prediction and lag
+  rewind.** In `src/game/gamesys/SysCvar.cpp` both enhanced prediction and lag
   compensation default off. Preserve the coupled displayed-pose-age and rewind
   contract implemented below with HF-01/HF-05; bound untrusted client claims
   and prevent double correction.
@@ -7089,7 +7089,8 @@ Completion substeps:
     it needs no protocol change.
   - **Game module:** `idGame::Draw( clientNum )` and
     `idMultiplayerGame::Draw( clientNum )` already draw for a named client,
-    but `src/mpgame/` asks who is local on nearly 580 lines through
+    but the multiplayer code (then `src/mpgame/`, merged into `src/game/` on
+    24 November) asks who is local on nearly 580 lines through
     `GetLocalPlayer()` and on 156 through `localClientNum` (62 in
     `MultiplayerGame.cpp`, 28 in `Player.cpp`). Those lines cover HUD
     updates, private sounds, the view weapon, hit feedback, item timers, team
@@ -7152,7 +7153,7 @@ Completion substeps:
      pads in PAD-01's harness bound to two seats.
   2. **Listen-server seats.** Extra seats join as local clients through the
      bot path, and `LocalClientInput` fills each seat's command. Classify
-     every `GetLocalPlayer()` and `localClientNum` use in `src/mpgame/` as
+     every `GetLocalPlayer()` and `localClientNum` use in the multiplayer code as
      per seat (view, HUD, private sounds, view weapon, hit feedback), any
      local seat, or host only. Route the per-seat uses through a current-seat
      context that `Draw` and the HUD set. Scoreboards, votes, chat and team
@@ -7210,8 +7211,8 @@ Completion substeps:
   (MMREX, `DarkMatter-Productions/MuffMode`: `mm_horde*`, the
   configuration reference's Horde sections, the level design guide's spawn
   anchors and `horde-nav-format-design.md`), adapted to Quake 4 rather than
-  copied. Today the multiplayer module compiles Quake 4's AI, AAS and monster
-  classes (`src/mpgame/ai/`, registered in `Class.cpp`), but `idAI` and
+  copied. Today the game module's multiplayer mode has Quake 4's AI, AAS and
+  monster classes (`src/game/ai/`, registered in `Class.cpp`), but `idAI` and
   `idActor` write no snapshot state, so a client never sees a monster, and no
   multiplayer mode spawns one. Deliver Horde as a new multiplayer mode in
   `game_mp`, not a single-player co-op path:
@@ -8281,7 +8282,7 @@ than CORE-01.
 | CORE-04 — Closed | Strict strings; configure warnings fixed (RmlUi's not reproduced); diagnostics reviewed; collision contents decoding fixed; MSVC ASan gameplay (dedicated tour, SP combat, compilers, malformed and fuzzed AAS data) with no report; T-junction ASan/UBSan fixture. | — |
 | CORE-05 — Closed | `hub2` sliver and silhouette repairs; #209's maps profiled and compiling in minutes with byte-identical output; collision contents decoded as retail; rebuilt maps load, render and navigate (AI take cover) in SP with compile memory recorded. | — |
 | CORE-06 — Closed | Tactical features generated as Quake 4 does (98.8% of 7,422 retail features reproduced exactly); `runAASTactical`; rebuilt `airdefense1` AI takes cover as on retail data; malformed data dropped or rejected, fuzzed. | — |
-| CORE-07 — Open | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64; campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. Linux x64: dedicated, client-demo, save and mode-switch smokes, saves cross-loading with Windows, the module really unloaded at each mode change. Linux ARM64 cross build validated and packaged; Android build and verified APK. Every official map A/B against the pre-merge build; eleven cross-mode leaks gated. | macOS build and smoke; an Android emulator or device run; a human session across both modes; then the follow-ups below. |
+| CORE-07 — Open | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64 (65 since 25 November); campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. Linux x64: dedicated, client-demo, save and mode-switch smokes, saves cross-loading with Windows, the module really unloaded at each mode change. Linux ARM64 cross build validated and packaged; Android build and verified APK. Every official map A/B against the pre-merge build; eleven cross-mode leaks gated. Third review (25 November): cvars, commands and every merged hunk against both old trees; seven minor leaks gated, five masked regression tests repaired, mode cvars safe in a kept image, retired modules retired by the updater. | macOS build and smoke; an Android emulator or device run; a human session across both modes; then the follow-ups below. |
 
 ### CORE task evidence and acceptance
 
@@ -8474,6 +8475,21 @@ than CORE-01.
   old build byte for byte apart from the documented server-info keys and
   fields neither build initialises. Every map logs the old build's warnings
   exactly, and server and client entity lists match on every multiplayer case.
+  Third review, 25 November: every cvar and console command compared with both
+  old trees, and five hunk-by-hunk reviews of the merge (three for the
+  campaign, two for network play, including its menus with no map loaded and
+  the single-player-only sources now compiled into it). No difference in
+  gameplay, saves, the wire format or anything visible; seven minor ones
+  (debug prints, a cheat's vehicle branch, load-time work) are now gated to the
+  mode whose library had them. Five recovered game regressions had failed since
+  the merge, hidden because their suite already failed before it; they pass
+  again. The mode cvars now follow the mode even where a platform keeps the
+  module's image loaded across a mode change (macOS keeps any image with
+  thread-local variables). The in-game updater retires the old split modules,
+  and a mod that still ships only those gets a console warning. A mode change
+  no longer reports the mode cvars as declared twice. Rechecked against the
+  pre-merge build: six campaign maps, eight server cases and a listen server
+  log the same warnings and hold the same entities and saved object tables.
   Remaining: the macOS build and smoke; an Android emulator or device run; a
   human session across both modes. Follow-ups once closed: keep one
   loaded library across a mode change, and remove the engine's workarounds for

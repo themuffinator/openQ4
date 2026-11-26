@@ -267,6 +267,12 @@ static void TestStage( const fs::path &scratch ) {
 		fs::create_directories( install / "baseoq4", ec );
 		std::ofstream( install / "baseoq4" / "pak7.pk4", std::ios::binary ) << "retired overlay";
 		std::ofstream( install / "baseoq4" / "pak0.pk4", std::ios::binary ) << "current pak0";
+		// CORE-07: the split modules an update planned by 0.15.0 left behind;
+		// game-sp_x64.dll stays because the fixture archive carries that name
+		std::ofstream( install / "baseoq4" / "game-mp_x64.pdb", std::ios::binary ) << "retired symbols";
+		std::ofstream( install / "baseoq4" / "game-mp_x64.dll", std::ios::binary ) << "retired module";
+		std::ofstream( install / "baseoq4" / "game-sp_x64.dll", std::ios::binary ) << "replaced module";
+		std::ofstream( install / "baseoq4" / "game_x64.dll", std::ios::binary ) << "current module";
 	};
 	auto request = [&]() {
 		StageRequest r;
@@ -312,7 +318,8 @@ static void TestStage( const fs::path &scratch ) {
 	const fs::path updateDir = install / UPDATE_DIRECTORY;
 	CHECK( ( plan.files == std::vector<std::string> { "README.txt", "baseoq4/game-sp_x64.dll", "baseoq4/pak1.pk4", "empty.txt", "launch.sh" } ),
 		"plan lists the archive and the pack" );
-	CHECK( ( plan.removals == std::vector<std::string> { "baseoq4/pak7.pk4" } ), "an unlisted numbered pack is retired" );
+	CHECK( ( plan.removals == std::vector<std::string> { "baseoq4/pak7.pk4", "baseoq4/game-mp_x64.dll", "baseoq4/game-mp_x64.pdb" } ),
+		"an unlisted numbered pack and the retired split game modules are retired" );
 	std::string digest, planText;
 	CHECK( SHA256File( updateDir / STAGE_DIRECTORY / "baseoq4" / "pak1.pk4", digest, result.error ) && digest == Sha256Hex( pak1 ), "pack staged intact" );
 	UpdatePlan written;

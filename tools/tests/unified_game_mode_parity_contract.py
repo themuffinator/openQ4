@@ -9,11 +9,22 @@ script stack and warnings, and campaign saves keep the values and spellings the
 single-player library wrote. A 25 November 2026 A/B of every official map
 against the pre-merge build (docs/dev/unified-game-module.md) found each of
 these; this check keeps the gates from being dropped by later edits.
+
+The few cvars whose default or flags differ per mode (idModeCVar) must follow
+the mode on every load, including when the platform keeps the loaded image
+across a mode change (dyld never unloads an image with thread-local variables),
+so the registration is also run as a fixture against a stand-in cvar system.
+A mode's own default must never be reported as a second declaration of the
+cvar at a mode change either.
 """
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -110,10 +121,129 @@ def check_network_play_script_runtime() -> None:
         raise AssertionError("the campaign keeps its 12288-byte locals stack")
 
 
+MODE_CVAR_HARNESS = r"""
+#include <cassert>
+#include <cstddef>
+#include <cstdio>
+#include <map>
+#include <string>
+enum { CVAR_GAME = 1 << 0, CVAR_BOOL = 1 << 1, CVAR_ARCHIVE = 1 << 2, CVAR_SERVERINFO = 1 << 3, CVAR_STATIC = 1 << 30 };
+typedef void ( *argCompletion_t )( void );
+class idCVar;
+// idInternalCVar::Update: a declaration's value becomes the reset value and
+// its flags, CVAR_STATIC included, merge into the registered ones; a static
+// declaration meeting a registration that is still static with another
+// default is "declared multiple times with different initial value".
+struct Registered { std::string reset; int flags = 0; int registrations = 0; };
+struct CVarSystem {
+	std::map<std::string, Registered> vars;
+	int declaredTwice = 0;
+	void Register( idCVar *cvar );
+} cvars, *cvarSystem = &cvars;
+class idCVar {
+public:
+	idCVar( const char *n, const char *v, int f, const char *, argCompletion_t = NULL ) : name( n ), value( v ), flags( f | CVAR_STATIC ) {}
+	idCVar( const char *n, const char *v, int f, const char *, const char **, argCompletion_t = NULL ) : name( n ), value( v ), flags( f | CVAR_STATIC ) {}
+	const char *Name() const { return name; }
+	const char *Default() const { return value; }
+	int Flags() const { return flags; }
+	// as the engine's: on the registered copy
+	void RemoveFlag( int flag ) { cvars.vars[ name ].flags &= ~flag; }
+protected:
+	const char *name;
+	const char *value;
+	int flags;
+};
+void CVarSystem::Register( idCVar *cvar ) {
+	Registered &r = vars[ cvar->Name() ];
+	if ( r.registrations > 0 && ( r.flags & CVAR_STATIC ) && r.reset != cvar->Default() ) {
+		++declaredTwice;
+	}
+	r.reset = cvar->Default();
+	r.flags |= cvar->Flags();
+	++r.registrations;
+}
+@CLASS@
+@DEFINITIONS@
+idModeCVar pure( "si_pure", "0", CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL, "1", CVAR_GAME | CVAR_SERVERINFO | CVAR_BOOL, "pure" );
+idModeCVar shape( "pm_usecylinder", "0", CVAR_GAME | CVAR_BOOL, "1", CVAR_GAME | CVAR_BOOL | CVAR_ARCHIVE, "shape" );
+static bool staticListRegistered = false;
+// one idGameLocal::Init: the mode, then idCVar::RegisterStaticVars, which
+// registers the static list once per loaded image
+static void Init( bool multiplayer ) {
+	idModeCVar::ApplyModuleMode( multiplayer );
+	if ( !staticListRegistered ) {
+		cvarSystem->Register( &pure );
+		cvarSystem->Register( &shape );
+		staticListRegistered = true;
+	}
+}
+// the late phase of idGameLocal::Shutdown, just before the engine unloads it
+static void Unload() {
+	idModeCVar::ReleaseModuleMode();
+}
+int main() {
+	// a fresh image per mode: nothing changes for the first load
+	Init( false );
+	assert( cvars.vars[ "si_pure" ].reset == "0" && cvars.vars[ "pm_usecylinder" ].reset == "0" );
+	assert( !( cvars.vars[ "pm_usecylinder" ].flags & CVAR_ARCHIVE ) );
+	assert( cvars.vars[ "si_pure" ].registrations == 1 );
+	Unload();
+	// the platform kept the image loaded: the next Init serves network play
+	Init( true );
+	assert( cvars.vars[ "si_pure" ].reset == "1" && cvars.vars[ "pm_usecylinder" ].reset == "1" );
+	assert( cvars.vars[ "pm_usecylinder" ].flags & CVAR_ARCHIVE );
+	assert( cvars.vars[ "si_pure" ].registrations == 2 );
+	Unload();
+	// ...and the campaign again, with its own defaults
+	Init( false );
+	assert( cvars.vars[ "si_pure" ].reset == "0" && cvars.vars[ "pm_usecylinder" ].reset == "0" );
+	assert( pure.Default() == std::string( "0" ) && !( pure.Flags() & CVAR_ARCHIVE ) );
+	assert( cvars.vars[ "si_pure" ].registrations == 3 );
+	// a mode's own default is never reported as a second declaration
+	assert( cvars.declaredTwice == 0 );
+	// ...while the registration is static again once a declaration arrived
+	assert( cvars.vars[ "si_pure" ].flags & CVAR_STATIC );
+	std::puts( "mode cvars across loads of one image: PASS" );
+	return 0;
+}
+"""
+
+
+def check_mode_cvars_follow_every_load() -> None:
+    header = read("src/game/gamesys/SysCvar.h").replace("\r\n", "\n")
+    source = read("src/game/gamesys/SysCvar.cpp").replace("\r\n", "\n")
+    begin = header.index("class idModeCVar : public idCVar {")
+    declaration = header[begin:header.index("\n};", begin) + 3]
+    start = source.index("idModeCVar *idModeCVar::modeCVars = NULL;")
+    release = source.index("void idModeCVar::ReleaseModuleMode( void ) {", start)
+    definitions = source[start:release] + "void idModeCVar::ReleaseModuleMode( void ) " + \
+        function_body(source[release:], "void idModeCVar::ReleaseModuleMode(", "SysCvar.cpp")
+    shutdown = read("src/game/Game_local.cpp").replace("\r\n", "\n")
+    require(shutdown, "cvarSystem->RemoveFlaggedAutoCompletion( CVAR_GAME );\n\t\tidModeCVar::ReleaseModuleMode();",
+            "idGameLocal's late shutdown releases the mode cvars")
+    compiler = os.environ.get("CXX") or shutil.which("clang++") or shutil.which("g++")
+    if not compiler:
+        raise RuntimeError("a C++ compiler is required")
+    (ROOT / ".tmp").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="mode-cvars-", dir=ROOT / ".tmp") as name:
+        directory = Path(name)
+        cpp, exe = directory / "fixture.cpp", directory / ("fixture.exe" if os.name == "nt" else "fixture")
+        cpp.write_text(MODE_CVAR_HARNESS.replace("@CLASS@", declaration).replace("@DEFINITIONS@", definitions),
+                       encoding="utf-8")
+        subprocess.run([compiler, "-std=c++17", "-Wall", "-Wextra", "-Werror", "-Wno-shadow", str(cpp), "-o", str(exe)],
+                       cwd=directory, check=True)
+        result = subprocess.run([str(exe)], cwd=directory, capture_output=True, text=True)
+        if result.returncode != 0:
+            raise AssertionError(f"mode cvar fixture failed: {result.stdout}{result.stderr}")
+        print(result.stdout, end="")
+
+
 def main() -> int:
     check_campaign_saves()
     check_campaign_keys_stay_out_of_network_play()
     check_network_play_script_runtime()
+    check_mode_cvars_follow_every_load()
     print("unified_game_mode_parity_contract: ok")
     return 0
 

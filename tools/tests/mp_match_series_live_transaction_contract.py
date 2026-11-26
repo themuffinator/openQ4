@@ -556,6 +556,10 @@ struct idGameLocal {
     // MP-18: a multiplayer server whose map ends forgets a serverShutdown that already stopped it
     int shutdownMapsEnded=0;
     void ServerShutdownMapEnded(){++shutdownMapsEnded;}
+    // CORE-07: one game module; this fixture is its network-play mode
+    bool mpInteractionsGenerated=false;
+    bool IsMultiplayerMode() const {return true;}
+    void ResetSpecialEffects(){}
     void MapShutdown();
 } gameLocal;
 bool idMultiplayerGame::FinalizeMatchEvidence(bool aborted) {
