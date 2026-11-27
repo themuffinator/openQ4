@@ -45,6 +45,28 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## The highest Shadows setting keeps every light's shadow stored, 27 November 2026
+
+- **The highest Shadows setting no longer redraws half a room's shadows every
+  frame.** Its larger point-light shadow maps take four times the memory of the
+  other settings', but the store for them was sized for the small ones, so in
+  a room with dozens of lights only about half fitted and the rest were drawn
+  again on every frame. Larger shadow maps now get three times the memory
+  (1536 MiB at the default). In the hub level's processing hall on Vulkan at
+  the Maximum preset, five point-light shadows were redrawn per frame and now
+  almost none are, and shadow drawing falls from about 690 objects a frame to
+  about 250.
+- **Memory.** Shadow memory in that hall stays about the same, 1.9 to 2.4 GiB
+  on Vulkan, because the temporary maps the unstored lights used are no longer
+  needed. In levels with more stored lights it can grow by up to 1 GiB over
+  before. The other Shadows settings are unchanged.
+- **What to do.** Nothing. `r_shadowMapPointCacheMegs` still sets the figure;
+  it now means the budget for the standard size, and larger maps get three
+  times it.
+- Developer detail:
+  [the top level's point cache](shadowmapping-audit-2026-11-27.md#the-top-levels-point-cache).
+  No ABI change.
+
 ## No more one-frame shadowless flashes in crowded rooms on Vulkan, 27 November 2026
 
 - **A light no longer flashes without its shadow on Vulkan's highest shadow

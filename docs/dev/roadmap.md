@@ -2690,7 +2690,11 @@ are not yet measured.
   was drawn for a frame with no shadow, because its stencil volumes had been elided:
   the back end now reports the pool's pressure and the front end keeps point lights'
   volumes while it lasts (Hub 2 at Maximum: the "required shadow resource
-  unavailable" warning in every run before, in none after). Open leads are listed
+  unavailable" warning in every run before, in none after). The pool ran out because
+  the 512 MiB point cache was sized for 512 cubes: cubes above 512, which only the top
+  shadow level draws, now get three times `r_shadowMapPointCacheMegs`, and that hall
+  goes from 21 cache slots and five cubes rendered a view to 64 slots and 0.2, with
+  no overflow. Open leads are listed
   there: cascade scale stepping with yaw and PCSS-lite on parallel lights.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an

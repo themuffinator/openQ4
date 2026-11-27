@@ -21,7 +21,9 @@ namespace {
 // upgrade together) and are 1024 there, not 2048: a 2048 cube is 96 MB, so the
 // default r_shadowMapPointCacheMegs held five and a Vulkan view's pool twelve,
 // and views with a hundred shadowing point lights (mcc_landing) put most of
-// them on stencil shadows (#258).
+// them on stencil shadows (#258). The renderer gives cubes above 512 three
+// times that figure (R_ShadowMapPointCacheBudgetMegsFor), so ultra's 1024
+// cubes have 1536 MiB and all 64 cache slots; it is not a column here.
 static const std::array<ShadowQuality,ShadowQualityCount> ShadowLevels{{
 	{ "off",      0, 0, 1,  512,  512,  1,  1, 0, 0,  2048, 0, 1 },
 	{ "original", 1, 0, 1, 1024,  512,  5,  5, 0, 0,  2048, 0, 1 },

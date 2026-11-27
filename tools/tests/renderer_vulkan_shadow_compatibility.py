@@ -9658,6 +9658,55 @@ def validate_point_pool_pressure_contract() -> None:
     )
 
 
+def validate_point_cache_budget_by_cube_size_contract() -> None:
+    """Point cubes above 512 texels a side get three times
+    r_shadowMapPointCacheMegs, for the cache and for Vulkan's scratch pool.
+
+    The figure was sized for 512 cubes, 64 of which fit in 512 MiB. The top
+    shadow level draws 1024 cubes, four times the texels: the same figure held
+    21, half of Nexus Hub 2's hall, and the rest were rendered again every
+    frame. The rule lives in the renderer and follows the cube size, so the
+    presets' closed footprint does not grow.
+    """
+    classification = read("src/renderer/ShadowMapClassification.cpp")
+    budget = braced_body(classification, "int R_ShadowMapPointCacheBudgetMegsFor(", "point cache budget")
+    require_order(
+        budget,
+        (
+            "const int megs = Max( 0, configuredMegs );",
+            "if ( faceSize <= SHADOWMAP_POINT_CACHE_BASE_FACE_SIZE ) {",
+            "return megs;",
+            "return megs * SHADOWMAP_POINT_CACHE_LARGE_CUBE_BUDGET_SCALE;",
+        ),
+        "larger cubes get a multiple of the configured figure",
+    )
+    header = read("src/renderer/ShadowMapClassification.h")
+    require(header, "static const int SHADOWMAP_POINT_CACHE_BASE_FACE_SIZE = 512;", "the size the figure is for")
+    require(header, "static const int SHADOWMAP_POINT_CACHE_LARGE_CUBE_BUDGET_SCALE = 3;", "the scale")
+    limit = braced_body(classification, "int R_ShadowMapPointCacheSlotLimit(", "shared point cache-size policy")
+    require_compact(
+        limit,
+        "R_ShadowMapPointCacheBudgetMegsFor( r_shadowMapPointCacheMegs.GetInteger(), faceSize ),",
+        "the cache's slot limit takes the scaled figure",
+    )
+    scratch = braced_body(read("src/renderer/Vulkan/vk_ShadowMap.cpp"),
+                          "static int VK_ShadowMap_ScratchCubeLimit(", "scratch cube ceiling")
+    require_compact(
+        scratch,
+        """R_ShadowMapPointCacheBudgetMegsFor(
+            r_shadowMapPointCacheMegs.GetInteger(),
+            VK_ShadowMap_PointSizeValue() )""",
+        "Vulkan's scratch pool takes the same scaled figure",
+    )
+    selftest = braced_body(classification, "bool R_ShadowMapCachePolicySelfTest(", "shared policy self-test")
+    for case in (
+        "R_ShadowMapPointCacheBudgetMegsFor( 512, 512 ) != 512",
+        "R_ShadowMapPointCacheBudgetMegsFor( 512, 1024 ) != 1536",
+        "R_ShadowMapPointCacheSlotLimitFor( 64, 512, 1024, 4, maxSlots ) != 21",
+    ):
+        require(selftest, case, "the self-test pins the budget rule")
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -10962,6 +11011,7 @@ def main() -> None:
     validate_source_plane_cascade_contract()
     validate_second_audit_followups_contract()
     validate_point_pool_pressure_contract()
+    validate_point_cache_budget_by_cube_size_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

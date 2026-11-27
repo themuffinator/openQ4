@@ -2021,8 +2021,11 @@ static int VK_ShadowMap_ScratchCubeLimit( void ) {
 			Max( 1, VK_ShadowMap_PointSizeValue() ) );
 	const double cubeBytes = 6.0 * faceSize * faceSize
 			* VK_ShadowMap_DepthBytesPerPixel();
+	// the figure the cache has, scaled for the cube size as the cache's is
 	const double budgetBytes = static_cast<double>(
-			Max( 0, r_shadowMapPointCacheMegs.GetInteger() ) ) * 1048576.0;
+			R_ShadowMapPointCacheBudgetMegsFor(
+				r_shadowMapPointCacheMegs.GetInteger(),
+				VK_ShadowMap_PointSizeValue() ) ) * 1048576.0;
 	const double affordable = floor( budgetBytes / cubeBytes );
 	const int cubes = affordable >= static_cast<double>(
 			VK_SHADOW_MAX_POINT_CUBES )

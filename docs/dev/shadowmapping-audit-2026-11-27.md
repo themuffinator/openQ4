@@ -10,8 +10,8 @@ FPS-03 in the [roadmap](roadmap.md).
 Five independent read-throughs produced about thirty candidates. Each was
 checked against the code before anything changed. Fourteen were fixed here, a
 fifteenth (the cascade collapse behind a light's source plane), five more
-leads, bilinear PCSS-lite taps on Vulkan and the point light left without a
-cube or volumes the same day, one
+leads, bilinear PCSS-lite taps on Vulkan, the point light left without a cube
+or volumes and the top level's point cache the same day, one
 was measured and left, and the rest are recorded below as leads with the reason
 each was not taken.
 
@@ -239,6 +239,43 @@ for a whole view, and always answers that there is room.
   teleport into a crowded hall) can still overflow before the pressure is
   known. Level starts are covered, since volumes are kept until the back end
   has proven its resources.
+
+## The top level's point cache
+
+The pool ran out at the top shadow level because its budget was sized for
+another cube. `r_shadowMapPointCacheMegs` (512) holds all 64 cache slots of 512
+cubes at 6 MiB each. The top level draws 1024 cubes, four times the texels:
+the same figure held 21, about half of the passes of Nexus Hub 2's hall, and
+the other half were rendered again every frame into a scratch pool with the
+same 21.
+
+The owner chose 1536 MiB for the top level. It is a rule in the renderer and
+not a preset value: cubes above 512 texels a side get three times the
+configured figure, for the cache and for Vulkan's scratch pool
+(`R_ShadowMapPointCacheBudgetMegsFor`). The top level is the only one with
+such cubes, a player who sets 1024 cubes by hand gets the same, an archived
+512 needs no migration, and the presets' closed footprint, with its settings
+catalogue version and System Check, does not grow.
+
+Hub 2 at the Maximum preset on Vulkan, the 360 degree sweep, default settings,
+two windows each:
+
+| | Before | After |
+|---|---:|---:|
+| Cache slots available | 21 | 64 |
+| Slots in use | 20 to 21 | 38 to 41 |
+| Point cubes rendered a view | 5.2 and 5.3 | 0.2 and 0.3 |
+| Cube faces rendered a view | 31 and 32 | 0.9 and 1.6 |
+| Caster draws a view | 698 and 688 | 243 and 258 |
+| Scratch cubes in use | 11 to 17 | 1 |
+| Pool overflows a run | 1 | 0 |
+| Resident shadow memory | 1.7 to 2.8 GiB | 1.9 to 2.4 GiB |
+
+Resident memory did not rise as a larger budget suggests: the scratch pool the
+uncached lights kept busy is nearly empty now. GPU time was not compared,
+because other projects' clients were loading the GPU. On OpenGL the same view
+holds 54 of 64 cube slots at Maximum. Quality is unchanged on both: 64 slots,
+350 to 450 MiB resident on Vulkan.
 
 ## Measured and left
 
