@@ -588,6 +588,13 @@ idCVar r_shadowMapPointFilterMode( "r_shadowMapPointFilterMode", "0", CVAR_RENDE
 idCVar r_shadowMapDistantFilterScale( "r_shadowMapDistantFilterScale", "0.35", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "scale projected PCF and PCSS radii for parallel/global sky lights whose shadow texels cover more world space", 0.0f, 1.0f );
 idCVar r_shadowMapPCSSLightRadius( "r_shadowMapPCSSLightRadius", "4.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "projected PCSS-lite blocker search radius in shadow texels", 0.0f, 16.0f );
 idCVar r_shadowMapPCSSMaxRadius( "r_shadowMapPCSSMaxRadius", "8.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "projected PCSS-lite maximum filter radius in shadow texels", 0.0f, 16.0f );
+// A sun's rays arrive parallel, so the penumbra it leaves is the gap between
+// caster and receiver times its apparent size, wherever the pair sits in the
+// light's box. The point-source rule the other projected lights use divides
+// the gap by the blocker's depth instead, which for a parallel light is its
+// height in the box and for a distant point light thousands of units, so
+// sunlight hardly ever softened (R_ShadowMapProjectedSunPenumbraScales).
+idCVar r_shadowMapSunAngle( "r_shadowMapSunAngle", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT, "apparent diameter, in degrees, of parallel and distant point lights for PCSS-lite: their shadows soften by the gap between caster and receiver times this angle (the Sun seen from Earth is 0.53); 0 = the point-source rule the other projected lights use", 0.0f, 10.0f );
 idCVar r_shadowMapPointHighPrecision( "r_shadowMapPointHighPrecision", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "store point-light shadow depth in an fp16 color cubemap instead of packed RGBA8 depth. The packed path quantizes finer (1.5e-5 vs 4.9e-4 near the far envelope) at half the memory, and the default hardware-compare path samples the depth cubemap directly, so this only affects the manual fallback. OpenGL only: the Vulkan backend always stores native depth, which quantizes finer than either colour format" );
 idCVar r_shadowMapPointLights( "r_shadowMapPointLights", "1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_BOOL, "shadow-map point lights when r_useShadowMap is enabled; disabled falls back to stencil shadows for point lights. Point lights are the dominant light class in Quake 4 content, so disabling this makes r_useShadowMap nearly a no-op" );
 idCVar r_shadowMapPointSize( "r_shadowMapPointSize", "512", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "point-light cube face resolution; separate from r_shadowMapSize because a cube costs six faces of color+depth storage per cached light", 128, 2048, idCmdSystem::ArgCompletion_Integer<128,2048> );

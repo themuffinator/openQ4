@@ -2699,8 +2699,20 @@ are not yet measured.
   number of nearest cascades; the owner chose 2 as the default): at Air Defense 1 a
   full turn resamples each cascade 8 times with the tight box and never with the
   sphere, for texels at the tight fit's worst direction on the near two; the far one,
-  which would be about a third coarser, keeps the tight box. One open lead is listed there: PCSS-lite on parallel
-  lights.
+  which would be about a third coarser, keeps the tight box. The OpenGL fix for
+  lights that need a map and stencil together was then checked on screen with a
+  forced case (3.25% of the view wrong before, 0.05% after; no stock view takes the
+  path, and the shadow report now prints `hybrid=` to show when one does), and PBR
+  receivers on both renderers skip the shadow filter where the light does not reach
+  (pictures identical; the showcase overview 6.6 ms against 6.7 to 7.6 on OpenGL).
+  Sunlight's soft edge then got its own rule (`r_shadowMapSunAngle`, default 1
+  degree): for parallel and distant point lights PCSS-lite widens by the gap between
+  caster and receiver times the sun's apparent size, where the point-source rule
+  divided by the blocker's depth and left sunlight at the base radius. Contact
+  shadows are unchanged, distant casters soften, coverage against stencil stays at
+  99.7%, and both renderers agree. The owner kept the 1 degree default. Open: its
+  Vulkan cost (at most 0.7 ms at 1440p, measured on a busy GPU) and the default's
+  look in motion.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always

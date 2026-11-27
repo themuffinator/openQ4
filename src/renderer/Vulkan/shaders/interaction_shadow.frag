@@ -73,7 +73,8 @@ layout(set = 7, binding = 1, std140) uniform ShadowBlock {
                        // w: index + 1 of the whole-light cascade (0 = none)
     vec4 filterParams; // x: radius, y: taps, z: mode, w: how a tap compares: 0 = the nearest raw
                        // depth, 1 = the hardware comparison sampler, 2 = raw depths, bilinear
-    vec4 pcssParams;   // x: light radius, y: max radius, z: effective radius, w: receiver-plane bias
+    vec4 pcssParams;   // x: light radius, y: max radius, z: effective radius,
+                       // w: receiver-plane bias (0 or 1) + sun penumbra tangent (ShadowSunTan)
     vec4 debugParams;  // x: debug mode, y: fallback reason, zw: PCSS ownership UV offset
     // Translucent moments live in a separate atlas whose blocks mirror the
     // depth-atlas blocks at a uniform scale: momentUV = depthUV * x + yz.
@@ -331,7 +332,42 @@ float SampleShadowCompare(vec2 uv, float depth, int cascadeIndex,
 // tap compares, against the same biased depth, so the filter takes the answer
 // instead of reading the map again (twice, under the ownership union). A
 // search that finds no blocker has by that found the centre lit.
-float ProjectedPCSSRadius(vec2 uv, float depth, int cascadeIndex,
+// The tangent of half a sun-like light's apparent diameter, 0 for every
+// other light: what pcssParams.w holds beside the receiver-plane flag.
+float ShadowSunTan() {
+    return shadow.pcssParams.w - (shadow.pcssParams.w > 0.5 ? 1.0 : 0.0);
+}
+
+// A sun-like light's penumbra radius in shadow texels per unit of stored
+// depth between blocker and receiver, for a receiver at light depth w = 1,
+// as R_ShadowMapProjectedSunPenumbraScales computes it for OpenGL: a gap of
+// g world units leaves a penumbra g * tan wide, stored depth changes by the
+// depth row's length per world unit, and a texel spans
+// 2 w / (tile texels * the coarser of S and T across the w axis) world units.
+float SunPenumbraScale(int cascadeIndex, vec2 tileTexels) {
+    float sunTan = ShadowSunTan();
+    if (sunTan <= 0.0) {
+        return 0.0;
+    }
+    int index = clamp(cascadeIndex, 0, 3);
+    vec3 s = shadow.shadowRow0[index].xyz;
+    vec3 t = shadow.shadowRow1[index].xyz;
+    vec3 wAxis = shadow.shadowRow3[index].xyz;
+    float wAxisSqr = dot(wAxis, wAxis);
+    if (wAxisSqr > 0.0) {
+        s -= wAxis * (dot(s, wAxis) / wAxisSqr);
+        t -= wAxis * (dot(t, wAxis) / wAxisSqr);
+    }
+    float across = min(length(s) * tileTexels.x, length(t) * tileTexels.y);
+    float depthRate = length(shadow.shadowRow2[index].xyz);
+    if (!(across > 0.0) || !(depthRate > 0.0)) {
+        return 0.0;
+    }
+    return sunTan * 0.5 * across / depthRate;
+}
+
+float ProjectedPCSSRadius(vec2 uv, float depth, float receiverW,
+        int cascadeIndex, vec2 tileTexels,
         vec2 clampMin, vec2 clampMax, vec2 texelStep, mat2 rotation,
         out float centreLit) {
     centreLit = -1.0;
@@ -347,7 +383,11 @@ float ProjectedPCSSRadius(vec2 uv, float depth, int cascadeIndex,
     }
 
     float compareDepth = depth - ShadowReceiverBias(cascadeIndex);
-    float searchRadius = max(shadow.pcssParams.x, 0.5);
+    // A sun's penumbra can reach the maximum radius from a blocker that far
+    // to the side, so its search looks that far.
+    float sunPenumbra = SunPenumbraScale(cascadeIndex, tileTexels);
+    float searchRadius = max(sunPenumbra > 0.0
+        ? shadow.pcssParams.y : shadow.pcssParams.x, 0.5);
     vec2 searchTap = texelStep * searchRadius;
     // Without the footprint bias a tilted receiver finds itself as a blocker.
     float searchBias = ShadowFootprintBias(cascadeIndex) * searchRadius;
@@ -425,10 +465,14 @@ float ProjectedPCSSRadius(vec2 uv, float depth, int cascadeIndex,
 
     float averageBlocker = blockerDepth / blockerCount;
     float separation = max(compareDepth - averageBlocker, 0.0);
-    float penumbra = separation
-        / max(averageBlocker, 1.0e-4);
+    // A point source's penumbra grows with the gap over the blocker's
+    // distance from it. A sun's rays are parallel: the gap times its
+    // apparent size, in this cascade's texels at the receiver's depth.
+    float penumbraRadius = sunPenumbra > 0.0
+        ? separation * sunPenumbra / max(receiverW, 1.0e-4)
+        : separation / max(averageBlocker, 1.0e-4) * shadow.pcssParams.x;
     float maxRadius = max(baseRadius, shadow.pcssParams.y);
-    return clamp(max(baseRadius, penumbra * shadow.pcssParams.x),
+    return clamp(max(baseRadius, penumbraRadius),
         baseRadius, maxRadius);
 }
 
@@ -500,7 +544,8 @@ float SampleShadowCascade(vec4 shadowCoord, vec4 atlasRect,
     mat2 rotation = ShadowOffsetRotation(tileTexel, depth);
 
     float centreLit;
-    float filterRadius = ProjectedPCSSRadius(uv, depth, cascadeIndex,
+    float filterRadius = ProjectedPCSSRadius(uv, depth, shadowCoord.w,
+        cascadeIndex, tileTexels,
         clampMin, clampMax, texelStep, rotation, centreLit);
     if (centreLit < 0.0) {
         centreLit = SampleShadowCompare(uv, depth, cascadeIndex, 0.0);
@@ -1044,8 +1089,19 @@ void main() {
     vec4 bumpSample = RetailTexture(bumpMap, bumpTexCoord, gPBRBumpDx, gPBRBumpDy);
     if (pc.d.x > 0.5) {
         vec3 localNormal = PBRDirectNormal(bumpTexCoord);
+        // EvaluatePBRDirect builds its radiance from these two samples, so
+        // where they are black the result is black whatever the shadow says:
+        // outside the projected image and past the falloff the filter, most
+        // of this shader's cost, has nothing to resolve.
+        vec3 reach = textureProj(lightFalloffMap, vLightFalloffTexCoord).rgb
+            * textureProj(lightProjectionMap, vLightProjectionTexCoord).rgb;
+        bool lit = max(reach.r, max(reach.g, reach.b)) > 0.0 || ShadowVisualDebugMode();
+        float shadowFactor = 1.0;
+        if (lit) {
+            shadowFactor = SampleShadowFactor();
+        }
         vec3 packed = EvaluatePBRDirect(localNormal,
-            diffuseTexCoord, specularTexCoord, SampleShadowFactor());
+            diffuseTexCoord, specularTexCoord, shadowFactor);
         // Sample first: the views describe the cascade the lit path chose.
         if (ShadowVisualDebugMode()) {
             outColor = ShadowDebugOutput();
@@ -1053,7 +1109,9 @@ void main() {
         }
         // Direct radiance is linear in the light color, so the colored
         // translucent transmittance can filter the evaluated result.
-        packed *= SampleTranslucentShadow();
+        if (lit) {
+            packed *= SampleTranslucentShadow();
+        }
         outColor = vec4(packed, PBRTransparentAlpha(diffuseTexCoord));
         return;
     }

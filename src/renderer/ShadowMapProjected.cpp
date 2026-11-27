@@ -602,6 +602,27 @@ static float R_ShadowMapPerspectiveTexelPerDepth( const idPlane clipPlanes[4], c
 	return 2.0f / ( static_cast<float>( tileSize ) * across );
 }
 
+void R_ShadowMapProjectedSunPenumbraScales( const shadowMapProjectedLightState_t &state, const float sunPenumbraTan, float scales[SHADOWMAP_PROJECTED_MAX_CASCADES] ) {
+	for ( int cascadeIndex = 0; cascadeIndex < SHADOWMAP_PROJECTED_MAX_CASCADES; cascadeIndex++ ) {
+		scales[cascadeIndex] = 0.0f;
+	}
+	if ( !state.valid || state.tileSize <= 0 || !( sunPenumbraTan > 0.0f ) ) {
+		return;
+	}
+	for ( int cascadeIndex = 0; cascadeIndex < state.cascadeCount && cascadeIndex < SHADOWMAP_PROJECTED_MAX_CASCADES; cascadeIndex++ ) {
+		const idPlane *planes = state.clipPlanes[cascadeIndex];
+		const idVec3 depthAxis = planes[3].Normal();
+		const float across = Min(
+			R_ShadowMapRowAcrossDepthLength( planes[0].Normal(), depthAxis ),
+			R_ShadowMapRowAcrossDepthLength( planes[1].Normal(), depthAxis ) );
+		const float depthRate = planes[2].Normal().Length();
+		if ( !( across > 0.0f ) || !( depthRate > 0.0f ) ) {
+			continue;
+		}
+		scales[cascadeIndex] = sunPenumbraTan * 0.5f * static_cast<float>( state.tileSize ) * across / depthRate;
+	}
+}
+
 float R_ShadowMapProjectedNormalOffsetWorld( const shadowMapProjectedLightState_t &state, const int cascadeIndex, const float normalOffsetScale, const bool depthScaled ) {
 	if ( cascadeIndex < 0 || cascadeIndex >= SHADOWMAP_PROJECTED_MAX_CASCADES ) {
 		return 0.0f;
@@ -1893,6 +1914,9 @@ bool R_ShadowMapDistantNormalOffsetSelfTest( void ) {
 	float singlePlayer = 0.0f;
 	float singleWorld = 0.0f;
 	int checked = 0;
+	// a one-degree sun and a caster 100 units from its receiver
+	const float sunTan = idMath::Tan( DEG2RAD( 0.5f ) );
+	const float sunGap = 100.0f;
 	for ( int layout = 0; layout < 2; ++layout ) {
 		const bool cascaded = layout == 1;
 		r_shadowMapCSM.SetBool( cascaded );
@@ -1905,6 +1929,8 @@ bool R_ShadowMapDistantNormalOffsetSelfTest( void ) {
 				layout, state.valid ? 1 : 0, state.cascadeCount, state.cascadeFallback ? 1 : 0 );
 			return false;
 		}
+		float sunScales[SHADOWMAP_PROJECTED_MAX_CASCADES];
+		R_ShadowMapProjectedSunPenumbraScales( state, sunTan, sunScales );
 		for ( int cascade = 0; cascade < state.cascadeCount; ++cascade ) {
 			const float perDepth = state.texelPerDepth[cascade];
 			if ( !( perDepth > 0.0f ) ) {
@@ -1914,6 +1940,8 @@ bool R_ShadowMapDistantNormalOffsetSelfTest( void ) {
 			for ( int i = 0; i < 11; ++i ) {
 				idVec4 clip;
 				R_ShadowMapTransformPointToClip( receivers[i], state.clipPlanes[cascade], clip );
+				// a crop keeps only part of the volume: the texel is measured
+				// wherever the receiver is, the map need not hold it
 				const float measured = R_ShadowMapMeasuredTexelAtPoint( state.clipPlanes[cascade], state.tileSize, receivers[i] );
 				const float predicted = perDepth * clip.w;
 				if ( !( measured > 0.0f ) || idMath::Fabs( predicted - measured ) > measured * 0.005f ) {
@@ -1927,6 +1955,20 @@ bool R_ShadowMapDistantNormalOffsetSelfTest( void ) {
 					} else if ( i == 9 ) {
 						singlePlayer = predicted;
 					}
+				}
+				// A caster 100 units nearer the source along the depth row
+				// leaves a penumbra 100 * tan wide: in texels at the
+				// receiver, what the scale makes of the depth between them.
+				idVec3 depthDir = state.clipPlanes[cascade][2].Normal();
+				depthDir.Normalize();
+				idVec4 blockerClip;
+				R_ShadowMapTransformPointToClip( receivers[i] - depthDir * sunGap, state.clipPlanes[cascade], blockerClip );
+				const float sunTexels = ( clip.z - blockerClip.z ) * sunScales[cascade] / clip.w;
+				const float sunExpected = sunGap * sunTan / measured;
+				if ( !( sunTexels > 0.0f ) || idMath::Fabs( sunTexels - sunExpected ) > sunExpected * 0.005f ) {
+					common->Printf( "ShadowMap distant normal offset self-test failed: layout %d cascade %d receiver %d sun penumbra %.4f texels, expected %.4f\n",
+						layout, cascade, i, sunTexels, sunExpected );
+					return false;
 				}
 				++checked;
 			}
@@ -1959,6 +2001,22 @@ bool R_ShadowMapDistantNormalOffsetSelfTest( void ) {
 	if ( !parallelState.valid || parallelState.texelPerDepth[0] != 0.0f
 			|| R_ShadowMapProjectedNormalOffsetWorld( parallelState, 0, 1.0f, true ) != parallelState.worldTexelSize[0] ) {
 		common->Printf( "ShadowMap distant normal offset self-test failed: a parallel light's offset follows depth\n" );
+		return false;
+	}
+	// A parallel light's penumbra is the same number of texels wherever the
+	// pair sits in the box: the gap in stored depth times the scale, against
+	// the gap times the tangent over the map's texel.
+	float parallelSun[SHADOWMAP_PROJECTED_MAX_CASCADES];
+	R_ShadowMapProjectedSunPenumbraScales( parallelState, sunTan, parallelSun );
+	const float parallelDepthGap = sunGap * parallelState.clipPlanes[0][2].Normal().Length();
+	const float parallelTexels = parallelDepthGap * parallelSun[0];
+	const float parallelExpected = sunGap * sunTan / parallelState.worldTexelSize[0];
+	float noSun[SHADOWMAP_PROJECTED_MAX_CASCADES];
+	R_ShadowMapProjectedSunPenumbraScales( parallelState, 0.0f, noSun );
+	if ( !( parallelTexels > 0.0f ) || idMath::Fabs( parallelTexels - parallelExpected ) > parallelExpected * 0.01f
+			|| parallelSun[1] != 0.0f || noSun[0] != 0.0f ) {
+		common->Printf( "ShadowMap distant normal offset self-test failed: parallel sun penumbra %.4f texels, expected %.4f (unused %.4f, off %.4f)\n",
+			parallelTexels, parallelExpected, parallelSun[1], noSun[0] );
 		return false;
 	}
 	common->Printf( "ShadowMap distant normal offset self-test passed: %d receiver texels, single map %.1f at the player against %.1f\n",

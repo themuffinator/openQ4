@@ -73,7 +73,14 @@ typedef struct shadowMapProjectedFilterSettings_s {
 	float				pcssLightRadius;
 	float				pcssMaxRadius;
 	float				effectiveFilterRadius;
+	// Tangent of half the apparent diameter of a sun-like light (parallel, or
+	// a distant point source), for PCSS-lite; 0 for every other light, which
+	// keeps the point-source penumbra rule (r_shadowMapSunAngle).
+	float				sunPenumbraTan;
 } shadowMapProjectedFilterSettings_t;
+// The largest tangent the settings hand out: Vulkan carries it in the
+// fraction of a slot whose whole part is a flag.
+static const float SHADOWMAP_SUN_PENUMBRA_MAX_TAN = 0.25f;
 
 // Point receivers express depth bias in normalized radial depth and normal
 // offset in cube texels.  On very large authored lights both therefore grow
