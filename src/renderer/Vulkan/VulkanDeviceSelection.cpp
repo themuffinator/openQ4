@@ -121,6 +121,8 @@ VkResult CheckCandidate( const vkDeviceSelectionApi_t &api, VkSurfaceKHR surface
 		if ( std::strcmp( extension.extensionName, VK_KHR_PRESENT_WAIT_EXTENSION_NAME ) == 0 ) { candidate.hasPresentWait = true; }
 		if ( std::strcmp( extension.extensionName, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME ) == 0 ) { candidate.hasMemoryBudget = true; }
 		if ( std::strcmp( extension.extensionName, VK_EXT_SHADER_VIEWPORT_INDEX_LAYER_EXTENSION_NAME ) == 0 ) { candidate.hasShaderViewportIndexLayer = true; }
+		// Spelled out: the name is declared only by the Win32 platform header.
+		if ( std::strcmp( extension.extensionName, "VK_EXT_full_screen_exclusive" ) == 0 ) { candidate.hasFullScreenExclusive = true; }
 	}
 	reason = "VK_KHR_swapchain unsupported";
 	if ( !swapchain ) { return VK_ERROR_EXTENSION_NOT_PRESENT; }

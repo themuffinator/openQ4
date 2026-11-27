@@ -5971,16 +5971,27 @@ void Sys_SDL_EmergencyReleaseGameWindow(void) {
 
 #if defined(_WIN32)
 static void SDL3_MinimizeOnFullscreenFocusLoss(void) {
-	// SDL's opt-out also applies to our Windows fallback. Otherwise a caller
-	// requesting a visible, unfocused fullscreen window still gets minimized
-	// here, even though SDL itself honored the hint. Keep the ordinary desktop
-	// behavior unless the caller explicitly disables it.
-	if (!s_sdlWindow || !SDL_GetHintBoolean(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, true)) {
+	// The same rule as SDL's own: unset or "auto", only an exclusive mode
+	// minimizes, so the desktop's display mode comes back. Desktop-resolution
+	// fullscreen is an ordinary, non-topmost window that Alt+Tab and the
+	// Snipping Tool already draw over; minimizing it only made switching away
+	// slow (the swapchain shrinks to nothing and is rebuilt on return). An
+	// explicit hint value applies to either kind.
+	if (!s_sdlWindow) {
 		return;
 	}
 
 	const SDL_WindowFlags flags = SDL_GetWindowFlags(s_sdlWindow);
 	if ((flags & SDL_WINDOW_FULLSCREEN) == 0) {
+		return;
+	}
+
+	const char *hint = SDL_GetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS);
+	if (!hint || !*hint || SDL_strcasecmp(hint, "auto") == 0) {
+		if (SDL_GetWindowFullscreenMode(s_sdlWindow) == NULL) {
+			return;
+		}
+	} else if (!SDL_GetHintBoolean(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, false)) {
 		return;
 	}
 
