@@ -512,7 +512,8 @@ the [development roadmap](../roadmap.md) for current scope.
   **Headphone HRTF** on Auto, which was the default, it is moved to Off once. To
   have it back, open Settings, then Audio, and set **Headphone HRTF** to **On**
   or **Auto**. VR is not affected: the game uses it by itself while you wear
-  the headset (`vr_hrtf 0` stops that).
+  the headset, unless you turn **Headset 3D Audio** off on the Virtual Reality
+  tab of Game Options.
 
 - **Low** no longer draws shadows, so it holds its 60 FPS cap on low-end
   graphics. Select Low again (or accept the system check's recommendation) to

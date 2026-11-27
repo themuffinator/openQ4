@@ -1248,7 +1248,7 @@ SCENARIOS = {
     # Other ends with Record Video.
     'game-video-stock': (None, [
         'waitMsec 9000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_gameoptions', 'waitMsec 1500',
-        'openq4_guiSet gui::game_section_choice 8', 'openq4_guiSet gui::gui_set_game_scroll 90', 'waitMsec 1000',
+        'openq4_guiSet gui::game_section_choice 8', 'openq4_guiSet gui::gui_set_game_scroll 92', 'waitMsec 1000',
         'openq4_guiGet set_game_video::visible', 'openq4_guiGet set_game_videotiming::visible', 'openq4_guiGet set_game_content::rect',
         'screenshot "screenshots/stock-video.tga"',
         'set com_videoFormat webm', 'set com_videoQuality 65', 'set com_videoFPS 30', 'set com_videoHeight 1080',
@@ -1271,7 +1271,7 @@ SCENARIOS = {
     # section, its rows following their CVars.
     'game-stereo-stock': (None, [
         'waitMsec 9000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_gameoptions', 'waitMsec 1500',
-        'openq4_guiSet gui::game_section_choice 9', 'openq4_guiSet gui::gui_set_game_scroll 95', 'waitMsec 1000',
+        'openq4_guiSet gui::game_section_choice 9', 'openq4_guiSet gui::gui_set_game_scroll 97', 'waitMsec 1000',
         'openq4_guiGet set_game_stereo::visible', 'openq4_guiGet set_game_stereoswap::visible', 'openq4_guiGet set_game_content::rect',
         'screenshot "screenshots/stock-stereo.tga"',
         'set r_stereo3D 4', 'set r_stereoSeparation 3', 'set r_stereoConvergence 160', 'set r_stereoSwapEyes 1', 'waitMsec 800',

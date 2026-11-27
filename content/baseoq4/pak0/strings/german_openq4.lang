@@ -2211,4 +2211,6 @@
 	"#str_233565"	"NACHLADEN"
 	"#str_233566"	"KEINE MUNITION"
 	"#str_233567"	"BOSS"
+	"#str_233570"	"3D-Klang im Headset"
+	"#str_233571"	"Mit dem Headset kommen Geräusche von dort, wo sie rings um deinen Kopf sind. Aus folgt der Einstellung Kopfhörer-HRTF unter Audio."
 }

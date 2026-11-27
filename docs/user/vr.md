@@ -547,9 +547,10 @@ Audio is for the desktop and is left as you set it.
 
 3D headphone audio changes the tone of sounds in the world: they lose some
 bass beside your own weapon and the music. If you would rather not have it in
-VR, or your headset plays through room speakers, set `vr_hrtf 0`; the headset
-then follows your Headphone HRTF choice too. The change takes a moment and
-does not interrupt the sound.
+VR, or your headset plays through room speakers, turn **Headset 3D Audio** off
+on the Virtual Reality tab of Game Options (`vr_hrtf 0`); the headset then
+follows your Headphone HRTF choice too. The change takes a moment and does not
+interrupt the sound.
 
 ## Performance
 
@@ -759,7 +760,7 @@ General settings (the others are in the sections above):
 | `vr_wristWidth` | 0.11 | **Not in 0.15.0.** Width of each wrist display in metres (0.06-0.2) |
 | `vr_menuHaptics` | 1 | **Not in 0.15.0.** 1 ticks the pointing hand as the pointer moves onto another control, and the off hand as its panel opens; **after 0.15.0** also on a world screen's controls (single player), with a firmer tick for each click and fingertip press |
 | `vr_pauseOnFocusLoss` | 1 | single player: 1 opens the pause menu when the headset comes off or its own menu takes the controllers |
-| `vr_hrtf` | 1 | **Not in 0.15.0.** 1 uses 3D headphone audio (HRTF) while the game presents to a headset, whatever Headphone HRTF is set to for the desktop; 0 makes the headset follow that setting |
+| `vr_hrtf` | 1 | **Not in 0.15.0.** Headset 3D Audio: 1 uses 3D headphone audio (HRTF) while the game presents to a headset, whatever Headphone HRTF is set to for the desktop; 0 makes the headset follow that setting |
 | `vr_mirror` | 1 | desktop window: 0 black, 1 left eye, 2 the floating screen |
 | `vr_debug` | 0 | 1 logs VR session events, 2 also logs every frame (for problem reports) |
 

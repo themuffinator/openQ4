@@ -2267,4 +2267,6 @@
 	"#str_233565"	"PRZEŁADUJ"
 	"#str_233566"	"BRAK AMUNICJI"
 	"#str_233567"	"BOSS"
+	"#str_233570"	"Dźwięk 3D w goglach"
+	"#str_233571"	"W goglach dźwięki dochodzą stamtąd, gdzie są wokół twojej głowy. Wyłączone stosuje ustawienie HRTF dla słuchawek z opcji dźwięku."
 }

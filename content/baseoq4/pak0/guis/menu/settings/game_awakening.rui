@@ -66,6 +66,7 @@
   "cvar.vr_playSpace": {"type": "number", "initial": 0, "cvar": "vr_playSpace"},
   "cvar.vr_body": {"type": "number", "initial": 0, "cvar": "vr_body"},
   "cvar.vr_hudMode": {"type": "number", "initial": 0, "cvar": "vr_hudMode"},
+  "cvar.vr_hrtf": {"type": "boolean", "initial": false, "cvar": "vr_hrtf"},
   "cvar.r_stereo3D": {"type": "number", "initial": 0, "cvar": "r_stereo3D"},
   "cvar.r_stereoSeparation": {"type": "number", "initial": 0, "cvar": "r_stereoSeparation"},
   "cvar.r_stereoConvergence": {"type": "number", "initial": 0, "cvar": "r_stereoConvergence"},
@@ -383,6 +384,11 @@
    "operation": "settings.player.set",
    "input": "number",
    "arguments": {"cvar": "vr_hudMode", "value": {"input": "value"}}
+  },
+  "set.vr_hrtf": {
+   "operation": "settings.player.set",
+   "input": "boolean",
+   "arguments": {"cvar": "vr_hrtf", "value": {"input": "value"}}
   },
   "set.r_stereo3D": {
    "operation": "settings.player.set",
@@ -1423,6 +1429,21 @@
   {
    "id": "game_vrhud.opacity",
    "node": "game_vrhud",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.vr_enable"}, 0]}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrhrtf.enabled",
+   "node": "game_vrhrtf",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"op": "!=", "args": [{"state": "cvar.vr_enable"}, 0]}]
+   }
+  },
+  {
+   "id": "game_vrhrtf.opacity",
+   "node": "game_vrhrtf",
    "property": "opacity",
    "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.vr_enable"}, 0]}, 1, 0.4]}
   },
@@ -47315,31 +47336,6 @@
    }
   },
   {
-   "id": "tall.game-vr-column-1.width",
-   "node": "game-vr-column-1",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     880.5,
-     {
-      "op": "*",
-      "args": [
-       430.5,
-       {
-        "op": "max",
-        "args": [
-         {"state": "view.text"},
-         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
-        ]
-       }
-      ]
-     }
-    ]
-   }
-  },
-  {
    "id": "tall.game_vrroomscale.width",
    "node": "game_vrroomscale",
    "property": "width",
@@ -47764,6 +47760,31 @@
       "op": "*",
       "args": [
        14,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-column-1.width",
+   "node": "game-vr-column-1",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {
+      "op": "*",
+      "args": [
+       430.5,
        {
         "op": "max",
         "args": [
@@ -53986,6 +54007,443 @@
       "op": "*",
       "args": [
        8,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf.width",
+   "node": "game_vrhrtf",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {
+      "op": "*",
+      "args": [
+       430.5,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf.height",
+   "node": "game_vrhrtf",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-focus.width",
+   "node": "game_vrhrtf-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {
+      "op": "*",
+      "args": [
+       4,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-focus.height",
+   "node": "game_vrhrtf-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-head.left",
+   "node": "game_vrhrtf-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {
+      "op": "*",
+      "args": [
+       21,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-head.width",
+   "node": "game_vrhrtf-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     345.6551,
+     {
+      "op": "*",
+      "args": [
+       169,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-head.height",
+   "node": "game_vrhrtf-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-label.font-size",
+   "node": "game_vrhrtf-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         14,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-label.line-height",
+   "node": "game_vrhrtf-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         13.0,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-box.left",
+   "node": "game_vrhrtf-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {
+      "op": "*",
+      "args": [
+       198,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-box.top",
+   "node": "game_vrhrtf-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {
+      "op": "*",
+      "args": [
+       11.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-box.width",
+   "node": "game_vrhrtf-box",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {
+      "op": "*",
+      "args": [
+       14,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-box.height",
+   "node": "game_vrhrtf-box",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {
+      "op": "*",
+      "args": [
+       14,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-checked.left",
+   "node": "game_vrhrtf-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {
+      "op": "*",
+      "args": [
+       198,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-checked.top",
+   "node": "game_vrhrtf-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {
+      "op": "*",
+      "args": [
+       11.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-checked.width",
+   "node": "game_vrhrtf-checked",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {
+      "op": "*",
+      "args": [
+       14,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhrtf-checked.height",
+   "node": "game_vrhrtf-checked",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {
+      "op": "*",
+      "args": [
+       14,
        {
         "op": "max",
         "args": [
@@ -66522,6 +66980,150 @@
     },
     {
      "node": "game_vrhud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhrtf.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "game_vrhrtf-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_vrhrtf-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_vrhrtf-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhrtf.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "game_vrhrtf-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_vrhrtf-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "game_vrhrtf-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhrtf.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "game_vrhrtf-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_vrhrtf-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_vrhrtf-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhrtf.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "game_vrhrtf-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_vrhrtf-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_vrhrtf-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhrtf.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "game_vrhrtf-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_vrhrtf-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_vrhrtf-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -145869,7 +146471,7 @@
                  ],
                  "placementBounds": "screen",
                  "scrollbar": {"track": "game_vr-scroll-track", "thumb": "game_vr-scroll-thumb", "lineStep": 22.0, "minimumThumb": 24},
-                 "navigation": {"down": "game_vrsetup", "up": "tab-vr", "right": "game_vrroomscale", "left": "game_vr"},
+                 "navigation": {"down": "game_vrsetup", "up": "tab-vr", "right": "game_vrlaser", "left": "game_vr"},
                  "tooltip": "#str_233049"
                 }
                },
@@ -146021,7 +146623,7 @@
                   "pressed": "game_vrsetup.pressed",
                   "disabled": "game_vrsetup.disabled"
                  },
-                 "navigation": {"down": "game_vrdetect", "up": "game_vr", "right": "game_vrlaser", "left": "game_vrsetup"}
+                 "navigation": {"down": "game_vrdetect", "up": "game_vr", "right": "game_vrhaptics", "left": "game_vrsetup"}
                 }
                },
                {
@@ -146172,7 +146774,7 @@
                   "pressed": "game_vrdetect.pressed",
                   "disabled": "game_vrdetect.disabled"
                  },
-                 "navigation": {"down": "game_vraim", "up": "game_vrsetup", "right": "game_vrhaptics", "left": "game_vrdetect"}
+                 "navigation": {"down": "game_vraim", "up": "game_vrsetup", "right": "game_vrtwohanded", "left": "game_vrdetect"}
                 }
                },
                {
@@ -146724,7 +147326,7 @@
                  ],
                  "placementBounds": "screen",
                  "scrollbar": {"track": "game_vraim-scroll-track", "thumb": "game_vraim-scroll-thumb", "lineStep": 22.0, "minimumThumb": 24},
-                 "navigation": {"down": "game_vrhand", "up": "game_vrdetect", "right": "game_vrtwohanded", "left": "game_vraim"},
+                 "navigation": {"down": "game_vrhand", "up": "game_vrdetect", "right": "game_vrvignette", "left": "game_vraim"},
                  "tooltip": "#str_233050"
                 }
                },
@@ -147282,7 +147884,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrturn", "up": "game_vraim", "right": "game_vrvignette", "left": "game_vrhand"},
+                 "navigation": {"down": "game_vrturn", "up": "game_vraim", "right": "game_vrcrouch", "left": "game_vrhand"},
                  "tooltip": "#str_233051"
                 }
                },
@@ -147840,7 +148442,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrsnap", "up": "game_vrhand", "right": "game_vrcrouch", "left": "game_vrturn"},
+                 "navigation": {"down": "game_vrsnap", "up": "game_vrhand", "right": "game_vrplayspace", "left": "game_vrturn"},
                  "tooltip": "#str_233052"
                 }
                },
@@ -148578,7 +149180,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrmove", "up": "game_vrturn", "right": "game_vrplayspace", "left": "game_vrsnap"},
+                 "navigation": {"down": "game_vrmove", "up": "game_vrturn", "right": "game_vrbody", "left": "game_vrsnap"},
                  "tooltip": "#str_233053"
                 }
                },
@@ -149136,23 +149738,10 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrroomscale", "up": "game_vrsnap", "right": "game_vrbody", "left": "game_vrmove"},
+                 "navigation": {"down": "game_vrroomscale", "up": "game_vrsnap", "right": "game_vrhud", "left": "game_vrmove"},
                  "tooltip": "#str_233054"
                 }
-               }
-              ]
-             },
-             {
-              "id": "game-vr-column-1",
-              "type": "group",
-              "properties": {
-               "position": {"type": "keyword", "value": "relative"},
-               "display": {"type": "keyword", "value": "flex"},
-               "flex-direction": {"type": "keyword", "value": "column"},
-               "width": {"type": "length", "value": 430.5, "unit": "dp"},
-               "flex-shrink": {"type": "number", "value": 0}
-              },
-              "children": [
+               },
                {
                 "id": "game_vrroomscale",
                 "type": "group",
@@ -149371,10 +149960,23 @@
                   "disabled": "game_vrroomscale.disabled"
                  },
                  "parts": {"checked": "game_vrroomscale-checked"},
-                 "navigation": {"down": "game_vrlaser", "up": "game_vrmove", "left": "game_vr", "right": "game_vrroomscale"},
+                 "navigation": {"down": "game_vrlaser", "up": "game_vrmove", "right": "game_vrhrtf", "left": "game_vrroomscale"},
                  "tooltip": "#str_233055"
                 }
-               },
+               }
+              ]
+             },
+             {
+              "id": "game-vr-column-1",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "flex"},
+               "flex-direction": {"type": "keyword", "value": "column"},
+               "width": {"type": "length", "value": 430.5, "unit": "dp"},
+               "flex-shrink": {"type": "number", "value": 0}
+              },
+              "children": [
                {
                 "id": "game_vrlaser",
                 "type": "group",
@@ -150019,7 +150621,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrhaptics", "up": "game_vrroomscale", "left": "game_vrsetup", "right": "game_vrlaser"},
+                 "navigation": {"down": "game_vrhaptics", "up": "game_vrroomscale", "left": "game_vr", "right": "game_vrlaser"},
                  "tooltip": "#str_233056"
                 }
                },
@@ -150667,7 +151269,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrtwohanded", "up": "game_vrlaser", "left": "game_vrdetect", "right": "game_vrhaptics"},
+                 "navigation": {"down": "game_vrtwohanded", "up": "game_vrlaser", "left": "game_vrsetup", "right": "game_vrhaptics"},
                  "tooltip": "#str_233057"
                 }
                },
@@ -150889,7 +151491,7 @@
                   "disabled": "game_vrtwohanded.disabled"
                  },
                  "parts": {"checked": "game_vrtwohanded-checked"},
-                 "navigation": {"down": "game_vrvignette", "up": "game_vrhaptics", "left": "game_vraim", "right": "game_vrtwohanded"},
+                 "navigation": {"down": "game_vrvignette", "up": "game_vrhaptics", "left": "game_vrdetect", "right": "game_vrtwohanded"},
                  "tooltip": "#str_233058"
                 }
                },
@@ -151537,7 +152139,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrcrouch", "up": "game_vrtwohanded", "left": "game_vrhand", "right": "game_vrvignette"},
+                 "navigation": {"down": "game_vrcrouch", "up": "game_vrtwohanded", "left": "game_vraim", "right": "game_vrvignette"},
                  "tooltip": "#str_233059"
                 }
                },
@@ -151759,7 +152361,7 @@
                   "disabled": "game_vrcrouch.disabled"
                  },
                  "parts": {"checked": "game_vrcrouch-checked"},
-                 "navigation": {"down": "game_vrplayspace", "up": "game_vrvignette", "left": "game_vrturn", "right": "game_vrcrouch"},
+                 "navigation": {"down": "game_vrplayspace", "up": "game_vrvignette", "left": "game_vrhand", "right": "game_vrcrouch"},
                  "tooltip": "#str_233060"
                 }
                },
@@ -152407,7 +153009,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrbody", "up": "game_vrcrouch", "left": "game_vrsnap", "right": "game_vrplayspace"},
+                 "navigation": {"down": "game_vrbody", "up": "game_vrcrouch", "left": "game_vrturn", "right": "game_vrplayspace"},
                  "tooltip": "#str_233061"
                 }
                },
@@ -153055,7 +153657,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrhud", "up": "game_vrplayspace", "left": "game_vrmove", "right": "game_vrbody"},
+                 "navigation": {"down": "game_vrhud", "up": "game_vrplayspace", "left": "game_vrsnap", "right": "game_vrbody"},
                  "tooltip": "#str_233062"
                 }
                },
@@ -153608,8 +154210,230 @@
                  ],
                  "placementBounds": "screen",
                  "scrollbar": {"track": "game_vrhud-scroll-track", "thumb": "game_vrhud-scroll-thumb", "lineStep": 22.0, "minimumThumb": 24},
-                 "navigation": {"down": "game_stereo3d", "up": "game_vrbody", "left": "game_vrmove", "right": "game_vrhud"},
+                 "navigation": {"down": "game_vrhrtf", "up": "game_vrbody", "left": "game_vrmove", "right": "game_vrhud"},
                  "tooltip": "#str_233562"
+                }
+               },
+               {
+                "id": "game_vrhrtf",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "game_vrhrtf-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhrtf-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhrtf-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhrtf-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 169, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_vrhrtf-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_233570"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhrtf-box",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"}
+                  },
+                  "paths": [
+                   {
+                    "id": "box",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhrtf-checked",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_vrhrtf-mark",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "mark",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]}}
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "toggle",
+                 "label": "#str_233570",
+                 "action": "set.vr_hrtf",
+                 "value": {"state": "cvar.vr_hrtf"},
+                 "states": {
+                  "default": "game_vrhrtf.default",
+                  "hover": "game_vrhrtf.hover",
+                  "focus": "game_vrhrtf.focus",
+                  "pressed": "game_vrhrtf.pressed",
+                  "disabled": "game_vrhrtf.disabled"
+                 },
+                 "parts": {"checked": "game_vrhrtf-checked"},
+                 "navigation": {"down": "game_stereo3d", "up": "game_vrhud", "left": "game_vrroomscale", "right": "game_vrhrtf"},
+                 "tooltip": "#str_233571"
                 }
                },
                {
@@ -154548,7 +155372,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_stereodepth", "up": "game_vrhud", "left": "game_vrmove", "right": "game_stereo3d"},
+                 "navigation": {"down": "game_stereodepth", "up": "game_vrhrtf", "left": "game_vrroomscale", "right": "game_stereo3d"},
                  "tooltip": "#str_233063"
                 }
                },
@@ -155071,7 +155895,12 @@
                   "thumb": "game_stereodepth-thumb",
                   "value": "game_stereodepth-value"
                  },
-                 "navigation": {"down": "game_stereoconvergence", "up": "game_stereo3d", "left": "game_vrmove", "right": "game_stereodepth"},
+                 "navigation": {
+                  "down": "game_stereoconvergence",
+                  "up": "game_stereo3d",
+                  "left": "game_vrroomscale",
+                  "right": "game_stereodepth"
+                 },
                  "tooltip": "#str_233064"
                 }
                },
@@ -155790,7 +156619,7 @@
                  "navigation": {
                   "down": "game_stereoswap",
                   "up": "game_stereodepth",
-                  "left": "game_vrmove",
+                  "left": "game_vrroomscale",
                   "right": "game_stereoconvergence"
                  },
                  "tooltip": "#str_233065"
@@ -156014,7 +156843,7 @@
                   "disabled": "game_stereoswap.disabled"
                  },
                  "parts": {"checked": "game_stereoswap-checked"},
-                 "navigation": {"down": "game_vr", "up": "game_stereoconvergence", "left": "game_vrmove", "right": "game_stereoswap"},
+                 "navigation": {"down": "game_vr", "up": "game_stereoconvergence", "left": "game_vrroomscale", "right": "game_stereoswap"},
                  "tooltip": "#str_233066"
                 }
                }

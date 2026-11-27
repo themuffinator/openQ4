@@ -2211,4 +2211,6 @@
 	"#str_233565"	"RECARGAR"
 	"#str_233566"	"SIN MUNICIÓN"
 	"#str_233567"	"JEFE"
+	"#str_233570"	"Audio 3D en el casco"
+	"#str_233571"	"Con el casco, los sonidos llegan desde donde están alrededor de tu cabeza. Desactivado sigue la opción HRTF auriculares de Audio."
 }

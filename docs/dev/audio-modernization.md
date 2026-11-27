@@ -772,8 +772,10 @@ machine and vary by a factor of two between runs.
 
 ## Deferred
 
-- **A menu row for `vr_hrtf`.** It is a console setting; the Virtual Reality tab
-  has no row for it yet. Listening on real headsets is still wanted.
+- **Listening in a headset.** `vr_hrtf` has its row (Headset 3D Audio, on the
+  Virtual Reality tab of both the retained and the stock Game Options, with a
+  tooltip, in all 12 languages; the translations are not reviewed by native
+  speakers). The behaviour is checked on the simulated headset only.
 
 - **Audible distance units.** Current `DOOM_TO_METERS` and `METERS_TO_DOOM` are both
   `1.0f` in `src/sound/sound.h`; the earlier claim that the mixer necessarily converts

@@ -2211,4 +2211,6 @@
 	"#str_233565"	"RECARREGAR"
 	"#str_233566"	"SEM MUNIÇÃO"
 	"#str_233567"	"CHEFE"
+	"#str_233570"	"Áudio 3D no headset"
+	"#str_233571"	"Com o headset, os sons vêm de onde estão ao redor da sua cabeça. Desativado segue a opção HRTF para fones, em Áudio."
 }

@@ -7854,8 +7854,9 @@ the non-verbal remainder is marked for players rather than counted as covered.
   headphone-labelled endpoint reports HRTF disabled by default. A VR headset
   session asks for HRTF by itself (`vr_hrtf`, on by default) and gives the
   desktop its choice back five seconds after it stops; the OpenXR test runtime
-  run and `sound_vr_hrtf.py` cover it. Open: listening on a real headset, and a
-  Virtual Reality tab row for `vr_hrtf`.
+  run and `sound_vr_hrtf.py` cover it. Its row, Headset 3D Audio, is on the
+  Virtual Reality tab of the retained and the stock Game Options in all 12
+  languages. Open: listening on a real headset.
   [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
 - [ ] **AUD-05 — P1, implementation: functional multiplayer voice.** Capture,
   codec, transport and playback are implemented with explicit microphone consent,

@@ -2211,4 +2211,6 @@
 	"#str_233565"	"PŘEBÍT"
 	"#str_233566"	"DOŠLA MUNICE"
 	"#str_233567"	"BOSS"
+	"#str_233570"	"3D zvuk v headsetu"
+	"#str_233571"	"S headsetem zvuky přicházejí z míst, kde jsou kolem vaší hlavy. Vypnuto se řídí volbou HRTF pro sluchátka v nastavení zvuku."
 }

@@ -2211,4 +2211,6 @@
 	"#str_233565"	"YENİDEN DOLDUR"
 	"#str_233566"	"CEPHANE YOK"
 	"#str_233567"	"BOSS"
+	"#str_233570"	"Başlıkta 3D ses"
+	"#str_233571"	"Başlık takılıyken sesler, başının çevresinde bulundukları yerden gelir. Kapalı, Ses ayarlarındaki Kulaklık HRTF seçeneğine uyar."
 }

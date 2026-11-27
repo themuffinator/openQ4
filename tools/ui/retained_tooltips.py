@@ -114,6 +114,7 @@ TOOLTIPS = {
     "game_vrplayspace": "#str_233061",
     "game_vrbody": "#str_233062",
     "game_vrhud": "#str_233562",
+    "game_vrhrtf": "#str_233571",
     # VR SETUP's rows on GAME OPTIONS (retained_vr) share the tab's tooltips.
     "vrsetup_playspace": "#str_233061",
     "vrsetup_turn": "#str_233052",

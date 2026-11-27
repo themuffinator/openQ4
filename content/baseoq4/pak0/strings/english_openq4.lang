@@ -2211,4 +2211,6 @@
 	"#str_233565"	"RELOAD"
 	"#str_233566"	"NO AMMO"
 	"#str_233567"	"BOSS"
+	"#str_233570"	"Headset 3D Audio"
+	"#str_233571"	"Sounds come from where they are around your head while you wear the headset. Off follows Headphone HRTF in the Audio settings."
 }

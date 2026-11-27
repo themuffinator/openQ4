@@ -25,8 +25,9 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   headphones, at the cost of that change in tone.
 - **In VR it is on by itself.** A headset's speakers sit on your ears, so the
   game uses 3D headphone audio while it presents to a headset and goes back to
-  your desktop choice afterwards. `vr_hrtf 0` makes the headset follow that
-  choice instead.
+  your desktop choice afterwards. **Headset 3D Audio** on the Virtual Reality
+  tab of Game Options turns that off (`vr_hrtf 0`), and the headset then follows
+  your desktop choice.
 - **Upgrading:** a profile that had this on Auto, which was the default, is
   moved to Off once. A choice you make afterwards is kept.
 - Evidence: hidden launches show a fresh profile and a profile from an earlier

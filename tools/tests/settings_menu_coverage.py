@@ -1259,6 +1259,7 @@ def main() -> None:
         "vr_playSpace",
         "vr_body",
         "vr_hudMode",
+        "vr_hrtf",
         "com_videoFormat",
         "com_videoQuality",
         "com_videoFPS",
@@ -1304,6 +1305,7 @@ def main() -> None:
         "set_game_vr_playspace",
         "set_game_vr_body",
         "set_game_vr_hud",
+        "set_game_vr_hrtf",
         "set_game_video",
         "set_game_videoformat",
         "set_game_videoquality",
@@ -1347,11 +1349,11 @@ def main() -> None:
     for token in (
         "rect\t204,104,377,16",
         "rect\t0,128,640,256",
-        "rect\t-24,-41,640,2618",
+        "rect\t-24,-41,640,2642",
         "rect\t613,128,16,256",
-        "high\t96",
+        "high\t97",
         "cvar\tgui_set_game_scroll",
-        "640,2618",
+        "640,2642",
     ):
         require(game_gui + mainmenu, token, "Game Options scroll coverage")
     for token in (
@@ -1368,8 +1370,8 @@ def main() -> None:
         'set "gui::gui_set_game_scroll" "62"',
         'set "gui::gui_set_game_scroll" "70"',
         'set "gui::gui_set_game_scroll" "77"',
-        'set "gui::gui_set_game_scroll" "91"',
-        'set "gui::gui_set_game_scroll" "96"',
+        'set "gui::gui_set_game_scroll" "92"',
+        'set "gui::gui_set_game_scroll" "97"',
         'set "cmd" "applySettingsScroll game"',
         "set_game_section_choice::noevents",
     ):
@@ -1382,7 +1384,7 @@ def main() -> None:
     reject(audio_gui + mainmenu, "set gui_set_audio_scroll", "Audio scroll cvar command")
     for token in (
         'gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "display menu scroll step", 0, 28 )',
-        'gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 96 )',
+        'gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 97 )',
         "HandleMainMenuSettingsScrollInput( guiActive, event->evValue )",
         'MainMenuWindowStateEqualsInt( gui, "desktop::curr", page.expectedPage )',
         "MainMenuSettingsPopupIsVisible( gui )",

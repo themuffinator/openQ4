@@ -2211,4 +2211,6 @@
 	"#str_233565"	"ÚJRATÖLTÉS"
 	"#str_233566"	"NINCS LŐSZER"
 	"#str_233567"	"FŐELLENSÉG"
+	"#str_233570"	"3D hang a headsetben"
+	"#str_233571"	"A headsetben a hangok onnan szólnak, ahol a fejed körül vannak. Kikapcsolva a hangbeállítások Fejhallgató-HRTF beállítását követi."
 }

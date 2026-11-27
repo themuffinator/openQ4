@@ -4577,6 +4577,29 @@
       "accessibility": "Focusable choiceDef row. Chooses whether the headset shows health, armor and ammunition on the wrists or the whole HUD in front of the eyes."
     },
     {
+      "id": "game.vr_hrtf",
+      "pane": "Game Options",
+      "section": "Virtual Reality",
+      "path": "Settings > Game Options > Virtual Reality > Headset 3D Audio",
+      "source": "game",
+      "container": "set_game_vr_hrtf",
+      "widgets": [
+        "set_game_vr_hrtf_value"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_233570",
+      "choices_key": "#str_200246",
+      "values": [
+        "0",
+        "1"
+      ],
+      "target_type": "cvar",
+      "target": "vr_hrtf",
+      "default": "1",
+      "restart_required": false,
+      "accessibility": "Focusable choiceDef row. Chooses whether a headset session uses 3D headphone audio by itself or follows the Audio page's Headphone HRTF."
+    },
+    {
       "id": "game.videoformat",
       "pane": "Game Options",
       "section": "Video Capture",

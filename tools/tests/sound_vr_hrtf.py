@@ -112,6 +112,26 @@ def main() -> int:
                       r's_openALHRTF 0 -> 1[^\n]*\n\s*cvarSystem->SetCVarInteger\( "s_openALHRTF", 1, CVAR_ARCHIVE \);', common) is not None,
             'an archived automatic HRTF is not moved to off')
 
+    # the player's switch: Headset 3D Audio on the Virtual Reality tab, retained and stock, in every language
+    require('toggle("game_vrhrtf", "#str_233570", "vr_hrtf"),' in read('tools/ui/retained_game.py'), 'the Virtual Reality tab has no Headset 3D Audio row')
+    require('"game_vrhrtf": "#str_233571",' in read('tools/ui/retained_tooltips.py'), 'the Headset 3D Audio row has no tooltip')
+    require('{"vr_hrtf",{1}}' in read('src/ui/UserInterfaceRetained.cpp'), 'the Headset 3D Audio row may not set vr_hrtf')
+    stock = read('content/baseoq4/pak0/guis/menu/settings/game.gui')
+    require(re.search(r'choiceDef set_game_vr_hrtf_value\s*\{[^}]*cvar\tvr_hrtf\b[^}]*choices\t"#str_200246"[^}]*values\t"0;1"', stock) is not None,
+            'the stock Game Options page has no Headset 3D Audio row')
+    for document in ('game.rui', 'game_awakening.rui'):
+        page = read(f'content/baseoq4/pak0/guis/menu/settings/{document}')
+        require('"game_vrhrtf"' in page and 'vr_hrtf' in page and '#str_233571' in page, f'{document} was not regenerated with the row')
+    for language in ('brazilian', 'czech', 'english', 'french', 'german', 'hungarian', 'italian', 'polish', 'russian', 'spanish',
+                     'turkish', 'ukrainian'):
+        table = read(f'content/baseoq4/pak0/strings/{language}_openq4.lang')
+        for key in ('#str_233570', '#str_233571'):
+            found = re.search(r'^\t"%s"\t"([^"\n]+)"$' % key, table, re.M)
+            require(found is not None and len(found.group(1).strip()) > 3, f'{language} lacks {key}')
+        label = re.search(r'^\t"#str_233570"\t"([^"\n]+)"$', table, re.M)
+        # the page generator wraps labels only at spaces
+        require(label is not None and ' ' in label.group(1), f'{language}: the row label needs a space to wrap at')
+
     for failure in failures:
         print('FAILED:', failure)
     print('sound_vr_hrtf:', 'ok' if not failures else 'failed')

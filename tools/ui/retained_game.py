@@ -142,6 +142,8 @@ SECTIONS = (
         choice("game_vrbody", "#str_232514", "vr_body", "#str_232515", (0, 1, 2)),
         # Status Display (VR-09): on the wrists (vr_hudMode 1) or the whole HUD in front
         choice("game_vrhud", "#str_233560", "vr_hudMode", "#str_233561", (1, 0)),
+        # Headset 3D Audio: a headset session asks for HRTF by itself (vr_hrtf), or follows Headphone HRTF
+        toggle("game_vrhrtf", "#str_233570", "vr_hrtf"),
     )),
     # Stereoscopic 3D without a headset (r_stereo3D, docs/user/stereoscopic-3d.md),
     # under the VR rows on VIRTUAL REALITY's second column.
@@ -182,7 +184,7 @@ TABS = (
     ("hud", "#str_231235", (("hud",), ("crosshair",))),
     ("viewweapon", "#str_229952", (("viewweapon", 0, VIEW_PLACE), ("viewweapon", VIEW_PLACE, None))),
     ("accessibility", "#str_232542", (("motion",), ("visibility",))),
-    ("vr", "#str_230120", (("vr", 0, 8), (("vr", 8, None), "stereo"))),
+    ("vr", "#str_230120", (("vr", 0, 9), (("vr", 9, None), "stereo"))),
 )
 
 
