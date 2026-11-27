@@ -45,6 +45,21 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## No more one-frame shadowless flashes in crowded rooms on Vulkan, 27 November 2026
+
+- **A light no longer flashes without its shadow on Vulkan's highest shadow
+  setting.** In rooms with dozens of shadow-casting lights the memory set
+  aside for point-light shadows can run out, and the lights that do not fit
+  are drawn with the classic stencil shadows instead. One of those lights
+  could be drawn for a single frame with no shadow at all, each time it came
+  into view. It now goes straight to its stencil shadow. Seen in the hub
+  level's processing hall at the Maximum preset; the lower shadow settings use
+  smaller shadow maps and do not run out there.
+- **What to do.** Nothing.
+- Developer detail:
+  [a point light with no cube and no volumes](shadowmapping-audit-2026-11-27.md#a-point-light-with-no-cube-and-no-volumes).
+  No ABI change.
+
 ## Smooth soft shadow edges on Vulkan, 27 November 2026
 
 - **Soft shadow edges are smooth on Vulkan.** The soft edge of a spotlight's or

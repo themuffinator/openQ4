@@ -2403,7 +2403,8 @@ R_ShadowMapGatherAtlasRequests
 
 The view's atlas lights: projected, parallel and distant point lights, which
 share one projected atlas that Vulkan allocates afresh for every view. Point
-lights take cubes from a pool no view exhausts and are not among them.
+lights take cubes from a pool and are not among them; what they need of it
+depends on the cache and cannot be counted here (RB_ShadowMapPointPoolHasRoom).
 
 Before the view's interactions are known every such light is counted for two
 blocks, one per receiver ownership, at the smallest tile it may be given: the
@@ -2614,6 +2615,12 @@ bool R_ShadowMapLightWillUseShadowMaps( const idRenderLightLocal *lightDef, cons
 	}
 	if ( pointLightPath ) {
 		if ( !r_shadowMapPointLights.GetBool() || !glConfig.cubeMapAvailable ) {
+			return false;
+		}
+		// What a point light cannot count on is a cube, where the pool that
+		// holds them is bounded and close to full: a pass that finds none
+		// has only these volumes to fall back on in that frame.
+		if ( !RB_ShadowMapPointPoolHasRoom() ) {
 			return false;
 		}
 	} else if ( !R_ShadowMapAtlasHoldsView() ) {

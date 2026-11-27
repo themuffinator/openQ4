@@ -1977,6 +1977,7 @@ void R_RendererUpload_RecordLegacyUpload( int bytes ) {
 
 // vk_ShadowMap.cpp narrow accessor (the shadow module state stays file-static there)
 bool VK_ShadowMap_ResourcesKnownGood( bool pointLight );
+bool VK_ShadowMap_PointPoolHasRoom( void );
 
 // Phase F3 hook for the front-end stencil-volume elision gate
 // (R_ShadowMapLightWillUseShadowMaps, tr_light.cpp). Vulkan reports the same
@@ -1985,6 +1986,10 @@ bool VK_ShadowMap_ResourcesKnownGood( bool pointLight );
 // than to a dropped receiver.
 bool RB_ShadowMapResourcesKnownGood( bool pointLight ) {
 	return VK_ShadowMap_ResourcesKnownGood( pointLight );
+}
+
+bool RB_ShadowMapPointPoolHasRoom( void ) {
+	return VK_ShadowMap_PointPoolHasRoom();
 }
 
 // shadow-map / post-process resource teardown hooks

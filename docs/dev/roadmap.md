@@ -2686,8 +2686,12 @@ are not yet measured.
   retires. Vulkan then filters each PCSS-lite tap bilinearly (`r_vkShadowBilinearPCSS`,
   default 1): penumbra grain at Air Defense 1 falls from 0.048 to 0.022 with coverage
   unchanged, and soft projected shadows no longer match OpenGL pixel for pixel; `0`
-  restores the match. Open leads are listed there: cascade scale stepping with yaw and
-  PCSS-lite on parallel lights.
+  restores the match. A point light that found Vulkan's memory-bounded cube pool empty
+  was drawn for a frame with no shadow, because its stencil volumes had been elided:
+  the back end now reports the pool's pressure and the front end keeps point lights'
+  volumes while it lasts (Hub 2 at Maximum: the "required shadow resource
+  unavailable" warning in every run before, in none after). Open leads are listed
+  there: cascade scale stepping with yaw and PCSS-lite on parallel lights.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always

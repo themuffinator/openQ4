@@ -466,6 +466,38 @@ Phase F3: per-light-class resource honesty + the sticky stencil fallback
 static std::atomic<int> vkShadowProjectedResourcesOkGeneration( -1 );
 static std::atomic<int> vkShadowPointResourcesOkGeneration( -1 );
 
+// The scratch cube pool is bounded by memory (VK_ShadowMap_ScratchCubeLimit),
+// and a point pass that finds it empty has only its light's stencil volumes to
+// fall back on. The front end has decided by then whether to build them, and a
+// light it expected to be mapped has none: its receivers are drawn for that
+// frame with no shadow at all. Projected lights are spared this by a count the
+// front end can make before it decides (R_ShadowMapAtlasHoldsView); a point
+// pass's need for a scratch cube depends on what the cache holds and cannot be
+// counted there. So the back end says when the pool is close to its limit, and
+// while it is the front end keeps point lights' volumes: a pass that then
+// overflows falls back to stencil shadows and nothing flashes. At the top
+// shadow level, whose 1024 cubes leave the pool 21, Nexus Hub 2's processing
+// hall sits at the limit all the time and each light that turned into view
+// past it flashed once, and again each time it left the sticky fallback.
+//
+// Held for a while after the last crowded view, so that a view hovering at the
+// threshold does not rebuild its lights' interactions every other frame.
+static const int VK_SHADOW_POINT_POOL_PRESSURE_HOLD_MSEC = 2000;
+static std::atomic<int> vkShadowPointPoolPressureMsec( 0 );
+static std::atomic<bool> vkShadowPointPoolPressureSeen( false );
+
+static void VK_ShadowMap_NotePointPoolPressure( void ) {
+	vkShadowPointPoolPressureMsec = Sys_Milliseconds();
+	vkShadowPointPoolPressureSeen = true;
+}
+
+bool VK_ShadowMap_PointPoolHasRoom( void ) {
+	if ( !vkShadowPointPoolPressureSeen ) {
+		return true;
+	}
+	return Sys_Milliseconds() - vkShadowPointPoolPressureMsec > VK_SHADOW_POINT_POOL_PRESSURE_HOLD_MSEC;
+}
+
 bool VK_ShadowMap_ResourcesKnownGood( bool pointLight ) {
 	// VK_ShadowMap_EnsureResources (atlas + compare/raw samplers + atlas
 	// descriptor wiring) gates the whole view's shadow pass, point cubes
@@ -4177,6 +4209,13 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 			vkShadow.projectedUsedMsec = vkShadow.mappedUsedMsec;
 		}
 	}
+	}
+
+	// A quarter of the pool, and never fewer than two lights' worth, has to be
+	// free for the next view's new lights (VK_ShadowMap_PointPoolHasRoom).
+	const int scratchLimit = VK_ShadowMap_ScratchCubeLimit();
+	if ( vkShadow.pointCubesUsed + Max( 4, scratchLimit / 4 ) > scratchLimit ) {
+		VK_ShadowMap_NotePointPoolPressure();
 	}
 
 	VK_ShadowMap_AllocateMomentBlocks();

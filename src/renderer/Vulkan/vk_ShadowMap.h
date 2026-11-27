@@ -164,6 +164,10 @@ const vkShadowPassState_t *VK_ShadowMap_PassState(
 // light unshadowed for one frame and marks it sticky, which is the OpenGL
 // contract.
 bool	VK_ShadowMap_ResourcesKnownGood( bool pointLight );
+// False while recent views have filled the memory-bounded scratch cube pool to
+// within a quarter of its limit: a point pass may then find no cube, so the
+// front end keeps point lights' stencil volumes for it to fall back on.
+bool	VK_ShadowMap_PointPoolHasRoom( void );
 
 // Phase F3 sticky fallback contract (GL RB_ShadowMapMarkStencilFallbackSticky
 // parity): a hard shadow-map failure records that later front-end frames must

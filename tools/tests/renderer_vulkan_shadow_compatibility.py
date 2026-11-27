@@ -6249,8 +6249,10 @@ def validate_fail_closed_target_and_stencil_behavior() -> None:
             """if ( pointLightPath ) {
                 if ( !r_shadowMapPointLights.GetBool() || !glConfig.cubeMapAvailable ) {
                     return false;
-                }
-            } else if ( !R_ShadowMapAtlasHoldsView() ) {""",
+                }""",
+            # a point light's cube pool has its own gate (validate_point_pool_pressure_contract)
+            "if ( !RB_ShadowMapPointPoolHasRoom() ) {",
+            "} else if ( !R_ShadowMapAtlasHoldsView() ) {",
             "return false;",
             "if ( !RB_ShadowMapResourcesKnownGood( pointLightPath ) ) { return false; }",
         ),
@@ -9596,6 +9598,66 @@ def validate_second_audit_followups_contract() -> None:
         require(braced_body(gl, marker, context), "IsKnownIncomplete()", f"OpenGL {context} proves its framebuffer")
 
 
+def validate_point_pool_pressure_contract() -> None:
+    """A point light keeps its stencil volumes while the back end's cube pool
+    is close to full, so a pass that finds no cube falls back to stencil
+    shadows and is never drawn without any.
+
+    Vulkan's scratch cube pool is bounded by memory. At the top shadow level
+    its 1024 cubes leave it 21, Nexus Hub 2's hall sits at that limit, and a
+    light that overflowed had had its volumes elided: one frame unshadowed.
+    Projected lights are spared the same by R_ShadowMapAtlasHoldsView.
+    """
+    light = read("src/renderer/tr_light.cpp")
+    will_use = braced_body(light, "bool R_ShadowMapLightWillUseShadowMaps(", "front-end elision gate")
+    require_order(
+        will_use,
+        (
+            "if ( pointLightPath ) {",
+            "if ( !RB_ShadowMapPointPoolHasRoom() ) {",
+            "return false;",
+            "} else if ( !R_ShadowMapAtlasHoldsView() ) {",
+            "if ( !RB_ShadowMapResourcesKnownGood( pointLightPath ) ) { return false; }",
+        ),
+        "a point light sheds its volumes only while its pool has room",
+    )
+    require(read("src/renderer/tr_local.h"), "bool RB_ShadowMapPointPoolHasRoom( void );", "back-end hook")
+    vulkan = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+    room = braced_body(vulkan, "bool VK_ShadowMap_PointPoolHasRoom(", "Vulkan point pool room")
+    require_order(
+        room,
+        (
+            "if ( !vkShadowPointPoolPressureSeen ) {",
+            "return true;",
+            "Sys_Milliseconds() - vkShadowPointPoolPressureMsec > VK_SHADOW_POINT_POOL_PRESSURE_HOLD_MSEC",
+        ),
+        "pressure is held for a while after the last crowded view",
+    )
+    prepare = braced_body(vulkan, "int VK_ShadowMap_PrepareViewLights(", "Vulkan light preparation")
+    require_order(
+        prepare,
+        (
+            "const int scratchLimit = VK_ShadowMap_ScratchCubeLimit();",
+            "if ( vkShadow.pointCubesUsed + Max( 4, scratchLimit / 4 ) > scratchLimit ) {",
+            "VK_ShadowMap_NotePointPoolPressure();",
+            "return prepared;",
+        ),
+        "a view that leaves less than a quarter of the pool free reports pressure",
+    )
+    require_compact(
+        read("src/renderer/Vulkan/vk_Backend.cpp"),
+        "bool RB_ShadowMapPointPoolHasRoom( void ) { return VK_ShadowMap_PointPoolHasRoom(); }",
+        "Vulkan answers from its pool",
+    )
+    # OpenGL draws a light's receivers as soon as its cube is rendered: one
+    # scratch cube serves every uncached light and no view exhausts it.
+    require_compact(
+        read("src/renderer/draw_arb2.cpp"),
+        "bool RB_ShadowMapPointPoolHasRoom( void ) { return true; }",
+        "OpenGL's pool always has room",
+    )
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -10899,6 +10961,7 @@ def main() -> None:
     validate_layered_point_cube_contract()
     validate_source_plane_cascade_contract()
     validate_second_audit_followups_contract()
+    validate_point_pool_pressure_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 
