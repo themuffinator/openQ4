@@ -12,6 +12,26 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## One Window Mode choice instead of three display switches, 27 November 2026
+
+- **Settings > Display > Screen now has a single Window Mode list:**
+  Windowed, Borderless, Fullscreen and Exclusive Fullscreen (#264). It
+  replaces the Fullscreen and Borderless Window switches and the Fullscreen
+  Policy choice, which could be combined in ways that did nothing. Only the
+  size and resolution rows that the chosen mode uses can be changed:
+  Windowed uses Window Width and Height, Exclusive Fullscreen uses Display
+  Resolution, the custom size and Refresh Rate, and Borderless and
+  Fullscreen use the desktop's own size. Your current setup shows as the
+  matching mode, so nothing needs setting again. The classic interface keeps
+  its three rows.
+- Evidence: the SYSTEM display-controls test checks that each mode sets the
+  three display settings in one change and reads back as that mode, in seven
+  languages; the page's choice, text-size, catalog and preset tests pass with
+  the new row. In a running game (hidden window, OpenGL, Air Defense 1) the
+  list opened with its four modes, and choosing Borderless and then Exclusive
+  Fullscreen greyed out and enabled the matching size rows. Applying each mode
+  in a running game was not tried.
+
 ## Window Width and Height grey out when Borderless Window fills the screen, 27 November 2026
 
 - **The display settings no longer offer a window size that does nothing**
@@ -19,8 +39,8 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   whole display, so it ignores Window Width and Height, but those boxes
   stayed editable while it was on. Players who set a size there still got a
   full-screen game. The boxes are now greyed out with Borderless Window on,
-  as they already were in fullscreen. For a window of your chosen size, turn
-  off both Fullscreen and Borderless Window.
+  as they already were in fullscreen. For a window of your chosen size, choose
+  the Windowed Window Mode.
 - Evidence: the SYSTEM display-controls test drives the production page in
   seven languages and checks that both rows are disabled and dimmed with
   Borderless Window on and editable with it off; it fails on the previous

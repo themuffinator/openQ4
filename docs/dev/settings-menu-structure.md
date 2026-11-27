@@ -31,7 +31,7 @@ With `ui_retained 1` (the default) the Settings screen opens the retained SETTIN
 | Game Options | Accessibility | Motion: View Kick, Screen Shake, Cinematic Shake | Visibility: Reduced Flashing, Opaque Menu Backing |
 | Game Options | Virtual Reality | VR Mode to Walk Direction | Room Scale to Your Body. Stereoscopic 3D: Stereoscopic 3D, Stereo Depth, Stereo Convergence, Swap Eyes |
 | Display | Graphics | Performance Preset, Auto-Detect, Rendering Backend and Device, Renderer Fallback, Restart Renderer | Interface: UI Scale, Text Size, UI Aspect, Reset UI Sizes |
-| Display | Screen | Display: Display Device, Expand Across Displays, Fullscreen, Borderless, Fullscreen Policy, V-Sync, Frame Rate Cap | Display Sizing: window size, Display Resolution, custom fullscreen size, Refresh Rate |
+| Display | Screen | Display: Display Device, Expand Across Displays, Window Mode, V-Sync, Frame Rate Cap | Display Sizing: window size, Display Resolution, custom fullscreen size, Refresh Rate |
 | Display | Image Quality | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering | Rendering: Specular, Bump Mapping, Sky, Ambient Light, Ambient Brightness |
 | Display | Effects | Lighting: Shadows, Shadow Maps, Character Self-Shadows, Irradiance Volumes, Preload Light Grids | Post-Processing: Bloom, Ambient Occlusion, Tone Mapping, Motion Blur, CRT Filter |
 | Audio | (one page) | Levels, Devices | Effects: EAX, Surround Speakers, Headphone HRTF. Subtitles: the five subtitle rows |
@@ -44,10 +44,10 @@ On the retained pages a row that another setting has turned off is dimmed and di
 
 | Page | Row | Enabled while | Why |
 |---|---|---|---|
-| Display | Borderless Window | Fullscreen is off | `r_borderless` only shapes a window. |
-| Display | Fullscreen Policy | Fullscreen is on | `r_fullscreenDesktop` is read only for fullscreen. |
-| Display | Window Width, Window Height | Fullscreen is off | A window's size (unchanged). |
-| Display | Display Resolution, Custom FS Width/Height, Refresh Rate | Fullscreen is on and the policy is exclusive | Desktop fullscreen uses the desktop's mode, a window its window size. |
+| Display | Window Width, Window Height | Window Mode is Windowed | Only a bordered window takes the window size; Borderless covers the display (#265). |
+| Display | Display Resolution, Custom FS Width/Height, Refresh Rate | Window Mode is Exclusive Fullscreen | Fullscreen uses the desktop's mode, a window its window size. |
+
+The retained Display page's **Window Mode** (#264) replaces the classic page's Fullscreen, Borderless Window and Fullscreen Policy rows. Windowed is `r_fullscreen 0`, `r_borderless 0`; Borderless is `r_fullscreen 0`, `r_borderless 1`; Fullscreen is `r_fullscreen 1`, `r_fullscreenDesktop 1`; Exclusive Fullscreen is `r_fullscreen 1`, `r_fullscreenDesktop 0`. One choice edits the three settings in one draft patch; a windowed mode keeps `r_fullscreenDesktop` and a fullscreen mode keeps `r_borderless`, which neither reads. The classic page keeps its three rows.
 | Display | Shadow Maps | Enable Shadows is on | Unchanged. |
 | Display | Character Self-Shadows | Shadows and Shadow Maps are on | Unchanged. |
 | Display | MSAA, Rendering Device, Renderer, Auto-Detect | The renderer or device reports it can | Unchanged capability gates. |

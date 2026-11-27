@@ -154,6 +154,10 @@ SPAN_ALLOWED = op("&&", st("settings.display.spanAvailable"), op("||", op("&&", 
                                                                          st("settings.draft.r_fullscreenDesktop")),
                                                                op("&&", no(st("settings.draft.r_fullscreen")),
                                                                   st("settings.draft.r_borderless"))))
+# The Window Mode the draft holds (#264): 0 Windowed, 1 Borderless,
+# 2 Fullscreen, 3 Exclusive Fullscreen.
+WINDOW_MODE = op("select", st("settings.draft.r_fullscreen"), op("select", st("settings.draft.r_fullscreenDesktop"), 2, 3),
+                 op("select", st("settings.draft.r_borderless"), 1, 0))
 EXCLUSIVE_LISTS = op("&&", st("settings.display.available"), no(st("settings.draft.r_fullscreenDesktop")))
 
 
@@ -220,6 +224,17 @@ def page_actions(doc: Document) -> None:
                                  "arguments": {"r_forceAmbient": op("select", {"input": "value"}, 0.7, 0)}},
         # Ambient Occlusion: 0 Off, else r_ssaoMethod + 1 (SSAO, HBAO, GTAO). Off
         # keeps the method, so turning it back on restores the choice.
+        # Window Mode: 0 Windowed, 1 Borderless, 2 Fullscreen (the desktop's
+        # size), 3 Exclusive Fullscreen. A window keeps the fullscreen policy
+        # and fullscreen keeps the borderless switch, so a change edits only
+        # what the chosen mode means.
+        "edit.window-mode": {"input": "number", "operation": "settings.system.edit",
+                             "arguments": {"r_fullscreen": op(">=", {"input": "value"}, 2),
+                                           "r_borderless": op("select", op("<", {"input": "value"}, 2),
+                                                              op("==", {"input": "value"}, 1), st("settings.draft.r_borderless")),
+                                           "r_fullscreenDesktop": op("select", op(">=", {"input": "value"}, 2),
+                                                                     op("==", {"input": "value"}, 2),
+                                                                     st("settings.draft.r_fullscreenDesktop"))}},
         "edit.ambient-occlusion": {"input": "number", "operation": "settings.system.edit",
                                    "arguments": {"r_ssao": op(">", {"input": "value"}, 0),
                                                  "r_ssaoMethod": op("select", op(">", {"input": "value"}, 0),
@@ -634,16 +649,12 @@ def system_document() -> dict:
              op("select", op("&&", span_shown, no(SPAN_ALLOWED)), "block", "none"))
     doc.bind("settings_multiscreen-status.text", "settings_multiscreen-status", "text",
              op("select", st("settings.display.spanAvailable"), "#str_230088", "#str_230089"))
-    fullscreen = row(doc, "settings_fullscreen", "#str_200147", "toggle", x, value=draft("r_fullscreen"), action=edit("r_fullscreen"))
-    gate(doc, "settings_fullscreen", QUIET, None)
-    # Borderless shapes only a window and the Fullscreen Policy only
-    # fullscreen (RenderSystem_init.cpp, sdl3_backend.cpp): each waits for
-    # Fullscreen's draft to reach it.
-    borderless = row(doc, "settings_borderless", "#str_229909", "toggle", x, value=draft("r_borderless"), action=edit("r_borderless"))
-    gate(doc, "settings_borderless", both(QUIET, no(draft("r_fullscreen"))), opacity=dim(no(draft("r_fullscreen")), 0.45))
-    policy = choice(doc, "settings_fullscreen_policy", "#str_229910", x, edit("r_fullscreenDesktop"), draft("r_fullscreenDesktop"),
-                    [(("#str_229911", 0), True), (("#str_229911", 1), False)])
-    gate(doc, "settings_fullscreen_policy", both(QUIET, draft("r_fullscreen")), opacity=dim(draft("r_fullscreen"), 0.45))
+    # #264: one Window Mode over r_fullscreen, r_borderless and
+    # r_fullscreenDesktop (RenderSystem_init.cpp, sdl3_backend.cpp), where
+    # three rows could be set in ways that did nothing.
+    window_mode = choice(doc, "settings_window_mode", "#str_232926", x, "edit.window-mode", WINDOW_MODE,
+                         listed("#str_232927", (0, 1, 2, 3)))
+    gate(doc, "settings_window_mode", QUIET, None)
     msaa = choice(doc, "settings_msaa", "#str_41093", x, edit("r_multiSamples"), draft("r_multiSamples"),
                   listed("#str_230020", (0, 2, 4, 8, 16)))
     gate(doc, "settings_msaa", both(QUIET, st("settings.msaaAvailable")), opacity=dim(st("settings.msaaAvailable"), 0.45))
@@ -754,7 +765,7 @@ def system_document() -> dict:
             [heading("#str_41098"), preset, autodetect, backend, gpu, renderer, renderer_status, restart, active, notice],
             [heading("#str_230018"), ui_scale, text_scale, aspect, reset, fit]]),
         ("screen", "#str_41099", [
-            [heading("#str_229900"), device, span, span_status, fullscreen, borderless, policy, vsync, framecap],
+            [heading("#str_229900"), device, span, span_status, window_mode, vsync, framecap],
             [heading("#str_229943"), width, height, mode, hint, custom_w, custom_h, refresh]]),
         ("image", "#str_41101", [
             [heading("#str_41101"), brightness, scale, msaa, msaa_help, msaa_status, postaa, anisotropy],
@@ -802,7 +813,7 @@ def system_document() -> dict:
     focus = lambda control: {"op": "focus", "control": control}
     screen_first = [{"op": "if", "condition": device_shown, "then": [focus("settings_display_device")],
                      "else": [{"op": "if", "condition": span_shown, "then": [focus("settings_multiscreen")],
-                               "else": [focus("settings_fullscreen")]}]}]
+                               "else": [focus("settings_window_mode")]}]}]
     built = settings_subpage(doc, PREFIX, "#str_229900", tabs, activate=activate, overlays=dialogs(doc), back_event="onBack",
                              back_id="settings_back", slots=SLOTS, footer=[footer], body=BODY, first_focus={"screen": screen_first})
     return finish(built)
@@ -867,8 +878,8 @@ EXTENSIONS = {
                                    "these two draft values.",
                           "localization": ["#str_230015", "#str_230016", "#str_230017", "#str_230018", "#str_230019"],
                           "catalogVersion": 2},
-    "displayControls": {"scope": "Display Device, Expand Across Displays, fullscreen, borderless, fullscreen policy and MSAA edit the "
-                                 "draft. Apply uses owned Keep/Revert recovery; unsupported device requests do not bypass validation.",
+    "displayControls": {"scope": "Display Device, Expand Across Displays, Window Mode and MSAA edit the "
+                                 "draft. Window Mode sets r_fullscreen, r_borderless and r_fullscreenDesktop in one patch. Apply uses owned Keep/Revert recovery; unsupported device requests do not bypass validation.",
                         "displayLists": "settings.display.* keys from system_display_catalog.py: owner-only lists the settings "
                                         "service builds from the display topology.",
                         "deviceRow": "Auto and the device list slots; hidden on one display unless the draft names a display the "
@@ -877,7 +888,7 @@ EXTENSIONS = {
                                    "desktop fullscreen, and a line under the row says which is missing.",
                         "msaaAvailability": "Read-only renderer observation; an unavailable renderer disables MSAA.",
                         "localization": ["#str_229900", "#str_229912", "#str_229914", "#str_229915", "#str_200059", "#str_230088",
-                                         "#str_230089", "#str_200147", "#str_229909", "#str_229910", "#str_229911", "#str_41093",
+                                         "#str_230089", "#str_232926", "#str_232927", "#str_41093",
                                          "#str_230020"]},
     "dimensionControls": {"source": "Legacy custom-size entry selects r_mode=-1; new selection and dimension changes share one owned "
                                     "draft patch.",

@@ -1996,4 +1996,6 @@
 	"#str_232923"	"Profondeur 3D"
 	"#str_232924"	"Convergence 3D"
 	"#str_232925"	"Inverser les yeux"
+	"#str_232926"	"Mode d'affichage"
+	"#str_232927"	"Fenêtré;Sans bordure;Plein écran;Plein écran exclusif"
 }

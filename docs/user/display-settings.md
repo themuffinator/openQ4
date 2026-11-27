@@ -15,7 +15,7 @@ The Display page has four tabs (in 0.14.1, three: MSAA was on **Screen**, and th
 | Tab | What it holds |
 |---|---|
 | **Graphics** | Performance Preset, Auto-Detect, Rendering Backend, Rendering Device, Restart Renderer, UI Scale, Text Size, UI Aspect |
-| **Screen** | Display Device, Expand Across Displays, Fullscreen, Borderless Window, Fullscreen Policy, V-Sync, Frame Rate Cap, window size, Display Resolution, custom fullscreen size, Refresh Rate |
+| **Screen** | Display Device, Expand Across Displays, Window Mode, V-Sync, Frame Rate Cap, window size, Display Resolution, custom fullscreen size, Refresh Rate |
 | **Image Quality** | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering, specular, bump maps, detailed sky, ambient light |
 | **Effects** | Lighting: shadows, Shadow Maps, character self-shadows, Irradiance Volumes, Preload Light Grids. Post-processing: Bloom, Ambient Occlusion, HDR Tonemap, Motion Blur, Depth of Field, CRT Emulation |
 
@@ -122,10 +122,19 @@ The classic menus' four quality choices use the same recipes: Low is Low, Medium
 
 ## Fullscreen, windows and monitors
 
+**Window Mode** on the Screen tab picks how the game fills your display:
+
+- **Windowed**: a normal window, sized by **Window Width** and **Window Height**.
+- **Borderless**: a window without a frame that covers the whole display.
+- **Fullscreen**: fullscreen at your desktop resolution.
+- **Exclusive Fullscreen**: fullscreen in the display mode you choose.
+
+Only the size and resolution rows that apply to the chosen mode can be changed. The classic interface (**Stock UI**) still has separate **Fullscreen**, **Borderless Window** and **Fullscreen Policy** rows.
+
 ### Fullscreen
 
-- **Desktop fullscreen** (the default, **Fullscreen Policy: Desktop**) fills the screen at your desktop resolution without switching display modes. It is the recommended choice. To render the 3D scene below or above your screen's resolution, use [Resolution Scale](#resolution-scale) rather than changing the display mode.
-- **Exclusive fullscreen** (**Fullscreen Policy: Exclusive**) switches the display to the mode you choose:
+- **Fullscreen** (the default) fills the screen at your desktop resolution without switching display modes. It is the recommended choice. To render the 3D scene below or above your screen's resolution, use [Resolution Scale](#resolution-scale) rather than changing the display mode.
+- **Exclusive Fullscreen** switches the display to the mode you choose:
   - **Display Resolution** lists Desktop Native first, then the fullscreen modes your selected display reports (with aspect labels such as 16:9 or 21:9), then Custom.
   - **Custom FS Width** and **Custom FS Height** set a custom size; editing them selects Custom.
   - **Refresh Rate** offers Auto plus the rates your display reports for that resolution. Auto keeps your desktop's refresh rate, or the nearest rate that resolution offers, and openQ4 picks the same rate every time. Leave it on Auto unless you need a specific rate. On macOS, Auto uses the desktop rate rather than the display's highest; this has not yet been confirmed on a Mac.
@@ -134,8 +143,8 @@ The classic menus' four quality choices use the same recipes: Low is Low, Medium
 
 ### Windowed and borderless
 
-- Turn **Fullscreen** off to play in a window, and set its size with **Window Width** and **Window Height**.
-- **Borderless Window** is on by default on Windows, because bordered OpenGL windows can stutter there. Turn it off for a normal, resizable window. Resizing a bordered window updates its saved size; hold `Shift` while resizing to snap to common shapes such as 4:3, 16:9, 16:10 and 21:9.
+- Choose **Windowed** to play in a window, and set its size with **Window Width** and **Window Height**.
+- **Borderless** is the default window on Windows, because bordered OpenGL windows can stutter there. It always covers the whole display; choose **Windowed** for a normal, resizable window. Resizing a bordered window updates its saved size; hold `Shift` while resizing to snap to common shapes such as 4:3, 16:9, 16:10 and 21:9.
 - openQ4 remembers the window's position. Leaving fullscreen brings back your window size rather than a fullscreen-sized window, and a window you take out of fullscreen or borderless from the Display page is centred on its display.
 - If you unplug or rearrange monitors and the saved position ends up off-screen, openQ4 moves the whole window back onto a display.
 - On Linux desktops that use Wayland, the desktop decides where windows go, so openQ4 doesn't save a position there. Windowed and borderless play stay on the monitor the desktop chose; to move the game to another monitor there, use fullscreen.
@@ -143,7 +152,7 @@ The classic menus' four quality choices use the same recipes: Low is Low, Medium
 ### Multiple monitors
 
 - **Display Device** chooses the monitor. **Auto** uses the current display. Choosing a specific monitor keeps the whole window, title bar included, on that monitor, shrinking it if needed.
-- **Expand Across Displays** stretches the game across all your monitors. It needs a borderless window or desktop fullscreen, and the page tells you if your displays can't be spanned.
+- **Expand Across Displays** stretches the game across all your monitors. It needs the **Borderless** or **Fullscreen** Window Mode, and the page tells you if your displays can't be spanned.
 - When the game spans several monitors, the HUD, menus, console and loading screens stay on one display (the one you chose, or the primary display on Auto), and the mouse follows them. The 3D world still spans every monitor.
 - In the console, `listDisplays` lists monitor numbers for `r_screen`, and `listDisplayModes [display]` lists the exclusive fullscreen modes a monitor supports.
 

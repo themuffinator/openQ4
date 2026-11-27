@@ -1987,4 +1987,6 @@
 	"#str_232923"	"Profundidad 3D"
 	"#str_232924"	"Convergencia 3D"
 	"#str_232925"	"Intercambiar ojos"
+	"#str_232926"	"Modo de ventana"
+	"#str_232927"	"Ventana;Sin bordes;Pantalla completa;Pantalla completa exclusiva"
 }

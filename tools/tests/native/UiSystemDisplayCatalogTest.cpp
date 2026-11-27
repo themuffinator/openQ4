@@ -85,13 +85,11 @@ static void OneDisplay(View& v) {
  // The rate row sizes an exclusive fullscreen, so the draft asks for one.
  Draft(v,{{"r_fullscreen",true}});
  Check(v.runtime.FocusControl(Refresh,v.time),"focus the tab's last row");v.Frame();
- v.Key(MenuInput::Down);v.Frame();Check(v.runtime.FocusedControl()=="settings_fullscreen","keyboard order passes over the hidden rows");
+ v.Key(MenuInput::Down);v.Frame();Check(v.runtime.FocusedControl()=="settings_window_mode","keyboard order passes over the hidden rows");
  v.Key(MenuInput::Up);v.Frame();Check(v.runtime.FocusedControl()=="tab-screen","Up from the first shown row reaches the tab past the hidden rows");
- // Borderless shapes only a window.
- Check(!v.runtime.FocusControl("settings_borderless",v.time),"Borderless waits for a windowed draft");
+ // Window Mode answers a windowed draft as well as a fullscreen one.
  Draft(v,{{"r_fullscreen",false}});
- Check(v.runtime.FocusControl("settings_borderless",v.time),"focus the row after Fullscreen");
- v.Key(MenuInput::Previous);v.Frame();Check(v.runtime.FocusedControl()=="settings_fullscreen","Previous reaches Fullscreen");
+ Check(v.runtime.FocusControl("settings_window_mode",v.time),"Window Mode answers a windowed draft");
  v.Key(MenuInput::Previous);v.Frame();Check(v.runtime.FocusedControl()!=Device&&v.runtime.FocusedControl()!=Span,"Previous passes over the hidden rows");
  // A change not yet applied keeps its row, so it can be seen and undone.
  Draft(v,{{"r_screen",0.0}});Check(Shown(v,Device)=="block","a pending choice of the only display keeps the row");

@@ -5,14 +5,13 @@
 #include "UiSystemPresetRuntimeTest.cpp"
 #undef main
 
-struct Field { const char* id; const char* key; StateValue target; const char* label; };
-// In the order each answers from the seeded fullscreen draft: the Fullscreen
-// Policy only while Fullscreen is on, Borderless only once it is off.
+// Each row's last option and the draft patch it makes. From the seeded
+// desktop fullscreen, Window Mode's last option, Exclusive Fullscreen, turns
+// the fullscreen policy over and keeps Borderless (#264).
+struct Field { const char* id; StateValue target; StateValues patch; const char* label; };
 static const Field fields[] = {
- {"settings_fullscreen_policy","r_fullscreenDesktop",false,"#str_229910"},
- {"settings_fullscreen","r_fullscreen",false,"#str_200147"},
- {"settings_borderless","r_borderless",true,"#str_229909"},
- {"settings_msaa","r_multiSamples",16.0,"#str_41093"}
+ {"settings_window_mode",3.0,{{"r_fullscreen",true},{"r_borderless",false},{"r_fullscreenDesktop",false}},"#str_232926"},
+ {"settings_msaa",16.0,{{"r_multiSamples",16.0}},"#str_41093"}
 };
 static void Inside(const Bounds& a,const Bounds& b,const char* why) {
  Check(a.x>=b.x-1&&a.y>=b.y-1&&a.x+a.width<=b.x+b.width+1&&a.y+a.height<=b.y+b.height+1,why);
@@ -37,10 +36,10 @@ static void Propose(View& v,const Field& field) {
  Check(actions.size()==1&&actions[0].proposal&&SettingsValueEqual(*actions[0].proposal,field.target),"exact typed display proposal");
  Check(v.runtime.CanDispatchControlAction(actions[0],v.time),"live display proposal eligible");
  ActionInvocation action;Check(v.runtime.ResolveAction(actions[0].action,action,v.error,&*actions[0].proposal),"display action resolves");
- Check(action.operation=="settings.system.edit"&&action.arguments==StateValues({{field.key,field.target}}),"one existing catalog key and no direct restart");
+ Check(action.operation=="settings.system.edit"&&action.arguments==field.patch,"the row's catalog keys in one patch and no direct restart");
  Check(v.tx.Edit(View::Owner,action.arguments).code==SettingsCode::Ok,"display edit stages in transaction");
  v.Sync();Check(v.runtime.AcknowledgeControlProposal(field.id,actions[0].proposalToken,true),"authoritative readback before ACK");v.Frame();
- for(const auto& [key,value]:before)Check(SettingsValueEqual(v.tx.Draft().at(key),key==field.key?field.target:value),"display edit preserves unrelated draft fields");
+ for(const auto& [key,value]:before)Check(SettingsValueEqual(v.tx.Draft().at(key),field.patch.contains(key)?field.patch.at(key):value),"display edit preserves unrelated draft fields");
  Check(v.host.writes==0,"selection never writes CVars or starts display work");
 }
 static void Run(const std::string& source,const std::string& directory,const char* locale,float expansion) {
@@ -53,11 +52,21 @@ static void Run(const std::string& source,const std::string& directory,const cha
   std::fprintf(stderr,"Display controls locale=%s expansion=%g viewport=%dx%d density=%g text=%g\n",locale,expansion,c.width,c.height,c.density,c.text);
   v.viewport.width=c.width;v.viewport.height=c.height;v.viewport.displayScale=c.density;v.viewport.textScale=c.text;
   Check(v.tx.Edit(View::Owner,{{"r_fullscreen",true},{"r_borderless",false},{"r_fullscreenDesktop",true},{"r_multiSamples",0.0}}).code==SettingsCode::Ok,"seed opposite display drafts");v.Sync();v.Frame();
-  Check(!v.runtime.CanActivateControl("settings_borderless",v.time),"Borderless waits for a windowed draft");
   for(const auto& field:fields)Propose(v,field);
-  Check(!v.runtime.CanActivateControl("settings_fullscreen_policy",v.time),"the Fullscreen Policy waits for a fullscreen draft");
-  auto dimmed=v.runtime.PresentedValue("settings_fullscreen_policy","opacity");
-  Check(dimmed&&std::abs(dimmed->data[0]-.45)<1e-6,"a windowed draft dims the Fullscreen Policy");
+  // #264: each Window Mode is one patch of the three window settings. A
+  // window keeps the fullscreen policy and fullscreen keeps Borderless.
+  struct Mode{double index;StateValues patch;};
+  for(const auto& mode:{Mode{0,{{"r_fullscreen",false},{"r_borderless",false},{"r_fullscreenDesktop",false}}},
+                        Mode{1,{{"r_fullscreen",false},{"r_borderless",true},{"r_fullscreenDesktop",false}}},
+                        Mode{2,{{"r_fullscreen",true},{"r_borderless",true},{"r_fullscreenDesktop",true}}},
+                        Mode{3,{{"r_fullscreen",true},{"r_borderless",true},{"r_fullscreenDesktop",false}}}}) {
+   const StateValue input=mode.index;ActionInvocation action;
+   Check(v.runtime.ResolveAction("edit.window-mode",action,v.error,&input),"Window Mode action resolves");
+   Check(action.operation=="settings.system.edit"&&action.arguments==mode.patch,"Window Mode sets the three window settings in one patch");
+   Check(v.tx.Edit(View::Owner,action.arguments).code==SettingsCode::Ok,"Window Mode patch stages");v.Sync();v.Frame();
+   Check(SettingsValueEqual(v.runtime.GetWidgetState("settings_window_mode")->accepted,input),"Window Mode reads back the staged mode");
+  }
+  Check(v.tx.Edit(View::Owner,{{"r_fullscreen",false}}).code==SettingsCode::Ok,"Borderless Window Mode draft");v.Sync();v.Frame();
   // #265: a borderless window covers the display, so only a bordered window
   // takes the window size.
   v.Show("settings_window_width");
@@ -68,6 +77,7 @@ static void Run(const std::string& source,const std::string& directory,const cha
   Check(v.tx.Edit(View::Owner,{{"r_borderless",false}}).code==SettingsCode::Ok,"bordered window draft");v.Sync();v.Frame();
   for(const auto* id:{"settings_window_width","settings_window_height"})Check(v.runtime.CanActivateControl(id,v.time),"a bordered window takes the window size");
   Check(v.tx.Edit(View::Owner,{{"r_borderless",true}}).code==SettingsCode::Ok,"restore the borderless draft");v.Sync();v.Frame();v.Show("settings_msaa");
+  Check(v.tx.Edit(View::Owner,{{"r_fullscreen",true},{"r_borderless",false}}).code==SettingsCode::Ok,"back to the proposed Exclusive Fullscreen");v.Sync();v.Frame();
   Check(SettingsValuesEqual(v.host.live,baseline),"all display choices leave original host snapshot intact");
   // Existing popup cancellation must also preserve a nonlisted custom value.
   Check(v.tx.Edit(View::Owner,{{"r_multiSamples",3.0}}).code==SettingsCode::Ok,"counted host permits observed custom baseline shape");v.Sync();v.Frame();

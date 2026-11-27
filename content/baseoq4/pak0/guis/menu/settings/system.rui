@@ -534,6 +534,29 @@
    "operation": "settings.system.edit",
    "arguments": {"r_forceAmbient": {"op": "select", "args": [{"input": "value"}, 0.7, 0]}}
   },
+  "edit.window-mode": {
+   "input": "number",
+   "operation": "settings.system.edit",
+   "arguments": {
+    "r_fullscreen": {"op": ">=", "args": [{"input": "value"}, 2]},
+    "r_borderless": {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"input": "value"}, 2]},
+      {"op": "==", "args": [{"input": "value"}, 1]},
+      {"state": "settings.draft.r_borderless"}
+     ]
+    },
+    "r_fullscreenDesktop": {
+     "op": "select",
+     "args": [
+      {"op": ">=", "args": [{"input": "value"}, 2]},
+      {"op": "==", "args": [{"input": "value"}, 2]},
+      {"state": "settings.draft.r_fullscreenDesktop"}
+     ]
+    }
+   }
+  },
   "edit.ambient-occlusion": {
    "input": "number",
    "operation": "settings.system.edit",
@@ -949,7 +972,7 @@
            ]
           },
           "then": [{"op": "focus", "control": "settings_multiscreen"}],
-          "else": [{"op": "focus", "control": "settings_fullscreen"}]
+          "else": [{"op": "focus", "control": "settings_window_mode"}]
          }
         ]
        }
@@ -1249,7 +1272,7 @@
            ]
           },
           "then": [{"op": "focus", "control": "settings_multiscreen"}],
-          "else": [{"op": "focus", "control": "settings_fullscreen"}]
+          "else": [{"op": "focus", "control": "settings_window_mode"}]
          }
         ]
        }
@@ -2223,8 +2246,8 @@
    "value": {"op": "select", "args": [{"state": "settings.display.spanAvailable"}, "#str_230088", "#str_230089"]}
   },
   {
-   "id": "settings_fullscreen.enabled",
-   "node": "settings_fullscreen",
+   "id": "settings_window_mode.enabled",
+   "node": "settings_window_mode",
    "property": "enabled",
    "value": {
     "op": "&&",
@@ -2257,102 +2280,6 @@
      }
     ]
    }
-  },
-  {
-   "id": "settings_borderless.enabled",
-   "node": "settings_borderless",
-   "property": "enabled",
-   "value": {
-    "op": "&&",
-    "args": [
-     {"op": "==", "args": [{"state": "page.tab"}, 1]},
-     {
-      "op": "&&",
-      "args": [
-       {
-        "op": "&&",
-        "args": [
-         {
-          "op": "&&",
-          "args": [
-           {
-            "op": "&&",
-            "args": [
-             {
-              "op": "&&",
-              "args": [
-               {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
-               {"op": "!", "args": [{"state": "settings.busy"}]}
-              ]
-             },
-             {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
-            ]
-           },
-           {"op": "!", "args": [{"state": "page.discardVisible"}]}
-          ]
-         },
-         {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
-        ]
-       },
-       {"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]}
-      ]
-     }
-    ]
-   }
-  },
-  {
-   "id": "settings_borderless.opacity",
-   "node": "settings_borderless",
-   "property": "opacity",
-   "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]}, 1, 0.45]}
-  },
-  {
-   "id": "settings_fullscreen_policy.enabled",
-   "node": "settings_fullscreen_policy",
-   "property": "enabled",
-   "value": {
-    "op": "&&",
-    "args": [
-     {"op": "==", "args": [{"state": "page.tab"}, 1]},
-     {
-      "op": "&&",
-      "args": [
-       {
-        "op": "&&",
-        "args": [
-         {
-          "op": "&&",
-          "args": [
-           {
-            "op": "&&",
-            "args": [
-             {
-              "op": "&&",
-              "args": [
-               {"op": "&&", "args": [{"state": "settings.open"}, {"op": "==", "args": [{"state": "settings.phase"}, 1]}]},
-               {"op": "!", "args": [{"state": "settings.busy"}]}
-              ]
-             },
-             {"op": "!", "args": [{"state": "settings.confirmationVisible"}]}
-            ]
-           },
-           {"op": "!", "args": [{"state": "page.discardVisible"}]}
-          ]
-         },
-         {"op": "!", "args": [{"state": "ui.numberDraftsPending"}]}
-        ]
-       },
-       {"state": "settings.draft.r_fullscreen"}
-      ]
-     }
-    ]
-   }
-  },
-  {
-   "id": "settings_fullscreen_policy.opacity",
-   "node": "settings_fullscreen_policy",
-   "property": "opacity",
-   "value": {"op": "select", "args": [{"state": "settings.draft.r_fullscreen"}, 1, 0.45]}
   },
   {
    "id": "settings_msaa.enabled",
@@ -11945,8 +11872,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen.width",
-   "node": "settings_fullscreen",
+   "id": "tall.settings_window_mode.width",
+   "node": "settings_window_mode",
    "property": "width",
    "value": {
     "op": "select",
@@ -11958,8 +11885,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen.height",
-   "node": "settings_fullscreen",
+   "id": "tall.settings_window_mode.height",
+   "node": "settings_window_mode",
    "property": "height",
    "value": {
     "op": "select",
@@ -11971,8 +11898,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-focus.width",
-   "node": "settings_fullscreen-focus",
+   "id": "tall.settings_window_mode-focus.width",
+   "node": "settings_window_mode-focus",
    "property": "width",
    "value": {
     "op": "select",
@@ -11984,8 +11911,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-focus.height",
-   "node": "settings_fullscreen-focus",
+   "id": "tall.settings_window_mode-focus.height",
+   "node": "settings_window_mode-focus",
    "property": "height",
    "value": {
     "op": "select",
@@ -11997,8 +11924,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-head.left",
-   "node": "settings_fullscreen-head",
+   "id": "tall.settings_window_mode-head.left",
+   "node": "settings_window_mode-head",
    "property": "left",
    "value": {
     "op": "select",
@@ -12010,8 +11937,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-head.width",
-   "node": "settings_fullscreen-head",
+   "id": "tall.settings_window_mode-head.width",
+   "node": "settings_window_mode-head",
    "property": "width",
    "value": {
     "op": "select",
@@ -12023,8 +11950,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-head.height",
-   "node": "settings_fullscreen-head",
+   "id": "tall.settings_window_mode-head.height",
+   "node": "settings_window_mode-head",
    "property": "height",
    "value": {
     "op": "select",
@@ -12036,8 +11963,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-label.font-size",
-   "node": "settings_fullscreen-label",
+   "id": "tall.settings_window_mode-label.font-size",
+   "node": "settings_window_mode-label",
    "property": "font-size",
    "value": {
     "op": "select",
@@ -12049,8 +11976,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-label.line-height",
-   "node": "settings_fullscreen-label",
+   "id": "tall.settings_window_mode-label.line-height",
+   "node": "settings_window_mode-label",
    "property": "line-height",
    "value": {
     "op": "select",
@@ -12062,8 +11989,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-box.left",
-   "node": "settings_fullscreen-box",
+   "id": "tall.settings_window_mode-value.left",
+   "node": "settings_window_mode-value",
    "property": "left",
    "value": {
     "op": "select",
@@ -12075,450 +12002,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen-box.top",
-   "node": "settings_fullscreen-box",
-   "property": "top",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     22.4983,
-     {"op": "*", "args": [11.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen-box.width",
-   "node": "settings_fullscreen-box",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen-box.height",
-   "node": "settings_fullscreen-box",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen-checked.left",
-   "node": "settings_fullscreen-checked",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     370.2211,
-     {"op": "*", "args": [181.011, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen-checked.top",
-   "node": "settings_fullscreen-checked",
-   "property": "top",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     22.4983,
-     {"op": "*", "args": [11.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen-checked.width",
-   "node": "settings_fullscreen-checked",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen-checked.height",
-   "node": "settings_fullscreen-checked",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless.width",
-   "node": "settings_borderless",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     880.5,
-     {"op": "*", "args": [430.5, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless.height",
-   "node": "settings_borderless",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-focus.width",
-   "node": "settings_borderless-focus",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     8.1812,
-     {"op": "*", "args": [4, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-focus.height",
-   "node": "settings_borderless-focus",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-head.left",
-   "node": "settings_borderless-head",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     42.9512,
-     {"op": "*", "args": [21, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-head.width",
-   "node": "settings_borderless-head",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     310.9075,
-     {"op": "*", "args": [152.011, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-head.height",
-   "node": "settings_borderless-head",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-label.font-size",
-   "node": "settings_borderless-label",
-   "property": "font-size",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
-     14
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-label.line-height",
-   "node": "settings_borderless-label",
-   "property": "line-height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
-     13.0
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-box.left",
-   "node": "settings_borderless-box",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     370.2211,
-     {"op": "*", "args": [181.011, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-box.top",
-   "node": "settings_borderless-box",
-   "property": "top",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     22.4983,
-     {"op": "*", "args": [11.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-box.width",
-   "node": "settings_borderless-box",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-box.height",
-   "node": "settings_borderless-box",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-checked.left",
-   "node": "settings_borderless-checked",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     370.2211,
-     {"op": "*", "args": [181.011, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-checked.top",
-   "node": "settings_borderless-checked",
-   "property": "top",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     22.4983,
-     {"op": "*", "args": [11.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-checked.width",
-   "node": "settings_borderless-checked",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_borderless-checked.height",
-   "node": "settings_borderless-checked",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     28.6341,
-     {"op": "*", "args": [14, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy.width",
-   "node": "settings_fullscreen_policy",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     880.5,
-     {"op": "*", "args": [430.5, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy.height",
-   "node": "settings_fullscreen_policy",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-focus.width",
-   "node": "settings_fullscreen_policy-focus",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     8.1812,
-     {"op": "*", "args": [4, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-focus.height",
-   "node": "settings_fullscreen_policy-focus",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-head.left",
-   "node": "settings_fullscreen_policy-head",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     42.9512,
-     {"op": "*", "args": [21, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-head.width",
-   "node": "settings_fullscreen_policy-head",
-   "property": "width",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     310.9075,
-     {"op": "*", "args": [152.011, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-head.height",
-   "node": "settings_fullscreen_policy-head",
-   "property": "height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     73.6307,
-     {"op": "*", "args": [36.0, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-label.font-size",
-   "node": "settings_fullscreen_policy-label",
-   "property": "font-size",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
-     14
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-label.line-height",
-   "node": "settings_fullscreen_policy-label",
-   "property": "line-height",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
-     13.0
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-value.left",
-   "node": "settings_fullscreen_policy-value",
-   "property": "left",
-   "value": {
-    "op": "select",
-    "args": [
-     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     370.2211,
-     {"op": "*", "args": [181.011, {"state": "view.text"}]}
-    ]
-   }
-  },
-  {
-   "id": "tall.settings_fullscreen_policy-value.width",
-   "node": "settings_fullscreen_policy-value",
+   "id": "tall.settings_window_mode-value.width",
+   "node": "settings_window_mode-value",
    "property": "width",
    "value": {
     "op": "select",
@@ -12530,8 +12015,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-value.height",
-   "node": "settings_fullscreen_policy-value",
+   "id": "tall.settings_window_mode-value.height",
+   "node": "settings_window_mode-value",
    "property": "height",
    "value": {
     "op": "select",
@@ -12543,8 +12028,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-value.font-size",
-   "node": "settings_fullscreen_policy-value",
+   "id": "tall.settings_window_mode-value.font-size",
+   "node": "settings_window_mode-value",
    "property": "font-size",
    "value": {
     "op": "select",
@@ -12556,8 +12041,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-value.line-height",
-   "node": "settings_fullscreen_policy-value",
+   "id": "tall.settings_window_mode-value.line-height",
+   "node": "settings_window_mode-value",
    "property": "line-height",
    "value": {
     "op": "select",
@@ -12569,8 +12054,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-chevron.left",
-   "node": "settings_fullscreen_policy-chevron",
+   "id": "tall.settings_window_mode-chevron.left",
+   "node": "settings_window_mode-chevron",
    "property": "left",
    "value": {
     "op": "select",
@@ -12582,8 +12067,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-chevron.top",
-   "node": "settings_fullscreen_policy-chevron",
+   "id": "tall.settings_window_mode-chevron.top",
+   "node": "settings_window_mode-chevron",
    "property": "top",
    "value": {
     "op": "select",
@@ -12595,8 +12080,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-chevron.width",
-   "node": "settings_fullscreen_policy-chevron",
+   "id": "tall.settings_window_mode-chevron.width",
+   "node": "settings_window_mode-chevron",
    "property": "width",
    "value": {
     "op": "select",
@@ -12608,8 +12093,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-chevron.height",
-   "node": "settings_fullscreen_policy-chevron",
+   "id": "tall.settings_window_mode-chevron.height",
+   "node": "settings_window_mode-chevron",
    "property": "height",
    "value": {
     "op": "select",
@@ -12621,8 +12106,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-viewport.margin-left",
-   "node": "settings_fullscreen_policy-viewport",
+   "id": "tall.settings_window_mode-viewport.margin-left",
+   "node": "settings_window_mode-viewport",
    "property": "margin-left",
    "value": {
     "op": "select",
@@ -12634,8 +12119,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-viewport.margin-top",
-   "node": "settings_fullscreen_policy-viewport",
+   "id": "tall.settings_window_mode-viewport.margin-top",
+   "node": "settings_window_mode-viewport",
    "property": "margin-top",
    "value": {
     "op": "select",
@@ -12647,8 +12132,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-option-0.height",
-   "node": "settings_fullscreen_policy-option-0",
+   "id": "tall.settings_window_mode-option-0.height",
+   "node": "settings_window_mode-option-0",
    "property": "height",
    "value": {
     "op": "select",
@@ -12660,8 +12145,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-option-0-label.padding-left",
-   "node": "settings_fullscreen_policy-option-0-label",
+   "id": "tall.settings_window_mode-option-0-label.padding-left",
+   "node": "settings_window_mode-option-0-label",
    "property": "padding-left",
    "value": {
     "op": "select",
@@ -12673,8 +12158,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-option-0-label.font-size",
-   "node": "settings_fullscreen_policy-option-0-label",
+   "id": "tall.settings_window_mode-option-0-label.font-size",
+   "node": "settings_window_mode-option-0-label",
    "property": "font-size",
    "value": {
     "op": "select",
@@ -12686,8 +12171,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-option-0-label.line-height",
-   "node": "settings_fullscreen_policy-option-0-label",
+   "id": "tall.settings_window_mode-option-0-label.line-height",
+   "node": "settings_window_mode-option-0-label",
    "property": "line-height",
    "value": {
     "op": "select",
@@ -12699,8 +12184,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-option-1.height",
-   "node": "settings_fullscreen_policy-option-1",
+   "id": "tall.settings_window_mode-option-1.height",
+   "node": "settings_window_mode-option-1",
    "property": "height",
    "value": {
     "op": "select",
@@ -12712,8 +12197,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-option-1-label.padding-left",
-   "node": "settings_fullscreen_policy-option-1-label",
+   "id": "tall.settings_window_mode-option-1-label.padding-left",
+   "node": "settings_window_mode-option-1-label",
    "property": "padding-left",
    "value": {
     "op": "select",
@@ -12725,8 +12210,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-option-1-label.font-size",
-   "node": "settings_fullscreen_policy-option-1-label",
+   "id": "tall.settings_window_mode-option-1-label.font-size",
+   "node": "settings_window_mode-option-1-label",
    "property": "font-size",
    "value": {
     "op": "select",
@@ -12738,8 +12223,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-option-1-label.line-height",
-   "node": "settings_fullscreen_policy-option-1-label",
+   "id": "tall.settings_window_mode-option-1-label.line-height",
+   "node": "settings_window_mode-option-1-label",
    "property": "line-height",
    "value": {
     "op": "select",
@@ -12751,8 +12236,112 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-scroll-track.width",
-   "node": "settings_fullscreen_policy-scroll-track",
+   "id": "tall.settings_window_mode-option-2.height",
+   "node": "settings_window_mode-option-2",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_window_mode-option-2-label.padding-left",
+   "node": "settings_window_mode-option-2-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_window_mode-option-2-label.font-size",
+   "node": "settings_window_mode-option-2-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_window_mode-option-2-label.line-height",
+   "node": "settings_window_mode-option-2-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_window_mode-option-3.height",
+   "node": "settings_window_mode-option-3",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {"op": "*", "args": [22.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_window_mode-option-3-label.padding-left",
+   "node": "settings_window_mode-option-3-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {"op": "*", "args": [8, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_window_mode-option-3-label.font-size",
+   "node": "settings_window_mode-option-3-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     15
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_window_mode-option-3-label.line-height",
+   "node": "settings_window_mode-option-3-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     22.0
+    ]
+   }
+  },
+  {
+   "id": "tall.settings_window_mode-scroll-track.width",
+   "node": "settings_window_mode-scroll-track",
    "property": "width",
    "value": {
     "op": "select",
@@ -12764,8 +12353,8 @@
    }
   },
   {
-   "id": "tall.settings_fullscreen_policy-scroll-thumb.width",
-   "node": "settings_fullscreen_policy-scroll-thumb",
+   "id": "tall.settings_window_mode-scroll-thumb.width",
+   "node": "settings_window_mode-scroll-thumb",
    "property": "width",
    "value": {
     "op": "select",
@@ -29552,21 +29141,21 @@
    ]
   },
   {
-   "id": "settings_fullscreen.default",
+   "id": "settings_window_mode.default",
    "durationMs": 300,
    "tracks": [
     {
-     "node": "settings_fullscreen-focus",
+     "node": "settings_window_mode-focus",
      "property": "opacity",
      "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
     },
     {
-     "node": "settings_fullscreen-wash",
+     "node": "settings_window_mode-wash",
      "property": "opacity",
      "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
     },
     {
-     "node": "settings_fullscreen-label",
+     "node": "settings_window_mode-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
@@ -29576,11 +29165,11 @@
    ]
   },
   {
-   "id": "settings_fullscreen.hover",
+   "id": "settings_window_mode.hover",
    "durationMs": 1,
    "tracks": [
     {
-     "node": "settings_fullscreen-focus",
+     "node": "settings_window_mode-focus",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
@@ -29588,7 +29177,7 @@
      ]
     },
     {
-     "node": "settings_fullscreen-wash",
+     "node": "settings_window_mode-wash",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
@@ -29596,7 +29185,7 @@
      ]
     },
     {
-     "node": "settings_fullscreen-label",
+     "node": "settings_window_mode-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
@@ -29606,11 +29195,11 @@
    ]
   },
   {
-   "id": "settings_fullscreen.focus",
+   "id": "settings_window_mode.focus",
    "durationMs": 80,
    "tracks": [
     {
-     "node": "settings_fullscreen-focus",
+     "node": "settings_window_mode-focus",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
@@ -29618,7 +29207,7 @@
      ]
     },
     {
-     "node": "settings_fullscreen-wash",
+     "node": "settings_window_mode-wash",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
@@ -29626,7 +29215,7 @@
      ]
     },
     {
-     "node": "settings_fullscreen-label",
+     "node": "settings_window_mode-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
@@ -29636,11 +29225,11 @@
    ]
   },
   {
-   "id": "settings_fullscreen.pressed",
+   "id": "settings_window_mode.pressed",
    "durationMs": 60,
    "tracks": [
     {
-     "node": "settings_fullscreen-focus",
+     "node": "settings_window_mode-focus",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
@@ -29648,7 +29237,7 @@
      ]
     },
     {
-     "node": "settings_fullscreen-wash",
+     "node": "settings_window_mode-wash",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
@@ -29656,7 +29245,7 @@
      ]
     },
     {
-     "node": "settings_fullscreen-label",
+     "node": "settings_window_mode-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
@@ -29666,11 +29255,11 @@
    ]
   },
   {
-   "id": "settings_fullscreen.disabled",
+   "id": "settings_window_mode.disabled",
    "durationMs": 150,
    "tracks": [
     {
-     "node": "settings_fullscreen-focus",
+     "node": "settings_window_mode-focus",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
@@ -29678,7 +29267,7 @@
      ]
     },
     {
-     "node": "settings_fullscreen-wash",
+     "node": "settings_window_mode-wash",
      "property": "opacity",
      "keys": [
       {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
@@ -29686,295 +29275,7 @@
      ]
     },
     {
-     "node": "settings_fullscreen-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_borderless.default",
-   "durationMs": 300,
-   "tracks": [
-    {
-     "node": "settings_borderless-focus",
-     "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
-    },
-    {
-     "node": "settings_borderless-wash",
-     "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
-    },
-    {
-     "node": "settings_borderless-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
-      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_borderless.hover",
-   "durationMs": 1,
-   "tracks": [
-    {
-     "node": "settings_borderless-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_borderless-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
-     ]
-    },
-    {
-     "node": "settings_borderless-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_borderless.focus",
-   "durationMs": 80,
-   "tracks": [
-    {
-     "node": "settings_borderless-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_borderless-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_borderless-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_borderless.pressed",
-   "durationMs": 60,
-   "tracks": [
-    {
-     "node": "settings_borderless-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_borderless-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_borderless-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_borderless.disabled",
-   "durationMs": 150,
-   "tracks": [
-    {
-     "node": "settings_borderless-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_borderless-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_borderless-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_fullscreen_policy.default",
-   "durationMs": 300,
-   "tracks": [
-    {
-     "node": "settings_fullscreen_policy-focus",
-     "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
-    },
-    {
-     "node": "settings_fullscreen_policy-wash",
-     "property": "opacity",
-     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
-    },
-    {
-     "node": "settings_fullscreen_policy-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
-      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_fullscreen_policy.hover",
-   "durationMs": 1,
-   "tracks": [
-    {
-     "node": "settings_fullscreen_policy-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_fullscreen_policy-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
-     ]
-    },
-    {
-     "node": "settings_fullscreen_policy-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_fullscreen_policy.focus",
-   "durationMs": 80,
-   "tracks": [
-    {
-     "node": "settings_fullscreen_policy-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_fullscreen_policy-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_fullscreen_policy-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_fullscreen_policy.pressed",
-   "durationMs": 60,
-   "tracks": [
-    {
-     "node": "settings_fullscreen_policy-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_fullscreen_policy-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "number", "value": 1}}
-     ]
-    },
-    {
-     "node": "settings_fullscreen_policy-label",
-     "property": "color",
-     "keys": [
-      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
-     ]
-    }
-   ]
-  },
-  {
-   "id": "settings_fullscreen_policy.disabled",
-   "durationMs": 150,
-   "tracks": [
-    {
-     "node": "settings_fullscreen_policy-focus",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_fullscreen_policy-wash",
-     "property": "opacity",
-     "keys": [
-      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
-      {"atMs": 150, "value": {"type": "number", "value": 0}}
-     ]
-    },
-    {
-     "node": "settings_fullscreen_policy-label",
+     "node": "settings_window_mode-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -50356,7 +49657,7 @@
                     "minimumThumb": 24
                    },
                    "navigation": {
-                    "down": "settings_fullscreen",
+                    "down": "settings_window_mode",
                     "up": "settings_display_device",
                     "right": "settings_window_height",
                     "left": "settings_multiscreen"
@@ -50385,7 +49686,7 @@
                   }
                  },
                  {
-                  "id": "settings_fullscreen",
+                  "id": "settings_window_mode",
                   "type": "group",
                   "properties": {
                    "position": {"type": "keyword", "value": "relative"},
@@ -50397,7 +49698,7 @@
                   },
                   "children": [
                    {
-                    "id": "settings_fullscreen-plate",
+                    "id": "settings_window_mode-plate",
                     "type": "vector",
                     "properties": {
                      "position": {"type": "keyword", "value": "absolute"},
@@ -50429,7 +49730,7 @@
                     ]
                    },
                    {
-                    "id": "settings_fullscreen-wash",
+                    "id": "settings_window_mode-wash",
                     "type": "vector",
                     "properties": {
                      "position": {"type": "keyword", "value": "absolute"},
@@ -50463,7 +49764,7 @@
                     ]
                    },
                    {
-                    "id": "settings_fullscreen-focus",
+                    "id": "settings_window_mode-focus",
                     "type": "vector",
                     "properties": {
                      "position": {"type": "keyword", "value": "absolute"},
@@ -50488,7 +49789,7 @@
                     ]
                    },
                    {
-                    "id": "settings_fullscreen-head",
+                    "id": "settings_window_mode-head",
                     "type": "group",
                     "properties": {
                      "position": {"type": "keyword", "value": "absolute"},
@@ -50502,10 +49803,10 @@
                     },
                     "children": [
                      {
-                      "id": "settings_fullscreen-label",
+                      "id": "settings_window_mode-label",
                       "type": "text",
                       "properties": {
-                       "text": {"type": "text", "value": "#str_200147"},
+                       "text": {"type": "text", "value": "#str_232926"},
                        "position": {"type": "keyword", "value": "relative"},
                        "display": {"type": "keyword", "value": "block"},
                        "flex-shrink": {"type": "number", "value": 1},
@@ -50521,459 +49822,7 @@
                     ]
                    },
                    {
-                    "id": "settings_fullscreen-box",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
-                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
-                     "width": {"type": "length", "value": 14, "unit": "dp"},
-                     "height": {"type": "length", "value": 14, "unit": "dp"}
-                    },
-                    "paths": [
-                     {
-                      "id": "box",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
-                       "widthDp": 1.5,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_fullscreen-checked",
-                    "type": "group",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
-                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
-                     "width": {"type": "length", "value": 14, "unit": "dp"},
-                     "height": {"type": "length", "value": 14, "unit": "dp"},
-                     "display": {"type": "keyword", "value": "none"}
-                    },
-                    "children": [
-                     {
-                      "id": "settings_fullscreen-mark",
-                      "type": "vector",
-                      "properties": {
-                       "position": {"type": "keyword", "value": "absolute"},
-                       "left": {"type": "length", "value": 0, "unit": "dp"},
-                       "top": {"type": "length", "value": 0, "unit": "dp"},
-                       "width": {"type": "length", "value": 100, "unit": "%"},
-                       "height": {"type": "length", "value": 100, "unit": "%"}
-                      },
-                      "paths": [
-                       {
-                        "id": "mark",
-                        "commands": [
-                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
-                         {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
-                         {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
-                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
-                         {"id": "close", "op": "close"}
-                        ],
-                        "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ],
-                  "control": {
-                   "role": "toggle",
-                   "label": "#str_200147",
-                   "action": "edit.r_fullscreen",
-                   "value": {"state": "settings.draft.r_fullscreen"},
-                   "states": {
-                    "default": "settings_fullscreen.default",
-                    "hover": "settings_fullscreen.hover",
-                    "focus": "settings_fullscreen.focus",
-                    "pressed": "settings_fullscreen.pressed",
-                    "disabled": "settings_fullscreen.disabled"
-                   },
-                   "parts": {"checked": "settings_fullscreen-checked"},
-                   "navigation": {
-                    "down": "settings_borderless",
-                    "up": "settings_multiscreen",
-                    "right": "settings_display_mode",
-                    "left": "settings_fullscreen"
-                   }
-                  }
-                 },
-                 {
-                  "id": "settings_borderless",
-                  "type": "group",
-                  "properties": {
-                   "position": {"type": "keyword", "value": "relative"},
-                   "display": {"type": "keyword", "value": "block"},
-                   "width": {"type": "length", "value": 430.5, "unit": "dp"},
-                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
-                   "opacity": {"type": "number", "value": 1},
-                   "flex-shrink": {"type": "number", "value": 0}
-                  },
-                  "children": [
-                   {
-                    "id": "settings_borderless-plate",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 0, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 100, "unit": "%"},
-                     "height": {"type": "length", "value": 100, "unit": "%"}
-                    },
-                    "paths": [
-                     {
-                      "id": "plate",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
-                       {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_borderless-wash",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 0, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 100, "unit": "%"},
-                     "height": {"type": "length", "value": 100, "unit": "%"},
-                     "opacity": {"type": "number", "value": 0}
-                    },
-                    "paths": [
-                     {
-                      "id": "wash",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
-                       {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "fill": {
-                       "type": "linear",
-                       "from": [{"fraction": 0.0}, {"fraction": 0.0}],
-                       "to": [{"fraction": 1}, {"fraction": 0.0}],
-                       "stops": [
-                        {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
-                        {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
-                       ]
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_borderless-focus",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 0, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 4, "unit": "dp"},
-                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
-                     "opacity": {"type": "number", "value": 0}
-                    },
-                    "paths": [
-                     {
-                      "id": "rail",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_borderless-head",
-                    "type": "group",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 21, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 152.011, "unit": "dp"},
-                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
-                     "display": {"type": "keyword", "value": "flex"},
-                     "flex-direction": {"type": "keyword", "value": "row"},
-                     "align-items": {"type": "keyword", "value": "center"}
-                    },
-                    "children": [
-                     {
-                      "id": "settings_borderless-label",
-                      "type": "text",
-                      "properties": {
-                       "text": {"type": "text", "value": "#str_229909"},
-                       "position": {"type": "keyword", "value": "relative"},
-                       "display": {"type": "keyword", "value": "block"},
-                       "flex-shrink": {"type": "number", "value": 1},
-                       "min-width": {"type": "length", "value": 0, "unit": "dp"},
-                       "font-family": {"type": "font", "value": "lowpixel"},
-                       "font-size": {"type": "length", "value": 14, "unit": "dp"},
-                       "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
-                       "color": {"type": "color", "value": [1, 1, 1, 0.85]},
-                       "white-space": {"type": "keyword", "value": "normal"},
-                       "overflow": {"type": "keyword", "value": "hidden"}
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_borderless-box",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
-                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
-                     "width": {"type": "length", "value": 14, "unit": "dp"},
-                     "height": {"type": "length", "value": 14, "unit": "dp"}
-                    },
-                    "paths": [
-                     {
-                      "id": "box",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
-                       "widthDp": 1.5,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_borderless-checked",
-                    "type": "group",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 181.011, "unit": "dp"},
-                     "top": {"type": "length", "value": 11.0, "unit": "dp"},
-                     "width": {"type": "length", "value": 14, "unit": "dp"},
-                     "height": {"type": "length", "value": 14, "unit": "dp"},
-                     "display": {"type": "keyword", "value": "none"}
-                    },
-                    "children": [
-                     {
-                      "id": "settings_borderless-mark",
-                      "type": "vector",
-                      "properties": {
-                       "position": {"type": "keyword", "value": "absolute"},
-                       "left": {"type": "length", "value": 0, "unit": "dp"},
-                       "top": {"type": "length", "value": 0, "unit": "dp"},
-                       "width": {"type": "length", "value": 100, "unit": "%"},
-                       "height": {"type": "length", "value": 100, "unit": "%"}
-                      },
-                      "paths": [
-                       {
-                        "id": "mark",
-                        "commands": [
-                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
-                         {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
-                         {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
-                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
-                         {"id": "close", "op": "close"}
-                        ],
-                        "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
-                       }
-                      ]
-                     }
-                    ]
-                   }
-                  ],
-                  "control": {
-                   "role": "toggle",
-                   "label": "#str_229909",
-                   "action": "edit.r_borderless",
-                   "value": {"state": "settings.draft.r_borderless"},
-                   "states": {
-                    "default": "settings_borderless.default",
-                    "hover": "settings_borderless.hover",
-                    "focus": "settings_borderless.focus",
-                    "pressed": "settings_borderless.pressed",
-                    "disabled": "settings_borderless.disabled"
-                   },
-                   "parts": {"checked": "settings_borderless-checked"},
-                   "navigation": {
-                    "down": "settings_fullscreen_policy",
-                    "up": "settings_fullscreen",
-                    "right": "settings_custom_width",
-                    "left": "settings_borderless"
-                   }
-                  }
-                 },
-                 {
-                  "id": "settings_fullscreen_policy",
-                  "type": "group",
-                  "properties": {
-                   "position": {"type": "keyword", "value": "relative"},
-                   "display": {"type": "keyword", "value": "block"},
-                   "width": {"type": "length", "value": 430.5, "unit": "dp"},
-                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
-                   "opacity": {"type": "number", "value": 1},
-                   "flex-shrink": {"type": "number", "value": 0}
-                  },
-                  "children": [
-                   {
-                    "id": "settings_fullscreen_policy-plate",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 0, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 100, "unit": "%"},
-                     "height": {"type": "length", "value": 100, "unit": "%"}
-                    },
-                    "paths": [
-                     {
-                      "id": "plate",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
-                       {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
-                      "stroke": {
-                       "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
-                       "widthDp": 1,
-                       "minimumPixels": 1,
-                       "join": "miter",
-                       "cap": "butt"
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_fullscreen_policy-wash",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 0, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 100, "unit": "%"},
-                     "height": {"type": "length", "value": 100, "unit": "%"},
-                     "opacity": {"type": "number", "value": 0}
-                    },
-                    "paths": [
-                     {
-                      "id": "wash",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
-                       {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "fill": {
-                       "type": "linear",
-                       "from": [{"fraction": 0.0}, {"fraction": 0.0}],
-                       "to": [{"fraction": 1}, {"fraction": 0.0}],
-                       "stops": [
-                        {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
-                        {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
-                       ]
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_fullscreen_policy-focus",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 0, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 4, "unit": "dp"},
-                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
-                     "opacity": {"type": "number", "value": 0}
-                    },
-                    "paths": [
-                     {
-                      "id": "rail",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
-                       {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
-                       {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
-                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_fullscreen_policy-head",
-                    "type": "group",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 21, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 152.011, "unit": "dp"},
-                     "height": {"type": "length", "value": 36.0, "unit": "dp"},
-                     "display": {"type": "keyword", "value": "flex"},
-                     "flex-direction": {"type": "keyword", "value": "row"},
-                     "align-items": {"type": "keyword", "value": "center"}
-                    },
-                    "children": [
-                     {
-                      "id": "settings_fullscreen_policy-label",
-                      "type": "text",
-                      "properties": {
-                       "text": {"type": "text", "value": "#str_229910"},
-                       "position": {"type": "keyword", "value": "relative"},
-                       "display": {"type": "keyword", "value": "block"},
-                       "flex-shrink": {"type": "number", "value": 1},
-                       "min-width": {"type": "length", "value": 0, "unit": "dp"},
-                       "font-family": {"type": "font", "value": "lowpixel"},
-                       "font-size": {"type": "length", "value": 14, "unit": "dp"},
-                       "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
-                       "color": {"type": "color", "value": [1, 1, 1, 0.85]},
-                       "white-space": {"type": "keyword", "value": "normal"},
-                       "overflow": {"type": "keyword", "value": "hidden"}
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "settings_fullscreen_policy-value",
+                    "id": "settings_window_mode-value",
                     "type": "text",
                     "properties": {
                      "text": {"type": "text", "value": "#str_230030"},
@@ -50992,7 +49841,7 @@
                     }
                    },
                    {
-                    "id": "settings_fullscreen_policy-chevron",
+                    "id": "settings_window_mode-chevron",
                     "type": "vector",
                     "properties": {
                      "position": {"type": "keyword", "value": "absolute"},
@@ -51020,19 +49869,19 @@
                     ]
                    },
                    {
-                    "id": "settings_fullscreen_policy-popup",
+                    "id": "settings_window_mode-popup",
                     "type": "group",
                     "properties": {
                      "position": {"type": "keyword", "value": "absolute"},
                      "left": {"type": "length", "value": 173.011, "unit": "dp"},
                      "top": {"type": "length", "value": 36.0, "unit": "dp"},
                      "width": {"type": "length", "value": 245.489, "unit": "dp"},
-                     "height": {"type": "length", "value": 48.0, "unit": "dp"},
+                     "height": {"type": "length", "value": 92.0, "unit": "dp"},
                      "display": {"type": "keyword", "value": "none"}
                     },
                     "children": [
                      {
-                      "id": "settings_fullscreen_policy-popup-frame",
+                      "id": "settings_window_mode-popup-frame",
                       "type": "vector",
                       "properties": {
                        "position": {"type": "keyword", "value": "absolute"},
@@ -51080,19 +49929,19 @@
                       ]
                      },
                      {
-                      "id": "settings_fullscreen_policy-viewport",
+                      "id": "settings_window_mode-viewport",
                       "type": "group",
                       "properties": {
                        "position": {"type": "keyword", "value": "relative"},
                        "display": {"type": "keyword", "value": "block"},
                        "width": {"type": "length", "value": 227.489, "unit": "dp"},
-                       "height": {"type": "length", "value": 44.0, "unit": "dp"},
+                       "height": {"type": "length", "value": 88.0, "unit": "dp"},
                        "margin-left": {"type": "length", "value": 2, "unit": "dp"},
                        "margin-top": {"type": "length", "value": 2, "unit": "dp"}
                       },
                       "children": [
                        {
-                        "id": "settings_fullscreen_policy-content",
+                        "id": "settings_window_mode-content",
                         "type": "group",
                         "properties": {
                          "position": {"type": "keyword", "value": "absolute"},
@@ -51102,7 +49951,7 @@
                         },
                         "children": [
                          {
-                          "id": "settings_fullscreen_policy-option-0",
+                          "id": "settings_window_mode-option-0",
                           "type": "group",
                           "properties": {
                            "position": {"type": "keyword", "value": "relative"},
@@ -51112,7 +49961,7 @@
                           },
                           "children": [
                            {
-                            "id": "settings_fullscreen_policy-option-0-selected",
+                            "id": "settings_window_mode-option-0-selected",
                             "type": "vector",
                             "properties": {
                              "position": {"type": "keyword", "value": "absolute"},
@@ -51137,7 +49986,7 @@
                             ]
                            },
                            {
-                            "id": "settings_fullscreen_policy-option-0-highlight",
+                            "id": "settings_window_mode-option-0-highlight",
                             "type": "vector",
                             "properties": {
                              "position": {"type": "keyword", "value": "absolute"},
@@ -51162,10 +50011,10 @@
                             ]
                            },
                            {
-                            "id": "settings_fullscreen_policy-option-0-label",
+                            "id": "settings_window_mode-option-0-label",
                             "type": "text",
                             "properties": {
-                             "text": {"type": "text", "value": "#str_229911"},
+                             "text": {"type": "text", "value": "#str_232927"},
                              "position": {"type": "keyword", "value": "relative"},
                              "display": {"type": "keyword", "value": "block"},
                              "padding-left": {"type": "length", "value": 8, "unit": "dp"},
@@ -51180,7 +50029,7 @@
                           ]
                          },
                          {
-                          "id": "settings_fullscreen_policy-option-1",
+                          "id": "settings_window_mode-option-1",
                           "type": "group",
                           "properties": {
                            "position": {"type": "keyword", "value": "relative"},
@@ -51190,7 +50039,7 @@
                           },
                           "children": [
                            {
-                            "id": "settings_fullscreen_policy-option-1-selected",
+                            "id": "settings_window_mode-option-1-selected",
                             "type": "vector",
                             "properties": {
                              "position": {"type": "keyword", "value": "absolute"},
@@ -51215,7 +50064,7 @@
                             ]
                            },
                            {
-                            "id": "settings_fullscreen_policy-option-1-highlight",
+                            "id": "settings_window_mode-option-1-highlight",
                             "type": "vector",
                             "properties": {
                              "position": {"type": "keyword", "value": "absolute"},
@@ -51240,10 +50089,166 @@
                             ]
                            },
                            {
-                            "id": "settings_fullscreen_policy-option-1-label",
+                            "id": "settings_window_mode-option-1-label",
                             "type": "text",
                             "properties": {
-                             "text": {"type": "text", "value": "#str_229911"},
+                             "text": {"type": "text", "value": "#str_232927"},
+                             "position": {"type": "keyword", "value": "relative"},
+                             "display": {"type": "keyword", "value": "block"},
+                             "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                             "font-family": {"type": "font", "value": "lowpixel"},
+                             "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                             "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                             "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                             "white-space": {"type": "keyword", "value": "nowrap"},
+                             "overflow": {"type": "keyword", "value": "hidden"}
+                            }
+                           }
+                          ]
+                         },
+                         {
+                          "id": "settings_window_mode-option-2",
+                          "type": "group",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                          },
+                          "children": [
+                           {
+                            "id": "settings_window_mode-option-2-selected",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_window_mode-option-2-highlight",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_window_mode-option-2-label",
+                            "type": "text",
+                            "properties": {
+                             "text": {"type": "text", "value": "#str_232927"},
+                             "position": {"type": "keyword", "value": "relative"},
+                             "display": {"type": "keyword", "value": "block"},
+                             "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                             "font-family": {"type": "font", "value": "lowpixel"},
+                             "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                             "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                             "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+                             "white-space": {"type": "keyword", "value": "nowrap"},
+                             "overflow": {"type": "keyword", "value": "hidden"}
+                            }
+                           }
+                          ]
+                         },
+                         {
+                          "id": "settings_window_mode-option-3",
+                          "type": "group",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                          },
+                          "children": [
+                           {
+                            "id": "settings_window_mode-option-3-selected",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_window_mode-option-3-highlight",
+                            "type": "vector",
+                            "properties": {
+                             "position": {"type": "keyword", "value": "absolute"},
+                             "left": {"type": "length", "value": 0, "unit": "dp"},
+                             "top": {"type": "length", "value": 0, "unit": "dp"},
+                             "width": {"type": "length", "value": 100, "unit": "%"},
+                             "height": {"type": "length", "value": 100, "unit": "%"},
+                             "display": {"type": "keyword", "value": "none"}
+                            },
+                            "paths": [
+                             {
+                              "id": "band",
+                              "commands": [
+                               {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                               {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                               {"id": "close", "op": "close"}
+                              ],
+                              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                             }
+                            ]
+                           },
+                           {
+                            "id": "settings_window_mode-option-3-label",
+                            "type": "text",
+                            "properties": {
+                             "text": {"type": "text", "value": "#str_232927"},
                              "position": {"type": "keyword", "value": "relative"},
                              "display": {"type": "keyword", "value": "block"},
                              "padding-left": {"type": "length", "value": 8, "unit": "dp"},
@@ -51262,18 +50267,18 @@
                       ]
                      },
                      {
-                      "id": "settings_fullscreen_policy-scroll-track",
+                      "id": "settings_window_mode-scroll-track",
                       "type": "group",
                       "properties": {
                        "position": {"type": "keyword", "value": "absolute"},
                        "left": {"type": "length", "value": 233.489, "unit": "dp"},
                        "top": {"type": "length", "value": 2, "unit": "dp"},
                        "width": {"type": "length", "value": 8, "unit": "dp"},
-                       "height": {"type": "length", "value": 44.0, "unit": "dp"}
+                       "height": {"type": "length", "value": 88.0, "unit": "dp"}
                       },
                       "children": [
                        {
-                        "id": "settings_fullscreen_policy-scroll-trough",
+                        "id": "settings_window_mode-scroll-trough",
                         "type": "vector",
                         "properties": {
                          "position": {"type": "keyword", "value": "absolute"},
@@ -51297,7 +50302,7 @@
                         ]
                        },
                        {
-                        "id": "settings_fullscreen_policy-scroll-thumb",
+                        "id": "settings_window_mode-scroll-thumb",
                         "type": "group",
                         "properties": {
                          "position": {"type": "keyword", "value": "absolute"},
@@ -51308,7 +50313,7 @@
                         },
                         "children": [
                          {
-                          "id": "settings_fullscreen_policy-scroll-ink",
+                          "id": "settings_window_mode-scroll-ink",
                           "type": "vector",
                           "properties": {
                            "position": {"type": "keyword", "value": "absolute"},
@@ -51340,61 +50345,92 @@
                   ],
                   "control": {
                    "role": "choice",
-                   "label": "#str_229910",
-                   "action": "edit.r_fullscreenDesktop",
-                   "value": {"state": "settings.draft.r_fullscreenDesktop"},
+                   "label": "#str_232926",
+                   "action": "edit.window-mode",
+                   "value": {
+                    "op": "select",
+                    "args": [
+                     {"state": "settings.draft.r_fullscreen"},
+                     {"op": "select", "args": [{"state": "settings.draft.r_fullscreenDesktop"}, 2, 3]},
+                     {"op": "select", "args": [{"state": "settings.draft.r_borderless"}, 1, 0]}
+                    ]
+                   },
                    "states": {
-                    "default": "settings_fullscreen_policy.default",
-                    "hover": "settings_fullscreen_policy.hover",
-                    "focus": "settings_fullscreen_policy.focus",
-                    "pressed": "settings_fullscreen_policy.pressed",
-                    "disabled": "settings_fullscreen_policy.disabled"
+                    "default": "settings_window_mode.default",
+                    "hover": "settings_window_mode.hover",
+                    "focus": "settings_window_mode.focus",
+                    "pressed": "settings_window_mode.pressed",
+                    "disabled": "settings_window_mode.disabled"
                    },
                    "parts": {
-                    "popup": "settings_fullscreen_policy-popup",
-                    "viewport": "settings_fullscreen_policy-viewport",
-                    "content": "settings_fullscreen_policy-content",
-                    "value": "settings_fullscreen_policy-value"
+                    "popup": "settings_window_mode-popup",
+                    "viewport": "settings_window_mode-viewport",
+                    "content": "settings_window_mode-content",
+                    "value": "settings_window_mode-value"
                    },
-                   "visibleRows": 2,
+                   "visibleRows": 4,
                    "options": [
                     {
-                     "id": "settings_fullscreen_policy-option-0",
-                     "node": "settings_fullscreen_policy-option-0",
-                     "label": "#str_229911",
-                     "value": true,
+                     "id": "settings_window_mode-option-0",
+                     "node": "settings_window_mode-option-0",
+                     "label": "#str_232927",
+                     "value": 0,
                      "parts": {
-                      "label": "settings_fullscreen_policy-option-0-label",
-                      "selected": "settings_fullscreen_policy-option-0-selected",
-                      "highlight": "settings_fullscreen_policy-option-0-highlight"
+                      "label": "settings_window_mode-option-0-label",
+                      "selected": "settings_window_mode-option-0-selected",
+                      "highlight": "settings_window_mode-option-0-highlight"
                      },
                      "labelIndex": 0
                     },
                     {
-                     "id": "settings_fullscreen_policy-option-1",
-                     "node": "settings_fullscreen_policy-option-1",
-                     "label": "#str_229911",
-                     "value": false,
+                     "id": "settings_window_mode-option-1",
+                     "node": "settings_window_mode-option-1",
+                     "label": "#str_232927",
+                     "value": 1,
                      "parts": {
-                      "label": "settings_fullscreen_policy-option-1-label",
-                      "selected": "settings_fullscreen_policy-option-1-selected",
-                      "highlight": "settings_fullscreen_policy-option-1-highlight"
+                      "label": "settings_window_mode-option-1-label",
+                      "selected": "settings_window_mode-option-1-selected",
+                      "highlight": "settings_window_mode-option-1-highlight"
                      },
                      "labelIndex": 1
+                    },
+                    {
+                     "id": "settings_window_mode-option-2",
+                     "node": "settings_window_mode-option-2",
+                     "label": "#str_232927",
+                     "value": 2,
+                     "parts": {
+                      "label": "settings_window_mode-option-2-label",
+                      "selected": "settings_window_mode-option-2-selected",
+                      "highlight": "settings_window_mode-option-2-highlight"
+                     },
+                     "labelIndex": 2
+                    },
+                    {
+                     "id": "settings_window_mode-option-3",
+                     "node": "settings_window_mode-option-3",
+                     "label": "#str_232927",
+                     "value": 3,
+                     "parts": {
+                      "label": "settings_window_mode-option-3-label",
+                      "selected": "settings_window_mode-option-3-selected",
+                      "highlight": "settings_window_mode-option-3-highlight"
+                     },
+                     "labelIndex": 3
                     }
                    ],
                    "placementBounds": "settings-body",
                    "scrollbar": {
-                    "track": "settings_fullscreen_policy-scroll-track",
-                    "thumb": "settings_fullscreen_policy-scroll-thumb",
+                    "track": "settings_window_mode-scroll-track",
+                    "thumb": "settings_window_mode-scroll-thumb",
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
                    "navigation": {
                     "down": "settings_vsync",
-                    "up": "settings_borderless",
-                    "right": "settings_custom_height",
-                    "left": "settings_fullscreen_policy"
+                    "up": "settings_multiscreen",
+                    "right": "settings_display_mode",
+                    "left": "settings_window_mode"
                    }
                   }
                  },
@@ -51954,8 +50990,8 @@
                    },
                    "navigation": {
                     "down": "settings_framecap",
-                    "up": "settings_fullscreen_policy",
-                    "right": "settings_display_refresh",
+                    "up": "settings_window_mode",
+                    "right": "settings_custom_width",
                     "left": "settings_vsync"
                    }
                   }
@@ -53237,7 +52273,7 @@
                    "navigation": {
                     "down": "settings_window_width",
                     "up": "settings_vsync",
-                    "right": "settings_display_refresh",
+                    "right": "settings_custom_height",
                     "left": "settings_framecap"
                    }
                   }
@@ -57886,7 +56922,7 @@
                    "navigation": {
                     "down": "settings_custom_width",
                     "up": "settings_window_height",
-                    "left": "settings_fullscreen",
+                    "left": "settings_window_mode",
                     "right": "settings_display_mode"
                    }
                   }
@@ -58243,7 +57279,7 @@
                    "navigation": {
                     "down": "settings_custom_height",
                     "up": "settings_display_mode",
-                    "left": "settings_borderless",
+                    "left": "settings_vsync",
                     "right": "settings_custom_width"
                    }
                   }
@@ -58579,7 +57615,7 @@
                    "navigation": {
                     "down": "settings_display_refresh",
                     "up": "settings_custom_width",
-                    "left": "settings_fullscreen_policy",
+                    "left": "settings_framecap",
                     "right": "settings_custom_height"
                    }
                   }
@@ -60386,7 +59422,7 @@
                    "navigation": {
                     "down": "settings_display_device",
                     "up": "settings_custom_height",
-                    "left": "settings_vsync",
+                    "left": "settings_framecap",
                     "right": "settings_display_refresh"
                    }
                   }
@@ -74895,7 +73931,7 @@
     "catalogVersion": 2
    },
    "displayControls": {
-    "scope": "Display Device, Expand Across Displays, fullscreen, borderless, fullscreen policy and MSAA edit the draft. Apply uses owned Keep/Revert recovery; unsupported device requests do not bypass validation.",
+    "scope": "Display Device, Expand Across Displays, Window Mode and MSAA edit the draft. Window Mode sets r_fullscreen, r_borderless and r_fullscreenDesktop in one patch. Apply uses owned Keep/Revert recovery; unsupported device requests do not bypass validation.",
     "displayLists": "settings.display.* keys from system_display_catalog.py: owner-only lists the settings service builds from the display topology.",
     "deviceRow": "Auto and the device list slots; hidden on one display unless the draft names a display the list lacks or holds a change not yet applied, and hidden without lists.",
     "spanRow": "No or Yes over r_multiScreen; spanning needs the list to allow it and a borderless window or desktop fullscreen, and a line under the row says which is missing.",
@@ -74908,10 +73944,8 @@
      "#str_200059",
      "#str_230088",
      "#str_230089",
-     "#str_200147",
-     "#str_229909",
-     "#str_229910",
-     "#str_229911",
+     "#str_232926",
+     "#str_232927",
      "#str_41093",
      "#str_230020"
     ]
