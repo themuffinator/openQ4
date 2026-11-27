@@ -924,6 +924,15 @@ shadowMapCasterFaces_t R_ShadowMapCasterFaces( const int cullingMode,
 		nearShell = R_ShadowMapSwapCasterFaces( nearShell );
 	}
 	if ( mode == 1 ) {
+		// The shell is named by the side the material shows, and the caster
+		// passes keep one front face for the whole pass. A reflected model
+		// reaches the rasterizer wound the other way round, so the face to
+		// discard is the other one, as for every mode below. Without this the
+		// forced near shell of a mirrored model was its far shell on Vulkan,
+		// and only OpenGL's per-surface front face hid it there.
+		if ( haveGeometry && R_ShadowMapCasterTransformWinding( modelMatrix ) < 0 ) {
+			return R_ShadowMapSwapCasterFaces( nearShell );
+		}
 		return nearShell;
 	}
 	if ( !haveGeometry ) {

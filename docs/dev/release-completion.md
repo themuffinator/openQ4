@@ -45,6 +45,28 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## Characters behind you stop costing shadow time, and Vulkan hands back unused shadow memory, 27 November 2026
+
+- **Animated characters you cannot see no longer take shadow-map time.** A
+  squad mate behind you used to be posed and drawn into the shadow map of
+  every lamp around him on every frame, although none of his shadow could
+  reach the screen. He is now left out until it can. With eight marines behind
+  the camera in the hub level on Vulkan at Quality, the game's own thread
+  spends about half a millisecond less on a frame (3.5 to 3.0 ms). Sunlight
+  keeps every caster. `r_shadowMapCullOffscreenLiveCasters 0` restores the old
+  behaviour.
+- **Vulkan gives back shadow memory you are no longer using.** Lowering the
+  Shadows setting, or switching shadow maps off, used to leave their memory
+  allocated until the next video restart: up to several hundred megabytes of
+  graphics memory on the settings meant for weaker cards. It is now released
+  after half a minute without use, and comes back if you raise the setting.
+- **Mirrored models cast the same shadow on both renderers**, for mods and
+  maps that use them.
+- **What to do.** Nothing.
+- Developer detail:
+  [five more leads](shadowmapping-audit-2026-11-27.md#five-more-leads).
+  No ABI change.
+
 ## Outdoor lamps keep their sharp shadows when you look up, 27 November 2026
 
 - **Looking up no longer blurs every shadow of a big outdoor lamp.** On

@@ -2677,9 +2677,14 @@ are not yet measured.
   ownership. A follow-up the same day ended the single-map collapse when a view
   slice reaches behind a cascaded light's source plane: the slice is cut where the
   light begins, and on mcc_landing, looking up under `outdoor_Main`, 68% to 87% of
-  stencil's shadow is kept on both backends. Open leads are listed there: cascade
-  scale stepping with yaw, off-screen live casters, PCSS-lite on parallel lights,
-  and Vulkan memory kept after shadow maps are switched off.
+  stencil's shadow is kept on both backends. Five more leads followed: an animating
+  caster whose shadow cannot reach the view is left out of the map (Hub 2 on Vulkan
+  with eight marines behind the camera: 49 caster draws a view to 5.5, CPU frame 3.5
+  to 3.0 ms), Vulkan releases shadow memory unused for half a minute, caster passes
+  keep one front face on both backends, OpenGL's moment passes prove their
+  framebuffer, and Vulkan's shadow timing spans are read only after their frame slot
+  retires. Open leads are listed there: cascade scale stepping with yaw, PCSS-lite on
+  parallel lights, and Vulkan's binary PCSS taps.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always

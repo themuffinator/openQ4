@@ -313,6 +313,14 @@ typedef struct vkShadowMapState_s {
 	// already have bound, so they are rebuilt at the next frame boundary;
 	// shadowed lights fall back for the remainder of this frame.
 	bool				resizePending;
+	// Sys_Milliseconds a view last asked for each class of shadow resource:
+	// any mapped light (the atlas and both samplers' images), a projected
+	// light (the resident tiles) and a point light (scratch and resident
+	// cubes). What no view has asked for in a while is given back
+	// (VK_ShadowMap_ReleaseIdleResources).
+	int					mappedUsedMsec;
+	int					projectedUsedMsec;
+	int					pointUsedMsec;
 
 	// r_shadowMapTranslucentMoments: the moment atlas (one RGBA16F image per
 	// color channel) and the cleared 1x1 placeholder that stands in for it.
@@ -1044,6 +1052,63 @@ static void VK_ShadowMap_TrimScratchCubes( void ) {
 	vkShadow.pointCubesWindowStart = now;
 }
 
+static double VK_ShadowMap_ResidentBytes( void );
+
+// Shadow memory no view has used for half a minute goes back to the driver.
+// Nothing else ever released it short of a size change or a video restart:
+// stepping from Quality to Enhanced, which draws point shadows as stencil
+// volumes, left the point cube cache resident (up to 384 MiB at the default 64
+// slots of 512 cubes) on the tier meant for weaker cards, and r_useShadowMap 0
+// left the atlas and every resident tile behind it. A class that comes back
+// into use is created again as on first use. Called between frames with no
+// command buffer recording; the device is idled first, as for a resize.
+static const int VK_SHADOW_IDLE_RELEASE_MSEC = 30000;
+
+static void VK_ShadowMap_ReleaseIdleResources( void ) {
+	const int now = Sys_Milliseconds();
+	bool havePointCubes = false;
+	for ( int i = 0 ; i < VK_SHADOW_MAX_POINT_CUBES && !havePointCubes ; i++ ) {
+		havePointCubes = vkShadow.pointCubes[ i ].image != VK_NULL_HANDLE;
+	}
+	bool haveProjectedTiles = false;
+	for ( int i = 0 ; i < VK_SHADOW_MAX_CACHE_SLOTS ; i++ ) {
+		havePointCubes = havePointCubes || vkShadow.pointCache[ i ].cube.image != VK_NULL_HANDLE;
+		haveProjectedTiles = haveProjectedTiles || vkShadow.projectedCache[ i ].image != VK_NULL_HANDLE;
+	}
+	const bool releasePoint = havePointCubes
+			&& now - vkShadow.pointUsedMsec > VK_SHADOW_IDLE_RELEASE_MSEC;
+	const bool releaseAtlas = vkShadow.atlasImage != VK_NULL_HANDLE
+			&& now - vkShadow.mappedUsedMsec > VK_SHADOW_IDLE_RELEASE_MSEC;
+	// the atlas takes the resident tiles with it
+	const bool releaseProjected = !releaseAtlas && haveProjectedTiles
+			&& now - vkShadow.projectedUsedMsec > VK_SHADOW_IDLE_RELEASE_MSEC;
+	if ( !releasePoint && !releaseAtlas && !releaseProjected ) {
+		return;
+	}
+	const double before = VK_ShadowMap_ResidentBytes();
+	vkDeviceWaitIdle( vkCtx.device );
+	if ( releasePoint ) {
+		VK_ShadowMap_DestroyPointCubes();
+		vkShadow.pointCubeFaceSize = 0;
+		vkShadow.pointCubesUsed = 0;
+		vkShadow.pointCubesPeakFrame = 0;
+		vkShadow.pointCubesPeakRecent[ 0 ] = 0;
+		vkShadow.pointCubesPeakRecent[ 1 ] = 0;
+	}
+	if ( releaseAtlas ) {
+		VK_Exec_UpdateShadowAtlasDescriptors( VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE );
+		VK_ShadowMap_DestroyAtlas();
+	} else if ( releaseProjected ) {
+		VK_ShadowMap_DestroyProjectedCaches();
+	}
+	common->Printf( "Vulkan: released idle shadow memory (%s%s%s): %.1f MiB resident, was %.1f\n",
+			releasePoint ? "point cubes" : "",
+			releasePoint && ( releaseAtlas || releaseProjected ) ? ", " : "",
+			releaseAtlas ? "atlas and projected tiles" : ( releaseProjected ? "projected tiles" : "" ),
+			VK_ShadowMap_ResidentBytes() / ( 1024.0 * 1024.0 ),
+			before / ( 1024.0 * 1024.0 ) );
+}
+
 void VK_ShadowMap_BeginFrame( void ) {
 	// One per frame recorded, whatever number the renderer gives it: what a
 	// resident tile's descriptor sets are aged against
@@ -1063,6 +1128,7 @@ void VK_ShadowMap_BeginFrame( void ) {
 		vkShadow.resizePending = true;
 	}
 	if ( !vkShadow.resizePending ) {
+		VK_ShadowMap_ReleaseIdleResources();
 		return;
 	}
 	vkShadow.resizePending = false;
@@ -3894,6 +3960,7 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 		if ( !resourcesChecked ) {
 			resourcesChecked = true;
 			resourcesOk = VK_ShadowMap_EnsureResources();
+			vkShadow.mappedUsedMsec = Sys_Milliseconds();
 		}
 		if ( !resourcesOk ) {
 			// The destroy path reset class resource truth; this hard failure
@@ -4007,6 +4074,7 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 						/ static_cast<float>( Max( 1, faceSize ) );
 				vkShadow.numLights++;
 				prepared++;
+				vkShadow.pointUsedMsec = vkShadow.mappedUsedMsec;
 			}
 			continue;
 		}
@@ -4106,6 +4174,7 @@ int VK_ShadowMap_PrepareViewLights( const viewDef_t *viewDef,
 		if ( entry.valid ) {
 			vkShadow.numLights++;
 			prepared++;
+			vkShadow.projectedUsedMsec = vkShadow.mappedUsedMsec;
 		}
 	}
 	}

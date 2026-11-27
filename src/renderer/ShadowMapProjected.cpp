@@ -1780,6 +1780,10 @@ bool R_ShadowMapCasterFacesSelfTest( void ) {
 		{ 1, false, false, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
 		{ 1, false, false, identity, false, CT_BACK_SIDED, SHADOWMAP_CASTER_FACES_FAR },
 		{ 1, true, false, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		// a reflected model is wound the other way round on screen
+		{ 1, false, false, mirror, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_FAR },
+		{ 1, true, false, mirror, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
+		{ 1, false, false, mirror, false, CT_TWO_SIDED, SHADOWMAP_CASTER_FACES_BOTH },
 		// a sealed hull keeps its near shell, on either kind of projection
 		{ 2, false, true, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_NEAR },
 		{ 2, true, true, identity, false, CT_FRONT_SIDED, SHADOWMAP_CASTER_FACES_FAR },

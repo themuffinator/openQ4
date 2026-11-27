@@ -9,7 +9,8 @@ FPS-03 in the [roadmap](roadmap.md).
 
 Five independent read-throughs produced about thirty candidates. Each was
 checked against the code before anything changed. Fourteen were fixed here, a
-fifteenth (the cascade collapse behind a light's source plane) the same day, one
+fifteenth (the cascade collapse behind a light's source plane) and five more
+leads the same day, one
 was measured and left, and the rest are recorded below as leads with the reason
 each was not taken.
 
@@ -101,6 +102,65 @@ a spotlight's lamp.
   `projected bias scale is invalid` and put the light on its stencil fallback.
   Zero is accepted where the light's receiver bias scale is zero.
 
+## Five more leads
+
+Taken the same day from the list below.
+
+**An animating caster whose shadow cannot reach the view is left out of the
+map.** A caster that is changing is in no cached map: it is drawn into its
+lights' maps afresh every view, and skinned first if nothing else needed its
+model. Where the volume its shadow can fall in misses the view, that is work
+for nothing. The first audit set this aside because a skipped caster's model
+is not rebuilt, so it stops reading as changing; the worry was that it would
+then join the static map, be rebuilt, leave again, and re-render the map each
+time. It does not: such a caster is let through after the quarter-second live
+window, and the rebuild that follows marks it changing before its surfaces are
+sorted into chains, so it is drawn as a live caster for that one view and
+skipped again from the next. An off-screen animation costs one skin and one
+draw a quarter second instead of one a frame and never enters a static map; a
+caster that has really come to rest joins the static map as before. A static
+caster is never skipped, and suns and other distant sources keep every caster,
+because their filter reaches tens of units past a shadow's edge
+(`R_ShadowMapOffscreenLiveCasterSkips`, `r_shadowMapCullOffscreenLiveCasters`,
+default 1).
+
+- Hub 2 at Quality on Vulkan, eight marines spawned behind a fixed view, the
+  setting switched within one launch, two windows each way: 49 caster draws a
+  view without it, 5.5 with; the shadow pass's CPU time 0.20 ms to 0.05; the
+  CPU frame 3.42 and 3.61 ms to 2.96 and 3.00; front-end time 1.47 and 1.61 ms
+  to 1.21 and 1.20. GPU time does not move. All thirty point maps are exact
+  cache hits in every window either way: nothing re-renders.
+- On OpenGL with four marines the skip engages the same way (ten light and
+  caster pairs a view) and the time difference is inside the noise: its back
+  end already drew little for them.
+- Not checked by picture: a soft edge within a filter radius of the screen
+  edge can appear a frame late for a caster that was just outside. The
+  frustum is built from the entity's reference bounds, which are generous for
+  animated models.
+
+**Vulkan gives back shadow memory nothing has used for half a minute.** Only
+a size change or a video restart released it before. A hidden run at Quality
+in Hub 2 under the validation layers: 260 MiB resident; 128 thirty seconds
+after `r_shadowMapPointLights 0` (the point cubes); 0 thirty seconds after
+`r_useShadowMap 0` (the atlas and resident tiles); 162 a few seconds after both
+are switched back on. No validation message
+(`VK_ShadowMap_ReleaseIdleResources`).
+
+**One front face for a caster pass, on both renderers.** The shared verdict on
+which face a caster discards already answers for a reflected model. OpenGL's
+two caster chains also turned the front face for such a model, as the lit
+passes do, which undid the answer: a mirrored open caster stored the triangles
+that face the light. They now keep one front face, as Vulkan and the shared
+stream do. The forced near shell (`r_shadowMapCasterCulling 1`) took no account
+of a reflected model at all, which only OpenGL's per-surface front face hid; it
+swaps like every other mode. Three self-test cases pin it. No stock map has a
+reflected entity, so this was not seen on screen.
+
+**OpenGL's translucent moment passes prove their framebuffer** before changing
+state, as the opaque passes do; and **Vulkan's shadow timing spans are read
+only after their frame slot has retired**, so a span cannot be credited with
+the previous result of the queries it reuses (diagnostics only).
+
 ## Measured and left
 
 **Skipping the blocker search under distant suns.** A distant point light's
@@ -123,13 +183,6 @@ Not done in this round. Each is real; the note says why it waited.
   rotation-invariant extent (the slice's bounding sphere) removes the steps at
   the cost of the resolution of the worst orientation. A judgement call that
   wants a moving capture, not frozen poses.
-- **Off-screen animated casters are drawn into every map they touch.** A
-  live caster whose shadow misses the view could be skipped. It cannot be done
-  by the interaction's frustum test alone: a skipped caster's model is not
-  regenerated, so after a quarter second it reads as static, joins the static
-  map, is regenerated, reads as live and leaves again, re-rendering the map
-  each time. It needs a liveness signal that does not depend on having drawn
-  the model.
 - **PCSS-lite on parallel lights** divides the caster-to-receiver gap by the
   blocker's depth into the light box, so softness follows height in the box
   and not the gap. A sun's penumbra should be `gap * tan(source angle)` in
@@ -141,25 +194,14 @@ Not done in this round. Each is real; the note says why it waited.
   on the same image and could filter each tap bilinearly; OpenGL 2.1 cannot
   have both on one texture. Changing it breaks picture parity between the
   renderers and the PCSS ownership union.
-- **Reflected model transforms and caster culling** disagree between the
-  renderers: OpenGL turns the front face for a mirrored entity where the
-  shared face verdict has already swapped it (mode 2), and Vulkan does neither
-  in mode 1. A scan of the stock `.map` sources found no reflected entity;
-  a mirrored model in a mod or the VR left hand would show it.
 - **PBR receivers sample shadows before knowing the light reaches the pixel**
   (both renderers), and the modern OpenGL cluster loop does the same. Stock
   content has no PBR owners and the modern path is opt-in.
-- **Vulkan keeps shadow memory after its consumer is switched off** (point
-  caches after Quality to Enhanced, the atlas after `r_useShadowMap 0`) until
-  a size cvar changes. OpenGL's idle purge and the slot release above cover
-  its side.
 - **Smaller items:** Vulkan takes a full-atlas layout round trip in views
   where every projected map is read in place; it builds the projected state
-  two or three times per light per view; its shadow GPU timing spans can read
-  a slot's previous result (diagnostics only); the point filter's rotated mode
+  two or three times per light per view; the point filter's rotated mode
   hashes a fixed direction grid, seven to twenty-eight texels wide, where the
-  projected one hashes the texel; OpenGL's translucent moment passes do not
-  check their framebuffer; the receiver-plane bias (off by default) mixes
+  projected one hashes the texel; the receiver-plane bias (off by default) mixes
   screen pixels with shadow texels; OpenGL asks for an unsized depth format
   where its bias assumes 24 bits; the debug overlay draws its tile grid in
   atlas coordinates.

@@ -7205,11 +7205,18 @@ def validate_shadow_gpu_timing_contract() -> None:
         }""",
         "spans recorded this frame are never resolved",
     )
+    # A span is read only once its frame slot has come back around. Until its
+    # command buffer runs, the reset it recorded has not happened and the two
+    # queries still report the slot's previous result as available: polled
+    # earlier, that old result was taken for this span's.
     require_compact(
         begin_view,
-        """VK_ShadowGpuTiming_ResolveSpan( span, i,
-            synchronized && age > VK_FRAMES_IN_FLIGHT );""",
-        "the synchronized wait is gated on a retired frame slot",
+        """if ( age <= VK_FRAMES_IN_FLIGHT ) {
+            vkShadowTimingReport.pending++;
+            continue;
+        }
+        VK_ShadowGpuTiming_ResolveSpan( span, i, synchronized );""",
+        "a span is read only after its frame slot has retired",
     )
     require_compact(
         begin_view,
@@ -9446,6 +9453,99 @@ def validate_source_plane_cascade_contract() -> None:
     )
 
 
+def validate_second_audit_followups_contract() -> None:
+    """The 27 November audit's follow-ups: off-screen live casters, idle
+    Vulkan shadow memory, one front face per caster pass."""
+    interaction = read("src/renderer/Interaction.cpp")
+    skips = braced_body(interaction, "static bool R_ShadowMapOffscreenLiveCasterSkips(", "off-screen live caster skip")
+    require_order(
+        skips,
+        (
+            "!r_shadowMapCullOffscreenLiveCasters.GetBool()",
+            # a sun's filter reaches past the frustum's edge
+            "vLight->parallel || R_ShadowMapUsesDistantPointProjection( lightDef->parms )",
+            "return false;",
+            # only what no cached map holds: the one live-caster rule, asked
+            # for the entity alone
+            "return R_ShadowMapCasterIsDynamic( entityDef, NULL );",
+        ),
+        "only a changing caster of a near light is skipped",
+    )
+    add = braced_body(interaction, "void idInteraction::AddActiveInteraction(", "active interaction")
+    require_order(
+        add,
+        (
+            "if ( CullInteractionByViewFrustum( tr.viewDef->viewFrustum ) ) {",
+            "if ( !shadowMapConservativeCandidate ) {",
+            "if ( R_ShadowMapOffscreenLiveCasterSkips( vLight, lightDef, entityDef ) ) {",
+            "R_RecordShadowMapRejectedCaster( vLight, SHADOWMAP_CASTER_REJECT_OFFSCREEN_LIVE );",
+            "return;",
+            "shadowMapViewFrustumCulled = true;",
+            # before the model is built
+            "idRenderModel *model = R_EntityDefDynamicModel( entityDef );",
+        ),
+        "the skip comes before the dynamic model is built",
+    )
+
+    vulkan = read("src/renderer/Vulkan/vk_ShadowMap.cpp")
+    idle = braced_body(vulkan, "static void VK_ShadowMap_ReleaseIdleResources(", "idle shadow memory")
+    require_order(
+        idle,
+        (
+            "now - vkShadow.pointUsedMsec > VK_SHADOW_IDLE_RELEASE_MSEC",
+            "now - vkShadow.mappedUsedMsec > VK_SHADOW_IDLE_RELEASE_MSEC",
+            "now - vkShadow.projectedUsedMsec > VK_SHADOW_IDLE_RELEASE_MSEC",
+            "vkDeviceWaitIdle( vkCtx.device );",
+            "VK_ShadowMap_DestroyPointCubes();",
+            "VK_Exec_UpdateShadowAtlasDescriptors( VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE );",
+            "VK_ShadowMap_DestroyAtlas();",
+            "VK_ShadowMap_DestroyProjectedCaches();",
+        ),
+        "each class of shadow memory is released on wall time, device idle",
+    )
+    begin_frame = braced_body(vulkan, "void VK_ShadowMap_BeginFrame(", "shadow frame start")
+    require_order(
+        begin_frame,
+        (
+            "VK_GuiExecutor_FrameIsOpen()",
+            "if ( !vkShadow.resizePending ) {",
+            "VK_ShadowMap_ReleaseIdleResources();",
+        ),
+        "idle memory is released between frames, never under a recording one",
+    )
+    require(vulkan, "vkShadow.pointUsedMsec = vkShadow.mappedUsedMsec;", "a prepared point light marks its class used")
+    require(vulkan, "vkShadow.projectedUsedMsec = vkShadow.mappedUsedMsec;", "a prepared projected light marks its class used")
+
+    # One front face for a caster pass on OpenGL, as on Vulkan: the shared
+    # face verdict already answers for a reflected model.
+    gl = read("src/renderer/draw_arb2.cpp")
+    for marker, context in (
+        ("static bool RB_ShadowMapDrawCasterChain(", "projected caster chain"),
+        ("static bool RB_PointShadowMapDrawCasterChain(", "point caster chain"),
+    ):
+        chain = braced_body(gl, marker, context)
+        require(chain, "RB_SetSurfaceWinding( NULL );", f"{context} keeps one front face")
+        if "RB_SetSurfaceWinding( backEnd.currentSpace );" in chain:
+            raise AssertionError(f"OpenGL {context} must not turn the front face per caster")
+    classification = read("src/renderer/ShadowMapClassification.cpp")
+    faces = braced_body(classification, "shadowMapCasterFaces_t R_ShadowMapCasterFaces(", "shared caster face policy")
+    require_order(
+        faces,
+        (
+            "if ( mode == 1 ) {",
+            "if ( haveGeometry && R_ShadowMapCasterTransformWinding( modelMatrix ) < 0 ) {",
+            "return R_ShadowMapSwapCasterFaces( nearShell );",
+            "return nearShell;",
+        ),
+        "the forced near shell answers for a reflected model too",
+    )
+    for marker, context in (
+        ("static bool RB_RenderTranslucentShadowMap(", "projected moment pass"),
+        ("static bool RB_RenderPointTranslucentShadowMap(", "point moment pass"),
+    ):
+        require(braced_body(gl, marker, context), "IsKnownIncomplete()", f"OpenGL {context} proves its framebuffer")
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -10748,6 +10848,7 @@ def main() -> None:
     validate_prelight_caster_contract()
     validate_layered_point_cube_contract()
     validate_source_plane_cascade_contract()
+    validate_second_audit_followups_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

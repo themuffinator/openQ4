@@ -2739,6 +2739,8 @@ static const char *RB_ShadowMapCasterRejectReasonName( const shadowMapCasterReje
 		return "spectrumMismatch";
 	case SHADOWMAP_CASTER_REJECT_LOD:
 		return "shadowLOD";
+	case SHADOWMAP_CASTER_REJECT_OFFSCREEN_LIVE:
+		return "offscreenLive";
 	default:
 		return "unknown";
 	}
@@ -8131,7 +8133,13 @@ static bool RB_ShadowMapDrawCasterChain( const drawSurf_t *surf, const int casca
 
 		if ( surf->space != backEnd.currentSpace ) {
 			backEnd.currentSpace = surf->space;
-			RB_SetSurfaceWinding( backEnd.currentSpace );
+			// One front face for the whole caster pass: the face each caster
+			// discards (RB_ShadowMapApplyCasterCull) already answers for a
+			// reflected model, as it does on Vulkan and in the shared stream.
+			// Turning the front face for such a model as well, as the lit
+			// passes do, undid that answer: a mirrored open caster stored the
+			// triangles that face the light.
+			RB_SetSurfaceWinding( NULL );
 			glLoadMatrixf( surf->space->modelMatrix );
 			RB_ShadowMapSetCasterModelRows( surf );
 			RB_ShadowMapSetCasterDepthRow( surf, cascadeIndex );
@@ -8576,7 +8584,8 @@ static bool RB_PointShadowMapDrawCasterChain( const drawSurf_t *surf, const floa
 			float row2[4];
 
 			backEnd.currentSpace = surf->space;
-			RB_SetSurfaceWinding( backEnd.currentSpace );
+			// one front face for the pass, as RB_ShadowMapDrawCasterChain
+			RB_SetSurfaceWinding( NULL );
 			myGlMultMatrix( surf->space->modelMatrix, lightModelViewMatrix, modelViewMatrix );
 			glLoadMatrixf( modelViewMatrix );
 
@@ -9622,6 +9631,19 @@ static bool RB_RenderTranslucentShadowMap( const drawSurf_t *primaryCasters, con
 	glGetFloatv( GL_COLOR_CLEAR_VALUE, clearColor );
 
 	g_translucentShadowMapRenderTexture->MakeCurrent();
+	if ( g_translucentShadowMapRenderTexture->IsKnownIncomplete() ) {
+		// An incomplete moment target leaves the view's framebuffer bound:
+		// the pass would clear a tile of the scene, draw its casters into it
+		// and report maps it never rendered. No state has changed yet; go
+		// back and let the casters keep their binary shadows.
+		if ( backEnd.renderTexture != NULL ) {
+			backEnd.renderTexture->MakeCurrent();
+		} else {
+			idRenderTexture::BindNull();
+			R_SetDefaultDrawAndReadBuffers();
+		}
+		return false;
+	}
 	glUseProgramObjectARB( g_translucentShadowCasterProgram.programObject );
 	glDisable( GL_VERTEX_PROGRAM_ARB );
 	glDisable( GL_FRAGMENT_PROGRAM_ARB );
@@ -9725,6 +9747,19 @@ static bool RB_RenderPointTranslucentShadowMap( const drawSurf_t *primaryCasters
 	g_pointTranslucentShadowPassReady = false;
 
 	if ( !RB_PointShadowMapEnsureTranslucentResources() ) {
+		return false;
+	}
+	// as RB_RenderTranslucentShadowMap: prove the target before any state
+	// changes, or six faces of casters are drawn into the scene
+	g_pointTranslucentShadowMapRenderTexture->MakeCurrent( 0 );
+	const bool momentTargetIncomplete = g_pointTranslucentShadowMapRenderTexture->IsKnownIncomplete();
+	if ( backEnd.renderTexture != NULL ) {
+		backEnd.renderTexture->MakeCurrent();
+	} else {
+		idRenderTexture::BindNull();
+		R_SetDefaultDrawAndReadBuffers();
+	}
+	if ( momentTargetIncomplete ) {
 		return false;
 	}
 

@@ -200,6 +200,8 @@ typedef enum {
 	SHADOWMAP_CASTER_REJECT_AREA_DISCONNECTED,
 	SHADOWMAP_CASTER_REJECT_SPECTRUM_MISMATCH,
 	SHADOWMAP_CASTER_REJECT_LOD,
+	// an animating caster whose shadow from this light misses the view
+	SHADOWMAP_CASTER_REJECT_OFFSCREEN_LIVE,
 	SHADOWMAP_CASTER_REJECT_COUNT
 } shadowMapCasterRejectReason_t;
 
@@ -1686,6 +1688,7 @@ extern idCVar r_shadowMapTranslucentReceivers;	// translucent surfaces sample th
 extern idCVar r_shadowMapSubviewPolicy;	// 0 = full renders in subviews, 1 = reuse-or-stencil, 2 = always stencil
 extern idCVar r_shadowMapReportInterval;	// frames between shadow-map diagnostic reports
 extern idCVar r_shadowMapPrelightCasters;	// 0 = world surfaces whole, 1 = prelight front caps for lights whose source lies outside their box, 2 = for every prelit light
+extern idCVar r_shadowMapCullOffscreenLiveCasters;	// 1 = leave an animating caster out of a map its shadow cannot reach the view through
 extern idCVar r_shadowMapConservativeCasters;	// 1 = keep shadow-map caster submission independent from visible receiver scissors
 extern idCVar r_shadowMapProjectedCSM;	// 1 = allow ordinary projected lights to use CSM when r_shadowMapCSM is enabled
 extern idCVar r_shadowMapDepthCompare;	// 1 = use sampler2DShadow compare mode for projected depth maps

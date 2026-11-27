@@ -663,6 +663,48 @@ static bool R_ShadowMapCasterIsDynamic( const idRenderEntityLocal *entityDef, co
 	return hasDynamicGeometry && entityDef->dynamicModelRegenFrame >= recentFrame;
 }
 
+/*
+=================
+R_ShadowMapOffscreenLiveCasterSkips
+
+A caster that is changing is in no cached map: it is drawn into its lights'
+maps afresh every view, and skinned first if nothing else needed its model. If
+the volume its shadow can fall in (the interaction's frustum: the entity's
+bounds carried away from the light, cut to the light) misses the view, all of
+that is for nothing. A squad mate behind the player was skinned and drawn into
+six cube faces of every lamp around him, and kept each of those lamps
+composing over a copy of its map instead of sampling the map where it lives.
+
+A static caster is never skipped: cached depth must not follow the camera.
+
+Skipping does not turn an animating caster static. Its model is not rebuilt
+while it is skipped, so after the live window it no longer reads as changing
+and is let through; the rebuild that follows marks it changing again before
+its surfaces are sorted into chains, so it is drawn as the live caster it is
+for that one view and skipped again from the next. An off-screen animation
+costs one skin and one draw a quarter second instead of one a frame, and never
+enters a static map. One that has really come to rest is let through, is not
+rebuilt, and joins the static map as it always did.
+
+Suns and other distant sources keep every caster: their filter reaches tens
+of world units past a shadow's edge at the whole-light map's texel, and the
+frustum does not carry that margin.
+=================
+*/
+static bool R_ShadowMapOffscreenLiveCasterSkips( const viewLight_t *vLight,
+		const idRenderLightLocal *lightDef, const idRenderEntityLocal *entityDef ) {
+	if ( !r_shadowMapCullOffscreenLiveCasters.GetBool() || vLight == NULL || lightDef == NULL
+			|| entityDef == NULL || entityDef->parms.hModel == NULL ) {
+		return false;
+	}
+	if ( vLight->parallel || R_ShadowMapUsesDistantPointProjection( lightDef->parms ) ) {
+		return false;
+	}
+	// the entity's own share of the rule: asked without a material, a cutout
+	// whose coverage animates on a still entity is not this function's business
+	return R_ShadowMapCasterIsDynamic( entityDef, NULL );
+}
+
 static void R_RecordShadowMapCaster( viewLight_t *vLight,
 		const idRenderEntityLocal *entityDef, const idMaterial *shader,
 		const srfTriangles_t *casterTris, const bool translucent,
@@ -2353,6 +2395,12 @@ void idInteraction::AddActiveInteraction( void ) {
 		// view frustum and the entity bounds are outside the view frustum
 		if ( CullInteractionByViewFrustum( tr.viewDef->viewFrustum ) ) {
 			if ( !shadowMapConservativeCandidate ) {
+				return;
+			}
+			// before the model is built and before the surfaces are walked:
+			// a skipped caster is no missing caster
+			if ( R_ShadowMapOffscreenLiveCasterSkips( vLight, lightDef, entityDef ) ) {
+				R_RecordShadowMapRejectedCaster( vLight, SHADOWMAP_CASTER_REJECT_OFFSCREEN_LIVE );
 				return;
 			}
 			shadowMapViewFrustumCulled = true;

@@ -219,13 +219,22 @@ void VK_ShadowGpuTiming_BeginView( int frameSlot ) {
 			VK_ShadowGpuTiming_ReleaseSpan( span );
 			continue;
 		}
-		// Only wait once this frame slot has come back around, because by
+		// Only read once this frame slot has come back around, because by
 		// then the frame loop has already waited its fence: the work is
-		// complete, so the wait returns immediately, and a submission that
+		// complete, so a wait returns immediately, and a submission that
 		// never happened has already hung that fence wait rather than this
-		// one. Younger spans are polled and simply carried.
-		VK_ShadowGpuTiming_ResolveSpan( span, i,
-			synchronized && age > VK_FRAMES_IN_FLIGHT );
+		// one. A younger span is carried and not even polled. Its command
+		// buffer may not have run yet, and until it runs the reset it recorded
+		// has not happened: the pair still holds, and reports as available,
+		// the result of whichever span used these two queries before. Polled,
+		// that old result was read as this span's and the span released, so
+		// the real one was never read and a phase could be credited with
+		// another phase's time.
+		if ( age <= VK_FRAMES_IN_FLIGHT ) {
+			vkShadowTimingReport.pending++;
+			continue;
+		}
+		VK_ShadowGpuTiming_ResolveSpan( span, i, synchronized );
 	}
 }
 
