@@ -332,7 +332,7 @@ def _heading_ids(tab: str) -> dict:
     return ids
 
 
-def device_fit(doc: Document, first_focus: dict, flow: dict) -> None:
+def device_fit(doc: Document, first_focus: dict, flow: dict, touch_page: bool = False) -> None:
     """`flow` maps each device row's control id to its node in the column's
     flow: a fine slider's row (<id>_row) holds the slider and its number."""
     touch = {"state": "controls.touchLayout"}
@@ -352,13 +352,13 @@ def device_fit(doc: Document, first_focus: dict, flow: dict) -> None:
     tight = {language: int(sum(text_width("marine", any_text(key)[language], TAB_SIZE) + TAB_FLARE + 2 * TAB_PAD + TAB_SHOULDER
                                for key in keys) > room) for language in any_text(TOUCH_TAB_LABEL)}
     relabel = {"op": "&&", "args": [swap, {"op": "<", "args": [per_language(doc, tight), 0.5]}]}
-    for node in ("tab-mouse-label", "tab-mouse-lit"):
+    for node in ("touch-tab-mouse-label",) if touch_page else ("tab-mouse-label", "tab-mouse-lit"):
         doc.bind(f"device.{node}.text", node, "text", {"op": "select", "args": [relabel, TOUCH_TAB_LABEL, "#str_231777"]})
     first_focus["mouse"] = [{"op": "if", "condition": swap, "then": [{"op": "focus", "control": TOUCH_ROWS[0]}],
                              "else": [{"op": "focus", "control": "controls_freelook"}]}]
 
 
-def controls_document() -> dict:
+def controls_document(touch: bool = False) -> dict:
     doc = Document("openq4.controls")
     doc.state["controls.capture"] = {"type": "number", "initial": -1}
     for row, binding in enumerate(BINDINGS):
@@ -410,12 +410,15 @@ def controls_document() -> dict:
             spare = next(item[1] for item in rows if item[1] not in needs)
             first_focus[ident] = [{"op": "if", "condition": needs[rows[0][1]], "then": [{"op": "focus", "control": rows[0][1]}],
                                    "else": [{"op": "focus", "control": spare}]}]
-    device_fit(doc, first_focus, flow)
+    device_fit(doc, first_focus, flow, touch)
     # The west face button clears the focused row, as Delete does.
     doc.events["onSecondary"] = [{"op": "action", "action": "controlsClear"}]
     # The prompt bar (section 13.4): Accept reads CHANGE on a row; while the
     # page waits for a key, Accept is the key itself and leaves the bar.
     prompts = {"verbs": (VERB_CHANGE,), "accept_shown": {"op": "<", "args": [{"state": CAPTURE}, 0]}}
     note = {section: "#str_231545" for section, _heading, _rows in SECTIONS}
-    return settings_subpage(doc, PREFIX, "#str_200083", tabs, note=note, prompts=prompts, overlays=[controller_test_modal(doc)],
+    # The touch variant's own page (retained_touch): the same rows and programs in its simple frame.
+    from retained_touch import touch_subpage
+    frame = touch_subpage if touch else settings_subpage
+    return frame(doc, PREFIX, "#str_200083", tabs, note=note, prompts=prompts, overlays=[controller_test_modal(doc)],
                             first_focus=first_focus)

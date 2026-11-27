@@ -279,7 +279,7 @@ def game_row(doc: Document, row: tuple, value_x: float) -> dict:
     return cvar_row(doc, row, value_x)
 
 
-def game_document() -> dict:
+def game_document(touch: bool = False) -> dict:
     doc = Document("openq4.game")
     doc.state.update({
         "game.gunPosition": {"type": "number", "initial": -1}, "game.forceModel": {"type": "boolean", "initial": False},
@@ -331,4 +331,7 @@ def game_document() -> dict:
                                "else": [{"op": "if", "condition": vr_state(doc),
                                          "then": [*show_tab(doc, "game", tabs, vr_tab), {"op": "focus", "control": "game_vr"}],
                                          "else": focus}]}]
-    return settings_subpage(doc, PREFIX, "#str_200084", tabs, activate=activate, overlays=[setup_modal(doc)])
+    # The touch variant's own page (retained_touch): the same rows and programs in its simple frame.
+    from retained_touch import touch_subpage
+    frame = touch_subpage if touch else settings_subpage
+    return frame(doc, PREFIX, "#str_200084", tabs, activate=activate, overlays=[setup_modal(doc)])

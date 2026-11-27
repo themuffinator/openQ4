@@ -138,10 +138,14 @@ larger interface size may not make them bigger; text size always applies.
 Android's rotation lock is on. Portrait play is new and still being tested on
 phones.
 
-On a phone or tablet the game's settings pages also stand in one column with
-taller rows that are easier to tap, and a tap just beside a small button still
-reaches it. Connecting a mouse switches the menus to their desktop layout;
-touching the screen switches back.
+On a phone or tablet the game's menus take a simple touch layout: one column
+of big buttons with large text, the same whichever way you hold the device.
+The settings pages list their categories first; pick one to see its settings
+as large rows, and use **Back** at the top to return. Load/Save, Chapters and
+the multiplayer browser and lobby pages keep their current layout for now; a
+tap just beside one of their small buttons still reaches it. Connecting a
+mouse switches the menus to their desktop layout; touching the screen
+switches back.
 
 Select **Apply interface** to save. The game uses these sizes and the
 orientation the next time it starts or you return to it from setup. Each Apply

@@ -3494,7 +3494,7 @@ The Quest flavor is integrated, with emulator and test-runtime evidence only.
 | AND-01 — Closed | Phone/emulator scope, startup ownership, UI-thread binding, background handling, Back/cutouts and touch controls repaired; S25 save/touch/audio checks exist; host-owned orientation and the portrait thumb deck pass a mid-match emulator rotation; the per-orientation layout editor, suspension save, multiplayer resume/reconnect and Quest flavor package checks pass native/JVM and emulator probes. | None; S25 hardware checks pass (layout, portrait, suspension save, background kill/restore, multiplayer reconnect, editor by hand). Residuals moved to AND-02/AND-04. |
 | AND-02 — Partial | The device harness and S25 (Adreno 830, API 36) campaign pass cold and warm: real level transitions, save/load, audio residency, storage, thermal and per-model budgets. | S25 sustain and multiplayer phases; audible and gamepad/mouse/keyboard checks; Mali and API-floor devices. |
 | AND-03 — Partial | Verified package repair/import, localized setup, settings return, control/interface setup and save/log export implemented; scoped device round trips pass. | Release-signing continuity; cloud/removable providers; interrupted-process recovery; physical setup/accessibility and upgrade matrix. |
-| AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas, HUD safe-area and thumb-deck positioning and the per-orientation layout editor exist. 27 November: the interface-variant selector (desktop/touch/vr, device class, live switching; AND-04.1) and 48 dp touch reach in the retained menus (AND-04.2). | AND-04.3-AND-04.6 (touch-sized settings rows, device-fitting rows, device-class defaults, device qualification); device-based presets and GLES limits; human-finger portrait play, the weapon control over the portrait readouts, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
+| AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas, HUD safe-area and thumb-deck positioning and the per-orientation layout editor exist. 27 November: the interface-variant selector (desktop/touch/vr, device class, live switching; AND-04.1), 48 dp touch reach in the retained menus (AND-04.2) and simplified one-column touch layouts for the menus, dialogs, message box and settings pages (AND-04.3, partial). | AND-04.3's remaining screens (Load/Save, Chapters, multiplayer pages, Demos, Credits, Mods, Updates, on-screen keyboard), AND-04.4-AND-04.6 (device-fitting rows, device-class defaults, device qualification); device-based presets and GLES limits; human-finger portrait play, the weapon control over the portrait readouts, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
 | AND-05 — Partial | The archived Quest change (`65aa9bd88`) is integrated with refresh-rate, performance-level, thermal and frame-thread services; the `-Popenq4Quest` release APK with its generated headset manifest passes `verify_android_apk.py --variant quest`, and the emulator plays Air Defense 1 in stereo on the test runtime (12 November). | On a headset: installation/assets, stereo gameplay, controller/UI interaction, comfort, session recovery and sustained thermal/refresh budgets; distribution decision. |
 
 ### AND task evidence and acceptance
@@ -3724,10 +3724,21 @@ The Quest flavor is integrated, with emulator and test-runtime evidence only.
     top of the existing release activation, 8 dp cancel, 500 ms long-press,
     drag lists and tab swipes. Gate: native reach tests at two densities;
     device finger checks remain physical.
-  - **AND-04.3 Touch-sized settings rows.** GAME OPTIONS, CONTROLS and AUDIO
-    stand in one column with rows grown toward the 48 dp target in the touch
-    variant. Gate: generator checks, the native settings-page suites and
-    headless captures at phone and tablet sizes in both orientations.
+  - **AND-04.3 Simplified touch layouts.** In the touch variant every screen
+    is one column in the device's own dp, the same in landscape and portrait:
+    buttons the column's width and at least 56 dp tall, 16 dp labels, 20 dp
+    titles, no prompt bars or decoration
+    ([contract](ui/interface-variants.md#the-touch-variant)). Done 27
+    November: the title, pauses, Single Player, Campaigns, Multiplayer and
+    SETTINGS menus, New Game's difficulty, the death and Restart Level
+    screens, the Arena pause, every Yes/No dialog of those screens, the
+    preset check and the message box; GAME OPTIONS, CONTROLS, AUDIO and
+    DISPLAY as touch documents (categories, then 368 by 56 dp rows). Remaining:
+    Load/Save, Chapters, the multiplayer pages (Join, Create, Player Setup,
+    in-match menus, buy menu, summary), Demos, Credits, Mods, Updates and the
+    on-screen keyboard. Gate: generator checks, the native settings-page
+    suites and headless captures at phone and tablet sizes in both
+    orientations, nothing below 48 dp to touch or 14 dp to read.
   - **AND-04.4 Device-fitting rows.** Touch rows (touch controls, control
     size, look sensitivity, layout editor) come forward where the built-in
     controls exist; mouse rows step aside without a mouse. Gate: the retained

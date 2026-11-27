@@ -439,6 +439,7 @@ def choice(doc: Document, ident: str, label_key: str, value_x: float, action: st
 
 
 MARKED: list = []                         # the rows that carry a reset mark, for their edges
+TOUCH_MARKS = False                       # the touch document's marks: a strip under the row (retained_touch)
 
 
 def preset_mark(doc: Document, row_node: dict, changed: dict) -> dict:
@@ -469,6 +470,21 @@ def preset_mark(doc: Document, row_node: dict, changed: dict) -> dict:
     MARKED.append(row_node)
     doc.bind(f"{button}.display", button, "display", op("select", changed, "block", "none"))
     gate(doc, button, both(EDITABLE, changed), None)
+    if TOUCH_MARKS:
+        # A finger's strip under the row, the row's width, the arrow and its
+        # name ("Reset to Preset") on it.
+        strip_h = 44.0
+        arrow["properties"].update(absolute(left=21, top=(strip_h - 12) / 2, width=12, height=12))
+        focus["properties"].update(absolute(left=0, top=0))
+        focus["properties"].update({"width": length(100, "%"), "height": length(100, "%")})
+        caption = label(f"{button}-label", "#str_233302", {**absolute(left=41, top=0, right=8, height=strip_h),
+                        **typeface("lowpixel", 15, strip_h, rgb(ORANGE)), "white-space": keyword("nowrap"),
+                        "overflow": keyword("hidden"), "text-overflow": keyword("ellipsis"), "pointer-events": keyword("none")})
+        mark["properties"] = {"position": keyword("relative"), "display": keyword("none"), "width": length(U * COLUMN_W),
+                              "height": length(strip_h), "opacity": number(1)}
+        mark["children"].append(caption)
+        return group(f"{ident}_marked", {"position": keyword("relative"), "display": keyword("block"), "width": length(U * COLUMN_W),
+                                         "flex-shrink": number(0)}, [row_node, mark])
     return group(f"{ident}_marked", {"position": keyword("relative"), "display": keyword("block"), "width": length(U * COLUMN_W),
                                      "height": length(row_h), "flex-shrink": number(0)}, [row_node, mark])
 
@@ -741,7 +757,7 @@ def check_system_text(notes: list, apply_w: float, message_w: float) -> None:
     del message_w
 
 
-def system_document() -> dict:
+def system_document(touch: bool = False) -> dict:
     doc = Document("openq4.system")
     doc.state.update(page_state())
     page_actions(doc)
@@ -967,31 +983,41 @@ def system_document() -> dict:
 
     # APPLY CHANGES under the columns' trailing end, the service's message
     # (or the number drafts') before it.
-    apply_w = max(text_width("marine", text, APPLY_TEXT) for text in any_text("#str_200241").values()) / U + 40
-    apply_left = CONTENT_LEFT + CONTENT_W - apply_w
-    apply = primary_plate(doc, "settings_apply", "#str_200241", 0, 0, apply_w, APPLY_H, event="apply",
-                          label_box=(28.0, 4.0, apply_w - 32, 22.0), text=APPLY_TEXT, marker=(9.0, 8.0, 14.0))
-    apply["properties"]["opacity"] = number(1)
-    fixed_text(doc, apply)   # the label keeps its size on the plate
-    gate(doc, "settings_apply", CAN_APPLY)
-    message_w = U * (apply_left - CONTENT_LEFT - 12)
-    # The message: one line centred on APPLY CHANGES' height, more lines (a
-    # long status, a large text size) growing up into the room above.
-    message = label("settings-message", "#str_230007", {**absolute(left=0, bottom=(U * APPLY_H - 18) / 2, width=message_w - 21),
-                    "display": keyword("block"), **typeface("lowpixel", 14, 18, [1, 1, 1, 0.8]), "white-space": keyword("normal")})
-    status = group("settings-status", {**absolute(left=21, top=0, width=message_w - 21, height=U * APPLY_H),
-                                       "pointer-events": keyword("none")}, [message])
-    doc.bind("settings-message.text", "settings-message", "text", op("select", op("&&", op("&&", st("ui.numberDraftsPending"), IDLE),
-                                                                                 op("||", op("==", st("settings.phase"), 0),
-                                                                                    op("==", st("settings.phase"), 1))),
-                                                                      st("ui.numberDraftMessage"), st("settings.message")))
-    footer = group("settings-footer", absolute(left=U * CONTENT_LEFT, top=U * FOOTER_TOP, width=U * CONTENT_W, height=U * APPLY_H), [
-        status, group("settings-actions", absolute(left=U * (apply_left - CONTENT_LEFT), top=0, width=U * apply_w, height=U * APPLY_H),
-                       [apply])])
-    check_system_text([("#str_230019", 2), ("#str_230024", 3), ("#str_230088", 2), ("#str_230089", 2), ("#str_42821", 3),
-                       ("#str_230078", 2), ("#str_230079", 2), ("#str_230080", 2), ("#str_230081", 2), ("#str_230082", 2),
-                       ("#str_230145", 3), ("#str_231768", 3), ("#str_231769", 2), ("#str_231770", 2), ("#str_231771", 2),
-                       ("#str_231772", 2)], U * apply_w, message_w)
+    message_text = op("select", op("&&", op("&&", st("ui.numberDraftsPending"), IDLE),
+                                        op("||", op("==", st("settings.phase"), 0), op("==", st("settings.phase"), 1))),
+                      st("ui.numberDraftMessage"), st("settings.message"))
+    if touch:
+        # The touch document (retained_touch): APPLY CHANGES a big button
+        # under the lists, the message beside it or over it.
+        from retained_touch import Sizes, button as touch_button, touch_footer
+        apply = touch_button(Sizes(None), doc.timelines.items, "settings_apply", "#str_200241", {"event": "apply"}, width=220)
+        gate(doc, "settings_apply", CAN_APPLY)
+        message = label("settings-message", "#str_230007", {**typeface("lowpixel", 14, 18, [1, 1, 1, 0.8]),
+                                                            "white-space": keyword("normal")})
+        footer = touch_footer("settings-footer", message, apply)
+    else:
+        apply_w = max(text_width("marine", text, APPLY_TEXT) for text in any_text("#str_200241").values()) / U + 40
+        apply_left = CONTENT_LEFT + CONTENT_W - apply_w
+        apply = primary_plate(doc, "settings_apply", "#str_200241", 0, 0, apply_w, APPLY_H, event="apply",
+                              label_box=(28.0, 4.0, apply_w - 32, 22.0), text=APPLY_TEXT, marker=(9.0, 8.0, 14.0))
+        apply["properties"]["opacity"] = number(1)
+        fixed_text(doc, apply)   # the label keeps its size on the plate
+        gate(doc, "settings_apply", CAN_APPLY)
+        message_w = U * (apply_left - CONTENT_LEFT - 12)
+        # The message: one line centred on APPLY CHANGES' height, more lines (a
+        # long status, a large text size) growing up into the room above.
+        message = label("settings-message", "#str_230007", {**absolute(left=0, bottom=(U * APPLY_H - 18) / 2, width=message_w - 21),
+                        "display": keyword("block"), **typeface("lowpixel", 14, 18, [1, 1, 1, 0.8]), "white-space": keyword("normal")})
+        status = group("settings-status", {**absolute(left=21, top=0, width=message_w - 21, height=U * APPLY_H),
+                                           "pointer-events": keyword("none")}, [message])
+        footer = group("settings-footer", absolute(left=U * CONTENT_LEFT, top=U * FOOTER_TOP, width=U * CONTENT_W, height=U * APPLY_H), [
+            status, group("settings-actions", absolute(left=U * (apply_left - CONTENT_LEFT), top=0, width=U * apply_w, height=U * APPLY_H),
+                           [apply])])
+        check_system_text([("#str_230019", 2), ("#str_230024", 3), ("#str_230088", 2), ("#str_230089", 2), ("#str_42821", 3),
+                           ("#str_230078", 2), ("#str_230079", 2), ("#str_230080", 2), ("#str_230081", 2), ("#str_230082", 2),
+                           ("#str_230145", 3), ("#str_231768", 3), ("#str_231769", 2), ("#str_231770", 2), ("#str_231771", 2),
+                           ("#str_231772", 2)], U * apply_w, message_w)
+    doc.bind("settings-message.text", "settings-message", "text", message_text)
 
     # The pages' bounds hold every list the rows unfold.
     def activate(focus: list) -> list:
@@ -1002,12 +1028,16 @@ def system_document() -> dict:
     screen_first = [{"op": "if", "condition": device_shown, "then": [focus("settings_display_device")],
                      "else": [{"op": "if", "condition": span_shown, "then": [focus("settings_multiscreen")],
                                "else": [focus("settings_window_mode")]}]}]
-    built = settings_subpage(doc, PREFIX, "#str_229900", tabs, activate=activate, overlays=dialogs(doc), back_event="onBack",
-                             back_id="settings_back", slots=SLOTS, footer=[footer], body=BODY, first_focus={"screen": screen_first})
+    if touch:
+        from retained_touch import touch_subpage as frame
+    else:
+        frame = settings_subpage
+    built = frame(doc, PREFIX, "#str_229900", tabs, activate=activate, overlays=dialogs(doc), back_event="onBack",
+                  back_id="settings_back", slots=SLOTS, footer=[footer], body=BODY, first_focus={"screen": screen_first})
     # A column's outer edge holds the focus on the row as it does on a row
     # without a mark, whose mark is the last control of its unit.
     for node in MARKED:
-        node["control"]["navigation"].setdefault("right", node["id"])
+        node["control"].setdefault("navigation", {}).setdefault("right", node["id"])
     MARKED.clear()
     return finish(built)
 
@@ -1032,7 +1062,8 @@ def finish(document: dict) -> dict:
     bindings = document["bindings"]
     tabs = [name[4:] for name in document["events"] if name.startswith("tab_")]
     for ident in tabs:
-        control = f"tab-{ident}"
+        # The touch document's categories are its list's buttons.
+        control = f"tab-{ident}" if node(document["root"], f"tab-{ident}") else f"touch-tab-{ident}"
         found = next((binding for binding in bindings if binding["node"] == control and binding["property"] == "enabled"), None)
         if found:
             found["value"] = op("&&", no(blocked), found["value"])

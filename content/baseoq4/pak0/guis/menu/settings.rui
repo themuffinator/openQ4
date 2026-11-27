@@ -34,6 +34,9 @@
   "notice.2.text": {"type": "string", "initial": ""},
   "notice.2.kind": {"type": "number", "initial": 0},
   "notice.2.action": {"type": "string", "initial": ""},
+  "view.target": {"type": "number", "initial": 0, "view": "target"},
+  "view.physical": {"type": "number", "initial": 1, "view": "physical"},
+  "view.device": {"type": "string", "initial": "", "view": "device"},
   "view.safeLeft": {"type": "number", "initial": 0, "view": "safeLeft"},
   "view.safeTop": {"type": "number", "initial": 0, "view": "safeTop"},
   "view.safeRight": {"type": "number", "initial": 0, "view": "safeRight"},
@@ -57,7 +60,12 @@
   ],
   "defaultsModalShown": [
    {"op": "setState", "values": {"defaultsModal.contents": true}},
-   {"op": "playTimeline", "timeline": "defaultsModalEnergy"}
+   {"op": "playTimeline", "timeline": "defaultsModalEnergy"},
+   {
+    "op": "if",
+    "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+    "then": [{"op": "focus", "control": "touch-defaultsModal_no"}]
+   }
   ],
   "defaultsModalHide": [
    {"op": "setState", "values": {"defaultsModal.contents": false}},
@@ -73,11 +81,60 @@
   "subpageReverse300": [{"op": "playTimeline", "timeline": "subpageReverse300"}],
   "onActivate": [
    {"op": "playTimeline", "timeline": "arrive"},
-   {"op": "focus", "control": "controls"},
-   {"op": "if", "condition": {"state": "from_controls"}, "then": [{"op": "focus", "control": "controls"}]},
-   {"op": "if", "condition": {"state": "from_game"}, "then": [{"op": "focus", "control": "game"}]},
-   {"op": "if", "condition": {"state": "from_display"}, "then": [{"op": "focus", "control": "display"}]},
-   {"op": "if", "condition": {"state": "from_audio"}, "then": [{"op": "focus", "control": "audio"}]}
+   {
+    "op": "if",
+    "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+    "then": [{"op": "focus", "control": "touch-controls"}],
+    "else": [{"op": "focus", "control": "controls"}]
+   },
+   {
+    "op": "if",
+    "condition": {"state": "from_controls"},
+    "then": [
+     {
+      "op": "if",
+      "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+      "then": [{"op": "focus", "control": "touch-controls"}],
+      "else": [{"op": "focus", "control": "controls"}]
+     }
+    ]
+   },
+   {
+    "op": "if",
+    "condition": {"state": "from_game"},
+    "then": [
+     {
+      "op": "if",
+      "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+      "then": [{"op": "focus", "control": "touch-game"}],
+      "else": [{"op": "focus", "control": "game"}]
+     }
+    ]
+   },
+   {
+    "op": "if",
+    "condition": {"state": "from_display"},
+    "then": [
+     {
+      "op": "if",
+      "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+      "then": [{"op": "focus", "control": "touch-display"}],
+      "else": [{"op": "focus", "control": "display"}]
+     }
+    ]
+   },
+   {
+    "op": "if",
+    "condition": {"state": "from_audio"},
+    "then": [
+     {
+      "op": "if",
+      "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+      "then": [{"op": "focus", "control": "touch-audio"}],
+      "else": [{"op": "focus", "control": "audio"}]
+     }
+    ]
+   }
   ],
   "onDeactivate": [{"op": "playTimeline", "timeline": "rest"}],
   "depart": [{"op": "playTimeline", "timeline": "depart"}],
@@ -12021,6 +12078,1554 @@
    "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
   },
   {
+   "id": "touch.content.display",
+   "node": "content",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.target"}, 0]}, "none", "block"]}
+  },
+  {
+   "id": "touch.titles.display",
+   "node": "titles",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.target"}, 0]}, "none", "block"]}
+  },
+  {
+   "id": "touch.prompts.display",
+   "node": "prompts",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.target"}, 0]}, "none", "block"]}
+  },
+  {
+   "id": "touch.touch-title.font-size",
+   "node": "touch-title",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [20.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-title.line-height",
+   "node": "touch-title",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [28, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-title.margin-top",
+   "node": "touch-title",
+   "property": "margin-top",
+   "value": {"op": "/", "args": [8, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-title.margin-bottom",
+   "node": "touch-title",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [12, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-title.padding-left",
+   "node": "touch-title",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-controls-rail.width",
+   "node": "touch-controls-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-controls-label.font-size",
+   "node": "touch-controls-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-controls-label.line-height",
+   "node": "touch-controls-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-controls-label.padding-top",
+   "node": "touch-controls-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-controls-label.padding-bottom",
+   "node": "touch-controls-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-controls-label.padding-left",
+   "node": "touch-controls-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-controls-label.padding-right",
+   "node": "touch-controls-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-controls.margin-bottom",
+   "node": "touch-controls",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-game-rail.width",
+   "node": "touch-game-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-game-label.font-size",
+   "node": "touch-game-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-game-label.line-height",
+   "node": "touch-game-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-game-label.padding-top",
+   "node": "touch-game-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-game-label.padding-bottom",
+   "node": "touch-game-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-game-label.padding-left",
+   "node": "touch-game-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-game-label.padding-right",
+   "node": "touch-game-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-game.margin-bottom",
+   "node": "touch-game",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-display-rail.width",
+   "node": "touch-display-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-display-label.font-size",
+   "node": "touch-display-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-display-label.line-height",
+   "node": "touch-display-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-display-label.padding-top",
+   "node": "touch-display-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-display-label.padding-bottom",
+   "node": "touch-display-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-display-label.padding-left",
+   "node": "touch-display-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-display-label.padding-right",
+   "node": "touch-display-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-display.margin-bottom",
+   "node": "touch-display",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-audio-rail.width",
+   "node": "touch-audio-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-audio-label.font-size",
+   "node": "touch-audio-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-audio-label.line-height",
+   "node": "touch-audio-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-audio-label.padding-top",
+   "node": "touch-audio-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-audio-label.padding-bottom",
+   "node": "touch-audio-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-audio-label.padding-left",
+   "node": "touch-audio-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-audio-label.padding-right",
+   "node": "touch-audio-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-audio.margin-bottom",
+   "node": "touch-audio",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaults-rail.width",
+   "node": "touch-defaults-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaults-label.font-size",
+   "node": "touch-defaults-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaults-label.line-height",
+   "node": "touch-defaults-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaults-label.padding-top",
+   "node": "touch-defaults-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaults-label.padding-bottom",
+   "node": "touch-defaults-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaults-label.padding-left",
+   "node": "touch-defaults-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaults-label.padding-right",
+   "node": "touch-defaults-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaults.margin-bottom",
+   "node": "touch-defaults",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-back-rail.width",
+   "node": "touch-back-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-back-label.font-size",
+   "node": "touch-back-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-back-label.line-height",
+   "node": "touch-back-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-back-label.padding-top",
+   "node": "touch-back-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-back-label.padding-bottom",
+   "node": "touch-back-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-back-label.padding-left",
+   "node": "touch-back-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-back-label.padding-right",
+   "node": "touch-back-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-back.margin-bottom",
+   "node": "touch-back",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-column.width",
+   "node": "touch-column",
+   "property": "width",
+   "value": {"op": "/", "args": [440.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-scroll.padding-left",
+   "node": "touch-scroll",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-scroll.padding-right",
+   "node": "touch-scroll",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-scroll.padding-top",
+   "node": "touch-scroll",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [28, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-scroll.padding-bottom",
+   "node": "touch-scroll",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [28, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.display",
+   "node": "touch",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.target"}, 0]}, "block", "none"]}
+  },
+  {
+   "id": "touch.defaultsModal-stage.display",
+   "node": "defaultsModal-stage",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.target"}, 0]}, "none", "block"]}
+  },
+  {
+   "id": "touch.touch-defaultsModal-title.font-size",
+   "node": "touch-defaultsModal-title",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [20.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaultsModal-title.line-height",
+   "node": "touch-defaultsModal-title",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [28, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaultsModal-title.margin-bottom",
+   "node": "touch-defaultsModal-title",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [14, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal-body.font-size",
+   "node": "touch-defaultsModal-body",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [17, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaultsModal-body.line-height",
+   "node": "touch-defaultsModal-body",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaultsModal-body.margin-bottom",
+   "node": "touch-defaultsModal-body",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [14, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_yes-rail.width",
+   "node": "touch-defaultsModal_yes-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_yes-label.font-size",
+   "node": "touch-defaultsModal_yes-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaultsModal_yes-label.line-height",
+   "node": "touch-defaultsModal_yes-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaultsModal_yes-label.padding-top",
+   "node": "touch-defaultsModal_yes-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_yes-label.padding-bottom",
+   "node": "touch-defaultsModal_yes-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_yes-label.padding-left",
+   "node": "touch-defaultsModal_yes-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_yes-label.padding-right",
+   "node": "touch-defaultsModal_yes-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_yes.margin-bottom",
+   "node": "touch-defaultsModal_yes",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_no-rail.width",
+   "node": "touch-defaultsModal_no-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_no-label.font-size",
+   "node": "touch-defaultsModal_no-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaultsModal_no-label.line-height",
+   "node": "touch-defaultsModal_no-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-defaultsModal_no-label.padding-top",
+   "node": "touch-defaultsModal_no-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_no-label.padding-bottom",
+   "node": "touch-defaultsModal_no-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_no-label.padding-left",
+   "node": "touch-defaultsModal_no-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_no-label.padding-right",
+   "node": "touch-defaultsModal_no-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal_no.margin-bottom",
+   "node": "touch-defaultsModal_no",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal-card.width",
+   "node": "touch-defaultsModal-card",
+   "property": "width",
+   "value": {"op": "/", "args": [440.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal-card.padding-left",
+   "node": "touch-defaultsModal-card",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [20, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal-card.padding-right",
+   "node": "touch-defaultsModal-card",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [20, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal-card.padding-top",
+   "node": "touch-defaultsModal-card",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [18, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal-card.padding-bottom",
+   "node": "touch-defaultsModal-card",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [10, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal.padding-left",
+   "node": "touch-defaultsModal",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal.padding-right",
+   "node": "touch-defaultsModal",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal.padding-top",
+   "node": "touch-defaultsModal",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [24, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-defaultsModal.padding-bottom",
+   "node": "touch-defaultsModal",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [24, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.defaultsModal.display",
+   "node": "touch-defaultsModal",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [{"op": ">", "args": [{"state": "view.target"}, 0]}, {"state": "defaultsModal.contents"}]
+     },
+     "flex",
+     "none"
+    ]
+   }
+  },
+  {
    "id": "safe.field-vignette.left",
    "node": "field-vignette",
    "property": "left",
@@ -16801,6 +18406,1014 @@
      ]
     }
    ]
+  },
+  {
+   "id": "touch-controls.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-controls-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-controls-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-controls-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-controls.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-controls-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-controls-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-controls-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-controls.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-controls-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-controls-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-controls-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-controls.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-controls-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-controls-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-controls-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-controls.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-controls-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-controls-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-controls-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-game.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-game-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-game-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-game-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-game.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-game-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-game-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-game-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-game.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-game-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-game-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-game-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-game.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-game-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-game-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-game-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-game.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-game-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-game-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-game-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-display.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-display-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-display-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-display-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-display.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-display-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-display-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-display-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-display.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-display-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-display-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-display-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-display.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-display-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-display-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-display-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-display.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-display-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-display-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-display-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-audio.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-audio-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-audio-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-audio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-audio.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-audio-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-audio-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-audio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-audio.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-audio-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-audio-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-audio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-audio.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-audio-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-audio-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-audio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-audio.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-audio-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-audio-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-audio-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaults.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-defaults-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaults-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaults-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaults.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-defaults-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-defaults-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaults-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaults.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-defaults-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-defaults-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaults-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaults.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-defaults-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaults-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaults-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaults.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-defaults-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaults-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaults-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-back.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-back-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-back.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-back-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-back.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-back-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-back.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-back-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-back.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-back-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_yes.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_yes-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_yes-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_yes-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_yes.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_yes-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-defaultsModal_yes-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_yes-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_yes.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_yes-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-defaultsModal_yes-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaultsModal_yes-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_yes.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_yes-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaultsModal_yes-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaultsModal_yes-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_yes.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_yes-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_yes-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_yes-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_no.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_no-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_no-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_no-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_no.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_no-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-defaultsModal_no-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_no-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_no.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_no-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-defaultsModal_no-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaultsModal_no-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_no.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_no-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaultsModal_no-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-defaultsModal_no-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-defaultsModal_no.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-defaultsModal_no-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_no-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-defaultsModal_no-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
   }
  ],
  "root": {
@@ -19896,7 +22509,8 @@
      "margin-left": {"type": "length", "value": -480.0, "unit": "dp"},
      "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
      "opacity": {"type": "number", "value": 1},
-     "margin-top": {"type": "length", "value": -360, "unit": "dp"}
+     "margin-top": {"type": "length", "value": -360, "unit": "dp"},
+     "display": {"type": "keyword", "value": "block"}
     },
     "children": [
      {
@@ -21229,7 +23843,8 @@
      "height": {"type": "length", "value": 720, "unit": "dp"},
      "left": {"type": "length", "value": 50, "unit": "%"},
      "margin-left": {"type": "length", "value": -480.0, "unit": "dp"},
-     "pointer-events": {"type": "keyword", "value": "none"}
+     "pointer-events": {"type": "keyword", "value": "none"},
+     "display": {"type": "keyword", "value": "block"}
     },
     "children": [
      {
@@ -21356,7 +23971,8 @@
      "height": {"type": "length", "value": 45.0, "unit": "dp"},
      "margin-left": {"type": "length", "value": 90.0, "unit": "dp"},
      "opacity": {"type": "number", "value": 1},
-     "bottom": {"type": "length", "value": 13.5, "unit": "dp"}
+     "bottom": {"type": "length", "value": 13.5, "unit": "dp"},
+     "display": {"type": "keyword", "value": "block"}
     },
     "children": [
      {
@@ -22772,6 +25388,961 @@
     ]
    },
    {
+    "id": "touch",
+    "type": "group",
+    "properties": {
+     "position": {"type": "keyword", "value": "absolute"},
+     "left": {"type": "length", "value": 0, "unit": "dp"},
+     "top": {"type": "length", "value": 0, "unit": "dp"},
+     "width": {"type": "length", "value": 100, "unit": "%"},
+     "height": {"type": "length", "value": 100, "unit": "%"},
+     "display": {"type": "keyword", "value": "none"}
+    },
+    "children": [
+     {
+      "id": "touch-scroll",
+      "type": "group",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 100, "unit": "%"},
+       "height": {"type": "length", "value": 100, "unit": "%"},
+       "overflow": {"type": "keyword", "value": "auto"},
+       "box-sizing": {"type": "keyword", "value": "border-box"},
+       "padding-left": {"type": "length", "value": 16.0, "unit": "dp"},
+       "padding-right": {"type": "length", "value": 16.0, "unit": "dp"},
+       "padding-top": {"type": "length", "value": 28, "unit": "dp"},
+       "padding-bottom": {"type": "length", "value": 28, "unit": "dp"}
+      },
+      "children": [
+       {
+        "id": "touch-column",
+        "type": "group",
+        "properties": {
+         "position": {"type": "keyword", "value": "relative"},
+         "display": {"type": "keyword", "value": "block"},
+         "max-width": {"type": "length", "value": 100, "unit": "%"},
+         "margin-left": {"type": "keyword", "value": "auto"},
+         "margin-right": {"type": "keyword", "value": "auto"},
+         "width": {"type": "length", "value": 440.0, "unit": "dp"}
+        },
+        "children": [
+         {
+          "id": "touch-title",
+          "type": "text",
+          "properties": {
+           "text": {"type": "text", "value": "#str_200009"},
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "font-family": {"type": "font", "value": "marine"},
+           "color": {"type": "color", "value": [1, 1, 1, 0.7]},
+           "white-space": {"type": "keyword", "value": "normal"},
+           "pointer-events": {"type": "keyword", "value": "none"},
+           "flex-shrink": {"type": "number", "value": 0},
+           "font-size": {"type": "length", "value": 20.0, "unit": "dp"},
+           "line-height": {"type": "length", "value": 28, "unit": "dp"},
+           "margin-top": {"type": "length", "value": 8, "unit": "dp"},
+           "margin-bottom": {"type": "length", "value": 12, "unit": "dp"},
+           "padding-left": {"type": "length", "value": 4, "unit": "dp"}
+          }
+         },
+         {
+          "id": "touch-controls",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-controls-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-controls-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-controls-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-controls-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200083"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200083",
+           "action": "settingsControls",
+           "states": {
+            "default": "touch-controls.default",
+            "hover": "touch-controls.hover",
+            "focus": "touch-controls.focus",
+            "pressed": "touch-controls.pressed",
+            "disabled": "touch-controls.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-game",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-game-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-game-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-game-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-game-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200084"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200084",
+           "action": "settingsGame",
+           "states": {
+            "default": "touch-game.default",
+            "hover": "touch-game.hover",
+            "focus": "touch-game.focus",
+            "pressed": "touch-game.pressed",
+            "disabled": "touch-game.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-display",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-display-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-display-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-display-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-display-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_229900"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_229900",
+           "action": "settingsDisplay",
+           "states": {
+            "default": "touch-display.default",
+            "hover": "touch-display.hover",
+            "focus": "touch-display.focus",
+            "pressed": "touch-display.pressed",
+            "disabled": "touch-display.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-audio",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-audio-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-audio-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-audio-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-audio-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_229901"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_229901",
+           "action": "settingsAudio",
+           "states": {
+            "default": "touch-audio.default",
+            "hover": "touch-audio.hover",
+            "focus": "touch-audio.focus",
+            "pressed": "touch-audio.pressed",
+            "disabled": "touch-audio.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-defaults",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-defaults-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-defaults-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-defaults-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-defaults-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200086"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200086",
+           "event": "defaultsModalShow",
+           "states": {
+            "default": "touch-defaults.default",
+            "hover": "touch-defaults.hover",
+            "focus": "touch-defaults.focus",
+            "pressed": "touch-defaults.pressed",
+            "disabled": "touch-defaults.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-back",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-back-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-back-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-back-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-back-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_230045"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_230045",
+           "action": "back",
+           "states": {
+            "default": "touch-back.default",
+            "hover": "touch-back.hover",
+            "focus": "touch-back.focus",
+            "pressed": "touch-back.pressed",
+            "disabled": "touch-back.disabled"
+           }
+          }
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   },
+   {
     "id": "defaultsModal",
     "type": "group",
     "properties": {
@@ -22820,7 +26391,8 @@
        "height": {"type": "length", "value": 720, "unit": "dp"},
        "left": {"type": "length", "value": 50, "unit": "%"},
        "margin-left": {"type": "length", "value": -480.0, "unit": "dp"},
-       "margin-top": {"type": "length", "value": -360, "unit": "dp"}
+       "margin-top": {"type": "length", "value": -360, "unit": "dp"},
+       "display": {"type": "keyword", "value": "block"}
       },
       "children": [
        {
@@ -23923,6 +27495,425 @@
             }
            }
           ]
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": "touch-defaultsModal",
+      "type": "group",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 100, "unit": "%"},
+       "height": {"type": "length", "value": 100, "unit": "%"},
+       "display": {"type": "keyword", "value": "none"},
+       "overflow": {"type": "keyword", "value": "auto"},
+       "box-sizing": {"type": "keyword", "value": "border-box"},
+       "flex-direction": {"type": "keyword", "value": "column"},
+       "justify-content": {"type": "keyword", "value": "center"},
+       "padding-left": {"type": "length", "value": 16.0, "unit": "dp"},
+       "padding-right": {"type": "length", "value": 16.0, "unit": "dp"},
+       "padding-top": {"type": "length", "value": 24, "unit": "dp"},
+       "padding-bottom": {"type": "length", "value": 24, "unit": "dp"}
+      },
+      "children": [
+       {
+        "id": "touch-defaultsModal-card",
+        "type": "group",
+        "properties": {
+         "position": {"type": "keyword", "value": "relative"},
+         "display": {"type": "keyword", "value": "block"},
+         "max-width": {"type": "length", "value": 100, "unit": "%"},
+         "margin-left": {"type": "keyword", "value": "auto"},
+         "margin-right": {"type": "keyword", "value": "auto"},
+         "box-sizing": {"type": "keyword", "value": "border-box"},
+         "background-color": {"type": "color", "value": [0.02, 0.025, 0.015, 0.97]},
+         "width": {"type": "length", "value": 440.0, "unit": "dp"},
+         "padding-left": {"type": "length", "value": 20, "unit": "dp"},
+         "padding-right": {"type": "length", "value": 20, "unit": "dp"},
+         "padding-top": {"type": "length", "value": 18, "unit": "dp"},
+         "padding-bottom": {"type": "length", "value": 10, "unit": "dp"}
+        },
+        "children": [
+         {
+          "id": "touch-defaultsModal-frame",
+          "type": "vector",
+          "properties": {
+           "position": {"type": "keyword", "value": "absolute"},
+           "left": {"type": "length", "value": 0, "unit": "dp"},
+           "top": {"type": "length", "value": 0, "unit": "dp"},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "height": {"type": "length", "value": 100, "unit": "%"}
+          },
+          "paths": [
+           {
+            "id": "frame",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[0, 0]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+             {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+             {"id": "close", "op": "close"}
+            ],
+            "stroke": {
+             "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+             "widthDp": 4,
+             "minimumPixels": 1,
+             "join": "miter",
+             "cap": "butt"
+            }
+           },
+           {
+            "id": "edge",
+            "commands": [
+             {"id": "p0", "op": "move", "points": [[0, 0]]},
+             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+             {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+             {"id": "close", "op": "close"}
+            ],
+            "stroke": {
+             "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.7]}},
+             "widthDp": 1.5,
+             "minimumPixels": 1,
+             "join": "miter",
+             "cap": "butt"
+            }
+           }
+          ]
+         },
+         {
+          "id": "touch-defaultsModal-title",
+          "type": "text",
+          "properties": {
+           "text": {"type": "text", "value": "#str_200086"},
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "font-family": {"type": "font", "value": "marine"},
+           "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+           "white-space": {"type": "keyword", "value": "normal"},
+           "pointer-events": {"type": "keyword", "value": "none"},
+           "font-size": {"type": "length", "value": 20.0, "unit": "dp"},
+           "line-height": {"type": "length", "value": 28, "unit": "dp"},
+           "margin-bottom": {"type": "length", "value": 14, "unit": "dp"}
+          }
+         },
+         {
+          "id": "touch-defaultsModal-body",
+          "type": "text",
+          "properties": {
+           "text": {"type": "text", "value": "#str_200156"},
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "font-family": {"type": "font", "value": "lowpixel"},
+           "color": {"type": "color", "value": [1, 1, 1, 0.82]},
+           "white-space": {"type": "keyword", "value": "normal"},
+           "pointer-events": {"type": "keyword", "value": "none"},
+           "font-size": {"type": "length", "value": 17, "unit": "dp"},
+           "line-height": {"type": "length", "value": 24, "unit": "dp"},
+           "margin-bottom": {"type": "length", "value": 14, "unit": "dp"}
+          }
+         },
+         {
+          "id": "touch-defaultsModal_yes",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-defaultsModal_yes-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-defaultsModal_yes-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-defaultsModal_yes-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-defaultsModal_yes-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200157"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200157",
+           "event": "defaultsConfirmed",
+           "states": {
+            "default": "touch-defaultsModal_yes.default",
+            "hover": "touch-defaultsModal_yes.hover",
+            "focus": "touch-defaultsModal_yes.focus",
+            "pressed": "touch-defaultsModal_yes.pressed",
+            "disabled": "touch-defaultsModal_yes.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-defaultsModal_no",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-defaultsModal_no-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-defaultsModal_no-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-defaultsModal_no-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-defaultsModal_no-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200158"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200158",
+           "event": "defaultsModalHide",
+           "states": {
+            "default": "touch-defaultsModal_no.default",
+            "hover": "touch-defaultsModal_no.hover",
+            "focus": "touch-defaultsModal_no.focus",
+            "pressed": "touch-defaultsModal_no.pressed",
+            "disabled": "touch-defaultsModal_no.disabled"
+           }
+          }
          }
         ]
        }

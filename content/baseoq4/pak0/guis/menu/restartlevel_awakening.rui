@@ -26,6 +26,9 @@
   "notice.2.text": {"type": "string", "initial": ""},
   "notice.2.kind": {"type": "number", "initial": 0},
   "notice.2.action": {"type": "string", "initial": ""},
+  "view.target": {"type": "number", "initial": 0, "view": "target"},
+  "view.physical": {"type": "number", "initial": 1, "view": "physical"},
+  "view.device": {"type": "string", "initial": "", "view": "device"},
   "view.safeLeft": {"type": "number", "initial": 0, "view": "safeLeft"},
   "view.safeTop": {"type": "number", "initial": 0, "view": "safeTop"},
   "view.safeRight": {"type": "number", "initial": 0, "view": "safeRight"},
@@ -49,26 +52,59 @@
   "chooseSkill4": [{"op": "setState", "values": {"restart.skill": 4}}],
   "onActivate": [
    {"op": "playTimeline", "timeline": "arrive"},
-   {"op": "focus", "control": "skill-0"},
+   {
+    "op": "if",
+    "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+    "then": [{"op": "focus", "control": "touch-skill-0"}],
+    "else": [{"op": "focus", "control": "skill-0"}]
+   },
    {
     "op": "if",
     "condition": {"op": "==", "args": [{"state": "restart.skill"}, 1]},
-    "then": [{"op": "focus", "control": "skill-1"}]
+    "then": [
+     {
+      "op": "if",
+      "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+      "then": [{"op": "focus", "control": "touch-skill-1"}],
+      "else": [{"op": "focus", "control": "skill-1"}]
+     }
+    ]
    },
    {
     "op": "if",
     "condition": {"op": "==", "args": [{"state": "restart.skill"}, 2]},
-    "then": [{"op": "focus", "control": "skill-2"}]
+    "then": [
+     {
+      "op": "if",
+      "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+      "then": [{"op": "focus", "control": "touch-skill-2"}],
+      "else": [{"op": "focus", "control": "skill-2"}]
+     }
+    ]
    },
    {
     "op": "if",
     "condition": {"op": "==", "args": [{"state": "restart.skill"}, 3]},
-    "then": [{"op": "focus", "control": "skill-3"}]
+    "then": [
+     {
+      "op": "if",
+      "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+      "then": [{"op": "focus", "control": "touch-skill-3"}],
+      "else": [{"op": "focus", "control": "skill-3"}]
+     }
+    ]
    },
    {
     "op": "if",
     "condition": {"op": "==", "args": [{"state": "restart.skill"}, 4]},
-    "then": [{"op": "focus", "control": "skill-4"}]
+    "then": [
+     {
+      "op": "if",
+      "condition": {"op": ">", "args": [{"state": "view.target"}, 0]},
+      "then": [{"op": "focus", "control": "touch-skill-4"}],
+      "else": [{"op": "focus", "control": "skill-4"}]
+     }
+    ]
    }
   ],
   "onDeactivate": [{"op": "playTimeline", "timeline": "rest"}],
@@ -5711,6 +5747,1030 @@
    "value": {"op": "/", "args": [22.0, {"state": "view.text"}]}
   },
   {
+   "id": "touch.restart-stage.display",
+   "node": "restart-stage",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.target"}, 0]}, "none", "block"]}
+  },
+  {
+   "id": "touch.touch-skill-0-rail.width",
+   "node": "touch-skill-0-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-0-label.font-size",
+   "node": "touch-skill-0-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-0-label.line-height",
+   "node": "touch-skill-0-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-0-label.padding-top",
+   "node": "touch-skill-0-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-0-label.padding-bottom",
+   "node": "touch-skill-0-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-0-label.padding-left",
+   "node": "touch-skill-0-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-0-label.padding-right",
+   "node": "touch-skill-0-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-0.margin-bottom",
+   "node": "touch-skill-0",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-0-chosen.display",
+   "node": "touch-skill-0-chosen",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "restart.skill"}, 0]}, "block", "none"]}
+  },
+  {
+   "id": "touch.touch-skill-1-rail.width",
+   "node": "touch-skill-1-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-1-label.font-size",
+   "node": "touch-skill-1-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-1-label.line-height",
+   "node": "touch-skill-1-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-1-label.padding-top",
+   "node": "touch-skill-1-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-1-label.padding-bottom",
+   "node": "touch-skill-1-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-1-label.padding-left",
+   "node": "touch-skill-1-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-1-label.padding-right",
+   "node": "touch-skill-1-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-1.margin-bottom",
+   "node": "touch-skill-1",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-1-chosen.display",
+   "node": "touch-skill-1-chosen",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "restart.skill"}, 1]}, "block", "none"]}
+  },
+  {
+   "id": "touch.touch-skill-2-rail.width",
+   "node": "touch-skill-2-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-2-label.font-size",
+   "node": "touch-skill-2-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-2-label.line-height",
+   "node": "touch-skill-2-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-2-label.padding-top",
+   "node": "touch-skill-2-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-2-label.padding-bottom",
+   "node": "touch-skill-2-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-2-label.padding-left",
+   "node": "touch-skill-2-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-2-label.padding-right",
+   "node": "touch-skill-2-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-2.margin-bottom",
+   "node": "touch-skill-2",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-2-chosen.display",
+   "node": "touch-skill-2-chosen",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "restart.skill"}, 2]}, "block", "none"]}
+  },
+  {
+   "id": "touch.touch-skill-3-rail.width",
+   "node": "touch-skill-3-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-3-label.font-size",
+   "node": "touch-skill-3-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-3-label.line-height",
+   "node": "touch-skill-3-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-3-label.padding-top",
+   "node": "touch-skill-3-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-3-label.padding-bottom",
+   "node": "touch-skill-3-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-3-label.padding-left",
+   "node": "touch-skill-3-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-3-label.padding-right",
+   "node": "touch-skill-3-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-3.margin-bottom",
+   "node": "touch-skill-3",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-3-chosen.display",
+   "node": "touch-skill-3-chosen",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "restart.skill"}, 3]}, "block", "none"]}
+  },
+  {
+   "id": "touch.touch-skill-4-rail.width",
+   "node": "touch-skill-4-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-4-label.font-size",
+   "node": "touch-skill-4-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-4-label.line-height",
+   "node": "touch-skill-4-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-skill-4-label.padding-top",
+   "node": "touch-skill-4-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-4-label.padding-bottom",
+   "node": "touch-skill-4-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-4-label.padding-left",
+   "node": "touch-skill-4-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-4-label.padding-right",
+   "node": "touch-skill-4-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-4.margin-bottom",
+   "node": "touch-skill-4",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-skill-4-chosen.display",
+   "node": "touch-skill-4-chosen",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "restart.skill"}, 4]}, "block", "none"]}
+  },
+  {
+   "id": "touch.touch-restart_go-rail.width",
+   "node": "touch-restart_go-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_go-label.font-size",
+   "node": "touch-restart_go-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-restart_go-label.line-height",
+   "node": "touch-restart_go-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-restart_go-label.padding-top",
+   "node": "touch-restart_go-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_go-label.padding-bottom",
+   "node": "touch-restart_go-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_go-label.padding-left",
+   "node": "touch-restart_go-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_go-label.padding-right",
+   "node": "touch-restart_go-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_go.margin-bottom",
+   "node": "touch-restart_go",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_back-rail.width",
+   "node": "touch-restart_back-rail",
+   "property": "width",
+   "value": {"op": "/", "args": [4, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_back-label.font-size",
+   "node": "touch-restart_back-label",
+   "property": "font-size",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-restart_back-label.line-height",
+   "node": "touch-restart_back-label",
+   "property": "line-height",
+   "value": {
+    "op": "*",
+    "args": [
+     {"op": "/", "args": [24.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "max",
+        "args": [
+         1,
+         {
+          "op": "/",
+          "args": [
+           {"state": "view.text"},
+           {
+            "op": "select",
+            "args": [
+             {"op": "==", "args": [{"state": "view.device"}, "phone"]},
+             1.5,
+             {
+              "op": "select",
+              "args": [
+               {
+                "op": "||",
+                "args": [
+                 {"op": "==", "args": [{"state": "view.device"}, "tablet"]},
+                 {"op": "==", "args": [{"state": "view.device"}, "handheld"]}
+                ]
+               },
+               1.25,
+               1
+              ]
+             }
+            ]
+           }
+          ]
+         }
+        ]
+       },
+       {"op": "max", "args": [{"state": "view.text"}, 0.05]}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "touch.touch-restart_back-label.padding-top",
+   "node": "touch-restart_back-label",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_back-label.padding-bottom",
+   "node": "touch-restart_back-label",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_back-label.padding-left",
+   "node": "touch-restart_back-label",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [22, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_back-label.padding-right",
+   "node": "touch-restart_back-label",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-restart_back.margin-bottom",
+   "node": "touch-restart_back",
+   "property": "margin-bottom",
+   "value": {"op": "/", "args": [10.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-column.width",
+   "node": "touch-column",
+   "property": "width",
+   "value": {"op": "/", "args": [440.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-scroll.padding-left",
+   "node": "touch-scroll",
+   "property": "padding-left",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-scroll.padding-right",
+   "node": "touch-scroll",
+   "property": "padding-right",
+   "value": {"op": "/", "args": [16.0, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-scroll.padding-top",
+   "node": "touch-scroll",
+   "property": "padding-top",
+   "value": {"op": "/", "args": [28, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.touch-scroll.padding-bottom",
+   "node": "touch-scroll",
+   "property": "padding-bottom",
+   "value": {"op": "/", "args": [28, {"op": "max", "args": [{"state": "view.physical"}, 0.05]}]}
+  },
+  {
+   "id": "touch.display",
+   "node": "touch",
+   "property": "display",
+   "value": {"op": "select", "args": [{"op": ">", "args": [{"state": "view.target"}, 0]}, "block", "none"]}
+  },
+  {
    "id": "safe.restart-backing.left",
    "node": "restart-backing",
    "property": "left",
@@ -5755,6 +6815,30 @@
   {
    "id": "safe.restart-backing-tall.bottom",
    "node": "restart-backing-tall",
+   "property": "bottom",
+   "value": {"op": "-", "args": [0, {"state": "view.safeBottom"}]}
+  },
+  {
+   "id": "safe.touch.left",
+   "node": "touch",
+   "property": "left",
+   "value": {"op": "-", "args": [0, {"state": "view.safeLeft"}]}
+  },
+  {
+   "id": "safe.touch.top",
+   "node": "touch",
+   "property": "top",
+   "value": {"op": "-", "args": [0, {"state": "view.safeTop"}]}
+  },
+  {
+   "id": "safe.touch.right",
+   "node": "touch",
+   "property": "right",
+   "value": {"op": "-", "args": [0, {"state": "view.safeRight"}]}
+  },
+  {
+   "id": "safe.touch.bottom",
+   "node": "touch",
    "property": "bottom",
    "value": {"op": "-", "args": [0, {"state": "view.safeBottom"}]}
   },
@@ -8823,6 +9907,888 @@
      ]
     }
    ]
+  },
+  {
+   "id": "touch-skill-0.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-skill-0-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-0-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-0-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-0.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-0-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-skill-0-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-0-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-0.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-skill-0-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-skill-0-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-0-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-0.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-0-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-0-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-0-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-0.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-skill-0-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-0-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-0-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-1.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-skill-1-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-1-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-1-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-1.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-1-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-skill-1-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-1-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-1.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-skill-1-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-skill-1-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-1-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-1.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-1-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-1-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-1-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-1.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-skill-1-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-1-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-1-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-2.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-skill-2-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-2-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-2-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-2.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-2-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-skill-2-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-2-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-2.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-skill-2-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-skill-2-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-2-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-2.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-2-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-2-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-2-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-2.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-skill-2-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-2-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-2-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-3.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-skill-3-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-3-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-3-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-3.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-3-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-skill-3-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-3-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-3.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-skill-3-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-skill-3-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-3-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-3.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-3-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-3-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-3-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-3.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-skill-3-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-3-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-3-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-4.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-skill-4-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-4-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-4-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-4.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-4-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-skill-4-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-4-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-4.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-skill-4-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-skill-4-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-4-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-4.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-skill-4-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-4-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-skill-4-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-skill-4.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-skill-4-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-4-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-skill-4-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_go.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-restart_go-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_go-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_go-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_go.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-restart_go-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-restart_go-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_go-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_go.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-restart_go-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-restart_go-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-restart_go-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_go.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-restart_go-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-restart_go-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-restart_go-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_go.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-restart_go-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_go-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_go-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_back.default",
+   "durationMs": 200,
+   "tracks": [
+    {
+     "node": "touch-restart_back-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 200, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.92]}},
+      {"atMs": 200, "value": {"type": "color", "value": [1, 1, 1, 0.92]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_back.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-restart_back-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "touch-restart_back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 1, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_back.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "touch-restart_back-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.8}},
+      {"atMs": 80, "value": {"type": "number", "value": 0.8}}
+     ]
+    },
+    {
+     "node": "touch-restart_back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 80, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-restart_back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_back.pressed",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "touch-restart_back-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-restart_back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 1}}, {"atMs": 1, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "touch-restart_back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+      {"atMs": 1, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "touch-restart_back.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "touch-restart_back-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_back-rail",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 150, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "touch-restart_back-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.35]}},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.35]}}
+     ]
+    }
+   ]
   }
  ],
  "root": {
@@ -8912,7 +10878,8 @@
      "height": {"type": "length", "value": 100, "unit": "%"},
      "left": {"type": "length", "value": 50, "unit": "%"},
      "margin-left": {"type": "length", "value": -480.0, "unit": "dp"},
-     "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+     "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]},
+     "display": {"type": "keyword", "value": "block"}
     },
     "children": [
      {
@@ -11981,6 +13948,1255 @@
        "event": "chooseSkill4",
        "navigation": {"up": "skill-3", "down": "restart_go"}
       }
+     }
+    ]
+   },
+   {
+    "id": "touch",
+    "type": "group",
+    "properties": {
+     "position": {"type": "keyword", "value": "absolute"},
+     "left": {"type": "length", "value": 0, "unit": "dp"},
+     "top": {"type": "length", "value": 0, "unit": "dp"},
+     "display": {"type": "keyword", "value": "none"},
+     "background-color": {"type": "color", "value": [0, 0, 0, 0.92]},
+     "right": {"type": "length", "value": 0, "unit": "dp"},
+     "bottom": {"type": "length", "value": 0, "unit": "dp"}
+    },
+    "children": [
+     {
+      "id": "touch-scroll",
+      "type": "group",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 100, "unit": "%"},
+       "height": {"type": "length", "value": 100, "unit": "%"},
+       "overflow": {"type": "keyword", "value": "auto"},
+       "box-sizing": {"type": "keyword", "value": "border-box"},
+       "padding-left": {"type": "length", "value": 16.0, "unit": "dp"},
+       "padding-right": {"type": "length", "value": 16.0, "unit": "dp"},
+       "padding-top": {"type": "length", "value": 28, "unit": "dp"},
+       "padding-bottom": {"type": "length", "value": 28, "unit": "dp"}
+      },
+      "children": [
+       {
+        "id": "touch-column",
+        "type": "group",
+        "properties": {
+         "position": {"type": "keyword", "value": "relative"},
+         "display": {"type": "keyword", "value": "block"},
+         "max-width": {"type": "length", "value": 100, "unit": "%"},
+         "margin-left": {"type": "keyword", "value": "auto"},
+         "margin-right": {"type": "keyword", "value": "auto"},
+         "width": {"type": "length", "value": 440.0, "unit": "dp"}
+        },
+        "children": [
+         {
+          "id": "touch-skill-0",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-skill-0-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-0-chosen",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "none"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "chosen",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+               "widthDp": 2.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-0-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-0-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-0-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200014"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200014",
+           "event": "chooseSkill0",
+           "states": {
+            "default": "touch-skill-0.default",
+            "hover": "touch-skill-0.hover",
+            "focus": "touch-skill-0.focus",
+            "pressed": "touch-skill-0.pressed",
+            "disabled": "touch-skill-0.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-skill-1",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-skill-1-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-1-chosen",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "none"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "chosen",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+               "widthDp": 2.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-1-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-1-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-1-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200015"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200015",
+           "event": "chooseSkill1",
+           "states": {
+            "default": "touch-skill-1.default",
+            "hover": "touch-skill-1.hover",
+            "focus": "touch-skill-1.focus",
+            "pressed": "touch-skill-1.pressed",
+            "disabled": "touch-skill-1.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-skill-2",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-skill-2-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-2-chosen",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "none"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "chosen",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+               "widthDp": 2.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-2-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-2-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-2-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200016"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200016",
+           "event": "chooseSkill2",
+           "states": {
+            "default": "touch-skill-2.default",
+            "hover": "touch-skill-2.hover",
+            "focus": "touch-skill-2.focus",
+            "pressed": "touch-skill-2.pressed",
+            "disabled": "touch-skill-2.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-skill-3",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-skill-3-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-3-chosen",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "none"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "chosen",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+               "widthDp": 2.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-3-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-3-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-3-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_200017"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_200017",
+           "event": "chooseSkill3",
+           "states": {
+            "default": "touch-skill-3.default",
+            "hover": "touch-skill-3.hover",
+            "focus": "touch-skill-3.focus",
+            "pressed": "touch-skill-3.pressed",
+            "disabled": "touch-skill-3.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-skill-4",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-skill-4-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-4-chosen",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "display": {"type": "keyword", "value": "none"},
+             "pointer-events": {"type": "keyword", "value": "none"}
+            },
+            "paths": [
+             {
+              "id": "chosen",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}},
+               "widthDp": 2.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-4-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-4-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-skill-4-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_41117"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_41117",
+           "event": "chooseSkill4",
+           "states": {
+            "default": "touch-skill-4.default",
+            "hover": "touch-skill-4.hover",
+            "focus": "touch-skill-4.focus",
+            "pressed": "touch-skill-4.pressed",
+            "disabled": "touch-skill-4.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-restart_go",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-restart_go-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-restart_go-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-restart_go-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-restart_go-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_229983"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_229983",
+           "action": "go",
+           "states": {
+            "default": "touch-restart_go.default",
+            "hover": "touch-restart_go.hover",
+            "focus": "touch-restart_go.focus",
+            "pressed": "touch-restart_go.pressed",
+            "disabled": "touch-restart_go.disabled"
+           }
+          }
+         },
+         {
+          "id": "touch-restart_back",
+          "type": "group",
+          "properties": {
+           "position": {"type": "keyword", "value": "relative"},
+           "display": {"type": "keyword", "value": "block"},
+           "opacity": {"type": "number", "value": 1},
+           "flex-shrink": {"type": "number", "value": 0},
+           "width": {"type": "length", "value": 100, "unit": "%"},
+           "margin-bottom": {"type": "length", "value": 10.0, "unit": "dp"}
+          },
+          "children": [
+           {
+            "id": "touch-restart_back-plate",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"}
+            },
+            "paths": [
+             {
+              "id": "base",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.035, 0.042, 0.025, 0.94]}}
+             },
+             {
+              "id": "plate",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.22]}},
+              "stroke": {
+               "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.6]}},
+               "widthDp": 1.5,
+               "minimumPixels": 1,
+               "join": "miter",
+               "cap": "butt"
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-restart_back-wash",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 100, "unit": "%"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "wash",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[12, {"fraction": 1}]]},
+               {"id": "p4", "op": "line", "points": [[0, {"fraction": 1, "dp": -12}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {
+               "type": "linear",
+               "from": [0, 0],
+               "to": [{"fraction": 1}, 0],
+               "stops": [
+                {"at": 0, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.35]}},
+                {"at": 1, "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.06]}}
+               ]
+              }
+             }
+            ]
+           },
+           {
+            "id": "touch-restart_back-rail",
+            "type": "vector",
+            "properties": {
+             "position": {"type": "keyword", "value": "absolute"},
+             "left": {"type": "length", "value": 0, "unit": "dp"},
+             "top": {"type": "length", "value": 0, "unit": "dp"},
+             "width": {"type": "length", "value": 4, "unit": "dp"},
+             "height": {"type": "length", "value": 100, "unit": "%"},
+             "opacity": {"type": "number", "value": 0}
+            },
+            "paths": [
+             {
+              "id": "rail",
+              "commands": [
+               {"id": "p0", "op": "move", "points": [[0, 0]]},
+               {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+               {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+               {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+               {"id": "close", "op": "close"}
+              ],
+              "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+             }
+            ]
+           },
+           {
+            "id": "touch-restart_back-label",
+            "type": "text",
+            "properties": {
+             "text": {"type": "text", "value": "#str_230045"},
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "font-family": {"type": "font", "value": "marine"},
+             "color": {"type": "color", "value": [1, 1, 1, 0.92]},
+             "white-space": {"type": "keyword", "value": "normal"},
+             "pointer-events": {"type": "keyword", "value": "none"},
+             "font-size": {"type": "length", "value": 16.0, "unit": "dp"},
+             "line-height": {"type": "length", "value": 24.0, "unit": "dp"},
+             "padding-top": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-bottom": {"type": "length", "value": 16.0, "unit": "dp"},
+             "padding-left": {"type": "length", "value": 22, "unit": "dp"},
+             "padding-right": {"type": "length", "value": 16, "unit": "dp"}
+            }
+           }
+          ],
+          "control": {
+           "role": "button",
+           "label": "#str_230045",
+           "action": "back",
+           "states": {
+            "default": "touch-restart_back.default",
+            "hover": "touch-restart_back.hover",
+            "focus": "touch-restart_back.focus",
+            "pressed": "touch-restart_back.pressed",
+            "disabled": "touch-restart_back.disabled"
+           }
+          }
+         }
+        ]
+       }
+      ]
      }
     ]
    },

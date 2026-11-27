@@ -2,8 +2,9 @@
 
 27 November 2026. The retained interface (`ui_retained 1`) resolves one
 **interface variant** at run time: `desktop`, `touch` or `vr`. A document keeps
-one layout per screen and adapts it with variant conditions; a variant document
-is added only where a screen's layout genuinely differs. The stock interface is
+one layout per screen and adapts it with variant conditions, or, where a
+screen's layout genuinely differs (the touch settings pages and message box),
+has a variant document beside it. The stock interface is
 unaffected and stays the fallback. Design context: [visual specification](../ui-visual-design.md)
 sections 13.2 (viewing profiles), 13.4 (modality) and 13.6 (touch).
 
@@ -111,27 +112,54 @@ same reach.
 
 ## The touch variant
 
-**Why the menus need it.** Every retained menu lays out on a 720 dp canvas
+**Why the menus need it.** Every desktop menu lays out on a 720 dp canvas
 that spans the view's safe height (960 dp wide below 4:3), so a document dp is
 not the platform's dp. On a phone in landscape (2340x1080 at density 2.625) a
-document dp spans only 0.57 physical dp: a 36 dp settings row is 21 physical
-dp tall and 17 dp body text reads at about 10 dp. A tablet (2560x1600 at
-density 2) spans 1.11 physical dp per document dp, a Steam Deck about 0.82,
-a 1080p monitor 1.5. The touch variant answers this without a second set of
-documents:
+document dp spans only 0.57 physical dp, and in portrait 0.43: a 36 dp row is
+15 physical dp tall and 17 dp text reads at about 7 dp. Growing those
+compositions cannot fix a portrait phone, so the touch variant follows one
+simpler rule instead: **one column in the device's own dp**, the same in
+landscape and portrait, on a phone or a tablet.
+
+- **Buttons** are the column's width (at most 440 dp, 16 dp from the view's
+  safe edges), at least 56 dp tall, 10 dp apart, with a 16 dp Marine label
+  that wraps (`retained_touch.button`). Hover, focus and a press light the
+  plate and turn the label orange; a button that picks one of several (a
+  difficulty) is outlined in orange while chosen.
+- **Text** is 16 dp for labels and values, 17 dp for a dialog's message and
+  20 dp for titles, times the player's text size.
+- **Nothing else**: no prompt bar, crumbs, wordmark or decorative frame. A
+  finger needs none of them; Back is a button.
+
+What each screen becomes:
+
+| Screen | Touch layout |
+| --- | --- |
+| Title, the pauses (Marine, Strogg, Awakening), Single Player, Campaigns, Multiplayer, SETTINGS, New Game's difficulty, the restart screen after a death, Restart Level, the Arena pause | The column, added to the screen's own document (`touch_menu`): each button a twin of the composition's control (the same label and action, shown and enabled under the same conditions), the composition set aside. Its sizes bind to `view.physical`, so they are device dp on the canvas. |
+| Every Yes/No or notice dialog of those screens and the preset check | A card the column's width in the view's middle (`touch_dialog`): the dialog's title, message and buttons, the dialog's art set aside. The card's twin takes the first focus. |
+| GAME OPTIONS, CONTROLS, AUDIO, DISPLAY | Their own touch documents, `guis/menu/touch/{game,controls,audio,system}.rui`, built by the same modules at 368 by 56 dp rows (`touch_geometry`). A 64 dp header holds Back and the title; under it the page's categories as big buttons, and a category's rows once one is chosen (Back returns to the categories). Rows stand as many abreast as the view holds, in a list that scrolls. DISPLAY keeps its draft: APPLY CHANGES is a big button in a footer under the list, with the service's message beside it or over it in a narrow view; a row's return-to-preset mark is a 44 dp strip under the row, "Reset to Preset". |
+| The message box | Its own touch document, `guis/menu/touch/msgbox.rui`: the session's title, message, typed field and answers in a card, under the same state names and verbs. |
+
+The adapter (`UserInterfaceRetained.cpp`) loads `guis/menu/touch/<name>.rui`
+in place of `guis/menu/[<folder>/]<name>[_awakening|_strogg].rui` while the
+variant is touch and that file exists, and swaps back and forth live, keeping
+the session's state and the page's draft; the screen keeps its logical name.
+A touch document has no canvas: its dp is the device's, and its text sizes
+divide out the device class's starting text size
+(`RetainedUI_DeviceTextDefault`), so a phone's 150 % reads as 100 % there and
+a larger choice still grows it.
+
+Not yet in the touch layout, and still the desktop composition in the touch
+variant: Load Game and Save Game (whose tall layout already gives portrait
+rows a readable size, but whose filters and actions stay small), Chapters,
+the multiplayer pages (Join, Create, Player Setup, the in-match menus, buy
+menu and summary), Demos, Credits, Mods, Updates and the on-screen keyboard.
+They are AND-04.3's remaining work.
+
+**Also in the variant:**
 
 - **Reach** (above) gives every small control a 48 dp hit region where its
-  neighbours leave room.
-- **Settings rows grow toward the target.** GAME OPTIONS, CONTROLS, AUDIO and
-  DISPLAY (`retained_settings_rows.py`) already stand in one scrolling column
-  in a tall view or above 100 % text. In the touch variant their rows also
-  grow by `min(2, max(1, target / 36))` (`view.target / ROW_PITCH`), with
-  their type, as a larger text size grows them; the larger of that and the
-  text size applies. A phone in landscape reaches 2x (72 dp rows, 41
-  physical dp, and reach covers the rest of the row's pitch), a tablet about
-  1.2x (48 physical dp), a Steam Deck about 1.6x. A tall view keeps its own
-  full-width column. Desktop documents are unchanged: every growth binding
-  gives its authored value outside the touch variant (`check_text_bindings`).
+  neighbours leave room; the desktop compositions still in use rely on it.
 - **CONTROLS fits the devices** (`retained_controls.device_fit`). The MOUSE
   tab's mouse-only rows (Invert Mouse, MOUSE INPUT, ACCELERATION) step aside
   while `view.mouse` is false; its AIM rows stay. Where the session reports
@@ -140,37 +168,38 @@ documents:
   (`in_touchLayoutPreset`), Control Size (`in_touchControlsScale`), Look
   Sensitivity (`in_touchLookSensitivity`) and Touch Layout (the setup's
   editor, moved here from the Other tab). With those controls and no mouse
-  the tab reads TOUCH (Turkish keeps its MOUSE label: its strip has no room)
-  and opens on the touch rows. The four CVars exist on every platform so the
-  page can read them; only Android's controls act on them.
+  the category reads TOUCH (Turkish keeps its MOUSE label) and opens on the
+  touch rows. The four CVars exist on every platform so the page can read
+  them; only Android's controls act on them.
 - **Text size by device class.** A fresh Android install starts
   `ui_retainedTextScale` at 1.5 on a phone and 1.25 on a tablet
   (`SDL_IsTablet`), set before the saved configuration runs, as a platform
   profile's defaults are, so a saved choice and Android's interface setup
-  keep the player's size. Android setup's Automatic text now resolves to the
-  same base times the system font scale (phone 150 %, tablet 125 %, rounded
-  to 5 %, at most 200 %). The Steam Deck profile starts text at 125 %. This
-  departs from section 13.2's "100 % at native density" because the canvas is
-  not at native density; the menus' compact layouts (section 13.3) would
-  restore that premise.
+  keep the player's size. The desktop compositions need that size; the touch
+  layouts divide it back out. Android setup's Automatic text resolves to the
+  same base times the system font scale (phone 150 %, tablet 125 %, rounded to
+  5 %, at most 200 %). The Steam Deck profile starts text at 125 %.
+- **Settings rows grow toward the target** in the desktop settings pages
+  (`retained_settings_rows.py`), by `min(2, max(1, target / 36))`, for a touch
+  variant showing them (a document without its touch file). Desktop documents
+  are unchanged: every growth binding gives its authored value outside the
+  touch variant (`check_text_bindings`).
 - **Text entry** keeps the existing path: the platform's input method where
   the session provides one (Android), otherwise the PAD-05 on-screen
   keyboard, which a touch or controller press opens.
-- **Not yet:** DISPLAY's monitor rows already show only where the display
-  service reports several displays, but Window Mode and the resolution rows
-  still show on a phone, where the platform owns the window; hiding them
-  there, and CONTROLS' binding tabs on a device with neither keyboard nor
-  controller, remain AND-04.4 work.
+- **Not yet:** DISPLAY's Window Mode and resolution rows still show on a
+  phone, where the platform owns the window, and CONTROLS' binding categories
+  on a device with neither keyboard nor controller (AND-04.4).
 
-The document schema now allows 16,384 bindings (was 8,192): CONTROLS, the
-largest page, holds about 8,200 with these rows.
+The document schema allows 16,384 bindings (was 8,192): CONTROLS, the
+largest page, holds about 8,200.
 
 **Testing on a desktop.** `ui_interfaceVariant touch` forces the layout,
 `ui_retainedDensity` stands in for a phone's display scale (2.625 for a 2340x1080
 phone; 1.3125 for a half-size capture), `ui_retainedSafeArea "l t r b"` for its
-cutout and gesture bar, and `ui_interfaceTestDevices none` (or `keyboard`,
-`mouse`, `keyboard mouse`) for the keyboard and mouse the documents see. A
-harness sets `controls.touchLayout` with `openq4_retainedGui state`.
+cutout and gesture bar, `ui_interfaceTestDevices none phone` (or `keyboard`,
+`mouse`, `tablet`) for the keyboard, mouse and device class the documents see.
+A harness sets `controls.touchLayout` with `openq4_retainedGui state`.
 
 ## Qualification
 

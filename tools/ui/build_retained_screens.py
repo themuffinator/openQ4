@@ -5541,6 +5541,17 @@ def main() -> int:
     # loading screen, the Strogg family's pages and the multiplayer cards.
     for name in NOTICE_DOCUMENTS:
         documents[name] = with_notices(documents[name])
+    # The touch variant (retained_touch): the menu levels' touch column, and
+    # the settings pages the adapter loads in place of the desktop ones.
+    from retained_touch import TOUCH_PAGES, touch_geometry, touch_message_box, with_touch_menus
+    with_touch_menus(documents)
+    documents["touch_msgbox"] = touch_message_box()
+    OUTPUTS["touch_msgbox"] = PAK0 / "guis" / "menu" / "touch" / "msgbox.rui"
+    with touch_geometry():
+        builders = {"game": game_document, "controls": controls_document, "audio": audio_document, "system": system_document}
+        for page, name in TOUCH_PAGES.items():
+            documents[name] = builders[page](touch=True)
+            OUTPUTS[name] = PAK0 / "guis" / "menu" / "touch" / f"{page}.rui"
     for document in documents.values():
         safe_frame(document)
         check_text_bindings(document)

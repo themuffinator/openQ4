@@ -68,6 +68,10 @@ openq4::ui::InterfaceDeviceClass RetainedUI_InterfaceDeviceClass();
 // Whether a keyboard, or a mouse, is attached or was used.
 bool RetainedUI_InterfaceKeyboard();
 bool RetainedUI_InterfaceMouse();
+// The text size a device class starts at (a new Android install's phone 1.5
+// and tablet 1.25, the Steam Deck profile's 1.25; 1 elsewhere), which the
+// canvas menus need and the touch documents divide back out.
+float RetainedUI_DeviceTextDefault();
 double RetainedUI_PresentationTime();
 // Call immediately after renderSystem->EndFrame has consumed its front-end
 // command chain. Allows a deferred resource rebuild before the next draw; this
