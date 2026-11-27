@@ -53,19 +53,61 @@ assets.
 
 **Top recommendations** (details in the [shortlist](#ranked-shortlist)):
 
-1. Stop a gun pushed through a wall from firing out of the far side (single
-   player).
+1. Close the remaining ways a gun pushed through a wall could fire out of the
+   far side (single player). See [corrections](#corrections-and-follow-up).
 2. Let the movement hand be chosen apart from the weapon hand.
 3. Use the stock guns' own ammunition displays and keep the wrist for the rest.
 4. Add directional and event haptics: the side a hit comes from, reload steps
    and world-screen hover. Always pair them with sound or a visual.
-5. Turn on HRTF audio by default while a headset presents.
+5. Check that each headset's audio device reports itself as headphones, so
+   HRTF audio turns on by itself, and force it on in VR only where one does
+   not. See [corrections](#corrections-and-follow-up).
 6. Add adaptive VR resolution, after Valve's adaptive-quality method, together
    with the OpenXR visibility mask.
 7. Add a single-controller mode.
 8. Press world screens with a finger, as well as pointing at them.
 9. Show one-time contextual VR hints in all twelve languages.
 10. Optionally, a Shift-style quick dash for single player.
+
+## Corrections and follow-up
+
+Added 27 November 2026, after the owner had four of the recommendations
+built. The rest of this note keeps its first reading, with these two
+corrections applied in place.
+
+**Two items were overstated.**
+
+- **Wall clearance (recommendation 1).** The study said a muzzle pushed through
+  a wall fires from the far side. The basic case was already fixed on
+  17 November (`d54c2323c`): single-player shots were traced from the eye
+  through the hand to the muzzle. Three gaps remained, and `c3b70b785` closes
+  them:
+  - The trace used only what stops bullets. Rockets, grenades, napalm and the
+    dark matter gun also stop at large-shot clip brushes, so they could still
+    leave through one.
+  - The trace started from the tracking origin. While crouched, that origin is
+    lifted to standing eye height and can sit inside a low ceiling.
+  - The laser dot, the tracer origin and the lightning beam did not follow the
+    shot's own path.
+- **HRTF (recommendation 5).** The study proposed turning HRTF on in VR. Auto
+  (`s_openALHRTF 0`, the default) already leaves the choice to OpenAL Soft, and
+  OpenAL Soft turns HRTF on when the system reports headphones. The open
+  question is only whether each headset's audio device reports itself that way.
+  That is a check for the headset checklist, with HRTF forced on in VR only
+  where a headset does not report headphones. Its value is smaller than the
+  quick-win ranking implied.
+
+**Built on 27 November** (on `main`, not pushed; none of it is checked on a
+real headset yet):
+
+- the hand menu on the off hand, `fce31edc3`;
+- wall clearance, `c3b70b785`;
+- directional and event haptics, `9c2610e55`;
+- wrist displays in place of the head-locked HUD by default, `ad012cbd6`.
+  The owner chose to show ammunition on the weapon hand's wrist for every gun,
+  including those with their own on-gun display, and to keep the HUD as an
+  option (`vr_hudMode 0`);
+- fingertip presses on world screens and the hand panel, `5333c58a5`.
 
 ## Sources and how far to trust them
 
@@ -409,7 +451,7 @@ campaigns. "SP" means single player only.
 
 | Idea | Fits Quake 4? | openQ4 today | Adaptation | Effort / risk | Blockers |
 | --- | --- | --- | --- | --- | --- |
-| Solid hands: weapons do not pass through walls | Yes, and it closes an exploit | The gun hides behind geometry; SP shots leave the controller, so a muzzle pushed through a wall fires from the far side. "Projectile launch clearance" is an open lead from the 17 November body round. | SP: trace from the eye (or shoulder) to the muzzle each shot. If blocked, launch from the blocked point, or hold fire with a click and a haptic. Optionally stop the drawn gun at the surface, as Alyx's hands stop. | S–M / low | None; MP already fires from the eye. |
+| Solid hands: weapons do not pass through walls | Yes, and it closes an exploit | The gun hides behind geometry. SP shots leave the controller, but since 17 November (`d54c2323c`) they are traced from the eye through the hand to the muzzle, so a bullet poked through a plain wall hits it. Gaps remained: large-shot clips, the crouched starting point, and the marker and effects (see [corrections](#corrections-and-follow-up)). | SP: trace from the eye (or shoulder) to the muzzle each shot. If blocked, launch from the blocked point, or hold fire with a click and a haptic. Optionally stop the drawn gun at the surface, as Alyx's hands stop. | S–M / low | None; MP already fires from the eye. |
 | Press world screens with a fingertip | Yes. Quake 4 has many door panels, lift calls and terminals. | Laser pointing plus trigger | SP: when the off-hand fingertip (from the body's hand joints) crosses a world GUI surface within a few centimetres, click there, with a haptic tick. Pointing stays. | M / low | The fingertip position needs the body's hand rig; MP keeps the view-based focus. |
 | Hover ticks on world screens | Yes | Menu hover ticks in progress (`vr_menuHaptics`) | Extend the same tick to world GUIs when the cursor enters a new control. | S / low | None. |
 | Pull pickups by pointing (gravity gloves) | Weak. Quake 4 items are picked up by touch, and room scale walks you over them; Alyx's reason, sparing the real floor, mostly does not apply. | Touch pickup | SP option: point at an item within range with line of sight, flick, and the item flies to the hand and is collected through the normal pickup path, so its scripts and triggers fire. | M / medium | Changes SP balance (health from range); MP excluded; saves must finish the flight. |
@@ -465,7 +507,7 @@ campaigns. "SP" means single player only.
 
 | Idea | Fits Quake 4? | openQ4 today | Adaptation | Effort / risk | Blockers |
 | --- | --- | --- | --- | --- | --- |
-| HRTF by default in VR | Yes. Headset audio is nearly always headphones. | Listener on the head; HRTF on auto, which depends on how the device reports itself | While a headset presents and `s_openALHRTF` is 0 (auto), request HRTF on; 1 and 2 keep their meaning. | S / low | None. |
+| HRTF in VR | Yes. Headset audio is nearly always headphones. | Listener on the head; HRTF on auto, which OpenAL Soft already turns on when the system reports headphones | Check on each headset whether its audio device reports headphones (the log says whether HRTF is active when the device opens). Only where one does not, request HRTF while a headset presents and `s_openALHRTF` is 0; 1 and 2 keep their meaning. | S / low | Needs headsets to check. |
 | Richer haptics, never alone | Yes | Shot, hit, beam, latch, pickup | Pulses for reload steps (from the reload animations' existing frame events), weapon switches, world-screen hover and landing from a fall. Every pulse pairs with a sound or a visual, because Valve found haptics too subtle for some players. | S–M / low | None. |
 
 ### Puzzles and onboarding
@@ -493,15 +535,17 @@ Ranked by value for the effort, within each group.
 ### Quick wins
 
 1. **Shots cannot leave through a wall** (SP launch clearance). This is a
-   fairness and correctness fix, and it closes an open lead from the body
-   round.
+   fairness and correctness fix. The basic case was already fixed; the
+   remaining gaps closed an open lead from the body round (done,
+   `c3b70b785`).
 2. **Movement hand chosen apart from the weapon hand** (`vr_moveHand`). Alyx
    needed a patch for this, and players asked for it.
 3. **Ammunition on the stock guns' own displays**, with the wrist showing the
    rest. This needs no new content, and it fits the wrist HUD now in progress.
 4. **Directional hit haptics and event pulses.** Every pulse pairs with a
    sound or a visual.
-5. **HRTF on while a headset presents**, when the setting is on auto.
+5. **An HRTF check per headset.** Auto already turns HRTF on for devices that
+   report headphones; force it in VR only for headsets that do not.
 6. **Vignette for movers, falls and jump pads**, after checking what it reads
    today.
 7. **Light-sensitivity scale for full-view flashes in VR.**
@@ -553,7 +597,7 @@ decline. Nothing here is on the roadmap.
 
 | Candidate | Would extend | Scope |
 | --- | --- | --- |
-| VR fairness and feedback | VR-02 | SP launch clearance; directional and event haptics; vignette for movers and falls; HRTF on in VR; light-sensitivity scale. |
+| VR fairness and feedback | VR-02 | SP launch clearance and directional and event haptics (both done 27 November); vignette for movers and falls; an HRTF check per headset; light-sensitivity scale. |
 | VR access | new, or VR-03 | `vr_moveHand`; single-controller mode; crouch toggle in VR; VR SETUP rows; strings in all 12 languages. |
 | VR diegetic status | VR-09 | Wrist HUD trimmed to weapons without their own display; head-locked damage arrows and captions; world-screen and panel fingertip presses; wheel at the hand. |
 | VR adaptive quality | VR-04 | Visibility mask; adaptive eye resolution by GPU time; VR anti-aliasing default; Quest foveation under AND-05. |
