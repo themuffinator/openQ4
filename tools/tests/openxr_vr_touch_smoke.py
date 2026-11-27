@@ -301,7 +301,7 @@ def main(argv: list[str] | None = None) -> None:
                         os.link(path, link)
             elif entry.is_file():
                 os.link(entry, target)
-    for stale in list(game_dir.glob("vr_touch_*.txt")) + list(game_dir.glob("vr_touch_*.cfg")):
+    for stale in list(game_dir.glob("vr_touch_*.txt")) + list(game_dir.glob("vr_touch_*.cfg")) + list(profile.glob("xr_m*.tga")):
         stale.unlink()
     log_path = game_dir / "logs/openq4.log"
     log_path.unlink(missing_ok=True)
@@ -360,9 +360,9 @@ def main(argv: list[str] | None = None) -> None:
                        f"when {marker_path(f'm{t}_menu')} button left menu 1",
                        f"when {marker_path(f'm{t}_menuup')} button left menu 0",
                        f"when {marker_path(f'm{t}_rest')} hand {weapon} {panel_line(off, 0.03)}",
-                       f"when {marker_path(f'm{t}_stamp_rest')} pad left 0 0",
+                       f"when {marker_path(f'm{t}_stamp_rest')} capture {profile / f'xr_m{t}_rest'}",
                        f"when {marker_path(f'm{t}_away')} hand {weapon} {panel_line(off, panel_steps[0])}",
-                       f"when {marker_path(f'm{t}_stamp_after')} pad left 0 0",
+                       f"when {marker_path(f'm{t}_stamp_after')} capture {profile / f'xr_m{t}_after'}",
                        f"when {marker_path(f'm{t}_done')} hand {weapon} {away(weapon)}"]
             for phase in ("p", "r"):
                 script += [f"when {marker_path(f'm{t}_{phase}{k}')} hand {weapon} {panel_line(off, d)}"
@@ -606,19 +606,24 @@ def main(argv: list[str] | None = None) -> None:
         assert ticks(record["hand"], 25) >= 1, f"no 25 ms press tick in the {record['hand']} hand"
 
     # the panel menu was up while the finger rested and closed after the poke
-    stamps = [e["frame"] for e in events if e.get("event") == "script_command" and e.get("command") == "pad"]
+    # (a capture logs the frame it takes, whatever the runtime's sampling; the
+    # panel is the one quad as wide as vr_menuWidth, the wrist displays and
+    # the HUD are other sizes)
+    stamps = [e["frame"] for e in events if e.get("event") == "script_command" and e.get("command") == "capture"]
     frames = [e for e in events if e.get("event") == "end_frame"]
 
-    def layers_at(frame: int) -> int:
-        before = [f for f in frames if f["frame"] <= frame]
-        return len(before[-1]["layers"]) if before else 0
+    def panel_shown(frame: int) -> bool:
+        taken = [f for f in frames if f["frame"] >= frame]
+        assert taken, f"no frame was logged at or after the capture at frame {frame}"
+        return any(layer["type"] == "quad" and abs(layer.get("width", 0.0) - PANEL_WIDTH_M) < 0.01
+                   for layer in taken[0]["layers"])
 
     panels = [r for r in results["trials"] if r.get("panel") is not None]
-    assert len(stamps) == 2 * len(panels), f"the panel stamps ran {len(stamps)} times for {len(panels)} panels"
+    assert len(stamps) == 2 * len(panels), f"the panel captures ran {len(stamps)} times for {len(panels)} panels"
     for i, record in enumerate(panels):
         rest, after = stamps[2 * i], stamps[2 * i + 1]
-        assert layers_at(rest) == 2, f"the pause menu was not up while the finger rested near it ({layers_at(rest)} layers)"
-        assert layers_at(after) == 3, f"pressing RESUME with the fingertip did not close the menu ({layers_at(after)} layers)"
+        assert panel_shown(rest), "the pause menu's panel was not up while the finger rested near it"
+        assert not panel_shown(after), "pressing RESUME with the fingertip did not close the menu"
     print(json.dumps(results, indent=2))
     print("VR touch smoke passed")
 
