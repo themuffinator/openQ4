@@ -126,7 +126,8 @@ idCVar ui_interfaceDeviceClass("ui_interfaceDeviceClass", "desk", CVAR_GUI | CVA
 	"the device class the interface resolved: desk, couch, handheld, phone, tablet or headset");
 idCVar ui_interfaceTestDevices("ui_interfaceTestDevices", "", CVAR_GUI | CVAR_NOCHEAT,
 	"interface variant test: the keyboard and mouse the documents see instead of the real ones "
-	"('none', 'keyboard', 'mouse' or 'keyboard mouse'); empty uses the real devices");
+	"('none', 'keyboard', 'mouse' or 'keyboard mouse'), and 'phone' or 'tablet' for that device class; "
+	"empty uses the real devices");
 
 struct InterfaceVariantState {
 	openq4::ui::InterfaceVariantTracker tracker;
@@ -150,6 +151,12 @@ void RefreshInterfaceVariant() {
 		const idStr devices(test);
 		signals.keyboard = devices.Find("keyboard", false) >= 0;
 		signals.mouse = devices.Find("mouse", false) >= 0;
+		// A phone or tablet build's device class, for testing on a desktop.
+		if (devices.Find("phone", false) >= 0 || devices.Find("tablet", false) >= 0) {
+			signals.mobileBuild = true;
+			signals.sdlTablet = devices.Find("tablet", false) >= 0;
+			signals.smallestWidthDp = signals.sdlTablet ? 800.f : 400.f;
+		}
 	}
 	openq4::ui::InterfaceVariantRequest request = openq4::ui::InterfaceVariantRequest::Auto;
 	(void)openq4::ui::ParseInterfaceVariantRequest(ui_interfaceVariant.GetString(), request);
@@ -2230,6 +2237,13 @@ openq4::ui::InterfaceDeviceClass RetainedUI_InterfaceDeviceClass() {
 	return interfaceVariantState.tracker.DeviceClass();
 }
 bool RetainedUI_InterfaceKeyboard() { RefreshInterfaceVariant(); return interfaceVariantState.signals.keyboard; }
+float RetainedUI_DeviceTextDefault() {
+	switch (RetainedUI_InterfaceDeviceClass()) {
+	case openq4::ui::InterfaceDeviceClass::Phone: return 1.5f;
+	case openq4::ui::InterfaceDeviceClass::Tablet: case openq4::ui::InterfaceDeviceClass::Handheld: return 1.25f;
+	default: return 1.f;
+	}
+}
 bool RetainedUI_InterfaceMouse() { RefreshInterfaceVariant(); return interfaceVariantState.signals.mouse; }
 double RetainedUI_PresentationTime() { return PresentationTime(); }
 void RetainedUI_FrameSubmitted() { rootSubmissionPending = false; ++submittedFrames; }
@@ -2591,6 +2605,7 @@ bool RetainedUI_DefaultViewport(openq4::ui::Viewport&) { return false; }
 openq4::ui::InterfaceVariant RetainedUI_InterfaceVariant() { return openq4::ui::InterfaceVariant::Desktop; }
 openq4::ui::InterfaceDeviceClass RetainedUI_InterfaceDeviceClass() { return openq4::ui::InterfaceDeviceClass::Desk; }
 bool RetainedUI_InterfaceKeyboard() { return true; }
+float RetainedUI_DeviceTextDefault() { return 1.f; }
 bool RetainedUI_InterfaceMouse() { return true; }
 double RetainedUI_PresentationTime() { return 0; }
 void RetainedUI_FrameSubmitted() {}

@@ -255,4 +255,7 @@ def preset_check_document() -> dict:
         group("backdrop", {**FULL, "pointer-events": keyword("none")}, [*field, top_band, bottom_band]),
         modal,
     ])
-    return fit_narrow(doc.build(root))
+    # The touch variant shows the question as a card in device dp
+    # (retained_touch), the dialog's art set aside.
+    from retained_touch import touch_dialogs
+    return touch_dialogs(fit_narrow(doc.build(root)))

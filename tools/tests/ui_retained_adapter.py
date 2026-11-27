@@ -249,8 +249,9 @@ struct TextFit { bool overflow=false; int maxIndex=-1,lastWhitespace=-1; };
 struct Viewport {
     int width=1920,height=1080;
     float displayScale=1,userScale=1,pixelDensityX=2,pixelDensityY=2,originX=80,originY=40;
-    float fitScale=1,canvasHeight=0,canvasMinWidth=0;
+    float fitScale=1,canvasHeight=0,canvasMinWidth=0,textScale=1;
     float DpRatio() const { return canvasHeight>0&&height>0 ? height/canvasHeight : displayScale*userScale; }
+    void FitToMinimum(float,float) {}
 };
 static DocumentModel modelTemplate;
 struct Document::Impl { std::string source; DocumentModel model; };

@@ -68,7 +68,7 @@ DEPENDENCIES = {
 COLUMNS = ((0, 1), (2, 3))
 
 
-def audio_document() -> dict:
+def audio_document(touch: bool = False) -> dict:
     doc = Document("openq4.audio")
     doc.state.update({
         "audio.volume": {"type": "number", "initial": 0}, "audio.music": {"type": "number", "initial": 0},
@@ -114,4 +114,7 @@ def audio_document() -> dict:
         columns.append(items)
     for node in (node for column in columns for node in column if isinstance(node, dict) and node["id"] in DEPENDENCIES):
         requires(doc, node, DEPENDENCIES[node["id"]])
-    return settings_subpage(doc, "audio", "#str_229901", [("audio", "#str_229901", columns)])
+    # The touch variant's own page (retained_touch): the same rows and programs in its simple frame.
+    from retained_touch import touch_subpage
+    frame = touch_subpage if touch else settings_subpage
+    return frame(doc, "audio", "#str_229901", [("audio", "#str_229901", columns)])

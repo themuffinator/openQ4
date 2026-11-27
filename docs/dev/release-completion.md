@@ -95,12 +95,19 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
 ## Menus that fit phones, tablets and the Steam Deck, 27 November 2026
 
-- **The new interface now knows what it is running on.** On a phone, a
-  tablet or a Steam Deck it takes a touch layout: Game Options, Controls,
-  Audio and Display stand in one column with taller rows that are easier to
-  tap, and a tap just beside a small button or tab still reaches it.
-  Connecting a mouse switches the menus to their desktop layout at once;
-  touching the screen switches back. Desktop players see no change.
+- **Simple, finger-sized menus on phones and tablets.** On a touch device
+  the new interface takes a touch layout: one column of big buttons (at least
+  56 dp tall, the width of a phone) with large, plain text, the same in
+  landscape and portrait. It covers the title, the pause menus, Single
+  Player, New Game's difficulty, Multiplayer, Settings, the death and Restart
+  Level screens, every Yes/No question and message box, and Game Options,
+  Controls, Audio and Display, which show their categories as buttons and
+  then their settings as large rows, with Display's **Apply Changes** always
+  at the bottom. Load/Save, Chapters, the multiplayer browser and lobby
+  pages, Demos and Credits keep their current layout for now, and a tap just
+  beside one of their small buttons still reaches it. Connecting a mouse
+  switches the menus to their desktop layout at once; touching the screen
+  switches back. Desktop players see no change.
 - **Touch controls in the game's own Settings (Android).** **Settings →
   Controls → Touch** holds **Show in Play**, **Layout Preset**, **Control
   Size**, **Look Sensitivity** and **Touch Layout**, applied at once. Without
@@ -115,8 +122,9 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - Evidence: `openq4-ui-scrollbar-runtime` (variant resolution, the
   pointer-held latch, view sources, touch reach at two densities),
   `openq4-ui-retained-screens --controls/--game/--audio`, Android
-  setup JVM/JNI tests, and hidden-window OpenGL captures of Game Options,
-  Controls and Audio at desk, phone and tablet sizes in both orientations.
+  setup JVM/JNI tests, and hidden-window OpenGL captures of the touch menus,
+  dialogs, message box and the four settings pages at phone and tablet sizes
+  in both orientations.
   No phone, tablet, Steam Deck or desktop touchscreen has been used by hand.
   Contract: [ui/interface-variants.md](ui/interface-variants.md).
 

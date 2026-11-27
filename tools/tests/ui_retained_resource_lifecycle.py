@@ -148,7 +148,10 @@ struct CVar {
     float value;
     float GetFloat() const { return value; }
     bool GetBool() const { return value!=0; }
-} ui_retainedDensity{0},ui_retainedScale{1.5f},ui_retainedTextScale{1.75f},ui_retainedReducedMotion{0},ui_retainedWarm{1};
+} ui_retainedDensity{0},ui_retainedScale{1.5f},ui_retainedTextScale{1.75f},ui_retainedReducedMotion{0},ui_retainedWarm{1},
+  ui_retainedVRTextScale{1.25f};
+// No headset presents here: the VR text floor stays out of the viewport.
+struct VRSystem { bool IsActive() const { return false; } } vrSystemObject, *vrSystem=&vrSystemObject;
 struct StringCVar {
     std::string value;
     const char* GetString() const { return value.c_str(); }
