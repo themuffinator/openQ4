@@ -7848,8 +7848,11 @@ the non-verbal remainder is marked for players rather than counted as covered.
   [Real-endpoint evidence](audio-voice-evidence.md#real-playback-endpoints-13-november-2026).
   November 27: OpenAL Soft's built-in HRTF measures -7 dB at 125 Hz and a 15 dB
   notch at 8 kHz on positional sounds, and `s_openALHRTF 0` lets the runtime
-  turn it on for any endpoint Windows calls headphones. Whether HRTF becomes
-  opt-in is an open product decision; the default is unchanged.
+  turn it on for any endpoint Windows calls headphones. HRTF is opt-in now:
+  the default is 1 (off), and an archived 0 moves to it once. Fresh, archived
+  and chosen profiles are checked in hidden launches, and this machine's
+  headphone-labelled endpoint reports HRTF disabled by default. Open: whether a
+  presenting VR headset should request HRTF unasked.
   [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
 - [ ] **AUD-05 — P1, implementation: functional multiplayer voice.** Capture,
   codec, transport and playback are implemented with explicit microphone consent,

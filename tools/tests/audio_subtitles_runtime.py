@@ -164,7 +164,7 @@ def main():
         'r_mode': '-1', 'r_customWidth': str(width), 'r_customHeight': str(height), 'r_renderApi': 'gl', 'r_multiSamples': '0',
         'r_swapInterval': '1', 'in_mouse': '0', 'in_joystick': '0', 'in_joystickRumble': '0',
         's_noSound': '0', 's_muteUnfocused': '0', 'com_skipLogoVideos': '1', 'g_autoSkipCinematics': '0',
-        's_decodeMemoryMB': '16', 's_numberOfSpeakers': '2', 's_openALHRTF': '0', 'ui_subtitles': '1',
+        's_decodeMemoryMB': '16', 's_numberOfSpeakers': '2', 's_openALHRTF': '1', 'ui_subtitles': '1',
         # Markers off until the phase that asks for them: the earlier phases count transcript cues.
         'ui_subtitleUntranscribed': '0',
         'com_skipLoadingContinue': '1', 'com_maxfps': '60', 'ui_autoJoin': '0', 'ui_retained': '0' if args.classic else '1',

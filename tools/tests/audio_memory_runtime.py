@@ -67,7 +67,7 @@ def main():
     }
     capture.SCENARIO_CVARS['pressure'] = {
         'com_gameMode': 'SP', 'si_gameType': 'singleplayer', 's_noSound': '0', 's_muteUnfocused': '0',
-        's_audioMemoryMB': '256', 's_decodeMemoryMB': '16', 's_numberOfSpeakers': '2', 's_openALHRTF': '0',
+        's_audioMemoryMB': '256', 's_decodeMemoryMB': '16', 's_numberOfSpeakers': '2', 's_openALHRTF': '1',
         's_debugHardware': '1', 'win_allowMultipleInstances': '1'}
     result = capture.run(args, 'pressure')
     log = (ROOT / result['log']).read_text(errors='replace') if result['log'] else ''

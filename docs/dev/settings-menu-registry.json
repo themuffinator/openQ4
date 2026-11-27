@@ -1319,7 +1319,7 @@
       ],
       "target_type": "cvar",
       "target": "s_openALHRTF",
-      "default": "0",
+      "default": "1",
       "restart_required": false,
       "accessibility": "Standard focusable choiceDef row."
     },

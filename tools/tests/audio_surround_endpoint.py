@@ -153,7 +153,7 @@ def launch(args, root, primary, steps_first, write_second, cvars_extra):
         'r_mode': '-1', 'r_customWidth': '1280', 'r_customHeight': '720', 'r_renderApi': args.renderer, 'r_multiSamples': '0',
         'r_swapInterval': '1', 'in_mouse': '0', 'in_joystick': '0', 'in_joystickRumble': '0',
         's_noSound': '0', 's_muteUnfocused': '0', 'com_skipLogoVideos': '1', 'g_autoSkipCinematics': '1',
-        's_numberOfSpeakers': '0', 's_openALHRTF': '0', 's_deviceName': primary, 's_debugHardware': '1',
+        's_numberOfSpeakers': '0', 's_openALHRTF': '1', 's_deviceName': primary, 's_debugHardware': '1',
         'com_skipLoadingContinue': '1', 'com_maxfps': '60', 'ui_autoJoin': '0', 'ui_retained': '1',
         'sys_lang': 'english', 'g_autoExecAfterMapLoad': 'audio_endpoint.cfg', 'g_autoExecAfterMapLoadDelayMs': '3000',
         **cvars_extra,

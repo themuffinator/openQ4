@@ -508,6 +508,12 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Upgrade Notes
 
+- **3D headphone audio (HRTF) is now off unless you choose it.** If you had
+  **Headphone HRTF** on Auto, which was the default, it is moved to Off once. To
+  have it back, open Settings, then Audio, and set **Headphone HRTF** to **On**
+  or **Auto**. VR players who want sounds placed around the head should turn it
+  on.
+
 - **Low** no longer draws shadows, so it holds its 60 FPS cap on low-end
   graphics. Select Low again (or accept the system check's recommendation) to
   adopt it. If your PC can afford them, turn **Shadows** back on or choose
@@ -584,6 +590,17 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- Weapons, creatures, voices and ambience sound clearer. Most Quake 4 sounds are
+  recorded at 22 kHz, and the filter that converts them to your sound device's
+  rate was too short: it removed most of what they have above 6 kHz, which made
+  them dull, as if heavily compressed. A longer filter keeps it, still without
+  adding distortion. Nothing to change; `s_resampler default` gives a slightly
+  brighter, grittier sound closer to the original game's mixer.
+- **Headphone HRTF** no longer switches itself on when your system says the
+  output is headphones, which many laptop and front-panel outputs do whatever
+  is plugged in. It thinned the bass of every sound in the world beside your
+  own weapon and the music. It is a choice in Settings, Audio: Off (default),
+  On, or Auto for the old behaviour.
 - The **Low** preset holds its 60 FPS cap on low-end graphics again. Since the
   presets stopped lowering the resolution, Low drew every pixel and fell to
   44-55 FPS in battles and open areas on an Intel Iris Xe at 1080p. It now

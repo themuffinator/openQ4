@@ -42,7 +42,7 @@ a protected master bus, streaming), not with any one game's tuning, which is not
 | Close sources | Blend to omni inside the inner radius | Spread / focus by distance | Hard point panning; the inner radius was stored but never applied | `AL_SOURCE_RADIUS` from `minDistance` (`s_sourceRadiusScale`) |
 | Unpositioned sounds | Equal to every speaker | Non-spatialized | Rendered as a point straight ahead | Full spread around the listener |
 | Stereo and music | Straight to left and right | Non-diegetic bus | Virtual speakers, so through HRTF on headphones | Direct channels (`s_directStereo`) |
-| Speaker layout and HRTF | XAudio2 device channels | Endpoint layout, binaural option | 5.1 forced everywhere; `s_openALHRTF 1` ignored | Device layout by default; HRTF preference honoured; reopen keeps both |
+| Speaker layout and HRTF | XAudio2 device channels | Endpoint layout, binaural option | 5.1 forced everywhere; `s_openALHRTF 1` ignored | Device layout by default; HRTF a choice, off by default; reopen keeps both |
 | Resampling | XAudio2 SRC | High-quality SRC | OpenAL Soft cubic spline | 23rd order sinc (`s_resampler`) |
 | Master bus | XAudio2 mastering voice | Limiter / HDR | No limiter on float devices | OpenAL Soft limiter (`s_outputLimiter`) |
 | Distance filtering | None | Attenuation low-pass | None | Air absorption from the room preset (`s_airAbsorption`) |
@@ -727,8 +727,22 @@ with a 15 dB notch at 8 kHz; to the side the bass loss is the same. Sounds at
 the listener (your own weapon, music, the interface) bypass it, so the world
 sounds thin beside them. `s_openALHRTF 0` leaves the choice to OpenAL Soft, which
 turns HRTF on whenever Windows calls the endpoint headphones, as it does for
-many laptop and front-panel outputs whatever is plugged in. That default is
-unchanged here; see Deferred.
+many laptop and front-panel outputs whatever is plugged in.
+
+**HRTF is opt-in (decided the same day).** `s_openALHRTF` now defaults to 1, off.
+Auto and On stay in the menu. An archived 0 cannot be told from a deliberate
+Auto, so step 3 of `Common_MigrateLegacyAudioDefaults` moves it to 1 once and
+says so in the log; a choice made afterwards is kept. Hidden launches confirm
+it: a fresh profile requests off, a profile archived on Auto moves to off on
+its first launch and prints nothing on the second, and Auto or On chosen after
+that survive. On this machine's `Headphones (Realtek(R) Audio)` endpoint,
+opened at zero volume, the default reports HRTF disabled and basic stereo,
+where Auto and On both report HRTF enabled. `audio_output_recovery_runtime.py`
+still passes its 34 checks, which switch HRTF on and off during a line. The
+audio harnesses that passed `s_openALHRTF 0` only to mean the default now pass 1.
+VR is the exception worth a decision: a headset is headphones, and the
+[Alyx study](vr-half-life-alyx-study.md) counted on Auto. VR players choose On
+for now.
 
 **Stale test doubles.** `sound_settings.py` and `sound_recovery.py` had not
 compiled since the 23 November capture work added a loopback flag and a capture
@@ -741,9 +755,9 @@ machine and vary by a factor of two between runs.
 
 ## Deferred
 
-- **HRTF by default on endpoints Windows calls headphones.** Measured above. Making
-  HRTF opt-in would change the sound for every player on such an endpoint, so it
-  waits for a product decision.
+- **HRTF in VR.** Headphone HRTF is opt-in everywhere since 27 November. Whether a
+  presenting headset should request it without being asked is open; it needs
+  listening on headsets, and a way to tell a default Off from a chosen one.
 
 - **Audible distance units.** Current `DOOM_TO_METERS` and `METERS_TO_DOOM` are both
   `1.0f` in `src/sound/sound.h`; the earlier claim that the mixer necessarily converts

@@ -12,6 +12,27 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## 3D headphone audio is a choice, not a guess, 27 November 2026
+
+- **Sounds in the world keep their full tone unless you ask for 3D headphone
+  audio.** Headphone HRTF used to switch itself on whenever your system said the
+  output was headphones. Many laptop and front-panel outputs say so whatever is
+  plugged in, speakers included. With it on, every sound in the world loses bass
+  (7 dB at 125 Hz) and some treble beside your own weapon and the music, which
+  made the game sound thin. It is now off until you choose it.
+- **If you want it:** Settings > Audio > Headphone HRTF. **On** always uses it,
+  **Auto** brings back the old behaviour. It helps you hear where sounds are on
+  headphones, VR headsets included, at the cost of that change in tone.
+- **Upgrading:** a profile that had this on Auto, which was the default, is
+  moved to Off once. A choice you make afterwards is kept.
+- Evidence: hidden launches show a fresh profile and a profile from an earlier
+  version both starting with HRTF off, the move happening once, and On and Auto
+  staying where they are put. On a real output that Windows labels headphones,
+  opened at zero volume, the default reports HRTF disabled where Auto reports
+  it enabled. The gameplay run that switches HRTF on and off in the middle of a
+  line passes all 34 checks. Nobody has listened to it yet.
+  [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
+
 ## Sounds get their treble back, 27 November 2026
 
 - **Weapons, creatures, voices and ambience sound clearer.** Most Quake 4

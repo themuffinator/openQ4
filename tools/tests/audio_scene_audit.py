@@ -340,7 +340,7 @@ def launch(args, root, entries, walk=None, blocked_exits=None):
         'r_mode': '-1', 'r_customWidth': '1280', 'r_customHeight': '720', 'r_renderApi': 'gl', 'r_multiSamples': '0',
         'r_swapInterval': '1', 'in_mouse': '0', 'in_joystick': '0', 'in_joystickRumble': '0',
         's_noSound': '1' if getattr(args, 'silent', False) else '0', 's_muteUnfocused': '0', 'com_skipLogoVideos': '1', 'g_autoSkipCinematics': '0',
-        's_numberOfSpeakers': '2', 's_openALHRTF': '0', 's_dialogueVolume': '1', 's_logSpeech': '1', 'ui_subtitles': '1',
+        's_numberOfSpeakers': '2', 's_openALHRTF': '1', 's_dialogueVolume': '1', 's_logSpeech': '1', 'ui_subtitles': '1',
         # Markers for untranscribed speech would take free overlay slots; the audit
         # measures transcript cues, as every earlier corpus report did.
         'ui_subtitleUntranscribed': '0',

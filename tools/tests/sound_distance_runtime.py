@@ -216,7 +216,7 @@ def main() -> None:
         "s_useOcclusion": "0", "s_useEAXReverb": "0", "s_airAbsorption": "0",
         # Without this, a fresh profile's one-time audio migration turns room
         # reverb back on for the minimum/lowpower/performance presets.
-        "s_audioDefaultsMigrated": "2",
+        "s_audioDefaultsMigrated": "3",
         "logFile": "2", "logFileName": "logs/openq4.log", "developer": "1",
         "com_skipLoadingContinue": "1", "g_autoExecAfterMapLoad": "distance_probe.cfg",
         "g_autoExecAfterMapLoadDelayMs": "500",

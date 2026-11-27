@@ -574,7 +574,7 @@ def run_openq4(output: Path, install: Path, runtime: Path, cases: list[dict]) ->
         "s_numberOfSpeakers": "0",
         # A fresh profile runs the one-time audio migration, which turns room
         # reverb back on for some presets; mark it applied so the mix stays dry.
-        "s_audioDefaultsMigrated": "2", "logFile": "2", "logFileName": "logs/openq4.log", "developer": "0",
+        "s_audioDefaultsMigrated": "3", "logFile": "2", "logFileName": "logs/openq4.log", "developer": "0",
         "com_skipLoadingContinue": "1", "g_autoExecAfterMapLoad": "cmp_probe.cfg",
         "g_autoExecAfterMapLoadDelayMs": "3000",
     }

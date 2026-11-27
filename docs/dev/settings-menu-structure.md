@@ -433,8 +433,8 @@ The Audio pane is `p_settings_audio`, included from `content/baseoq4/pak0/guis/m
 | Devices | Sound System | `choiceDef` | `set_audio_backend_val` | `s_useOpenAL` | `0 Default`, `1 OpenAL` | Runs `sound drivar` on release. |
 | Devices | Sound Device | `choiceDef` | `set_audio_device_val` | `s_deviceName` | Runtime `gui::device_name` / `gui::device_value` | Disabled when OpenAL is off or failed to load. Runs `sound drivar` on release. |
 | Effects | EAX Reverb | `choiceDef` | `set_audio_eax_val` | `s_useEAXReverb` | `No;Yes` | Disabled when OpenAL is off or failed to load. Runs `sound eax` on release. |
-| Effects | Surround Speakers | `choiceDef` | `set_audio_speakers_val` | `s_numberOfSpeakers` | `0 Auto`, `2 Off`, `6 On` | Displayed through `Auto;Off;On` (`#str_229980`, shared with Headphone HRTF). `Auto` (default) sends no output-mode request, so OpenAL Soft uses the device's own layout and its automatic HRTF; `Off`/`On` request stereo or 5.1 through `ALC_SOFT_output_mode` when available. Runs `sound speakers` on release. |
-| Effects | Headphone HRTF | `choiceDef` | `set_audio_hrtf_val` | `s_openALHRTF` | `0 Auto`, `1 Off`, `2 On` | Requests OpenAL Soft HRTF through `ALC_SOFT_HRTF` when available. Runs `sound drivar` on release. |
+| Effects | Surround Speakers | `choiceDef` | `set_audio_speakers_val` | `s_numberOfSpeakers` | `0 Auto`, `2 Off`, `6 On` | Displayed through `Auto;Off;On` (`#str_229980`, shared with Headphone HRTF). `Auto` (default) sends no output-mode request, so OpenAL Soft uses the device's own layout; `Off`/`On` request stereo or 5.1 through `ALC_SOFT_output_mode` when available. Runs `sound speakers` on release. |
+| Effects | Headphone HRTF | `choiceDef` | `set_audio_hrtf_val` | `s_openALHRTF` | `0 Auto`, `1 Off`, `2 On` | `Off` is the default since 27 November 2026. Requests OpenAL Soft HRTF through `ALC_SOFT_HRTF` when available; `Auto` sends no request, and the runtime then turns HRTF on for an endpoint the system labels headphones. Runs `sound drivar` on release. |
 
 ## Dynamic Lists
 

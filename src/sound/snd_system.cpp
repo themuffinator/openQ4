@@ -54,7 +54,10 @@ idCVar s_frequencyShift( "s_frequencyShift", "1", CVAR_BOOL, "enable sound shade
 idCVar s_useOpenAL( "s_useOpenAL", "1", CVAR_ARCHIVE | CVAR_BOOL, "use OpenAL audio backend" );
 idCVar s_deviceName( "s_deviceName", "", CVAR_ARCHIVE, "OpenAL device name override" );
 idCVar s_useEAXReverb( "s_useEAXReverb", "1", CVAR_SOUND | CVAR_ARCHIVE | CVAR_BOOL, "use EAX reverb if available" );
-idCVar s_openALHRTF( "s_openALHRTF", "0", CVAR_ARCHIVE | CVAR_INTEGER, "OpenAL Soft HRTF mode: 0 = auto, 1 = off, 2 = on", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+// Off unless the player chooses it: the runtime's automatic mode turns HRTF on for any
+// endpoint the system labels headphones, whatever is plugged in, and its built-in HRTF
+// thins the bass of every positional sound (docs/dev/audio-modernization.md).
+idCVar s_openALHRTF( "s_openALHRTF", "1", CVAR_ARCHIVE | CVAR_INTEGER, "OpenAL Soft HRTF (3D headphone audio): 0 = auto (on when the output device says it is headphones), 1 = off, 2 = on", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar s_openALEfxDebugMode( "s_openALEfxDebugMode", "0", CVAR_INTEGER, "OpenAL wet/dry debug mode (0=normal, 1=wet-only, 2=dry-only)" );
 // 0 leaves the layout to the output device, so headphones get stereo (and OpenAL
 // Soft's automatic HRTF) and a 5.1 or 7.1 system gets its own channels. Requesting

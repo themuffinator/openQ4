@@ -147,7 +147,7 @@ def main():
         's_noSound': '0', 's_muteUnfocused': '0', 'com_skipLogoVideos': '1', 'g_autoSkipCinematics': '1',
         's_decodeMemoryMB': str(args.decode_memory),
         's_audioMemoryMB': str(args.audio_memory),
-        's_numberOfSpeakers': str(args.speakers), 's_openALHRTF': '0',
+        's_numberOfSpeakers': str(args.speakers), 's_openALHRTF': '1',
         'com_skipLoadingContinue': '1', 'com_maxfps': '60', 'ui_autoJoin': '0', 'ui_retained': '1',
         'sys_lang': args.language, 'g_autoExecAfterMapLoad': 'audio-dialogue.cfg', 'g_autoExecAfterMapLoadDelayMs': '3000'
     }
