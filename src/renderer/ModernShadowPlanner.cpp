@@ -3162,6 +3162,10 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (source-plane cascade)\n" );
 		return false;
 	}
+	if ( !R_ShadowMapCascadeTurnSelfTest() ) {
+		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (cascade turn)\n" );
+		return false;
+	}
 	if ( !R_ShadowMapDistantNormalOffsetSelfTest() ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (distant normal offset)\n" );
 		return false;

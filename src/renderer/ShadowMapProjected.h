@@ -126,6 +126,7 @@ void R_ShadowMapProjectedTexelDepthSteps( const shadowMapProjectedLightState_t &
 float R_ShadowMapProjectedNormalOffsetWorld( const shadowMapProjectedLightState_t &state, int cascadeIndex, float normalOffsetScale, bool depthScaled );
 extern idCVar r_shadowMapDistantNormalOffsetDepth;
 float R_ShadowMapQuantizeCascadeExtent( float rawExtent, int tileSize );
+float R_ShadowMapQuantizeCascadeExtent( float rawExtent, int tileSize, float ladder );
 float R_ShadowMapSnapCascadeCenter( float rawCenter, float quantizedExtent, int tileSize );
 int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_t &state );
 // pins the stabilization guarantees (shadow plan invariant I5)
@@ -134,6 +135,9 @@ bool R_ShadowMapCascadeWholeLightSelfTest( void );
 // A cascaded light keeps its cascades when a view slice reaches behind its
 // source plane: the slice is cut where the light begins.
 bool R_ShadowMapCascadeSourcePlaneSelfTest( void );
+// A cascade sized by its slice's bounding sphere keeps its scale while the
+// view turns (r_shadowMapCascadeStableExtent).
+bool R_ShadowMapCascadeTurnSelfTest( void );
 bool R_ShadowMapDistantPointProjectionSelfTest( void );
 bool R_ShadowMapDistantNormalOffsetSelfTest( void );
 bool R_ShadowMapCasterFacesSelfTest( void );

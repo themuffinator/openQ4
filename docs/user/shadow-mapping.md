@@ -261,6 +261,7 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 | `r_shadowMapCascadeLambda` | `0.75` | `0..1` | How the cascades divide that distance: lower spaces them evenly, higher packs more detail close to you. |
 | `r_shadowMapCascadeBlend` | `0.15` | `0..0.5` | Width of the crossfade between neighbouring cascades. |
 | `r_shadowMapCascadeStabilize` | `1` | `0..1` | Holds cascades steady to stop shimmering as you move. |
+| `r_shadowMapCascadeStableExtent` | `0` | `0..4` | How many of the nearest cascades keep one sharpness whichever way you look, so their shadow edges do not shift as you turn. They give up the extra sharpness some directions had; the far cascade loses the most. `0` sizes every cascade as tightly as the view allows, `2` steadies the two nearest, `4` all of them. |
 
 ### Stored shadows and update limits
 

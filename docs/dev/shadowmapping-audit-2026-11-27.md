@@ -11,7 +11,8 @@ Five independent read-throughs produced about thirty candidates. Each was
 checked against the code before anything changed. Fourteen were fixed here, a
 fifteenth (the cascade collapse behind a light's source plane), five more
 leads, bilinear PCSS-lite taps on Vulkan, the point light left without a cube
-or volumes and the top level's point cache the same day, one
+or volumes, the top level's point cache and turn-steady cascades (as an
+option) the same day, one
 was measured and left, and the rest are recorded below as leads with the reason
 each was not taken.
 
@@ -277,6 +278,57 @@ because other projects' clients were loading the GPU. On OpenGL the same view
 holds 54 of 64 cube slots at Maximum. Quality is unchanged on both: 64 slots,
 350 to 450 MiB resident on Vulkan.
 
+## Cascades that keep their scale while the view turns
+
+Built and measured; **off by default until the owner chooses**, because it
+trades resolution for steadiness and only eyes can price that.
+
+The tight fit bounds each view slice's corners in light space. That box
+changes shape as the view turns, its two sides are quantised to the 1.25
+ladder separately, and each time one crosses a step the cascade's texel size
+changes and every shadow edge in it is resampled. A sphere around the slice
+looks the same from the light whichever way the view faces, so a crop sized by
+it keeps its scale through a turn (`R_ShadowMapSliceStableBox`).
+`r_shadowMapCascadeStableExtent` is how many of a light's nearest fitted
+cascades are sized that way: 0 none (as before), 4 all.
+
+Two things had to be got right for a perspective source such as Air Defense
+1's sun, whose picture is a fan 46 degrees to a side:
+
+- The sphere's size in the picture depends on where its centre is, and the
+  centre swings about the eye as the view turns. Sized at the centre itself
+  the far cascade still crossed a ladder step four times in a turn. The size
+  is taken over everywhere a turn can put the centre, so it follows only where
+  the eye stands.
+- With no breathing left to absorb, these extents use a finer ladder (eight
+  steps to a doubling), which gives back most of the quarter of the resolution
+  the coarse one can round away.
+
+A view that stands close under a lamp, where the bound would reach the plane
+the light begins at, keeps the tight fit for that cascade.
+
+Air Defense 1 at Quality. The sweep is one 360 degree turn at one pose on
+OpenGL; the scores are nine frozen poses at 2560x1440 against stencil.
+
+| Setting | Scale changes in the turn, per cascade | Texel, units | Shadow kept (GL / VK) | Falsely dark pixels (GL / VK) |
+|---|---|---|---|---|
+| 0, tight box | 8 / 8 / 8 | 0.47-0.73 / 1.43-1.78 / 5.44-6.80 | 99.1% / 99.1% | 7,583 / 8,586 |
+| 2, nearest two | 0 / 0 / 8 | 0.72 / 2.03 / 5.44-6.80 | 99.2% / 99.2% | 9,138 / 9,996 |
+| 4, all | 0 / 0 / 0 | 0.72 / 2.03 / 8.87 | 99.1% / 99.1% | 9,864 / 10,807 |
+
+The self-test's fixture (the same sun from the level's opening, a degree at a
+time) counts 24, 26 and 26 changes for the tight box and none for the sphere
+(`R_ShadowMapCascadeTurnSelfTest`), with every in-light point of every slice
+inside its crop all the way round.
+
+Reading it: the two near cascades give up their best directions and keep the
+tight fit's worst (0.72 against 0.47 to 0.73, 2.03 against 1.43 to 1.78), for
+no resampling at all as the view turns. The far cascade pays more, 8.87
+against 5.44 to 6.80, because a slice 1500 units deep reaches a fifth of the
+way to that sun. The texel also grows and shrinks with the eye's distance from
+the source (0.72 to 0.93 across the nine poses). Not measured: how the
+resampling looks in motion, which is the reason for doing it.
+
 ## Measured and left
 
 **Skipping the blocker search under distant suns.** A distant point light's
@@ -293,12 +345,6 @@ it is.
 
 Not done in this round. Each is real; the note says why it waited.
 
-- **Cascade scale steps with camera yaw.** Each slice's light-space box is
-  quantised to a 1.25 ladder per axis, so the crop size changes fifteen to
-  twenty-four times in a full turn at the Air Defense 1 fixture. A
-  rotation-invariant extent (the slice's bounding sphere) removes the steps at
-  the cost of the resolution of the worst orientation. A judgement call that
-  wants a moving capture, not frozen poses.
 - **PCSS-lite on parallel lights** divides the caster-to-receiver gap by the
   blocker's depth into the light box, so softness follows height in the box
   and not the gap. A sun's penumbra should be `gap * tan(source angle)` in

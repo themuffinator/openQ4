@@ -9707,6 +9707,80 @@ def validate_point_cache_budget_by_cube_size_contract() -> None:
         require(selftest, case, "the self-test pins the budget rule")
 
 
+def validate_cascade_stable_extent_contract() -> None:
+    """A cascade sized by its view slice's bounding sphere keeps its scale
+    while the view turns (r_shadowMapCascadeStableExtent nearest cascades).
+
+    The tight light-space box changes shape with the view's direction, and
+    each ladder step it crosses resamples the cascade's shadow edges: eight
+    times per cascade in a turn at Air Defense 1. The sphere's size is taken
+    over everywhere a turn can put its centre, so it follows the eye's place
+    alone, and its extents use a finer ladder.
+    """
+    projected = read("src/renderer/ShadowMapProjected.cpp")
+    box = braced_body(projected, "static bool R_ShadowMapSliceStableBox(", "stable slice box")
+    require_order(
+        box,
+        (
+            "nearRadiusSqr = Max( nearRadiusSqr,",
+            "farRadiusSqr = Max( farRadiusSqr,",
+            "const float depth = idMath::ClampFloat( sliceNear, sliceFar,",
+            "const float cornerDistance = idMath::Sqrt( sliceFar * sliceFar + farRadiusSqr );",
+            "const float wMin = eyeClip.w - cornerDistance * divideLength;",
+            # near the plane the light begins at the tight fit serves
+            "!( wMin > wClip ) || !( wMin > eyeClip.w * 0.5f )",
+            "return false;",
+            "const float wCentreMin = eyeClip.w - depth * divideLength;",
+            "const float swing = depth * ( row - divide * eyeNdc[axis] ).Length() / wCentreMin;",
+            "( row - divide * ( eyeNdc[axis] - swing ) ).Length(),",
+            "( row - divide * ( eyeNdc[axis] + swing ) ).Length() );",
+            "extent[axis] = radius * reach / wMin;",
+        ),
+        "the sphere's size is bounded over a whole turn, from the eye",
+    )
+    bounds = braced_body(projected, "static bool R_ShadowMapBuildCascadeBounds(", "cascade bounds")
+    require_order(
+        bounds,
+        (
+            "if ( stabilize && stableExtentWanted && sampleCount >= 8",
+            "&& R_ShadowMapSliceStableBox( viewDef, samplePoints, sliceNear, sliceFar,",
+            # the slice's own points are kept whatever the bound says
+            "ndcMins.x = Min( ndcMins.x, stableCentre[0] - stableExtent[0] );",
+            "ndcMaxs.x = Max( ndcMaxs.x, stableCentre[0] + stableExtent[0] );",
+            "tileSize, stabilize, stableExtent[0] );",
+            "tileSize, stabilize, stableExtent[1] );",
+        ),
+        "a stable cascade is the union of its slice's box and the sphere's",
+    )
+    axis = braced_body(projected, "static void R_ShadowMapFitCascadeAxis(", "cascade axis fit")
+    require_order(
+        axis,
+        (
+            "Min( 1.0f, Max( 0.0f, floorExtent ) )",
+            "floorExtent > 0.0f ? SHADOWMAP_CASCADE_STABLE_EXTENT_LADDER : SHADOWMAP_CASCADE_EXTENT_LADDER );",
+        ),
+        "a stable extent is kept at the projection's edge and uses the finer ladder",
+    )
+    fit = braced_body(projected, "static void R_BuildShadowMapProjectedLightStateFit(", "projected state fit")
+    require(
+        fit,
+        "const bool stableExtent = cascadeIndex < r_shadowMapCascadeStableExtent.GetInteger();",
+        "the nearest cascades take the stable extent first",
+    )
+    selftest = braced_body(projected, "bool R_ShadowMapCascadeTurnSelfTest(", "cascade turn self-test")
+    require(selftest, "if ( stableTotal != 0 || tightTotal < 12 ) {", "no scale change in a full turn")
+    require(
+        read("src/renderer/ModernShadowPlanner.cpp"),
+        "if ( !R_ShadowMapCascadeTurnSelfTest() ) {",
+        "the diagnostic self-test runs the turn",
+    )
+    require(
+        read("src/renderer/RenderSystem_init.cpp"),
+        'idCVar r_shadowMapCascadeStableExtent( "r_shadowMapCascadeStableExtent", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,',
+        "the setting counts cascades and is off by default",
+    )
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -11012,6 +11086,7 @@ def main() -> None:
     validate_second_audit_followups_contract()
     validate_point_pool_pressure_contract()
     validate_point_cache_budget_by_cube_size_contract()
+    validate_cascade_stable_extent_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 
