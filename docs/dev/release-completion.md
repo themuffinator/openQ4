@@ -103,6 +103,26 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## Sunlight shadows near you hold still when you turn, 27 November 2026
+
+- **Shadows close to you no longer shift as you look around outdoors.** On
+  Quality and above, sunlight is drawn in slices, finest near you. Each slice
+  used to be fitted to the exact shape of your view, which changes as you
+  turn, so its sharpness changed in steps and every shadow edge in it shifted
+  a little each time: eight times in a full turn on Air Defense 1. The two
+  slices nearest you now keep one sharpness whichever way you face, and their
+  edges stay put.
+- **What it costs.** Those two slices used to be a little sharper in some
+  directions than others; they now hold the sharpness of the least favourable
+  direction (0.72 units a texel where it ranged from 0.47 to 0.73 on Air
+  Defense 1). The far slice is unchanged. How much shadow is drawn does not
+  change.
+- **What to do.** Nothing. `r_shadowMapCascadeStableExtent 0` restores the old
+  fit, and `4` steadies the far slice as well, at a larger cost in sharpness.
+- Developer detail:
+  [cascades that keep their scale while the view turns](shadowmapping-audit-2026-11-27.md#cascades-that-keep-their-scale-while-the-view-turns).
+  No ABI change.
+
 ## The highest Shadows setting keeps every light's shadow stored, 27 November 2026
 
 - **The highest Shadows setting no longer redraws half a room's shadows every
