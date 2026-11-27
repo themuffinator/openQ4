@@ -1135,6 +1135,25 @@ static bool VK_Device_CreateSwapchain( void ) {
 	sci.presentMode = presentMode;
 	sci.clipped = VK_TRUE;
 	sci.oldSwapchain = vkCtx.swapchain;
+#if defined( VK_USE_PLATFORM_WIN32_KHR )
+	// Exclusive Fullscreen leaves the choice to the driver as before; every
+	// other mode, a window that merely covers the display included, refuses
+	// exclusive control so switching away stays instant. Read from the window
+	// itself: the swapchain is rebuilt after every window-mode change.
+	VkSurfaceFullScreenExclusiveInfoEXT fullScreenExclusive;
+	memset( &fullScreenExclusive, 0, sizeof( fullScreenExclusive ) );
+	if ( vkCtx.fullScreenExclusiveControl ) {
+		renderWindowState_t windowState;
+		memset( &windowState, 0, sizeof( windowState ) );
+		const bool exclusiveWindow = vkWindowServices != NULL && vkWindowServices->QueryWindowState != NULL
+				&& vkWindowServices->QueryWindowState( &windowState )
+				&& windowState.fullscreen && !windowState.fullscreenDesktop;
+		fullScreenExclusive.sType = VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT;
+		fullScreenExclusive.fullScreenExclusive = exclusiveWindow
+				? VK_FULL_SCREEN_EXCLUSIVE_DEFAULT_EXT : VK_FULL_SCREEN_EXCLUSIVE_DISALLOWED_EXT;
+		sci.pNext = &fullScreenExclusive;
+	}
+#endif
 
 	VkSwapchainKHR newSwapchain = VK_NULL_HANDLE;
 	// creating with oldSwapchain retires it: the present-timing waiter lets go first
@@ -1719,14 +1738,29 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 	// harmless nowhere -- so it is strictly presence-gated. The flag bit is
 	// only ever set together with the extension
 	// (VUID-VkInstanceCreateInfo-flags-06559).
+	// VK_KHR_get_surface_capabilities2 is what VK_EXT_full_screen_exclusive
+	// builds on; it is only wanted where that extension exists (Windows).
 	static const char *const optionalInstanceExtensions[] = {
-		VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+		VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME, VK_EXT_DEBUG_UTILS_EXTENSION_NAME,
+		VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME
 	};
-	bool loaderExtensions[ 2 ] = { false, false };
-	if ( !VK_Device_FindInstanceExtensions( NULL, optionalInstanceExtensions, 2, loaderExtensions ) ) {
+	bool loaderExtensions[ 3 ] = { false, false, false };
+	if ( !VK_Device_FindInstanceExtensions( NULL, optionalInstanceExtensions, 3, loaderExtensions ) ) {
 		return false;
 	}
 	const bool portabilityEnumeration = loaderExtensions[ 0 ];
+#if defined( VK_USE_PLATFORM_WIN32_KHR )
+	if ( loaderExtensions[ 2 ] ) {
+		bool listed = false;
+		for ( int i = 0; i < extensions.Num(); i++ ) {
+			if ( idStr::Cmp( extensions[ i ], VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME ) == 0 ) { listed = true; }
+		}
+		if ( !listed ) {
+			extensions.Append( VK_KHR_GET_SURFACE_CAPABILITIES_2_EXTENSION_NAME );
+		}
+		vkCtx.surfaceCapabilities2 = true;
+	}
+#endif
 
 	const char *validationLayer = "VK_LAYER_KHRONOS_validation";
 	const bool wantValidation = r_vkValidation.GetBool();
@@ -1943,9 +1977,22 @@ bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firs
 	// enabled when they advertise it, and their optional subset features read
 	// back through the chained feature struct. Native drivers advertise neither,
 	// and every portability capability then stays at its permissive default.
-	const char *deviceExtensions[ 8 ];
+	const char *deviceExtensions[ 12 ];
 	uint32_t deviceExtensionCount = 0;
 	deviceExtensions[ deviceExtensionCount++ ] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+#if defined( VK_USE_PLATFORM_WIN32_KHR )
+	// A borderless or desktop-fullscreen window covers the display, and some
+	// drivers then take exclusive control of it on their own: Alt+Tab has to
+	// give that back, which is slow and blanks the screen. With the extension
+	// every swapchain says which kind of window it is (VK_Device_CreateSwapchain).
+	vkCtx.fullScreenExclusiveControl = vkCtx.surfaceCapabilities2 && selected.hasFullScreenExclusive;
+	if ( vkCtx.fullScreenExclusiveControl ) {
+		deviceExtensions[ deviceExtensionCount++ ] = VK_EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME;
+	}
+	common->Printf( "Vulkan: exclusive fullscreen %s\n", vkCtx.fullScreenExclusiveControl
+			? "only in Exclusive Fullscreen (VK_EXT_full_screen_exclusive)"
+			: "left to the driver (no VK_EXT_full_screen_exclusive)" );
+#endif
 	// A point shadow cube is drawn as one six-layer target where the caster
 	// vertex shader may name the layer (r_shadowMapPointLayered). Enabling
 	// the extension enables both of its features; without it the cube keeps

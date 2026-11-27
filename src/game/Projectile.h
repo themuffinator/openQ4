@@ -52,6 +52,8 @@ public :
 	static idVec3			GetVelocity( const idDict *projectile );
 	idVec3					DeadReckonOrigin( int atTime ) const;
 	static idVec3			GetGravity( const idDict *projectile );
+	// openQ4: what a projectile of this def collides with, as Spawn sets it
+	static int				GetClipMask( const idDict *projectile );
 
 	void					SetSpeed		( float s, int accelTime = 0 );
 	float					GetSpeed		( void ) const;

@@ -4905,9 +4905,16 @@ def pause_document(strogg: bool = False) -> dict:
     desktop = [group("desktop-home", {**FULL, "display": keyword("block")}, [*field, objectives_bar, *bands, content]),
                vr_backing,
                objectives,
-               group("desktop-prompts", {**FULL, "display": keyword("block")}, [prompt, carry])]
-    for ident in ("desktop-home", "desktop-prompts"):
-        doc.bind(f"{ident}.display", ident, "display", flat)
+               prompt,
+               carry]
+    doc.bind("desktop-home.display", "desktop-home", "display", flat)
+    # The prompt bar and the carried titles stand down in VR each on its own:
+    # a full-size group round them, after the home and the Objectives page,
+    # would take the pointer's hits over their buttons.
+    # A bound property needs its base value in the node.
+    for node in (prompt, carry):
+        shown = node["properties"].setdefault("display", keyword("block"))["value"]
+        doc.bind(f"{node['id']}.display", node["id"], "display", {"op": "select", "args": [vr, "none", shown]})
     chrome = group("chrome", {**FULL, "display": keyword("block")}, [
         *desktop,
         vr_card,

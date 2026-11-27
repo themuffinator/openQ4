@@ -2415,6 +2415,67 @@ void Cmd_Damage_f( const idCmdArgs &args ) {
 
 /*
 ==================
+Cmd_TestVRHaptics_f
+
+openQ4 VR: drives the event haptics for headless tests, through the paths
+play takes, with no controller or keyboard input. A hit is real damage
+travelling from a point beside the player towards it, so the pulse comes from
+idPlayer::ClientDamageEffects; a blast plays the rocket launcher's own impact
+effect, whose shake segment pulses the hands as it is drawn.
+  testVRHaptics hit <degrees right> [damage] [room]
+  testVRHaptics blast <distance> [degrees right]
+Degrees are measured from where the tracked head faces, or with "room" from
+the tracking space's forward (the way the body faces, whatever the head does).
+==================
+*/
+void Cmd_TestVRHaptics_f( const idCmdArgs &args ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( player == NULL || !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	const idStr kind = args.Argv( 1 );
+	if ( args.Argc() < 3 || ( kind.Icmp( "hit" ) != 0 && kind.Icmp( "blast" ) != 0 ) ) {
+		gameLocal.Printf( "usage: testVRHaptics hit <degrees right> [damage] [room] | blast <distance> [degrees right]\n" );
+		return;
+	}
+	vrFrameState_t frame;
+	float trackingYaw = player->viewAngles.yaw;
+	float facing = trackingYaw;
+	if ( player->GetVRView( frame, trackingYaw ) ) {
+		facing = trackingYaw;
+		const bool room = kind.Icmp( "hit" ) == 0 && args.Argc() > 4 && idStr::Icmp( args.Argv( 4 ), "room" ) == 0;
+		if ( frame.head.valid && !room ) {
+			idVec3 headOrigin;
+			idMat3 headAxis;
+			VR_PoseToWorld( frame.head, player->firstPersonViewOrigin, trackingYaw, headOrigin, headAxis );
+			facing = headAxis[ 0 ].ToYaw();
+		}
+	}
+	const idVec3 centre = player->GetPhysics()->GetAbsBounds().GetCenter();
+	if ( kind.Icmp( "hit" ) == 0 ) {
+		const float yaw = facing - static_cast<float>( atof( args.Argv( 2 ) ) );
+		const idVec3 toward = idAngles( 0.0f, yaw, 0.0f ).ToForward();
+		const float damage = args.Argc() > 3 ? static_cast<float>( atof( args.Argv( 3 ) ) ) : 10.0f;
+		gameLocal.Printf( "testVRHaptics: a hit from %s degrees right of %s\n", args.Argv( 2 ),
+			args.Argc() > 4 ? "the room's forward" : "the head" );
+		// the damage travels from the source to the player: against toward
+		player->Damage( gameLocal.world, gameLocal.world, -toward, "damage_moverCrush", Max( 1.0f, damage ), INVALID_JOINT );
+		return;
+	}
+	const float distance = static_cast<float>( atof( args.Argv( 2 ) ) );
+	const float yaw = facing - ( args.Argc() > 3 ? static_cast<float>( atof( args.Argv( 3 ) ) ) : 0.0f );
+	const idDecl *effect = ( const idDecl * )declManager->FindEffect( "effects/weapons/rocketlauncher/impact", false );
+	if ( effect == NULL ) {
+		gameLocal.Printf( "testVRHaptics: no rocket impact effect\n" );
+		return;
+	}
+	const idVec3 origin = centre + idAngles( 0.0f, yaw, 0.0f ).ToForward() * distance;
+	gameLocal.Printf( "testVRHaptics: a rocket's blast %.0f units away\n", distance );
+	gameLocal.PlayEffect( effect, origin, mat3_identity );
+}
+
+/*
+==================
 Cmd_TestFlashlight_f
 
 Sets the current player's weapon flashlight for renderer validation.
@@ -5913,6 +5974,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "trigger",				Cmd_Trigger_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"triggers an entity", idGameLocal::ArgCompletion_EntityName );
 	cmdSystem->AddCommand( "spawn",					Cmd_Spawn_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"spawns a game entity", idCmdSystem::ArgCompletion_Decl<DECL_ENTITYDEF> );
 	cmdSystem->AddCommand( "damage",				Cmd_Damage_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"apply damage to an entity", idGameLocal::ArgCompletion_EntityName );
+	cmdSystem->AddCommand( "testVRHaptics",			Cmd_TestVRHaptics_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"drives a VR hit from one side or a nearby blast, for headless haptics tests" );
 	cmdSystem->AddCommand( "openq4_launchTestProjectile", Cmd_OpenQ4LaunchTestProjectile_f, CMD_FL_GAME|CMD_FL_CHEAT, "launch a projectile from the player's eye at an entity, for headless tests" );
 	cmdSystem->AddCommand( "openq4_killHostiles",	Cmd_OpenQ4KillHostiles_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"kills the AI fighting the player through ordinary damage, for headless progression tests" );
 	cmdSystem->AddCommand( "openq4_testInput",	Cmd_OpenQ4TestInput_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"holds buttons and movement on the local player for headless tests" );

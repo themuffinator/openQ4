@@ -110,6 +110,9 @@ idCVar vr_roomScale( "vr_roomScale", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL
 	"1 = the body walks after your head as you move about the room (in multiplayer through its movement input); 0 = it stays put and leaning stops at vr_headOffsetLimit" );
 idCVar vr_hapticStrength( "vr_hapticStrength", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"controller vibration strength, from 0 (off) to 1", 0.0f, 1.0f );
+idCVar vr_hapticEvents( "vr_hapticEvents", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
+	"scales the vibration for blasts, reload steps, drawing a weapon and landing from a fall, from 0 (off) to 1; "
+	"shots, hits, beams and grips keep vr_hapticStrength alone", 0.0f, 1.0f );
 idCVar vr_aimLaser( "vr_aimLaser", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
 	"while aiming with the controller: 0 = no marker, 1 = a dot where the shot lands, 2 = the dot and a laser beam", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar vr_body( "vr_body", "2", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,

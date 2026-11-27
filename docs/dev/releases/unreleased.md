@@ -54,7 +54,10 @@ the [development roadmap](../roadmap.md) for current scope.
   the menu grows out of your off hand on a panel, with the level still around
   you: a light beam points from your other hand, buttons grow and light up
   under it and your hand ticks as you move between them. Health, armor and
-  ammunition sit on your off-hand wrist. See the
+  ammunition sit on your off-hand wrist. The controllers now tell you which
+  side a hit came from and buzz with nearby blasts, each reload step, a drawn
+  weapon and a hard landing, always alongside a sound or a sight
+  (`vr_hapticEvents` turns those down without touching shots and hits). See the
   [VR guide](../../user/vr.md#vr-mode-and-headset-detection).
 - **Play in 3D without a headset.** Turn on **Stereoscopic 3D** in Settings >
   Game Options > Virtual Reality and the game draws a view for each eye: side

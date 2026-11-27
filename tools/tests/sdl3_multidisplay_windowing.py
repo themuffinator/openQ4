@@ -252,6 +252,34 @@ def validate_platform_wrappers() -> None:
     require(sys_display, "CGMainDisplayID()", "macOS primary display fallback")
 
 
+def validate_switching_away() -> None:
+    """Only Exclusive Fullscreen gives the display back on Alt+Tab.
+
+    Desktop-resolution fullscreen and borderless windows cover the display
+    without owning it, so switching away must not minimize them, and on
+    Windows Vulkan their swapchains refuse the exclusive control some drivers
+    take over a covering window on their own.
+    """
+    source = read("src/sys/sdl3/sdl3_backend.cpp")
+    minimize = function_body(source, "static void SDL3_MinimizeOnFullscreenFocusLoss(void) {")
+    require(minimize, 'SDL_strcasecmp(hint, "auto") == 0', "focus-loss minimize follows SDL's auto rule")
+    require(minimize, "SDL_GetWindowFullscreenMode(s_sdlWindow) == NULL", "desktop fullscreen stays up on focus loss")
+    require(minimize, "SDL_GetHintBoolean(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, false)", "an explicit hint still applies")
+    reject(minimize, "SDL_GetHintBoolean(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, true)", "focus-loss minimize")
+
+    device = read("src/renderer/Vulkan/VulkanDevice.cpp")
+    selection = read("src/renderer/Vulkan/VulkanDeviceSelection.cpp")
+    create = function_body(device, "static bool VK_Device_CreateSwapchain( void ) {")
+    require(selection, '"VK_EXT_full_screen_exclusive" ) == 0 ) { candidate.hasFullScreenExclusive = true; }',
+            "admission records the exclusive-fullscreen extension")
+    require(device, "vkCtx.fullScreenExclusiveControl = vkCtx.surfaceCapabilities2 && selected.hasFullScreenExclusive;",
+            "the device extension needs its instance dependency")
+    require(create, "windowState.fullscreen && !windowState.fullscreenDesktop", "the policy reads the window itself")
+    require(create, "? VK_FULL_SCREEN_EXCLUSIVE_DEFAULT_EXT : VK_FULL_SCREEN_EXCLUSIVE_DISALLOWED_EXT;",
+            "only Exclusive Fullscreen leaves the choice to the driver")
+    require(create, "sci.pNext = &fullScreenExclusive;", "the policy reaches the swapchain")
+
+
 def validate_ci_hooks() -> None:
     validator = read("tools/validation/openq4_validate.py")
     push = read(".github/workflows/push-verification.yml")
@@ -279,6 +307,7 @@ def validate_ci_hooks() -> None:
 def main() -> None:
     validate_shared_backend_contract()
     validate_platform_wrappers()
+    validate_switching_away()
     validate_ci_hooks()
     print("sdl3_multidisplay_windowing: ok")
 

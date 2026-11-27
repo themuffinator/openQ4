@@ -13,6 +13,40 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def verify_runtime_has_unified_game_module(runtime: Path):
+    """Refuse a stage from before the single game module.
+
+    One `game_<arch>` module now serves single-player and multiplayer. A stage
+    whose game directory holds only the old `game-sp_*`/`game-mp_*` modules, or
+    no game module at all, comes from an engine that asks for `game-sp_<arch>`
+    and stops on a fatal error at the first map. The timestamp check below
+    cannot see this when the build lives outside `<stage>/../builddir`.
+    """
+    if os.environ.get("OPENQ4_ALLOW_STALE_RUNTIME", "").strip() == "1":
+        return
+    runtime = runtime.resolve()
+    game_dir = runtime / "baseoq4"
+    if not game_dir.is_dir():
+        return
+    unified = [path for directory in (game_dir, runtime)
+               for path in directory.glob("game_*") if path.is_file()]
+    if unified:
+        return
+    split = sorted(path.name for directory in (game_dir, runtime)
+                   for pattern in ("game-sp_*", "game-mp_*")
+                   for path in directory.glob(pattern) if path.is_file())
+    found = f"only the old split modules ({', '.join(split)})" if split else "no game module"
+    restage = ("tools/build/meson_setup.ps1 install -C builddir --no-rebuild --skip-subprojects"
+               if os.name == "nt" else
+               "meson install -C builddir --no-rebuild --skip-subprojects")
+    raise SystemExit(
+        f"{runtime} has {found}: it predates the unified game_<arch> module, and "
+        "its engine stops on a fatal error looking for game-sp_<arch>.\n\n"
+        f"Re-stage it from a current build before running:\n  {restage}\n"
+        "Pass --runtime-dir to qualify a different tree, or set "
+        "OPENQ4_ALLOW_STALE_RUNTIME=1 to run it deliberately.\n")
+
+
 def verify_runtime_is_current(runtime: Path, executable_name: str | None = None):
     """Refuse to qualify a staged runtime older than the build it came from.
 
@@ -26,6 +60,7 @@ def verify_runtime_is_current(runtime: Path, executable_name: str | None = None)
     # A standard stage in another worktree belongs to that worktree's build,
     # not to the checkout containing this harness. Resolve junctions as well.
     runtime = runtime.resolve()
+    verify_runtime_has_unified_game_module(runtime)
     build_root = runtime.parent if runtime.name == ".install" else ROOT
     build = build_root / "builddir"
     if not build.is_dir():
