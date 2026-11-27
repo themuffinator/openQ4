@@ -339,6 +339,7 @@ void rvWeaponLightningGun::Think ( void ) {
 	} else {
 		GetGlobalJointTransform( true, barrelJointView, origin, axis );
 	}
+	ClearVREffectOrigin( origin );
 
 	// Cache the target we are hitting
 	currentPath.origin = tr.endpos;
@@ -653,6 +654,7 @@ void rvWeaponLightningGun::UpdatePresentationEffects( void ) {
 	} else {
 		GetGlobalJointTransform( true, barrelJointView, origin, axis );
 	}
+	ClearVREffectOrigin( origin );
 
 	idVec3 dir = currentPath.origin - origin;
 	dir.Normalize();

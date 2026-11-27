@@ -508,21 +508,8 @@ void idProjectile::Launch( const idVec3 &start, const idVec3 &dir, const idVec3 
 	Unbind();
 
 	contents = 0;
-	clipMask = spawnArgs.GetBool( "clipmask_rendermodel", "1" ) ? MASK_SHOT_RENDERMODEL : MASK_SHOT_BOUNDINGBOX;
-	
-	// all projectiles are projectileclip
-	clipMask |= CONTENTS_PROJECTILECLIP;
-
-	if ( spawnArgs.GetBool( "clipmask_largeshot", "1" ) ) {
-		clipMask |= CONTENTS_LARGESHOTCLIP;
-	}
-
-	if ( spawnArgs.GetBool( "clipmask_moveable", "0" ) ) {
-		clipMask |= CONTENTS_MOVEABLECLIP;
-	}
-	if ( spawnArgs.GetBool( "clipmask_monsterclip", "0" ) ) {
-		clipMask |= CONTENTS_MONSTERCLIP;
-	}
+	// openQ4: the rules live in GetClipMask, which VR's launch clearance also asks
+	clipMask = GetClipMask( &spawnArgs );
 	
 	if ( spawnArgs.GetBool( "detonate_on_trigger" ) ) {
 		contents |= CONTENTS_TRIGGER;
@@ -1834,6 +1821,37 @@ idVec3 idProjectile::GetGravity( const idDict *projectile ) {
 		return gameLocal.GetGravity ( ) * projectile->GetFloat( "gravity" );
 	}
 	return vec3_origin;
+}
+
+/*
+================
+idProjectile::GetClipMask
+
+openQ4: what a projectile of this def collides with, as Spawn sets it. A VR
+gun held in the hand clears its launch with it before the projectile exists
+(idPlayer::GetVRAimMarker, rvWeapon::Attack).
+================
+*/
+int idProjectile::GetClipMask( const idDict *projectile ) {
+	if ( projectile == NULL ) {
+		return MASK_SHOT_RENDERMODEL | CONTENTS_PROJECTILECLIP | CONTENTS_LARGESHOTCLIP | CONTENTS_PROJECTILE;
+	}
+	int clipMask = projectile->GetBool( "clipmask_rendermodel", "1" ) ? MASK_SHOT_RENDERMODEL : MASK_SHOT_BOUNDINGBOX;
+
+	// all projectiles are projectileclip
+	clipMask |= CONTENTS_PROJECTILECLIP;
+
+	if ( projectile->GetBool( "clipmask_largeshot", "1" ) ) {
+		clipMask |= CONTENTS_LARGESHOTCLIP;
+	}
+
+	if ( projectile->GetBool( "clipmask_moveable", "0" ) ) {
+		clipMask |= CONTENTS_MOVEABLECLIP;
+	}
+	if ( projectile->GetBool( "clipmask_monsterclip", "0" ) ) {
+		clipMask |= CONTENTS_MONSTERCLIP;
+	}
+	return clipMask | CONTENTS_PROJECTILE;
 }
 
 /*

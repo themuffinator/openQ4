@@ -567,9 +567,29 @@ def validate_bind_widget_fit_and_capture() -> None:
         ROOT / "content" / "baseoq4" / "pak0" / "guis" / "menu" / "settings" / "controls.gui"
     )
     bind_defs = list(re.finditer(r"\bbindDef\s+([A-Za-z0-9_]+)", controls))
-    # The stock rows plus openQ4's quick-chat, last-weapon and Classic ruleset hook rows.
-    if len(bind_defs) != 51:
-        raise AssertionError(f"Expected 51 controls bindDef rows, found {len(bind_defs)}")
+    # The rows are the stock ones plus openQ4's additions (quick chat, last
+    # weapon, the Classic ruleset hook, Record Video, ...). The session's
+    # RETAINED_CONTROLS_BINDINGS lists every row's binding in the stock page's
+    # order, so it sets how many rows the page must have and what each binds; a
+    # new key added to both passes, a row lost or added on one side fails.
+    session_menu = read(ROOT / "src" / "framework" / "Session_menu.cpp")
+    table = re.search(r"\bRETAINED_CONTROLS_BINDINGS\[\]\s*=\s*\{([^}]*)\};", session_menu)
+    if table is None:
+        raise AssertionError("Missing RETAINED_CONTROLS_BINDINGS in Session_menu.cpp")
+    expected_bindings = re.findall(r'"([^"]+)"', table.group(1))
+    bind_pattern = re.compile(r'\bbind\s+("[^"]+"|\S+)')
+    page_bindings = []
+    for bind_def in bind_defs:
+        block = body_of(controls, bind_def.group(0), f"controls.gui bindDef {bind_def.group(1)}")
+        binding = bind_pattern.search(block)
+        if binding is None:
+            raise AssertionError(f"Missing bind in controls bindDef {bind_def.group(1)}")
+        page_bindings.append(binding.group(1).strip('"'))
+    if page_bindings != expected_bindings:
+        raise AssertionError(
+            f"controls.gui binds {len(page_bindings)} rows that differ from the session's "
+            f"{len(expected_bindings)} RETAINED_CONTROLS_BINDINGS rows"
+        )
 
     number = r"(?:\d+(?:\.\d*)?|\.\d+)"
     rect_pattern = re.compile(
@@ -773,7 +793,14 @@ def validate_ready_binding_contract() -> None:
     )
     require(ready_command, "SendReady( true );", "idempotent ready command")
 
-    reset = body_of(multiplayer, "void idMultiplayerGame::Reset(", str(multiplayer_path))
+    # Since CORE-07 one game module serves both modes, and Reset runs the
+    # network-play half of a map reset, the function-key migration included,
+    # only in multiplayer mode (docs/dev/unified-game-module.md).
+    map_reset = body_of(multiplayer, "void idMultiplayerGame::Reset(", str(multiplayer_path))
+    require(map_reset, "const bool matchSession = gameLocal.IsMultiplayerMode();", "multiplayer-mode map reset")
+    if re.search(r"if \( matchSession \) \{\s*ResetMatchSession\(\);\s*\}", map_reset) is None:
+        raise AssertionError("Reset must run ResetMatchSession, and the key migration, for network play")
+    reset = body_of(multiplayer, "void idMultiplayerGame::ResetMatchSession(", str(multiplayer_path))
     require(
         reset,
         'common->BindingFromKey( "F3" )',
