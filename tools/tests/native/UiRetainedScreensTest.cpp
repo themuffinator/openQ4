@@ -69,7 +69,9 @@ struct ScreenHost final : Host {
 		// Player Setup's Player Identity (MP-17), on by default.
 		{"ui_identity",true},
 		// VR SETUP over the title and pause (retained_vr.py) at its defaults.
-		{"vr_playSpace",0.0},{"vr_turnMode",0.0},{"vr_leftHanded",0.0},{"vr_comfortVignette",std::string("0")}};
+		{"vr_playSpace",0.0},{"vr_turnMode",0.0},{"vr_leftHanded",0.0},{"vr_comfortVignette",std::string("0")},
+		// Status Display (vr_hudMode), on the wrists by default.
+		{"vr_hudMode",1.0}};
 	bool ReadCVar(const std::string& name, size_t type, StateValue& value) override {
 		if (type == 2 && name == "sys_lang") { value = language; return true; }
 		if (const auto found = cvars.find(name); found != cvars.end()) {
@@ -330,7 +332,7 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","ui_identity"
 	"ui_reducedFlashing","ui_retainedOpaqueBacking","ui_tooltips","g_corpseSink","con_allowConsole","r_screenshotFormat","g_autoSkipCinematics","ui_cinematicShake","g_screenShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
 	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","g_viewKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
 	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch",
-	"vr_playSpace","vr_body",
+	"vr_playSpace","vr_body","vr_hudMode",
 	// openQ4: GENERAL's VIDEO CAPTURE section
 	"com_videoFormat","com_videoQuality","com_videoFPS","com_videoHeight","com_videoAudio","com_videoTiming",
 	// openQ4: VIRTUAL REALITY's STEREOSCOPIC 3D section

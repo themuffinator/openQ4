@@ -69,9 +69,9 @@
 							} else if ( "gui::game_section_choice" == 7 ) {
 								set "gui::gui_set_game_scroll" "77" ;
 							} else if ( "gui::game_section_choice" == 8 ) {
-								set "gui::gui_set_game_scroll" "90" ;
+								set "gui::gui_set_game_scroll" "91" ;
 							} else {
-								set "gui::gui_set_game_scroll" "95" ;
+								set "gui::gui_set_game_scroll" "96" ;
 							}
 							set "cmd" "applySettingsScroll game" ;
 						}
@@ -84,7 +84,7 @@
 					noclip	0
 					windowDef set_game_content
 					{
-						rect	-24,-41,640,2594
+						rect	-24,-41,640,2618
 						visible	1
 
 	//--------------------------------------------------------------//
@@ -4692,12 +4692,54 @@
 					}
 				}
 	//==============================================================//
+	// Settings->Game Options->Status Display
+	//==============================================================//
+
+				windowDef set_game_vr_hud
+				{
+					rect	228,2267,403,25
+					visible	1
+
+					windowDef set_game_vr_hud_background
+					{
+						rect	0,0,377,25
+						visible	1
+						background	"gfx/guis/mainmenu/b3_light"
+						matcolor	0.545,0.588,0.294,0.4
+					}
+					windowDef set_game_vr_hud_description
+					{
+						rect	31,3,210,18
+						visible	1
+						forecolor	1,1,1,0.8
+						text	"#str_233560"
+						textscale	0.24
+						font	"fonts/lowpixel"
+					}
+					choiceDef set_game_vr_hud_value
+					{
+							rect	240,3,162,18
+							visible	1
+							forecolor	1,0.745,0.137,0.8
+							cvar	vr_hudMode
+							textscale	0.24
+							font	"fonts/lowpixel"
+							choices	"#str_233561"
+							values	"1;0"
+							choiceType	1
+
+							onAction {
+								set "cmd" "play main_menu_selection" ;
+							}
+					}
+				}
+	//==============================================================//
 	// Settings->Game Options->Video Capture (recordVideo, docs/user/video-capture.md)
 	//==============================================================//
 
 				windowDef set_game_video
 				{
-					rect	259,2277,327,13
+					rect	259,2301,327,13
 					visible	1
 					forecolor	1,1,1,0.4
 					text	"#str_232900"
@@ -4711,7 +4753,7 @@
 
 				windowDef set_game_videoformat
 				{
-					rect	228,2291,403,25
+					rect	228,2315,403,25
 					visible	1
 
 					windowDef set_game_videoformat_background
@@ -4753,7 +4795,7 @@
 
 				windowDef set_game_videoquality
 				{
-					rect	228,2315,377,25
+					rect	228,2339,377,25
 					visible	1
 
 					windowDef set_game_videoquality_background
@@ -4818,7 +4860,7 @@
 
 				windowDef set_game_videofps
 				{
-					rect	228,2339,403,25
+					rect	228,2363,403,25
 					visible	1
 
 					windowDef set_game_videofps_background
@@ -4860,7 +4902,7 @@
 
 				windowDef set_game_videoheight
 				{
-					rect	228,2363,403,25
+					rect	228,2387,403,25
 					visible	1
 
 					windowDef set_game_videoheight_background
@@ -4902,7 +4944,7 @@
 
 				windowDef set_game_videoaudio
 				{
-					rect	228,2387,403,25
+					rect	228,2411,403,25
 					visible	1
 
 					windowDef set_game_videoaudio_background
@@ -4944,7 +4986,7 @@
 
 				windowDef set_game_videotiming
 				{
-					rect	228,2411,403,25
+					rect	228,2435,403,25
 					visible	1
 
 					windowDef set_game_videotiming_background
@@ -4986,7 +5028,7 @@
 
 				windowDef set_game_stereo
 				{
-					rect	259,2445,327,13
+					rect	259,2469,327,13
 					visible	1
 					forecolor	1,1,1,0.4
 					text	"#str_232920"
@@ -5000,7 +5042,7 @@
 
 				windowDef set_game_stereo3d
 				{
-					rect	228,2459,403,25
+					rect	228,2483,403,25
 					visible	1
 
 					windowDef set_game_stereo3d_background
@@ -5042,7 +5084,7 @@
 
 				windowDef set_game_stereodepth
 				{
-					rect	228,2483,377,25
+					rect	228,2507,377,25
 					visible	1
 
 					windowDef set_game_stereodepth_background
@@ -5107,7 +5149,7 @@
 
 				windowDef set_game_stereoconvergence
 				{
-					rect	228,2507,377,25
+					rect	228,2531,377,25
 					visible	1
 
 					windowDef set_game_stereoconvergence_background
@@ -5172,7 +5214,7 @@
 
 				windowDef set_game_stereoswap
 				{
-					rect	228,2531,403,25
+					rect	228,2555,403,25
 					visible	1
 
 					windowDef set_game_stereoswap_background
@@ -5220,7 +5262,7 @@
 					forecolor	1,1,1,0.8
 					matcolor	1,1,1,0.4
 					low	0
-					high	95
+					high	96
 					step	1
 					vertical	1
 					scrollbar	1

@@ -16768,7 +16768,9 @@ windowDef Desktop
 			set "set_game_vr_playspace::visible" "1" ;
 			set "set_game_vr_playspace_hover::visible" "1" ;
 			set "set_game_vr_body::visible" "1" ;
+			set "set_game_vr_hud::visible" "1" ;
 			set "set_game_vr_body_hover::visible" "1" ;
+			set "set_game_vr_hud_hover::visible" "1" ;
 			set "set_game_video::visible" "1" ;
 			set "set_game_videoformat::visible" "1" ;
 			set "set_game_videoformat_hover::visible" "1" ;
@@ -16876,6 +16878,7 @@ windowDef Desktop
 			set "set_game_vr_physicalcrouch::noevents" "0" ;
 			set "set_game_vr_playspace::noevents" "0" ;
 			set "set_game_vr_body::noevents" "0" ;
+			set "set_game_vr_hud::noevents" "0" ;
 			set "set_game_videoformat::noevents" "0" ;
 			set "set_game_videoquality::noevents" "0" ;
 			set "set_game_videofps::noevents" "0" ;
@@ -17069,7 +17072,9 @@ windowDef Desktop
 			set "set_game_vr_playspace::visible" "0" ;
 			set "set_game_vr_playspace_hover::visible" "0" ;
 			set "set_game_vr_body::visible" "0" ;
+			set "set_game_vr_hud::visible" "0" ;
 			set "set_game_vr_body_hover::visible" "0" ;
+			set "set_game_vr_hud_hover::visible" "0" ;
 			set "set_game_video::visible" "0" ;
 			set "set_game_videoformat::visible" "0" ;
 			set "set_game_videoformat_hover::visible" "0" ;
@@ -17177,6 +17182,7 @@ windowDef Desktop
 			set "set_game_vr_physicalcrouch::noevents" "1" ;
 			set "set_game_vr_playspace::noevents" "1" ;
 			set "set_game_vr_body::noevents" "1" ;
+			set "set_game_vr_hud::noevents" "1" ;
 			set "set_game_videoformat::noevents" "1" ;
 			set "set_game_videoquality::noevents" "1" ;
 			set "set_game_videofps::noevents" "1" ;
@@ -19397,6 +19403,7 @@ windowDef Desktop
 				set "set_game_vr_physicalcrouch_background::matcolor_w" "0.4" ;
 				set "set_game_vr_playspace_background::matcolor_w" "0.4" ;
 				set "set_game_vr_body_background::matcolor_w" "0.4" ;
+				set "set_game_vr_hud_background::matcolor_w" "0.4" ;
 				set "set_game_videoformat_background::matcolor_w" "0.4" ;
 				set "set_game_videoquality_background::matcolor_w" "0.4" ;
 				set "set_game_videofps_background::matcolor_w" "0.4" ;
