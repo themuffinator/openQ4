@@ -280,8 +280,9 @@ holds 54 of 64 cube slots at Maximum. Quality is unchanged on both: 64 slots,
 
 ## Cascades that keep their scale while the view turns
 
-Built and measured; **off by default until the owner chooses**, because it
-trades resolution for steadiness and only eyes can price that.
+Built and measured, then put to the owner, because it trades resolution for
+steadiness and only eyes can price that. **The owner chose the nearest two
+cascades (27 November 2026)**, which is the default.
 
 The tight fit bounds each view slice's corners in light space. That box
 changes shape as the view turns, its two sides are quantised to the 1.25
@@ -290,7 +291,7 @@ changes and every shadow edge in it is resampled. A sphere around the slice
 looks the same from the light whichever way the view faces, so a crop sized by
 it keeps its scale through a turn (`R_ShadowMapSliceStableBox`).
 `r_shadowMapCascadeStableExtent` is how many of a light's nearest fitted
-cascades are sized that way: 0 none (as before), 4 all.
+cascades are sized that way: 0 none (as before), 2 the default, 4 all.
 
 Two things had to be got right for a perspective source such as Air Defense
 1's sun, whose picture is a fan 46 degrees to a side:
@@ -328,6 +329,11 @@ against 5.44 to 6.80, because a slice 1500 units deep reaches a fifth of the
 way to that sun. The texel also grows and shrinks with the eye's distance from
 the source (0.72 to 0.93 across the nine poses). Not measured: how the
 resampling looks in motion, which is the reason for doing it.
+
+With the default in place, the same turn counts 0 / 0 / 8 at texels of 0.72,
+2.03 and 5.44 to 6.80; the nine poses keep 99.1% of stencil's shadow on OpenGL
+and 99.2% on Vulkan; and Hub 2 at the Maximum preset, where spotlights are
+cascaded too, runs under the Vulkan validation layers with no message.
 
 ## Measured and left
 

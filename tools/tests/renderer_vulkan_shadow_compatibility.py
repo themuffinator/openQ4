@@ -9776,8 +9776,8 @@ def validate_cascade_stable_extent_contract() -> None:
     )
     require(
         read("src/renderer/RenderSystem_init.cpp"),
-        'idCVar r_shadowMapCascadeStableExtent( "r_shadowMapCascadeStableExtent", "0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,',
-        "the setting counts cascades and is off by default",
+        'idCVar r_shadowMapCascadeStableExtent( "r_shadowMapCascadeStableExtent", "2", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER,',
+        "the setting counts cascades: the two nearest by default, the owner's choice of 27 November 2026",
     )
 
 
