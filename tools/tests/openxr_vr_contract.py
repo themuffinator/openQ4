@@ -596,6 +596,28 @@ def check_audit_leads() -> None:
                 f"{tree}: a hand-held muzzle stays short of a wall")
         require(weapon, "\t\t\tif ( owner->IsVRHandAiming() ) {\n\t\t\t\tstart = playerViewOrigin;\n\t\t\t}\n",
                 f"{tree}: a projectile's way is cleared from the hand")
+    # single player clears a hand-held shot from the body's eye with the shot's own clip mask
+    # (openxr_vr_wall_clearance_smoke.py proves it in game); multiplayer keeps the paths above
+    weapon = read("src/game/Weapon.cpp")
+    player = read("src/game/Player.cpp")
+    require(player, "bool idPlayer::ClearVRShot( const idVec3 &eye, const idVec3 &hand, idVec3 &launch, int clipMask,",
+            "one clearance for every hand-held single-player shot")
+    require(player, "ClearVRShot( firstPersonViewOrigin, handOrigin, origin, MASK_SHOT_RENDERMODEL );",
+            "the weapon hand is cleared from the body's eye, not the lifted tracking origin")
+    require(weapon, "const bool vrHandShot = owner->IsVRHandAiming() && !gameLocal.isMultiplayer;",
+            "the muzzle's single-player clearance leaves multiplayer alone")
+    require(weapon, "vrShotCleared = owner->ClearVRShot( owner->firstPersonViewOrigin, playerViewOrigin, muzzleOrigin, GetVRShotClipMask( altAttack ) );",
+            "the muzzle is cleared with the shot's own clip mask")
+    require(weapon, "if ( owner->IsVRHandAiming() && !gameLocal.isMultiplayer ) {\n\t\t\t\t// single player: from the body's eye through the hand, with this",
+            "a projectile's launch is cleared with its own box and clip mask in single player only")
+    require(weapon, "return dict.GetNumKeyVals() > 0 ? idProjectile::GetClipMask( &dict ) : MASK_SHOT_RENDERMODEL;",
+            "a projectile weapon's shot mask is its projectile's")
+    require(weapon, "const int clipMask = idProjectile::GetClipMask( &proj->spawnArgs );",
+            "the launch is cleared with the mask Launch gives the projectile")
+    require(player, "const int shotMask = armed ? weapon->GetVRShotClipMask( zoomed ) : MASK_SHOT_RENDERMODEL;",
+            "the aim marker stops where the weapon's own shot stops")
+    require(read("src/game/Projectile.cpp"), "clipMask = GetClipMask( &spawnArgs );", "Spawn and the VR clearance share one clip mask")
+    require(read("src/game/weapon/WeaponLightningGun.cpp"), "ClearVREffectOrigin( origin );", "the lightning beam leaves the near side of a wall")
     require(read("src/game/Player.cpp"), "VR_RoomScaleCatchUp( distance, freeRadius, 5.0f * frame.unitsPerMetre * MS2SEC( gameLocal.msec ) );",
             "room scale catches up at a sprint")
     mp = read("src/game/Player.cpp")
@@ -747,11 +769,43 @@ def check_detection() -> None:
     require(runtime, "return XR_ERROR_FORM_FACTOR_UNAVAILABLE;", "a runtime without a headset answers as real ones do")
 
 
+def check_haptics() -> None:
+    """Directional and event haptics (VR-02): headset-only, prediction-safe, never alone."""
+    player = read("src/game/Player.cpp")
+    for token, label in (
+        ("void idPlayer::VREventPulse(", "the event pulses have one way in"),
+        ('cvarSystem->GetCVarFloat( "vr_hapticEvents" )', "vr_hapticEvents scales the event pulses"),
+        ("vrSystem == NULL || !vrSystem->IsActive() || gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame",
+         "event pulses stay in the local headset and never repeat for prediction"),
+        ("float idPlayer::VRHitSide(", "a hit's side is placed by the tracked head"),
+        ("scale[ VR_HAND_LEFT ] = 1.0f - 0.75f * side;", "a hit keeps the hand on its side whole and quiets the other"),
+        ("VRVibrate( true, true, hitStrength, 90, side );", "hits pulse both hands with their side"),
+        ('VREventPulse( true, true, 0.3f + 0.7f * fall, 80, "landing" );', "a fall jolts both hands beside its landing sound"),
+        ("void idPlayer::VRBlastPulse( float scale ) const {", "an effect's shake pulses the hands"),
+    ):
+        require(player, token, label)
+    require(read("src/game/Game_local.cpp"), "player->VRBlastPulse( scale );",
+            "every BSE shake segment reaches the hands, in multiplayer too")
+    require(read("src/game/anim/Anim_Blend.cpp"), 'player->VREventPulse( false, true, 0.45f, 25, "reload" );',
+            "a reload animation's sounds tick the off hand")
+    require(read("src/game/anim/Anim_Blend.cpp"), 'name.Icmpn( "reload", 6 ) == 0',
+            "only reload animations tick")
+    require(read("src/game/Weapon.cpp"), 'owner->VREventPulse( true, false, 0.4f, 35, "draw" );',
+            "a drawn weapon pulses the weapon hand")
+    require(read("src/framework/VRSystem.cpp"), 'idCVar vr_hapticEvents( "vr_hapticEvents", "1"',
+            "vr_hapticEvents defaults on")
+    require(read("src/game/gamesys/SysCmds.cpp"), '"testVRHaptics",', "the haptics smoke has its dev command")
+    smoke = read("tools/tests/openxr_vr_haptics_smoke.py")
+    for token in ('"q4xbase"', "hit_turned", "blast_far", "events_off", "landing_fall", "weapon_goobgun"):
+        require(smoke, token, "the haptics smoke covers every kind in both campaigns")
+
+
 def check_documents() -> None:
     for relative in ("docs/user/vr.md", "docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md", "LICENSES/openxr-sdk.txt",
                      "tools/tests/openxr_vr_smoke.py", "tools/tests/openxr_vr_menu_smoke.py",
                      "tools/tests/openxr_vr_touch_smoke.py", "src/framework/VRTouchCore.h",
                      "tools/tests/openxr_vr_mp_smoke.py", "tools/tests/openxr_vr_detection_smoke.py",
+                     "tools/tests/openxr_vr_haptics_smoke.py",
                      "tools/tests/openxr/OpenXRTestRuntime.cpp",
                      "tools/tests/native/VRMathCoreTest.cpp"):
         if not (ROOT / relative).is_file():
@@ -764,7 +818,7 @@ def check_documents() -> None:
     for cvar in ("vr_enable", "vr_aimMode", "vr_aimLaser", "vr_hapticStrength", "vr_turnMode", "vr_recenter",
                  "vr_restart", "vr_twoHanded", "vr_comfortVignette", "vr_physicalCrouch", "vr_vehicleStereo",
                  "vr_refreshRate", "vr_performanceLevel", "vr_body", "vr_detect", "vr_start", "vr_offer", "vr_setup",
-                 "ui_retainedVRTextScale"):
+                 "ui_retainedVRTextScale", "vr_hapticEvents"):
         require(guide, cvar, "the VR guide documents the settings players use")
 
 
@@ -781,6 +835,7 @@ def main() -> int:
     check_engine()
     check_body()
     check_detection()
+    check_haptics()
     check_audit_leads()
     check_strings()
     check_documents()

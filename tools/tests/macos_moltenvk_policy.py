@@ -77,7 +77,7 @@ def validate_portability_negotiation() -> None:
     init_body = function_body(source, "bool VK_Device_Init( const renderWindowServices_s *windowServices, uint32_t firstCandidate,")
     require(
         init_body,
-        "if ( !VK_Device_FindInstanceExtensions( NULL, optionalInstanceExtensions, 2, loaderExtensions ) ) {\n\t\treturn false;",
+        "if ( !VK_Device_FindInstanceExtensions( NULL, optionalInstanceExtensions, 3, loaderExtensions ) ) {\n\t\treturn false;",
         "instance-extension inventory failure fails the start",
     )
     require(

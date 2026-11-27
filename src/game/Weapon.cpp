@@ -1566,6 +1566,76 @@ bool rvWeapon::GetVRMuzzle( idVec3 &origin ) const {
 
 /*
 ================
+rvWeapon::GetVRShotClipMask
+
+openQ4 VR: what this weapon's shot stops at, which a gun held in the hand
+clears its launch with (idPlayer::ClearVRShot): a hitscan what
+idGameLocal::HitScan traces against, a projectile its def's clip mask, which
+adds the projectile and large-shot clip brushes bullets cross.
+================
+*/
+int rvWeapon::GetVRShotClipMask( bool altAttack ) const {
+	const bool alt = altAttack && attackAltDict.GetNumKeyVals() > 0;
+	if ( alt ? wfl.attackAltHitscan : wfl.attackHitscan ) {
+		return MASK_SHOT_RENDERMODEL;
+	}
+	const idDict &dict = alt ? attackAltDict : attackDict;
+	return dict.GetNumKeyVals() > 0 ? idProjectile::GetClipMask( &dict ) : MASK_SHOT_RENDERMODEL;
+}
+
+/*
+================
+rvWeapon::ClearVREffectOrigin
+
+openQ4 VR: a tracer or a beam leaves the drawn gun's joint, which a gun pushed
+through a wall has on its far side, where it drew in the next room. It leaves
+where the shot does then.
+================
+*/
+void rvWeapon::ClearVREffectOrigin( idVec3 &origin ) const {
+	if ( !gameLocal.isMultiplayer && owner != NULL && owner->IsVRHandAiming() ) {
+		owner->ClearVRShot( owner->firstPersonViewOrigin, playerViewOrigin, origin, MASK_SHOT_RENDERMODEL );
+	}
+}
+
+/*
+================
+rvWeapon_LogVRShot
+
+openQ4 VR: vr_debug logs a hand-held single-player shot: whether its way was
+cleared, the body's eye it was cleared from, the tracked hand, where it
+starts, where its line meets the world with what it stops at, and where the
+aim marker shows it (openxr_vr_wall_clearance_smoke.py holds one to the
+other).
+================
+*/
+static void rvWeapon_LogVRShot( const idPlayer *owner, const char *kind, bool cleared, const idVec3 &start,
+	const idVec3 &dir, int clipMask ) {
+	if ( owner == NULL || cvarSystem->GetCVarInteger( "vr_debug" ) <= 0 ) {
+		return;
+	}
+	idVec3 aimOrigin;
+	idVec3 hand = start;
+	if ( owner->GetVRAimOrigin( aimOrigin, &hand ) && ( aimOrigin - hand ).LengthSqr() > 0.01f ) {
+		cleared = true;
+	}
+	trace_t trace;
+	gameLocal.TracePoint( owner, trace, start, start + dir * VR_AIM_RANGE,
+		clipMask & ~( MASK_WATER | CONTENTS_PROJECTILE | CONTENTS_TRIGGER ), owner );
+	const idVec3 &eye = owner->firstPersonViewOrigin;
+	idStr markerText = "none";
+	vrAimMarker_t marker;
+	if ( owner->GetVRAimMarker( marker ) ) {
+		markerText = va( "( %.1f %.1f %.1f )", marker.target.x, marker.target.y, marker.target.z );
+	}
+	gameLocal.Printf( "VR shot %s %s anchor ( %.1f %.1f %.1f ) hand ( %.1f %.1f %.1f ) start ( %.1f %.1f %.1f ) "
+		"impact ( %.1f %.1f %.1f ) marker %s\n", kind, cleared ? "cleared" : "clear",
+		eye.x, eye.y, eye.z, hand.x, hand.y, hand.z, start.x, start.y, start.z,
+		trace.endpos.x, trace.endpos.y, trace.endpos.z, markerText.c_str() );
+}
+
+/*
+================
 rvWeapon::GetVRHold
 
 openQ4 VR: how the view model holds its gun, so VR_WeaponTransform can put it
@@ -3829,12 +3899,22 @@ void rvWeapon::Attack( bool altAttack, int num_attacks, float spread, float fuse
 	// may be right up against a wall: a shot from there started on the far
 	// side. The muzzle stays short of whatever lies between it and the hand,
 	// as GetVRAimOrigin keeps the hand short of what lies between it and the eye.
-	if ( owner->IsVRHandAiming() ) {
+	const bool vrHandShot = owner->IsVRHandAiming() && !gameLocal.isMultiplayer;
+	bool vrShotCleared = false;
+	if ( vrHandShot ) {
+		// single player: from the body's eye through the hand, stopped by what
+		// this shot stops at (a projectile's own launch is cleared again with
+		// its clip model in LaunchProjectiles)
+		vrShotCleared = owner->ClearVRShot( owner->firstPersonViewOrigin, playerViewOrigin, muzzleOrigin, GetVRShotClipMask( altAttack ) );
+	} else if ( owner->IsVRHandAiming() ) {
 		trace_t clearance;
 		gameLocal.TracePoint( owner, clearance, playerViewOrigin, muzzleOrigin, MASK_SHOT_RENDERMODEL, owner );
 		if ( clearance.fraction < 1.0f ) {
 			muzzleOrigin = playerViewOrigin + ( clearance.endpos - playerViewOrigin ) * 0.9f;
 		}
+	}
+	if ( vrHandShot && ( altAttack ? wfl.attackAltHitscan : wfl.attackHitscan ) ) {
+		rvWeapon_LogVRShot( owner, "hitscan", vrShotCleared, muzzleOrigin, playerViewAxis[ 0 ], MASK_SHOT_RENDERMODEL );
 	}
 
 	// add some to the kick time, incrementally moving repeat firing weapons back
@@ -4004,11 +4084,23 @@ void rvWeapon::LaunchProjectiles ( idDict& dict, const idVec3& muzzleOrigin, con
 			if ( owner->IsVRHandAiming() ) {
 				start = playerViewOrigin;
 			}
+			if ( owner->IsVRHandAiming() && !gameLocal.isMultiplayer ) {
+				// single player: from the body's eye through the hand, with this
+				// projectile's own box and clip mask, so a rocket pushed through a
+				// large-shot clip bursts on it as one fired from the eye would
+				const idClipModel *clip = proj->GetPhysics()->GetClipModel();
+				// (Launch sets the projectile's clip mask from these same spawn args)
+				const int clipMask = idProjectile::GetClipMask( &proj->spawnArgs );
+				const bool cleared = owner->ClearVRShot( owner->firstPersonViewOrigin, playerViewOrigin, muzzle_pos, clipMask,
+					clip, clip != NULL ? clip->GetAxis() : mat3_identity );
+				rvWeapon_LogVRShot( owner, "projectile", cleared, muzzle_pos, playerViewAxis[ 0 ], clipMask );
+			} else {
 // RAVEN BEGIN
 // ddynerman: multiple clip worlds
 			gameLocal.Translation( owner, tr, start, muzzle_pos, proj->GetPhysics()->GetClipModel(), proj->GetPhysics()->GetClipModel()->GetAxis(), MASK_SHOT_RENDERMODEL, owner );
 // RAVEN END
 			muzzle_pos = tr.endpos;
+			}
 		}
 		
 		// Launch the actual projectile
@@ -4087,6 +4179,9 @@ void rvWeapon::Hitscan( const idDict& dict, const idVec3& muzzleOrigin, const id
 	}
 
 	GetGlobalJointTransform( true, flashJointView, fxOrigin, fxAxis, dict.GetVector( "fxOriginOffset" ) );
+	// openQ4 VR: the tracer leaves the drawn gun's flash joint, which may be
+	// on the far side of a wall the gun was pushed through
+	ClearVREffectOrigin( fxOrigin );
 
 // openQ4 BEGIN
 	// The shooting client draws this shot itself as it predicts it (rvWeapon::Attack), so it
@@ -4545,6 +4640,12 @@ void rvWeapon::PlayAnim( int channel, const char *animname, int blendFrames ) {
 		viewModel->Show();
 		viewAnimator->PlayAnim( channel, anim, startTime, FRAME2MS( blendFrames ) );
 		animDoneTime[channel] = viewAnimator->CurrentAnim( channel )->GetEndTime();
+
+		// openQ4 VR: the weapon hand feels the gun it just drew come up, as it
+		// is seen rising and its raise sounds play
+		if ( raise && owner ) {
+			owner->VREventPulse( true, false, 0.4f, 35, "draw" );
+		}
 		
 		// Play the animation on the world model as well
 		if ( worldAnimator ) {

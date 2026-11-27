@@ -1470,6 +1470,7 @@ idPlayer::idPlayer() {
 	InitStatusBar();
 	memset( &usercmd, 0, sizeof( usercmd ) );
 	vrButtonCrouch = false;
+	vrHitPulseTime = 0;
 	vrVehicleDeltaYaw = 0.0f;
 	vrVehicleYaw = 0.0f;
 	vrVehicleYawValid = false;
@@ -9882,6 +9883,17 @@ void idPlayer::CrashLand( const idVec3 &oldOrigin, const idVec3 &oldVelocity ) {
 		// todo - 2 different landing sounds for variety?
 		StartSound ( "snd_land_soft", SND_CHANNEL_ANY, 0, false, NULL );				 
 	}
+
+	// openQ4 VR: a fall that dips the view and plays its landing sound above
+	// jolts both hands, harder the faster the fall. Landing a jump on level
+	// ground (as fast as it took off) stays still, or every hop would buzz.
+	const float jumpDelta = 2.0f * gravityVector.Length() * pm_jumpheight.GetFloat() * 0.0001f;
+	if ( ( pfl.hardLanding || pfl.softLanding ) && delta > jumpDelta * 1.2f ) {
+		const float floor = Max( noFallDelta, jumpDelta * 1.2f );
+		const float top = hardFallDelta > floor ? hardFallDelta : floor + 1.0f;
+		const float fall = idMath::ClampFloat( 0.0f, 1.0f, ( delta - floor ) / ( top - floor ) );
+		VREventPulse( true, true, 0.3f + 0.7f * fall, 80, "landing" );
+	}
 }
 
 /*
@@ -14979,7 +14991,7 @@ float idPlayer::GetVRWeaponScale( void ) const {
 idPlayer::GetVRAimOrigin
 ===============
 */
-bool idPlayer::GetVRAimOrigin( idVec3 &origin ) const {
+bool idPlayer::GetVRAimOrigin( idVec3 &origin, idVec3 *reach ) const {
 	vrFrameState_t frame;
 	float trackingYaw;
 	if ( health <= 0 || !GetVRView( frame, trackingYaw ) || frame.aimMode != VR_AIM_HAND ) {
@@ -14991,17 +15003,61 @@ bool idPlayer::GetVRAimOrigin( idVec3 &origin ) const {
 	}
 	vrPose_t pose = aim;
 	pose.origin += VR_HeadOffsetCorrection( frame );
-	idVec3 eyeOrigin = firstPersonViewOrigin;
-	eyeOrigin.z += VRCrouchLift( frame );
+	idVec3 trackingOrigin = firstPersonViewOrigin;
+	trackingOrigin.z += VRCrouchLift( frame );
 	idVec3 handOrigin;
 	idMat3 handAxis;
-	VR_PoseToWorld( pose, eyeOrigin, trackingYaw, handOrigin, handAxis );
+	VR_PoseToWorld( pose, trackingOrigin, trackingYaw, handOrigin, handAxis );
+	if ( reach != NULL ) {
+		*reach = handOrigin;
+	}
 
 	// a hand reaching through a wall must not fire from behind it
-	trace_t trace;
-	gameLocal.TracePoint( this, trace, eyeOrigin, handOrigin, MASK_SHOT_RENDERMODEL, this );
-	origin = trace.fraction < 1.0f ? eyeOrigin + ( trace.endpos - eyeOrigin ) * 0.9f : handOrigin;
+	origin = handOrigin;
+	ClearVRShot( firstPersonViewOrigin, handOrigin, origin, MASK_SHOT_RENDERMODEL );
 	return true;
+}
+
+/*
+===============
+idPlayer::ClearVRShot
+
+openQ4 VR: single player fires a hand-held shot from the weapon hand, so with
+room scale or an outstretched arm a gun pushed through a wall, door or crate
+would fire from its far side. The shot's way starts at the body's own eye,
+which the player's box keeps clear of the world: the tracked head can lean
+past a wall the body stands against, and the tracking origin is lifted to the
+standing eye while crouched, into a low ceiling. It runs to the hand and on to
+the launch point with what the shot itself stops at (water and other shots
+are not walls: HitScan crosses water itself). Where something is in the way,
+the shot starts just in front of it, so it strikes what the gun went through.
+===============
+*/
+bool idPlayer::ClearVRShot( const idVec3 &eye, const idVec3 &hand, idVec3 &launch, int clipMask,
+	const idClipModel *clip, const idMat3 &clipAxis ) const {
+	const float standoff = 1.0f;
+	clipMask &= ~( MASK_WATER | CONTENTS_PROJECTILE | CONTENTS_TRIGGER );
+	const idVec3 way[ 3 ] = { eye, hand, launch };
+	for ( int leg = 0; leg < 2; leg++ ) {
+		const idVec3 &from = way[ leg ];
+		const idVec3 delta = way[ leg + 1 ] - from;
+		const float length = delta.Length();
+		if ( length < 0.01f ) {
+			continue;
+		}
+		trace_t trace;
+		if ( clip != NULL ) {
+			gameLocal.Translation( this, trace, from, way[ leg + 1 ], clip, clipAxis, clipMask, this );
+		} else {
+			gameLocal.TracePoint( this, trace, from, way[ leg + 1 ], clipMask, this );
+		}
+		if ( trace.fraction < 1.0f ) {
+			// in front of what it met, and never behind where this leg began
+			launch = from + delta * ( Max( 0.0f, length * trace.fraction - standoff ) / length );
+			return true;
+		}
+	}
+	return false;
 }
 
 /*
@@ -15012,7 +15068,8 @@ Where a shot would land this frame. Multiplayer shots leave the eye along
 the weapon hand's aim (the server only knows usercmd angles), so the trace
 does too; a beam still starts at the hand. Single player follows the path
 GetVRAimOrigin gives the weapon, along the tracked aim from the same
-presentation pose the view weapon is drawn at.
+presentation pose the view weapon is drawn at, cleared from the body's eye
+and stopped by what the weapon's own shot stops at (ClearVRShot).
 ===============
 */
 bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
@@ -15030,6 +15087,8 @@ bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
 		idVec3 eyeOrigin;
 		idMat3 eyeAxis;
 		GetPresentationViewPos( eyeOrigin, eyeAxis );
+		// the shot's way starts at the body's eye; the tracked poses sit on the lifted origin
+		const idVec3 bodyEye = eyeOrigin;
 		eyeOrigin.z += VRCrouchLift( frame );
 		const idVec3 headCorrection = VR_HeadOffsetCorrection( frame );
 
@@ -15063,9 +15122,16 @@ bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
 			idMat3 handAxis;
 			VR_PoseToWorld( pose, eyeOrigin, trackingYaw, handOrigin, handAxis );
 
-			gameLocal.TracePoint( this, trace, eyeOrigin, handOrigin, MASK_SHOT_RENDERMODEL, this );
-			const idVec3 start = trace.fraction < 1.0f ? eyeOrigin + ( trace.endpos - eyeOrigin ) * 0.9f : handOrigin;
-			gameLocal.TracePoint( this, trace, start, start + handAxis[0] * VR_AIM_RANGE, MASK_SHOT_RENDERMODEL, this );
+			// the way the shot takes: the hand cleared from the eye as
+			// GetVRAimOrigin clears it, then the rest with what this weapon's
+			// shot stops at (a rocket bursts on a large-shot clip a bullet
+			// crosses), as rvWeapon::Attack and LaunchProjectiles clear it
+			const int shotMask = armed ? weapon->GetVRShotClipMask( zoomed ) : MASK_SHOT_RENDERMODEL;
+			idVec3 start = handOrigin;
+			ClearVRShot( bodyEye, handOrigin, start, MASK_SHOT_RENDERMODEL );
+			ClearVRShot( bodyEye, start, start, shotMask );
+			gameLocal.TracePoint( this, trace, start, start + handAxis[0] * VR_AIM_RANGE,
+				shotMask & ~( MASK_WATER | CONTENTS_PROJECTILE | CONTENTS_TRIGGER ), this );
 			// a beam leaves the drawn weapon's muzzle, or the hand without one
 			if ( !armed || !weapon->GetVRMuzzle( marker.muzzle ) ) {
 				marker.muzzle = handOrigin;
@@ -15488,12 +15554,114 @@ void idPlayer::VRVibrate( bool weaponHand, bool otherHand, float amplitude, int 
 	vrFrameState_t frame;
 	vrSystem->GetFrameState( frame );
 	const int hand = frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT;
+	const int other = hand == VR_HAND_LEFT ? VR_HAND_RIGHT : VR_HAND_LEFT;
+	// openQ4 VR: a pulse in both hands from one side (a hit, VRHitSide) keeps
+	// the hand on that side whole and quiets the other, as PAD-08 does for a
+	// gamepad's two motors; from straight ahead or behind both stay whole
+	float scale[ VR_NUM_HANDS ] = { 1.0f, 1.0f };
+	if ( weaponHand && otherHand && direction == direction ) {
+		const float side = idMath::ClampFloat( -1.0f, 1.0f, direction );
+		if ( side > 0.0f ) {
+			scale[ VR_HAND_LEFT ] = 1.0f - 0.75f * side;
+		} else {
+			scale[ VR_HAND_RIGHT ] = 1.0f + 0.75f * side;
+		}
+	}
 	if ( weaponHand ) {
-		vrSystem->Vibrate( hand, amplitude, durationMsec );
+		vrSystem->Vibrate( hand, amplitude * scale[ hand ], durationMsec );
 	}
 	if ( otherHand ) {
-		vrSystem->Vibrate( hand == VR_HAND_LEFT ? VR_HAND_RIGHT : VR_HAND_LEFT, amplitude, durationMsec );
+		vrSystem->Vibrate( other, amplitude * scale[ other ], durationMsec );
 	}
+}
+
+/*
+===============
+idPlayer::VREventPulse
+
+openQ4 VR: a pulse for something the player also hears or sees (a blast, a
+reload step, a weapon coming up, a landing). Valve found haptics alone too
+subtle for some players, so none of these stands by itself. They are felt in
+the headset only, where vr_hapticEvents turns them down or off without
+touching the shots, hits, beams and grips; a gamepad's rumble stays as it was.
+===============
+*/
+void idPlayer::VREventPulse( bool weaponHand, bool otherHand, float amplitude, int durationMsec, const char *kind, float direction ) const {
+	if ( vrSystem == NULL || !vrSystem->IsActive() || gameLocal.GetLocalPlayer() != this || !gameLocal.isNewFrame ) {
+		return;
+	}
+	const float events = idMath::ClampFloat( 0.0f, 1.0f, cvarSystem->GetCVarFloat( "vr_hapticEvents" ) );
+	const float strength = idMath::ClampFloat( 0.0f, 1.0f, amplitude ) * events;
+	if ( strength <= 0.0f ) {
+		return;
+	}
+	if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+		gameLocal.Printf( "VR haptic %s: %s, amplitude %.2f for %d ms\n", kind,
+			weaponHand && otherHand ? "both hands" : ( weaponHand ? "weapon hand" : "off hand" ), strength, durationMsec );
+	}
+	VRVibrate( weaponHand, otherHand, strength, durationMsec, direction );
+}
+
+/*
+===============
+idPlayer::VRBlastPulse
+
+openQ4 VR: an effect's shake segment (a rocket's or a grenade's blast, an
+exploding barrel or vehicle, a Strogg's heavy footfall) reaches the hands as
+well as the eyes, whether or not it hurts. The effect's author already scaled
+the shake by its size and faded it with distance, and the blast is seen and
+heard. Effects run once a rendered frame, never again for prediction, so
+multiplayer feels each blast once. A hit felt just now keeps its side.
+===============
+*/
+void idPlayer::VRBlastPulse( float scale ) const {
+	if ( vrSystem == NULL || !vrSystem->IsActive() || gameLocal.GetLocalPlayer() != this || health <= 0 ) {
+		return;
+	}
+	if ( scale < 0.05f || ( vrHitPulseTime > 0 && gameLocal.time - vrHitPulseTime >= 0 && gameLocal.time - vrHitPulseTime < 250 ) ) {
+		return;
+	}
+	const float events = idMath::ClampFloat( 0.0f, 1.0f, cvarSystem->GetCVarFloat( "vr_hapticEvents" ) );
+	const float strength = Min( 1.0f, 0.2f + 0.6f * scale ) * events;
+	if ( strength <= 0.0f ) {
+		return;
+	}
+	if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+		gameLocal.Printf( "VR haptic blast: both hands, amplitude %.2f for 150 ms (shake %.2f)\n", strength, scale );
+	}
+	vrSystem->Vibrate( VR_HAND_LEFT, strength, 150 );
+	vrSystem->Vibrate( VR_HAND_RIGHT, strength, 150 );
+}
+
+/*
+===============
+idPlayer::VRHitSide
+
+openQ4 VR: the hands sit about the head, not about the body's view, which
+in a headset only follows the stick. So a hit is placed by the way the
+tracked head faces: dir is the way the damage travelled, and one travelling
+to the head's left came from its right (1).
+===============
+*/
+float idPlayer::VRHitSide( const idVec3 &dir, float bodySide ) const {
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( !GetVRView( frame, trackingYaw ) || !frame.head.valid ) {
+		return bodySide;
+	}
+	idVec3 headOrigin;
+	idMat3 headAxis;
+	VR_PoseToWorld( frame.head, firstPersonViewOrigin, trackingYaw, headOrigin, headAxis );
+	idVec3 forward = headAxis[ 0 ];
+	forward.z = 0.0f;
+	if ( forward.Normalize() < 0.001f ) {
+		return bodySide;
+	}
+	const idVec3 left( -forward.y, forward.x, 0.0f );
+	const float ahead = dir * forward;
+	const float across = dir * left;
+	const float sideways = idMath::Sqrt( ahead * ahead + across * across );
+	return sideways > 0.001f ? across / sideways : 0.0f;
 }
 
 /*
@@ -20078,9 +20246,18 @@ void idPlayer::ClientDamageEffects ( const idDict& damageDef, const idVec3& dir,
 		// gamepad it rumbles more on the side it came from (PAD-08): dir is the
 		// way the damage travelled, so one moving to the player's left came
 		// from the right.
+		// In a headset the hand on the hit's side feels it most, placed by the
+		// tracked head (VRHitSide); one from ahead or behind shakes both alike.
 		const float sideways = idMath::Sqrt( localDir.x * localDir.x + localDir.y * localDir.y );
-		VRVibrate( true, true, Min( 1.0f, 0.3f + static_cast<float>( damage ) / 50.0f ), 90,
-			sideways > 0.001f ? localDir.y / sideways : 0.0f );
+		const float side = VRHitSide( from, sideways > 0.001f ? localDir.y / sideways : 0.0f );
+		const float hitStrength = Min( 1.0f, 0.3f + static_cast<float>( damage ) / 50.0f );
+		VRVibrate( true, true, hitStrength, 90, side );
+		if ( vrSystem != NULL && vrSystem->IsActive() && gameLocal.GetLocalPlayer() == this && gameLocal.isNewFrame ) {
+			vrHitPulseTime = gameLocal.time;
+			if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+				gameLocal.Printf( "VR haptic hit: both hands, amplitude %.2f for 90 ms, side %.2f\n", hitStrength, side );
+			}
+		}
 	}
 
 	// Visual effects

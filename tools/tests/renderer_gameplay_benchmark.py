@@ -5913,6 +5913,10 @@ def main(argv: list[str]) -> int:
         if not failures:
             print("renderer gameplay benchmark verification: pass")
         return 1 if failures else 0
+    # Refuse a stage older than its build, or one from before the unified game
+    # module, before any capture opens a client on it.
+    from mp_round_remote_smoke import verify_runtime_is_current
+    verify_runtime_is_current(runtime_dir)
     args.pbr_fixture_acceptance_required = requires_pbr_fixture_acceptance(
         args.extra_cvars, args.render_api
     )
