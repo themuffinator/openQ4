@@ -1956,6 +1956,7 @@ typedef enum {
 	SHADOWMAP_DEBUGMODE_COUNT
 } shadowMapDebugMode_t;
 extern idCVar r_shadowMapDebugMode;		// projected shadow-map visualization mode
+extern idCVar r_shadowMapCascadeStableExtent;	// how many nearest cascades are sized by their slice's bounding sphere, so turning the view leaves their scale alone
 extern idCVar r_shadowMapCascadeStabilize;	// snap projected-light cascade bounds to texels
 extern idCVar r_shadowMapCascadeFarMap;		// last cascade holds the whole light past the fitted reach
 extern idCVar r_shadowMapCascadeFarCache;	// GL: cache that cascade's still scenery between frames
