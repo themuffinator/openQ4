@@ -284,6 +284,9 @@ public:
 	virtual int				Seek( long offset, fsOrigin_t origin );
 
 private:
+	bool					BeginSeekCache( void );
+	bool					FillSeekCache( int end );
+
 	idStr					name;			// name of the file in the pak
 	idStr					fullPath;		// full file path including pak file name
 	uint32_t				zipFilePos;		// classic-ZIP central-directory position
@@ -291,6 +294,11 @@ private:
 	int						containerChecksum;
 	uint32_t				contentCrc;		// zip CRC-32 of the member's uncompressed bytes
 	void *					z;				// unzip info
+	// After the first seek, a member up to ZIP_SEEK_CACHE_MAX_BYTES keeps what it
+	// has inflated, so seeking never inflates the same bytes twice.
+	byte *					seekCache;		// inflated bytes [0, seekCacheFilled), or NULL
+	int						seekCacheFilled;
+	int						seekCachePos;	// read position while seekCache is in use
 };
 
 #endif /* !__FILE_H__ */

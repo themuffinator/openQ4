@@ -545,6 +545,15 @@ single idProgram.
 class idProgram {
 private:
 	friend class idCompiler;
+	// "<RESULT>" temporaries by scope; see FindFreeResultDef
+	idList<idVarDef *>							resultDefs;
+	idHashIndex									resultHash;
+	bool										resultIndexValid;
+
+	void										InvalidateResultIndex( void );
+	void										AddResultToIndex( idVarDef *def );
+	void										RemoveResultFromIndex( idVarDef *def );
+
 	// Only compiled code and operand identities contribute to this checksum.
 	mutable bool saveChecksumValid;
 	mutable int saveChecksum;

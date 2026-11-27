@@ -321,6 +321,18 @@ unsafe, trailing-dot/space, and Windows device-name segments. Invalid files are
 removed and the selected parser source is used. Writes use a `.tmp` file,
 `Sync()`, and atomic promotion.
 
+The writer applies the reader's checks before it queues anything, builds the
+record and its trailer in memory byte for byte as the idFile writes did, and
+opens the `.tmp` file on the load thread. A background thread writes, syncs
+and closes it while the load goes on. At most 16 staging files are queued open,
+because the C runtime limits open streams per process and a full queue made
+the next PK4 open fail in openPR06, and at most 64 MiB of record data. The main
+thread promotes each written file over its final name when it next queues or
+reads a cache and at game shutdown, which first waits for the queue: promotion
+clears the filesystem's directory cache, which the main thread reads. A cache
+not yet promoted is a plain miss. Ported from openPR06 (#54), where it cut a
+first visit's load time by 28%.
+
 The v3 reader first holds the bounded on-disk record so it can verify the whole
 record CRC before trusting lengths, then copies the verified record into a
 read-only memory file for field parsing. Its 528 MiB record cap therefore makes

@@ -1208,6 +1208,9 @@ void idGameLocal::Shutdown( void ) {
 	// shutdown the model exporter
 	idModelExport::Shutdown();
 
+	// generated animation caches still being written
+	idMD5Anim_FinishGeneratedCacheWrites();
+
 	if ( moduleEventInitStarted ) {
 		idEvent::Shutdown();
 		moduleEventInitStarted = false;

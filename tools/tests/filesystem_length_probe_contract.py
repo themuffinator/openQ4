@@ -16,8 +16,10 @@ otherwise schedule preloads of payloads nobody reads.
 Loose search directories: every packed-asset lookup first fails an fopen in
 each loose search directory ahead of its pak. During a level load the
 existence of each directory on the way is checked once, top-down, and a lookup
-under a directory known to be missing skips the open. CreateOSPath must forget
-every negative answer, so files written mid-load are always found.
+under a directory known to be missing skips the open. On a case-sensitive
+filesystem a directory missing under its exact name is looked up again ignoring
+case, as the open would. CreateOSPath must forget every negative answer, so
+files written mid-load are always found, and creates each directory once.
 
 The real ReadFile, OpenFileReadSearch, CreateOSPath and memo bodies are
 compiled against stubs.
@@ -48,6 +50,7 @@ SUPPORT_HEAD = r'''
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 typedef long long ID_TIME_T;
 typedef unsigned char byte;
@@ -171,9 +174,14 @@ public:
 
 static ID_TIME_T Sys_FileTimeStamp( FILE * ) { return 0; }
 
-// The OS directory tree the memo observes: lower-case-insensitive like Windows.
+// The OS directory tree the memo observes: case-insensitive like Windows,
+// unless caseSensitiveDirectories holds the exact names of a POSIX tree.
 static std::set<std::string> existingDirectories;
+static std::set<std::string> caseSensitiveDirectories;
+static bool caseSensitiveTree = false;
 static int directoryStats = 0;
+static int caseInsensitiveResolves = 0;
+static int mkdirCalls = 0;
 static std::string FoldPath( const char *path ) {
 	std::string folded;
 	for ( const char *c = path; *c; ++c ) {
@@ -183,9 +191,14 @@ static std::string FoldPath( const char *path ) {
 }
 static bool FS_IsOSDirectory( const char *osPath ) {
 	++directoryStats;
+	if ( caseSensitiveTree ) {
+		return caseSensitiveDirectories.count( osPath ) != 0;
+	}
 	return existingDirectories.count( FoldPath( osPath ) ) != 0;
 }
-static void Sys_Mkdir( const char *path ) { existingDirectories.insert( FoldPath( path ) ); }
+static void Sys_Mkdir( const char *path ) { ++mkdirCalls; existingDirectories.insert( FoldPath( path ) ); }
+static std::mutex createdOSPathLock;
+static std::unordered_set<std::string> createdOSPaths;
 static bool FS_HasParentOSPathSegment( const char *path ) { return strstr( path, ".." ) != nullptr; }
 '''
 
@@ -239,6 +252,13 @@ public:
 	bool LooseDirectoryMissing( const directory_t *dir, const char *relativePath );
 	bool LooseDirectoryMissingLocked( const std::string &key, const std::string &osPath );
 	void CreateOSPath( const char *OSPath );
+	bool ResolveCaseInsensitiveOSPath( const char *path, idStr &resolvedPath, bool ) {
+		++caseInsensitiveResolves;
+		for ( const std::string &name : caseSensitiveDirectories ) {
+			if ( FoldPath( name.c_str() ) == FoldPath( path ) ) { resolvedPath = name.c_str(); return true; }
+		}
+		return false;
+	}
 	idFile *OpenFileRead( const char *relativePath, bool allowCopyFiles ) {
 		return OpenFileReadSearch( relativePath, FSFLAG_SEARCH_DIRS | FSFLAG_SEARCH_PAKS, nullptr, allowCopyFiles, nullptr, nullptr );
 	}
@@ -293,7 +313,12 @@ struct Fixture {
 		pakPath.pack = &pak;
 		fs.searchPaths = &dirPath;
 		existingDirectories.clear();
+		caseSensitiveDirectories.clear();
+		caseSensitiveTree = false;
 		directoryStats = 0;
+		caseInsensitiveResolves = 0;
+		mkdirCalls = 0;
+		createdOSPaths.clear();
 	}
 };
 
@@ -443,18 +468,36 @@ static void LooseDirectoryMemo() {
 		assert( !f.fs.LooseDirectoryMissing( &f.dir, "generated/images/a.bimage" ) );
 		// positive answers survive the invalidation
 		assert( f.fs.looseDirectoryExists.at( "c:/game/baseoq4" ) );
+		// each directory on the way is created once per process
+		const int mkdirsAfterFirst = mkdirCalls;
+		f.fs.CreateOSPath( "C:/Game/baseoq4/generated/images/b.bimage" );
+		assert( mkdirsAfterFirst == 5 && mkdirCalls == mkdirsAfterFirst );	// C:, Game, baseoq4, generated, images
 	}
 	{
-		// opted out, or on a case-sensitive filesystem, the memo stays off
+		// on a case-sensitive filesystem a directory missing under its exact
+		// name is found ignoring case, as the open would find it
+		Fixture f;
+		caseSensitiveTree = true;
+		fs_caseSensitiveOS.value = 1;
+		caseSensitiveDirectories.insert( "C:/Game/baseoq4" );
+		caseSensitiveDirectories.insert( "C:/Game/baseoq4/Textures" );
+		f.fs.SetLooseDirectoryCacheActive( true );
+		assert( f.fs.looseDirectoryCacheActive );
+		assert( f.fs.LooseDirectoryMissing( &f.dir, "textures/base/wall.tga" ) );
+		assert( caseInsensitiveResolves == 2 );	// textures/, then textures/base/
+		assert( f.fs.LooseDirectoryMissing( &f.dir, "TEXTURES/Base/x.tga" ) );
+		assert( caseInsensitiveResolves == 2 );
+		assert( !f.fs.LooseDirectoryMissing( &f.dir, "textures/y.tga" ) );
+		fs_caseSensitiveOS.value = 0;
+	}
+	{
+		// opted out, the memo stays off
 		Fixture f;
 		fs_cacheLooseDirectories.value = 0;
 		f.fs.SetLooseDirectoryCacheActive( true );
 		assert( !f.fs.looseDirectoryCacheActive && !f.fs.LooseDirectoryMissing( &f.dir, "a/b.tga" ) );
+		assert( directoryStats == 0 );
 		fs_cacheLooseDirectories.value = 1;
-		fs_caseSensitiveOS.value = 1;
-		f.fs.SetLooseDirectoryCacheActive( true );
-		assert( !f.fs.looseDirectoryCacheActive && directoryStats == 0 );
-		fs_caseSensitiveOS.value = 0;
 	}
 }
 

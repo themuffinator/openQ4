@@ -12,6 +12,58 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Pack seeks, background animation caches and no config rewrite at launch, from openPR06, 27 November 2026
+
+The third openPR06 port round: danperisse-hue's pull requests #53-#81 and
+issues #61-#78, reviewed from openPR06 eae938d69 to 181cd5749.
+
+- **Pack members keep what they inflate when seeked** (#53). A deflated PK4
+  member could only be read forward, so every seek reopened it and inflated
+  everything before the target again. From the first seek that moves, a
+  member up to 32 MiB keeps its inflated bytes and serves reads and seeks
+  from memory; larger members keep the old path, and a seek to the current
+  position does nothing.
+- **Animation caches are written in the background** (#54, with openPR06's
+  version-3 adaptation). With `com_levelLoadModernization 1`, each `.banim`
+  record is built in memory and written, synced and closed by a writer thread;
+  the main thread promotes it. See
+  [MD5 animations](loading-cache-modernization.md#md5-animations).
+- **The configuration is not rewritten at every launch** (#63). A module
+  that registered an archived cvar the config had already set flagged the
+  archive as modified, so the first frame wrote `openQ4Config.cfg` again.
+  Archive is now flagged only when the declaration makes a cvar archived.
+- **Script result temporaries are indexed by scope** (#64), so the compiler no
+  longer walks every `<RESULT>` of every function compiled so far for each
+  expression. openQ4 already had its own index of immediates, so #59 was not
+  needed.
+- **Linux:** the loose-directory memo also runs on case-sensitive filesystems
+  (#56; openPR06 measured 2.4 million stat calls for one startup and map
+  load without it). glibc malloc arenas are capped at two unless
+  `MALLOC_ARENA_MAX` is set (#71). The fatal-breadcrumb directory is created
+  level by level like `mkdir -p` (#57). `com_timestampPrints` describes its
+  values as they behave (1 seconds, 2 milliseconds; #60).
+- **Docs:** BUILDING.md explains running the Linux stock smokes under a
+  headless Weston (from #81).
+- **Not ported, because openQ4 already has it or it is Prey-only:** #48,
+  #55, #59, #66-#68, #70, #73, #74, #76 (openQ4's `idPVS::Shutdown` already
+  uses `delete[]`, and no class derives from `idMD5Anim`), #77, #79, #80, and
+  issues #62, #75 and #78. Issue #61's first-launch fix (one renderer start
+  instead of two, and the menu-music envelope off the main thread) is left for
+  a separate change, because it decides which preset cvars the running GL and
+  Vulkan devices take without a restart.
+- Evidence: the client and dedicated server build, and the 20 contract tests
+  that read the changed code pass. A hidden-window, soundless
+  `game/airdefense1` run with a fresh save folder wrote 820 animation caches
+  and left no `.tmp`; the second run read every one back without rewriting
+  any, in 14.7 s against 23.2 s. On a copy of that save folder, today's
+  previous build rewrote the configuration on a launch where nothing changed,
+  and this build did not. An autosave written by the previous build restores
+  on this one. The dedicated server ran `mp/q4dm1`, writing 234 animation
+  caches, with the same 108 warnings as the previous build. No native Linux
+  build was made: `Posix_MkdirParents` compiles and runs in the Android
+  save-path harness, and the `mallopt( M_ARENA_MAX, 2 )` call compiles and
+  returns success in a WSL glibc probe.
+
 ## 3D headphone audio is a choice, not a guess, 27 November 2026
 
 - **Sounds in the world keep their full tone unless you ask for 3D headphone

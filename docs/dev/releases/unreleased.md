@@ -591,6 +591,16 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- **Quicker loads and a menu that appears without a stall**, from openPR06,
+  thanks to danperisse-hue. A sound or model read back and forth inside a pack
+  is inflated once instead of again at each seek (openPR06 measured first
+  visits of six maps 26% faster and revisits 11.5% faster). With the
+  level-load cache on, animation caches are written in the background (28%
+  off a first visit there). The game no longer rewrites its configuration file
+  at every launch, which held the screen for up to half a second as the menu
+  appeared. On Linux, level loads no longer probe every loose folder in every
+  letter case (about five times faster in openPR06), memory stays lower from
+  map to map, and the crash-report folder is created on a first run.
 - Weapons, creatures, voices and ambience sound clearer. Most Quake 4 sounds are
   recorded at 22 kHz, and the filter that converts them to your sound device's
   rate was too short: it removed most of what they have above 6 kHz, which made

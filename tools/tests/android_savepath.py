@@ -45,18 +45,30 @@ static void reset(){
     savepath.clear();environment.clear();created.clear();posix_fatalBreadcrumbPath[0]='\0';
     internalStorage="/data/user/0/com.darkmatter.openq4/files";
 }
+struct SaveRootCase {const char* root;std::vector<std::string> levels;};
 int main(){try {
-    for(const char* root:{"/data/user/0/com.darkmatter.openq4/files/saves", "/private/player saves///", "/"}){
-        reset();environment[OPENQ4_ANDROID_SAVE_ROOT_ENV]=root;environment["USER_FILES"]="/legacy";
-        std::string expected=root;while(expected.size()>1 && expected.back()=='/')expected.pop_back();
+    // The fatal directory is created like mkdir -p: every level from the top,
+    // because a first run's save root may not exist yet.
+    const std::string app="/data/user/0/com.darkmatter.openq4";
+    const SaveRootCase cases[]={
+        {"/data/user/0/com.darkmatter.openq4/files/saves",
+         {"/data","/data/user","/data/user/0",app,app+"/files",app+"/files/saves",
+          app+"/files/saves/baseoq4",app+"/files/saves/baseoq4/logs"}},
+        {"/private/player saves///",
+         {"/private","/private/player saves","/private/player saves/baseoq4","/private/player saves/baseoq4/logs"}},
+        {"/",{"/baseoq4","/baseoq4/logs"}},
+    };
+    for(const SaveRootCase& test:cases){
+        reset();environment[OPENQ4_ANDROID_SAVE_ROOT_ENV]=test.root;environment["USER_FILES"]="/legacy";
+        std::string expected=test.root;while(expected.size()>1 && expected.back()=='/')expected.pop_back();
         require(Sys_DefaultSavePath()==expected,"explicit save root did not win over legacy/default paths");
         Posix_InitFatalBreadcrumbPath();
         std::string directory=expected+(expected.back()=='/'?"":"/")+"baseoq4";
         require(posix_fatalBreadcrumbPath==directory+"/logs/fatal.txt","fatal report is outside the selected save root");
-        require(created==std::vector<std::string>{directory,directory+"/logs"},"fatal directory creation changed");
+        require(created==test.levels,"fatal directory creation changed");
         environment[OPENQ4_ANDROID_SAVE_ROOT_ENV]="/different";
         require(Sys_DefaultSavePath()==expected,"cached save path moved during the same engine instance");
-        Posix_InitFatalBreadcrumbPath();require(created.size()==2,"cached fatal path repeated initialization");
+        Posix_InitFatalBreadcrumbPath();require(created.size()==test.levels.size(),"cached fatal path repeated initialization");
     }
     for(const char* invalid:{"", "relative/saves", "content://external/tree/saves"}){
         reset();environment[OPENQ4_ANDROID_SAVE_ROOT_ENV]=invalid;environment["USER_FILES"]="/legacy///";
@@ -79,9 +91,11 @@ def source():
     constant = re.search(r'^#define OPENQ4_ANDROID_SAVE_ROOT_ENV\s+"[^"]+"', header, re.M)
     if not constant:
         raise RuntimeError('Android save-root environment contract is missing')
+    posix = (ROOT/'src/sys/posix/posix_main.cpp').read_text()
     return (SUPPORT + '\n' + constant.group() + '\n'
             + function_body((ROOT/'src/sys/android/android_main.cpp').read_text(), 'const char *Sys_DefaultSavePath(')
-            + function_body((ROOT/'src/sys/posix/posix_main.cpp').read_text(), 'void Posix_InitFatalBreadcrumbPath(')
+            + function_body(posix, 'static void Posix_MkdirParents(')
+            + function_body(posix, 'void Posix_InitFatalBreadcrumbPath(')
             + MAIN)
 
 

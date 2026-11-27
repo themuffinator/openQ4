@@ -339,6 +339,28 @@ Retain the exact JSON as
 the accepted manifest binds its raw bytes and the release gate validates its
 native ARM64, Wayland, physical-host, and candidate-binary identity.
 
+### Running The Stock Smokes Without A Desktop
+
+Both stock smokes need a Wayland socket, not a desktop. Without one, a headless
+Weston gives them a socket that opens no window:
+
+```bash
+export XDG_RUNTIME_DIR=$HOME/.wl-runtime
+mkdir -p "$XDG_RUNTIME_DIR" && chmod 700 "$XDG_RUNTIME_DIR"
+weston --backend=headless --renderer=pixman --socket=wayland-smoke --width=1920 --height=1080 --idle-time=0 &
+export WAYLAND_DISPLAY=wayland-smoke
+```
+
+Use Weston's `pixman` renderer: with `noop` it never answers frame callbacks,
+so the client blocks at its first buffer swap. The SP smoke fails on any OpenAL
+device error, so on a machine without an audio device set `ALSOFT_DRIVERS=null`
+to give OpenAL Soft a silent one. On WSL, Mesa picks zink, which fails there,
+and falls back to llvmpipe, which is too slow for these smokes;
+`GALLIUM_DRIVER=d3d12` uses the GPU instead. The d3d12 driver has been seen to
+end the process after 15 to 25 map loads, so longer map-cycling runs on WSL
+need llvmpipe. A headless Weston run is not physical-hardware evidence and
+never takes `--physical-hardware`.
+
 ### Linux Sanitizer Validation
 
 On Linux, use this when touching memory-sensitive code, SDL event normalization, display/window geometry, staged source handling, or parser/launcher logic:

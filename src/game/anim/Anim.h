@@ -255,6 +255,9 @@ public:
 ==============================================================================================
 */
 
+// Waits until every queued generated animation cache is on disk.
+void idMD5Anim_FinishGeneratedCacheWrites( void );
+
 class idMD5Anim {
 private:
 	int						numFrames;

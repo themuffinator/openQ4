@@ -274,7 +274,13 @@ void idInternalCVar::Update( const idCVar *cvar ) {
 		valueStrings = CopyValueStrings( cvar->GetValueStrings() );
 		valueCompletion = cvar->GetValueCompletion();
 		UpdateValue();
-		cvarSystem->SetModifiedFlags( cvar->GetFlags() );
+		// The value is the one the user already set, so a cvar the
+		// configuration already archives has nothing new to write. Flag
+		// archive only when the declaration makes the cvar archived, as when
+		// a "set" value meets a CVAR_ARCHIVE declaration. Flagging it for
+		// every archived cvar of a module loaded after the config rewrote
+		// the config file on every launch.
+		cvarSystem->SetModifiedFlags( cvar->GetFlags() & ~( flags & CVAR_ARCHIVE ) );
 	}
 
 	flags |= cvar->GetFlags();

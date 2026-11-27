@@ -105,10 +105,23 @@ def validate_level_load_heap_release() -> None:
         raise AssertionError("level load must release free heap memory after the settle frames")
 
 
+def validate_malloc_arena_cap() -> None:
+    posix = read("src/sys/posix/posix_main.cpp")
+    body = function_body(posix, "void Posix_EarlyInit( void ) {")
+    require(body, "#if defined( __GLIBC__ )", "glibc malloc arena cap")
+    require(body, 'if ( getenv( "MALLOC_ARENA_MAX" ) == NULL ) {', "user MALLOC_ARENA_MAX wins")
+    require(body, "mallopt( M_ARENA_MAX, 2 );", "glibc malloc arena cap")
+    cap = body.find("mallopt( M_ARENA_MAX, 2 );")
+    thread = body.find("posix_mainThread = pthread_self();")
+    if cap == -1 or thread == -1 or cap > thread:
+        raise AssertionError("the malloc arena cap must be set before Posix_EarlyInit does anything else")
+
+
 def main() -> None:
     validate_posix_page_locking()
     validate_ram_total_helpers()
     validate_level_load_heap_release()
+    validate_malloc_arena_cap()
     validate_release_note()
     print("posix_memory_management: ok")
 

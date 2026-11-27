@@ -1453,6 +1453,9 @@ idFile_InZip::idFile_InZip( void ) {
 	containerChecksum = 0;
 	contentCrc = 0;
 	memset( &z, 0, sizeof( z ) );
+	seekCache = NULL;
+	seekCacheFilled = 0;
+	seekCachePos = 0;
 }
 
 /*
@@ -1461,6 +1464,7 @@ idFile_InZip::~idFile_InZip
 =================
 */
 idFile_InZip::~idFile_InZip( void ) {
+	Mem_Free( seekCache );
 	unzCloseCurrentFile( z );
 	unzClose( z );
 }
@@ -1479,6 +1483,22 @@ int idFile_InZip::Read( void *buffer, int len ) {
 	}
 	byte *buf = static_cast<byte *>( buffer );
 	int totalRead = 0;
+
+	if ( seekCache != NULL ) {
+		const int want = Min( len, fileSize - seekCachePos );
+		if ( want <= 0 ) {
+			return 0;
+		}
+		FillSeekCache( seekCachePos + want );
+		const int got = Min( want, seekCacheFilled - seekCachePos );
+		if ( got <= 0 ) {
+			return -1;
+		}
+		memcpy( buf, seekCache + seekCachePos, got );
+		seekCachePos += got;
+		fileSystem->AddToReadCount( got );
+		return got;
+	}
 
 	while ( totalRead < len ) {
 		const int block = Min( len - totalRead, readChunkBytes );
@@ -1537,6 +1557,9 @@ idFile_InZip::Tell
 =================
 */
 int idFile_InZip::Tell( void ) {
+	if ( seekCache != NULL ) {
+		return seekCachePos;
+	}
 	return unztell( z );
 }
 
@@ -1570,6 +1593,65 @@ ID_TIME_T idFile_InZip::ContentStamp( void ) {
 	return FS_PakMemberContentStamp( contentCrc, fileSize );
 }
 
+#define ZIP_SEEK_BUF_SIZE	(1<<15)
+#define ZIP_SEEK_CACHE_MAX_BYTES	( 32 << 20 )
+#define ZIP_SEEK_CACHE_STEP_BYTES	( 64 << 10 )
+
+/*
+=================
+idFile_InZip::BeginSeekCache
+
+A deflated member can only be read forward, so a seek used to reopen it
+and inflate everything up to the target again. A wave file's chunk scan
+and a model's chunk reader seek back and forth, which inflated most of
+the file twice or more. From the first seek on, a member that fits keeps
+what it inflates and serves reads and seeks from memory.
+=================
+*/
+bool idFile_InZip::BeginSeekCache( void ) {
+	if ( seekCache != NULL ) {
+		return true;
+	}
+	if ( fileSize <= 0 || fileSize > ZIP_SEEK_CACHE_MAX_BYTES ) {
+		return false;
+	}
+	if ( unzSetCurrentFileInfoPosition( z, static_cast<unsigned long>( zipFilePos ) ) != UNZ_OK ||
+		unzOpenCurrentFile( z ) != UNZ_OK ) {
+		return false;
+	}
+	seekCache = static_cast<byte *>( Mem_Alloc( fileSize ) );
+	if ( seekCache == NULL ) {
+		return false;
+	}
+	seekCacheFilled = 0;
+	seekCachePos = 0;
+	return true;
+}
+
+/*
+=================
+idFile_InZip::FillSeekCache
+
+Inflates on into the cache until it holds [0, end). Small reads round up to
+a step so a chunk reader does not call into the inflater for every field.
+=================
+*/
+bool idFile_InZip::FillSeekCache( int end ) {
+	end = Min( fileSize, Max( end, Min( seekCacheFilled + ZIP_SEEK_CACHE_STEP_BYTES, fileSize ) ) );
+	while ( seekCacheFilled < end ) {
+		const int block = Min( end - seekCacheFilled, ZIP_SEEK_CACHE_STEP_BYTES );
+		const int l = unzReadCurrentFile( z, seekCache + seekCacheFilled, block );
+		if ( l <= 0 ) {
+			return false;
+		}
+		seekCacheFilled += l;
+		if ( l == ZIP_SEEK_CACHE_STEP_BYTES ) {
+			common->LoadingCheckpoint();
+		}
+	}
+	return true;
+}
+
 /*
 =================
 idFile_InZip::Seek
@@ -1577,11 +1659,33 @@ idFile_InZip::Seek
   returns zero on success and -1 on failure
 =================
 */
-#define ZIP_SEEK_BUF_SIZE	(1<<15)
-
 int idFile_InZip::Seek( long offset, fsOrigin_t origin ) {
 	int res, i;
 	char *buf;
+
+	long target;
+	switch( origin ) {
+		case FS_SEEK_CUR: target = Tell() + offset; break;
+		case FS_SEEK_SET: target = offset; break;
+		case FS_SEEK_END: target = fileSize - offset; break;
+		default: target = -1; break;
+	}
+	if ( seekCache != NULL ) {
+		if ( target < 0 || target > fileSize ) {
+			return -1;
+		}
+		seekCachePos = static_cast<int>( target );
+		return 0;
+	}
+	if ( target >= 0 && target <= fileSize ) {
+		if ( target == unztell( z ) ) {
+			return 0;
+		}
+		if ( BeginSeekCache() ) {
+			seekCachePos = static_cast<int>( target );
+			return 0;
+		}
+	}
 
 	switch( origin ) {
 		case FS_SEEK_END: {

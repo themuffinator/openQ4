@@ -1480,6 +1480,63 @@ idVarDef *idProgram::GetDefList( const char *name ) const {
 
 /*
 ============
+Result index
+
+FindFreeResultDef reuses a "<RESULT>" temporary of the same type and scope.
+It walked every result of every function compiled so far to find one, so
+each expression cost a pass over all of them. The index chains the results
+by scope, newest first, the order of the def list, and FindFreeResultDef
+applies the same tests to that chain, so it returns the def the walk
+returned. AllocDef adds each new result and FreeDef takes one out; Restart
+and FreeData drop the index and the next lookup rebuilds it.
+============
+*/
+static int ResultScopeHash( const idVarDef *scope ) {
+	const unsigned int key = static_cast<unsigned int>( reinterpret_cast<uintptr_t>( scope ) >> 4 );
+	return static_cast<int>( ( key * 2654435761u ) & 0x7fffffff );
+}
+
+/*
+============
+idProgram::AddResultToIndex
+============
+*/
+void idProgram::AddResultToIndex( idVarDef *def ) {
+	resultHash.Add( ResultScopeHash( def->scope ), resultDefs.Append( def ) );
+}
+
+/*
+============
+idProgram::RemoveResultFromIndex
+============
+*/
+void idProgram::RemoveResultFromIndex( idVarDef *def ) {
+	if ( !resultIndexValid || idStr::Cmp( def->Name(), RESULT_STRING ) != 0 ) {
+		return;
+	}
+	const int hash = ResultScopeHash( def->scope );
+	for( int i = resultHash.First( hash ); i != -1; i = resultHash.Next( i ) ) {
+		if ( resultDefs[ i ] == def ) {
+			resultHash.Remove( hash, i );
+			resultDefs[ i ] = NULL;
+			return;
+		}
+	}
+}
+
+/*
+============
+idProgram::InvalidateResultIndex
+============
+*/
+void idProgram::InvalidateResultIndex( void ) {
+	resultDefs.Clear();
+	resultHash.Free();
+	resultIndexValid = false;
+}
+
+/*
+============
 idProgram::AddDefToNameList
 ============
 */
@@ -1523,6 +1580,9 @@ idVarDef *idProgram::AllocDef( idTypeDef *type, const char *name, idVarDef *scop
 
 	// add the def to the list with defs with this name and set the name pointer
 	AddDefToNameList( def, name );
+	if ( resultIndexValid && !strcmp( name, RESULT_STRING ) ) {
+		AddResultToIndex( def );
+	}
 
 	if ( ( type->Type() == ev_vector ) || ( ( type->Type() == ev_field ) && ( type->FieldType()->Type() == ev_vector ) ) ) {
 		//
@@ -1726,6 +1786,7 @@ void idProgram::FreeDef( idVarDef *def, const idVarDef *scope ) {
 		varDefs[ i ]->num = i;
 	}
 
+	RemoveResultFromIndex( def );
 	delete def;
 }
 
@@ -1736,7 +1797,32 @@ idProgram::FindFreeResultDef
 */
 idVarDef *idProgram::FindFreeResultDef( idTypeDef *type, const char *name, idVarDef *scope, const idVarDef *a, const idVarDef *b ) {
 	idVarDef *def;
-	
+
+	if ( !strcmp( name, RESULT_STRING ) ) {
+		if ( !resultIndexValid ) {
+			idList<idVarDef *> newestFirst;
+			for( def = GetDefList( RESULT_STRING ); def != NULL; def = def->Next() ) {
+				newestFirst.Append( def );
+			}
+			resultDefs.Clear();
+			resultDefs.SetGranularity( 1024 );
+			resultHash.Clear( 4096, 1024 );
+			resultHash.SetGranularity( 1024 );
+			for( int i = newestFirst.Num() - 1; i >= 0; i-- ) {
+				AddResultToIndex( newestFirst[ i ] );
+			}
+			resultIndexValid = true;
+		}
+		for( int i = resultHash.First( ResultScopeHash( scope ) ); i != -1; i = resultHash.Next( i ) ) {
+			def = resultDefs[ i ];
+			if ( def->scope != scope || def == a || def == b || def->TypeDef() != type || def->numUsers <= 1 ) {
+				continue;
+			}
+			return def;
+		}
+		return AllocDef( type, name, scope, false );
+	}
+
 	for( def = GetDefList( name ); def != NULL; def = def->Next() ) {
 		if ( def == a || def == b ) {
 			continue;
@@ -2289,6 +2375,7 @@ void idProgram::FreeData( void ) {
 	int i;
 
 	// free the defs
+	InvalidateResultIndex();
 	varDefs.DeleteContents( true );
 	varDefNames.DeleteContents( true );
 	varDefNameHash.Free();
@@ -2615,6 +2702,7 @@ void idProgram::Restart( void ) {
 	}
 	types.SetNum( top_types, false );
 
+	InvalidateResultIndex();
 	for( i = top_defs; i < varDefs.Num(); i++ ) {
 		delete varDefs[ i ];
 	}
