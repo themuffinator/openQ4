@@ -3746,25 +3746,57 @@ def control_settings(value) -> set[str]:
     return found
 
 
+def reset_mark_conditions(document: dict) -> dict:
+    """What shows each row's reset mark (retained_system.preset_mark), by row:
+    the draft has left the value the preset gives that row."""
+    marks = {}
+    for binding in document['bindings']:
+        value = binding['value']
+        if binding['property'] == 'display' and binding['node'].endswith('_reset') and isinstance(value, dict) and \
+                value.get('op') == 'select' and value['args'][1:] == ['block', 'none']:
+            marks[binding['node'][:-len('_reset')]] = value['args'][0]
+    return marks
+
+
+def shown_setting_value(node: dict, marks: dict):
+    """The part of a control's value that shows its own setting. Performance
+    Preset reads Custom while its reset mark shows, which compares every row the
+    preset fills with the preset's value: those reads are the mark's, not a
+    control for each row, so only the preset name it otherwise shows counts.
+    Custom is an entry that cannot be chosen, so the preset never writes it."""
+    value = node['control']['value']
+    if isinstance(value, dict) and value.get('op') == 'select' and len(value['args']) == 3 and value['args'][1] == 'custom':
+        assert node['id'] in marks and value['args'][0] == marks[node['id']], \
+            f'{node["id"]} reads Custom by a test its reset mark does not show on'
+        custom = [option for option in node['control'].get('options', []) if option['value'] == 'custom']
+        assert len(custom) == 1 and custom[0].get('enabled') is False, f'{node["id"]}: Custom must be one entry that cannot be chosen'
+        return value['args'][2]
+    return value
+
+
 def retained_system_controls() -> set[str]:
     """Every setting the retained SYSTEM page has a control for: the settings the
     values of controls that act read."""
     found = set()
+    document = retained_system_document()
+    marks = reset_mark_conditions(document)
 
     def walk(node):
         control = node.get('control')
         if isinstance(control, dict) and 'value' in control and (control.get('action') or control.get('event')):
-            found.update(control_settings(control['value']))
+            found.update(control_settings(shown_setting_value(node, marks)))
         for child in node.get('children', []):
             walk(child)
 
-    walk(retained_system_document()['root'])
+    walk(document['root'])
     return found
 
 
 def check_retained_system_control_writes() -> None:
     """A control counts for a setting only when its action writes that setting."""
     document = retained_system_document()
+    marks = reset_mark_conditions(document)
+    assert 'settings_preset' in marks, 'Performance Preset no longer has a reset mark'
 
     def walk(node):
         control = node.get('control')
@@ -3773,7 +3805,7 @@ def check_retained_system_control_writes() -> None:
             operation = action['operation']
             writes = set(action.get('arguments', {})) if operation == 'settings.system.edit' else OPERATION_WRITES.get(operation)
             assert writes is not None, f'{node["id"]}: unknown write set for {operation}'
-            missing = control_settings(control['value']) - writes
+            missing = control_settings(shown_setting_value(node, marks)) - writes
             assert not missing, f'{node["id"]} reads {sorted(missing)} but {control["action"]} ({operation}) does not write them'
         for child in node.get('children', []):
             walk(child)
@@ -5716,6 +5748,26 @@ def main() -> int:
         gated = (ROOT / source).read_text(encoding='utf-8', errors='replace')
         assert gate in gated and 'cvarSystem->Find( "ui_retained" )' in gated, f'{cvar} is not gated on ui_retained'
         assert not re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} has a stock row: drop its exemption'
+    # A setting the retained documents read themselves needs no gate in code:
+    # Menu Tooltips (ui_tooltips) shows the settings pages' tooltip card, which
+    # the stock pages do not have. The engine declares it and the adapter's
+    # rules accept it, but no code reads it and no stock GUI names it; the
+    # retained settings pages bind it to their tooltip state. Code or a stock
+    # GUI that honors it ends the exemption: then the stock page owes the row.
+    RETAINED_DOCUMENT_SETTINGS = {'ui_tooltips': ('src/ui/RetainedUI.cpp', 'tooltip.enabled')}
+    engine_sources = {path.relative_to(ROOT).as_posix(): path.read_text(encoding='utf-8', errors='replace') for path in (ROOT / 'src').rglob('*')
+                      if path.suffix in ('.c', '.cpp', '.h', '.hpp', '.inl') and path.is_file()}
+    stock_guis = {path.relative_to(ROOT).as_posix(): path.read_text(encoding='utf-8', errors='replace')
+                  for path in (ROOT / 'content').rglob('*.gui') if path.is_file()}
+    for cvar, (declared, state) in RETAINED_DOCUMENT_SETTINGS.items():
+        named = {path for path, text in engine_sources.items() if re.search(rf'\b{cvar}\b', text)}
+        assert named == {declared, 'src/ui/UserInterfaceRetained.cpp'}, f'{cvar} is named in {sorted(named)}: drop its exemption if code honors it'
+        assert re.search(rf'^idCVar {cvar}\("{cvar}",', engine_sources[declared], re.M) and f'{cvar}.Get' not in engine_sources[declared], \
+            f'{declared} must declare {cvar} and not read it'
+        assert cvar in rules, f'the player rules no longer accept {cvar}'
+        assert game_document['state'][state].get('cvar') == cvar, f'GAME OPTIONS no longer binds {cvar} to {state}'
+        assert not [path for path, text in stock_guis.items() if re.search(rf'\b{cvar}\b', text)], f'a stock GUI names {cvar}: drop its exemption'
+    del engine_sources, stock_guis
     # The controller's Aim, Gyro and Feedback tabs (PAD-01 to PAD-08) are on
     # the retained page first. The stock page keeps the three controller rows
     # they refine (Stick Dead Zone, Look Sensitivity and Gyro Sensitivity,
@@ -5747,7 +5799,7 @@ def main() -> int:
             action = document['actions'][f'set.{cvar}']
             assert action['operation'] == 'settings.player.set' and action['arguments'] == {'cvar': cvar, 'value': {'input': 'value'}}, cvar
             assert cvar in rules and (kind != 'choice' or not isinstance(extra[1][0], str) or rules[cvar] == list(extra[1])), cvar
-            assert cvar in RETAINED_ONLY_GAME_SETTINGS or cvar in STOCK_ROWS_PENDING or \
+            assert cvar in RETAINED_ONLY_GAME_SETTINGS or cvar in RETAINED_DOCUMENT_SETTINGS or cvar in STOCK_ROWS_PENDING or \
                 re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
     # The CONTROLS page: the button's and the multiplayer menu's routes as
     # GAME OPTIONS'; its rows are the stock page's bindings in its order, the
