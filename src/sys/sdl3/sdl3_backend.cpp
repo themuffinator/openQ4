@@ -291,6 +291,15 @@ static idCVar in_gyroCalibrationState("in_gyroCalibrationState", "0", CVAR_SYSTE
 static idCVar in_touchpadMode("in_touchpadMode", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "SDL gamepad touchpad mode: 0=off, 1=menu cursor, 2=mouse-look, 3=button-only", 0, 3);
 static idCVar in_touchpadSensitivity("in_touchpadSensitivity", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "SDL gamepad touchpad motion sensitivity", 0.0f, 8.0f);
 static idCVar in_touchscreen("in_touchscreen", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "route SDL touchscreen events to menu and loading UI mouse input");
+#if !defined(__ANDROID__) || defined(OPENQ4_SIGMATOUCH)
+// The built-in touch controls' settings (src/sys/android/android_touch_controls.cpp)
+// exist everywhere, so the retained CONTROLS page can read them; only Android's
+// built-in controls act on them, and elsewhere the page hides their rows.
+static idCVar in_touchControls("in_touchControls", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "show the built-in touch gameplay controls (Android only)");
+static idCVar in_touchControlsScale("in_touchControlsScale", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "size of the touch gameplay controls (Android only)", 0.75f, 1.5f);
+static idCVar in_touchLayoutPreset("in_touchLayoutPreset", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "touch layout: 0 default, 1 compact, 2 left-handed (Android only)", 0, 2);
+static idCVar in_touchLookSensitivity("in_touchLookSensitivity", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT, "touch drag-to-look speed (Android only)", 0.1f, 4.0f);
+#endif
 static idCVar com_steamDeckAutoFrameCap("com_steamDeckAutoFrameCap", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL, "apply a Steam Deck frame cap when com_maxfps is still at the global default");
 static idCVar com_steamDeckFrameCap("com_steamDeckFrameCap", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER, "Steam Deck frame cap override (0 = detected display refresh, clamped for Deck)", 0, 1000);
 static idCVar r_screen("r_screen", "-1", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_INTEGER, "SDL3 display index to target (-1 = auto/current display)");
@@ -3298,9 +3307,102 @@ static bool SDL3_IsNonTouchPlayEvent(const SDL_Event &event) {
 }
 #endif
 
+// The interface variant's signals (docs/dev/ui/interface-variants.md): the
+// devices SDL reports, and what the player last used. Android reports no
+// keyboards or mice to SDL, so there a keyboard counts once a key outside the
+// system's own (Back, volume, media) arrives while no text field takes the
+// on-screen keyboard, and a mouse once it moves.
+static struct {
+	bool devicesCurrent = false, keyboardAttached = false, mouseAttached = false, touchscreen = false;
+	bool keyboardUsed = false, mouseUsed = false;
+	openq4::ui::InterfacePointer pointer = openq4::ui::InterfacePointer::None;
+	float mouseTravel = 0; // pixels the mouse moved since a finger last led
+} s_interface;
+
+static void SDL3_RefreshInterfaceDevices(void) {
+	s_interface.devicesCurrent = true;
+	s_interface.keyboardAttached = SDL_HasKeyboard();
+	s_interface.mouseAttached = SDL_HasMouse();
+	s_interface.touchscreen = false;
+	int count = 0;
+	if (SDL_TouchID *devices = SDL_GetTouchDevices(&count)) {
+		for (int i = 0; i < count; ++i) {
+			if (SDL_GetTouchDeviceType(devices[i]) == SDL_TOUCH_DEVICE_DIRECT) s_interface.touchscreen = true;
+		}
+		SDL_free(devices);
+	}
+}
+
+static void SDL3_NoteInterfaceTouch(void) {
+	s_interface.pointer = openq4::ui::InterfacePointer::Touch;
+	s_interface.touchscreen = true;
+	s_interface.mouseTravel = 0;
+}
+
+// A mouse leads once it has moved a few pixels past a finger's lead, or at
+// a press: a warped cursor or a bumped desk does not take the touch layout
+// away. Touch and pen emulation never count.
+static void SDL3_NoteInterfaceMouse(SDL_MouseID which, float travel) {
+	if (which == SDL_TOUCH_MOUSEID || which == SDL_PEN_MOUSEID || !std::isfinite(travel) || travel <= 0.0f) return;
+	s_interface.mouseUsed = true;
+	if (s_interface.pointer == openq4::ui::InterfacePointer::Mouse) return;
+	s_interface.mouseTravel += travel;
+	if (s_interface.mouseTravel >= 6.0f) s_interface.pointer = openq4::ui::InterfacePointer::Mouse;
+}
+
+static void SDL3_NoteInterfaceKey(SDL_Keycode key) {
+	switch (key) {
+		case SDLK_UNKNOWN: case SDLK_AC_BACK: case SDLK_AC_HOME: case SDLK_AC_SEARCH: case SDLK_AC_FORWARD:
+		case SDLK_VOLUMEUP: case SDLK_VOLUMEDOWN: case SDLK_MUTE: case SDLK_POWER: case SDLK_SLEEP: case SDLK_MENU:
+		case SDLK_MEDIA_PLAY: case SDLK_MEDIA_PAUSE: case SDLK_MEDIA_PLAY_PAUSE: case SDLK_MEDIA_STOP:
+		case SDLK_MEDIA_NEXT_TRACK: case SDLK_MEDIA_PREVIOUS_TRACK: case SDLK_MEDIA_FAST_FORWARD: case SDLK_MEDIA_REWIND:
+			return;
+		default:
+			break;
+	}
+	if (s_sdlWindow != NULL && SDL_TextInputActive(s_sdlWindow)) return;
+	s_interface.keyboardUsed = true;
+}
+
+void Sys_SDL_InterfaceSignals(openq4::ui::InterfaceSignals &signals) {
+	if (!s_interface.devicesCurrent && SDL_WasInit(SDL_INIT_VIDEO)) SDL3_RefreshInterfaceDevices();
+#if defined(SDL_PLATFORM_ANDROID) || defined(SDL_PLATFORM_IOS)
+	signals.mobileBuild = true;
+#endif
+	signals.sdlTablet = SDL_IsTablet();
+	signals.sdlTV = SDL_IsTV();
+	signals.touchscreen = s_interface.touchscreen || signals.mobileBuild;
+	signals.keyboard = s_interface.keyboardAttached || s_interface.keyboardUsed;
+	signals.mouse = s_interface.mouseAttached || s_interface.mouseUsed;
+	signals.pointer = s_interface.pointer;
+	signals.pointerHeld = s_touchscreenFingerActive || SDL_GetMouseState(NULL, NULL) != 0;
+	const float scale = engineWindowState.displayScale > 0.0f ? engineWindowState.displayScale : 1.0f;
+	const int shorter = (std::min)(engineWindowState.vidWidth, engineWindowState.vidHeight);
+	signals.smallestWidthDp = shorter > 0 ? static_cast<float>(shorter) / scale : 0.0f;
+}
+
+// A device arriving or leaving: an added mouse takes the desktop
+// presentation at once (a player connects one to use it), and the last
+// mouse leaving gives the presentation back to the device.
+static void SDL3_HandleInterfaceDeviceEvent(const SDL_Event &event) {
+	SDL3_RefreshInterfaceDevices();
+	if (event.type == SDL_EVENT_MOUSE_ADDED && event.mdevice.which != SDL_TOUCH_MOUSEID && event.mdevice.which != SDL_PEN_MOUSEID) {
+		s_interface.pointer = openq4::ui::InterfacePointer::Mouse;
+	} else if (event.type == SDL_EVENT_MOUSE_REMOVED && !s_interface.mouseAttached &&
+			s_interface.pointer == openq4::ui::InterfacePointer::Mouse) {
+		s_interface.pointer = openq4::ui::InterfacePointer::None;
+		s_interface.mouseUsed = false;
+	} else if (event.type == SDL_EVENT_KEYBOARD_REMOVED && !s_interface.keyboardAttached) {
+		s_interface.keyboardUsed = false;
+	}
+}
+
 static void SDL3_HandleFingerEvent(const SDL_TouchFingerEvent &event, int eventTime) {
 	if (!in_touchscreen.GetBool() || !s_sdlWindow) {
 		return;
+	}
+	if (event.type == SDL_EVENT_FINGER_DOWN) {
+		SDL3_NoteInterfaceTouch();
 	}
 
 	const SDL_WindowID windowId = SDL_GetWindowID(s_sdlWindow);
@@ -6668,6 +6770,13 @@ bool Sys_SDL_PumpEvents(void) {
 #endif
 
 		switch (event.type) {
+			case SDL_EVENT_KEYBOARD_ADDED:
+			case SDL_EVENT_KEYBOARD_REMOVED:
+			case SDL_EVENT_MOUSE_ADDED:
+			case SDL_EVENT_MOUSE_REMOVED:
+				SDL3_HandleInterfaceDeviceEvent(event);
+				break;
+
 			case SDL_EVENT_QUIT:
 				common->Printf("SDL3: SDL_EVENT_QUIT received\n");
 				cmdSystem->BufferCommandText(CMD_EXEC_APPEND, "quit\n");
@@ -6712,6 +6821,7 @@ bool Sys_SDL_PumpEvents(void) {
 			case SDL_EVENT_KEY_UP: {
 				const bool down = (event.type == SDL_EVENT_KEY_DOWN) && event.key.down;
 				const int key = SDL3_MapScancode(event.key.scancode);
+				if (down && !event.key.repeat) SDL3_NoteInterfaceKey(event.key.key);
 
 				if (down && !event.key.repeat && key == K_ENTER && (event.key.mod & SDL_KMOD_ALT) != 0) {
 					cvarSystem->SetCVarBool("r_fullscreen", !renderSystem->IsFullScreen());
@@ -6788,6 +6898,11 @@ bool Sys_SDL_PumpEvents(void) {
 				(void)SDL3_JoinMouseMotionRun(event.motion);
 				// Touch synthesises no mouse events (SDL_HINT_TOUCH_MOUSE_EVENTS 0).
 				idKeyInput::NotePointerSource(false);
+				// The motion a menu cursor warp makes is not the player's.
+				if (!(s_ignoreNextMenuWarpMotion && fabsf(event.motion.x - s_menuWarpWindowX) <= 1.0f &&
+						fabsf(event.motion.y - s_menuWarpWindowY) <= 1.0f)) {
+					SDL3_NoteInterfaceMouse(event.motion.which, std::fabs(event.motion.xrel) + std::fabs(event.motion.yrel));
+				}
 				if (RetainedUI_IsOpen() && !(console && console->Active())) {
 					if (SDL3_ShouldRouteMenuMouse() && !SDL3_IsMouseCaptured())
 						SDL3_QueueRetainedPointer(event.motion.x,event.motion.y,eventTime);
@@ -6862,6 +6977,7 @@ bool Sys_SDL_PumpEvents(void) {
 			case SDL_EVENT_MOUSE_BUTTON_DOWN:
 			case SDL_EVENT_MOUSE_BUTTON_UP: {
 				idKeyInput::NotePointerSource(false);
+				if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) SDL3_NoteInterfaceMouse(event.button.which, 1000.0f);
 				const bool routedMouseInput = SDL3_IsMouseCaptured() || SDL3_ShouldRouteMenuMouse();
 				if (RetainedUI_IsOpen() && !(console && console->Active()) && SDL3_ShouldRouteMenuMouse())
 					SDL3_QueueRetainedPointer(event.button.x,event.button.y,eventTime);
@@ -6878,6 +6994,7 @@ bool Sys_SDL_PumpEvents(void) {
 			}
 
 			case SDL_EVENT_MOUSE_WHEEL: {
+				SDL3_NoteInterfaceMouse(event.wheel.which, 1000.0f);
 				float deltaY = event.wheel.y;
 				if (event.wheel.direction == SDL_MOUSEWHEEL_FLIPPED) {
 					deltaY = -deltaY;

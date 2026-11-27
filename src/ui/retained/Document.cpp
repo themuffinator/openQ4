@@ -486,10 +486,17 @@ private:
 			Require(ValidStateValue(declaration.initial),v["initial"],p+"/initial","Invalid state value");
 			if (v.isMember("cvar")) declaration.cvar = Id(v["cvar"],p+"/cvar");
 			if (v.isMember("view")) {
-				static const std::set<std::string> views{"aspect","text","safeLeft","safeTop","safeRight","safeBottom"};
-				Require(v["view"].isString() && views.contains(v["view"].asString()),v["view"],p+"/view",
-					"Expected the view source 'aspect', 'text', 'safeLeft', 'safeTop', 'safeRight' or 'safeBottom'");
-				Require(type == "number" && !v.isMember("cvar"),v,p,"A view source is a number state without a CVar source");
+				// Number sources measure the view; the interface variant and
+				// device class are names, the keyboard and mouse present flags.
+				static const std::map<std::string,std::string> views{{"aspect","number"},{"text","number"},{"safeLeft","number"},
+					{"safeTop","number"},{"safeRight","number"},{"safeBottom","number"},{"physical","number"},{"target","number"},
+					{"variant","string"},{"device","string"},{"keyboard","boolean"},{"mouse","boolean"}};
+				const auto view = v["view"].isString() ? views.find(v["view"].asString()) : views.end();
+				Require(view != views.end(),v["view"],p+"/view",
+					"Expected the view source 'aspect', 'text', 'safeLeft', 'safeTop', 'safeRight', 'safeBottom', 'physical', "
+					"'target', 'variant', 'device', 'keyboard' or 'mouse'");
+				Require(type == view->second && !v.isMember("cvar"),v,p,
+					"A view source is a state of its source's type (number; string for variant and device; boolean for keyboard and mouse) without a CVar source");
 				declaration.view = v["view"].asString();
 			}
 			if (v.isMember("keyBinding")) {
@@ -879,7 +886,9 @@ private:
 	void ReadBindings(const Json::Value& root) {
 		if (!root.isMember("bindings")) return;
 		const auto& bindings = root["bindings"];
-		Require(bindings.isArray() && bindings.size() <= 8192,bindings,"/bindings","Expected at most 8192 bindings");
+		// CONTROLS, the largest page, binds about 8,200 lengths and states (its
+		// rows grow with the text size, the touch variant and tall views).
+		Require(bindings.isArray() && bindings.size() <= 16384,bindings,"/bindings","Expected at most 16384 bindings");
 		std::set<std::string> ids; std::set<std::pair<std::string,std::string>> targets;
 		model.bindings.reserve(bindings.size());
 		for (Json::ArrayIndex i = 0; i < bindings.size(); ++i) {

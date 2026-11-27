@@ -247,6 +247,70 @@ def text_source(doc: "Document") -> dict:
     return TEXT
 
 
+# The interface variant (docs/dev/ui/interface-variants.md): the runtime's
+# view sources name the presentation (desktop, touch or vr), the device class
+# (desk, couch, handheld, phone, tablet or headset), whether a keyboard and a
+# mouse are present, and the physical dp one document dp spans. A document
+# declares what it reads through these helpers and keeps one layout with
+# variant conditions; a change applies live.
+VARIANT_STATE, DEVICE_STATE = "view.variant", "view.device"
+KEYBOARD_STATE, MOUSE_STATE, PHYSICAL_STATE, TARGET_STATE = "view.keyboard", "view.mouse", "view.physical", "view.target"
+TOUCH_TARGET_DP = 48.0                    # section 13.6: a touch hit region, in physical dp
+
+
+def variant_source(doc: "Document") -> dict:
+    """The document's view.variant source, declared once; its value."""
+    doc.state[VARIANT_STATE] = {"type": "string", "initial": "", "view": "variant"}
+    return {"state": VARIANT_STATE}
+
+
+def variant_is(doc: "Document", *names: str) -> dict:
+    """True while the variant is one of `names` (desktop, touch or vr)."""
+    value = variant_source(doc)
+    return either(*({"op": "==", "args": [value, name]} for name in names))
+
+
+def either(*tests: dict) -> dict:
+    """Any of `tests`, as the runtime's two-operand ||."""
+    return tests[0] if len(tests) == 1 else {"op": "||", "args": [tests[0], either(*tests[1:])]}
+
+
+def touch_variant(doc: "Document") -> dict:
+    """True in the touch variant."""
+    return variant_is(doc, "touch")
+
+
+def device_is(doc: "Document", *names: str) -> dict:
+    """True while the device class is one of `names`."""
+    doc.state[DEVICE_STATE] = {"type": "string", "initial": "", "view": "device"}
+    return either(*({"op": "==", "args": [{"state": DEVICE_STATE}, name]} for name in names))
+
+
+def keyboard_present(doc: "Document") -> dict:
+    """True while a keyboard is attached or was typed on."""
+    doc.state[KEYBOARD_STATE] = {"type": "boolean", "initial": True, "view": "keyboard"}
+    return {"state": KEYBOARD_STATE}
+
+
+def mouse_present(doc: "Document") -> dict:
+    """True while a mouse is attached or was moved."""
+    doc.state[MOUSE_STATE] = {"type": "boolean", "initial": True, "view": "mouse"}
+    return {"state": MOUSE_STATE}
+
+
+def physical_density(doc: "Document") -> dict:
+    """The physical dp one document dp spans."""
+    doc.state[PHYSICAL_STATE] = {"type": "number", "initial": 1, "view": "physical"}
+    return {"state": PHYSICAL_STATE}
+
+
+def touch_target(doc: "Document") -> dict:
+    """The document dp section 13.6's 48 dp touch target spans in the touch
+    variant; 0 in any other, so a size grown to it stays as authored."""
+    doc.state[TARGET_STATE] = {"type": "number", "initial": 0, "view": "target"}
+    return {"state": TARGET_STATE}
+
+
 def text_times(value):
     """`value` (dp, or an expression) times the text size."""
     return {"op": "*", "args": [value, TEXT]}

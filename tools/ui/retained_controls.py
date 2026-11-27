@@ -31,21 +31,27 @@ on a row, and while the page waits for a key Accept leaves the bar, the key
 being the answer. BACK, or the back input, returns to the settings screen that
 opened the page.
 
-On Android with the built-in touch controls the Other tab ends with TOUCH
-LAYOUT (controlsTouchLayout), which opens the Android setup's layout editor
-(docs/dev/ui-visual-design.md section 13.6) over the paused game; the session
-shows it through controls.touchLayout, and elsewhere the row is not shown."""
+On Android with the built-in touch controls the MOUSE tab ends with
+ON-SCREEN CONTROLS (section 13.6): whether they show in play, their layout's
+preset, size and look speed, and TOUCH LAYOUT (controlsTouchLayout), which
+opens the Android setup's layout editor over the paused game; the session
+shows them through controls.touchLayout, and elsewhere they are not shown.
+Without a mouse (the runtime's view.mouse) the rows only a mouse uses step
+aside, and where the touch controls are there the tab reads TOUCH and opens
+on them (device_fit; docs/dev/ui/interface-variants.md)."""
 from __future__ import annotations
 
-from build_retained_screens import (ORANGE, U, Document, absolute, group, keyword, label, length,
-                                    number, path, rgb, solid, text_width, typeface, vector)
+from build_retained_screens import (ORANGE, U, Document, absolute, group, keyword, label, length, mouse_present,
+                                    number, path, per_language, rgb, solid, text_width, typeface, vector)
 from retained_controller_test import ROW_LABEL as TEST_LABEL, SHOW as TEST_SHOW, controller_test_modal
 from retained_key_glyphs import bound_keys, em
-from retained_mp_menus import PLACEHOLDER, any_text, row_face, row_states
-from retained_settings_rows import (COLUMN_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, heading, requires,
+from retained_mp_menus import (KEYCAP_GAP, KEYCAP_W, PLACEHOLDER, STRIP_EDGE, TAB_FLARE, TAB_PAD, TAB_SHOULDER, TAB_SIZE, any_text,
+                               row_face, row_states)
+from retained_settings_rows import (COLUMN_W, CONTENT_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, heading, requires,
                                     row_chrome, rows_value_column, settings_subpage, slider, toggle, value_column)
 
 PREFIX = "controls"
+TOUCH_HEADING = "#str_233409"             # ON-SCREEN CONTROLS
 
 
 def button(ident: str, label_key: str, action: str) -> tuple:
@@ -107,7 +113,16 @@ DEVICES = (
          slider("controls_maccel", "#str_229938", "cl_mouseAccel", -5, 5, 0.01, 2),
          slider("controls_macceloffset", "#str_229939", "cl_mouseAccelOffset", 0, 50, 0.1, 1),
          slider("controls_maccelpower", "#str_229940", "cl_mouseAccelPower", 1, 8, 0.05, 2),
-         slider("controls_msenscap", "#str_229941", "cl_mouseSensCap", 0, 100, 0.1, 1)),
+         slider("controls_msenscap", "#str_229941", "cl_mouseSensCap", 0, 100, 0.1, 1),
+         # The built-in touch controls (section 13.6), where the session
+         # reports them: shown, their layout's preset, size and look speed,
+         # and the layout editor.
+         heading(TOUCH_HEADING),
+         toggle("controls_touchcontrols", "#str_233400", "in_touchControls"),
+         choice("controls_touchpreset", "#str_233403", "in_touchLayoutPreset", "#str_233404", (0, 1, 2)),
+         slider("controls_touchsize", "#str_233401", "in_touchControlsScale", 0.75, 1.5, 0.05, 2),
+         slider("controls_touchlook", "#str_233402", "in_touchLookSensitivity", 0.1, 4, 0.05, 2),
+         button("controls_touch_layout", "#str_231762", "controlsTouchLayout")),
     )),
     # The controller has two tabs: the strip has room for one more beside the
     # stock tabs in every language. CONTROLLER holds the device, its buttons,
@@ -181,7 +196,6 @@ DEVICES = (
 )
 # The session actions the device tabs' buttons run (HandleRetainedControlsRequest).
 DEVICE_ACTIONS = ("controlsResetController", "controlsResetKeyboard", "controlsCalibrateGyro")
-TOUCH_LAYOUT_ROW, TOUCH_LAYOUT_LABEL = "controls_touch_layout", "#str_231762"
 CAPTURE = "controls.capture"              # the row waiting for a key, or -1
 WAITING_TEXT = "#str_107000"              # "Press any key...", the stock field's
 VERB_CHANGE = "#str_231766"               # Accept's verb on a row
@@ -287,6 +301,63 @@ def bind_row(doc: Document, row: int, label_key: str, value_x: float) -> dict:
                           "states": row_states(doc, ident)})
 
 
+# The MOUSE tab fits the device (docs/dev/ui/interface-variants.md): the rows
+# that only a mouse uses, with their MOUSE INPUT and ACCELERATION headings,
+# step aside where no mouse is attached or has been used; the ON-SCREEN
+# CONTROLS section shows only where the session reports the built-in touch
+# controls (controls.touchLayout, Android). With those controls and no mouse
+# the tab reads TOUCH and opens on its first touch row. The headings' ids are
+# settings_subpage's: a column's first heading is <prefix>-<tab>-head-<side>,
+# a later one <prefix>-<tab>-head-<side>-<position among the rest>.
+MOUSE_ROWS = ("controls_invertmouse", "controls_msensitivity", "controls_mcpi", "controls_msmooth", "controls_mfilter",
+              "controls_maccel", "controls_macceloffset", "controls_maccelpower", "controls_msenscap")
+TOUCH_ROWS = ("controls_touchcontrols", "controls_touchpreset", "controls_touchsize", "controls_touchlook", "controls_touch_layout")
+TOUCH_TAB_LABEL = "#str_232733"           # TOUCH
+
+
+def _heading_ids(tab: str) -> dict:
+    """Each heading key of a device tab and the id settings_subpage gives it."""
+    ids = {}
+    for ident, _key, columns in DEVICES:
+        if ident != tab:
+            continue
+        for side, column in enumerate(columns):
+            rest = list(column)
+            lead = rest.pop(0) if rest and rest[0][0] == "heading" else None
+            if lead:
+                ids[lead[1]] = f"{PREFIX}-{tab}-head-{side}"
+            for position, item in enumerate(rest):
+                if item[0] == "heading":
+                    ids[item[1]] = f"{PREFIX}-{tab}-head-{side}-{position}"
+    return ids
+
+
+def device_fit(doc: Document, first_focus: dict, flow: dict) -> None:
+    """`flow` maps each device row's control id to its node in the column's
+    flow: a fine slider's row (<id>_row) holds the slider and its number."""
+    touch = {"state": "controls.touchLayout"}
+    mouse = mouse_present(doc)
+    shown = lambda condition: {"op": "select", "args": [condition, "block", "none"]}
+    headings = _heading_ids("mouse")
+    for ident in (*(flow[row] for row in MOUSE_ROWS), headings["#str_229935"], headings["#str_232556"]):
+        doc.bind(f"device.{ident}.display", ident, "display", shown(mouse))
+    for ident in (*(flow[row] for row in TOUCH_ROWS), headings[TOUCH_HEADING]):
+        doc.bind(f"device.{ident}.display", ident, "display", shown(touch))
+    swap = {"op": "&&", "args": [touch, {"op": "!", "args": [mouse]}]}
+    # TOUCH takes MOUSE's place in the strip where it fits as
+    # check_settings_text measures the strip; a language (Turkish) whose
+    # strip has no room for it keeps MOUSE's label over the same rows.
+    keys = [key for _section, key, _rows in SECTIONS] + [TOUCH_TAB_LABEL if key == "#str_231777" else key for _i, key, _c in DEVICES]
+    room = U * CONTENT_W - 2 * (STRIP_EDGE + KEYCAP_W + KEYCAP_GAP)
+    tight = {language: int(sum(text_width("marine", any_text(key)[language], TAB_SIZE) + TAB_FLARE + 2 * TAB_PAD + TAB_SHOULDER
+                               for key in keys) > room) for language in any_text(TOUCH_TAB_LABEL)}
+    relabel = {"op": "&&", "args": [swap, {"op": "<", "args": [per_language(doc, tight), 0.5]}]}
+    for node in ("tab-mouse-label", "tab-mouse-lit"):
+        doc.bind(f"device.{node}.text", node, "text", {"op": "select", "args": [relabel, TOUCH_TAB_LABEL, "#str_231777"]})
+    first_focus["mouse"] = [{"op": "if", "condition": swap, "then": [{"op": "focus", "control": TOUCH_ROWS[0]}],
+                             "else": [{"op": "focus", "control": "controls_freelook"}]}]
+
+
 def controls_document() -> dict:
     doc = Document("openq4.controls")
     doc.state["controls.capture"] = {"type": "number", "initial": -1}
@@ -305,12 +376,6 @@ def controls_document() -> dict:
         for label_key, _binding in rows:
             built.append(bind_row(doc, row, label_key, value_x))
             row += 1
-        if section == "other":
-            # Shown only where the session reports the built-in touch controls;
-            # the rows above keep their columns either way.
-            built.append(button_row(doc, TOUCH_LAYOUT_ROW, TOUCH_LAYOUT_LABEL, value_x, None, {"action": "controlsTouchLayout"}))
-            doc.bind(f"{TOUCH_LAYOUT_ROW}.display", TOUCH_LAYOUT_ROW, "display",
-                     {"op": "select", "args": [{"state": "controls.touchLayout"}, "block", "none"]})
         half = (len(built) + 1) // 2
         tabs.append((section, heading_key, [built[:half], built[half:]]))
     # The device tabs share one value column, as GAME OPTIONS' rows do.
@@ -330,9 +395,10 @@ def controls_document() -> dict:
         return cvar_row(doc, item, value_x)
 
     needs = dependencies()
-    first_focus = {}
+    first_focus, flow = {}, {}
     for ident, key, columns in DEVICES:
         laid = [[device_row(item) for item in column] for column in columns]
+        flow.update({node["id"].removesuffix("_row"): node["id"] for column in laid for node in column if isinstance(node, dict)})
         for node in (node for column in laid for node in column if isinstance(node, dict)):
             if node["id"] in needs:
                 requires(doc, node, needs[node["id"]])
@@ -344,6 +410,7 @@ def controls_document() -> dict:
             spare = next(item[1] for item in rows if item[1] not in needs)
             first_focus[ident] = [{"op": "if", "condition": needs[rows[0][1]], "then": [{"op": "focus", "control": rows[0][1]}],
                                    "else": [{"op": "focus", "control": spare}]}]
+    device_fit(doc, first_focus, flow)
     # The west face button clears the focused row, as Delete does.
     doc.events["onSecondary"] = [{"op": "action", "action": "controlsClear"}]
     # The prompt bar (section 13.4): Accept reads CHANGE on a row; while the

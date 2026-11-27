@@ -2430,7 +2430,14 @@ struct Runtime::Impl {
 				// area's shape or an inset to it in dp, which a view not yet laid
 				// out keeps from the last.
 				if (source.view == "text") value = static_cast<double>(viewport.TextRatio());
+				else if (source.view == "variant") value = std::string(InterfaceVariantName(viewport.variant));
+				else if (source.view == "device") value = std::string(InterfaceDeviceClassName(viewport.device));
+				else if (source.view == "keyboard") value = viewport.keyboard;
+				else if (source.view == "mouse") value = viewport.mouse;
 				else if (viewport.width <= 0 || viewport.height <= 0) continue;
+				else if (source.view == "physical") value = static_cast<double>(viewport.DpRatio()/Positive(viewport.displayScale));
+				else if (source.view == "target") value = viewport.variant == InterfaceVariant::Touch ?
+					static_cast<double>(TouchTargetDp*Positive(viewport.displayScale)/viewport.DpRatio()) : 0.0;
 				else if (source.view == "aspect") value = static_cast<double>(viewport.SafeWidth())/static_cast<double>(viewport.SafeHeight());
 				else {
 					const float inset = source.view == "safeLeft" ? viewport.safeLeft : source.view == "safeTop" ? viewport.safeTop :
@@ -3036,6 +3043,31 @@ struct Runtime::Impl {
 		};
 		return context->GetElementAtPoint(point,nullptr,document,allowed);
 	}
+	// Section 13.6 (INP-007): a touch hit region is at least TouchTargetDp
+	// physical dp across, though the plate may look smaller. For a finger, and
+	// for any pointer in the touch or VR variant, a press that lands on no
+	// control reaches the nearest one whose box, grown to that size about its
+	// centre, holds the point; neighbours closer than the size split the gap,
+	// the nearer box winning. Controls already that large reach no further.
+	float TargetMinimumPixels() const {
+		if (!touchPointer && viewport.variant == InterfaceVariant::Desktop) return 0;
+		return TouchTargetDp * Positive(viewport.displayScale);
+	}
+	std::string ReachedControl(const std::map<std::string,ControlBounds>& bounds) const {
+		// An open list owns the finger: a press beside it closes it.
+		const float minimum = TargetMinimumPixels();
+		if (!(minimum > 0) || !pointerPresent || !interaction.OpenPopup().empty()) return {};
+		std::string best; float nearest = std::numeric_limits<float>::infinity();
+		for (const auto& [id,box] : bounds) {
+			if (!box.visible || !interaction.AllowsNode(id)) continue;
+			const float reachX = std::max(0.f,(minimum-box.width)/2), reachY = std::max(0.f,(minimum-box.height)/2);
+			const float dx = std::max({box.x-pointerX,0.f,pointerX-(box.x+box.width)});
+			const float dy = std::max({box.y-pointerY,0.f,pointerY-(box.y+box.height)});
+			if ((dx <= 0 && dy <= 0) || dx > reachX || dy > reachY) continue;
+			if (const float distance = dx*dx+dy*dy; distance < nearest) { nearest = distance; best = id; }
+		}
+		return best;
+	}
 	std::string HitControl(Rml::Element* element) const {
 		if (!canonical) return {};
 		for (; element && element != document; element = element->GetParentNode()) {
@@ -3118,7 +3150,8 @@ struct Runtime::Impl {
         valueView.ValidatePlacement(interaction,viewport.width,viewport.height,viewport.DpRatio(),refreshPopup && !freshLayout);
 		// A finger dragging content or swiping a tab strip hovers nothing.
 		auto* element = pointerNavigation && !touch.dragging && !touch.swiping ? HitElement() : nullptr;
-		const auto hit = HitControl(element);
+		auto hit = HitControl(element);
+		if (hit.empty() && element) hit = ReachedControl(bounds);
 		const auto scrollbar=scrollView.PointerPart(element,pointerX,pointerY,interaction);
         if(!scrollbar.control.empty()) interaction.PointerPart(scrollbar.control,scrollbar.invalidProjection?std::nullopt:scrollbar.fraction,{},scrollbar.thumb);
         else {

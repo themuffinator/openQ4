@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "retained/DocumentEdit.h"
+#include "retained/InterfaceVariant.h"
 
 namespace openq4::ui { class Runtime; class Document; struct Viewport; struct Diagnostic; }
 namespace openq4::ui { struct RuntimeDocumentOptions; }
@@ -57,6 +58,16 @@ bool RetainedUI_EndWarm();
 namespace openq4::ui { class VectorCompileBatch; }
 bool RetainedUI_GatherViewCompilations(retainedUIView_t* view, const openq4::ui::Viewport& viewport, openq4::ui::VectorCompileBatch& batch);
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport& viewport);
+// The interface variant the retained UI presents (docs/dev/ui/interface-variants.md):
+// desktop, touch, or vr while the VR session presents; ui_interfaceVariant
+// forces one. Each call observes the current signals, so the answer follows a
+// headset starting or stopping, a device attaching and the pointer used last.
+// A dedicated server answers desktop.
+openq4::ui::InterfaceVariant RetainedUI_InterfaceVariant();
+openq4::ui::InterfaceDeviceClass RetainedUI_InterfaceDeviceClass();
+// Whether a keyboard, or a mouse, is attached or was used.
+bool RetainedUI_InterfaceKeyboard();
+bool RetainedUI_InterfaceMouse();
 double RetainedUI_PresentationTime();
 // Call immediately after renderSystem->EndFrame has consumed its front-end
 // command chain. Allows a deferred resource rebuild before the next draw; this

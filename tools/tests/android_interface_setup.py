@@ -78,17 +78,20 @@ public class InterfaceSetupTest {
             check(rejected,"invalid settings constructed: "+Arrays.toString(bad));
         }
         // ui-visual-design.md 13.2: Desk 100/100, Couch 150/125, Handheld 125/100,
-        // Phone and Tablet 100% at native density with text from the system font scale.
+        // Phone and Tablet 100% with text from the system font scale over 150 %
+        // and 125 %: the menus' canvas spans the view (interface-variants.md).
         InterfaceSettings auto=InterfaceSettings.DEFAULT;
-        check(tail(auto.engineValues(false,1)).equals(expected(4,100,100)),"automatic phone profile");
-        check(tail(auto.engineValues(true,1)).equals(expected(5,100,100)),"automatic tablet profile");
+        check(tail(auto.engineValues(false,1)).equals(expected(4,100,150)),"automatic phone profile");
+        check(tail(auto.engineValues(true,1)).equals(expected(5,100,125)),"automatic tablet profile");
         check(tail(auto.select(1,0,0).engineValues(false,1.5f)).equals(expected(1,100,100)),"desk ignores phone font scale");
         check(tail(auto.select(2,0,0).engineValues(false,1.5f)).equals(expected(2,150,125)),"couch defaults");
         check(tail(auto.select(3,0,0).engineValues(true,1.5f)).equals(expected(3,125,100)),"handheld defaults");
-        float[][] fonts={{.85f,100},{1,100},{1.15f,115},{1.3f,130},{1.5f,150},{2,200},{2.5f,200},{Float.NaN,100},{Float.POSITIVE_INFINITY,100}};
+        // Font scale, phone text, tablet text.
+        float[][] fonts={{.85f,130,105},{1,150,125},{1.15f,175,145},{1.3f,195,165},{1.5f,200,190},{2,200,200},{2.5f,200,200},
+            {Float.NaN,150,125},{Float.POSITIVE_INFINITY,150,125}};
         for(float[] font:fonts){
             check(tail(auto.engineValues(false,font[0])).equals(expected(4,100,(int)font[1])),"phone font scale "+font[0]);
-            check(tail(auto.select(5,0,0).engineValues(false,font[0])).equals(expected(5,100,(int)font[1])),"tablet font scale "+font[0]);
+            check(tail(auto.select(5,0,0).engineValues(false,font[0])).equals(expected(5,100,(int)font[2])),"tablet font scale "+font[0]);
         }
         check(tail(auto.select(2,80,190).engineValues(false,2)).equals(expected(2,80,190)),"player sizes did not override profile");
         check(tail(auto.select(4,0,140).engineValues(false,2)).equals(expected(4,100,140)),"explicit text ignored system font");
@@ -122,11 +125,11 @@ public class InterfaceSetupTest {
         check(prefs.memory.get(InterfaceSettings.DRAFT).equals(next.encode()),"failed update lost draft");
         prefs.fail=false;check(saveApplied(prefs,next),"retry rejected");
         String updated=host.getInterfaceSetup();
-        check(!updated.split(":")[1].equals(delivered.split(":")[1]) && tail(updated).equals(expected(4,120,100)),"update kept the old transaction");
+        check(!updated.split(":")[1].equals(delivered.split(":")[1]) && tail(updated).equals(expected(4,120,150)),"update kept the old transaction");
         host.resources.config.fontScale=1.3f;
-        check(tail(host.getInterfaceSetup()).equals(expected(4,120,130)),"system font scale not read from the live configuration");
+        check(tail(host.getInterfaceSetup()).equals(expected(4,120,195)),"system font scale not read from the live configuration");
         host.resources.config.smallestScreenWidthDp=600;prefs.edit().putString(InterfaceSettings.SAVED,auto.applied().encode()).commit();
-        check(tail(host.getInterfaceSetup()).equals(expected(5,100,130)),"tablet width not read from the live configuration");
+        check(tail(host.getInterfaceSetup()).equals(expected(5,100,165)),"tablet width not read from the live configuration");
         prefs.edit().putString(InterfaceSettings.SAVED,"1:corrupt").commit();
         check(host.getInterfaceSetup()==null,"corrupt applied record reached engine");
         prefs.edit().remove(InterfaceSettings.SAVED).commit();

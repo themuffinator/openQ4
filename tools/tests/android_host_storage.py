@@ -429,10 +429,10 @@ public final class StorageTest {
             Math.abs(touch[2] - 1.15f) < 1e-6f, "applied touch setup not delivered");
         SDLActivity.preferences.values.put(InterfaceSettings.SAVED, "1:0123456789abcdef0123456789abcdef:0:0:0");
         SDLActivity.resources.configuration.fontScale = 1.3f;
-        require("1:0123456789abcdef0123456789abcdef:4:100:130".equals(activity.getInterfaceSetup()),
+        require("1:0123456789abcdef0123456789abcdef:4:100:195".equals(activity.getInterfaceSetup()),
             "applied interface setup not resolved for this phone");
         SDLActivity.resources.configuration.smallestScreenWidthDp = 720;
-        require("1:0123456789abcdef0123456789abcdef:5:100:130".equals(activity.getInterfaceSetup()),
+        require("1:0123456789abcdef0123456789abcdef:5:100:165".equals(activity.getInterfaceSetup()),
             "applied interface setup not resolved for this tablet");
         SDLActivity.preferences.values.put(InterfaceSettings.SAVED, "1:damaged");
         require(activity.getInterfaceSetup() == null, "damaged interface record reached the engine");

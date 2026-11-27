@@ -418,6 +418,9 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"in_joystickTriggerThreshold",{0,0,1,false}},{"in_joystickRumble",{1}},{"in_joystickRumbleScale",{0,0,2,false}},{"in_gyro",{1}},
 		{"in_gyroSensitivity",{0,0,8,false}},{"in_touchpadMode",{0,0,3,true,{},{0,1,2,3}}},{"in_touchpadSensitivity",{0,0,8,false}},
 		{"in_touchscreen",{1}},{"in_joystickLowBatteryRumbleThreshold",{0,0,100,true}},
+		// The built-in touch controls (CONTROLS' ON-SCREEN CONTROLS, Android).
+		{"in_touchControls",{1}},{"in_touchLayoutPreset",{0,0,2,true,{},{0,1,2}}},{"in_touchControlsScale",{0,0.75,1.5,false}},
+		{"in_touchLookSensitivity",{0,0.1,4,false}},
 		{"in_joystickLowBatteryRumbleScale",{0,0,2,false}},{"in_promptStyle",{0,0,5,true,{},{0,1,2,3,4,5}}},
 		{"in_swapConfirmBack",{0,0,2,true,{},{0,1,2}}},
 		// The controller's own tabs on CONTROLS (PAD-01 to PAD-08): the device

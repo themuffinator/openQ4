@@ -40,7 +40,7 @@ static std::string Encode(const Json::Value& d){Json::StreamWriterBuilder w;w["i
 static Json::Value& Frame(Json::Value& d){return d["root"]["children"][0];}
 static Json::Value& Bar(Json::Value& d){return Frame(d)["children"][1];}
 struct HostFixture final:Host {unsigned errors=0,draws=0;std::uint64_t frame=0;
- bool ReadFile(const std::string&,std::string&)override{return false;}bool softFocus=false;bool ReadCVar(const std::string& name,size_t type,StateValue& value)override{if(name=="sys_lang"&&type==2){value=std::string("english");return true;}if(name!="ui_retainedSoftFocus"||type!=1)return false;value=softFocus;return true;}unsigned softened=0;float sigma=0,saturation=1;bool SoftenBackdrop(std::uint32_t destination,float s,float sat,const Bounds&)override{Check(destination!=0,"SYSTEM backdrop into a pushed layer");++softened;sigma=s;saturation=sat;return softFocus;}
+ bool ReadFile(const std::string&,std::string&)override{return false;}bool softFocus=false;bool ReadCVar(const std::string& name,size_t type,StateValue& value)override{if(name=="sys_lang"&&type==2){value=std::string("english");return true;}if(name=="ui_tooltips"&&type==1){value=false;return true;}if(name!="ui_retainedSoftFocus"||type!=1)return false;value=softFocus;return true;}unsigned softened=0;float sigma=0,saturation=1;bool SoftenBackdrop(std::uint32_t destination,float s,float sat,const Bounds&)override{Check(destination!=0,"SYSTEM backdrop into a pushed layer");++softened;sigma=s;saturation=sat;return softFocus;}
  std::string Translate(const std::string& value)override{return value.starts_with("#str_")?"Localized":value;}
  void Log(bool bad,const std::string& message)override{if(bad){++errors;std::fprintf(stderr,"Runtime: %s\n",message.c_str());}}
  std::uintptr_t LoadMaterial(const std::string&,int& w,int& h)override{w=h=64;return 1;}
@@ -248,6 +248,84 @@ static void TouchSwipe(){for(float ratio:{1.f,2.f}){auto source=TouchSource();so
  Stroke(v,row,{-12*ratio,0},5);Check(events().empty()&&v.runtime.TakeActions().empty(),"a swipe off the strip asks for nothing");
  v.runtime.SetTouchPointer(false);v.runtime.PointerMove(a.x,a.y,v.time);v.runtime.PointerButton(true,v.time);v.runtime.PointerMove(a.x-60*ratio,a.y,v.time);v.runtime.PointerButton(false,v.time);
  Check(events().empty(),"a mouse never swipes");}}
+// Section 13.6's touch hit regions (INP-007): beside a control smaller than
+// 48 physical dp a finger, or any pointer in the touch or VR variant, reaches
+// the nearest control within that size; a mouse on the desktop never does.
+static Json::Value ReachSource(){Json::Value d;d["format"]="retained-ui";d["version"]=1;d["id"]="touch-reach";d["actions"]["button"]["operation"]="test.button";d["actions"]["button"]["arguments"]=Json::Value(Json::objectValue);
+ auto root=Box("root",0,0,640,360);
+ for(const auto& [id,x,y,w,h]:std::vector<std::tuple<const char*,double,double,double,double>>{{"a",100,100,20,20},{"b",140,100,20,20},{"big",300,100,80,60}}){
+  auto button=Box(id,x,y,w,h);button["control"]["role"]="button";button["control"]["action"]="button";button["control"]["label"]="#str_test";Feedback(d,button);root["children"].append(button);}
+ d["root"]=root;return d;}
+static void TouchReach(){for(float ratio:{1.f,2.625f}){View v(ratio);Load(v,ReachSource(),"reach.rui");
+ const auto tap=[&](double x,double y,bool touch)->std::string{v.runtime.SetTouchPointer(touch);v.runtime.PointerMove(float(x*ratio),float(y*ratio),v.time);v.runtime.PointerButton(true,v.time);
+  v.runtime.PointerButton(false,v.time);Leave(v);v.Frame();const auto actions=v.runtime.TakeActions();return actions.size()==1?actions[0].node:actions.empty()?std::string():std::string("several");};
+ Check(tap(110,110,true)=="a","a finger on a control taps it");
+ Check(tap(125,110,true)=="a","5 dp beside a 20 dp control a finger reaches it");
+ Check(tap(113,93,true)=="a","and 7 dp above it");
+ Check(tap(133,110,true)=="b","between two neighbours the nearer box wins");
+ Check(tap(110,135,true).empty(),"past the 48 dp size nothing is reached");
+ Check(tap(297,130,true).empty(),"a control 48 dp or larger reaches no further");
+ Check(tap(125,110,false).empty(),"a mouse on the desktop reaches nothing beside a control");
+ v.viewport.variant=InterfaceVariant::Touch;v.Frame();
+ Check(tap(125,110,false)=="a","in the touch variant any pointer reaches");
+ v.viewport.variant=InterfaceVariant::Vr;v.Frame();
+ Check(tap(95,105,false)=="a","and in the VR variant, the laser pointer's");
+ v.viewport.variant=InterfaceVariant::Desktop;v.Frame();
+ Check(tap(95,105,false).empty(),"back on the desktop the mouse reaches nothing again");}}
+// The interface variant's resolution (InterfaceVariant.h): the device class
+// from the platform, the variant from the pointer used last and the device,
+// VR only from the session, and a change that waits for the finger to lift.
+static void VariantResolution(){
+ using S=InterfaceSignals;using R=InterfaceVariantRequest;const auto variant=[](const S& s,R r=R::Auto){return ResolveInterfaceVariant(s,r);};
+ S desk;Check(ResolveInterfaceDeviceClass(desk)==InterfaceDeviceClass::Desk&&variant(desk)==InterfaceVariant::Desktop,"a desktop machine is a desk with the desktop variant");
+ S deskTouch=desk;deskTouch.touchscreen=true;Check(variant(deskTouch)==InterfaceVariant::Desktop,"a touchscreen alone keeps the desktop variant");
+ deskTouch.pointer=InterfacePointer::Touch;Check(variant(deskTouch)==InterfaceVariant::Touch,"a finger on it takes the touch variant");
+ deskTouch.pointer=InterfacePointer::Mouse;Check(variant(deskTouch)==InterfaceVariant::Desktop,"and the mouse takes it back");
+ S phone;phone.mobileBuild=true;phone.smallestWidthDp=411;Check(ResolveInterfaceDeviceClass(phone)==InterfaceDeviceClass::Phone&&variant(phone)==InterfaceVariant::Touch,"a phone starts touch");
+ S tablet=phone;tablet.smallestWidthDp=800;Check(ResolveInterfaceDeviceClass(tablet)==InterfaceDeviceClass::Tablet&&variant(tablet)==InterfaceVariant::Touch,"600 dp and wider is a tablet");
+ S sdlTablet=phone;sdlTablet.sdlTablet=true;Check(ResolveInterfaceDeviceClass(sdlTablet)==InterfaceDeviceClass::Tablet,"SDL's tablet test is a tablet");
+ S tv=phone;tv.sdlTV=true;Check(ResolveInterfaceDeviceClass(tv)==InterfaceDeviceClass::Couch&&variant(tv)==InterfaceVariant::Desktop,"Android TV is the couch");
+ S mouse=phone;mouse.pointer=InterfacePointer::Mouse;mouse.mouse=true;Check(variant(mouse)==InterfaceVariant::Desktop,"a mouse on a phone takes the desktop variant");
+ S deck;deck.steamDeck=true;Check(ResolveInterfaceDeviceClass(deck)==InterfaceDeviceClass::Handheld&&variant(deck)==InterfaceVariant::Touch,"a Steam Deck is a touch handheld");
+ deck.pointer=InterfacePointer::Mouse;Check(variant(deck)==InterfaceVariant::Desktop,"until its trackpad moves the mouse");
+ S couch;couch.couch=true;Check(ResolveInterfaceDeviceClass(couch)==InterfaceDeviceClass::Couch&&variant(couch)==InterfaceVariant::Desktop,"the couch profile keeps the desktop variant");
+ S vr=deskTouch;vr.vrActive=true;vr.pointer=InterfacePointer::Touch;Check(ResolveInterfaceDeviceClass(vr)==InterfaceDeviceClass::Headset&&variant(vr)==InterfaceVariant::Vr,"a VR session is vr whatever the pointer");
+ Check(variant(phone,R::Desktop)==InterfaceVariant::Desktop&&variant(desk,R::Touch)==InterfaceVariant::Touch&&variant(desk,R::Vr)==InterfaceVariant::Vr&&variant(vr,R::Desktop)==InterfaceVariant::Desktop,"a request forces its variant");
+ R parsed=R::Vr;Check(ParseInterfaceVariantRequest("AUTO",parsed)&&parsed==R::Auto&&ParseInterfaceVariantRequest("Touch",parsed)&&parsed==R::Touch&&ParseInterfaceVariantRequest("",parsed)&&parsed==R::Auto&&
+  !ParseInterfaceVariantRequest("phone",parsed)&&parsed==R::Auto,"requests parse by name, case-insensitively; others are refused");
+ Check(std::string(InterfaceVariantName(InterfaceVariant::Touch))=="touch"&&std::string(InterfaceDeviceClassName(InterfaceDeviceClass::Tablet))=="tablet","names");
+ InterfaceVariantTracker tracker;S live=desk;Check(tracker.Update(live,R::Auto)&&tracker.Variant()==InterfaceVariant::Desktop,"the first update applies");
+ Check(!tracker.Update(live,R::Auto),"an unchanged signal changes nothing");
+ live.pointer=InterfacePointer::Touch;live.pointerHeld=true;Check(!tracker.Update(live,R::Auto)&&tracker.Variant()==InterfaceVariant::Desktop,"the touch layout waits while the first finger is down");
+ live.pointerHeld=false;Check(tracker.Update(live,R::Auto)&&tracker.Variant()==InterfaceVariant::Touch,"and follows once it lifts");
+ live.pointer=InterfacePointer::Mouse;live.pointerHeld=true;Check(!tracker.Update(live,R::Auto)&&tracker.Variant()==InterfaceVariant::Touch,"a held mouse button holds the layout too");
+ live.vrActive=true;Check(tracker.Update(live,R::Auto)&&tracker.Variant()==InterfaceVariant::Vr&&tracker.DeviceClass()==InterfaceDeviceClass::Headset,"VR starting applies at once");
+ live.vrActive=false;Check(tracker.Update(live,R::Auto)&&tracker.Variant()==InterfaceVariant::Desktop,"and stopping");
+ Check(tracker.Update(live,R::Touch)&&tracker.Variant()==InterfaceVariant::Touch,"a forced change applies though a button is held");}
+// Documents read the variant, device class, keyboard, mouse and physical
+// density through view sources, typed by source, which apply live.
+static void VariantSources(){auto source=ReachSource();
+ const auto state=[&](Json::Value& d,const char* id,const char* type,Json::Value initial,const char* view){d["state"][id]["type"]=type;d["state"][id]["initial"]=initial;d["state"][id]["view"]=view;};
+ state(source,"variant","string","","variant");state(source,"device","string","","device");state(source,"keyboard","boolean",false,"keyboard");
+ state(source,"mouse","boolean",false,"mouse");state(source,"physical","number",1,"physical");state(source,"target","number",0,"target");
+ Json::Value binding;binding["id"]="b.display";binding["node"]="b";binding["property"]="display";
+ Json::Value touch;touch["op"]="==";touch["args"].append([]{Json::Value s;s["state"]="variant";return s;}());touch["args"].append("touch");
+ binding["value"]["op"]="select";binding["value"]["args"].append(touch);binding["value"]["args"].append("none");binding["value"]["args"].append("block");source["bindings"].append(binding);
+ for(const auto& [type,view]:std::vector<std::pair<const char*,const char*>>{{"number","variant"},{"boolean","device"},{"string","keyboard"},{"string","physical"},{"boolean","target"},{"string","pointer"}}){
+  auto bad=ReachSource();state(bad,"x",type,std::string(type)=="number"?Json::Value(0):std::string(type)=="boolean"?Json::Value(false):Json::Value(""),view);
+  Document d;std::vector<Diagnostic> ds;Check(!d.Load(Encode(bad),ds),"a view source takes only its own type");}
+ View v(2.625f);Load(v,source,"variant.rui");v.viewport.canvasHeight=720;v.viewport.canvasMinWidth=960;v.viewport.width=2340;v.viewport.height=1080;
+ v.viewport.variant=InterfaceVariant::Touch;v.viewport.device=InterfaceDeviceClass::Phone;v.viewport.keyboard=false;v.viewport.mouse=false;v.Frame();
+ const auto read=[&](const char* id){return v.runtime.GetState(true).at(id);};
+ const auto shown=[&]{const auto value=v.runtime.PresentedValue("b","display");return value?value->text:std::string("?");};
+ Check(std::get<std::string>(read("variant"))=="touch"&&std::get<std::string>(read("device"))=="phone"&&!std::get<bool>(read("keyboard"))&&!std::get<bool>(read("mouse")),"the sources read the viewport's variant");
+ Check(Near(std::get<double>(read("physical")),1.5/2.625,.0001),"a phone's 720 dp canvas spans 0.57 physical dp per dp");
+ Check(Near(std::get<double>(read("target")),48*2.625/1.5,.0001),"and a 48 dp touch target 84 of its dp");
+ Check(shown()=="none","a touch condition hides its node");
+ v.viewport.variant=InterfaceVariant::Desktop;v.viewport.device=InterfaceDeviceClass::Desk;v.viewport.keyboard=true;v.viewport.mouse=true;v.Frame();
+ Check(std::get<std::string>(read("variant"))=="desktop"&&std::get<bool>(read("keyboard"))&&std::get<bool>(read("mouse"))&&shown()=="block","and follow a live change");
+ Check(std::get<double>(read("target"))==0,"outside the touch variant the target is 0");
+ std::string error;Check(!v.runtime.SetState({{"variant",std::string("vr")}},error,v.time),"the application cannot write a view source");}
 static void SystemCandidate(const std::string& text){Document document;std::vector<Diagnostic> ds;Check(document.Load(text,ds),"actual SYSTEM candidate parses");State state;std::string error;Check(state.Reset(document.Model(),error),"SYSTEM candidate typed state resets");
  std::string message;for(int i=0;i<40;++i)message+="The display change waits for your answer before it reverts by itself. ";
  // The engine lays the page out on its 720 dp canvas: the view's size sets the dp ratio.
@@ -274,5 +352,5 @@ static void SystemCandidate(const std::string& text){Document document;std::vect
  Check(host.softened==1&&runtime.Statistics().backdropComposites==0,"a closed SYSTEM dialog softens nothing");host.softFocus=false;
  }
  }}
-int main(int argc,char** argv){Schema();Gestures();DensityKeepsContentFocus();MixedViewportReveal();Persistence();Lifecycle();TwoAxes();ThumbFrames();TouchDrag();TouchPress();TouchInertia();TouchRim();TouchLongPress();TouchSwipe();if(argc>1){std::ifstream file(argv[1],std::ios::binary);std::string text{std::istreambuf_iterator<char>(file),{}};SystemCandidate(text);}
+int main(int argc,char** argv){Schema();Gestures();DensityKeepsContentFocus();MixedViewportReveal();Persistence();Lifecycle();TwoAxes();ThumbFrames();TouchDrag();TouchPress();TouchInertia();TouchRim();TouchLongPress();TouchSwipe();TouchReach();VariantResolution();VariantSources();if(argc>1){std::ifstream file(argv[1],std::ios::binary);std::string text{std::istreambuf_iterator<char>(file),{}};SystemCandidate(text);}
  std::printf("PASS %u checks; actual canonical schema/Interaction/Runtime/Rml layout; counted host, no native input or GPU qualification.\n",checks);}

@@ -3434,7 +3434,7 @@ The Quest flavor is integrated, with emulator and test-runtime evidence only.
 | AND-01 — Closed | Phone/emulator scope, startup ownership, UI-thread binding, background handling, Back/cutouts and touch controls repaired; S25 save/touch/audio checks exist; host-owned orientation and the portrait thumb deck pass a mid-match emulator rotation; the per-orientation layout editor, suspension save, multiplayer resume/reconnect and Quest flavor package checks pass native/JVM and emulator probes. | None; S25 hardware checks pass (layout, portrait, suspension save, background kill/restore, multiplayer reconnect, editor by hand). Residuals moved to AND-02/AND-04. |
 | AND-02 — Partial | The device harness and S25 (Adreno 830, API 36) campaign pass cold and warm: real level transitions, save/load, audio residency, storage, thermal and per-model budgets. | S25 sustain and multiplayer phases; audible and gamepad/mouse/keyboard checks; Mali and API-floor devices. |
 | AND-03 — Partial | Verified package repair/import, localized setup, settings return, control/interface setup and save/log export implemented; scoped device round trips pass. | Release-signing continuity; cloud/removable providers; interrupted-process recovery; physical setup/accessibility and upgrade matrix. |
-| AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas, HUD safe-area and thumb-deck positioning and the per-orientation layout editor exist. | Device-based presets and GLES limits; keyboard/touch targets, human-finger portrait play, the weapon control over the portrait readouts, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
+| AND-04 — Partial | Touch presets, UI/text sizing, an opt-in portrait orientation, retained safe areas, HUD safe-area and thumb-deck positioning and the per-orientation layout editor exist. 27 November: the interface-variant selector (desktop/touch/vr, device class, live switching; AND-04.1) and 48 dp touch reach in the retained menus (AND-04.2). | AND-04.3-AND-04.6 (touch-sized settings rows, device-fitting rows, device-class defaults, device qualification); device-based presets and GLES limits; human-finger portrait play, the weapon control over the portrait readouts, stock GUIs in portrait, cutouts/gesture bars/folds/multi-window qualification. |
 | AND-05 — Partial | The archived Quest change (`65aa9bd88`) is integrated with refresh-rate, performance-level, thermal and frame-thread services; the `-Popenq4Quest` release APK with its generated headset manifest passes `verify_android_apk.py --variant quest`, and the emulator plays Air Defense 1 in stereo on the test runtime (12 November). | On a headset: installation/assets, stereo gameplay, controller/UI interaction, comfort, session recovery and sustained thermal/refresh budgets; distribution decision. |
 
 ### AND task evidence and acceptance
@@ -3649,6 +3649,36 @@ The Quest flavor is integrated, with emulator and test-runtime evidence only.
   Low Power, and a detected cap stays at the preset's 60 on a 120 Hz panel.
   This is policy from one device: a Mali phone, a mid-range phone and a fresh
   first launch on the S25 still have to confirm it.
+  **Mobile interface variant (plan, 27 November).** The retained interface
+  gains a touch variant for phones, tablets and handhelds that keeps every
+  function players expect; the VR variant and headset detection belong to the
+  VR track. Work items, each with its acceptance gate:
+  - **AND-04.1 Interface-variant selector (shared with the VR variant).** One runtime
+    variant (`desktop`, `touch`, `vr`) and device class from SDL3 signals, the
+    VR session and `ui_interfaceVariant`, switching live; view sources and an
+    engine query. Gate: native resolver/latch/source tests and a headless
+    client resolving each forced and automatic case.
+    [Contract](ui/interface-variants.md).
+  - **AND-04.2 Touch fundamentals across the retained menus.** 48 dp hit
+    regions by reach (INP-007) for a finger and in the touch/VR variants, on
+    top of the existing release activation, 8 dp cancel, 500 ms long-press,
+    drag lists and tab swipes. Gate: native reach tests at two densities;
+    device finger checks remain physical.
+  - **AND-04.3 Touch-sized settings rows.** GAME OPTIONS, CONTROLS and AUDIO
+    stand in one column with rows grown toward the 48 dp target in the touch
+    variant. Gate: generator checks, the native settings-page suites and
+    headless captures at phone and tablet sizes in both orientations.
+  - **AND-04.4 Device-fitting rows.** Touch rows (touch controls, control
+    size, look sensitivity, layout editor) come forward where the built-in
+    controls exist; mouse rows step aside without a mouse. Gate: the retained
+    gate's setting contracts and captures with and without a mouse.
+  - **AND-04.5 Device-class defaults.** Text size starts from the device class
+    (phone, tablet, handheld) once, never over a saved choice. Gate: a fresh
+    and a saved profile on each class.
+  - **AND-04.6 Device qualification.** Human-finger use, IME/on-screen keyboard
+    entry, Bluetooth keyboard/mouse switching, cutouts, folds and multi-window
+    on phones and tablets; the in-engine first-run interface prompt for touch
+    devices without Android's setup. Physical devices only.
 - [ ] **AND-05 — P2, integration and qualification: standalone Quest.** After
   VR-01/AND-01, qualify real installation, assets, stereo gameplay, controller/UI
   interaction, comfort, session recovery and sustained refresh/thermal budgets.
@@ -3824,7 +3854,7 @@ seven final gates remain pending.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | UI-01 — Partial | Settings hub, GAME/CONTROLS/AUDIO, Load Defaults, DISPLAY (with presets applied there) and Player Setup exist; current scaling/tall layouts and effect/readback increments recorded. Settings tree audit (20 November 2026): tabs and sections grouped by what each row changes, GAME OPTIONS' VIEW WEAPON and ACCESSIBILITY tabs, DISPLAY's EFFECTS tab, and Frame Rate Cap, Anisotropic Filtering, Shadow Maps and Motion Blur rows ([retained screens](ui/retained-screens.md#the-settings-tree-audit-20-november-2026)). Dependent rows (23 November 2026): a row another setting turns off is dimmed and skipped on every retained settings page, each dependency checked against the code ([settings structure](settings-menu-structure.md#dependent-rows)). | Complete settings transactions/failure/restart/capability matrix; real-font/state coverage; production SYSTEM editor round trip and device/platform acceptance. |
-| UI-02 — Partial | Binding capture, contextual prompts, controller navigation, touch scrolling and right-stick detail/preview handling exist. | Production native IME wiring, shaping/fallback/graphemes, accessibility exposure; physical controller families, composition/focus/hotplug and locale/layout matrix. |
+| UI-02 — Partial | Binding capture, contextual prompts, controller navigation, touch scrolling and right-stick detail/preview handling exist; 27 November: the interface-variant selector and 48 dp touch reach (AND-04.1/AND-04.2, [contract](ui/interface-variants.md)). | Production native IME wiring, shaping/fallback/graphemes, accessibility exposure; physical controller families, composition/focus/hotplug and locale/layout matrix. |
 | UI-03 — Partial | Roster scrolling/identity guards, save-browser/details, Strogg confirmations, server focus/empty states and objective markers have scoped evidence. | Tourney/watch and Match Control flows, catalogs beyond 128, remaining target-identity/role operations, handoffs and actual task/failure completion. |
 | UI-04 — Partial | Retained menus/HUDs and specific implant/vehicle/cinematic surfaces have implementation or captures. | Accept every required source/include variant's behavior and artwork; world terminals, script/timeline provenance, per-instance state and exactly-once commands. |
 | UI-05 — Partial | Awakening scope clauses reconciled; fresh-profile hit-feedback defaults repaired without overwriting opt-ins. | Remaining artwork/default-policy exceptions, vector fidelity, motion and visual review; approve exceptions explicitly. |

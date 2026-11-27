@@ -8331,6 +8331,14 @@ void idCommonLocal::InitGame( void ) {
 	if ( platformProfileConfig.Length() > 0 && fileSystem->ReadFile( platformProfileConfig, NULL ) >= 0 ) {
 		cmdSystem->BufferCommandText( CMD_EXEC_APPEND, va( "exec %s\n", platformProfileConfig.c_str() ) );
 	}
+#if defined( __ANDROID__ ) && defined( USE_SDL3 )
+	// openQ4: the device class's text size (docs/dev/ui/interface-variants.md).
+	// The retained menus' 720 dp canvas spans the view rather than following
+	// the platform's density, so a phone starts at 150 % and a tablet at 125 %.
+	// A default only, as a platform profile's: the saved config executed below
+	// and Android's interface setup keep the player's choice.
+	cvarSystem->SetCVarFloat( "ui_retainedTextScale", SDL_IsTablet() ? 1.25f : 1.5f );
+#endif
 
 	// skip the config file if "safe" is on the command line
 	bool migratedRenderScale = false;

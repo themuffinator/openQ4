@@ -36,8 +36,14 @@ struct StateDeclaration {
 	// Optional read-only view source: "aspect" is the window safe area's width
 	// over its height (the view's, without insets), "text" the text size it
 	// applies (1 to 2) and "safeLeft", "safeTop", "safeRight" and "safeBottom"
-	// the safe area's insets from the view's edges in dp, all refreshed as the
-	// runtime lays the document out.
+	// the safe area's insets from the view's edges in dp, and "physical" the
+	// physical dp (the platform's density-independent pixel) one document dp
+	// spans, and "target" the document dp a TouchTargetDp (48 physical dp)
+	// touch target spans in the touch variant, 0 in any other. The string sources "variant" (desktop, touch or vr) and "device"
+	// (desk, couch, handheld, phone, tablet or headset) name the interface
+	// variant and device class (InterfaceVariant.h), and the boolean sources
+	// "keyboard" and "mouse" whether one is attached or was used. All are
+	// refreshed as the runtime lays the document out, so a change applies live.
 	std::string view;
 	// Application string refreshed by the public GUI SetKeyBindingNames call.
 	// This is a binding lookup, never a command to execute. Applications can

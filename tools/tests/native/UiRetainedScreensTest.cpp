@@ -322,6 +322,7 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","ui_identity"
 	"in_weaponWheelSensitivity","ui_weaponWheelOffset","in_joystickLookCurve","in_joystickInvertLook","in_joystickTriggerThreshold",
 	"in_joystickRumble","in_joystickRumbleScale","in_gyro","in_gyroSensitivity","in_touchpadMode","in_touchpadSensitivity",
 	"in_touchscreen","in_joystickLowBatteryRumbleThreshold","in_joystickLowBatteryRumbleScale","in_promptStyle","in_swapConfirmBack",
+	"in_touchControls","in_touchLayoutPreset","in_touchControlsScale","in_touchLookSensitivity",
 	"g_crosshairCustom","g_crosshairSize","g_crosshairColor","hud_hitMarker","hud_crosshairAnimated","ui_hudLayout","ui_hudScale","ui_hudWidth",
 	"ui_hudSafeInset","g_objectivesToggle","ui_hudOpacity","ui_hudDamageDirection","ui_hudPickups","ui_hudWeaponStrip",
 	"ui_reducedFlashing","ui_retainedOpaqueBacking","ui_tooltips","g_corpseSink","con_allowConsole","r_screenshotFormat","g_autoSkipCinematics","ui_cinematicShake","g_screenShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
@@ -4900,27 +4901,17 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	Check(tab() == 3 && runtime.FocusedControl() == "controls_bind_38","OTHER opens on its first binding");
 	Check(text("controls_bind_50-key0-cap-name","text") == "V" && text("controls_bind_50-key0","display") == "flex",
 		"the last tab shows its keys");
-	// TOUCH LAYOUT closes the Other tab only where the session reports the
-	// built-in touch controls (Android); it asks for the layout editor.
+	// TOUCH LAYOUT asks for the layout editor; with the rest of ON-SCREEN
+	// CONTROLS it stands on MOUSE, only where the session reports the
+	// built-in touch controls (Android).
 	{
 		const auto* touch = document.Model().FindNode("controls_touch_layout");
 		Check(touch && touch->control && touch->control->role == ControlRole::Button && touch->control->action == "controlsTouchLayout",
 			"TOUCH LAYOUT asks the session for the layout editor");
-		Check(text("controls_touch_layout","display") == "none","no TOUCH LAYOUT without the built-in touch controls");
+		Check(text("controls_touch_layout","display") == "none" && text("controls_touchcontrols","display") == "none",
+			"no touch rows without the built-in touch controls");
 		Check(!runtime.FocusControl("controls_touch_layout",0.81),"a hidden TOUCH LAYOUT takes no focus");
-		Check(runtime.SetState({{"controls.touchLayout",true}},error,0.82),"the session reports the touch controls");
-		runtime.Frame(viewport,0.83);
-		Check(text("controls_touch_layout","display") == "block","TOUCH LAYOUT shows with the touch controls");
-		const auto last = bounds("controls_bind_51"), touchRow = bounds("controls_touch_layout");
-		Check(std::abs(touchRow.x-last.x) < .5f && touchRow.y > last.y,"TOUCH LAYOUT follows the last binding in its column");
-		Check(runtime.FocusControl("controls_touch_layout",0.84),"TOUCH LAYOUT takes focus");
-		runtime.TakeActions();
-		press(MenuInput::Accept,0.85);
-		const auto actions = runtime.TakeActions();
-		Check(actions.size() == 1 && actions[0].action == "controlsTouchLayout","Accept on TOUCH LAYOUT asks for the editor");
-		Check(runtime.SetState({{"controls.touchLayout",false}},error,0.86),"the touch controls go");
-		runtime.Frame(viewport,0.87);
-		Check(runtime.FocusControl("controls_bind_38",0.88),"focus returns to the tab");
+		Check(runtime.FocusControl("controls_bind_38",0.88),"focus stays on the tab");
 	}
 	// MOUSE: AIM and MOUSE INPUT, then ACCELERATION beside them; a setting row
 	// sets its CVar, Free Look off.
@@ -4972,6 +4963,37 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	const auto accel = bounds("controls_maccel");
 	Check(std::abs(cpi.x-sensitivity.x) < .5f && cpi.y > sensitivity.y,"CPI stands under the sensitivity");
 	Check(accel.x > aim.x+aim.width && std::abs(accel.y-aim.y) < .5f,"the mouse's rows stand in two columns");
+	// ON-SCREEN CONTROLS follow ACCELERATION where the session reports the
+	// built-in touch controls; without a mouse the rows only a mouse uses step
+	// aside, the tab reads TOUCH and opens on the touch rows.
+	Check(runtime.SetState({{"controls.touchLayout",true}},error,0.9841),"the session reports the touch controls");
+	runtime.Frame(viewport,0.9842);
+	{
+		const auto cap = bounds("controls_msenscap"), shown = bounds("controls_touchcontrols"), layout = bounds("controls_touch_layout");
+		Check(text("controls_touchcontrols","display") == "block" && std::abs(shown.x-cap.x) < .5f && shown.y > cap.y && layout.y > shown.y,
+			"the touch rows follow ACCELERATION in its column");
+		Check(text("tab-mouse-label","text") == "#str_231777","with a mouse the tab still reads MOUSE");
+		Check(runtime.FocusControl("controls_touch_layout",0.9843),"TOUCH LAYOUT takes focus");
+		runtime.TakeActions();
+		press(MenuInput::Accept,0.9844);
+		const auto actions = runtime.TakeActions();
+		Check(actions.size() == 1 && actions[0].action == "controlsTouchLayout","Accept on TOUCH LAYOUT asks for the editor");
+		Viewport touchView = viewport; touchView.mouse = false;
+		runtime.Frame(touchView,0.9845);
+		Check(text("controls_msensitivity_row","display") == "none" && text("controls_maccel_row","display") == "none" &&
+			text("controls_freelook","display") != "none","without a mouse its rows step aside, the aim rows stay");
+		Check(!runtime.FocusControl("controls_mcpi",0.9846),"a hidden mouse row takes no focus");
+		Check(text("tab-mouse-label","text") == "#str_232733","and the tab reads TOUCH");
+		Check(runtime.RunEvent("tab_controller",0.9847,effects,error) && runtime.RunEvent("tab_mouse",0.9848,effects,error),
+			"leave and come back");
+		runtime.Frame(touchView,0.9849);
+		Check(runtime.FocusedControl() == "controls_touchcontrols","the tab opens on its first touch row");
+		Check(runtime.SetState({{"controls.touchLayout",false}},error,0.985),"the touch controls go");
+		runtime.Frame(viewport,0.9851);
+		Check(text("controls_touchcontrols","display") == "none" && text("controls_msensitivity_row","display") != "none",
+			"with a mouse and no touch controls the tab is as it was");
+		Check(runtime.FocusControl("controls_mcpi",0.9852),"back on CPI");
+	}
 	// CONTROLLER: its first row, and its prompt style a list of the stock values.
 	Check(runtime.RunEvent("onTabNext",0.99,effects,error),"the next tab");
 	runtime.Frame(viewport,1.0);
@@ -5041,8 +5063,8 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	const auto panel = bounds("controls-panel"), row = bounds("controls_bind_51");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && row.x+row.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"controls_bind_45","controls_bind_46","controls_bind_51","controls-other-rows",2.3);
-	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_45","controls_bind_46","controls_bind_51",2.4);
+	CheckSettingsPortrait(runtime,document,"controls_bind_44","controls_bind_45","controls_bind_51","controls-other-rows",2.3);
+	CheckSettingsTextScale(host,runtime,document,"controls-other","controls_bind_44","controls_bind_45","controls_bind_51",2.4);
 	host.cvars = saved;
 }
 
