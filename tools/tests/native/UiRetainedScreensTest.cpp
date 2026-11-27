@@ -67,7 +67,9 @@ struct ScreenHost final : Host {
 		{"hud_hitSound",1.0},{"hud_crosshairNames",1.0},{"hud_crosshairAmmo",false},{"hud_itemTimers",true},{"hud_teamLocations",true},
 		{"hud_localClock",0.0},{"ui_spectatorSpeed",100.0},{"g_spectatorFollowView",0.0},
 		// Player Setup's Player Identity (MP-17), on by default.
-		{"ui_identity",true}};
+		{"ui_identity",true},
+		// VR SETUP over the title and pause (retained_vr.py) at its defaults.
+		{"vr_playSpace",0.0},{"vr_turnMode",0.0},{"vr_leftHanded",0.0},{"vr_comfortVignette",std::string("0")}};
 	bool ReadCVar(const std::string& name, size_t type, StateValue& value) override {
 		if (type == 2 && name == "sys_lang") { value = language; return true; }
 		if (const auto found = cvars.find(name); found != cvars.end()) {
@@ -283,7 +285,7 @@ static const std::set<std::string> SessionCommands = {"continue","singlePlayer",
 	"createMapsOlder","createBanList","createBanPick","createBanRemove",
 	"joinBack","joinPick","joinServer","joinSpectate","joinNewer","joinOlder","joinRefresh","joinNewList","joinSourceInternet","joinSourceLan",
 	"joinClearSort","joinSortFavorite","joinSortLocked","joinSortName","joinSortPing","joinSortPlayers","joinSortGameType","joinSortMap",
-	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsResetController","controlsResetKeyboard","controlsCalibrateGyro","controlsRumbleTest",
+	"joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext","joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters","noticeAction0","noticeAction1","noticeAction2","vrRecenter","vrCalibrateHeight","vrDetect","audioBack","gameBack","controlsBind","controlsResetController","controlsResetKeyboard","controlsCalibrateGyro","controlsRumbleTest",
 	"oskKey","oskShift","oskLayer","oskSpace","oskLeft","oskRight","oskBackspace","oskDone","oskCancel","controlsClear","controlsBack","controlsTouchLayout","settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults","joinConnect","joinSearch","joinSearchClear","joinSortNext",
 	"mpClose","mpMainMenu","mpDisconnect","mpStockPage","mpTeamAction","mpSelectPlayer","mpMute","mpFriend","mpWelcomeAction",
 	"mpVoteYes","mpVoteNo","mpCallVote","mpRail","mpSettingsControls","mpSettingsGame","mpSettingsSystem","mpSettingsAudio","weaponOrderOpen","weaponOrderPick",
@@ -5262,12 +5264,12 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	Check(tab() == 3 && runtime.FocusedControl() == "game_viewkick","ACCESSIBILITY follows VIEW WEAPON, on View Kick");
 	const auto kick = bounds("game_viewkick"), flashing = bounds("game_reducedflashing");
 	Check(flashing.x > kick.x+kick.width && bounds("game_cinematicshake").y > kick.y,"MOTION and VISIBILITY stand in two columns");
-	// VIRTUAL REALITY: an on and off setting is a toggle.
+	// VIRTUAL REALITY: VR Mode is Off, On or Automatic (VR-08).
 	Check(runtime.RunEvent("onTabNext",1.64,effects,error),"the next tab");
 	runtime.Frame(viewport,1.641);
 	Check(tab() == 4 && runtime.FocusedControl() == "game_vr","VIRTUAL REALITY follows ACCESSIBILITY, on VR Mode");
-	press(MenuInput::Accept,1.642);
-	Check(std::get<bool>(taken("set.vr_enable").arguments.at("value")),"Accept turns VR Mode on as a toggle");
+	press(MenuInput::Right,1.642);
+	Check(std::get<double>(taken("set.vr_enable").arguments.at("value")) == 1,"Right steps VR Mode from Off to On");
 	// Corpse Time shows Custom but never offers it.
 	Check(runtime.RunEvent("tab_general",1.65,effects,error),"back to GENERAL");
 	runtime.Frame(viewport,1.66);
