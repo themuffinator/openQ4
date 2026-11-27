@@ -65,6 +65,9 @@ bool CopyEvent(const SDL_Event& e,const OQ4_NativeQueueRecord& tag,OwnedNativeQu
     case SDL_EVENT_MOUSE_MOTION: out.header.motion=e.motion; return true;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP: out.header.button=e.button; return true;
     case SDL_EVENT_MOUSE_WHEEL: out.header.wheel=e.wheel; return true;
+    // The interface variant (docs/dev/ui/interface-variants.md) follows keyboards and mice arriving and leaving.
+    case SDL_EVENT_KEYBOARD_ADDED: case SDL_EVENT_KEYBOARD_REMOVED: out.header.kdevice=e.kdevice; return true;
+    case SDL_EVENT_MOUSE_ADDED: case SDL_EVENT_MOUSE_REMOVED: out.header.mdevice=e.mdevice; return true;
     case SDL_EVENT_GAMEPAD_ADDED: case SDL_EVENT_GAMEPAD_REMOVED: case SDL_EVENT_GAMEPAD_REMAPPED:
     case SDL_EVENT_GAMEPAD_STEAM_HANDLE_UPDATED: out.header.gdevice=e.gdevice; return true;
     case SDL_EVENT_GAMEPAD_BUTTON_DOWN: case SDL_EVENT_GAMEPAD_BUTTON_UP: out.header.gbutton=e.gbutton; return true;
@@ -85,9 +88,7 @@ bool CopyEvent(const SDL_Event& e,const OQ4_NativeQueueRecord& tag,OwnedNativeQu
     case SDL_EVENT_CLIPBOARD_UPDATE: case SDL_EVENT_DROP_FILE: case SDL_EVENT_DROP_TEXT:
     case SDL_EVENT_DROP_BEGIN: case SDL_EVENT_DROP_COMPLETE: case SDL_EVENT_DROP_POSITION:
     case SDL_EVENT_LOCALE_CHANGED: case SDL_EVENT_SYSTEM_THEME_CHANGED: case SDL_EVENT_KEYMAP_CHANGED:
-    case SDL_EVENT_KEYBOARD_ADDED: case SDL_EVENT_KEYBOARD_REMOVED:
     case SDL_EVENT_SCREEN_KEYBOARD_SHOWN: case SDL_EVENT_SCREEN_KEYBOARD_HIDDEN:
-    case SDL_EVENT_MOUSE_ADDED: case SDL_EVENT_MOUSE_REMOVED:
     case SDL_EVENT_JOYSTICK_BALL_MOTION: case SDL_EVENT_JOYSTICK_UPDATE_COMPLETE:
     case SDL_EVENT_GAMEPAD_UPDATE_COMPLETE: case SDL_EVENT_AUDIO_DEVICE_ADDED: case SDL_EVENT_AUDIO_DEVICE_REMOVED:
     case SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED: case SDL_EVENT_SENSOR_UPDATE:
