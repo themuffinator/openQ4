@@ -1249,7 +1249,11 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 	}
 	renderSystem->SetVRRenderTarget( -1 );
 
-	SingleView( hud, view, RF_GUI_ONLY );
+	// the HUD shares the screen image with a menu, which shows the world round
+	// its buttons in VR: with a menu up only the menu draws there (VR-09)
+	if ( !vrFrame.menuUp ) {
+		SingleView( hud, view, RF_GUI_ONLY );
+	}
 }
 
 /*

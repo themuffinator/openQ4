@@ -83,7 +83,7 @@ def hand_pointing_at(u: float, v: float) -> str:
 SETUP_TURNING = (0.464, 0.545)                  # VR SETUP's Turning value
 SETUP_SMOOTH = (0.420, 0.617)                   # "Smooth", second in the list it unfolds
 SETUP_DONE = (0.380, 0.716)                     # VR SETUP's DONE
-PAUSE_SETTINGS = (0.231, 0.723)                 # the retained pause menu's Settings row
+PAUSE_SETTINGS = (0.500, 0.603)                 # SETTINGS in the pause's VR column (retained_vr.hand_menu)
 NAV_GAME_OPTIONS = canvas_to_screen(105, 227)   # Settings' left-hand Game Options button
 VR_TAB = (0.746, 0.116)                         # Game Options' VIRTUAL REALITY tab
 LASER_VALUE = (0.400, 0.783)                    # the Laser Sight row's value on that tab (one column at VR text size)
@@ -202,7 +202,7 @@ def main(argv: list[str] | None = None) -> None:
         "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1", "sys_lang": options.language,
         # the first VR entry: VR SETUP opens over the pause, Turning starts at Snap
         "vr_enable": "1", "vr_setupDone": "0", "vr_turnMode": "0", "vr_debug": "1", "vr_aimMode": "1", "vr_screenDistance": "2.5",
-        "vr_screenWidth": str(SCREEN_WIDTH_M), "vr_leftHanded": "0",
+        "vr_screenWidth": str(SCREEN_WIDTH_M), "vr_leftHanded": "0", "vr_menuAnchor": str(MENU_ANCHOR),
         # after the launch configuration's own r_renderApi, so this one wins
         "r_renderApi": options.render_api,
     }

@@ -94,6 +94,7 @@ typedef struct vrFrameState_s {
 	bool					menuPointer;	// a menu is up and the weapon hand points at its panel or screen
 	bool					menuPointerHit;	// the beam ends on the menu, at menuPointerEnd
 	idVec3					menuPointerEnd;	// tracking space, units
+	bool					menuUp;			// a session menu is up: the HUD stands down, as the menu shares its image
 } vrFrameState_t;
 
 // What the usercmd generator applies for one tic while VR drives input.

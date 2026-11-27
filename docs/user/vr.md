@@ -122,7 +122,24 @@ line, which helps when you report a problem.
 
 ## Menus in VR
 
-**Not in 0.15.0.** While you play in the headset the menus adapt to it:
+**Not in 0.15.0.** During play the menus never take the world away. Press the
+menu button and a panel grows out of your off hand and stands above it, turned
+to face you, with the level still around you. It follows your hand when you
+move it, but a steady hand's small shake leaves it still, so what you point at
+stays put; hold it closer to read small text. Point with the weapon hand: a
+light beam runs from your hand to the panel, the button under it grows and
+lights up, and your hand ticks lightly as the pointer moves onto another
+control. The pause is nothing but its buttons, big and plain: Resume,
+Objectives, Save, Load, Restart, Settings, VR Setup, Quit to Menu and Exit. Set **vr_menuAnchor 0** for
+the screen hung in front of you instead; the title, loading screens and
+cinematics always use that screen.
+
+The HUD keeps out of your view too: health, armor and ammunition ride on your
+off-hand wrist, so you glance at your wrist to check them, and only notices,
+messages and objective updates stay before your eyes. Set **vr_hudMode 0** to
+have the whole HUD in front of you again.
+
+The menus also adapt in other ways:
 
 - **VR SETUP** opens over the title or pause menu the first time VR starts:
   seated or standing, **Measure My Height**, **Recentre View**, snap or smooth
@@ -198,10 +215,12 @@ use these instead (**not in 0.14.1**; before, some had no flashlight or jump):
 | HTC Vive wand | The trackpad is the stick. Press it to use it as buttons. Right pad: up crouches, down jumps, left and right turn, centre is the stick click. Left pad: up toggles the flashlight, down reloads, centre runs. The right menu button also crouches. A thumb resting on the right pad does nothing until you press. |
 | Windows Mixed Reality | Press the touchpad. Upper half: crouch (right) or flashlight (left). Lower half: jump (right) or reload (left). The thumbsticks work as on Touch. |
 
-Menus open on a floating screen in front of you, and the game world stays around
-you while the game is paused. Point your weapon-hand controller at the screen:
-a round dot shows where it points, and the trigger clicks there like a mouse. The
-sticks and the A and B buttons work in menus too. Button prompts name your
+During play, menus grow out of your off hand on a panel that stays above it
+(**not in 0.15.0**; see [Menus in VR](#menus-in-vr)), and the game world stays
+around you while the game is paused. Point your weapon-hand controller at the
+panel: a light beam runs from your hand to it, a round dot shows where it
+points, and the trigger clicks there like a mouse. The sticks and the A and B
+buttons work in menus too. Button prompts name your
 controller's buttons while you point (**after 0.15.0**; in 0.15.0 pointing
 switched them to keyboard keys, and the dot was square).
 
@@ -628,6 +647,11 @@ General settings (the others are in the sections above):
 | `vr_setup` | | **Not in 0.15.0.** Command: opens VR SETUP over the title or pause menu |
 | `vr_offer` | | **Not in 0.15.0.** Command: `status`, `yes`, `no`, `open`, or `reset` to ask the one-time question again |
 | `ui_retainedVRTextScale` | 1.25 | **Not in 0.15.0.** Menu text size while in VR, at least your usual text size |
+| `vr_menuAnchor` | 1 | **Not in 0.15.0.** Menus during play: 1 on a panel that grows out of your off hand, 0 on the screen hung in front of you |
+| `vr_menuWidth` | 0.5 | **Not in 0.15.0.** Width of the off-hand menu panel in metres (0.3 to 1.2) |
+| `vr_hudMode` | 1 | **Not in 0.15.0.** 1 health, armor and ammunition on your off-hand wrist and the rest before your eyes (a vehicle's HUD stays whole in front); 0 the whole HUD before your eyes |
+| `vr_wristWidth` | 0.24 | **Not in 0.15.0.** Width of the wrist display in metres |
+| `vr_menuHaptics` | 1 | **Not in 0.15.0.** 1 ticks the pointing hand as the pointer moves onto another control, and the off hand as its panel opens |
 | `vr_pauseOnFocusLoss` | 1 | single player: 1 opens the pause menu when the headset comes off or its own menu takes the controllers |
 | `vr_mirror` | 1 | desktop window: 0 black, 1 left eye, 2 the floating screen |
 | `vr_debug` | 0 | 1 logs VR session events, 2 also logs every frame (for problem reports) |

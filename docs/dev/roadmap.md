@@ -3198,7 +3198,7 @@ and AND-05.
 | VR-05 — Closed (approved scope) | Decision: per-eye TAA only. Each eye has its own view identity, history images, motion vectors and resets in the SP game chain and both backends' own temporal scenes; dynamic resolution stays off in VR. SP/MP GL/Vulkan pass the simulated-runtime smoke. | Headset comfort is checklist section 7. Hand presence arrived with the body (VR-02, 17 November); physical-object interaction needs its own design. |
 | VR-06 — Closed | Active GL teardown/ownership repair passes native failure cases and simulated-runtime SP/MP gameplay. | Carry guarantees into VR-01 backends; physical controller/headset validation remains VR-02. |
 | VR-08 — Partial | 27 November 2026: VR Mode Off/On/Automatic (`vr_enable` 0/1/2; archived 0 and 1 keep their meaning), a side-effect-free stage-one runtime probe (`XR_RUNTIME_JSON`, the Windows registry, the XDG files, the Quest flavor), Automatic's launch-time headset question before the renderer is chosen (OpenGL under `r_renderApi best`), its 20 s settle window, a menu notice for a headset found later (Play in VR, `vr_start`), the title's one-time question when a runtime is installed (`vr_offerAnswered`), `vr_detect` and the `VR_RUNTIME`/`VR_MODE`/`VR_OFFER`/`VR_DETECT` log lines; `openxr_vr_detection_smoke.py` covers no runtime, a runtime without a headset, a headset at launch, one connected later and the once-only question. | Real runtimes (SteamVR, Meta Link, WMR, Monado, Virtual Desktop): their registration read correctly, how each answers `xrGetSystem` with the headset off, asleep or unplugged, and whether Automatic starting SteamVR at launch is acceptable; checklist section 8. |
-| VR-09 — Partial | 27 November 2026: the retained interface in VR (`tools/ui/retained_vr.py`, keyed on the shared interface variant `vr`, AND-04.1): VR SETUP (play space, height, recentre, turning, weapon hand, comfort vignette) opened over the title or pause at the first VR entry and from the pause's VR SETUP link and the Virtual Reality tab's Comfort Setup; Game Options opens on Virtual Reality in VR; the desktop-only rows (the flat gun's place and field of view, stereoscopic 3D) leave the page in VR; the Marine, Strogg and Awakening pauses and the Awakening settings pages carry it; menu text at least 1.25x in VR (`ui_retainedVRTextScale`); the game's on-screen keyboard instead of the desktop's whenever VR has the controllers; the desktop mirror shows the menu screen while a menu is up; all 12 languages; `openxr_vr_menu_smoke.py` sets VR SETUP's Turning by pointer before its Laser Sight round. | Readability, laser-pointer hit sizes and the desktop mirror judged in a headset; the on-screen keyboard reached by the pointer on a headset; checklist section 8. |
+| VR-09 — Partial | 27 November 2026: the retained interface in VR (`tools/ui/retained_vr.py`, keyed on the shared interface variant `vr`, AND-04.1): VR SETUP (play space, height, recentre, turning, weapon hand, comfort vignette) opened over the title or pause at the first VR entry and from the pause's VR SETUP link and the Virtual Reality tab's Comfort Setup; Game Options opens on Virtual Reality in VR; the desktop-only rows (the flat gun's place and field of view, stereoscopic 3D) leave the page in VR; the Marine, Strogg and Awakening pauses and the Awakening settings pages carry it; menu text at least 1.25x in VR (`ui_retainedVRTextScale`); the game's on-screen keyboard instead of the desktop's whenever VR has the controllers; the desktop mirror shows the menu screen while a menu is up; all 12 languages; `openxr_vr_menu_smoke.py` sets VR SETUP's Turning by pointer before its Laser Sight round. Second round the same day (user: keep players in the 3D world, a minimal menu from the left hand, a clear pointer and hover; Half-Life: Alyx as inspiration, ideas only): menus during play grow out of the off hand on a panel that follows it past a tremor dead zone (`vr_menuAnchor`, `src/framework/VRPanelCore.h`), the world drawn behind every in-game menu; the pause is a bare column of big buttons, no plate, title or ornament (`retained_vr.hand_menu`), each growing and lighting under the pointer; a light beam from the pointing hand (`vrFrameState_t::menuPointer`, game API 66) and a haptic tick per new control; health, armor and ammunition on the off-hand wrist (`vr_hudMode`). The controllers' out-of-the-box binds were checked and left as they are: they press the gamepad's `JOY` keys, bound in default.cfg. | Readability, laser-pointer hit sizes and the desktop mirror judged in a headset; the on-screen keyboard reached by the pointer on a headset; checklist section 8. |
 | VR-07 — Partial | 24 November 2026: desktop stereoscopic 3D (`r_stereo3D`) on OpenGL and Vulkan: side by side (half and full width), top and bottom, red/cyan anaglyph (Dubois) and row interlaced, with depth, convergence and eye swap; SP, MP, menus, the paused menu's backdrop and window-sized screenshots captured in every layout; Settings rows on both interfaces in all 12 languages. | Physical stereo displays (a 3D TV or monitor, side-by-side glasses, a passive interlaced panel, anaglyph glasses); the zero-parallax crosshair; Apple GL and GLES, which decline it. |
 
 ### VR task evidence and acceptance
@@ -3472,9 +3472,34 @@ and AND-05.
   controllers (the desktop's own would open where no one looks), and a desktop
   mirror that shows the menu screen while a menu is up. The pointer counts as
   a controller for prompts (26 November), and the shared variant's touch reach
-  (a press beside a small control reaches it) applies to it once merged. Open: judging text
-  size, hit sizes, the mirror and the keyboard in a headset (checklist
-  section 8).
+  (a press beside a small control reaches it) applies to it once merged.
+  Second round, 27 November 2026, on the user's direction (keep VR players in
+  the 3D world, with a minimal menu from the left hand, an intuitive pointer
+  and widgets that clearly change under it; Half-Life: Alyx as inspiration,
+  ideas only). Menus during play grow out of the off hand on a panel that
+  stands above it facing the head, follows the hand past a small tremor dead
+  zone and lets the world show round it (`vr_menuAnchor`, `vr_menuWidth`,
+  `src/framework/VRPanelCore.h` with native tests); the session draws the
+  world behind every in-game menu in VR. The pause is a bare column of big
+  buttons, with no plate, title or ornament (the user: almost all of it
+  functional), that grow by 6% and fill with the hot colour under the
+  pointer or focus (`retained_vr.hand_menu`, the Marine, Strogg and
+  Awakening pauses). The
+  pointing hand draws a light beam to the panel in each eye
+  (`vrFrameState_t::menuPointer`, game API 66) and ticks on each new control
+  (`RetainedUI_HoverGeneration`, `vr_menuHaptics`). The HUD stands down
+  while a menu is up (`vrFrameState_t::menuUp`): it shares the screen image
+  the panel shows, and would show through round the buttons. Health, armor and
+  ammunition ride on the off-hand wrist, the rest of the HUD before the eyes
+  (`vr_hudMode`, two quad layers from the one HUD image). The controllers'
+  default binds were checked and need nothing: they press the gamepad's `JOY`
+  keys (`idVRSystemOpenXR::SyncInput`), which default.cfg binds; holding
+  scores or objectives has no button in play, and objectives are on the
+  pause card. Checked on the test runtime by composited eye views
+  (`openxr_vr_menu_smoke.py` now points at the hand panel; `--menu-anchor 0`
+  keeps the front screen covered). Open: judging text size, hit sizes, the
+  mirror, the keyboard, comfort and the hand panel's place in a headset
+  (checklist section 8).
 
 ## Android and mobile rendering
 

@@ -50,7 +50,11 @@ the [development roadmap](../roadmap.md) for current scope.
   or standing, your height, recentre, turning, weapon hand, comfort vignette)
   opens the first time and stays on the pause menu, Settings opens on Virtual
   Reality, desktop-only settings step aside, menu text is larger, and typing
-  uses the in-game keyboard. Off never touches your VR software. See the
+  uses the in-game keyboard. Off never touches your VR software. During play
+  the menu grows out of your off hand on a panel, with the level still around
+  you: a light beam points from your other hand, buttons grow and light up
+  under it and your hand ticks as you move between them. Health, armor and
+  ammunition sit on your off-hand wrist. See the
   [VR guide](../../user/vr.md#vr-mode-and-headset-detection).
 - **Play in 3D without a headset.** Turn on **Stereoscopic 3D** in Settings >
   Game Options > Virtual Reality and the game draws a view for each eye: side

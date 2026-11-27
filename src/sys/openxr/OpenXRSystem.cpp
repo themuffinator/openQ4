@@ -3797,19 +3797,19 @@ void idVRSystemOpenXR::UpdateMenuPointer( int weaponHand, bool menu ) {
 	const float deadBand = 0.0015f;
 	if ( wasOnScreen && idMath::Fabs( hit.u - pointerU ) < deadBand && idMath::Fabs( hit.v - pointerV ) < deadBand ) {
 		pointerOnScreen = true;
-		return;
-	}
-	if ( Sys_PostVRPointer( true, hit.u, hit.v ) ) {
+	} else if ( Sys_PostVRPointer( true, hit.u, hit.v ) ) {
 		pointerOnScreen = true;
 		pointerU = hit.u;
 		pointerV = hit.v;
 	}
 	// A light tick in the pointing hand as the pointer moves onto another
-	// control: the controls also grow and light up under it (VR-09).
+	// control: the controls also grow and light up under it (VR-09). The menu
+	// finds the control a frame after the pointer moves, while the hand holds
+	// still inside the dead band, so this looks every frame.
 	const unsigned int hover = RetainedUI_HoverGeneration();
-	if ( pointerOnScreen && hover != hoverGeneration ) {
+	if ( hover != hoverGeneration ) {
 		hoverGeneration = hover;
-		if ( vr_menuHaptics.GetBool() ) {
+		if ( pointerOnScreen && vr_menuHaptics.GetBool() ) {
 			Vibrate( weaponHand, 0.15f, 12 );
 		}
 	}
@@ -4100,6 +4100,9 @@ void idVRSystemOpenXR::BeginFrame( void ) {
 	// the menu's pointer beam, for the eyes to draw from the weapon hand (VR-09)
 	{
 		const int weaponHand = vr_leftHanded.GetBool() ? VR_HAND_LEFT : VR_HAND_RIGHT;
+		// the HUD and a menu draw into the one screen image; a menu shows only
+		// its buttons over the world, so the HUD must not show through it
+		frame.menuUp = ::session != NULL && ::session->IsGUIActive();
 		frame.menuPointer = MenuMode() && screenAnchored && !lastFrameHud && aimLocalValid[weaponHand];
 		frame.menuPointerHit = frame.menuPointer && pointerOnScreen;
 		if ( frame.menuPointerHit ) {
@@ -4245,8 +4248,10 @@ void idVRSystemOpenXR::EndFrame( void ) {
 			quad.size.height = quad.size.width * screenHeight / screenWidth;
 			// Health, armor and ammunition ride on the off-hand wrist
 			// (vr_hudMode 1): glance at it as at a watch. The rest of the HUD
-			// stays before the eyes without that band, where it was.
-			if ( vr_hudMode.GetInteger() == 1 && gripLocalValid[offHand] && headLocalValid ) {
+			// stays before the eyes without that band, where it was. A
+			// vehicle's HUD is its own sights and status: it stays whole on the
+			// line of sight (vr_hudOnSight).
+			if ( vr_hudMode.GetInteger() == 1 && !vr_hudOnSight.GetBool() && gripLocalValid[offHand] && headLocalValid ) {
 				const float fullHeight = quad.size.height;
 				quad.subImage.imageRect = ScreenRect( 0.0f, 0.0f, 1.0f, 1.0f - VR_WRIST_BAND );
 				quad.size.height = fullHeight * ( 1.0f - VR_WRIST_BAND );

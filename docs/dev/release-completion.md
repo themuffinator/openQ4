@@ -39,6 +39,37 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   No phone, tablet, Steam Deck or desktop touchscreen has been used by hand.
   Contract: [ui/interface-variants.md](ui/interface-variants.md).
 
+## VR menus from your hand and a HUD on your wrist, 27 November 2026
+
+- **Menus grow out of your off hand.** Press the menu button during play and
+  a panel grows out of your off hand and stands above it, facing you, with
+  the level still around you. It follows your hand when you move it and holds
+  still while you hold steady, so the button you point at stays put. Hold it
+  closer to read small text. `vr_menuAnchor 0` puts menus back on the screen
+  hung in front of you; the title, loading screens and cinematics stay there.
+- **A pointer you can see, and buttons that answer it.** A light beam runs
+  from your pointing hand to the panel. The pause is nothing but a column of
+  big, plain buttons, and the one under the beam grows and lights up while
+  your hand ticks lightly as the pointer moves onto another control
+  (`vr_menuHaptics`).
+- **Your HUD on your wrist.** Health, armor and ammunition ride on your
+  off-hand wrist; glance at it as at a watch. Notices, messages and
+  objective updates stay before your eyes. `vr_hudMode 0` brings the whole
+  HUD back in front.
+- **What to do.** Nothing; your bindings are unchanged.
+- Inspiration: Half-Life: Alyx's hand-held menus and wrist readouts (ideas
+  only; nothing taken from it).
+- Not yet checked on a real headset: the panel's place, the beam and the
+  wrist display's readability (VR headset checklist 8.11 to 8.13).
+- Development: `src/framework/VRPanelCore.h` (panel and wrist placement,
+  native tests in `VRMathCoreTest.cpp`), `idVRSystemOpenXR::PlaceHandPanel`
+  and the wrist's two quad layers from the HUD image (`ScreenRect`, which
+  flips rows for OpenGL), the session drawing the world behind in-game menus
+  in VR, `retained_vr.hand_menu` in the pause families, the
+  `vrFrameState_t::menuPointer` beam (game API 66), `RetainedUI_HoverGeneration`
+  for the tick, and `vrFrameState_t::menuUp`, which keeps the HUD out of the
+  screen image the menu shares while a menu is up.
+
 ## VR finds your headset, and the menus fit the headset, 27 November 2026
 
 - **VR Mode has three choices: Off, On and Automatic.** Off never asks your

@@ -4900,13 +4900,13 @@ def pause_document(strogg: bool = False) -> dict:
                                                  "pointer-events": keyword("none")})
     doc.bind("vr-objectives-backing.display", "vr-objectives-backing", "display",
              {"op": "select", "args": [{"op": "&&", "args": [vr, {"state": "objectives.visible"}]}, "block", "none"]})
-    desktop = [group("desktop-field", {**FULL, "display": keyword("block"), "pointer-events": keyword("none")}, field),
-               objectives_bar,
-               group("desktop-home", {**FULL, "display": keyword("block")}, [*bands, content]),
+    # The field, the Objectives bar, the bands and the home stay siblings, as
+    # the Awakening's frost reads them (retained_awakening.awaken_frame).
+    desktop = [group("desktop-home", {**FULL, "display": keyword("block")}, [*field, objectives_bar, *bands, content]),
                vr_backing,
                objectives,
                group("desktop-prompts", {**FULL, "display": keyword("block")}, [prompt, carry])]
-    for ident in ("desktop-field", "desktop-home", "desktop-prompts"):
+    for ident in ("desktop-home", "desktop-prompts"):
         doc.bind(f"{ident}.display", ident, "display", flat)
     chrome = group("chrome", {**FULL, "display": keyword("block")}, [
         *desktop,

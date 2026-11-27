@@ -216,7 +216,8 @@ def main(argv: list[str] | None = None) -> None:
     assert not re.search(r"FATAL|ERROR:|OpenXR: .* failed|Unknown command", text), "errors in the log"
     assert "spectate = 0" in text, "the player never joined the match"
     frames = [e for e in events if e.get("event") == "end_frame"]
-    assert any([layer["type"] for layer in f["layers"]] == ["projection", "quad"] for f in frames), \
+    # the HUD before the eyes, and with vr_hudMode 1 (the default) its status band on the off-hand wrist
+    assert any(tuple(layer["type"] for layer in f["layers"]) in (("projection", "quad"), ("projection", "quad", "quad")) for f in frames), \
         "the match never presented a stereo projection layer with the HUD"
 
     def head_forward(after: str) -> float:

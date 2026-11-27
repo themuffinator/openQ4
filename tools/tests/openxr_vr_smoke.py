@@ -86,11 +86,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 # Where the scripted controller points: straight ahead from this far right of
 # and above the eyes, onto a screen vr_screenWidth metres wide hung straight
-# ahead (the simulated head looks down -Z from 1.6 m). This is the pause
-# menu's Resume row.
-POINTER_RIGHT_M = -0.84
-POINTER_UP_M = 0.15
+# ahead (the simulated head looks down -Z from 1.6 m). This is RESUME, first in
+# the pause's VR column (retained_vr.hand_menu: nine 70 dp buttons 4 dp apart,
+# centred on the 720 dp canvas, so RESUME's middle is 64 dp down).
+POINTER_RIGHT_M = 0.0
+POINTER_UP_M = round((0.5 - 64.0 / 720.0) * 3.0 * 9.0 / 16.0, 3)
 SCREEN_WIDTH_M = 3.0
+# A frame that shows the HUD: the eyes, the HUD before them and, with
+# vr_hudMode 1 (the default, VR-09), its status band on the off-hand wrist.
+HUD_LAYERS = (("projection", "quad"), ("projection", "quad", "quad"))
 
 # The test runtime's eyes (OpenXRTestRuntime.cpp EyeFov, TR_IPD): signed
 # angles of each frustum, and their separation in metres.
@@ -443,6 +447,9 @@ def main(argv: list[str] | None = None) -> None:
         # VR SETUP opens at the first VR entry (retained_vr); these runs test the rest
         "vr_enable": "1", "vr_setupDone": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_turnMode": "0", "vr_snapTurnAngle": "45",
         "vr_screenDistance": "2.5", "vr_screenWidth": str(SCREEN_WIDTH_M), "vr_leftHanded": "0",
+        # the pause checks below read the screen hung in front; the hand panel,
+        # the default (VR-09), is openxr_vr_menu_smoke.py's
+        "vr_menuAnchor": "0",
         # after the launch configuration's own r_renderApi, so this one wins
         "r_renderApi": options.render_api,
     }
@@ -521,7 +528,7 @@ def main(argv: list[str] | None = None) -> None:
     frames = [e for e in events if e.get("event") == "end_frame"]
     assert any([layer["type"] for layer in f["layers"]] == ["quad"] for f in frames), \
         "loading never presented as a lone virtual-screen quad"
-    stereo = [f for f in frames if [layer["type"] for layer in f["layers"]] == ["projection", "quad"]]
+    stereo = [f for f in frames if tuple(layer["type"] for layer in f["layers"]) in HUD_LAYERS]
     assert stereo, "gameplay never presented a stereo projection layer with the HUD"
     assert any(f["layers"][1]["flags"] & 0x2 for f in stereo), \
         "the gameplay HUD quad must blend with source alpha"
@@ -741,7 +748,7 @@ def main(argv: list[str] | None = None) -> None:
         "the trigger did not click as a mouse button while pointing at the menu"
     # the hidden test window never has focus, as a desktop window seldom does
     # while the player wears the headset: the click must still reach the menu
-    assert any([layer["type"] for layer in f["layers"]] == ["projection", "quad"] and f["layers"][1]["flags"] & 0x2
+    assert any(tuple(layer["type"] for layer in f["layers"]) in HUD_LAYERS and f["layers"][1]["flags"] & 0x2
                for f in menu_frames), "clicking Resume with the pointer did not close the pause menu"
 
     # a walker in stereo: its cockpit turns after the head, about the eye,
@@ -764,7 +771,7 @@ def main(argv: list[str] | None = None) -> None:
     eye_moved = math.dist(seated[:3], looked[:3])
     assert eye_moved < 4.0, f"turning the cockpit moved the eye {eye_moved:.1f} units"
     vehicle_frames = [f for f in frames if f["frame"] >= vehicle_capture]
-    assert vehicle_frames and [layer["type"] for layer in vehicle_frames[0]["layers"]] == ["projection", "quad"], \
+    assert vehicle_frames and tuple(layer["type"] for layer in vehicle_frames[0]["layers"]) in HUD_LAYERS, \
         f"the walker should present a stereo view and the HUD: {vehicle_frames[:1]}"
     # the head aims the cockpit, so the HUD and its sights hang on the line of
     # sight even though the controller aims on foot (where it hangs lower)
