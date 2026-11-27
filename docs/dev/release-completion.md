@@ -12,6 +12,21 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Window Mode and several monitors, 27 November 2026
+
+- **Exclusive Fullscreen is greyed out in Window Mode while Expand Across
+  Displays is on** (#263). Exclusive fullscreen switches one display's mode,
+  so it can't stretch across monitors, and choosing it with spanning on used
+  to fail only when you pressed Apply. Turn spanning off to choose it.
+- **The line under Expand Across Displays names the new modes:** spanning
+  needs the Borderless or Fullscreen Window Mode, in all twelve languages.
+- Evidence: the SYSTEM display-lists test (two published displays) checks
+  that Exclusive Fullscreen reads as unavailable and is skipped while the
+  draft spans, and is offered again on one display; it fails on the previous
+  page. In a hidden-window OpenGL client started with spanning on, the list
+  showed Exclusive Fullscreen dimmed and End stopped on Fullscreen. Spanning
+  itself was not run: the test machine has one display.
+
 ## One Window Mode choice instead of three display switches, 27 November 2026
 
 - **Settings > Display > Screen now has a single Window Mode list:**

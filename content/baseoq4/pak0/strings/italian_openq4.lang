@@ -1285,7 +1285,7 @@
 	"#str_230085"	"%d Hz"
 	"#str_230086"	"%d: %s"
 	"#str_230087"	"Schermo %d (non collegato)"
-	"#str_230088"	"L’estensione richiede una finestra senza bordi o lo schermo intero desktop."
+	"#str_230088"	"L’estensione richiede la modalità finestra Senza bordi o Schermo intero."
 	"#str_230089"	"Questi schermi non possono essere estesi."
 	"#str_230100"	"Posa di mira"
 	"#str_230101"	"Posa dell'impugnatura"

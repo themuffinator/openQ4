@@ -50416,7 +50416,8 @@
                       "selected": "settings_window_mode-option-3-selected",
                       "highlight": "settings_window_mode-option-3-highlight"
                      },
-                     "labelIndex": 3
+                     "labelIndex": 3,
+                     "enabled": {"op": "==", "args": [{"state": "settings.draft.r_multiScreen"}, 0]}
                     }
                    ],
                    "placementBounds": "settings-body",

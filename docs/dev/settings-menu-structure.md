@@ -46,6 +46,7 @@ On the retained pages a row that another setting has turned off is dimmed and di
 |---|---|---|---|
 | Display | Window Width, Window Height | Window Mode is Windowed | Only a bordered window takes the window size; Borderless covers the display (#265). |
 | Display | Display Resolution, Custom FS Width/Height, Refresh Rate | Window Mode is Exclusive Fullscreen | Fullscreen uses the desktop's mode, a window its window size. |
+| Display | Window Mode's Exclusive Fullscreen option | Expand Across Displays is No | Exclusive fullscreen switches one display's mode; `BuildDisplayRequest` refuses it with `r_multiScreen 1`. |
 
 The retained Display page's **Window Mode** (#264) replaces the classic page's Fullscreen, Borderless Window and Fullscreen Policy rows. Windowed is `r_fullscreen 0`, `r_borderless 0`; Borderless is `r_fullscreen 0`, `r_borderless 1`; Fullscreen is `r_fullscreen 1`, `r_fullscreenDesktop 1`; Exclusive Fullscreen is `r_fullscreen 1`, `r_fullscreenDesktop 0`. One choice edits the three settings in one draft patch; a windowed mode keeps `r_fullscreenDesktop` and a fullscreen mode keeps `r_borderless`, which neither reads. The classic page keeps its three rows.
 | Display | Shadow Maps | Enable Shadows is on | Unchanged. |

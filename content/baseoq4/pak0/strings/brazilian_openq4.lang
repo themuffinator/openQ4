@@ -1285,7 +1285,7 @@
 	"#str_230085"	"%d Hz"
 	"#str_230086"	"%d: %s"
 	"#str_230087"	"Monitor %d (desconectado)"
-	"#str_230088"	"Para usar vários monitores, use janela sem bordas ou tela cheia da área de trabalho."
+	"#str_230088"	"Para usar vários monitores, use o modo de janela Sem bordas ou Tela cheia."
 	"#str_230089"	"Estes monitores não podem ser combinados."
 	"#str_230100"	"Pose de mira"
 	"#str_230101"	"Pose de empunhadura"

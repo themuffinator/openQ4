@@ -1285,7 +1285,7 @@
 	"#str_230085"	"%d Hz"
 	"#str_230086"	"%d: %s"
 	"#str_230087"	"Display %d (not connected)"
-	"#str_230088"	"Spanning needs a borderless window or desktop fullscreen."
+	"#str_230088"	"Spanning needs the Borderless or Fullscreen window mode."
 	"#str_230089"	"These displays cannot be spanned."
 	"#str_230100"	"Aim pose"
 	"#str_230101"	"Grip pose"

@@ -199,7 +199,18 @@ static void Spanning(View& v) {
  Draft(v,{{"r_fullscreen",true},{"r_fullscreenDesktop",false},{"r_borderless",false},{"r_multiScreen",1.0}});
  Check(ClosedText(v,Span)==Encoded(Segment(v,"#str_200059",1)),"an unoffered span still names itself");
  Open(v,Span);Check(Highlight(v,Span,MenuInput::Home)==Option(Span,0),"the primary display alone stays pickable");Close(v,Span);
- Draft(v,{{"r_fullscreen",false},{"r_multiScreen",0.0}});
+ // Exclusive Fullscreen switches one display's mode and cannot span, so
+ // Window Mode offers it only while the draft keeps to one display.
+ constexpr const char* Mode="settings_window_mode";
+ Draft(v,{{"r_fullscreenDesktop",true}});
+ Open(v,Mode);
+ Check(std::abs(Strength(v,Option(Mode,3))-.40)<.01,"Exclusive Fullscreen reads as unavailable while the draft spans");
+ Check(Highlight(v,Mode,MenuInput::End)==Option(Mode,2),"a spanning draft is offered Fullscreen at most");Close(v,Mode);
+ Draft(v,{{"r_multiScreen",0.0}});
+ Open(v,Mode);
+ Check(std::abs(Strength(v,Option(Mode,3))-.90)<.01,"Exclusive Fullscreen reads as available on one display");
+ Check(Highlight(v,Mode,MenuInput::End)==Option(Mode,3),"one display is offered Exclusive Fullscreen");Close(v,Mode);
+ Draft(v,{{"r_fullscreen",false},{"r_fullscreenDesktop",false},{"r_multiScreen",0.0}});
 }
 // Display Resolution and Refresh Rate pick a slot of their lists with the
 // list token; the reserved slot names an unlisted entry outside the popup.

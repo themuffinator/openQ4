@@ -1285,7 +1285,7 @@
 	"#str_230085"	"%d Hz"
 	"#str_230086"	"%d: %s"
 	"#str_230087"	"Écran %d (non connecté)"
-	"#str_230088"	"L’extension demande une fenêtre sans bordure ou le plein écran bureau."
+	"#str_230088"	"L’extension demande le mode d'affichage Sans bordure ou Plein écran."
 	"#str_230089"	"Ces écrans ne peuvent pas être étendus."
 	"#str_230100"	"Pose de visée"
 	"#str_230101"	"Pose de prise en main"

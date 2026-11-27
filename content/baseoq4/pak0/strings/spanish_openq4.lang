@@ -1285,7 +1285,7 @@
 	"#str_230085"	"%d Hz"
 	"#str_230086"	"%d: %s"
 	"#str_230087"	"Pantalla %d (no conectada)"
-	"#str_230088"	"La expansión requiere una ventana sin bordes o pantalla completa de escritorio."
+	"#str_230088"	"La expansión requiere el modo de ventana Sin bordes o Pantalla completa."
 	"#str_230089"	"Estas pantallas no se pueden expandir."
 	"#str_230100"	"Pose de apuntado"
 	"#str_230101"	"Pose de agarre"

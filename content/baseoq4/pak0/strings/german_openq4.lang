@@ -1285,7 +1285,7 @@
 	"#str_230085"	"%d Hz"
 	"#str_230086"	"%d: %s"
 	"#str_230087"	"Bildschirm %d (nicht verbunden)"
-	"#str_230088"	"Mehrere Bildschirme brauchen ein randloses Fenster oder Desktop-Vollbild."
+	"#str_230088"	"Mehrere Bildschirme brauchen den Fenstermodus Randlos oder Vollbild."
 	"#str_230089"	"Diese Bildschirme lassen sich nicht zusammenfassen."
 	"#str_230100"	"Zielpose"
 	"#str_230101"	"Griffpose"

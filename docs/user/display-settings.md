@@ -152,7 +152,7 @@ Only the size and resolution rows that apply to the chosen mode can be changed. 
 ### Multiple monitors
 
 - **Display Device** chooses the monitor. **Auto** uses the current display. Choosing a specific monitor keeps the whole window, title bar included, on that monitor, shrinking it if needed.
-- **Expand Across Displays** stretches the game across all your monitors. It needs the **Borderless** or **Fullscreen** Window Mode, and the page tells you if your displays can't be spanned.
+- **Expand Across Displays** stretches the game across all your monitors. It needs the **Borderless** or **Fullscreen** Window Mode, and the page tells you if your displays can't be spanned. **Exclusive Fullscreen** changes one display's mode and can't span, so it is greyed out in Window Mode while Expand Across Displays is on.
 - When the game spans several monitors, the HUD, menus, console and loading screens stay on one display (the one you chose, or the primary display on Auto), and the mouse follows them. The 3D world still spans every monitor.
 - In the console, `listDisplays` lists monitor numbers for `r_screen`, and `listDisplayModes [display]` lists the exclusive fullscreen modes a monitor supports.
 

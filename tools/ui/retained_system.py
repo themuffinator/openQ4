@@ -651,9 +651,13 @@ def system_document() -> dict:
              op("select", st("settings.display.spanAvailable"), "#str_230088", "#str_230089"))
     # #264: one Window Mode over r_fullscreen, r_borderless and
     # r_fullscreenDesktop (RenderSystem_init.cpp, sdl3_backend.cpp), where
-    # three rows could be set in ways that did nothing.
-    window_mode = choice(doc, "settings_window_mode", "#str_232926", x, "edit.window-mode", WINDOW_MODE,
-                         listed("#str_232927", (0, 1, 2, 3)))
+    # three rows could be set in ways that did nothing. Exclusive Fullscreen
+    # switches one display's mode and cannot span (BuildDisplayRequest refuses
+    # it), so it waits while the draft expands across displays, as Expand's
+    # Yes waits for a mode that can span.
+    modes = listed("#str_232927", (0, 1, 2, 3))
+    modes[3] = (*modes[3], op("==", draft("r_multiScreen"), 0))
+    window_mode = choice(doc, "settings_window_mode", "#str_232926", x, "edit.window-mode", WINDOW_MODE, modes)
     gate(doc, "settings_window_mode", QUIET, None)
     msaa = choice(doc, "settings_msaa", "#str_41093", x, edit("r_multiSamples"), draft("r_multiSamples"),
                   listed("#str_230020", (0, 2, 4, 8, 16)))

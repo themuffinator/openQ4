@@ -1285,7 +1285,7 @@
 	"#str_230085"	"%d Hz"
 	"#str_230086"	"%d: %s"
 	"#str_230087"	"Ekran %d (bağlı değil)"
-	"#str_230088"	"Genişletme için kenarlıksız pencere veya masaüstü tam ekran gerekir."
+	"#str_230088"	"Genişletme için Kenarlıksız veya Tam ekran pencere modu gerekir."
 	"#str_230089"	"Bu ekranlar arasında genişletilemez."
 	"#str_230100"	"Nişan pozu"
 	"#str_230101"	"Kavrama pozu"
