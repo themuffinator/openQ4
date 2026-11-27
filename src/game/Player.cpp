@@ -14935,7 +14935,7 @@ float idPlayer::GetVRWeaponScale( void ) const {
 idPlayer::GetVRAimOrigin
 ===============
 */
-bool idPlayer::GetVRAimOrigin( idVec3 &origin ) const {
+bool idPlayer::GetVRAimOrigin( idVec3 &origin, idVec3 *reach ) const {
 	vrFrameState_t frame;
 	float trackingYaw;
 	if ( health <= 0 || !GetVRView( frame, trackingYaw ) || frame.aimMode != VR_AIM_HAND ) {
@@ -14947,17 +14947,61 @@ bool idPlayer::GetVRAimOrigin( idVec3 &origin ) const {
 	}
 	vrPose_t pose = aim;
 	pose.origin += VR_HeadOffsetCorrection( frame );
-	idVec3 eyeOrigin = firstPersonViewOrigin;
-	eyeOrigin.z += VRCrouchLift( frame );
+	idVec3 trackingOrigin = firstPersonViewOrigin;
+	trackingOrigin.z += VRCrouchLift( frame );
 	idVec3 handOrigin;
 	idMat3 handAxis;
-	VR_PoseToWorld( pose, eyeOrigin, trackingYaw, handOrigin, handAxis );
+	VR_PoseToWorld( pose, trackingOrigin, trackingYaw, handOrigin, handAxis );
+	if ( reach != NULL ) {
+		*reach = handOrigin;
+	}
 
 	// a hand reaching through a wall must not fire from behind it
-	trace_t trace;
-	gameLocal.TracePoint( this, trace, eyeOrigin, handOrigin, MASK_SHOT_RENDERMODEL, this );
-	origin = trace.fraction < 1.0f ? eyeOrigin + ( trace.endpos - eyeOrigin ) * 0.9f : handOrigin;
+	origin = handOrigin;
+	ClearVRShot( firstPersonViewOrigin, handOrigin, origin, MASK_SHOT_RENDERMODEL );
 	return true;
+}
+
+/*
+===============
+idPlayer::ClearVRShot
+
+openQ4 VR: single player fires a hand-held shot from the weapon hand, so with
+room scale or an outstretched arm a gun pushed through a wall, door or crate
+would fire from its far side. The shot's way starts at the body's own eye,
+which the player's box keeps clear of the world: the tracked head can lean
+past a wall the body stands against, and the tracking origin is lifted to the
+standing eye while crouched, into a low ceiling. It runs to the hand and on to
+the launch point with what the shot itself stops at (water and other shots
+are not walls: HitScan crosses water itself). Where something is in the way,
+the shot starts just in front of it, so it strikes what the gun went through.
+===============
+*/
+bool idPlayer::ClearVRShot( const idVec3 &eye, const idVec3 &hand, idVec3 &launch, int clipMask,
+	const idClipModel *clip, const idMat3 &clipAxis ) const {
+	const float standoff = 1.0f;
+	clipMask &= ~( MASK_WATER | CONTENTS_PROJECTILE | CONTENTS_TRIGGER );
+	const idVec3 way[ 3 ] = { eye, hand, launch };
+	for ( int leg = 0; leg < 2; leg++ ) {
+		const idVec3 &from = way[ leg ];
+		const idVec3 delta = way[ leg + 1 ] - from;
+		const float length = delta.Length();
+		if ( length < 0.01f ) {
+			continue;
+		}
+		trace_t trace;
+		if ( clip != NULL ) {
+			gameLocal.Translation( this, trace, from, way[ leg + 1 ], clip, clipAxis, clipMask, this );
+		} else {
+			gameLocal.TracePoint( this, trace, from, way[ leg + 1 ], clipMask, this );
+		}
+		if ( trace.fraction < 1.0f ) {
+			// in front of what it met, and never behind where this leg began
+			launch = from + delta * ( Max( 0.0f, length * trace.fraction - standoff ) / length );
+			return true;
+		}
+	}
+	return false;
 }
 
 /*
@@ -14968,7 +15012,8 @@ Where a shot would land this frame. Multiplayer shots leave the eye along
 the weapon hand's aim (the server only knows usercmd angles), so the trace
 does too; a beam still starts at the hand. Single player follows the path
 GetVRAimOrigin gives the weapon, along the tracked aim from the same
-presentation pose the view weapon is drawn at.
+presentation pose the view weapon is drawn at, cleared from the body's eye
+and stopped by what the weapon's own shot stops at (ClearVRShot).
 ===============
 */
 bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
@@ -14986,6 +15031,8 @@ bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
 		idVec3 eyeOrigin;
 		idMat3 eyeAxis;
 		GetPresentationViewPos( eyeOrigin, eyeAxis );
+		// the shot's way starts at the body's eye; the tracked poses sit on the lifted origin
+		const idVec3 bodyEye = eyeOrigin;
 		eyeOrigin.z += VRCrouchLift( frame );
 		const idVec3 headCorrection = VR_HeadOffsetCorrection( frame );
 
@@ -15019,9 +15066,16 @@ bool idPlayer::GetVRAimMarker( vrAimMarker_t &marker ) const {
 			idMat3 handAxis;
 			VR_PoseToWorld( pose, eyeOrigin, trackingYaw, handOrigin, handAxis );
 
-			gameLocal.TracePoint( this, trace, eyeOrigin, handOrigin, MASK_SHOT_RENDERMODEL, this );
-			const idVec3 start = trace.fraction < 1.0f ? eyeOrigin + ( trace.endpos - eyeOrigin ) * 0.9f : handOrigin;
-			gameLocal.TracePoint( this, trace, start, start + handAxis[0] * VR_AIM_RANGE, MASK_SHOT_RENDERMODEL, this );
+			// the way the shot takes: the hand cleared from the eye as
+			// GetVRAimOrigin clears it, then the rest with what this weapon's
+			// shot stops at (a rocket bursts on a large-shot clip a bullet
+			// crosses), as rvWeapon::Attack and LaunchProjectiles clear it
+			const int shotMask = armed ? weapon->GetVRShotClipMask( zoomed ) : MASK_SHOT_RENDERMODEL;
+			idVec3 start = handOrigin;
+			ClearVRShot( bodyEye, handOrigin, start, MASK_SHOT_RENDERMODEL );
+			ClearVRShot( bodyEye, start, start, shotMask );
+			gameLocal.TracePoint( this, trace, start, start + handAxis[0] * VR_AIM_RANGE,
+				shotMask & ~( MASK_WATER | CONTENTS_PROJECTILE | CONTENTS_TRIGGER ), this );
 			// a beam leaves the drawn weapon's muzzle, or the hand without one
 			if ( !armed || !weapon->GetVRMuzzle( marker.muzzle ) ) {
 				marker.muzzle = handOrigin;

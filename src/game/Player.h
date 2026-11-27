@@ -747,8 +747,15 @@ public:
 	// size for a flat screen. The axis GetVRWeaponTransform returns stays
 	// unscaled; rvWeapon::ForeshortenAxis applies this.
 	float					GetVRWeaponScale( void ) const;
-	// Where shots leave the weapon hand, pulled back out of solid geometry.
-	bool					GetVRAimOrigin( idVec3 &origin ) const;
+	// Where shots leave the weapon hand, pulled back out of solid geometry
+	// along the way from the body's eye; reach, if given, is the tracked hand.
+	bool					GetVRAimOrigin( idVec3 &origin, idVec3 *reach = NULL ) const;
+	// Single player: a shot held in the hand starts no further than the body
+	// can reach. Follows eye -> hand -> launch with the shot's clip mask (and
+	// a projectile's clip model) and moves launch just in front of whatever
+	// is in the way. True when it moved.
+	bool					ClearVRShot( const idVec3 &eye, const idVec3 &hand, idVec3 &launch, int clipMask,
+										const idClipModel *clip = NULL, const idMat3 &clipAxis = mat3_identity ) const;
 	// Where this frame's shot from the weapon hand lands, for the aim
 	// marker. False when nothing is aimed by hand.
 	// Where this frame's shot lands, for the weapon hand's aim marker. False

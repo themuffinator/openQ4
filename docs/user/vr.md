@@ -250,6 +250,15 @@ HUD crosshair only shows when you aim with your head.
   intends, wherever your gun hand hangs; they used to point the gun that way
   instead, which could start you facing a wall.
 
+**After 0.15.0:** in single player, a gun pushed through a wall, a door or a
+crate, by reaching out or by walking up to it, can't shoot out of the far
+side. The shot starts just in front of what your gun went into and hits it,
+and the laser dot shows that. Rockets, grenades and other big shots also burst
+on the invisible barriers that stop them in a level; a gun pushed through one
+used to fire them from beyond it. Fire a rocket that way and you are caught
+in its blast, as you would be firing it at a wall at your feet. Multiplayer
+needed no change: shots there leave from your eyes.
+
 To steady a gun, hold it in both hands: put your off hand in front of your
 weapon hand, where a rifle's foregrip would be, and squeeze its grip. The
 off-hand controller buzzes briefly, and the gun then points from your rear hand

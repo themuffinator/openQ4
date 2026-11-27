@@ -39,6 +39,49 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   No phone, tablet, Steam Deck or desktop touchscreen has been used by hand.
   Contract: [ui/interface-variants.md](ui/interface-variants.md).
 
+## VR: a gun pushed through a wall no longer fires from the far side, 27 November 2026
+
+- **Shots start on your side of the wall.** In single player a VR shot
+  leaves the gun in your hand, so a gun pushed through a wall, a door or a
+  crate, by reaching out or by stepping up to it in room scale, could fire
+  from the far side. Every hand-held shot now finds its way from your body's
+  own eyes, through your hand, to the muzzle. If anything is in the way, the
+  shot starts just in front of it and strikes it, and the laser dot shows
+  that. This covers bullets and pellets, rockets, grenades and every other
+  projectile, the lightning gun and the gauntlet, and The Awakening's guns.
+- **Big shots respect invisible barriers.** Rockets, grenades, napalm and the
+  dark matter gun burst on the large-shot clips that levels use to stop them,
+  where a gun pushed through one used to fire them from beyond it. The 17
+  November clearance traced only what stops bullets. Tracers and the
+  lightning beam start on your side too.
+- **Crouching under something low is safe.** The way starts at the crouched
+  body's eye, not at the standing-height point that tracking uses, which
+  could be inside a low ceiling.
+- **What to do.** Nothing. Multiplayer is unchanged: its shots already leave
+  your eyes, and no network or save format changed.
+- Inspiration: Half-Life: Alyx's solid hands (ideas only; nothing taken from
+  it). The drawn gun still passes into the wall. Stopping it there, as Alyx's
+  hands stop, would pull the gun out of your tracked hand and the arms off
+  the grip.
+- Evidence: `openxr_vr_wall_clearance_smoke.py` stands at the large-shot clip
+  over dispersal's tram trench. With the hand drawn back, a control rocket
+  bursts on the clip and hurts the player on either build. With the hand a
+  metre ahead, through the clip, the rocket hurt no one on the build before
+  the fix, because it started beyond the clip. Now it bursts there, and the
+  log puts its start on the near side and the marker on the clip. A machine
+  gun aimed down with the hand under the floor starts above the floor, and
+  the marker lands where its line meets the floor. Crouched, the way starts
+  at the body's crouched eye. `openxr_vr_contract.py` pins the multiplayer
+  paths.
+- Not yet checked on a real headset: VR headset checklist 3.20.
+- Development: `idPlayer::ClearVRShot` (eye, hand, launch; the shot's clip
+  mask and, for a projectile, its clip model), used by `GetVRAimOrigin`,
+  `rvWeapon::Attack`, `LaunchProjectiles`, `Hitscan`'s tracer origin, the
+  lightning gun's beam (`ClearVREffectOrigin`) and the single-player branch
+  of `GetVRAimMarker`. `rvWeapon::GetVRShotClipMask` gives the shot's mask,
+  from `idProjectile::GetClipMask`, which `Spawn` now also uses. `vr_debug 1`
+  logs each hand-held shot (`VR shot ...`).
+
 ## VR menus from your hand and a HUD on your wrist, 27 November 2026
 
 - **Menus grow out of your off hand.** Press the menu button during play and

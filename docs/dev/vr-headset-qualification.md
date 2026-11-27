@@ -80,6 +80,7 @@ here: it waits on the AND-05 distribution decision.
 | 3.17 | On Windows Mixed Reality controllers, press each touchpad in its upper and lower half; click both thumbsticks. | Upper half: crouch (right), flashlight (left). Lower half: jump (right), reload (left). The thumbstick clicks keep their own actions. |
 | 3.18 | With a mirror or your shadow in view, point the gun straight up, then straight down, rolling your wrist. | Your character in the mirror or shadow keeps facing one way; it no longer spins on the spot. |
 | 3.19 | Set **Weapon Hand** to Left. Hold each gun close to your face, turn it, and let go of it with the right hand and take hold again. | A left hand grips each gun as the right hand did, the right hand supports it and follows its controller when free; no arm is dark, see-through or inside out, and the gun's displays read the right way round. |
+| 3.20 | Single player. Push the gun hand through a wall, a closed door and a crate, by reaching out and by stepping up to it in room scale, and fire the machine gun, the shotgun, the lightning gun and the gauntlet. Then stand back a little, reach through again and fire one rocket. Repeat while physically crouched under something low, and once in multiplayer. | The laser dot sits on the near face of what the gun went into. Bullets, pellets and the beam strike that face, the tracer starts on your side, and nothing beyond is hit. The rocket bursts on that face and its blast reaches you. Multiplayer shots still leave the eye and land on the dot. |
 
 ## 4. Body, space and movement (VR-02, VR-03)
 

@@ -97,7 +97,8 @@ def frame_guarded(commands: list[str]) -> list[str]:
 
 
 def run(options, staged: Path, executable: str, manifest: Path, profile: Path, spaces: str,
-        commands: list[str], script: list[str]) -> str:
+        commands: list[str], script: list[str], map_name: str = "game/airdefense1",
+        extra: dict[str, str] | None = None) -> str:
     game = profile / "baseoq4"
     game.mkdir(parents=True, exist_ok=True)
     for stale in game.glob("vr_marker_*.txt"):
@@ -129,9 +130,10 @@ def run(options, staged: Path, executable: str, manifest: Path, profile: Path, s
         # after the launch configuration's own r_renderApi, so this one wins
         "r_renderApi": options.render_api,
     }
+    settings.update(extra or {})
     for key, value in settings.items():
         args += ["+set", key, value]
-    args += ["+map", "game/airdefense1"]
+    args += ["+map", map_name]
     command = [str(staged / executable), *args]
     (profile / "command.json").write_text(json.dumps(command, indent=2), encoding="utf-8")
     environment = {k: v for k, v in os.environ.items() if not k.startswith("OPENQ4_XR_TEST_")}

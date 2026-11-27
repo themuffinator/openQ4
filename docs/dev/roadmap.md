@@ -3205,7 +3205,7 @@ and AND-05.
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
 | VR-01 — Closed (PC scope) | Vulkan (runtime-created device), desktop-independent submission, Wayland EGL and SP world-GUI pointing integrated at render API 32 with VR-06's guarantees; GL/Vulkan SP/MP/menu smokes, the Vulkan fault matrix and Linux Wayland/X11 bindings pass on the simulated runtime. | Quest standalone moved to AND-05 by decision; physical headsets are VR-02. |
-| VR-02 — Partial | GL and Vulkan stereo, tracking/input, room scale, play spaces, aiming, haptics, world GUIs, per-eye TAA, comfort controls and (17 November) the player's own body with arms that reach the hands (`vr_body`) provide the testable implementation; the [headset checklist](vr-headset-qualification.md) is ready to run. 26 November: the first player report from a real headset (Steam Frame, SteamVR, 0.15.0) found play working end to end; its five issues were fixed or answered the same day (adult-sized hands and guns `vr_weaponScale`, HUD below the line of sight, the wheel picked with the weapon-hand stick, controller prompts and a round menu pointer; see release-completion). | Run the checklist on each available PC runtime/headset: combat, refresh/latency, controls, collision, vehicles, HUD/world-GUI readability and recovery; confirm the 26 November fixes and aim accuracy on a headset, and world terminals (untested in that report). |
+| VR-02 — Partial | GL and Vulkan stereo, tracking/input, room scale, play spaces, aiming, haptics, world GUIs, per-eye TAA, comfort controls and (17 November) the player's own body with arms that reach the hands (`vr_body`) provide the testable implementation; the [headset checklist](vr-headset-qualification.md) is ready to run. 26 November: the first player report from a real headset (Steam Frame, SteamVR, 0.15.0) found play working end to end; its five issues were fixed or answered the same day (adult-sized hands and guns `vr_weaponScale`, HUD below the line of sight, the wheel picked with the weapon-hand stick, controller prompts and a round menu pointer; see release-completion). | Run the checklist on each available PC runtime/headset: combat, refresh/latency, controls, collision, vehicles, HUD/world-GUI readability and recovery; confirm the 26 November fixes and aim accuracy on a headset, and world terminals (untested in that report). 27 November: single-player hand-held shots are cleared from the body's eye with the shot's own clip mask, so a gun pushed through a wall, door, crate or large-shot clip no longer fires from the far side (`openxr_vr_wall_clearance_smoke.py`, failing before the fix); confirm on a headset with checklist 3.20. |
 | VR-03 — Closed | STAGE/LOCAL_FLOOR/LOCAL selection with warned fallback, floor-referenced standing height, recentering, calibration and live seated/standing changes pass natively and on the simulated runtime (GL/Vulkan). | Physical body alignment is checklist section 4 (VR-02). |
 | VR-04 — Partial | `openxr_vr_stereo_cost.py` records flat/stereo/warm-stereo CPU, build, submit and GPU tails, now at a chosen preset (`--preset quality`); the simulated baselines on this GPU are recorded below. Uploads, dynamic geometry, remote cameras, cached static shadow maps and (8 November) world-GUI quads are shared between the eyes; culling, lights, draws, mirror/reflection/refraction/x-ray maps and dynamic shadow composition stay per eye. `openxr_vr_stereo_share_smoke.py` proves both by work count on OpenGL and Vulkan. | Headset tails against the refresh budgets (checklist 2.2), and sharing work where those tails show a view-independent cost. |
 | VR-05 — Closed (approved scope) | Decision: per-eye TAA only. Each eye has its own view identity, history images, motion vectors and resets in the SP game chain and both backends' own temporal scenes; dynamic resolution stays off in VR. SP/MP GL/Vulkan pass the simulated-runtime smoke. | Headset comfort is checklist section 7. Hand presence arrived with the body (VR-02, 17 November); physical-object interaction needs its own design. |
@@ -3356,6 +3356,22 @@ and AND-05.
   inside out. `openxr_vr_hold_closeup.py` frames every gun's hold close up,
   right- and left-handed, through the test runtime's new `lens` command, and
   sets each left-handed capture, flipped back, beside the right-handed one.
+  Launch clearance, 27 November 2026 (the Half-Life: Alyx study's first
+  recommendation, [release record](release-completion.md#vr-a-gun-pushed-through-a-wall-no-longer-fires-from-the-far-side-27-november-2026)):
+  the 17 November clearance traced only what stops bullets, from the tracking
+  origin, which is lifted to the standing eye while crouched. One
+  `idPlayer::ClearVRShot` now runs every single-player hand-held shot's way
+  from the body's eye, which the player's box keeps clear, through the hand
+  to the launch point, with the shot's own clip mask
+  (`rvWeapon::GetVRShotClipMask`, from `idProjectile::GetClipMask`) and, for
+  a projectile, its clip model, and starts a blocked shot 1 unit in front of
+  what it met. The aim marker, the tracer's origin and the lightning beam
+  follow the same way. `openxr_vr_wall_clearance_smoke.py` shows a rocket
+  fired through dispersal's large-shot clip starting beyond it before the fix
+  and bursting on it after, against a control shot that bursts on either
+  build. Multiplayer keeps its eye-based paths unchanged. The drawn gun still
+  passes into geometry: stopping it would part it from the tracked hand and
+  the arms from the grip.
 - [x] **VR-03 — P2, implementation: standing space and floor calibration.** Define
   LOCAL/STAGE/floor behavior, recentering, seated/standing transitions and safe
   fallback when a runtime lacks stage space. Validate crouch/body alignment and
