@@ -1004,6 +1004,7 @@ def validate_validation_wiring() -> None:
         "openxr_vr_stereo_share_smoke.py",
         "openxr_vr_temporal_smoke.py",
         "openxr_vr_volumetric_smoke.py",
+        "openxr_vr_wall_clearance_smoke.py",
         # Benchmark and engine-capture drivers need a staged client, a GPU and
         # retail assets.
         "performance_suite.py",
