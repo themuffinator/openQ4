@@ -1550,8 +1550,8 @@
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "view.variant"}, "vr"]}, "none", "block"]}
   },
   {
-   "id": "game-vr-head-1-8.display",
-   "node": "game-vr-head-1-8",
+   "id": "game-vr-head-1-9.display",
+   "node": "game-vr-head-1-9",
    "property": "display",
    "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "view.variant"}, "vr"]}, "none", "block"]}
   },

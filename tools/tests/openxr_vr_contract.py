@@ -822,6 +822,11 @@ def check_wrists(view_module: str) -> None:
         for number in range(233560, 233568):
             require(table, f'"#str_{number}"', f"{language} has the wrist displays' strings")
     require(read("meson.build"), "files('tools/tests/native/VRWristCoreTest.cpp')", "the wrist decisions are natively tested")
+    # the stereo heading's id counts the VR rows before it; a stale one fails the page's load
+    heading = re.search(r'STEREO_HEADING = "([^"]+)"', read("tools/ui/retained_game.py")).group(1)
+    for page in ("game", "game_awakening"):
+        require(read(f"content/baseoq4/pak0/guis/menu/settings/{page}.rui"), f'"id": "{heading}"',
+                f"the {page} page holds the stereo heading the VR variant hides")
 
 
 def check_documents() -> None:

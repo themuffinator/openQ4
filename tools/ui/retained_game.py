@@ -240,7 +240,8 @@ def dependencies() -> dict:
 # second column: its rows, then the section's heading at that place).
 DESKTOP_ONLY = ("game_gunposition", "game_gunx", "game_guny", "game_gunz", "game_gunfov", "game_gunfovadjust",
                 "game_stereo3d", "game_stereodepth", "game_stereoconvergence", "game_stereoswap")
-STEREO_HEADING = "game-vr-head-1-8"
+# (its id counts the rows before it in that column: a VR row added moves it)
+STEREO_HEADING = "game-vr-head-1-9"
 
 
 def crosshair_row(doc: Document, ident: str, label: str, verb: str, value_x: float) -> dict:
