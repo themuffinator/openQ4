@@ -849,6 +849,16 @@ void idAnim::CallFrameCommandSound( const frameCommand_t& command, idEntity* ent
 	} else {
 		ent->StartSoundShader( command.soundShader, channel, flags, false, NULL );
 	}
+
+	// openQ4 VR: each sound a reload animation plays on the local player's
+	// view weapon (a magazine out, a magazine in, the bolt, a shell) ticks the
+	// off hand, which goes to the gun to work it; no new sound or animation.
+	if ( name.Icmpn( "reload", 6 ) == 0 ) {
+		idPlayer *player = gameLocal.GetLocalPlayer();
+		if ( player != NULL && player->weapon != NULL && player->weapon->GetViewModel() == ent ) {
+			player->VREventPulse( false, true, 0.45f, 25, "reload" );
+		}
+	}
 }
 // RAVEN END
 

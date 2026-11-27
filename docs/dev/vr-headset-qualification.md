@@ -80,6 +80,11 @@ here: it waits on the AND-05 distribution decision.
 | 3.17 | On Windows Mixed Reality controllers, press each touchpad in its upper and lower half; click both thumbsticks. | Upper half: crouch (right), flashlight (left). Lower half: jump (right), reload (left). The thumbstick clicks keep their own actions. |
 | 3.18 | With a mirror or your shadow in view, point the gun straight up, then straight down, rolling your wrist. | Your character in the mirror or shadow keeps facing one way; it no longer spins on the spot. |
 | 3.19 | Set **Weapon Hand** to Left. Hold each gun close to your face, turn it, and let go of it with the right hand and take hold again. | A left hand grips each gun as the right hand did, the right hand supports it and follows its controller when free; no arm is dark, see-through or inside out, and the gun's displays read the right way round. |
+| 3.20 | Let an enemy hit you from your left, your right and straight ahead; then turn your head well to one side and take a hit from where your body faces. | The hand on the hit's side vibrates clearly more than the other, judged from where your head faces; a hit from ahead shakes both alike. Note whether the difference is easy to feel. |
+| 3.21 | Fire a rocket at a wall a few metres away, then at one far off; stand near an exploding barrel; in `game/airdefense1` watch the battle's explosions. | Each nearby blast rumbles both hands with its screen shake and sound, softer the farther it is; distant ones do not. Note whether any blast feels too strong or misses. |
+| 3.22 | Reload the machine gun, shotgun, nailgun, hyperblaster and rocket launcher, and in `q4xbase` the goob gun. | The off hand ticks with each reload sound (magazine out, magazine in, bolt, each shell), in time with it. A gun whose reload makes no sound (the spike gun) stays still. |
+| 3.23 | Switch weapons several times, then drop off a ledge of about two metres, a bigger fall, and jump on level ground. | The weapon hand feels each gun come up; both hands jolt on landing, harder for the bigger fall; an ordinary jump stays still. |
+| 3.24 | Set `vr_hapticEvents 0` and repeat 3.21 to 3.23, then fire and take a hit. | Blasts, reloads, draws and landings stop; shots and hits still vibrate. Set it back to 1. |
 
 ## 4. Body, space and movement (VR-02, VR-03)
 

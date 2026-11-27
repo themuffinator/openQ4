@@ -488,6 +488,9 @@ public:
 	idVec3					firstPersonViewOrigin;
 	idMat3					firstPersonViewAxis;
 	int						presentationViewTime;
+	// openQ4 VR: when the last hit pulsed both hands; a blast's pulse in the
+	// same moment would only blur which side it came from
+	int						vrHitPulseTime;
 	// openQ4 VR: in a vehicle seat, where the tracking space faces (the seat's
 	// own deltaViewAngles yaw, which binding to the vehicle disturbs), and the
 	// vehicle's yaw last frame, while its turns carry the view
@@ -772,6 +775,16 @@ public:
 	// A pulse in the local player's weapon hand, other hand, or both; without
 	// a headset, a gamepad rumble (weapon hand high motor, other hand low).
 	void					VRVibrate( bool weaponHand, bool otherHand, float amplitude, int durationMsec, float direction = 0.0f ) const;
+	// openQ4 VR: the event pulses (explosions, reload steps, draws, landings),
+	// in the headset only and scaled by vr_hapticEvents; kind names the pulse
+	// for vr_debug. Desktop play keeps its rumble as it was.
+	void					VREventPulse( bool weaponHand, bool otherHand, float amplitude, int durationMsec, const char *kind, float direction = 0.0f ) const;
+	// openQ4 VR: an effect's screen shake (a blast, a heavy footfall) at this
+	// strength, distance and size already in it; see idGameLocal::StartViewEffect.
+	void					VRBlastPulse( float scale ) const;
+	// openQ4 VR: which side of the tracked head a hit travelling along dir came
+	// from, -1 left to 1 right; bodySide (the same from the body's view) without one.
+	float					VRHitSide( const idVec3 &dir, float bodySide ) const;
 	void					UpdateControllerState( void ) const;	// openQ4 (PAD-08): the controller's light and trigger feel
 	void					UpdateAimAssist( void );				// openQ4 (PAD-03): aim assistance for controller sticks
 	bool					AimAssistTargets( idEntity *ent ) const;
