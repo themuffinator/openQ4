@@ -12,6 +12,42 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## A first launch starts the renderer once, from openPR06, 27 November 2026
+
+Issue #61 in openPR06 (danperisse-hue) measured a first launch bringing the
+renderer up twice and the main-menu precache decoding the menu music on the
+main thread. openPR06 fixed both in 21ec144b1; this ports it to openQ4.
+
+- **Detection runs once the device exists**, right after `InitRenderSystem`,
+  before the interface, the game library and the menu precache load. The
+  running devices take the preset as the Settings page applies it
+  ([settings live apply](ui/settings-live-apply.md)). `vid_restart` runs only
+  while a renderer module selection is pending, or when an OpenGL ES window, or
+  a desktop OpenGL window with `r_glWindowMultisample 1`, carries the samples
+  and `r_multiSamples` changed. `s_restart` runs only when the speaker layout
+  or EFX changed. Vulkan never restarts for MSAA. The old code always ran
+  `vid_restart` and `s_restart` after the session had initialized.
+- **A streamed track's envelope builds on a job worker outside level loads
+  too.** Samples referenced from the menus or mid-level load through
+  `LoadResourceDeferringEnvelope`, and the sound system's frame joins the job.
+  The track streams and starts as before; its amplitude reads silent until the
+  job finishes.
+- Evidence (hidden window, OpenAL Soft's null device, fresh save folder each
+  run, today's previous build against this one):
+  - OpenGL: one `R_InitOpenGL` instead of two, ready for commands at 5.6 s
+    instead of 10.8 s.
+  - Vulkan: one device start instead of two, ready at 6.9 s instead of 14.9 s.
+  - Both: the same 71 warnings, the same preset values in the saved
+    configuration, and both menu tracks' envelopes on a job worker.
+  - An explicit Quality first launch into `game/airdefense1`: Vulkan and
+    default OpenGL did not restart and drew the scene at 2x MSAA
+    (`gfxInfo`: requested 2, effective 2). OpenGL with
+    `r_glWindowMultisample 1` restarted once and got a 2-sample window.
+  - `ui_performance_presets` checks the restart rule natively for OpenGL,
+    windowed-sample OpenGL, OpenGL ES, Vulkan and a pending module swap.
+- **Not tested:** the `s_restart` branch, because no preset's speaker layout
+  or EFX differs from the Minimum bootstrap; Android; macOS.
+
 ## Pack seeks, background animation caches and no config rewrite at launch, from openPR06, 27 November 2026
 
 The third openPR06 port round: danperisse-hue's pull requests #53-#81 and

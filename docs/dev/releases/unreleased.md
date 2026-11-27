@@ -591,6 +591,15 @@ the [development roadmap](../roadmap.md) for current scope.
 
 ## Change Log
 
+- **The first launch gets to the menu several seconds sooner**, from openPR06,
+  thanks to danperisse-hue's report. It used to start the renderer, load the
+  interface, then shut everything down and start again with the detected
+  graphics preset. Now it detects the preset as soon as the renderer is up and
+  loads everything once (in testing, ready 5.2 s sooner on OpenGL and 8 s
+  sooner on Vulkan). Only an OpenGL window that carries its own antialiasing
+  samples still restarts when the preset changes them. On every start the
+  menu music's loudness track, which lip sync and sound-driven effects read,
+  is worked out in the background instead of holding up the menu.
 - **Quicker loads and a menu that appears without a stall**, from openPR06,
   thanks to danperisse-hue. A sound or model read back and forth inside a pack
   is inflated once instead of again at each seek (openPR06 measured first

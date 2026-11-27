@@ -878,6 +878,13 @@ void idSoundSystemLocal::Render()
 {
 	SoundVoiceChat_Render();
 
+	// Envelope jobs of tracks loaded outside a level load (LoadSampleOutsideLevelLoad):
+	// join each once its worker is done, device or not. A level load joins its own.
+	if( !insideLevelLoad && decodingSamples.Num() > 0 )
+	{
+		FinishSampleDecodes( false );
+	}
+
 	if( s_noSound.GetBool() )
 	{
 		Sound_UpdateControllerRumble( 0.0f );
@@ -1363,7 +1370,7 @@ idSoundSample* idSoundSystemLocal::LoadSample( const char* name )
 				}
 				else
 				{
-					samples[i]->LoadResource();
+					LoadSampleOutsideLevelLoad( samples[i] );
 				}
 			}
 			return samples[i];
@@ -1380,7 +1387,7 @@ idSoundSample* idSoundSystemLocal::LoadSample( const char* name )
 	if( !insideLevelLoad )
 	{
 		sample->SetNeverPurge();
-		sample->LoadResource();
+		LoadSampleOutsideLevelLoad( sample );
 	}
 	else
 	{
@@ -1399,6 +1406,24 @@ idSoundSample* idSoundSystemLocal::LoadSample( const char* name )
 	}
 
 	return sample;
+}
+
+/*
+========================
+idSoundSystemLocal::LoadSampleOutsideLevelLoad
+
+Loads a sample the menus or a running level reference at once, as before, except
+that a streamed track's amplitude envelope builds on a job worker (see
+idSoundSample_OpenAL::LoadResourceDeferringEnvelope). Render joins the job.
+========================
+*/
+void idSoundSystemLocal::LoadSampleOutsideLevelLoad( idSoundSample* sample )
+{
+	sample->LoadResourceDeferringEnvelope();
+	if( sample->IsDecoding() )
+	{
+		decodingSamples.Append( sample );
+	}
 }
 
 /*

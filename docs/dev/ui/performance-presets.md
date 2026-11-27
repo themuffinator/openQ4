@@ -161,8 +161,20 @@ Ultra retains its documented maximum-quality role rather than becoming an
 automatic recommendation or a performance promise.
 
 Fresh installations now bootstrap at Minimum until a real renderer exists,
-then use the same canonical detection/expansion as Auto-Detect and recreate
-video/audio resources before startup map commands. The old frequency-based
+then use the same canonical detection/expansion as Auto-Detect. Detection runs
+as soon as the device exists, before the interface, the game library and the
+main-menu precache load anything, so their media loads once, under the
+detected settings (openPR06 issue #61). The running devices take the preset as
+the Settings page applies it ([settings live apply](settings-live-apply.md)):
+images reload through `idImageManager::CheckCvars`, the upload stream resizes
+itself, and shadow, post-processing and benchmark-budget cvars are read per
+frame. 3D views multisample in render targets, so `r_multiSamples` applies
+live. `Common_StartupPresetRestartCommands` asks for `vid_restart` only while a
+renderer module selection is pending, or when the window itself carries the
+samples (OpenGL ES, or desktop OpenGL with `r_glWindowMultisample 1`) and
+`r_multiSamples` changed. It asks for `s_restart` only when the speaker layout
+or EFX changed. Either runs before startup map commands. Until then every
+first launch rebuilt the device, whatever the preset changed. The old frequency-based
 four-tier classifier no longer chooses initial settings. `setMachineSpec`
 also derives its legacy classification from the shared policy, without
 guessing VRAM from system memory. An existing saved config is preserved when
@@ -707,7 +719,7 @@ scale and frame cap. It offers three answers:
 
 | Answer | Effect |
 | --- | --- |
-| Apply recommended (*Continue* when nothing would change) | Applies the detected preset through `Common_ApplyPerformancePreset`, records the device's video memory and the version. If any target moved, it runs `vid_restart` and `s_restart` before the main menu opens, as a first launch does. |
+| Apply recommended (*Continue* when nothing would change) | Applies the detected preset through `Common_ApplyPerformancePreset`, records the device's video memory and the version. If any target moved, it runs `vid_restart` and `s_restart` before the main menu opens. (A first launch restarts only what its running devices cannot take; see above.) |
 | Keep current | Records the version; no setting changes. |
 | Ask me next time (and Back/Escape) | Records nothing; no setting changes. |
 

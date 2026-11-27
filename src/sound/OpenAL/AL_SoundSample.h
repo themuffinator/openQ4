@@ -148,6 +148,9 @@ public:
 	virtual void	 LoadResource();
 	// LoadResource for a level load: an Ogg's PCM decodes on a job worker (see the .cpp).
 	void			LoadResourceAsync();
+	// LoadResource outside a level load: a streamed track's amplitude envelope
+	// builds on a job worker (IsDecoding until FinishDecode joins it; see the .cpp).
+	void			LoadResourceDeferringEnvelope();
 	// Waits for an outstanding decode and uploads the sample; nothing without one.
 	void			FinishDecode();
 	bool			IsDecoding() const
@@ -396,6 +399,8 @@ protected:
 	// An Ogg decoding on a job worker into buffers[0] (LoadResourceAsync), and its file
 	idSoundSampleDecode*	pendingDecode;
 	idStr					pendingDecodeName;
+	// Set only inside LoadResourceDeferringEnvelope.
+	bool					deferStreamEnvelope;
 };
 
 /*

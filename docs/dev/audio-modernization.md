@@ -428,8 +428,15 @@ compressed bytes go to a job worker, which fills the 60 Hz envelope sized before
 submission (`BeginOggStreamEnvelope`); the full pass had cost the main thread a tenth
 to a third of a second per music track. Voices can stream the track before the
 envelope is complete; until `FinishDecode` joins the job the envelope reads silent.
-Outside level loads, with jobs synchronous, or for a stream without length metadata
-the pass stays synchronous.
+Samples referenced outside a level load (the main-menu precache, a sound a script
+reaches for mid-level) do the same since openPR06 issue #61:
+`idSoundSystemLocal::LoadSampleOutsideLevelLoad` loads them through
+`LoadResourceDeferringEnvelope`, which hands only a streamed track's envelope pass
+to a worker. Everything else still loads synchronously, as before, and `Render`
+joins each such job once its worker is done. The menu music then streams and
+starts exactly as before, and its amplitude reads silent for the moment the job
+runs. With `s_asyncSampleDecode 0`, with jobs synchronous, or for a stream without
+length metadata the pass stays synchronous.
 
 ### Authored scenes, centred reverb and portrait captions (October 23)
 

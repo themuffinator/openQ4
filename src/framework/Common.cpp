@@ -3676,13 +3676,68 @@ static bool Common_BootstrapStartupPerformancePreset(
 	return true;
 }
 
+#ifndef ID_DEDICATED
+static bool Common_PerformancePresetValueChanged(
+	const openQ4PerformancePresetCVarBackup_t before[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT], const char *name ) {
+	for ( int i = 0; i < OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT; ++i ) {
+		if ( idStr::Icmp( before[i].name, name ) != 0 ) {
+			continue;
+		}
+		const idCVar *cvar = cvarSystem->Find( name );
+		return before[i].valid && cvar != NULL && idStr::Icmp( before[i].value.c_str(), cvar->GetString() ) != 0;
+	}
+	return false;
+}
+
+/*
+===============
+Common_StartupPresetRestartCommands
+
+What a first launch's detected preset needs restarted, given the values the
+running devices were created with (openPR06 issue #61). Every other target
+reaches them as it stands, as the Settings page applies it (settings-live-apply.md):
+texture reduction and sampling reload the images they affect
+(idImageManager::CheckCvars), image_ignoreHighQuality re-parses the materials
+that read it, the upload stream resizes itself at BeginFrame, and the shadow,
+post-processing and benchmark-budget cvars are read per frame. 3D views
+multisample in render targets, so r_multiSamples needs a new window only where
+the window itself carries the samples (OpenGL ES, or desktop OpenGL with
+r_glWindowMultisample); Vulkan's swapchain is single-sample. A renderer module
+selection still pending reloads through vid_restart. The sound device takes its
+speaker layout and EFX when it opens.
+
+The detection runs before any interface, game or menu media loads, so those load
+once, under the detected settings. Until this, every first launch shut the
+device down and brought it up again, whatever the preset changed.
+===============
+*/
+static idStr Common_StartupPresetRestartCommands(
+	const openQ4PerformancePresetCVarBackup_t before[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT] ) {
+	const auto api = R_RendererModule_GetStatus().activeApi;
+	const bool windowCarriesSamples = api == RENDER_MODULE_API_GLES ||
+		( ( api == RENDER_MODULE_API_GL || api == RENDER_MODULE_API_GL_MODULE ) &&
+			( cvarSystem->GetCVarBool( "r_glWindowMultisample" ) || cvarSystem->GetCVarBool( "r_glesContext" ) ) );
+	idStr commands;
+	if ( R_RendererModule_SelectionReloadPending() ||
+		( windowCarriesSamples && Common_PerformancePresetValueChanged( before, "r_multiSamples" ) ) ) {
+		commands += "vid_restart\n";
+	}
+	if ( Common_PerformancePresetValueChanged( before, "s_numberOfSpeakers" ) ||
+		Common_PerformancePresetValueChanged( before, "s_useEAXReverb" ) ) {
+		commands += "s_restart\n";
+	}
+	return commands;
+}
+
 // First launch starts with a small bootstrap profile until a real device can be
 // observed. Keep settings supplied by autoexec/launch options over that profile;
 // a named profile is an explicit choice, including Minimum. Existing saved
 // configurations never enter this path just because their spec marker is gone.
+// restartCommands receives what the running devices cannot take as they stand.
 static bool Common_ApplyStartupPerformancePreset(
 	const openQ4PerformancePresetCVarBackup_t bootstrap[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT],
-	const bool assigned[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT] ) {
+	const bool assigned[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT], idStr &restartCommands ) {
+	restartCommands.Clear();
 	idStr reason;
 	bool explicitPreset = false;
 	for ( int i = 0; i < OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT; ++i ) {
@@ -3717,11 +3772,13 @@ static bool Common_ApplyStartupPerformancePreset(
 	}
 	// The bootstrap ran before a device existed; record what the device reported.
 	if ( detectedVideoRamMB > 0 ) com_videoRam.SetInteger( detectedVideoRamMB );
+	restartCommands = Common_StartupPresetRestartCommands( configured );
 	common->Printf( "First-launch performance preset '%s'%s%s; preserving configured overrides.\n",
 		preset->name, reason.c_str()[0] == '\0' ? "" : ": ", reason.c_str() );
 	Common_PrintQualityProfile();
 	return true;
 }
+#endif // !ID_DEDICATED
 
 static const char *commonCommandCompletionMatch = NULL;
 static bool commonCommandCompletionFound = false;
@@ -8463,6 +8520,10 @@ void idCommonLocal::InitGame( void ) {
 	idAsyncNetwork::Init();
 	Updater_Init();
 
+	// A first launch's detected preset, applied once the device exists.
+	bool startupPresetApplied = false;
+	idStr startupPresetRestart;
+
 #ifdef	ID_DEDICATED
 	idAsyncNetwork::server.InitPort();
 	cvarSystem->SetCVarBool( "s_noSound", true );
@@ -8488,6 +8549,14 @@ void idCommonLocal::InitGame( void ) {
 			return;
 		}
 		InitRenderSystem();
+		// Detect as soon as the device can be observed, before the interface,
+		// the game and the menu precache load anything: they then load once,
+		// under the detected settings, and the running device takes the preset
+		// without a restart unless it changes what the device was created with
+		// (openPR06 issue #61). A pending settings recovery owns these fields.
+		if ( detectStartupPreset && !UI_SettingsStartupActive() && !UI_SettingsRecoveryPending() ) {
+			startupPresetApplied = Common_ApplyStartupPerformancePreset( startupPresetBootstrap, startupPresetAssigned, startupPresetRestart );
+		}
 	}
 #endif
 
@@ -8521,30 +8590,23 @@ void idCommonLocal::InitGame( void ) {
 	// InitGame cannot mistake the temporary bootstrap for completed detection.
 	const bool startupRecovery = UI_SettingsStartupActive() || UI_SettingsRecoveryPending();
 	bool startupPresetReady = !detectStartupPreset;
-	const int bootstrapMultiSamples = cvarSystem->GetCVarInteger( "r_multiSamples" );
-	if ( detectStartupPreset && !startupRecovery && Common_ApplyStartupPerformancePreset( startupPresetBootstrap, startupPresetAssigned ) ) {
-		// Apply the selected AA/texture/resource policy to the live device before
-		// startup map commands run. Detection never changes the window mode.
-		// The device is rebuilt on the window the start-up screen is showing in,
-		// as a game-module swap keeps its window (ReloadEngine). A new window put
-		// the screen out from under the player, came up black and was not always
-		// given the focus. Only a window that carries its own samples must be
-		// replaced when the preset changes them.
-		struct preserveWindowScope_t {
-			explicit preserveWindowScope_t( bool preserve ) { GLimp_PreserveWindowOnShutdown( preserve ); }
-			~preserveWindowScope_t() { GLimp_PreserveWindowOnShutdown( false ); }
-		};
-		{
-			const bool windowSamples = cvarSystem->GetCVarBool( "r_glesContext" ) || cvarSystem->GetCVarBool( "r_glWindowMultisample" );
-			const bool preserveWindow = renderSystem != NULL && renderSystem->IsOpenGLRunning() && !R_RendererModule_SelectionReloadPending() &&
-				!( windowSamples && cvarSystem->GetCVarInteger( "r_multiSamples" ) != bootstrapMultiSamples );
-			preserveWindowScope_t preserveWindowScope( preserveWindow );
-			cmdSystem->BufferCommandText( CMD_EXEC_NOW, "vid_restart\ns_restart\n" );
+	if ( startupPresetApplied && !startupRecovery ) {
+		// What the running devices could not take as they stand restarts here,
+		// before startup map commands run. Detection never changes the window mode.
+		if ( !startupPresetRestart.IsEmpty() ) {
+			idStr shown = startupPresetRestart;
+			shown.Replace( "\n", " " );
+			shown.StripTrailingWhitespace();
+			common->Printf( "First-launch performance preset: restarting for settings the running devices cannot take (%s)\n",
+				shown.c_str() );
+			cmdSystem->BufferCommandText( CMD_EXEC_NOW, startupPresetRestart.c_str() );
 			cmdSystem->ExecuteCommandBuffer();
+			// A rebuilt device has presented nothing yet: show the start-up
+			// screen again at once, not a blank window until the menu draws.
+			if ( startupPresetRestart.Find( "vid_restart" ) >= 0 ) {
+				PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104351" ) );
+			}
 		}
-		// The rebuilt device has presented nothing yet: show the start-up screen
-		// again at once, not a blank window until the menu or a level load draws.
-		PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104351" ) );
 		startupPresetReady = true;
 		// This detection is the system check: a new configuration starts on the
 		// current presets, so the check has nothing to offer it.

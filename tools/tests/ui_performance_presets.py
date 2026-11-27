@@ -88,6 +88,7 @@ struct Cvars{
  void SetCVarString(const char* key,const char* value,int flags){calls.push_back(key);if(refuse==key)return;openq4::CVarAssignmentCapture::Record(key);auto& v=vars.at(key);v.value=std::string(key)=="com_performancePreset"&&!*value?"balanced":value;v.flags|=flags;modified|=flags;}
  void SetCVarInteger(const char* key,int value,int flags){if(std::string(key)=="image_anisotropy"&&value>16)value=16;SetCVarString(key,std::to_string(value).c_str(),flags);}
  float GetCVarFloat(const char* key){auto i=vars.find(key);return i==vars.end()?0.0f:(float)std::atof(i->second.value.c_str());}
+ bool GetCVarBool(const char* key){auto i=vars.find(key);return i!=vars.end()&&std::atoi(i->second.value.c_str())!=0;}
  int GetModifiedFlags()const{return modified;}void ClearModifiedFlags(int f){modified&=~f;}void SetModifiedFlags(int f){modified|=f;}
 } cvars,*cvarSystem=&cvars;
 struct Common{int warnings=0,prints=0;void Warning(const char*,...){++warnings;}void Printf(const char*,...){++prints;}void SetMachineSpec();} instance,*common=&instance;
@@ -117,6 +118,12 @@ struct Renderer{
  bool overrideConfig=false;Config config;
  Config GetGLConfig(){if(overrideConfig)return config;Config c;c.isInitialized=initialized;c.dedicatedVideoMemoryMB=raw.videoRamMB;c.vidWidth=raw.drawableWidth;c.vidHeight=raw.drawableHeight;c.gpuClass=raw.gpuClass;c.GLSL130Available=raw.modernEffects;c.GLSLProgramAvailable=c.ARBVertexProgramAvailable=c.ARBFragmentProgramAvailable=!raw.legacyRenderer;c.backendCaps.hasFBO=!raw.legacyRenderer;c.maxTextureSize=raw.modernEffects?4096:2048;return c;}
 } renderer,*renderSystem=&renderer;
+// The renderer module a first launch's restart rule reads (Common_StartupPresetRestartCommands).
+enum rendererModuleApi_t{RENDER_MODULE_API_GL,RENDER_MODULE_API_GL_MODULE,RENDER_MODULE_API_GLES,RENDER_MODULE_API_VULKAN};
+struct rendererModuleStatus_t{rendererModuleApi_t activeApi=RENDER_MODULE_API_GL;} moduleStatus;
+static const rendererModuleStatus_t& R_RendererModule_GetStatus(){return moduleStatus;}
+static bool moduleReloadPending=false;
+static bool R_RendererModule_SelectionReloadPending(){return moduleReloadPending;}
 static idStr Sys_FormatMemoryMB(int n){return idStr(std::to_string(n).c_str());}
 static const char* va(const char* format,...){static char text[2048];va_list args;va_start(args,format);std::vsnprintf(text,sizeof(text),format,args);va_end(args);return text;}
 struct idCmdArgs{std::vector<std::string> args;int Argc()const{return (int)args.size();}const char* Argv(int i)const{return args.at(i).c_str();}};
@@ -226,27 +233,43 @@ int main(){
   raw.modernEffects=true;raw.logicalCpus=8;raw.drawableWidth=1920;raw.drawableHeight=1080;
  };
  openQ4PerformancePresetCVarBackup_t baseline[OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT];
+ idStr restart;
  bootstrap(baseline);
  openq4::CVarAssignmentCapture capture;capture.Begin(openq4::PerformancePresetTargets().data(),OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT,assigned);
  cvarSystem->SetCVarInteger("image_anisotropy",8,CVAR_ARCHIVE);
  cvarSystem->SetCVarInteger("r_multiSamples",0,CVAR_ARCHIVE); // autoexec value equal to bootstrap
  capture.End();cvars.calls.clear();
- Check(Common_ApplyStartupPerformancePreset(baseline,assigned),"actual initialized first-launch detection");
+ Check(Common_ApplyStartupPerformancePreset(baseline,assigned,restart),"actual initialized first-launch detection");
  Check(cvars.vars.at("com_performancePreset").value=="enhanced"&&cvars.vars.at("r_useShadowMap").value=="1","first launch uses canonical modern ladder");
  Check(cvars.vars.at("image_anisotropy").value=="8"&&cvars.vars.at("r_multiSamples").value=="0","configured and equal-valued autoexec overrides preserved");
  bootstrap(baseline);raw.gpuClass=RendererGpuClass::Integrated;raw.drawableWidth=3840;raw.drawableHeight=2160;raw.modernEffects=false;
- Check(Common_ApplyStartupPerformancePreset(baseline,assigned)&&std::find(cvars.calls.begin(),cvars.calls.end(),"r_screenFraction")==cvars.calls.end()&&cvars.vars.at("r_postAA").value=="0","first launch keeps the render scale and the same automatic AA recommendation");
+ Check(Common_ApplyStartupPerformancePreset(baseline,assigned,restart)&&std::find(cvars.calls.begin(),cvars.calls.end(),"r_screenFraction")==cvars.calls.end()&&cvars.vars.at("r_postAA").value=="0","first launch keeps the render scale and the same automatic AA recommendation");
  for(const auto* choice:{"minimum","quality","ultra"}){
   bootstrap(baseline);com_performancePreset.value=choice;
   capture.Begin(openq4::PerformancePresetTargets().data(),OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT,assigned);
   cvarSystem->SetCVarString("com_performancePreset",choice,CVAR_ARCHIVE);capture.End();
-  Check(Common_ApplyStartupPerformancePreset(baseline,assigned)&&cvars.vars.at("com_performancePreset").value==choice,"explicit first-launch profile respected including equal Minimum");
+  Check(Common_ApplyStartupPerformancePreset(baseline,assigned,restart)&&cvars.vars.at("com_performancePreset").value==choice,"explicit first-launch profile respected including equal Minimum");
  }
+ // The running devices take the preset as they stand (openPR06 issue #61): MSAA
+ // restarts only a window that carries the samples, or a pending module swap.
+ const auto explicitQuality=[&](rendererModuleApi_t api,bool windowSamples,bool reload){
+  bootstrap(baseline);com_performancePreset.value="quality";moduleStatus.activeApi=api;moduleReloadPending=reload;
+  cvars.vars["r_glWindowMultisample"].value=windowSamples?"1":"0";cvars.vars["r_glesContext"].value="0";
+  capture.Begin(openq4::PerformancePresetTargets().data(),OPENQ4_PERFORMANCE_PRESET_TOUCHED_CVAR_COUNT,assigned);
+  cvarSystem->SetCVarString("com_performancePreset","quality",CVAR_ARCHIVE);capture.End();
+  const bool applied=Common_ApplyStartupPerformancePreset(baseline,assigned,restart)&&cvars.vars.at("r_multiSamples").value!="0";
+  moduleStatus.activeApi=RENDER_MODULE_API_GL;moduleReloadPending=false;return applied;
+ };
+ Check(explicitQuality(RENDER_MODULE_API_GL,false,false)&&restart.empty(),"OpenGL takes MSAA in its render targets without a restart");
+ Check(explicitQuality(RENDER_MODULE_API_VULKAN,true,false)&&restart.empty(),"Vulkan's single-sample swapchain never restarts for MSAA");
+ Check(explicitQuality(RENDER_MODULE_API_GL,true,false)&&restart=="vid_restart\n","an OpenGL window that carries the samples is rebuilt");
+ Check(explicitQuality(RENDER_MODULE_API_GLES,false,false)&&restart=="vid_restart\n","an OpenGL ES window always carries the samples");
+ Check(explicitQuality(RENDER_MODULE_API_VULKAN,false,true)&&restart=="vid_restart\n","a pending renderer module selection still reloads");
  bootstrap(baseline);renderer.initialized=false;
- Check(!Common_ApplyStartupPerformancePreset(baseline,assigned)&&cvars.calls.empty(),"unavailable first-launch observation does not invent a device");
+ Check(!Common_ApplyStartupPerformancePreset(baseline,assigned,restart)&&cvars.calls.empty(),"unavailable first-launch observation does not invent a device");
  renderer.initialized=true;
  bootstrap(baseline);cvars.refuse="r_ssao";
- Check(!Common_ApplyStartupPerformancePreset(baseline,assigned)&&cvars.vars.at("r_useShadowMap").value=="0","failed first-launch expansion rolls back");
+ Check(!Common_ApplyStartupPerformancePreset(baseline,assigned,restart)&&cvars.vars.at("r_useShadowMap").value=="0","failed first-launch expansion rolls back");
  std::printf("actual Common preset commands/observation: %d checks passed\n",checks);
 }
 '''
@@ -286,8 +309,13 @@ def programs():
  valid='namespace openq4::ui {\n'+ '\n'.join(function_body(doc,x) for x in ('bool Utf8(', 'bool ValidStateValue('))+'\n}\n'
  common=source('src/framework/Common.cpp');start=common.index('using openQ4PerformancePreset_t =');end=common.index('static const char *commonCommandCompletionMatch',start)
  init=function_body(common,'void idCommonLocal::InitGame( void ) {')
- assert init.index('Common_ApplyStartupPerformancePreset( startupPresetBootstrap, startupPresetAssigned )')>init.index('session->Init();')
- assert init.index('OpenFileWrite( CONFIG_SPEC )')>init.index('Common_ApplyStartupPerformancePreset( startupPresetBootstrap, startupPresetAssigned )')
+ detect='Common_ApplyStartupPerformancePreset( startupPresetBootstrap, startupPresetAssigned, startupPresetRestart )'
+ # Detection runs once the device exists and before the interface, the game and
+ # the menu precache load, so their media loads once (openPR06 issue #61).
+ assert init.index('InitRenderSystem();')<init.index(detect)<init.index('uiManager->Init();')
+ assert init.index(detect)<init.index('session->Init();')<init.index('cmdSystem->BufferCommandText( CMD_EXEC_NOW, startupPresetRestart.c_str() );')
+ assert 'vid_restart\\ns_restart' not in init, 'a first launch restarts only what the running devices cannot take'
+ assert init.index('OpenFileWrite( CONFIG_SPEC )')>init.index(detect)
  assert 'sysDetect && !SafeMode() && fileSystem->ReadFile( CONFIG_FILE, NULL ) < 0' in init
  assert 'sysDetect && startupPresetReady && !startupRecovery' in init
  assert init.count('Common_BootstrapStartupPerformancePreset( startupPresetBootstrap )')==2

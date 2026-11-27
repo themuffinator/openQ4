@@ -765,10 +765,13 @@ public:
 	bool						needsRestart;
 
 	bool						insideLevelLoad;
-	// samples whose PCM is decoding on a job worker (LoadResourceAsync)
+	// samples whose PCM is decoding on a job worker (LoadResourceAsync), or whose
+	// streamed envelope is (LoadSampleOutsideLevelLoad)
 	idList<idSoundSample*>		decodingSamples;
 	// uploads the samples whose decode has finished, or all of them, waiting
 	void						FinishSampleDecodes( bool all );
+	// loads a sample referenced outside a level load; a streamed envelope joins later
+	void						LoadSampleOutsideLevelLoad( idSoundSample* sample );
 	// frees the audio a low-memory notice may take (SoundMemoryTrim.h); idleSeconds < 0
 	// keeps the current level's samples
 	void						TrimMemory( const char* reason, int idleSeconds );

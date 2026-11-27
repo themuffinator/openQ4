@@ -127,7 +127,7 @@ def session_paths() -> None:
           and startup.group(1).index("Session_StartPresetCheck") < startup.group(1).index("session->StartMenu( true );"),
           "the check stands in front of the default main menu only, never a startup command's map")
     game = function(common, "void idCommonLocal::InitGame( void ) {")
-    first = game.index("Common_ApplyStartupPerformancePreset( startupPresetBootstrap, startupPresetAssigned )")
+    first = game.index("Common_ApplyStartupPerformancePreset( startupPresetBootstrap, startupPresetAssigned, startupPresetRestart )")
     check(game.index('Common_RecordPerformancePresetCheck( "first launch" );') > first,
           "a first launch's detection records the version, so a new configuration is not asked")
     due = function(common, "bool Common_PerformancePresetCheckDue() {")
