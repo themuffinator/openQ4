@@ -80,7 +80,8 @@ def check_build() -> None:
                    "  and (host_system == 'windows' or host_system == 'linux' or openxr_android)",
             "OpenXR is limited to the SDL3 client on Windows and Linux and Android's Quest flavor and emulator")
     snapshot = meson.index("openq4_dedicated_sources = openq4_engine_sources")
-    client_sources = meson.index("openq4_engine_sources += files('src/sys/openxr/OpenXRSystem.cpp')")
+    client_sources = meson.index("openq4_engine_sources += files('src/sys/openxr/OpenXRSystem.cpp', "
+                                 "'src/sys/openxr/OpenXRRuntimeProbe.cpp')")
     if client_sources < snapshot:
         raise AssertionError("OpenXR sources must join the client after the dedicated-server snapshot")
     require(meson, "client_engine_cpp_args += ['-DOPENQ4_OPENXR=1']", "only the client defines OPENQ4_OPENXR")
@@ -695,10 +696,54 @@ def check_strings() -> None:
                 raise AssertionError(f"{language}_openq4.lang lacks {key}")
 
 
+def check_detection() -> None:
+    """VR Mode and headset detection (VR-08): stage one loads no runtime, stage
+    two asks only when the player allowed it, and the choice is made before
+    the renderer is."""
+    probe = read("src/sys/openxr/OpenXRRuntimeProbe.cpp") + read("src/sys/openxr/OpenXRRuntimeProbe.h")
+    for call in ("xrCreateInstance", "xrGetSystem", "xrEnumerate", "LoadLibrary", "dlopen", "openxr/openxr.h"):
+        if call in probe:
+            raise AssertionError(f"stage one must read, never load: the probe names {call}")
+    for source in ('getenv( "XR_RUNTIME_JSON" )', '"SOFTWARE\\\\Khronos\\\\OpenXR\\\\1"', '"ActiveRuntime"', "AvailableRuntimes",
+                   '"XDG_CONFIG_HOME"', '"XDG_CONFIG_DIRS"', "RuntimeSource::AndroidHeadset"):
+        require(probe, source, "stage one reads what the loader reads")
+    system = read("src/framework/VRSystem.cpp")
+    require(system, '"1 = on (plays in VR whenever a headset is there), 2 = automatic', "VR Mode is Off, On or Automatic")
+    require(system, "0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );", "vr_enable takes 0, 1 and 2")
+    require(system, 'idCVar vr_offerAnswered( "vr_offerAnswered", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,',
+            "the one-time question is remembered")
+    xr = read("src/sys/openxr/OpenXRSystem.cpp")
+    start = xr[xr.index("void idVRSystemOpenXR::StartIfRequested( void ) {"):xr.index("bool idVRSystemOpenXR::SessionWanted( void ) const {")]
+    if start.index("!InstanceWanted()") > start.index("if ( !CreateInstance() ) {"):
+        raise AssertionError("StartIfRequested must check InstanceWanted before it creates an instance")
+    wanted = xr[xr.index("bool idVRSystemOpenXR::InstanceWanted( void ) const {"):xr.index("void idVRSystemOpenXR::ProbeRuntime( void ) {")]
+    require(wanted, "return detectRequested || mode == VR_MODE_ON", "VR Mode off asks no runtime unless vr_detect does")
+    require(xr, "if ( !SessionWanted() || runtimeStopped ) {\n\t\treturn false;\n\t}",
+            "the Vulkan renderer takes the runtime's device only when VR wants a session")
+    boot = read("src/renderer/RendererModule.cpp")
+    early = boot[boot.index("void R_RendererModule_BootEarly( void ) {"):]
+    if not early.index('StartupVariable( "vr_enable"') < early.index("VR_BootDecide();") < early.index("R_RendererModule_Boot();"):
+        raise AssertionError("VR Mode decides after vr_enable is read and before the renderer is chosen")
+    require(boot, "requestedApi = RM_AutomaticApi(VR_WantsRenderer());", "the automatic renderer follows what VR wants")
+    session = read("src/framework/Session_vr.cpp")
+    require(session, 'MessageBox( MSG_YESNO, message.c_str(), strings->GetString( "#str_230120" ), false, OFFER_YES, OFFER_NO );',
+            "the title asks in the session's message box")
+    require(session, "vr_offerAnswered.SetBool( true );", "either answer is kept")
+    require(read("src/framework/Session_menu.cpp"), "if ( !Session_VROfferAnswer( msgFireBack[ 0 ].c_str() ) ) {",
+            "the question's answers apply in the session, not as menu commands")
+    smoke = read("tools/tests/openxr_vr_detection_smoke.py")
+    for case in ("no-runtime", "offer-no", "offer-yes", "auto-late", "auto-launch"):
+        require(smoke, f'"{case}" in cases', "the detection smoke covers every case")
+    require(smoke, "with VR Mode off the runtime was loaded", "the smoke proves stage one loads no runtime")
+    runtime = read("tools/tests/openxr/OpenXRTestRuntime.cpp")
+    require(runtime, '"OPENQ4_XR_TEST_HEADSET"', "the test runtime can have no headset, or one that connects later")
+    require(runtime, "return XR_ERROR_FORM_FACTOR_UNAVAILABLE;", "a runtime without a headset answers as real ones do")
+
+
 def check_documents() -> None:
     for relative in ("docs/user/vr.md", "docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md", "LICENSES/openxr-sdk.txt",
                      "tools/tests/openxr_vr_smoke.py", "tools/tests/openxr_vr_menu_smoke.py",
-                     "tools/tests/openxr_vr_mp_smoke.py",
+                     "tools/tests/openxr_vr_mp_smoke.py", "tools/tests/openxr_vr_detection_smoke.py",
                      "tools/tests/openxr/OpenXRTestRuntime.cpp",
                      "tools/tests/native/VRMathCoreTest.cpp"):
         if not (ROOT / relative).is_file():
@@ -706,7 +751,8 @@ def check_documents() -> None:
     guide = read("docs/user/vr.md")
     for cvar in ("vr_enable", "vr_aimMode", "vr_aimLaser", "vr_hapticStrength", "vr_turnMode", "vr_recenter",
                  "vr_restart", "vr_twoHanded", "vr_comfortVignette", "vr_physicalCrouch", "vr_vehicleStereo",
-                 "vr_refreshRate", "vr_performanceLevel", "vr_body"):
+                 "vr_refreshRate", "vr_performanceLevel", "vr_body", "vr_detect", "vr_start", "vr_offer", "vr_setup",
+                 "ui_retainedVRTextScale"):
         require(guide, cvar, "the VR guide documents the settings players use")
 
 
@@ -722,6 +768,7 @@ def main() -> int:
     check_stereo_sharing()
     check_engine()
     check_body()
+    check_detection()
     check_audit_leads()
     check_strings()
     check_documents()

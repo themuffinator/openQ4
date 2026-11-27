@@ -3127,6 +3127,8 @@ def title_document() -> dict:
     exit_modal = confirmation(doc, "exitModal", "#str_200169", "#str_200170", "quit", frame_leave_ms=200,
                               dim=(("wordmark", "image-color", colour([1, 1, 1, 1]), colour([0.4, 0.4, 0.4, 1])),))
     mods_dialog = mods_modal(doc)
+    from retained_vr import setup_modal
+    vr_modal = setup_modal(doc)
     doc.events["onBack"] = [{"op": "call", "event": "exitModalShow"}]
 
     # The message line at 44,364 u explains the focused item (section 13.7):
@@ -3183,6 +3185,7 @@ def title_document() -> dict:
     ])
     tall_title(doc, stage, content["children"][0], nav, base, [row[3] for row in rows])
     tall_dialog(doc, exit_modal)
+    tall_dialog(doc, vr_modal)
     field = lit_field("field", 0.7)
     root = group("screen", {**FULL, "background-color": colour([0, 0, 0, 1]), "font-family": font("marine"),
                             "font-size": length(16), "color": colour([1, 1, 1, 0.8])}, [
@@ -3205,6 +3208,7 @@ def title_document() -> dict:
                           ("multiplayer", "#str_200002", 272.2), ("settings", "#str_200009", 302.2)], continue_rows=True),
         exit_modal,
         mods_dialog,
+        vr_modal,
         group("fade", {**FULL, "background-color": colour([0, 0, 0, 0]), "pointer-events": keyword("none")}),
     ])
     band_motion(doc, "band", "home", [("wordmark", "image-color", colour([1, 1, 1, 1]), colour([1, 1, 1, 0])),
@@ -4748,19 +4752,28 @@ def pause_document(strogg: bool = False) -> dict:
         plates = [navigation_plate(doc, ident, key, action=action, event=event) for ident, key, action, event in items]
     nav = group("nav", {**absolute(left=0, top=U * 182.2, width=U * 413), "display": keyword("flex"),
                         "flex-direction": keyword("column")}, plates)
+    from retained_vr import SHOW as VR_SETUP_SHOW, TITLE as VR_SETUP_TITLE, setup_modal, vr_state
     if strogg:
         # The actions translate 45 ms apart, EXIT after them, and the level
         # block's lines follow.
         exit_link = strogg_link(doc, "link_exit", "#str_200013", translation, 120 + 45 * len(items), event="exitModalShow")
-        wrap_menu(plates, [exit_link], edges=True)
-        home_parts = [strogg_title(translation), nav, strogg_level_block(doc, translation, 120 + 45 * (len(items) + 1)),
-                      strogg_plinth([exit_link])]
+        vr_link = strogg_link(doc, "link_vrsetup", VR_SETUP_TITLE, translation, 120 + 45 * len(items), event=VR_SETUP_SHOW)
     else:
         exit_link = link(doc, "link_exit", "#str_200013", event="exitModalShow")
-        wrap_menu(plates, [exit_link], edges=True)
+        vr_link = link(doc, "link_vrsetup", VR_SETUP_TITLE, event=VR_SETUP_SHOW)
+    # VR SETUP (retained_vr) stands after EXIT while the game presents to a
+    # headset: Left and Right pass over it while it is hidden.
+    vr_link["properties"]["display"] = keyword("none")
+    doc.bind("link_vrsetup.display", "link_vrsetup", "display", {"op": "select", "args": [vr_state(doc), "block", "none"]})
+    wrap_menu(plates, [exit_link, vr_link], edges=True)
+    if strogg:
+        home_parts = [strogg_title(translation), nav, strogg_level_block(doc, translation, 120 + 45 * (len(items) + 1)),
+                      strogg_plinth([exit_link, vr_link])]
+    else:
         home_parts = [label("paused-title", "#str_230031", {**absolute(left=U * 44, top=U * 134, width=U * 330, height=U * 24),
                             **typeface("marine", 18, U * 24, [1, 1, 1, 0.5]), "white-space": keyword("nowrap")}),
-                      nav, level_block(doc), plinth(doc, [exit_link])]
+                      nav, level_block(doc), plinth(doc, [exit_link, vr_link])]
+    vr_modal = setup_modal(doc, strogg=strogg)
     # GAME PAUSED is the screen's title; the level block's details grow.
     fixed_text(doc, home_parts[0])
     reflow_level_block(doc, home_parts[2], strogg)
@@ -4770,7 +4783,7 @@ def pause_document(strogg: bool = False) -> dict:
     ])
     # A tall view stands the title, actions, EXIT and level block in one column.
     tall_pause(doc, content["children"][0], *home_parts)
-    for modal in (quit_modal, exit_modal):
+    for modal in (quit_modal, exit_modal, vr_modal):
         tall_dialog(doc, modal)
     # The paused view, softened and never dimmed (sections 9 and 13.7). The
     # specification gives scene softening no values of its own, so the pause
@@ -4818,6 +4831,7 @@ def pause_document(strogg: bool = False) -> dict:
         carry,
         quit_modal,
         exit_modal,
+        vr_modal,
         group("fade", {**FULL, "background-color": colour([0, 0, 0, 0]), "pointer-events": keyword("none")}),
     ])
     doc.bind("chrome.display", "chrome", "display", {"op": "select", "args": [{"state": "pause.released"}, "none", "block"]})

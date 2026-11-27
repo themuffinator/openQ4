@@ -20,8 +20,18 @@
 
 #include "VRSystemLocal.h"
 
-idCVar vr_enable( "vr_enable", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
-	"play in virtual reality through the system's OpenXR runtime (OpenGL or Vulkan renderer); takes effect at once" );
+// VR Mode. The values 0 and 1 are the Boolean this setting was, so archived
+// configs and +set vr_enable 1 keep their meaning; 2 is Automatic.
+idCVar vr_enable( "vr_enable", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
+	"VR Mode, through the system's OpenXR runtime (OpenGL or Vulkan renderer): 0 = off (never asks the runtime), "
+	"1 = on (plays in VR whenever a headset is there), 2 = automatic (VR when a headset answers at launch, else the "
+	"desktop, offering a headset that turns up later); takes effect at once", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+idCVar vr_offerAnswered( "vr_offerAnswered", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
+	"1 once the player answered the one-time question that a VR runtime is installed and VR can start by itself "
+	"(the title screen asks while VR Mode is off and this is 0)" );
+idCVar vr_setupDone( "vr_setupDone", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
+	"1 once the VR comfort setup (play space, height, turning, weapon hand) was shown at the first VR entry; "
+	"it stays in the pause menu and on the Virtual Reality tab" );
 idCVar vr_renderScale( "vr_renderScale", "1.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"multiplier on the headset's recommended per-eye resolution; the headset session restarts to apply it", 0.5f, 2.0f );
 idCVar vr_worldScale( "vr_worldScale", "39.37", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
@@ -54,7 +64,8 @@ idCVar vr_screenDistance( "vr_screenDistance", "2.5", CVAR_SYSTEM | CVAR_ARCHIVE
 idCVar vr_screenWidth( "vr_screenWidth", "3.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"width of the virtual screen in metres", 0.5f, 12.0f );
 idCVar vr_mirror( "vr_mirror", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
-	"desktop window while in VR: 0 = black, 1 = left eye, 2 = virtual screen", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+	"desktop window while in VR: 0 = black, 1 = left eye (the virtual screen while a menu is up, as the headset shows it), "
+	"2 = virtual screen", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
 idCVar vr_weaponOffsetX( "vr_weaponOffsetX", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"moves the held view weapon along the controller's aim, in game units (0 holds it by its own grip)", -40.0f, 40.0f );
 idCVar vr_weaponOffsetY( "vr_weaponOffsetY", "0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
@@ -180,7 +191,44 @@ bool VR_ConsumeFocusLoss( void ) {
 
 void VR_UsercmdAnglesCleared( void ) {
 }
+
+// without OpenXR there is no runtime to find and no headset to offer
+bool VR_RuntimeInstalled( void ) {
+	return false;
+}
+
+const char *VR_RuntimeName( void ) {
+	return "";
+}
+
+bool VR_BootDecide( void ) {
+	return false;
+}
+
+bool VR_WantsRenderer( void ) {
+	return false;
+}
+
+bool VR_ConsumeHeadsetOffer( void ) {
+	return false;
+}
+
+bool VR_HeadsetOffered( void ) {
+	return false;
+}
+
+bool VR_TakeHeadsetOffer( void ) {
+	return false;
+}
+
+int VR_ConsumeDetectResult( void ) {
+	return -1;
+}
 #endif
+
+int VR_Mode( void ) {
+	return idMath::ClampInt( VR_MODE_OFF, VR_MODE_AUTOMATIC, vr_enable.GetInteger() );
+}
 
 bool VR_HasInputFocus( void ) {
 	if ( vrSystem == NULL ) {

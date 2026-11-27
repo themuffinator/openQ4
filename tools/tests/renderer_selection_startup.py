@@ -55,6 +55,9 @@ struct Commands {void RemoveFlaggedCommands(int flags){assert(flags==CMD_FL_REND
 static bool RM_UnloadModule(){assert(ownersRetired);++unloads;events.push_back("unload");return true;}
 static void RM_ReleaseDisplayVideoPin(){++releases;}
 static void RM_AdvanceDisplayEpoch(){++epochs;}
+// VR Mode decides at boot, after vr_enable is read (VR-08)
+static int vrDecides=0;static std::string vrDecidedWith;
+static bool VR_BootDecide(){++vrDecides;vrDecidedWith=cvars.vr;return false;}
 '''
 TEST = r'''
 int main(){
@@ -83,8 +86,10 @@ int main(){
  assert(R_RendererModule_FinishSelectionReload()&&unloads==1); // One-shot boundary.
  config={{"r_renderApi",r_renderApi.value},{"r_renderDevice",r_renderDevice.value}};
  R_RendererModule_BootEarly();assert(events.back()=="vulkan:cccccccccccccccccccccccccccccccc");
- config["vr_enable"]="1";R_RendererModule_BootEarly();assert(cvars.vr=="1");
+ config["vr_enable"]="1";R_RendererModule_BootEarly();assert(cvars.vr=="1"&&vrDecidedWith=="1");
  cli["vr_enable"]="0";R_RendererModule_BootEarly();assert(cvars.vr=="0"&&cli.contains("vr_enable"));
+ // the boot decision sees the launch override, not the config, and runs once a boot
+ assert(vrDecidedWith=="0"&&vrDecides==boots);
  std::puts("Renderer selection startup: config/CLI precedence, launch override consumption, owner teardown and one-shot module reload passed");
 }
 '''
@@ -101,7 +106,10 @@ def main():
     # Never unload from a menu callback or from a renderer-module stack frame.
     assert source.count('R_RendererModule_FinishSelectionReload(') == 1
     boot = function_body(source, 'void R_RendererModule_Boot(')
-    assert 'RM_AutomaticApi(cvarSystem->GetCVarBool("vr_enable"))' in boot
+    # the automatic choice follows what VR Mode wants now (VR-08), decided at boot
+    assert 'RM_AutomaticApi(VR_WantsRenderer())' in boot
+    early = function_body(source, 'void R_RendererModule_BootEarly(')
+    assert early.index('StartupVariable( "vr_enable"') < early.index('VR_BootDecide();') < early.index('R_RendererModule_Boot();')
     assert 'idStr::Icmp(requestedValue,"best")==0' in boot
     base = ROOT/'.tmp/rendering-selection'
     base.mkdir(parents=True,exist_ok=True)

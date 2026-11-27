@@ -324,7 +324,7 @@ The Game Options pane is `p_settings_game` and is included from `content/baseoq4
 | Weapon Z Offset | `sliderDef` + `editDef` | `set_game_cl_gun_z_slider_bar`, `set_game_cl_gun_z_value` | `cl_gun_z` | `-5..5`, step `0.05` | Additive client-side up offset. |
 | Weapon Kick | `choiceDef` | `set_game_weaponkick_value` | `g_weaponMuzzleKick` | `No;Yes` | View model kicks back and tilts when the weapon fires. Presentation only: it never moves aim or the shot origin. Multiplayer weapon defs zero the stock kick values, so the game restores each weapon's single-player kick when this is on. |
 | Virtual Reality | `windowDef` label | `set_game_vr` | N/A | N/A | Section label. |
-| VR Mode | `choiceDef` | `set_game_vr_enable_value` | `vr_enable` | `Disabled;Enabled` | Starts or ends the OpenXR session at once (OpenGL renderer). |
+| VR Mode | `choiceDef` | `set_game_vr_enable_value` | `vr_enable` | `Off;On;Automatic` | Off asks no runtime; On starts or ends the OpenXR session at once; Automatic plays in VR when a headset answers at launch and offers one that connects later (VR-08). In the retained page, Comfort Setup (VR SETUP) and Look for Headset (`vr_detect`) follow it, and in VR the page opens on Virtual Reality with the flat gun's place and field of view and stereoscopic 3D hidden (VR-09). |
 | Aim With | `choiceDef` | `set_game_vr_aimmode_value` | `vr_aimMode` | `1 Controller`, `0 Head` | Controller aim hides the screen crosshair; the laser sight marks shots. |
 | Weapon Hand | `choiceDef` | `set_game_vr_lefthanded_value` | `vr_leftHanded` | `0 Right`, `1 Left` | Swaps the triggers, grips and sticks with the weapon. |
 | Turning | `choiceDef` | `set_game_vr_turnmode_value` | `vr_turnMode` | `0 Snap`, `1 Smooth` | Weapon-hand stick left and right. |

@@ -190,7 +190,7 @@ static bool UI_IsRetainedPath(const char* path) {
     return name.size() > 4 && name.compare(name.size() - 4, 4, ".rui") == 0;
 }
 enum { RETAINED_NOTICE_FAVORITE = 1, RETAINED_NOTICE_CONTROLLER = 2 };
-enum { RETAINED_NOTICE_UNDO_NONE, RETAINED_NOTICE_UNDO_FAVORITE };
+enum { RETAINED_NOTICE_UNDO_NONE, RETAINED_NOTICE_UNDO_FAVORITE, RETAINED_NOTICE_UNDO_VR_START };
 struct FileSystem {
     std::set<std::string> files;
     std::map<std::string, std::set<std::string>> gameDirFiles; // what each game directory itself supplies
@@ -458,6 +458,9 @@ static bool UI_RetainedViewFailed(idUserInterface* gui) { return gui->failed; }
 // The system check (Session_presetcheck.cpp) owns none of these screens.
 static bool Session_PresetCheckOwns(const idUserInterface*) { return false; }
 static void Session_PresetCheckRequest(idUserInterface*, const char*) {}
+// VR's session verbs and its notice's Play in VR (Session_vr.cpp) take none of these screens' requests.
+static bool Session_VRRequest(idUserInterface*, const char*) { return false; }
+static void Session_VRTakeOffer() {}
 // The legacy menu's timelines run to a time (each GUI, in order).
 static std::vector<std::string> timeRuns;
 static void UI_RunTimeEvents(idUserInterface* gui, int) { timeRuns.push_back(gui->source); }
@@ -6082,6 +6085,9 @@ def main() -> int:
     # The system check's answers, handled in its own session file.
     preset_check = (ROOT / 'src/framework/Session_presetcheck.cpp').read_text(encoding='utf-8')
     handled |= set(re.findall(r'!idStr::Icmp\(\s*request,\s*"(presetCheck[A-Za-z]*)"\s*\)', preset_check))
+    # VR SETUP's and the Virtual Reality tab's verbs, handled in VR's session file.
+    vr_session = (ROOT / 'src/framework/Session_vr.cpp').read_text(encoding='utf-8')
+    handled |= set(re.findall(r'!idStr::Icmp\(\s*request,\s*"(vr[A-Za-z]*)"\s*\)', vr_session))
     # The Arena page's verbs, each mapped to the campaign's own command.
     arena_verbs = menu[menu.index('RETAINED_ARENA_VERBS[][2] = {'):menu.index('RETAINED_ARENA_VERB_COUNT')]
     handled |= set(re.findall(r'\{ "(arena[A-Za-z0-9]*)", "arena', arena_verbs))

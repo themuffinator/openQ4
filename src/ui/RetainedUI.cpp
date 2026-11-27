@@ -67,6 +67,10 @@ idCVar ui_retainedScale("ui_retainedScale", "1", CVAR_GUI | CVAR_FLOAT | CVAR_AR
 	"retained UI density multiplier", .75f, 2.f);
 idCVar ui_retainedTextScale("ui_retainedTextScale", "1", CVAR_GUI | CVAR_FLOAT | CVAR_ARCHIVE,
 	"retained UI text size multiplier, independent of furniture", 1.f, 2.f);
+// The menus' virtual screen stands metres away in a headset (vr_screenDistance):
+// their text reads at this size at least while VR presents (VR-09).
+idCVar ui_retainedVRTextScale("ui_retainedVRTextScale", "1.25", CVAR_GUI | CVAR_FLOAT | CVAR_ARCHIVE,
+	"retained UI text size multiplier while the game presents to a VR headset, at least ui_retainedTextScale", 1.f, 2.f);
 // The unarchived test settings are CVAR_NOCHEAT, as the session's opt-ins are,
 // so joining or hosting a server without cheats does not reset them.
 idCVar ui_retainedDensity("ui_retainedDensity", "0", CVAR_GUI | CVAR_FLOAT | CVAR_NOCHEAT,
@@ -2136,6 +2140,7 @@ bool RetainedUI_DefaultViewport(openq4::ui::Viewport& viewport) {
 	viewport.displayScale = ui_retainedDensity.GetFloat() > 0 ? ui_retainedDensity.GetFloat() : engineWindowState.displayScale;
 	viewport.userScale = ui_retainedScale.GetFloat();
 	viewport.textScale = ui_retainedTextScale.GetFloat();
+	if (vrSystem != NULL && vrSystem->IsActive()) viewport.textScale = (std::max)(viewport.textScale, ui_retainedVRTextScale.GetFloat());
 	// Keep root-menu decisions and the size reset reachable. The requested
 	// CVars remain intact, and larger windows automatically restore that size.
 	viewport.FitToMinimum(640, 480);

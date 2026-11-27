@@ -810,7 +810,7 @@ void R_RendererModule_Boot( void ) {
 		common->Warning( "r_renderApi '%s' is not a valid rendering API; using the platform default", requestedValue );
 	}
 	if ( idStr::Icmp(requestedValue,"best")==0 ) {
-		requestedApi = RM_AutomaticApi(cvarSystem->GetCVarBool("vr_enable"));
+		requestedApi = RM_AutomaticApi(VR_WantsRenderer());
 	}
 #ifdef ID_DEDICATED
 	// the dedicated server keeps the statically linked front-end until the
@@ -1114,6 +1114,10 @@ void R_RendererModule_BootEarly( void ) {
 	common->StartupVariable( "r_renderDevice", false );
 	common->StartupVariable( "r_vkDevice", false );
 	common->StartupVariable( "vr_enable", false );
+	// VR Mode decides before the renderer does (VR-08): stage one of headset
+	// detection is logged, and Automatic asks the runtime for a headset now,
+	// so the automatic renderer choice keeps VR on OpenGL when one answers.
+	VR_BootDecide();
 
 	R_RendererModule_Boot();
 }

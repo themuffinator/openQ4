@@ -46,6 +46,12 @@
 //   OPENQ4_XR_TEST_PERF_SETTINGS 1 offers XR_EXT_performance_settings: levels the
 //                           application sets are logged, and the thermal script
 //                           command reports limits
+//   OPENQ4_XR_TEST_HEADSET  "absent": xrGetSystem answers XR_ERROR_FORM_FACTOR_UNAVAILABLE,
+//                           a runtime with no headset connected; "after:<file>": the
+//                           headset is connected once <file> exists (a marker the
+//                           application writes), as one switched on mid-session.
+//                           Every answer is logged ("get_system"), so a check can
+//                           prove whether the application asked at all
 //
 // On Android an app process has no environment a harness can set, so these
 // come from openq4_xr_test.env in the app's external files directory instead.
@@ -560,6 +566,9 @@ struct RuntimeGlobals {
 	bool					sessionLost = false, instanceLost = false;
 	std::string				faultCall, faultValue, faultAfter, faultOnce;
 	std::string				forcedProfile;
+	// OPENQ4_XR_TEST_HEADSET: no headset, or one that connects when a file appears
+	bool					headsetAbsent = false;
+	std::string				headsetAfter;
 	int						faultOccurrence = 1, faultCalls = 0;
 	bool					faultFired = false;
 	int						trackingInvalidFrames = 0;
@@ -789,6 +798,14 @@ void InitGlobals() {
 	}
 	if ( const char *perf = std::getenv( "OPENQ4_XR_TEST_PERF_SETTINGS" ) ) {
 		g.offerPerfSettings = std::atoi( perf ) != 0;
+	}
+	if ( const char *headset = std::getenv( "OPENQ4_XR_TEST_HEADSET" ) ) {
+		const std::string value = headset;
+		if ( value == "absent" ) {
+			g.headsetAbsent = true;
+		} else if ( value.rfind( "after:", 0 ) == 0 ) {
+			g.headsetAfter = value.substr( 6 );
+		}
 	}
 	if ( const char *path = std::getenv( "OPENQ4_XR_TEST_FAULT_AFTER" ) ) g.faultAfter = path;
 	if ( const char *path = std::getenv( "OPENQ4_XR_TEST_FAULT_ONCE" ) ) g.faultOnce = path;
@@ -1901,6 +1918,12 @@ XRAPI_ATTR XrResult XRAPI_CALL TR_xrGetSystem( XrInstance handle, const XrSystem
 	}
 	if ( getInfo->formFactor != XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY ) {
 		return XR_ERROR_FORM_FACTOR_UNSUPPORTED;
+	}
+	RuntimeGlobals &g = G();
+	const bool connected = !g.headsetAbsent && ( g.headsetAfter.empty() || FileExists( g.headsetAfter ) );
+	Log( "{\"event\":\"get_system\",\"headset\":%s}", connected ? "true" : "false" );
+	if ( !connected ) {
+		return XR_ERROR_FORM_FACTOR_UNAVAILABLE;
 	}
 	*systemId = TR_SYSTEM_ID;
 	return XR_SUCCESS;

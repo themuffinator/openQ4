@@ -262,7 +262,7 @@ bool SessionMenuCommand(const std::string& command) {
         "joinSortGameType","joinSortMap","joinSortDedicated","joinSortRepeater","joinFavorite","joinModPrevious","joinModNext",
         "joinFilterFull","joinFilterEmpty","joinFilterPassword","joinGameTypePrevious","joinGameTypeNext","joinClearFilters",
         "msgLeft","msgRight","msgMid","presetCheckApply","presetCheckKeep","presetCheckLater",
-        "noticeAction0","noticeAction1","noticeAction2","audioBack","gameBack","controlsBind","controlsClear","controlsBack","controlsTouchLayout",
+        "noticeAction0","noticeAction1","noticeAction2","vrRecenter","vrCalibrateHeight","vrDetect","audioBack","gameBack","controlsBind","controlsClear","controlsBack","controlsTouchLayout",
         "controlsResetController","controlsResetKeyboard","controlsCalibrateGyro","controlsRumbleTest",
         "oskKey","oskShift","oskLayer","oskSpace","oskLeft","oskRight","oskBackspace","oskDone","oskCancel",
         "settingsBack","settingsControls","settingsGame","settingsDisplay","settingsAudio","settingsDefaults",
@@ -445,7 +445,7 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"r_screenshotFormat",{0,0,1,true,{},{0,1}}},{"g_autoSkipCinematics",{1}},{"ui_cinematicShake",{0,0,1,false}},{"g_screenShake",{0,0,1,false}},{"g_enhancedPhysics",{1}},
 		{"cl_gunfov",{0,0,179,false}},{"cl_gunfov_adjust",{0,0,1,true,{},{0,1}}},
 		{"cl_gun_x",{0,-5,5,false}},{"cl_gun_y",{0,-5,5,false}},{"cl_gun_z",{0,-5,5,false}},{"g_weaponMuzzleKick",{1}},{"g_viewKick",{0,0,1,false}},
-		{"vr_enable",{1}},{"vr_aimMode",{0,0,1,true,{},{1,0}}},{"vr_leftHanded",{0,0,1,true,{},{0,1}}},
+		{"vr_enable",{0,0,2,true,{},{0,1,2}}},{"vr_aimMode",{0,0,1,true,{},{1,0}}},{"vr_leftHanded",{0,0,1,true,{},{0,1}}},
 		{"vr_turnMode",{0,0,1,true,{},{0,1}}},{"vr_snapTurnAngle",{0,30,90,true,{},{30,45,60,90}}},
 		{"vr_moveDirection",{0,0,1,true,{},{0,1}}},{"vr_roomScale",{1}},{"vr_aimLaser",{0,0,2,true,{},{0,1,2}}},
 		{"vr_hapticStrength",{2,0,0,false,{"0","0.5","1"}}},{"vr_twoHanded",{1}},
@@ -1088,6 +1088,16 @@ struct idUserInterfaceRetained::Impl {
 			const auto verb = RuntimeView()->AcceptPrompt(fallback ? *fallback : std::string(),RetainedUI_PresentationTime());
 			if (!state.FindKey(accept) || verb != state.GetString(accept)) {
 				state.Set(accept,verb.c_str()); changed.emplace(accept,verb);
+			}
+		}
+		// VR (tools/ui/retained_vr.py): a document that declares vr.active
+		// learns in the frame it changes whether the game presents to a
+		// headset, which the menus' VR layouts follow.
+		static const char* const vrActive = "vr.active";
+		if (document.Model().state.contains(vrActive)) {
+			const bool presenting = vrSystem != NULL && vrSystem->IsActive();
+			if (!state.FindKey(vrActive) || state.GetBool(vrActive) != presenting) {
+				state.SetBool(vrActive,presenting); changed.emplace(vrActive,presenting);
 			}
 		}
 		std::string error;

@@ -2,9 +2,11 @@
 """Change a VR setting from inside the headset, against the openQ4 OpenXR test
 runtime (requires Pillow, a staged client built with OpenXR, and retail assets).
 
-The runtime's scripted weapon hand opens the pause menu, then points and clicks
-its way to Settings > Game Options, opens its Virtual Reality tab, and clicks
-the Laser Sight value. The setting must change from the dot to the dot and
+The runtime's scripted weapon hand opens the pause menu. It is the first menu
+of this VR session, so VR SETUP opens over it (retained_vr.py): the hand sets
+Turning to Smooth there and closes it with DONE. Then it points and clicks
+its way to Settings > Game Options, which in VR opens on the Virtual Reality
+tab (the hand clicks the tab anyway), and clicks the Laser Sight value. The setting must change from the dot to the dot and
 beam, which only happens if the tab opened and the pointer's click reached its
 row. Nothing synthesises keyboard or mouse input: console commands write
 marker files, and the runtime acts on them.
@@ -40,13 +42,17 @@ def hand_pointing_at(u: float, v: float) -> str:
 
 
 # where to click
+SETUP_TURNING = (0.464, 0.545)                  # VR SETUP's Turning value
+SETUP_SMOOTH = (0.420, 0.617)                   # "Smooth", second in the list it unfolds
+SETUP_DONE = (0.380, 0.716)                     # VR SETUP's DONE
 PAUSE_SETTINGS = (0.231, 0.723)                 # the retained pause menu's Settings row
 NAV_GAME_OPTIONS = canvas_to_screen(105, 227)   # Settings' left-hand Game Options button
 VR_TAB = (0.746, 0.116)                         # Game Options' VIRTUAL REALITY tab
-LASER_VALUE = (0.707, 0.256)                    # the Laser Sight row's value on that tab
-LASER_BEAM = (0.707, 0.356)                     # "Dot and Beam", third in the list it unfolds
+LASER_VALUE = (0.400, 0.783)                    # the Laser Sight row's value on that tab (one column at VR text size)
+LASER_BEAM = (0.300, 0.913)                     # "Dot and Beam", third in the list it unfolds
 SECTION_CLICKS = 1                              # the tab
 LIST_CLICKS = 2                                 # the list, then its option
+SETUP_CLICKS = 3                                # VR SETUP's list, its option and DONE
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -89,6 +95,10 @@ def main(argv: list[str] | None = None) -> None:
     script = [
         f"when {marker('menu')} button left menu 1",
         f"when {marker('menu_up')} button left menu 0",
+        f"when {marker('to_turning')} hand right {hand_pointing_at(*SETUP_TURNING)}",
+        f"when {marker('turning_open')} capture {profile / 'xr_setup_open'}",
+        f"when {marker('to_smooth')} hand right {hand_pointing_at(*SETUP_SMOOTH)}",
+        f"when {marker('to_done')} hand right {hand_pointing_at(*SETUP_DONE)}",
         f"when {marker('to_settings')} hand right {hand_pointing_at(*PAUSE_SETTINGS)}",
         f"when {marker('to_game')} hand right {hand_pointing_at(*NAV_GAME_OPTIONS)}",
         f"when {marker('to_section')} hand right {hand_pointing_at(*VR_TAB)}",
@@ -110,7 +120,14 @@ def main(argv: list[str] | None = None) -> None:
         script.append(f"when {marker(name + '_up')} button right trigger 0")
         commands.extend([f"condump vr_marker_{name}_down.txt", "waitMsec 250", f"condump vr_marker_{name}_up.txt", "waitMsec 900"])
 
-    commands += ["condump vr_marker_to_settings.txt", "waitMsec 900"]
+    # VR SETUP, over the pause: Turning to Smooth, then DONE
+    commands += ["condump vr_marker_to_turning.txt", "waitMsec 900"]
+    click("turning")
+    commands += ["condump vr_marker_turning_open.txt", "waitMsec 600", "condump vr_marker_to_smooth.txt", "waitMsec 900"]
+    click("smooth")
+    commands += ["echo VR_MENU_TURNING", "vr_turnMode", "condump vr_marker_to_done.txt", "waitMsec 900"]
+    click("done")
+    commands += ["waitMsec 600", "condump vr_marker_to_settings.txt", "waitMsec 900"]
     click("settings")
     commands += ["waitMsec 800", "condump vr_marker_to_game.txt", "waitMsec 900"]
     click("game")
@@ -141,7 +158,8 @@ def main(argv: list[str] | None = None) -> None:
         "g_autoExecAfterMapLoad": "openxr_vr_menu_smoke.cfg", "g_autoExecAfterMapLoadDelayMs": "1000",
         "g_autoSkipCinematics": "1", "com_skipLoadingContinue": "1",
         "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1", "sys_lang": options.language,
-        "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_screenDistance": "2.5",
+        # the first VR entry: VR SETUP opens over the pause, Turning starts at Snap
+        "vr_enable": "1", "vr_setupDone": "0", "vr_turnMode": "0", "vr_debug": "1", "vr_aimMode": "1", "vr_screenDistance": "2.5",
         "vr_screenWidth": str(SCREEN_WIDTH_M), "vr_leftHanded": "0",
         # after the launch configuration's own r_renderApi, so this one wins
         "r_renderApi": options.render_api,
@@ -177,8 +195,11 @@ def main(argv: list[str] | None = None) -> None:
     assert result.returncode == 0, result.returncode
     assert "VR_MENU_SMOKE_COMPLETE" in text, "script did not complete"
     assert not re.search(r"FATAL|ERROR:|OpenXR: .* failed|Unknown command", text), "errors in the log"
+    assert "VR_SETUP shown reason=first-entry" in text, "the first VR entry did not open VR SETUP over the pause"
+    turning = re.search(r'"vr_turnMode" is:"(\d)"', text.partition("VR_MENU_TURNING")[2])
+    assert turning and turning.group(1) == "1", "pointing at VR SETUP's Turning and choosing Smooth did not set vr_turnMode 1"
     clicks = text.count("OpenXR: MOUSE1 down")
-    expected = 2 + SECTION_CLICKS + LIST_CLICKS
+    expected = SETUP_CLICKS + 2 + SECTION_CLICKS + LIST_CLICKS
     assert clicks == expected, f"expected {expected} pointer clicks on menus, saw {clicks}"
     laser = re.search(r'"vr_aimLaser" is:"(\d)"', text.partition("VR_MENU_LASER")[2])
     assert laser, "vr_aimLaser was not reported"
@@ -186,12 +207,13 @@ def main(argv: list[str] | None = None) -> None:
         f"clicking Laser Sight in the Virtual Reality section should step it from 1 to 2, it is {laser.group(1)}"
 
     # settings pages are opaque, so the world stops rendering and the screen is the only layer
-    for name in ("xr_vr_section", "xr_laser_open", "xr_laser_set"):
+    for name in ("xr_setup_open", "xr_vr_section", "xr_laser_open", "xr_laser_set"):
         quads = sorted(profile.glob(f"{name}_quad*.tga"))
         assert quads, f"no virtual-screen capture for {name}"
         with Image.open(quads[-1]) as screen:
             screen.convert("RGB").save(profile / f"{name}_screen.png")
-    print(f"OpenXR VR menu smoke ({options.render_api}): PASS (Laser Sight stepped to dot and beam through the pointer); evidence={profile}")
+    print(f"OpenXR VR menu smoke ({options.render_api}): PASS (VR SETUP's Turning set to Smooth and Laser Sight stepped to dot and beam "
+          f"through the pointer); evidence={profile}")
 
 
 if __name__ == "__main__":

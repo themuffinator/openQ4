@@ -37,6 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "BuildVersion.h"
 #include "SaveGameReleases.h"
 #include "VRSystemLocal.h"
+#include "SessionVR.h"
 #include "../sys/NetworkEndpoint.h"
 #if defined( __has_include )
 #if __has_include( "openq4_savegame_compat_generated.h" )
@@ -11400,6 +11401,9 @@ void idSessionLocal::Init() {
 #endif
 
 	cmdSystem->AddCommand( "disconnect", Session_Disconnect_f, CMD_FL_SYSTEM, "disconnects from a game" );
+	cmdSystem->AddCommand( "vr_offer", Session_VROffer_f, CMD_FL_SYSTEM,
+		"the one-time question at the title when a VR runtime is installed: status, yes, no, open, or reset to ask again" );
+	cmdSystem->AddCommand( "vr_setup", Session_VRSetup_f, CMD_FL_SYSTEM, "opens VR SETUP (play space, height, turning, weapon hand) over the retained title or pause" );
 
 #ifdef ID_DEMO_BUILD
 	cmdSystem->AddCommand( "endOfDemo", Session_EndOfDemo_f, CMD_FL_SYSTEM, "ends the demo version of the game" );

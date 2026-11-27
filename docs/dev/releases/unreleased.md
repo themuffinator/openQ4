@@ -42,6 +42,16 @@ the [development roadmap](../roadmap.md) for current scope.
   timing are under Video Capture in Settings > Game Options. See
   [Record Video](../../user/video-capture.md).
 
+- **VR finds your headset, and the menus fit the headset.** VR Mode now
+  has Off, On and **Automatic**: Automatic starts in VR when your headset
+  answers at launch and otherwise plays on the desktop, offering a headset you
+  switch on later rather than taking over. If a VR runtime is installed and
+  you never chose, the title asks once. In the headset, **VR SETUP** (seated
+  or standing, your height, recentre, turning, weapon hand, comfort vignette)
+  opens the first time and stays on the pause menu, Settings opens on Virtual
+  Reality, desktop-only settings step aside, menu text is larger, and typing
+  uses the in-game keyboard. Off never touches your VR software. See the
+  [VR guide](../../user/vr.md#vr-mode-and-headset-detection).
 - **Play in 3D without a headset.** Turn on **Stereoscopic 3D** in Settings >
   Game Options > Virtual Reality and the game draws a view for each eye: side
   by side or top and bottom for 3D televisions and monitors, full-resolution
