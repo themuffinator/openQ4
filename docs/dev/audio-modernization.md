@@ -15,6 +15,9 @@ survive output loss and layout changes, adds the low-memory response and streams
 files without usable length metadata.
 The [22 November volume audit](audio-volume-parity.md) restores retail's master volume
 range and its music classification.
+The [27 November fidelity audit](#resampler-passband-and-a-fidelity-audit-november-27)
+measures what the mixer does to a known signal, and replaces a resampler that cut
+the treble of every 22 kHz sound.
 
 ## Where openQ4 starts from
 
@@ -40,7 +43,7 @@ a protected master bus, streaming), not with any one game's tuning, which is not
 | Unpositioned sounds | Equal to every speaker | Non-spatialized | Rendered as a point straight ahead | Full spread around the listener |
 | Stereo and music | Straight to left and right | Non-diegetic bus | Virtual speakers, so through HRTF on headphones | Direct channels (`s_directStereo`) |
 | Speaker layout and HRTF | XAudio2 device channels | Endpoint layout, binaural option | 5.1 forced everywhere; `s_openALHRTF 1` ignored | Device layout by default; HRTF preference honoured; reopen keeps both |
-| Resampling | XAudio2 SRC | High-quality SRC | OpenAL Soft cubic spline | 11th order sinc (`s_resampler`) |
+| Resampling | XAudio2 SRC | High-quality SRC | OpenAL Soft cubic spline | 23rd order sinc (`s_resampler`) |
 | Master bus | XAudio2 mastering voice | Limiter / HDR | No limiter on float devices | OpenAL Soft limiter (`s_outputLimiter`) |
 | Distance filtering | None | Attenuation low-pass | None | Air absorption from the room preset (`s_airAbsorption`) |
 | Gain headroom | Unclamped sounds above unity | Bus headroom | Clamped to 1 by `AL_MAX_GAIN` | 16x headroom |
@@ -80,7 +83,9 @@ a protected master bus, streaming), not with any one game's tuning, which is not
 - **Output limiter.** OpenAL Soft's log showed "Output limiter disabled" on a Float32
   shared-mode WASAPI device; it now asks for `ALC_OUTPUT_LIMITER_SOFT` (`s_outputLimiter`).
 - **Resampler.** 4,762 of the 5,737 stock sounds are 22.05 kHz, so nearly every voice is
-  upsampled about 2.2x. `s_resampler auto` picks the runtime's "11th order Sinc"; `default`
+  upsampled about 2.2x. `s_resampler auto` picks the runtime's "23rd order Sinc" (it picked
+  the 11th order one until 27 November, which
+  [cut the treble](#resampler-passband-and-a-fidelity-audit-november-27)); `default`
   keeps OpenAL Soft's own (cubic spline in 1.25); `listResamplers` lists them.
 - **Units.** `AL_SPEED_OF_SOUND` is set in game units (343.3 / 0.0254). Stock content uses no
   Doppler, but a `useDoppler` sound faster than about 9 m/s would have run away in pitch.
@@ -659,7 +664,86 @@ test: varying network delay can exceed the 10 ms drift injected over ten seconds
 This diagnostic observes the existing timestamp; it does not alter admission or
 the wire protocol.
 
+### Resampler passband and a fidelity audit (November 27)
+
+A player reported that some sounds seemed compressed or low in quality. The audit
+plays known signals through the real mixer instead of reading the code again:
+loose probe sounds (white noise at 22.05 and 44.1 kHz, a 1 kHz + 9 kHz tone pair
+and a full-scale tone) loop from speakers in Hangar 1's sky room, at the
+listener, 300 units ahead and 300 units to the right. The mix goes to a float
+WAV through OpenAL Soft's wave writer with the window hidden, and each
+placement's spectrum is compared with the signal that went in.
+
+**The resampler cut the treble.** OpenAL Soft's band-limited sincs end their
+transition band at the source's Nyquist frequency, so a shorter filter starts
+rolling off lower. The "11th order Sinc" that `s_resampler auto` chose on
+6 October is flat only to about 5 kHz for a 22.05 kHz sound. Response of a
+22.05 kHz source in a 48 kHz mix, relative to 1 kHz:
+
+| Resampler | 6 kHz | 8 kHz | 9 kHz | 10 kHz | Images above 11 kHz | Mixing, 48 voices |
+| --- | --- | --- | --- | --- | --- | --- |
+| 11th order Sinc (old `auto`) | -1.2 dB | -9.4 dB | -18.4 dB | -33.5 dB | none | about 1% of a core |
+| 23rd order Sinc (new `auto`) | 0 dB | -0.2 dB | -3.8 dB | -16.5 dB | none | 1-3% |
+| 47th order Sinc | 0 dB | 0 dB | -0.3 dB | -9.1 dB | none | 5-7% |
+| Cubic Spline (OpenAL Soft's default) | -0.6 dB | -2.4 dB | -3.8 dB | -5.4 dB | -15 dB | 0.4% |
+| Nearest | -0.6 dB | -1.7 dB | -2.6 dB | -3.1 dB | -7 dB | 0.2% |
+
+44.1 kHz sounds lost less: -4.4 dB at 14 kHz and -9 dB at 16 kHz with the 11th
+order sinc, flat to 14 kHz and -0.7 dB at 16 kHz with the 23rd.
+
+The stock sounds do have that treble. Of 600 Oggs drawn at random from the
+installed packs, 371 are 22.05 kHz; their energy from 9 to 10 kHz is within 2 dB
+of their energy from 8 to 9 kHz, so the encoder did not cut it. Weighting each
+sound's spectrum by the measured responses, the 11th order sinc removed a median
+2.9 dB of everything above 5 kHz, and 5.5 dB from the brightest tenth. The 23rd
+order removes 0.5 dB (1.8 dB), the 47th 0.2 dB (1.1 dB). `auto` now picks the
+23rd order sinc (`SoundResamplerAutoChoice` in `src/sound/SoundResampler.h`):
+the 47th adds 0.3 dB for several times the mixing cost and stays available by
+name. A runtime with neither keeps its own default, never a short sinc.
+
+Retail's mixer upsampled by repeating samples (`UpSamplePCMTo44kHz` in the SDK),
+which keeps the treble and adds strong images above 11 kHz. `Nearest` and the
+runtime default are the nearest equivalents for players who want that brighter,
+grittier sound. The default stays the filter that reproduces the files.
+
+**What the audit cleared.**
+
+- *Dry path.* At the listener, with the 23rd order sinc, the response is flat
+  within 1 dB from 125 Hz to 8 kHz, the tone pair's distortion and images are
+  73 dB down, and a full-scale tone comes out at its level with no clipping.
+- *Reverb, air absorption and the pass-through filters* (stock defaults, stereo):
+  within 1 dB of the dry path at 300 units, apart from the room's own reverb.
+- *Output limiter.* Air Defense's opening battle, rendered for a minute at
+  `s_volume 1` with the limiter off, peaks at 1.22 of full scale; a tenth of its
+  100 ms blocks pass full scale. At the default `s_volume 0.5` nothing reaches the
+  limiter. At the menu's maximum of 2 it works through every loud moment, which
+  is what it is for.
+- *Decode.* Unchanged: every stock Ogg already decodes bit-identically to the
+  reference decoder (6 October).
+
+**HRTF colours positional sounds.** With OpenAL Soft's built-in HRTF, a sound
+300 units ahead measures -7 dB at 125 Hz and -3 dB at 250 Hz against 500 Hz,
+with a 15 dB notch at 8 kHz; to the side the bass loss is the same. Sounds at
+the listener (your own weapon, music, the interface) bypass it, so the world
+sounds thin beside them. `s_openALHRTF 0` leaves the choice to OpenAL Soft, which
+turns HRTF on whenever Windows calls the endpoint headphones, as it does for
+many laptop and front-panel outputs whatever is plugged in. That default is
+unchanged here; see Deferred.
+
+**Stale test doubles.** `sound_settings.py` and `sound_recovery.py` had not
+compiled since the 23 November capture work added a loopback flag and a capture
+clock to the two production functions they extract. Their doubles now carry
+both, and the suites pass again (38,423 and 44,969 checks, every mutant killed).
+
+Evidence and the probes are in `.tmp/audio-quality/` (`probe.py`,
+`stock_spectrum.py`, `resampler_cost.py`, `scene.py`). Timings are from a shared
+machine and vary by a factor of two between runs.
+
 ## Deferred
+
+- **HRTF by default on endpoints Windows calls headphones.** Measured above. Making
+  HRTF opt-in would change the sound for every player on such an endpoint, so it
+  waits for a product decision.
 
 - **Audible distance units.** Current `DOOM_TO_METERS` and `METERS_TO_DOOM` are both
   `1.0f` in `src/sound/sound.h`; the earlier claim that the mixer necessarily converts
@@ -710,7 +794,9 @@ the wire protocol.
   `tools/tests/sound_screen_shake.py` (camera strength, range and aggregation),
   `tools/tests/macos_openal_provider_policy.py`, `tools/tests/ui_performance_presets.py` and the
   in-engine `performancePresetSelfTest`.
-- The log reports `OpenAL voices: source radius on, direct stereo on (remixed), resampler 11th
+- `tools/tests/sound_resampler.py` (the resampler `auto` picks on each OpenAL Soft release, and
+  on the staged library the treble it keeps at 22.05 kHz, with the short sinc as a control).
+- The log reports `OpenAL voices: source radius on, direct stereo on (remixed), resampler 23rd
   order Sinc` and `OpenAL output limiter: on`.
 - Audible checks without a device: point `ALSOFT_CONF` at a config with `drivers=wave` and a
   `[wave] file=` path, as in [retail-audio-reverb.md](retail-audio-reverb.md).

@@ -47,6 +47,8 @@ public:
 	ALCdevice* openalDevice=nullptr; ALCcontext* openalContext=nullptr;
 	bool initFailed=false,deferredUpdatesActive=false,efxFiltersAvailable=true,efxEnabled=false;
 	bool devicePauseRequested=false;
+	// The capture loopback device is qualified by the demo-export and video-capture runs; never open here.
+	bool loopbackOpen=false;
 	ALuint auxEffectSlot=0,auxReverbEffect=0;
 	int openedSpeakerCount=2,openedHrtfMode=0,lastResetTime=0;
 	List<idSoundVoice_OpenAL> voices; List<idSoundVoice_OpenAL*> zombieVoices,freeVoices;
@@ -62,7 +64,8 @@ public:
 };
 struct World { int updates=0,budget=0; bool throws=false; void Update(){++updates;budget=s_maxEmitterChannels.GetInteger();if(throws)throw std::runtime_error("world failure");} float CurrentRumbleAmplitude(){return 0;} };
 struct idSoundSystemLocal { idSoundHardware_OpenAL hardware; bool muted=false,needsRestart=false; World* currentSoundWorld=nullptr; int soundTime=0,restarts=0;
-	bool IsMuted() const{return muted;} void Render(); void Restart(){++restarts;} };
+	bool IsMuted() const{return muted;} void Render(); void Restart(){++restarts;}
+	int RealSoundTime() const; void MixCapture(bool){CHECK(false);} };
 idSoundSystemLocal soundSystemLocal; idSoundSystemLocal* soundSystem=&soundSystemLocal;
 struct Session {World* sw=nullptr;} sessionValue; Session* session=&sessionValue;
 static void Sound_UpdateControllerRumble(float){}
@@ -70,6 +73,9 @@ static void Sound_UpdateControllerRumble(float){}
 // the settings transaction's provider calls at the Render boundary.
 static void SoundVoiceChat_Render(){}
 static int Sys_Milliseconds(){return 2000;}
+// No capture runs here, so Render keeps the real-time clock and never mixes capture slices.
+static bool Sound_CaptureActive(){return false;}
+int idSoundSystemLocal::RealSoundTime() const{return Sys_Milliseconds();}
 static bool mainThread=true; bool SDL_IsMainThread(){return mainThread;}
 static int automaticMonitor=0;
 void idSoundHardware_OpenAL::Init(){CHECK(!SoundSettings_BlockAutomaticRestart());}

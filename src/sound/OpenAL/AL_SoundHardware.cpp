@@ -31,6 +31,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../snd_local.h"
 #include "../VoiceChat.h"
 #include "../SoundSettings.h"
+#include "../SoundResampler.h"
 #if defined(USE_DOOMCLASSIC)
 	#include "../../../doomclassic/doom/i_sound.h"
 #endif
@@ -41,7 +42,7 @@ idCVar s_meterPosition( "s_meterPosition", "100 100 20 200", CVAR_ARCHIVE, "VU m
 idCVar s_device( "s_device", "-1", CVAR_INTEGER | CVAR_ARCHIVE, "Which audio device to use (listDevices to list, -1 for default)" );
 idCVar s_showPerfData( "s_showPerfData", "0", CVAR_BOOL, "Show sound backend performance data" );
 idCVar s_outputLimiter( "s_outputLimiter", "1", CVAR_ARCHIVE | CVAR_BOOL, "soft-limit the final mix so loud scenes compress instead of clipping" );
-idCVar s_resampler( "s_resampler", "auto", CVAR_ARCHIVE, "OpenAL resampler for every voice: auto (an 11th order sinc when the runtime has one), default (the runtime's own), or a name or number from listResamplers; takes effect on s_restart" );
+idCVar s_resampler( "s_resampler", "auto", CVAR_ARCHIVE, "OpenAL resampler for every voice: auto (a 23rd order sinc when the runtime has one, which keeps the treble of 22 kHz sounds), default (the runtime's own, brighter and grittier), or a name or number from listResamplers; takes effect on s_restart" );
 extern idCVar s_useEAXReverb;
 idCVar s_reverbIdleSlots( "s_reverbIdleSlots", "1", CVAR_SOUND | CVAR_BOOL, "let an area reverb slot no voice has fed for longer than its tail hold the null effect, which the OpenAL mixer skips; 0 keeps all four reverbs running" );
 idCVar s_reverbPanStep( "s_reverbPanStep", "0.05", CVAR_SOUND | CVAR_FLOAT, "while the view turns, resend a reverb slot's panning only once it moved this far (0.05 is about 3 degrees); it settles exactly when the view stops. 0 resends every change", 0.0f, 0.5f );
@@ -1469,9 +1470,10 @@ static const char* openQ4_ResamplerName( openq4_alGetStringiSOFT_t getStringi, c
 openQ4_SelectResampler
 
 Quake 4 recorded 4762 of its 5737 sounds at 22.05 kHz, so nearly every voice is
-upsampled about 2.2x to a 48 kHz device. A short polyphase sinc keeps the images
-above 11 kHz out of the mix; the runtime's own default is a 4-point
-interpolator. Returns -1 to leave the runtime default in place.
+upsampled about 2.2x to a 48 kHz device. A polyphase sinc keeps the images above
+11 kHz out of the mix, and it has to be long enough to keep the sounds' own
+treble: SoundResamplerAutoChoice has the measurements. Returns -1 to leave the
+runtime default in place.
 ========================
 */
 static ALint openQ4_SelectResampler( idStr& chosenName )
@@ -1502,21 +1504,13 @@ static ALint openQ4_SelectResampler( idStr& chosenName )
 	}
 	if( request.Icmp( "auto" ) == 0 )
 	{
-		for( ALint i = 0; i < count && chosen < 0; i++ )
+		idList<const char*> names;
+		names.SetNum( count );
+		for( ALint i = 0; i < count; i++ )
 		{
-			const idStr name = openQ4_ResamplerName( getStringi, i );
-			if( name.Find( "11th order Sinc", false ) >= 0 && name.Find( "fast", false ) < 0 )
-			{
-				chosen = i;
-			}
+			names[i] = openQ4_ResamplerName( getStringi, i );
 		}
-		for( ALint i = 0; i < count && chosen < 0; i++ )
-		{
-			if( idStr( openQ4_ResamplerName( getStringi, i ) ).Find( "Sinc", false ) >= 0 )
-			{
-				chosen = i;
-			}
-		}
+		chosen = SoundResamplerAutoChoice( names.Ptr(), count );
 	}
 	else if( request.IsNumeric() )
 	{

@@ -232,7 +232,7 @@ These are on by default and rarely need changing. Each takes effect after `s_res
 
 - `s_sourceRadiusScale 0.5`: gives each sound a size, so standing next to a machine or a fire surrounds you instead of jumping from ear to ear as you turn, and your own footsteps and weapons play evenly. `0` makes every positioned sound a point.
 - `s_directStereo 1`: music and other stereo sounds play straight to your speakers or headphones instead of through 3D headphone audio, which narrowed and quietened them.
-- `s_resampler auto`: most Quake 4 sounds are recorded at 22 kHz; `auto` upsamples them with a high-quality filter for cleaner high frequencies. `default` keeps OpenAL's own, and `listResamplers` lists the choices.
+- `s_resampler auto`: most Quake 4 sounds are recorded at 22 kHz and are converted to your sound device's rate as they play. `auto` uses a long filter that keeps their full treble and adds no distortion. `default` uses OpenAL's own short one, which is a little brighter and grittier, closer to the original game's mixer. `listResamplers` lists every choice.
 - `s_outputLimiter 1`: loud scenes compress instead of clipping.
 - `s_airAbsorption 1`: distant sounds lose a little treble, as each room's reverb sets.
 

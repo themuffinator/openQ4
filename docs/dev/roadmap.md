@@ -7656,6 +7656,15 @@ the non-verbal remainder is marked for players rather than counted as covered.
   synthetic input. The retail half therefore waits for a person to focus its window,
   and it has not run focused yet. Close this item when it passes.
   [Rendered comparison](audio-modernization.md#rendered-retail-comparison-13-november-2026).
+  November 27, rendered spectrum: a player reported dull, low-quality sounds.
+  Known signals played through the mixer showed the 11th order sinc that
+  `s_resampler auto` chose cutting 22.05 kHz sounds by 9 dB at 8 kHz and 18 dB at
+  9 kHz. `auto` now picks the 23rd order sinc (-0.2 dB and -3.8 dB), and
+  `sound_resampler.py` pins the choice and its response on the OpenAL library.
+  The dry path, reverb, air absorption and limiter measured clean. Retail's
+  mixer repeated samples, which is brighter and adds images; the levels above
+  do not compare that, and the focused retail run still decides this item.
+  [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
 - [ ] **AUD-02 — P1, qualification: physical device and timing lifecycle.** Test
   default/selected endpoint loss and return, hotplug, pause/resume/slow motion,
   cinematics, map/restart and long sessions on target OSes. Verify audible output,
@@ -7837,6 +7846,11 @@ the non-verbal remainder is marked for players rather than counted as covered.
   remaining gate is one run of that harness on a 5.1/7.1 endpoint, plus
   listening on speakers; real endpoint loss and hotplug stay with AUD-02.
   [Real-endpoint evidence](audio-voice-evidence.md#real-playback-endpoints-13-november-2026).
+  November 27: OpenAL Soft's built-in HRTF measures -7 dB at 125 Hz and a 15 dB
+  notch at 8 kHz on positional sounds, and `s_openALHRTF 0` lets the runtime
+  turn it on for any endpoint Windows calls headphones. Whether HRTF becomes
+  opt-in is an open product decision; the default is unchanged.
+  [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
 - [ ] **AUD-05 — P1, implementation: functional multiplayer voice.** Capture,
   codec, transport and playback are implemented with explicit microphone consent,
   push-to-talk, local-only testing, connection-scoped mute, server moderation and

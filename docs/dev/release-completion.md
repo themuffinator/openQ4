@@ -12,6 +12,30 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Sounds get their treble back, 27 November 2026
+
+- **Weapons, creatures, voices and ambience sound clearer.** Most Quake 4
+  sounds are recorded at 22 kHz and are converted to your sound device's rate as
+  they play. The filter openQ4 has used for that since 0.14.1 was too short: it
+  removed most of what those sounds have above 6 kHz (9 dB at 8 kHz, 18 dB at
+  9 kHz), which made them dull, as if heavily compressed. The game now uses a
+  longer filter that keeps them intact up to 8 kHz and most of the way to their
+  limit, still without adding distortion. Music and other 44 kHz sounds gain
+  their top octave back too.
+- **Nothing to change.** `s_resampler auto`, the default, picks the new filter
+  after an update. If you set `s_resampler` yourself, your choice is kept.
+  `s_resampler default` gives a slightly brighter, grittier sound closer to the
+  original game's mixer, and `listResamplers` lists every choice.
+- Reported by a player as sounds seeming compressed or low in quality.
+- Evidence: test signals played through the hidden game and captured from the
+  mix show the old filter's loss and the new one's flat response; 371 stock
+  sounds lose a median 0.5 dB above 5 kHz now, against 2.9 dB before.
+  `sound_resampler.py` repeats the measurement on the OpenAL library and fails
+  on the old filter. The mix stays within the output limiter at the default
+  volume in Air Defense's opening battle. Nobody has listened to it yet: the
+  check is measured, on rendered output.
+  [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
+
 ## Alt+Tab out of Fullscreen and Borderless is instant, 27 November 2026
 
 - **Switching away from the game no longer takes a moment in Fullscreen or
