@@ -2212,4 +2212,12 @@
 	"#str_233510"	"Nessun runtime VR installato"
 	"#str_233511"	"Nessun visore VR ha risposto"
 	"#str_233512"	"Visore VR trovato: scegli una Modalità VR per usarlo"
+	"#str_233560"	"Indicatori di stato"
+	"#str_233561"	"Sui polsi;HUD"
+	"#str_233562"	"Salute e armatura sul polso della mano libera e munizioni su quello della mano armata, oppure tutto l'HUD davanti agli occhi."
+	"#str_233563"	"NUOVO OBIETTIVO"
+	"#str_233564"	"OBIETTIVO COMPLETATO"
+	"#str_233565"	"RICARICA"
+	"#str_233566"	"MUNIZIONI ESAURITE"
+	"#str_233567"	"BOSS"
 }

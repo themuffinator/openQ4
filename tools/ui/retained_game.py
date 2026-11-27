@@ -121,7 +121,8 @@ SECTIONS = (
     # On and off settings are toggles here as everywhere else; the stock
     # page listed them as Disabled and Enabled.
     # VR Mode is Off, On or Automatic (VR-08); the two buttons under it open
-    # VR SETUP and look for a headset whatever the mode.
+    # VR SETUP and look for a headset whatever the mode. Status Display puts
+    # health, armor and ammunition on the wrists or the whole HUD in front.
     ("vr", "#str_230120", (
         choice("game_vr", "#str_230121", "vr_enable", "#str_233505", (0, 1, 2)),
         ("opener", "game_vrsetup", "#str_233506", VR_SETUP_SHOW, None),
@@ -139,6 +140,8 @@ SECTIONS = (
         toggle("game_vrcrouch", "#str_230139", "vr_physicalCrouch"),
         choice("game_vrplayspace", "#str_231760", "vr_playSpace", "#str_231761", (0, 1, 2)),
         choice("game_vrbody", "#str_232514", "vr_body", "#str_232515", (0, 1, 2)),
+        # Status Display (VR-09): on the wrists (vr_hudMode 1) or the whole HUD in front
+        choice("game_vrhud", "#str_233560", "vr_hudMode", "#str_233561", (1, 0)),
     )),
     # Stereoscopic 3D without a headset (r_stereo3D, docs/user/stereoscopic-3d.md),
     # under the VR rows on VIRTUAL REALITY's second column.

@@ -2203,4 +2203,12 @@
 	"#str_233510"	"Nenhum runtime de RV instalado"
 	"#str_233511"	"Nenhum headset de RV respondeu"
 	"#str_233512"	"Headset de RV encontrado: escolha um Modo RV para usá-lo"
+	"#str_233560"	"Exibição de Status"
+	"#str_233561"	"Nos Pulsos;HUD"
+	"#str_233562"	"Saúde e armadura no pulso da mão livre e munição no da mão da arma, ou todo o HUD à frente dos seus olhos."
+	"#str_233563"	"NOVO OBJETIVO"
+	"#str_233564"	"OBJETIVO CONCLUÍDO"
+	"#str_233565"	"RECARREGAR"
+	"#str_233566"	"SEM MUNIÇÃO"
+	"#str_233567"	"CHEFE"
 }

@@ -2203,4 +2203,12 @@
 	"#str_233510"	"Keine VR-Laufzeit installiert"
 	"#str_233511"	"Kein VR-Headset hat geantwortet"
 	"#str_233512"	"VR-Headset gefunden: wähle einen VR-Modus, um es zu nutzen"
+	"#str_233560"	"Statusanzeige"
+	"#str_233561"	"An den Handgelenken;HUD"
+	"#str_233562"	"Gesundheit und Rüstung am Handgelenk der freien Hand, Munition an dem der Waffenhand, oder das ganze HUD vor deinen Augen."
+	"#str_233563"	"NEUES ZIEL"
+	"#str_233564"	"ZIEL ERREICHT"
+	"#str_233565"	"NACHLADEN"
+	"#str_233566"	"KEINE MUNITION"
+	"#str_233567"	"BOSS"
 }

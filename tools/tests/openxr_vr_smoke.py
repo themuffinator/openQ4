@@ -92,9 +92,10 @@ ROOT = Path(__file__).resolve().parents[2]
 POINTER_RIGHT_M = 0.0
 POINTER_UP_M = round((0.5 - 64.0 / 720.0) * 3.0 * 9.0 / 16.0, 3)
 SCREEN_WIDTH_M = 3.0
-# A frame that shows the HUD: the eyes, the HUD before them and, with
-# vr_hudMode 1 (the default, VR-09), its status band on the off-hand wrist.
-HUD_LAYERS = (("projection", "quad"), ("projection", "quad", "quad"))
+# A frame that shows the HUD: the eyes and the HUD's layer before them. With
+# vr_hudMode 1 (the default, VR-09) the wrist displays draw in the eyes and
+# the layer carries only what stays in front of them.
+HUD_LAYERS = (("projection", "quad"),)
 
 # The test runtime's eyes (OpenXRTestRuntime.cpp EyeFov, TR_IPD): signed
 # angles of each frustum, and their separation in metres.

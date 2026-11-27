@@ -39,6 +39,41 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   No phone, tablet, Steam Deck or desktop touchscreen has been used by hand.
   Contract: [ui/interface-variants.md](ui/interface-variants.md).
 
+## Health on one wrist, ammunition on the other, no HUD in VR, 27 November 2026
+
+- **No HUD in front of you in a headset.** Your health and armor show on
+  your off-hand wrist and your ammunition on your weapon hand's, each a
+  small display turned towards your face, in clear figures beside the HUD's
+  own icons. The weapon wrist shows the magazine in large figures with the
+  rest you carry under it, one count for a weapon without a magazine and the
+  infinity sign for the blaster and gauntlet, turning amber when low and red
+  with RELOAD or NO AMMO when empty; the new weapon's name shows for a moment
+  after a change. The off-hand wrist pulses red below a quarter of your
+  health, and shows your air under water, a boss's health, powerups, a
+  carried flag and the latest pickups and objective notices.
+- **Only what you must see stays in front:** captions, red arcs round the
+  middle of your view pointing to each hit, the weapon wheel while open, a
+  vehicle's or turret's own HUD, and multiplayer's scores, timer and chat.
+- **Prefer the HUD?** Settings > Game Options > Virtual Reality > **Status
+  Display** (also in VR SETUP) switches between **On Wrists** and **HUD**.
+  Left-handed play swaps the wrists; the Strogg HUD's colours follow after
+  the Stroggification; The Awakening and multiplayer work the same.
+- **What to do.** Nothing. If you had set `vr_wristWidth`, its range is now
+  6 to 20 cm for each display.
+- Not yet checked on a real headset: legibility at arm's length, where the
+  displays sit, and how the hit arcs feel (VR headset checklist 8.13 to 8.18).
+- Development: `src/game/VRWristDisplay.cpp` draws both displays into each eye
+  over its 3D pass (projected like the aim marker, so they fuse at the
+  wrist's depth), from stock icons and the UI's localized text shaper
+  (`uiManager->BuildHudText`); `idPlayer::GetVRWristStatus` reads what the
+  HUD reads; the stock HUD keeps its state but is not drawn
+  (`VRWrist_HudOnWrists`), and the objective notices go to the wrist unless
+  the objectives are open or failed. The engine's HUD-band crop and wrist
+  quad layer are gone. Decisions in `src/game/VRWristCore.h` with native
+  tests (`VRWristCoreTest.cpp`); captures with
+  `tools/tests/openxr_vr_wrist_smoke.py`. No game API, save or network
+  change. Strings `#str_233560`-`#str_233567`.
+
 ## VR menus from your hand and a HUD on your wrist, 27 November 2026
 
 - **Menus grow out of your off hand.** Press the menu button during play and
@@ -55,7 +90,7 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **Your HUD on your wrist.** Health, armor and ammunition ride on your
   off-hand wrist; glance at it as at a watch. Notices, messages and
   objective updates stay before your eyes. `vr_hudMode 0` brings the whole
-  HUD back in front.
+  HUD back in front. (Superseded the same day by the wrist displays above.)
 - **What to do.** Nothing; your bindings are unchanged.
 - Inspiration: Half-Life: Alyx's hand-held menus and wrist readouts (ideas
   only; nothing taken from it).

@@ -8,6 +8,7 @@
 
 #include "Game_local.h"
 #include "gamesys/HudPrimitives.h"
+#include "VRWristDisplay.h"
 
 #include "ai/AI.h"
 #include "ai/AI_Manager.h"
@@ -5415,7 +5416,11 @@ void idPlayer::DrawHUD( idUserInterface *_hud ) {
 				// TODO: Find a way to get bracket text from gui to hud
 			}
 		}		
-		DrawHudWithStatusBar( _hud );
+		// openQ4 VR: with the status on the wrists (vr_hudMode 1) the stock HUD
+		// keeps its state but is not drawn; the weapon wheel still is (VR-09)
+		if ( !VRWrist_HudOnWrists() ) {
+			DrawHudWithStatusBar( _hud );
+		}
 		if ( !gameLocal.isMultiplayer ) {
 			DrawWeaponWheel();
 		}
@@ -5960,6 +5965,9 @@ bool idPlayer::GiveItem( idItem *item, bool updateHud ) {
 		hud->SetStateString ( "itemtext", common->GetLocalizedString( langToken ) );
 		hud->SetStateString ( "itemicon", item->spawnArgs.GetString( "inv_icon" ) );
 		hud->HandleNamedEvent ( "itemPickup" );
+		if ( this == gameLocal.GetLocalPlayer() ) {
+			VRWrist_NotePickup( common->GetLocalizedString( langToken ), item->spawnArgs.GetString( "inv_icon" ) );
+		}
 	}
 //RITUAL BEGIN
 	if ( updateHud && gameLocal.mpGame.IsBuyingAllowedInTheCurrentGameMode() )
@@ -7004,6 +7012,9 @@ bool idPlayer::GiveInventoryItem( idDict *item, bool updateHud ) {
 		hud->SetStateString ( "itemtext", itemName );
 		hud->SetStateString ( "itemicon", item->GetString( "inv_icon" ) );
 		hud->HandleNamedEvent ( "itemPickup" );
+		if ( this == gameLocal.GetLocalPlayer() ) {
+			VRWrist_NotePickup( itemName, item->GetString( "inv_icon" ) );
+		}
 	}
 	
 	return true;
@@ -7108,6 +7119,7 @@ void idPlayer::GiveObjective( const char *title, const char *text, const char *s
 	}
 	if ( showNewObjectives ) {
 		ShowObjective( "newObjective" );
+		VRWrist_NoteObjective( info.title.c_str(), false );
 	}
 	if ( objectiveSystem ) {
 		if ( objectiveSystemOpen ) {
@@ -7146,6 +7158,7 @@ void idPlayer::CompleteObjective( const char *title ) {
 		objectiveSystem->SetStateString( "oq4_done_title", title );
 	}
 	ShowObjective( "newObjectiveComplete" );
+	VRWrist_NoteObjective( title, true );
 
 	if ( objectiveSystemOpen ) {
 		objectiveSystemOpen = false;
@@ -15507,6 +15520,93 @@ bool idPlayer::GetVRHandPose( int hand, idVec3 &palm, idMat3 &aimAxis ) const {
 		VR_PoseToWorld( pose, eyeOrigin, trackingYaw, palm, gripAxis );
 	}
 	return true;
+}
+
+/*
+===============
+idPlayer::GetVRWristStatus
+
+openQ4 VR-09: what the wrist displays show (VRWristDisplay.h), read where
+the HUD reads it.
+===============
+*/
+void idPlayer::GetVRWristStatus( vrWristStatus_t &status ) {
+	// as the HUD's own gates: the wrists hide where the status bar would
+	const bool arenaPresentation = gameLocal.isMultiplayer && gameLocal.mpGame.ArenaCampaignPresentationActive();
+	status.valid = health > 0 && !spectating && !IsInVehicle() && !gameLocal.GetCamera() && !privateCameraView
+		&& influenceActive == INFLUENCE_NONE && !disableHud && g_showHud.GetBool() && !arenaPresentation
+		&& !gameDebug.IsHudActive( DBGHUD_ANY );
+	status.strogg = hud != NULL && idStr::FindText( hud->Name(), "strogg", false ) >= 0;
+	status.health = Max( 0, health );
+	status.maxHealth = Max( 1, inventory.maxHealth );
+	status.armor = Max( 0, inventory.armor );
+	status.maxArmor = Max( 1, inventory.maxarmor );
+	status.air = idMath::ClampInt( 0, 100, GetAirReadoutPercent() );
+	status.boss = -1.0f;
+	if ( bossEnemy.GetEntity() != NULL && bossEnemy->health > 0 && hud != NULL ) {
+		const int bossMax = hud->State().GetInt( "boss_maxhealth", "0" );
+		if ( bossMax > 0 ) {
+			status.boss = idMath::ClampFloat( 0.0f, 1.0f, static_cast<float>( bossEnemy->health ) / bossMax );
+		}
+	}
+
+	status.hasWeapon = weapon != NULL;
+	status.weaponIndex = currentWeapon;
+	status.weaponIcon = NULL;
+	status.weaponName.Clear();
+	status.infinite = false;
+	status.usesClip = false;
+	status.clip = status.clipSize = status.reserve = status.total = status.maxAmmo = 0;
+	if ( weapon != NULL ) {
+		const char *icon = weapon->GetIcon();
+		status.weaponIcon = icon != NULL && icon[0] ? declManager->FindMaterial( icon, false ) : NULL;
+		const idDeclEntityDef *def = GetWeaponDef( currentWeapon );
+		if ( def != NULL ) {
+			status.weaponName = common->GetLocalizedString( def->dict.GetString( "inv_name" ) );
+		}
+		// as UpdateHudAmmo counts it
+		const int inClip = weapon->AmmoInClip();
+		const int available = weapon->AmmoAvailable();
+		status.infinite = available < 0;
+		status.usesClip = !status.infinite && weapon->ClipSize() > 0 && !gameLocal.isMultiplayer;
+		status.clip = inClip;
+		status.clipSize = weapon->ClipSize();
+		status.reserve = weapon->ClipSize() == 1 ? available : available - inClip;
+		status.total = available;
+		status.maxAmmo = weapon->GetMaxAmmo();
+	}
+
+	status.powerups = 0;
+	status.flag = false;
+	for ( int i = 0; i < POWERUP_MAX; i++ ) {
+		if ( !( inventory.powerups & ( 1 << i ) ) || ( inventory.powerupEndTime[i] <= gameLocal.time && inventory.powerupEndTime[i] != -1 ) ) {
+			continue;
+		}
+		if ( i == POWERUP_CTF_MARINEFLAG || i == POWERUP_CTF_STROGGFLAG || i == POWERUP_CTF_ONEFLAG ) {
+			status.flag = true;
+			continue;
+		}
+		const idDeclEntityDef *def = GetPowerupDef( i );
+		if ( def == NULL || status.powerups >= VR_WRIST_MAX_POWERUPS ) {
+			continue;
+		}
+		status.powerupIcon[status.powerups] = declManager->FindMaterial( def->dict.GetString( "inv_icon" ), false );
+		status.powerupSeconds[status.powerups] = inventory.powerupEndTime[i] == -1 ? -1 :
+			static_cast<int>( MS2SEC( inventory.powerupEndTime[i] - gameLocal.time ) ) + 1;
+		status.powerups++;
+	}
+
+	status.hitTime = hudHitDirTime;
+	status.hitDirection = lastDamageDir;
+}
+
+/*
+===============
+idPlayer::VRObjectivesInFront
+===============
+*/
+bool idPlayer::VRObjectivesInFront( void ) const {
+	return objectiveSystemOpen || pfl.objectiveFailed;
 }
 
 /*

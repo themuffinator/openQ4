@@ -2259,4 +2259,12 @@
 	"#str_233510"	"Nie zainstalowano środowiska VR"
 	"#str_233511"	"Żadne gogle VR nie odpowiedziały"
 	"#str_233512"	"Znaleziono gogle VR: wybierz tryb VR, aby ich użyć"
+	"#str_233560"	"Wyświetlanie stanu"
+	"#str_233561"	"Na nadgarstkach;HUD"
+	"#str_233562"	"Zdrowie i pancerz na nadgarstku wolnej ręki, amunicja na nadgarstku ręki z bronią, albo cały HUD przed oczami."
+	"#str_233563"	"NOWY CEL"
+	"#str_233564"	"CEL WYKONANY"
+	"#str_233565"	"PRZEŁADUJ"
+	"#str_233566"	"BRAK AMUNICJI"
+	"#str_233567"	"BOSS"
 }

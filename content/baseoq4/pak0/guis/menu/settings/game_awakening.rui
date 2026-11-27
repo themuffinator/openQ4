@@ -65,6 +65,7 @@
   "cvar.vr_physicalCrouch": {"type": "boolean", "initial": false, "cvar": "vr_physicalCrouch"},
   "cvar.vr_playSpace": {"type": "number", "initial": 0, "cvar": "vr_playSpace"},
   "cvar.vr_body": {"type": "number", "initial": 0, "cvar": "vr_body"},
+  "cvar.vr_hudMode": {"type": "number", "initial": 0, "cvar": "vr_hudMode"},
   "cvar.r_stereo3D": {"type": "number", "initial": 0, "cvar": "r_stereo3D"},
   "cvar.r_stereoSeparation": {"type": "number", "initial": 0, "cvar": "r_stereoSeparation"},
   "cvar.r_stereoConvergence": {"type": "number", "initial": 0, "cvar": "r_stereoConvergence"},
@@ -377,6 +378,11 @@
    "operation": "settings.player.set",
    "input": "number",
    "arguments": {"cvar": "vr_body", "value": {"input": "value"}}
+  },
+  "set.vr_hudMode": {
+   "operation": "settings.player.set",
+   "input": "number",
+   "arguments": {"cvar": "vr_hudMode", "value": {"input": "value"}}
   },
   "set.r_stereo3D": {
    "operation": "settings.player.set",
@@ -1402,6 +1408,21 @@
   {
    "id": "game_vrbody.opacity",
    "node": "game_vrbody",
+   "property": "opacity",
+   "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.vr_enable"}, 0]}, 1, 0.4]}
+  },
+  {
+   "id": "game_vrhud.enabled",
+   "node": "game_vrhud",
+   "property": "enabled",
+   "value": {
+    "op": "&&",
+    "args": [{"op": "==", "args": [{"state": "page.tab"}, 4]}, {"op": "!=", "args": [{"state": "cvar.vr_enable"}, 0]}]
+   }
+  },
+  {
+   "id": "game_vrhud.opacity",
+   "node": "game_vrhud",
    "property": "opacity",
    "value": {"op": "select", "args": [{"op": "!=", "args": [{"state": "cvar.vr_enable"}, 0]}, 1, 0.4]}
   },
@@ -53180,18 +53201,18 @@
    }
   },
   {
-   "id": "tall.game-vr-head-1-8.width",
-   "node": "game-vr-head-1-8",
+   "id": "tall.game_vrhud.width",
+   "node": "game_vrhud",
    "property": "width",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     837.5488,
+     880.5,
      {
       "op": "*",
       "args": [
-       409.5,
+       430.5,
        {
         "op": "max",
         "args": [
@@ -53205,8 +53226,8 @@
    }
   },
   {
-   "id": "tall.game-vr-head-1-8.height",
-   "node": "game-vr-head-1-8",
+   "id": "tall.game_vrhud.height",
+   "node": "game_vrhud",
    "property": "height",
    "value": {
     "op": "select",
@@ -53230,18 +53251,18 @@
    }
   },
   {
-   "id": "tall.game-vr-head-1-8.padding-left",
-   "node": "game-vr-head-1-8",
-   "property": "padding-left",
+   "id": "tall.game_vrhud-focus.width",
+   "node": "game_vrhud-focus",
+   "property": "width",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     42.9512,
+     8.1812,
      {
       "op": "*",
       "args": [
-       21.0,
+       4,
        {
         "op": "max",
         "args": [
@@ -53255,8 +53276,108 @@
    }
   },
   {
-   "id": "tall.game-vr-head-1-8.font-size",
-   "node": "game-vr-head-1-8",
+   "id": "tall.game_vrhud-focus.height",
+   "node": "game_vrhud-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-head.left",
+   "node": "game_vrhud-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {
+      "op": "*",
+      "args": [
+       21,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-head.width",
+   "node": "game_vrhud-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     345.6551,
+     {
+      "op": "*",
+      "args": [
+       169,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-head.height",
+   "node": "game_vrhud-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-label.font-size",
+   "node": "game_vrhud-label",
    "property": "font-size",
    "value": {
     "op": "select",
@@ -53286,8 +53407,706 @@
    }
   },
   {
-   "id": "tall.game-vr-head-1-8.line-height",
-   "node": "game-vr-head-1-8",
+   "id": "tall.game_vrhud-label.line-height",
+   "node": "game_vrhud-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         13.0,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-value.left",
+   "node": "game_vrhud-value",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {
+      "op": "*",
+      "args": [
+       198,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-value.width",
+   "node": "game_vrhud-value",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     418.2631,
+     {
+      "op": "*",
+      "args": [
+       204.5,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-value.height",
+   "node": "game_vrhud-value",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-value.font-size",
+   "node": "game_vrhud-value",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         14,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-value.line-height",
+   "node": "game_vrhud-value",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [73.6307, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         36.0,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-chevron.left",
+   "node": "game_vrhud-chevron",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     831.4129,
+     {
+      "op": "*",
+      "args": [
+       406.5,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-chevron.top",
+   "node": "game_vrhud-chevron",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     30.6794,
+     {
+      "op": "*",
+      "args": [
+       15.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-chevron.width",
+   "node": "game_vrhud-chevron",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     24.5436,
+     {
+      "op": "*",
+      "args": [
+       12,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-chevron.height",
+   "node": "game_vrhud-chevron",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     12.2718,
+     {
+      "op": "*",
+      "args": [
+       6,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-viewport.margin-left",
+   "node": "game_vrhud-viewport",
+   "property": "margin-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {
+      "op": "*",
+      "args": [
+       2,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-viewport.margin-top",
+   "node": "game_vrhud-viewport",
+   "property": "margin-top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     4.0906,
+     {
+      "op": "*",
+      "args": [
+       2,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-option-0.height",
+   "node": "game_vrhud-option-0",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {
+      "op": "*",
+      "args": [
+       22.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-option-0-label.padding-left",
+   "node": "game_vrhud-option-0-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {
+      "op": "*",
+      "args": [
+       8,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-option-0-label.font-size",
+   "node": "game_vrhud-option-0-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         15,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-option-0-label.line-height",
+   "node": "game_vrhud-option-0-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         22.0,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-option-1.height",
+   "node": "game_vrhud-option-1",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     44.9965,
+     {
+      "op": "*",
+      "args": [
+       22.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-option-1-label.padding-left",
+   "node": "game_vrhud-option-1-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {
+      "op": "*",
+      "args": [
+       8,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-option-1-label.font-size",
+   "node": "game_vrhud-option-1-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [30.6794, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         15,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-option-1-label.line-height",
+   "node": "game_vrhud-option-1-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [44.9965, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         22.0,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-scroll-track.width",
+   "node": "game_vrhud-scroll-track",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {
+      "op": "*",
+      "args": [
+       8,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game_vrhud-scroll-thumb.width",
+   "node": "game_vrhud-scroll-thumb",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     16.3624,
+     {
+      "op": "*",
+      "args": [
+       8,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-9.width",
+   "node": "game-vr-head-1-9",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     837.5488,
+     {
+      "op": "*",
+      "args": [
+       409.5,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-9.height",
+   "node": "game-vr-head-1-9",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-9.padding-left",
+   "node": "game-vr-head-1-9",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {
+      "op": "*",
+      "args": [
+       21.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-9.font-size",
+   "node": "game-vr-head-1-9",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         14,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.game-vr-head-1-9.line-height",
+   "node": "game-vr-head-1-9",
    "property": "line-height",
    "value": {
     "op": "select",
@@ -65568,6 +66387,150 @@
    ]
   },
   {
+   "id": "game_vrhud.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "game_vrhud-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_vrhud-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_vrhud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhud.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "game_vrhud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_vrhud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "game_vrhud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhud.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "game_vrhud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_vrhud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_vrhud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhud.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "game_vrhud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_vrhud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_vrhud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_vrhud.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "game_vrhud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_vrhud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_vrhud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
    "id": "game_stereo3d.default",
    "durationMs": 300,
    "tracks": [
@@ -67872,6 +68835,150 @@
    ]
   },
   {
+   "id": "vrsetup_hud.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vrsetup_hud.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vrsetup_hud.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vrsetup_hud.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vrsetup_hud.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
    "id": "vrSetupModal_close.default",
    "durationMs": 300,
    "tracks": [
@@ -68239,8 +69346,8 @@
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
       {"atMs": 900.0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
-      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 403.05, 1, 1, 0]}},
-      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 403.05, 1, 1, 0]}}
+      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 439.05, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 439.05, 1, 1, 0]}}
      ]
     },
     {
@@ -151948,12 +153055,565 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_stereo3d", "up": "game_vrplayspace", "left": "game_vrmove", "right": "game_vrbody"},
+                 "navigation": {"down": "game_vrhud", "up": "game_vrplayspace", "left": "game_vrmove", "right": "game_vrbody"},
                  "tooltip": "#str_233062"
                 }
                },
                {
-                "id": "game-vr-head-1-8",
+                "id": "game_vrhud",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "game_vrhud-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhud-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhud-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhud-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 169, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_vrhud-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_233560"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhud-value",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_230030"},
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 204.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]},
+                   "white-space": {"type": "keyword", "value": "nowrap"},
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
+                  }
+                 },
+                 {
+                  "id": "game_vrhud-chevron",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 406.5, "unit": "dp"},
+                   "top": {"type": "length", "value": 15.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 12, "unit": "dp"},
+                   "height": {"type": "length", "value": 6, "unit": "dp"}
+                  },
+                  "paths": [
+                   {
+                    "id": "chevron",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.5}, {"fraction": 1.0}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.0}, {"fraction": 0.0}]]}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_vrhud-popup",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 190, "unit": "dp"},
+                   "top": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 228.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 48.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_vrhud-popup-frame",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "rim",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                       "widthDp": 4,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "body",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0.2627, 0.6686, 0.8039, 0.2]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "game_vrhud-viewport",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "width": {"type": "length", "value": 210.5, "unit": "dp"},
+                     "height": {"type": "length", "value": 44.0, "unit": "dp"},
+                     "margin-left": {"type": "length", "value": 2, "unit": "dp"},
+                     "margin-top": {"type": "length", "value": 2, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "game_vrhud-content",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "children": [
+                       {
+                        "id": "game_vrhud-option-0",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "game_vrhud-option-0-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_vrhud-option-0-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_vrhud-option-0-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_233561"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       },
+                       {
+                        "id": "game_vrhud-option-1",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "game_vrhud-option-1-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_vrhud-option-1-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "game_vrhud-option-1-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_233561"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "id": "game_vrhud-scroll-track",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 216.5, "unit": "dp"},
+                     "top": {"type": "length", "value": 2, "unit": "dp"},
+                     "width": {"type": "length", "value": 8, "unit": "dp"},
+                     "height": {"type": "length", "value": 44.0, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "game_vrhud-scroll-trough",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "trough",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.375}, {"fraction": 0.0}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 0.0}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 1}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.375}, {"fraction": 1}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.12]}}
+                       }
+                      ]
+                     },
+                     {
+                      "id": "game_vrhud-scroll-thumb",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 8, "unit": "dp"},
+                       "height": {"type": "length", "value": 24, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "game_vrhud-scroll-ink",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "paths": [
+                         {
+                          "id": "thumb",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[{"fraction": 0.125}, {"fraction": 0.0}]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 0.0}]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[{"fraction": 0.125}, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.9]}}
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "choice",
+                 "label": "#str_233560",
+                 "action": "set.vr_hudMode",
+                 "value": {"state": "cvar.vr_hudMode"},
+                 "states": {
+                  "default": "game_vrhud.default",
+                  "hover": "game_vrhud.hover",
+                  "focus": "game_vrhud.focus",
+                  "pressed": "game_vrhud.pressed",
+                  "disabled": "game_vrhud.disabled"
+                 },
+                 "parts": {
+                  "popup": "game_vrhud-popup",
+                  "viewport": "game_vrhud-viewport",
+                  "content": "game_vrhud-content",
+                  "value": "game_vrhud-value"
+                 },
+                 "visibleRows": 2,
+                 "options": [
+                  {
+                   "id": "game_vrhud-option-0",
+                   "node": "game_vrhud-option-0",
+                   "label": "#str_233561",
+                   "value": 1,
+                   "parts": {
+                    "label": "game_vrhud-option-0-label",
+                    "selected": "game_vrhud-option-0-selected",
+                    "highlight": "game_vrhud-option-0-highlight"
+                   },
+                   "labelIndex": 0
+                  },
+                  {
+                   "id": "game_vrhud-option-1",
+                   "node": "game_vrhud-option-1",
+                   "label": "#str_233561",
+                   "value": 0,
+                   "parts": {
+                    "label": "game_vrhud-option-1-label",
+                    "selected": "game_vrhud-option-1-selected",
+                    "highlight": "game_vrhud-option-1-highlight"
+                   },
+                   "labelIndex": 1
+                  }
+                 ],
+                 "placementBounds": "screen",
+                 "scrollbar": {"track": "game_vrhud-scroll-track", "thumb": "game_vrhud-scroll-thumb", "lineStep": 22.0, "minimumThumb": 24},
+                 "navigation": {"down": "game_stereo3d", "up": "game_vrbody", "left": "game_vrmove", "right": "game_vrhud"},
+                 "tooltip": "#str_233562"
+                }
+               },
+               {
+                "id": "game-vr-head-1-9",
                 "type": "text",
                 "properties": {
                  "text": {"type": "text", "value": "#str_232920"},
@@ -152888,7 +154548,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_stereodepth", "up": "game_vrbody", "left": "game_vrmove", "right": "game_stereo3d"},
+                 "navigation": {"down": "game_stereodepth", "up": "game_vrhud", "left": "game_vrmove", "right": "game_stereo3d"},
                  "tooltip": "#str_233063"
                 }
                },
@@ -157452,9 +159112,9 @@
         "properties": {
          "position": {"type": "keyword", "value": "absolute"},
          "left": {"type": "length", "value": 235.0, "unit": "dp"},
-         "top": {"type": "length", "value": 158.55, "unit": "dp"},
+         "top": {"type": "length", "value": 140.55, "unit": "dp"},
          "width": {"type": "length", "value": 490.0, "unit": "dp"},
-         "height": {"type": "length", "value": 403.05, "unit": "dp"}
+         "height": {"type": "length", "value": 439.05, "unit": "dp"}
         },
         "children": [
          {
@@ -157465,7 +159125,7 @@
            "left": {"type": "length", "value": 0, "unit": "dp"},
            "top": {"type": "length", "value": -130.5, "unit": "dp"},
            "width": {"type": "length", "value": 490.0, "unit": "dp"},
-           "height": {"type": "length", "value": 695.55, "unit": "dp"},
+           "height": {"type": "length", "value": 731.55, "unit": "dp"},
            "opacity": {"type": "number", "value": 0},
            "display": {"type": "keyword", "value": "block"}
           },
@@ -157504,7 +159164,7 @@
            "left": {"type": "length", "value": -16.0, "unit": "dp"},
            "top": {"type": "length", "value": -40.0, "unit": "dp"},
            "width": {"type": "length", "value": 522.0, "unit": "dp"},
-           "height": {"type": "length", "value": 483.05, "unit": "dp"},
+           "height": {"type": "length", "value": 519.05, "unit": "dp"},
            "opacity": {"type": "number", "value": 0},
            "display": {"type": "keyword", "value": "none"}
           },
@@ -157524,10 +159184,10 @@
              "to": [0, {"fraction": 1}],
              "stops": [
               {"at": 0, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0]}},
-              {"at": 0.0828, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.5]}},
-              {"at": 0.403, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.9]}},
-              {"at": 0.6478, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.9]}},
-              {"at": 0.9172, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.5]}},
+              {"at": 0.0771, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.5]}},
+              {"at": 0.4035, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.9]}},
+              {"at": 0.6431, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.9]}},
+              {"at": 0.9229, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.5]}},
               {"at": 1, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0]}}
              ]
             },
@@ -157581,7 +159241,7 @@
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
              "width": {"type": "length", "value": 490.0, "unit": "dp"},
-             "height": {"type": "length", "value": 403.05, "unit": "dp"},
+             "height": {"type": "length", "value": 439.05, "unit": "dp"},
              "opacity": {"type": "number", "value": 0.35}
             },
             "paths": [
@@ -157599,13 +159259,13 @@
                {"id": "p8", "op": "line", "points": [[487.301, 45.562]]},
                {"id": "p9", "op": "line", "points": [[487.301, 93.562]]},
                {"id": "p10", "op": "line", "points": [[483.301, 97.562]]},
-               {"id": "p11", "op": "line", "points": [[483.301, 397.706]]},
-               {"id": "p12", "op": "line", "points": [[425.301, 397.706]]},
-               {"id": "p13", "op": "line", "points": [[419.301, 391.706]]},
-               {"id": "p14", "op": "line", "points": [[343.301, 391.706]]},
-               {"id": "p15", "op": "line", "points": [[337.301, 397.706]]},
-               {"id": "p16", "op": "line", "points": [[44.699, 397.706]]},
-               {"id": "p17", "op": "line", "points": [[6.699, 359.706]]},
+               {"id": "p11", "op": "line", "points": [[483.301, 433.706]]},
+               {"id": "p12", "op": "line", "points": [[425.301, 433.706]]},
+               {"id": "p13", "op": "line", "points": [[419.301, 427.706]]},
+               {"id": "p14", "op": "line", "points": [[343.301, 427.706]]},
+               {"id": "p15", "op": "line", "points": [[337.301, 433.706]]},
+               {"id": "p16", "op": "line", "points": [[44.699, 433.706]]},
+               {"id": "p17", "op": "line", "points": [[6.699, 395.706]]},
                {"id": "close", "op": "close"}
               ],
               "stroke": {
@@ -157660,10 +159320,10 @@
             "type": "group",
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
-             "left": {"type": "length", "value": -84.234, "unit": "dp"},
-             "top": {"type": "length", "value": -127.709, "unit": "dp"},
-             "width": {"type": "length", "value": 658.468, "unit": "dp"},
-             "height": {"type": "length", "value": 658.468, "unit": "dp"},
+             "left": {"type": "length", "value": -95.962, "unit": "dp"},
+             "top": {"type": "length", "value": -121.437, "unit": "dp"},
+             "width": {"type": "length", "value": 681.924, "unit": "dp"},
+             "height": {"type": "length", "value": 681.924, "unit": "dp"},
              "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
             },
             "children": [
@@ -157674,32 +159334,32 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 0, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 658.468, "unit": "dp"},
-               "height": {"type": "length", "value": 658.468, "unit": "dp"},
+               "width": {"type": "length", "value": 681.924, "unit": "dp"},
+               "height": {"type": "length", "value": 681.924, "unit": "dp"},
                "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
               },
               "paths": [
                {
                 "id": "line",
                 "commands": [
-                 {"id": "p0", "op": "move", "points": [[90.933, 131.271]]},
-                 {"id": "p1", "op": "line", "points": [[97.632, 131.271]]},
-                 {"id": "p2", "op": "line", "points": [[114.632, 148.271]]},
-                 {"id": "p3", "op": "line", "points": [[438.562, 148.271]]},
-                 {"id": "p4", "op": "line", "points": [[455.562, 131.271]]},
-                 {"id": "p5", "op": "line", "points": [[554.535, 131.271]]},
-                 {"id": "p6", "op": "line", "points": [[567.535, 144.271]]},
-                 {"id": "p7", "op": "line", "points": [[567.535, 169.271]]},
-                 {"id": "p8", "op": "line", "points": [[571.535, 173.271]]},
-                 {"id": "p9", "op": "line", "points": [[571.535, 221.271]]},
-                 {"id": "p10", "op": "line", "points": [[567.535, 225.271]]},
-                 {"id": "p11", "op": "line", "points": [[567.535, 525.415]]},
-                 {"id": "p12", "op": "line", "points": [[509.535, 525.415]]},
-                 {"id": "p13", "op": "line", "points": [[503.535, 519.415]]},
-                 {"id": "p14", "op": "line", "points": [[427.535, 519.415]]},
-                 {"id": "p15", "op": "line", "points": [[421.535, 525.415]]},
-                 {"id": "p16", "op": "line", "points": [[128.933, 525.415]]},
-                 {"id": "p17", "op": "line", "points": [[90.933, 487.415]]},
+                 {"id": "p0", "op": "move", "points": [[102.661, 124.999]]},
+                 {"id": "p1", "op": "line", "points": [[109.36, 124.999]]},
+                 {"id": "p2", "op": "line", "points": [[126.36, 141.999]]},
+                 {"id": "p3", "op": "line", "points": [[450.29, 141.999]]},
+                 {"id": "p4", "op": "line", "points": [[467.29, 124.999]]},
+                 {"id": "p5", "op": "line", "points": [[566.263, 124.999]]},
+                 {"id": "p6", "op": "line", "points": [[579.263, 137.999]]},
+                 {"id": "p7", "op": "line", "points": [[579.263, 162.999]]},
+                 {"id": "p8", "op": "line", "points": [[583.263, 166.999]]},
+                 {"id": "p9", "op": "line", "points": [[583.263, 214.999]]},
+                 {"id": "p10", "op": "line", "points": [[579.263, 218.999]]},
+                 {"id": "p11", "op": "line", "points": [[579.263, 555.143]]},
+                 {"id": "p12", "op": "line", "points": [[521.263, 555.143]]},
+                 {"id": "p13", "op": "line", "points": [[515.263, 549.143]]},
+                 {"id": "p14", "op": "line", "points": [[439.263, 549.143]]},
+                 {"id": "p15", "op": "line", "points": [[433.263, 555.143]]},
+                 {"id": "p16", "op": "line", "points": [[140.661, 555.143]]},
+                 {"id": "p17", "op": "line", "points": [[102.661, 517.143]]},
                  {"id": "close", "op": "close"}
                 ],
                 "stroke": {
@@ -157719,16 +159379,16 @@
               {
                "id": "first",
                "commands": [
-                {"id": "p0", "op": "move", "points": [[329.234, 329.234]]},
-                {"id": "p1", "op": "line", "points": [[124.104, 46.897]]},
-                {"id": "p2", "op": "line", "points": [[221.391, -2.673]]},
-                {"id": "p3", "op": "line", "points": [[329.234, -19.754]]},
+                {"id": "p0", "op": "move", "points": [[340.962, 340.962]]},
+                {"id": "p1", "op": "line", "points": [[128.525, 48.567]]},
+                {"id": "p2", "op": "line", "points": [[229.277, -2.769]]},
+                {"id": "p3", "op": "line", "points": [[340.962, -20.458]]},
                 {"id": "close", "op": "close"}
                ],
                "fill": {
                 "type": "linear",
-                "from": [124.104, 46.897],
-                "to": [329.234, -19.754],
+                "from": [128.525, 48.567],
+                "to": [340.962, -20.458],
                 "stops": [
                  {"at": 0, "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0]}},
                  {"at": 0.72, "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.5019607843137255]}},
@@ -157744,10 +159404,10 @@
             "type": "group",
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
-             "left": {"type": "length", "value": -84.234, "unit": "dp"},
-             "top": {"type": "length", "value": -127.709, "unit": "dp"},
-             "width": {"type": "length", "value": 658.468, "unit": "dp"},
-             "height": {"type": "length", "value": 658.468, "unit": "dp"},
+             "left": {"type": "length", "value": -95.962, "unit": "dp"},
+             "top": {"type": "length", "value": -121.437, "unit": "dp"},
+             "width": {"type": "length", "value": 681.924, "unit": "dp"},
+             "height": {"type": "length", "value": 681.924, "unit": "dp"},
              "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
             },
             "children": [
@@ -157758,32 +159418,32 @@
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 0, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 658.468, "unit": "dp"},
-               "height": {"type": "length", "value": 658.468, "unit": "dp"},
+               "width": {"type": "length", "value": 681.924, "unit": "dp"},
+               "height": {"type": "length", "value": 681.924, "unit": "dp"},
                "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
               },
               "paths": [
                {
                 "id": "line",
                 "commands": [
-                 {"id": "p0", "op": "move", "points": [[90.933, 131.271]]},
-                 {"id": "p1", "op": "line", "points": [[97.632, 131.271]]},
-                 {"id": "p2", "op": "line", "points": [[114.632, 148.271]]},
-                 {"id": "p3", "op": "line", "points": [[438.562, 148.271]]},
-                 {"id": "p4", "op": "line", "points": [[455.562, 131.271]]},
-                 {"id": "p5", "op": "line", "points": [[554.535, 131.271]]},
-                 {"id": "p6", "op": "line", "points": [[567.535, 144.271]]},
-                 {"id": "p7", "op": "line", "points": [[567.535, 169.271]]},
-                 {"id": "p8", "op": "line", "points": [[571.535, 173.271]]},
-                 {"id": "p9", "op": "line", "points": [[571.535, 221.271]]},
-                 {"id": "p10", "op": "line", "points": [[567.535, 225.271]]},
-                 {"id": "p11", "op": "line", "points": [[567.535, 525.415]]},
-                 {"id": "p12", "op": "line", "points": [[509.535, 525.415]]},
-                 {"id": "p13", "op": "line", "points": [[503.535, 519.415]]},
-                 {"id": "p14", "op": "line", "points": [[427.535, 519.415]]},
-                 {"id": "p15", "op": "line", "points": [[421.535, 525.415]]},
-                 {"id": "p16", "op": "line", "points": [[128.933, 525.415]]},
-                 {"id": "p17", "op": "line", "points": [[90.933, 487.415]]},
+                 {"id": "p0", "op": "move", "points": [[102.661, 124.999]]},
+                 {"id": "p1", "op": "line", "points": [[109.36, 124.999]]},
+                 {"id": "p2", "op": "line", "points": [[126.36, 141.999]]},
+                 {"id": "p3", "op": "line", "points": [[450.29, 141.999]]},
+                 {"id": "p4", "op": "line", "points": [[467.29, 124.999]]},
+                 {"id": "p5", "op": "line", "points": [[566.263, 124.999]]},
+                 {"id": "p6", "op": "line", "points": [[579.263, 137.999]]},
+                 {"id": "p7", "op": "line", "points": [[579.263, 162.999]]},
+                 {"id": "p8", "op": "line", "points": [[583.263, 166.999]]},
+                 {"id": "p9", "op": "line", "points": [[583.263, 214.999]]},
+                 {"id": "p10", "op": "line", "points": [[579.263, 218.999]]},
+                 {"id": "p11", "op": "line", "points": [[579.263, 555.143]]},
+                 {"id": "p12", "op": "line", "points": [[521.263, 555.143]]},
+                 {"id": "p13", "op": "line", "points": [[515.263, 549.143]]},
+                 {"id": "p14", "op": "line", "points": [[439.263, 549.143]]},
+                 {"id": "p15", "op": "line", "points": [[433.263, 555.143]]},
+                 {"id": "p16", "op": "line", "points": [[140.661, 555.143]]},
+                 {"id": "p17", "op": "line", "points": [[102.661, 517.143]]},
                  {"id": "close", "op": "close"}
                 ],
                 "stroke": {
@@ -157803,16 +159463,16 @@
               {
                "id": "second",
                "commands": [
-                {"id": "p0", "op": "move", "points": [[329.234, 329.234]]},
-                {"id": "p1", "op": "line", "points": [[534.364, 611.571]]},
-                {"id": "p2", "op": "line", "points": [[437.077, 661.141]]},
-                {"id": "p3", "op": "line", "points": [[329.234, 678.222]]},
+                {"id": "p0", "op": "move", "points": [[340.962, 340.962]]},
+                {"id": "p1", "op": "line", "points": [[553.399, 633.357]]},
+                {"id": "p2", "op": "line", "points": [[452.647, 684.693]]},
+                {"id": "p3", "op": "line", "points": [[340.962, 702.382]]},
                 {"id": "close", "op": "close"}
                ],
                "fill": {
                 "type": "linear",
-                "from": [534.364, 611.571],
-                "to": [329.234, 678.222],
+                "from": [553.399, 633.357],
+                "to": [340.962, 702.382],
                 "stops": [
                  {"at": 0, "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0]}},
                  {"at": 0.72, "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.5019607843137255]}},
@@ -157833,7 +159493,7 @@
            "left": {"type": "length", "value": 0, "unit": "dp"},
            "top": {"type": "length", "value": 0, "unit": "dp"},
            "width": {"type": "length", "value": 490.0, "unit": "dp"},
-           "height": {"type": "length", "value": 403.05, "unit": "dp"},
+           "height": {"type": "length", "value": 439.05, "unit": "dp"},
            "opacity": {"type": "number", "value": 0}
           },
           "paths": [
@@ -157852,15 +159512,15 @@
              {"id": "p8", "op": "line", "points": [[487.301, 45.562]]},
              {"id": "p9", "op": "line", "points": [[487.301, 93.562]]},
              {"id": "p10", "op": "line", "points": [[483.301, 97.562]]},
-             {"id": "p11", "op": "line", "points": [[483.301, 397.706]]},
-             {"id": "p12", "op": "line", "points": [[425.301, 397.706]]},
-             {"id": "p13", "op": "line", "points": [[419.301, 391.706]]},
-             {"id": "p14", "op": "line", "points": [[343.301, 391.706]]},
-             {"id": "p15", "op": "line", "points": [[337.301, 397.706]]},
-             {"id": "p16", "op": "line", "points": [[44.699, 397.706]]},
-             {"id": "ch0", "op": "line", "points": [[6.699, 397.706]]},
-             {"id": "ch1", "op": "cubic", "points": [[15.811, 395.264], [24.12, 390.467], [30.79, 383.797]]},
-             {"id": "ch2", "op": "line", "points": [[6.699, 359.706]]},
+             {"id": "p11", "op": "line", "points": [[483.301, 433.706]]},
+             {"id": "p12", "op": "line", "points": [[425.301, 433.706]]},
+             {"id": "p13", "op": "line", "points": [[419.301, 427.706]]},
+             {"id": "p14", "op": "line", "points": [[343.301, 427.706]]},
+             {"id": "p15", "op": "line", "points": [[337.301, 433.706]]},
+             {"id": "p16", "op": "line", "points": [[44.699, 433.706]]},
+             {"id": "ch0", "op": "line", "points": [[6.699, 433.706]]},
+             {"id": "ch1", "op": "cubic", "points": [[15.811, 431.264], [24.12, 426.467], [30.79, 419.797]]},
+             {"id": "ch2", "op": "line", "points": [[6.699, 395.706]]},
              {"id": "close", "op": "close"}
             ],
             "fill": {"type": "solid", "color": {"type": "color", "value": [0.0157, 0.0549, 0.102, 0.7]}}
@@ -157880,15 +159540,15 @@
              {"id": "p8", "op": "line", "points": [[487.301, 45.562]]},
              {"id": "p9", "op": "line", "points": [[487.301, 93.562]]},
              {"id": "p10", "op": "line", "points": [[483.301, 97.562]]},
-             {"id": "p11", "op": "line", "points": [[483.301, 397.706]]},
-             {"id": "p12", "op": "line", "points": [[425.301, 397.706]]},
-             {"id": "p13", "op": "line", "points": [[419.301, 391.706]]},
-             {"id": "p14", "op": "line", "points": [[343.301, 391.706]]},
-             {"id": "p15", "op": "line", "points": [[337.301, 397.706]]},
-             {"id": "p16", "op": "line", "points": [[44.699, 397.706]]},
-             {"id": "ch0", "op": "line", "points": [[6.699, 397.706]]},
-             {"id": "ch1", "op": "cubic", "points": [[15.811, 395.264], [24.12, 390.467], [30.79, 383.797]]},
-             {"id": "ch2", "op": "line", "points": [[6.699, 359.706]]},
+             {"id": "p11", "op": "line", "points": [[483.301, 433.706]]},
+             {"id": "p12", "op": "line", "points": [[425.301, 433.706]]},
+             {"id": "p13", "op": "line", "points": [[419.301, 427.706]]},
+             {"id": "p14", "op": "line", "points": [[343.301, 427.706]]},
+             {"id": "p15", "op": "line", "points": [[337.301, 433.706]]},
+             {"id": "p16", "op": "line", "points": [[44.699, 433.706]]},
+             {"id": "ch0", "op": "line", "points": [[6.699, 433.706]]},
+             {"id": "ch1", "op": "cubic", "points": [[15.811, 431.264], [24.12, 426.467], [30.79, 419.797]]},
+             {"id": "ch2", "op": "line", "points": [[6.699, 395.706]]},
              {"id": "close", "op": "close"}
             ],
             "stroke": {
@@ -158169,7 +159829,7 @@
              "left": {"type": "length", "value": 29.75, "unit": "dp"},
              "top": {"type": "length", "value": 104.0, "unit": "dp"},
              "width": {"type": "length", "value": 430.5, "unit": "dp"},
-             "height": {"type": "length", "value": 216.0, "unit": "dp"},
+             "height": {"type": "length", "value": 252.0, "unit": "dp"},
              "display": {"type": "keyword", "value": "flex"},
              "flex-direction": {"type": "keyword", "value": "column"}
             },
@@ -160877,6 +162537,562 @@
                 "minimumThumb": 24
                }
               }
+             },
+             {
+              "id": "vrsetup_hud",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "relative"},
+               "display": {"type": "keyword", "value": "block"},
+               "width": {"type": "length", "value": 430.5, "unit": "dp"},
+               "height": {"type": "length", "value": 36.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 1},
+               "flex-shrink": {"type": "number", "value": 0}
+              },
+              "children": [
+               {
+                "id": "vrsetup_hud-plate",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"}
+                },
+                "paths": [
+                 {
+                  "id": "plate",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6, 1]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p4", "op": "line", "points": [[0, 7]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.12]}},
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.32]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "vrsetup_hud-wash",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"},
+                 "opacity": {"type": "number", "value": 0}
+                },
+                "paths": [
+                 {
+                  "id": "wash",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[6, 1]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                   {"id": "p4", "op": "line", "points": [[0, 7]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {
+                   "type": "linear",
+                   "from": [0, 0],
+                   "to": [{"fraction": 1}, 0],
+                   "stops": [
+                    {"at": 0, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.45]}},
+                    {"at": 1, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.1]}}
+                   ]
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "vrsetup_hud-focus",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 4, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 0}
+                },
+                "paths": [
+                 {
+                  "id": "rail",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[0, 7]]},
+                   {"id": "p1", "op": "line", "points": [[6, 1]]},
+                   {"id": "p2", "op": "line", "points": [[6, 35.0]]},
+                   {"id": "p3", "op": "line", "points": [[0, 35.0]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                 }
+                ]
+               },
+               {
+                "id": "vrsetup_hud-head",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 21, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 121.0, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "display": {"type": "keyword", "value": "flex"},
+                 "flex-direction": {"type": "keyword", "value": "row"},
+                 "align-items": {"type": "keyword", "value": "center"}
+                },
+                "children": [
+                 {
+                  "id": "vrsetup_hud-label",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_233560"},
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "flex-shrink": {"type": "number", "value": 1},
+                   "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]},
+                   "white-space": {"type": "keyword", "value": "normal"},
+                   "overflow": {"type": "keyword", "value": "hidden"}
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "vrsetup_hud-value",
+                "type": "text",
+                "properties": {
+                 "text": {"type": "text", "value": "#str_230030"},
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 150.0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 252.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "font-family": {"type": "font", "value": "lowpixel"},
+                 "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                 "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]},
+                 "white-space": {"type": "keyword", "value": "nowrap"},
+                 "overflow": {"type": "keyword", "value": "hidden"},
+                 "text-overflow": {"type": "keyword", "value": "ellipsis"}
+                }
+               },
+               {
+                "id": "vrsetup_hud-chevron",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 406.5, "unit": "dp"},
+                 "top": {"type": "length", "value": 15.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 12, "unit": "dp"},
+                 "height": {"type": "length", "value": 6, "unit": "dp"}
+                },
+                "paths": [
+                 {
+                  "id": "chevron",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[0, 0]]},
+                   {"id": "p1", "op": "line", "points": [[6, 6]]},
+                   {"id": "p2", "op": "line", "points": [[12, 0]]}
+                  ],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]}},
+                   "widthDp": 1.5,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 }
+                ]
+               },
+               {
+                "id": "vrsetup_hud-popup",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 142.0, "unit": "dp"},
+                 "top": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "width": {"type": "length", "value": 276.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 48.0, "unit": "dp"},
+                 "display": {"type": "keyword", "value": "none"}
+                },
+                "children": [
+                 {
+                  "id": "vrsetup_hud-popup-frame",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "rim",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[0, 0]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                     {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                     "widthDp": 4,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   },
+                   {
+                    "id": "body",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[0, 0]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                     {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.2627, 0.6686, 0.8039, 0.2]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "vrsetup_hud-viewport",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "relative"},
+                   "display": {"type": "keyword", "value": "block"},
+                   "width": {"type": "length", "value": 258.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 44.0, "unit": "dp"},
+                   "margin-left": {"type": "length", "value": 2, "unit": "dp"},
+                   "margin-top": {"type": "length", "value": 2, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "vrsetup_hud-content",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "children": [
+                     {
+                      "id": "vrsetup_hud-option-0",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "vrsetup_hud-option-0-selected",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.35]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "vrsetup_hud-option-0-highlight",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "vrsetup_hud-option-0-label",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_233561"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                         "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                         "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.9]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "overflow": {"type": "keyword", "value": "hidden"}
+                        }
+                       }
+                      ]
+                     },
+                     {
+                      "id": "vrsetup_hud-option-1",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "relative"},
+                       "display": {"type": "keyword", "value": "block"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "vrsetup_hud-option-1-selected",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.35]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "vrsetup_hud-option-1-highlight",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"},
+                         "display": {"type": "keyword", "value": "none"}
+                        },
+                        "paths": [
+                         {
+                          "id": "band",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[0, 0]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                         }
+                        ]
+                       },
+                       {
+                        "id": "vrsetup_hud-option-1-label",
+                        "type": "text",
+                        "properties": {
+                         "text": {"type": "text", "value": "#str_233561"},
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                         "font-family": {"type": "font", "value": "lowpixel"},
+                         "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                         "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                         "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.9]},
+                         "white-space": {"type": "keyword", "value": "nowrap"},
+                         "overflow": {"type": "keyword", "value": "hidden"}
+                        }
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 },
+                 {
+                  "id": "vrsetup_hud-scroll-track",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 264.5, "unit": "dp"},
+                   "top": {"type": "length", "value": 2, "unit": "dp"},
+                   "width": {"type": "length", "value": 8, "unit": "dp"},
+                   "height": {"type": "length", "value": 44.0, "unit": "dp"}
+                  },
+                  "children": [
+                   {
+                    "id": "vrsetup_hud-scroll-trough",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "trough",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[3, 0]]},
+                       {"id": "p1", "op": "line", "points": [[5, 0]]},
+                       {"id": "p2", "op": "line", "points": [[5, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[3, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.12]}}
+                     }
+                    ]
+                   },
+                   {
+                    "id": "vrsetup_hud-scroll-thumb",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 8, "unit": "dp"},
+                     "height": {"type": "length", "value": 24, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "vrsetup_hud-scroll-ink",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "thumb",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[1, 0]]},
+                         {"id": "p1", "op": "line", "points": [[7, 0]]},
+                         {"id": "p2", "op": "line", "points": [[7, {"fraction": 1}]]},
+                         {"id": "p3", "op": "line", "points": [[1, {"fraction": 1}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.9]}}
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ]
+               }
+              ],
+              "control": {
+               "role": "choice",
+               "label": "#str_233560",
+               "action": "set.vr_hudMode",
+               "value": {"state": "cvar.vr_hudMode"},
+               "states": {
+                "default": "vrsetup_hud.default",
+                "hover": "vrsetup_hud.hover",
+                "focus": "vrsetup_hud.focus",
+                "pressed": "vrsetup_hud.pressed",
+                "disabled": "vrsetup_hud.disabled"
+               },
+               "parts": {
+                "popup": "vrsetup_hud-popup",
+                "viewport": "vrsetup_hud-viewport",
+                "content": "vrsetup_hud-content",
+                "value": "vrsetup_hud-value"
+               },
+               "visibleRows": 2,
+               "options": [
+                {
+                 "id": "vrsetup_hud-option-0",
+                 "node": "vrsetup_hud-option-0",
+                 "label": "#str_233561",
+                 "value": 1,
+                 "parts": {
+                  "label": "vrsetup_hud-option-0-label",
+                  "selected": "vrsetup_hud-option-0-selected",
+                  "highlight": "vrsetup_hud-option-0-highlight"
+                 },
+                 "labelIndex": 0
+                },
+                {
+                 "id": "vrsetup_hud-option-1",
+                 "node": "vrsetup_hud-option-1",
+                 "label": "#str_233561",
+                 "value": 0,
+                 "parts": {
+                  "label": "vrsetup_hud-option-1-label",
+                  "selected": "vrsetup_hud-option-1-selected",
+                  "highlight": "vrsetup_hud-option-1-highlight"
+                 },
+                 "labelIndex": 1
+                }
+               ],
+               "placementBounds": "screen",
+               "scrollbar": {
+                "track": "vrsetup_hud-scroll-track",
+                "thumb": "vrsetup_hud-scroll-thumb",
+                "lineStep": 22.0,
+                "minimumThumb": 24
+               }
+              }
              }
             ]
            },
@@ -160886,7 +163102,7 @@
             "properties": {
              "position": {"type": "keyword", "value": "absolute"},
              "left": {"type": "length", "value": 30, "unit": "dp"},
-             "top": {"type": "length", "value": 334.05, "unit": "dp"},
+             "top": {"type": "length", "value": 370.05, "unit": "dp"},
              "width": {"type": "length", "value": 210.0, "unit": "dp"},
              "height": {"type": "length", "value": 45, "unit": "dp"}
             },

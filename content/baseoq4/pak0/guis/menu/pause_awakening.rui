@@ -30,6 +30,7 @@
   "cvar.vr_turnMode": {"type": "number", "initial": 0, "cvar": "vr_turnMode"},
   "cvar.vr_leftHanded": {"type": "number", "initial": 0, "cvar": "vr_leftHanded"},
   "cvar.vr_comfortVignette": {"type": "string", "initial": "", "cvar": "vr_comfortVignette"},
+  "cvar.vr_hudMode": {"type": "number", "initial": 0, "cvar": "vr_hudMode"},
   "vrSetupModal.visible": {"type": "boolean", "initial": false},
   "vrSetupModal.contents": {"type": "boolean", "initial": false},
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
@@ -115,6 +116,11 @@
    "operation": "settings.player.set",
    "input": "string",
    "arguments": {"cvar": "vr_comfortVignette", "value": {"input": "value"}}
+  },
+  "set.vr_hudMode": {
+   "operation": "settings.player.set",
+   "input": "number",
+   "arguments": {"cvar": "vr_hudMode", "value": {"input": "value"}}
   },
   "noticeAction0": {"operation": "session.menu", "arguments": {"command": "noticeAction0"}},
   "noticeAction1": {"operation": "session.menu", "arguments": {"command": "noticeAction1"}},
@@ -16960,7 +16966,7 @@
      "op": "select",
      "args": [
       {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 695.55]}]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 731.55]}]},
       0
      ]
     },
@@ -16995,7 +17001,7 @@
      "op": "select",
      "args": [
       {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 483.05]}]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 519.05]}]},
       0
      ]
     },
@@ -17039,7 +17045,7 @@
      "op": "select",
      "args": [
       {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 403.05]}]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 439.05]}]},
       0
      ]
     },
@@ -17081,7 +17087,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -84.234]}, -84.234]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -95.962]}, -95.962]
    }
   },
   {
@@ -17090,7 +17096,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -127.709]}, -127.709]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -121.437]}, -121.437]
    }
   },
   {
@@ -17099,7 +17105,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 658.468]}, 658.468]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 681.924]}, 681.924]
    }
   },
   {
@@ -17108,7 +17114,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 658.468]}, 658.468]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 681.924]}, 681.924]
    }
   },
   {
@@ -17117,7 +17123,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 658.468]}, 658.468]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 681.924]}, 681.924]
    }
   },
   {
@@ -17126,7 +17132,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 658.468]}, 658.468]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 681.924]}, 681.924]
    }
   },
   {
@@ -17135,7 +17141,7 @@
    "property": "left",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -84.234]}, -84.234]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -95.962]}, -95.962]
    }
   },
   {
@@ -17144,7 +17150,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -127.709]}, -127.709]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, -121.437]}, -121.437]
    }
   },
   {
@@ -17153,7 +17159,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 658.468]}, 658.468]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 681.924]}, 681.924]
    }
   },
   {
@@ -17162,7 +17168,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 658.468]}, 658.468]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 681.924]}, 681.924]
    }
   },
   {
@@ -17171,7 +17177,7 @@
    "property": "width",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 658.468]}, 658.468]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 681.924]}, 681.924]
    }
   },
   {
@@ -17180,7 +17186,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 658.468]}, 658.468]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 681.924]}, 681.924]
    }
   },
   {
@@ -17200,7 +17206,7 @@
      "op": "select",
      "args": [
       {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 403.05]}]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 439.05]}]},
       0
      ]
     },
@@ -17782,7 +17788,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 216.0]}, 216.0]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 252.0]}, 252.0]
    }
   },
   {
@@ -19180,6 +19186,292 @@
    }
   },
   {
+   "id": "tall.vrsetup_hud.width",
+   "node": "vrsetup_hud",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 430.5]}, 430.5]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud.height",
+   "node": "vrsetup_hud",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 36.0]}, 36.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-focus.transform",
+   "node": "vrsetup_hud-focus",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 4]}]},
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 36.0]}]},
+      0
+     ]
+    },
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    0
+   ]
+  },
+  {
+   "id": "tall.vrsetup_hud-head.left",
+   "node": "vrsetup_hud-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 21]}, 21]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-head.width",
+   "node": "vrsetup_hud-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 121.0]}, 121.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-head.height",
+   "node": "vrsetup_hud-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 36.0]}, 36.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-label.font-size",
+   "node": "vrsetup_hud-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 14]}, 14]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-label.line-height",
+   "node": "vrsetup_hud-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 13.0]}, 13.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-value.left",
+   "node": "vrsetup_hud-value",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 150.0]}, 150.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-value.width",
+   "node": "vrsetup_hud-value",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 252.5]}, 252.5]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-value.height",
+   "node": "vrsetup_hud-value",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 36.0]}, 36.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-value.font-size",
+   "node": "vrsetup_hud-value",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 14]}, 14]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-value.line-height",
+   "node": "vrsetup_hud-value",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 36.0]}, 36.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-chevron.transform",
+   "node": "vrsetup_hud-chevron",
+   "property": "transform",
+   "value": [
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 12]}]},
+      0
+     ]
+    },
+    {
+     "op": "select",
+     "args": [
+      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
+      {"op": "*", "args": [{"op": "-", "args": [1.6, 1]}, {"op": "*", "args": [0.5, 6]}]},
+      0
+     ]
+    },
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    {"op": "select", "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, 1.6, 1]},
+    0
+   ]
+  },
+  {
+   "id": "tall.vrsetup_hud-chevron.left",
+   "node": "vrsetup_hud-chevron",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 406.5]}, 406.5]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-chevron.top",
+   "node": "vrsetup_hud-chevron",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 15.0]}, 15.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-viewport.margin-left",
+   "node": "vrsetup_hud-viewport",
+   "property": "margin-left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 2]}, 2]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-viewport.margin-top",
+   "node": "vrsetup_hud-viewport",
+   "property": "margin-top",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 2]}, 2]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-option-0.height",
+   "node": "vrsetup_hud-option-0",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 22.0]}, 22.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-option-0-label.padding-left",
+   "node": "vrsetup_hud-option-0-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 8]}, 8]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-option-0-label.font-size",
+   "node": "vrsetup_hud-option-0-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 15]}, 15]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-option-0-label.line-height",
+   "node": "vrsetup_hud-option-0-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 22.0]}, 22.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-option-1.height",
+   "node": "vrsetup_hud-option-1",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 22.0]}, 22.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-option-1-label.padding-left",
+   "node": "vrsetup_hud-option-1-label",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 8]}, 8]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-option-1-label.font-size",
+   "node": "vrsetup_hud-option-1-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 15]}, 15]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-option-1-label.line-height",
+   "node": "vrsetup_hud-option-1-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 22.0]}, 22.0]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-scroll-track.width",
+   "node": "vrsetup_hud-scroll-track",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 8]}, 8]
+   }
+  },
+  {
+   "id": "tall.vrsetup_hud-scroll-thumb.width",
+   "node": "vrsetup_hud-scroll-thumb",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 8]}, 8]
+   }
+  },
+  {
    "id": "tall.vrSetupModal_close.left",
    "node": "vrSetupModal_close",
    "property": "left",
@@ -19194,7 +19486,7 @@
    "property": "top",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 334.05]}, 334.05]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 370.05]}, 370.05]
    }
   },
   {
@@ -19400,7 +19692,7 @@
    "property": "height",
    "value": {
     "op": "select",
-    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 403.05]}, 403.05]
+    "args": [{"op": "<", "args": [{"state": "view.aspect"}, 0.8274]}, {"op": "*", "args": [1.6, 439.05]}, 439.05]
    }
   },
   {
@@ -19411,8 +19703,8 @@
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.8274]},
-     {"op": "+", "args": [360.07500000000005, {"op": "*", "args": [-0.8, 403.05]}]},
-     158.55
+     {"op": "+", "args": [360.07500000000005, {"op": "*", "args": [-0.8, 439.05]}]},
+     140.55
     ]
    }
   },
@@ -26778,6 +27070,150 @@
    ]
   },
   {
+   "id": "vrsetup_hud.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vrsetup_hud.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vrsetup_hud.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vrsetup_hud.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "vrsetup_hud.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "vrsetup_hud-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "vrsetup_hud-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
    "id": "vrSetupModal_close.default",
    "durationMs": 300,
    "tracks": [
@@ -27145,8 +27581,8 @@
      "keys": [
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
       {"atMs": 900.0, "value": {"type": "transform", "unit": "dp", "value": [0, -46.0, 1, 1, 0]}},
-      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 403.05, 1, 1, 0]}},
-      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 403.05, 1, 1, 0]}}
+      {"atMs": 2400.0, "value": {"type": "transform", "unit": "dp", "value": [0, 439.05, 1, 1, 0]}},
+      {"atMs": 7200.0, "value": {"type": "transform", "unit": "dp", "value": [0, 439.05, 1, 1, 0]}}
      ]
     },
     {
@@ -89529,9 +89965,9 @@
           "properties": {
            "position": {"type": "keyword", "value": "absolute"},
            "left": {"type": "length", "value": 235.0, "unit": "dp"},
-           "top": {"type": "length", "value": 158.55, "unit": "dp"},
+           "top": {"type": "length", "value": 140.55, "unit": "dp"},
            "width": {"type": "length", "value": 490.0, "unit": "dp"},
-           "height": {"type": "length", "value": 403.05, "unit": "dp"}
+           "height": {"type": "length", "value": 439.05, "unit": "dp"}
           },
           "children": [
            {
@@ -89542,7 +89978,7 @@
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": -130.5, "unit": "dp"},
              "width": {"type": "length", "value": 490.0, "unit": "dp"},
-             "height": {"type": "length", "value": 695.55, "unit": "dp"},
+             "height": {"type": "length", "value": 731.55, "unit": "dp"},
              "opacity": {"type": "number", "value": 0},
              "display": {"type": "keyword", "value": "block"},
              "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
@@ -89582,7 +90018,7 @@
              "left": {"type": "length", "value": -16.0, "unit": "dp"},
              "top": {"type": "length", "value": -40.0, "unit": "dp"},
              "width": {"type": "length", "value": 522.0, "unit": "dp"},
-             "height": {"type": "length", "value": 483.05, "unit": "dp"},
+             "height": {"type": "length", "value": 519.05, "unit": "dp"},
              "opacity": {"type": "number", "value": 0},
              "display": {"type": "keyword", "value": "none"},
              "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
@@ -89603,10 +90039,10 @@
                "to": [0, {"fraction": 1}],
                "stops": [
                 {"at": 0, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0]}},
-                {"at": 0.0828, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.5]}},
-                {"at": 0.403, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.9]}},
-                {"at": 0.6478, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.9]}},
-                {"at": 0.9172, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.5]}},
+                {"at": 0.0771, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.5]}},
+                {"at": 0.4035, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.9]}},
+                {"at": 0.6431, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.9]}},
+                {"at": 0.9229, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0.5]}},
                 {"at": 1, "color": {"type": "color", "value": [0.0824, 0.298, 0.3686, 0]}}
                ]
               },
@@ -89660,7 +90096,7 @@
                "left": {"type": "length", "value": 0, "unit": "dp"},
                "top": {"type": "length", "value": 0, "unit": "dp"},
                "width": {"type": "length", "value": 490.0, "unit": "dp"},
-               "height": {"type": "length", "value": 403.05, "unit": "dp"},
+               "height": {"type": "length", "value": 439.05, "unit": "dp"},
                "opacity": {"type": "number", "value": 0.35},
                "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
               },
@@ -89679,13 +90115,13 @@
                  {"id": "p8", "op": "line", "points": [[487.301, 45.562]]},
                  {"id": "p9", "op": "line", "points": [[487.301, 93.562]]},
                  {"id": "p10", "op": "line", "points": [[483.301, 97.562]]},
-                 {"id": "p11", "op": "line", "points": [[483.301, 397.706]]},
-                 {"id": "p12", "op": "line", "points": [[425.301, 397.706]]},
-                 {"id": "p13", "op": "line", "points": [[419.301, 391.706]]},
-                 {"id": "p14", "op": "line", "points": [[343.301, 391.706]]},
-                 {"id": "p15", "op": "line", "points": [[337.301, 397.706]]},
-                 {"id": "p16", "op": "line", "points": [[44.699, 397.706]]},
-                 {"id": "p17", "op": "line", "points": [[6.699, 359.706]]},
+                 {"id": "p11", "op": "line", "points": [[483.301, 433.706]]},
+                 {"id": "p12", "op": "line", "points": [[425.301, 433.706]]},
+                 {"id": "p13", "op": "line", "points": [[419.301, 427.706]]},
+                 {"id": "p14", "op": "line", "points": [[343.301, 427.706]]},
+                 {"id": "p15", "op": "line", "points": [[337.301, 433.706]]},
+                 {"id": "p16", "op": "line", "points": [[44.699, 433.706]]},
+                 {"id": "p17", "op": "line", "points": [[6.699, 395.706]]},
                  {"id": "close", "op": "close"}
                 ],
                 "stroke": {
@@ -89740,10 +90176,10 @@
               "type": "group",
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
-               "left": {"type": "length", "value": -84.234, "unit": "dp"},
-               "top": {"type": "length", "value": -127.709, "unit": "dp"},
-               "width": {"type": "length", "value": 658.468, "unit": "dp"},
-               "height": {"type": "length", "value": 658.468, "unit": "dp"},
+               "left": {"type": "length", "value": -95.962, "unit": "dp"},
+               "top": {"type": "length", "value": -121.437, "unit": "dp"},
+               "width": {"type": "length", "value": 681.924, "unit": "dp"},
+               "height": {"type": "length", "value": 681.924, "unit": "dp"},
                "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
               },
               "children": [
@@ -89754,32 +90190,32 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 0, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 658.468, "unit": "dp"},
-                 "height": {"type": "length", "value": 658.468, "unit": "dp"},
+                 "width": {"type": "length", "value": 681.924, "unit": "dp"},
+                 "height": {"type": "length", "value": 681.924, "unit": "dp"},
                  "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                 },
                 "paths": [
                  {
                   "id": "line",
                   "commands": [
-                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.13809782707739784}, {"fraction": 0.19935820723254585}]]},
-                   {"id": "p1", "op": "line", "points": [[{"fraction": 0.148271442196128}, {"fraction": 0.19935820723254585}]]},
-                   {"id": "p2", "op": "line", "points": [[{"fraction": 0.17408894585613882}, {"fraction": 0.22517571089255667}]]},
-                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.6660338847142154}, {"fraction": 0.22517571089255667}]]},
-                   {"id": "p4", "op": "line", "points": [[{"fraction": 0.6918513883742263}, {"fraction": 0.19935820723254585}]]},
-                   {"id": "p5", "op": "line", "points": [[{"fraction": 0.8421593760061233}, {"fraction": 0.19935820723254585}]]},
-                   {"id": "p6", "op": "line", "points": [[{"fraction": 0.8619021729226022}, {"fraction": 0.2191010041490247}]]},
-                   {"id": "p7", "op": "line", "points": [[{"fraction": 0.8619021729226022}, {"fraction": 0.2570679212960994}]]},
-                   {"id": "p8", "op": "line", "points": [[{"fraction": 0.8679768796661341}, {"fraction": 0.2631426280396314}]]},
-                   {"id": "p9", "op": "line", "points": [[{"fraction": 0.8679768796661341}, {"fraction": 0.33603910896201483}]]},
-                   {"id": "p10", "op": "line", "points": [[{"fraction": 0.8619021729226022}, {"fraction": 0.34211381570554683}]]},
-                   {"id": "p11", "op": "line", "points": [[{"fraction": 0.8619021729226022}, {"fraction": 0.7979355109132107}]]},
-                   {"id": "p12", "op": "line", "points": [[{"fraction": 0.7738189251413888}, {"fraction": 0.7979355109132107}]]},
-                   {"id": "p13", "op": "line", "points": [[{"fraction": 0.764706865026091}, {"fraction": 0.7888234507979127}]]},
-                   {"id": "p14", "op": "line", "points": [[{"fraction": 0.6492874368989838}, {"fraction": 0.7888234507979127}]]},
-                   {"id": "p15", "op": "line", "points": [[{"fraction": 0.6401753767836859}, {"fraction": 0.7979355109132107}]]},
-                   {"id": "p16", "op": "line", "points": [[{"fraction": 0.19580754114095142}, {"fraction": 0.7979355109132107}]]},
-                   {"id": "p17", "op": "line", "points": [[{"fraction": 0.13809782707739784}, {"fraction": 0.7402257968496572}]]},
+                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.15054610191165}, {"fraction": 0.18330341797619676}]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 0.16036977727723326}, {"fraction": 0.18330341797619676}]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 0.18529924155771024}, {"fraction": 0.20823288225667377}]]},
+                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.660322851226823}, {"fraction": 0.20823288225667377}]]},
+                   {"id": "p4", "op": "line", "points": [[{"fraction": 0.6852523155073}, {"fraction": 0.18330341797619676}]]},
+                   {"id": "p5", "op": "line", "points": [[{"fraction": 0.8303901901091618}, {"fraction": 0.18330341797619676}]]},
+                   {"id": "p6", "op": "line", "points": [[{"fraction": 0.8494538980883501}, {"fraction": 0.20236712595538506}]]},
+                   {"id": "p7", "op": "line", "points": [[{"fraction": 0.8494538980883501}, {"fraction": 0.23902810283843948}]]},
+                   {"id": "p8", "op": "line", "points": [[{"fraction": 0.8553196543896388}, {"fraction": 0.2448938591397282}]]},
+                   {"id": "p9", "op": "line", "points": [[{"fraction": 0.8553196543896388}, {"fraction": 0.31528293475519265}]]},
+                   {"id": "p10", "op": "line", "points": [[{"fraction": 0.8494538980883501}, {"fraction": 0.32114869105648136}]]},
+                   {"id": "p11", "op": "line", "points": [[{"fraction": 0.8494538980883501}, {"fraction": 0.8140833875915792}]]},
+                   {"id": "p12", "op": "line", "points": [[{"fraction": 0.7644004317196639}, {"fraction": 0.8140833875915792}]]},
+                   {"id": "p13", "op": "line", "points": [[{"fraction": 0.7556017972677308}, {"fraction": 0.8052847531396461}]]},
+                   {"id": "p14", "op": "line", "points": [[{"fraction": 0.6441524275432453}, {"fraction": 0.8052847531396461}]]},
+                   {"id": "p15", "op": "line", "points": [[{"fraction": 0.6353537930913122}, {"fraction": 0.8140833875915792}]]},
+                   {"id": "p16", "op": "line", "points": [[{"fraction": 0.2062707867738927}, {"fraction": 0.8140833875915792}]]},
+                   {"id": "p17", "op": "line", "points": [[{"fraction": 0.15054610191165}, {"fraction": 0.7583587027293365}]]},
                    {"id": "close", "op": "close"}
                   ],
                   "stroke": {
@@ -89799,16 +90235,16 @@
                 {
                  "id": "first",
                  "commands": [
-                  {"id": "p0", "op": "move", "points": [[329.234, 329.234]]},
-                  {"id": "p1", "op": "line", "points": [[124.104, 46.897]]},
-                  {"id": "p2", "op": "line", "points": [[221.391, -2.673]]},
-                  {"id": "p3", "op": "line", "points": [[329.234, -19.754]]},
+                  {"id": "p0", "op": "move", "points": [[340.962, 340.962]]},
+                  {"id": "p1", "op": "line", "points": [[128.525, 48.567]]},
+                  {"id": "p2", "op": "line", "points": [[229.277, -2.769]]},
+                  {"id": "p3", "op": "line", "points": [[340.962, -20.458]]},
                   {"id": "close", "op": "close"}
                  ],
                  "fill": {
                   "type": "linear",
-                  "from": [124.104, 46.897],
-                  "to": [329.234, -19.754],
+                  "from": [128.525, 48.567],
+                  "to": [340.962, -20.458],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0]}},
                    {"at": 0.72, "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.5019607843137255]}},
@@ -89824,10 +90260,10 @@
               "type": "group",
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
-               "left": {"type": "length", "value": -84.234, "unit": "dp"},
-               "top": {"type": "length", "value": -127.709, "unit": "dp"},
-               "width": {"type": "length", "value": 658.468, "unit": "dp"},
-               "height": {"type": "length", "value": 658.468, "unit": "dp"},
+               "left": {"type": "length", "value": -95.962, "unit": "dp"},
+               "top": {"type": "length", "value": -121.437, "unit": "dp"},
+               "width": {"type": "length", "value": 681.924, "unit": "dp"},
+               "height": {"type": "length", "value": 681.924, "unit": "dp"},
                "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
               },
               "children": [
@@ -89838,32 +90274,32 @@
                  "position": {"type": "keyword", "value": "absolute"},
                  "left": {"type": "length", "value": 0, "unit": "dp"},
                  "top": {"type": "length", "value": 0, "unit": "dp"},
-                 "width": {"type": "length", "value": 658.468, "unit": "dp"},
-                 "height": {"type": "length", "value": 658.468, "unit": "dp"},
+                 "width": {"type": "length", "value": 681.924, "unit": "dp"},
+                 "height": {"type": "length", "value": 681.924, "unit": "dp"},
                  "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
                 },
                 "paths": [
                  {
                   "id": "line",
                   "commands": [
-                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.13809782707739784}, {"fraction": 0.19935820723254585}]]},
-                   {"id": "p1", "op": "line", "points": [[{"fraction": 0.148271442196128}, {"fraction": 0.19935820723254585}]]},
-                   {"id": "p2", "op": "line", "points": [[{"fraction": 0.17408894585613882}, {"fraction": 0.22517571089255667}]]},
-                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.6660338847142154}, {"fraction": 0.22517571089255667}]]},
-                   {"id": "p4", "op": "line", "points": [[{"fraction": 0.6918513883742263}, {"fraction": 0.19935820723254585}]]},
-                   {"id": "p5", "op": "line", "points": [[{"fraction": 0.8421593760061233}, {"fraction": 0.19935820723254585}]]},
-                   {"id": "p6", "op": "line", "points": [[{"fraction": 0.8619021729226022}, {"fraction": 0.2191010041490247}]]},
-                   {"id": "p7", "op": "line", "points": [[{"fraction": 0.8619021729226022}, {"fraction": 0.2570679212960994}]]},
-                   {"id": "p8", "op": "line", "points": [[{"fraction": 0.8679768796661341}, {"fraction": 0.2631426280396314}]]},
-                   {"id": "p9", "op": "line", "points": [[{"fraction": 0.8679768796661341}, {"fraction": 0.33603910896201483}]]},
-                   {"id": "p10", "op": "line", "points": [[{"fraction": 0.8619021729226022}, {"fraction": 0.34211381570554683}]]},
-                   {"id": "p11", "op": "line", "points": [[{"fraction": 0.8619021729226022}, {"fraction": 0.7979355109132107}]]},
-                   {"id": "p12", "op": "line", "points": [[{"fraction": 0.7738189251413888}, {"fraction": 0.7979355109132107}]]},
-                   {"id": "p13", "op": "line", "points": [[{"fraction": 0.764706865026091}, {"fraction": 0.7888234507979127}]]},
-                   {"id": "p14", "op": "line", "points": [[{"fraction": 0.6492874368989838}, {"fraction": 0.7888234507979127}]]},
-                   {"id": "p15", "op": "line", "points": [[{"fraction": 0.6401753767836859}, {"fraction": 0.7979355109132107}]]},
-                   {"id": "p16", "op": "line", "points": [[{"fraction": 0.19580754114095142}, {"fraction": 0.7979355109132107}]]},
-                   {"id": "p17", "op": "line", "points": [[{"fraction": 0.13809782707739784}, {"fraction": 0.7402257968496572}]]},
+                   {"id": "p0", "op": "move", "points": [[{"fraction": 0.15054610191165}, {"fraction": 0.18330341797619676}]]},
+                   {"id": "p1", "op": "line", "points": [[{"fraction": 0.16036977727723326}, {"fraction": 0.18330341797619676}]]},
+                   {"id": "p2", "op": "line", "points": [[{"fraction": 0.18529924155771024}, {"fraction": 0.20823288225667377}]]},
+                   {"id": "p3", "op": "line", "points": [[{"fraction": 0.660322851226823}, {"fraction": 0.20823288225667377}]]},
+                   {"id": "p4", "op": "line", "points": [[{"fraction": 0.6852523155073}, {"fraction": 0.18330341797619676}]]},
+                   {"id": "p5", "op": "line", "points": [[{"fraction": 0.8303901901091618}, {"fraction": 0.18330341797619676}]]},
+                   {"id": "p6", "op": "line", "points": [[{"fraction": 0.8494538980883501}, {"fraction": 0.20236712595538506}]]},
+                   {"id": "p7", "op": "line", "points": [[{"fraction": 0.8494538980883501}, {"fraction": 0.23902810283843948}]]},
+                   {"id": "p8", "op": "line", "points": [[{"fraction": 0.8553196543896388}, {"fraction": 0.2448938591397282}]]},
+                   {"id": "p9", "op": "line", "points": [[{"fraction": 0.8553196543896388}, {"fraction": 0.31528293475519265}]]},
+                   {"id": "p10", "op": "line", "points": [[{"fraction": 0.8494538980883501}, {"fraction": 0.32114869105648136}]]},
+                   {"id": "p11", "op": "line", "points": [[{"fraction": 0.8494538980883501}, {"fraction": 0.8140833875915792}]]},
+                   {"id": "p12", "op": "line", "points": [[{"fraction": 0.7644004317196639}, {"fraction": 0.8140833875915792}]]},
+                   {"id": "p13", "op": "line", "points": [[{"fraction": 0.7556017972677308}, {"fraction": 0.8052847531396461}]]},
+                   {"id": "p14", "op": "line", "points": [[{"fraction": 0.6441524275432453}, {"fraction": 0.8052847531396461}]]},
+                   {"id": "p15", "op": "line", "points": [[{"fraction": 0.6353537930913122}, {"fraction": 0.8140833875915792}]]},
+                   {"id": "p16", "op": "line", "points": [[{"fraction": 0.2062707867738927}, {"fraction": 0.8140833875915792}]]},
+                   {"id": "p17", "op": "line", "points": [[{"fraction": 0.15054610191165}, {"fraction": 0.7583587027293365}]]},
                    {"id": "close", "op": "close"}
                   ],
                   "stroke": {
@@ -89883,16 +90319,16 @@
                 {
                  "id": "second",
                  "commands": [
-                  {"id": "p0", "op": "move", "points": [[329.234, 329.234]]},
-                  {"id": "p1", "op": "line", "points": [[534.364, 611.571]]},
-                  {"id": "p2", "op": "line", "points": [[437.077, 661.141]]},
-                  {"id": "p3", "op": "line", "points": [[329.234, 678.222]]},
+                  {"id": "p0", "op": "move", "points": [[340.962, 340.962]]},
+                  {"id": "p1", "op": "line", "points": [[553.399, 633.357]]},
+                  {"id": "p2", "op": "line", "points": [[452.647, 684.693]]},
+                  {"id": "p3", "op": "line", "points": [[340.962, 702.382]]},
                   {"id": "close", "op": "close"}
                  ],
                  "fill": {
                   "type": "linear",
-                  "from": [534.364, 611.571],
-                  "to": [329.234, 678.222],
+                  "from": [553.399, 633.357],
+                  "to": [340.962, 702.382],
                   "stops": [
                    {"at": 0, "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0]}},
                    {"at": 0.72, "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.5019607843137255]}},
@@ -89913,7 +90349,7 @@
              "left": {"type": "length", "value": 0, "unit": "dp"},
              "top": {"type": "length", "value": 0, "unit": "dp"},
              "width": {"type": "length", "value": 490.0, "unit": "dp"},
-             "height": {"type": "length", "value": 403.05, "unit": "dp"},
+             "height": {"type": "length", "value": 439.05, "unit": "dp"},
              "opacity": {"type": "number", "value": 0},
              "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
             },
@@ -89933,15 +90369,15 @@
                {"id": "p8", "op": "line", "points": [[487.301, 45.562]]},
                {"id": "p9", "op": "line", "points": [[487.301, 93.562]]},
                {"id": "p10", "op": "line", "points": [[483.301, 97.562]]},
-               {"id": "p11", "op": "line", "points": [[483.301, 397.706]]},
-               {"id": "p12", "op": "line", "points": [[425.301, 397.706]]},
-               {"id": "p13", "op": "line", "points": [[419.301, 391.706]]},
-               {"id": "p14", "op": "line", "points": [[343.301, 391.706]]},
-               {"id": "p15", "op": "line", "points": [[337.301, 397.706]]},
-               {"id": "p16", "op": "line", "points": [[44.699, 397.706]]},
-               {"id": "ch0", "op": "line", "points": [[6.699, 397.706]]},
-               {"id": "ch1", "op": "cubic", "points": [[15.811, 395.264], [24.12, 390.467], [30.79, 383.797]]},
-               {"id": "ch2", "op": "line", "points": [[6.699, 359.706]]},
+               {"id": "p11", "op": "line", "points": [[483.301, 433.706]]},
+               {"id": "p12", "op": "line", "points": [[425.301, 433.706]]},
+               {"id": "p13", "op": "line", "points": [[419.301, 427.706]]},
+               {"id": "p14", "op": "line", "points": [[343.301, 427.706]]},
+               {"id": "p15", "op": "line", "points": [[337.301, 433.706]]},
+               {"id": "p16", "op": "line", "points": [[44.699, 433.706]]},
+               {"id": "ch0", "op": "line", "points": [[6.699, 433.706]]},
+               {"id": "ch1", "op": "cubic", "points": [[15.811, 431.264], [24.12, 426.467], [30.79, 419.797]]},
+               {"id": "ch2", "op": "line", "points": [[6.699, 395.706]]},
                {"id": "close", "op": "close"}
               ],
               "fill": {"type": "solid", "color": {"type": "color", "value": [0.0157, 0.0549, 0.102, 0.7]}}
@@ -89961,15 +90397,15 @@
                {"id": "p8", "op": "line", "points": [[487.301, 45.562]]},
                {"id": "p9", "op": "line", "points": [[487.301, 93.562]]},
                {"id": "p10", "op": "line", "points": [[483.301, 97.562]]},
-               {"id": "p11", "op": "line", "points": [[483.301, 397.706]]},
-               {"id": "p12", "op": "line", "points": [[425.301, 397.706]]},
-               {"id": "p13", "op": "line", "points": [[419.301, 391.706]]},
-               {"id": "p14", "op": "line", "points": [[343.301, 391.706]]},
-               {"id": "p15", "op": "line", "points": [[337.301, 397.706]]},
-               {"id": "p16", "op": "line", "points": [[44.699, 397.706]]},
-               {"id": "ch0", "op": "line", "points": [[6.699, 397.706]]},
-               {"id": "ch1", "op": "cubic", "points": [[15.811, 395.264], [24.12, 390.467], [30.79, 383.797]]},
-               {"id": "ch2", "op": "line", "points": [[6.699, 359.706]]},
+               {"id": "p11", "op": "line", "points": [[483.301, 433.706]]},
+               {"id": "p12", "op": "line", "points": [[425.301, 433.706]]},
+               {"id": "p13", "op": "line", "points": [[419.301, 427.706]]},
+               {"id": "p14", "op": "line", "points": [[343.301, 427.706]]},
+               {"id": "p15", "op": "line", "points": [[337.301, 433.706]]},
+               {"id": "p16", "op": "line", "points": [[44.699, 433.706]]},
+               {"id": "ch0", "op": "line", "points": [[6.699, 433.706]]},
+               {"id": "ch1", "op": "cubic", "points": [[15.811, 431.264], [24.12, 426.467], [30.79, 419.797]]},
+               {"id": "ch2", "op": "line", "points": [[6.699, 395.706]]},
                {"id": "close", "op": "close"}
               ],
               "stroke": {
@@ -90251,7 +90687,7 @@
                "left": {"type": "length", "value": 29.75, "unit": "dp"},
                "top": {"type": "length", "value": 104.0, "unit": "dp"},
                "width": {"type": "length", "value": 430.5, "unit": "dp"},
-               "height": {"type": "length", "value": 216.0, "unit": "dp"},
+               "height": {"type": "length", "value": 252.0, "unit": "dp"},
                "display": {"type": "keyword", "value": "flex"},
                "flex-direction": {"type": "keyword", "value": "column"}
               },
@@ -93017,6 +93453,572 @@
                   "minimumThumb": 24
                  }
                 }
+               },
+               {
+                "id": "vrsetup_hud",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "vrsetup_hud-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {
+                      "id": "p0",
+                      "op": "move",
+                      "points": [[{"fraction": 0.013937282229965157}, {"fraction": 0.027777777777777776}]]
+                     },
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027777777777777776}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.9722222222222222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.9722222222222222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.19444444444444445}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "vrsetup_hud-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {
+                      "id": "p0",
+                      "op": "move",
+                      "points": [[{"fraction": 0.013937282229965157}, {"fraction": 0.027777777777777776}]]
+                     },
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027777777777777776}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.9722222222222222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.9722222222222222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.19444444444444445}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "vrsetup_hud-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[0, 7]]},
+                     {"id": "p1", "op": "line", "points": [[6, 1]]},
+                     {"id": "p2", "op": "line", "points": [[6, 35.0]]},
+                     {"id": "p3", "op": "line", "points": [[0, 35.0]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "vrsetup_hud-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 121.0, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "vrsetup_hud-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_233560"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "vrsetup_hud-value",
+                  "type": "text",
+                  "properties": {
+                   "text": {"type": "text", "value": "#str_230030"},
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 150.0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 252.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "font-family": {"type": "font", "value": "lowpixel"},
+                   "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                   "line-height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]},
+                   "white-space": {"type": "keyword", "value": "nowrap"},
+                   "overflow": {"type": "keyword", "value": "hidden"},
+                   "text-overflow": {"type": "keyword", "value": "ellipsis"}
+                  }
+                 },
+                 {
+                  "id": "vrsetup_hud-chevron",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 406.5, "unit": "dp"},
+                   "top": {"type": "length", "value": 15.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 12, "unit": "dp"},
+                   "height": {"type": "length", "value": 6, "unit": "dp"},
+                   "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+                  },
+                  "paths": [
+                   {
+                    "id": "chevron",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[0, 0]]},
+                     {"id": "p1", "op": "line", "points": [[6, 6]]},
+                     {"id": "p2", "op": "line", "points": [[12, 0]]}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.4706, 0.8706, 1.0, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "vrsetup_hud-popup",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 142.0, "unit": "dp"},
+                   "top": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 276.5, "unit": "dp"},
+                   "height": {"type": "length", "value": 48.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "vrsetup_hud-popup-frame",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "rim",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
+                       "widthDp": 4,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     },
+                     {
+                      "id": "body",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
+                      "stroke": {
+                       "paint": {"type": "solid", "color": {"type": "color", "value": [0.2627, 0.6686, 0.8039, 0.2]}},
+                       "widthDp": 1,
+                       "minimumPixels": 1,
+                       "join": "miter",
+                       "cap": "butt"
+                      }
+                     }
+                    ]
+                   },
+                   {
+                    "id": "vrsetup_hud-viewport",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "width": {"type": "length", "value": 258.5, "unit": "dp"},
+                     "height": {"type": "length", "value": 44.0, "unit": "dp"},
+                     "margin-left": {"type": "length", "value": 2, "unit": "dp"},
+                     "margin-top": {"type": "length", "value": 2, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "vrsetup_hud-content",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "children": [
+                       {
+                        "id": "vrsetup_hud-option-0",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "vrsetup_hud-option-0-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "vrsetup_hud-option-0-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "vrsetup_hud-option-0-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_233561"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       },
+                       {
+                        "id": "vrsetup_hud-option-1",
+                        "type": "group",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "relative"},
+                         "display": {"type": "keyword", "value": "block"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 22.0, "unit": "dp"}
+                        },
+                        "children": [
+                         {
+                          "id": "vrsetup_hud-option-1-selected",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.35]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "vrsetup_hud-option-1-highlight",
+                          "type": "vector",
+                          "properties": {
+                           "position": {"type": "keyword", "value": "absolute"},
+                           "left": {"type": "length", "value": 0, "unit": "dp"},
+                           "top": {"type": "length", "value": 0, "unit": "dp"},
+                           "width": {"type": "length", "value": 100, "unit": "%"},
+                           "height": {"type": "length", "value": 100, "unit": "%"},
+                           "display": {"type": "keyword", "value": "none"}
+                          },
+                          "paths": [
+                           {
+                            "id": "band",
+                            "commands": [
+                             {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.0}]]},
+                             {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.0}]]},
+                             {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
+                             {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 1}]]},
+                             {"id": "close", "op": "close"}
+                            ],
+                            "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
+                           }
+                          ]
+                         },
+                         {
+                          "id": "vrsetup_hud-option-1-label",
+                          "type": "text",
+                          "properties": {
+                           "text": {"type": "text", "value": "#str_233561"},
+                           "position": {"type": "keyword", "value": "relative"},
+                           "display": {"type": "keyword", "value": "block"},
+                           "padding-left": {"type": "length", "value": 8, "unit": "dp"},
+                           "font-family": {"type": "font", "value": "lowpixel"},
+                           "font-size": {"type": "length", "value": 15, "unit": "dp"},
+                           "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
+                           "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.9]},
+                           "white-space": {"type": "keyword", "value": "nowrap"},
+                           "overflow": {"type": "keyword", "value": "hidden"}
+                          }
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   },
+                   {
+                    "id": "vrsetup_hud-scroll-track",
+                    "type": "group",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 264.5, "unit": "dp"},
+                     "top": {"type": "length", "value": 2, "unit": "dp"},
+                     "width": {"type": "length", "value": 8, "unit": "dp"},
+                     "height": {"type": "length", "value": 44.0, "unit": "dp"}
+                    },
+                    "children": [
+                     {
+                      "id": "vrsetup_hud-scroll-trough",
+                      "type": "vector",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 100, "unit": "%"},
+                       "height": {"type": "length", "value": 100, "unit": "%"}
+                      },
+                      "paths": [
+                       {
+                        "id": "trough",
+                        "commands": [
+                         {"id": "p0", "op": "move", "points": [[{"fraction": 0.375}, {"fraction": 0.0}]]},
+                         {"id": "p1", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 0.0}]]},
+                         {"id": "p2", "op": "line", "points": [[{"fraction": 0.625}, {"fraction": 1}]]},
+                         {"id": "p3", "op": "line", "points": [[{"fraction": 0.375}, {"fraction": 1}]]},
+                         {"id": "close", "op": "close"}
+                        ],
+                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.9333, 0.9725, 1.0, 0.12]}}
+                       }
+                      ]
+                     },
+                     {
+                      "id": "vrsetup_hud-scroll-thumb",
+                      "type": "group",
+                      "properties": {
+                       "position": {"type": "keyword", "value": "absolute"},
+                       "left": {"type": "length", "value": 0, "unit": "dp"},
+                       "top": {"type": "length", "value": 0, "unit": "dp"},
+                       "width": {"type": "length", "value": 8, "unit": "dp"},
+                       "height": {"type": "length", "value": 24, "unit": "dp"}
+                      },
+                      "children": [
+                       {
+                        "id": "vrsetup_hud-scroll-ink",
+                        "type": "vector",
+                        "properties": {
+                         "position": {"type": "keyword", "value": "absolute"},
+                         "left": {"type": "length", "value": 0, "unit": "dp"},
+                         "top": {"type": "length", "value": 0, "unit": "dp"},
+                         "width": {"type": "length", "value": 100, "unit": "%"},
+                         "height": {"type": "length", "value": 100, "unit": "%"}
+                        },
+                        "paths": [
+                         {
+                          "id": "thumb",
+                          "commands": [
+                           {"id": "p0", "op": "move", "points": [[{"fraction": 0.125}, {"fraction": 0.0}]]},
+                           {"id": "p1", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 0.0}]]},
+                           {"id": "p2", "op": "line", "points": [[{"fraction": 0.875}, {"fraction": 1}]]},
+                           {"id": "p3", "op": "line", "points": [[{"fraction": 0.125}, {"fraction": 1}]]},
+                           {"id": "close", "op": "close"}
+                          ],
+                          "fill": {"type": "solid", "color": {"type": "color", "value": [0.1569, 0.6196, 0.7176, 0.9]}}
+                         }
+                        ]
+                       }
+                      ]
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "choice",
+                 "label": "#str_233560",
+                 "action": "set.vr_hudMode",
+                 "value": {"state": "cvar.vr_hudMode"},
+                 "states": {
+                  "default": "vrsetup_hud.default",
+                  "hover": "vrsetup_hud.hover",
+                  "focus": "vrsetup_hud.focus",
+                  "pressed": "vrsetup_hud.pressed",
+                  "disabled": "vrsetup_hud.disabled"
+                 },
+                 "parts": {
+                  "popup": "vrsetup_hud-popup",
+                  "viewport": "vrsetup_hud-viewport",
+                  "content": "vrsetup_hud-content",
+                  "value": "vrsetup_hud-value"
+                 },
+                 "visibleRows": 2,
+                 "options": [
+                  {
+                   "id": "vrsetup_hud-option-0",
+                   "node": "vrsetup_hud-option-0",
+                   "label": "#str_233561",
+                   "value": 1,
+                   "parts": {
+                    "label": "vrsetup_hud-option-0-label",
+                    "selected": "vrsetup_hud-option-0-selected",
+                    "highlight": "vrsetup_hud-option-0-highlight"
+                   },
+                   "labelIndex": 0
+                  },
+                  {
+                   "id": "vrsetup_hud-option-1",
+                   "node": "vrsetup_hud-option-1",
+                   "label": "#str_233561",
+                   "value": 0,
+                   "parts": {
+                    "label": "vrsetup_hud-option-1-label",
+                    "selected": "vrsetup_hud-option-1-selected",
+                    "highlight": "vrsetup_hud-option-1-highlight"
+                   },
+                   "labelIndex": 1
+                  }
+                 ],
+                 "placementBounds": "screen",
+                 "scrollbar": {
+                  "track": "vrsetup_hud-scroll-track",
+                  "thumb": "vrsetup_hud-scroll-thumb",
+                  "lineStep": 22.0,
+                  "minimumThumb": 24
+                 }
+                }
                }
               ]
              },
@@ -93026,7 +94028,7 @@
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
                "left": {"type": "length", "value": 30, "unit": "dp"},
-               "top": {"type": "length", "value": 334.05, "unit": "dp"},
+               "top": {"type": "length", "value": 370.05, "unit": "dp"},
                "width": {"type": "length", "value": 210.0, "unit": "dp"},
                "height": {"type": "length", "value": 45, "unit": "dp"}
               },
