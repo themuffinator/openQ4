@@ -9027,6 +9027,9 @@ void idGameLocal::StartViewEffect( int type, float time, float scale )
 			if( !gameLocal.isMultiplayer ) {
 				view->SetShakeParms( time, scale );
 			}
+			// openQ4 VR: the blast that shakes the screen reaches the hands too,
+			// in multiplayer as well, where the screen itself keeps still
+			player->VRBlastPulse( scale );
 			break;
 
 		case VIEWEFFECT_TUNNEL:

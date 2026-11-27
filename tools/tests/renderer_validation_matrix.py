@@ -2553,6 +2553,10 @@ def main(argv: list[str]) -> int:
     if not runtime_dir.is_dir():
         print(f"runtime directory does not exist: {runtime_dir}", file=sys.stderr)
         return 2
+    # Refuse a stage older than its build, or one from before the unified game
+    # module, before any case opens a client on it.
+    from mp_round_remote_smoke import verify_runtime_is_current
+    verify_runtime_is_current(runtime_dir)
     if args.executable:
         executable = Path(args.executable).resolve()
         if not executable.is_file():

@@ -70,7 +70,33 @@ def main() -> None:
             smoke.verify_runtime_is_current(foreign_stage)
             os.utime(foreign_build / executable, (950, 950))
             expect_stale(foreign_stage, None, executable)
-    print("PASS: default/custom multiplayer executables, timestamp tolerance, stale modules, worktree ownership and explicit override")
+
+            # A stage from before the unified game module is refused even when
+            # no builddir sits beside it to compare timestamps against.
+            legacy = root / "legacy" / ".install"
+            (legacy / "baseoq4").mkdir(parents=True)
+            (legacy / executable).write_bytes(b"pre-unified build")
+            (legacy / "baseoq4/pak0.pk4").write_bytes(b"content only")
+            expect_pre_unified(legacy, "no game module")
+            for name in ("game-sp_x64.test", "game-mp_x64.test"):
+                (legacy / "baseoq4" / name).write_bytes(b"split module")
+            expect_pre_unified(legacy, "game-mp_x64.test, game-sp_x64.test")
+            with patch.dict(os.environ, {"OPENQ4_ALLOW_STALE_RUNTIME": "1"}):
+                smoke.verify_runtime_is_current(legacy)
+            (legacy / "baseoq4/game_x64.test").write_bytes(b"unified module")
+            smoke.verify_runtime_is_current(legacy)
+    print("PASS: default/custom multiplayer executables, timestamp tolerance, stale modules, worktree ownership, "
+          "pre-unified game modules and explicit override")
+
+
+def expect_pre_unified(runtime: Path, detail: str) -> None:
+    try:
+        smoke.verify_runtime_is_current(runtime)
+    except SystemExit as error:
+        message = str(error)
+        assert detail in message and "predates the unified game_<arch> module" in message, message
+    else:
+        raise AssertionError(f"pre-unified stage {runtime} was accepted")
 
 
 if __name__ == "__main__":

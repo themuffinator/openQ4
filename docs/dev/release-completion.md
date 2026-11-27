@@ -12,6 +12,87 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Alt+Tab out of Fullscreen and Borderless is instant, 27 November 2026
+
+- **Switching away from the game no longer takes a moment in Fullscreen or
+  Borderless.** On Windows the game minimized every fullscreen window when it
+  lost focus, including the desktop-resolution Fullscreen mode, which has no
+  display mode to give back; minimizing it, then rebuilding the picture on the
+  way back, made Alt+Tab slow both ways. Only Exclusive Fullscreen minimizes
+  now, as SDL itself does. Setting the `SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS`
+  environment variable still overrides this either way.
+- **Vulkan on Windows keeps a full-screen window a window.** Some drivers take
+  exclusive control of any window that covers the display, which blanks the
+  screen and delays Alt+Tab in Borderless too. Where the driver offers
+  `VK_EXT_full_screen_exclusive`, every swapchain outside Exclusive Fullscreen
+  now refuses that; Exclusive Fullscreen leaves the choice to the driver as
+  before. The log says which applies ("Vulkan: exclusive fullscreen ...").
+- Reported on Discord alongside #263, #264 and #265 (NVIDIA RTX 3070 Ti,
+  Vulkan).
+- Evidence: the SDL3 windowing source test checks both rules; the Vulkan
+  device-selection, display-presentation, probe-safety and portability tests
+  pass. A hidden-window Vulkan client (RTX 4060 Laptop, driver 591.74, with
+  the validation layer) enabled the extension, created its swapchains with
+  exclusive control refused and reached Air Defense 1 with no validation
+  messages. Alt+Tab itself was not timed: that needs a visible window and real
+  input, so the reporter's confirmation is still wanted.
+
+## VR vibration that tells you where, and what happened, 27 November 2026
+
+- **Feel which side a hit came from.** The hand on that side takes the hit
+  whole and the other a quarter of it, judged from where your head faces, so
+  a glance over your shoulder changes which hand feels it. A hit from ahead or
+  behind still shakes both hands alike, and bigger hits shake harder, as
+  before.
+- **Blasts you feel.** A rocket, a grenade, an exploding barrel or vehicle,
+  or a heavy Strogg's footfall rumbles both hands along with its screen
+  shake, harder the nearer and bigger it is, whether or not it hurts you. In
+  multiplayer the hands feel it although the screen keeps still.
+- **Reloads, draws and landings.** The off hand, the one that goes to the gun
+  in VR, ticks with each sound a reload makes (magazine out, magazine in, the
+  bolt, each shotgun shell), in both campaigns' guns; the weapon hand feels a
+  new gun come up; and a fall jolts both hands, harder the farther you fell,
+  while an ordinary jump stays still.
+- **Never touch alone.** Every new pulse comes with a sound or something you
+  see, because touch alone is too easy to miss for some players.
+- **What to do.** Nothing. To keep shots and hits but turn the rest down or
+  off, set `vr_hapticEvents` (0 to 1, default 1) in the console. Desktop
+  play, gamepad rumble and multiplayer's network traffic are unchanged.
+- Inspiration: Half-Life: Alyx's haptics (ideas only; nothing taken from it);
+  see [vr-half-life-alyx-study.md](vr-half-life-alyx-study.md),
+  recommendation 4.
+- Not yet felt on a real headset: how strong each pulse is and whether the
+  hit's side is easy to tell (VR headset checklist 3.21 to 3.25).
+- Development: `idPlayer::VRHitSide` (the hit's side from the tracked head's
+  yaw, the body's view without one), the weighting in `idPlayer::VRVibrate`
+  (both hands, as `Sys_PulseJoystickRumbleDirected` does for a gamepad's two
+  motors), `idPlayer::VREventPulse` (headset only, `vr_hapticEvents`, new
+  frames only, so prediction never repeats a pulse), `idPlayer::VRBlastPulse`
+  from `idGameLocal::StartViewEffect` (each BSE shake segment, already scaled
+  by its author's size and distance attenuation, run once a rendered frame;
+  a hit in the last 250 ms keeps its side), the reload tick in
+  `idAnim::CallFrameCommandSound` (sound frame commands of an animation named
+  `reload*` on the local player's view weapon), the draw in
+  `rvWeapon::PlayAnim` (the raise), and the landing in `idPlayer::CrashLand`
+  (beside the landing sound, from 1.2 times a level jump's landing speed).
+  Each kind has its own duration (draw 35 ms, reload 25, hit 90, blast 150,
+  landing 80), and `vr_debug 1` logs each one. No wire, save or game API
+  change.
+- Evidence: `tools/tests/openxr_vr_haptics_smoke.py` on the OpenXR test
+  runtime, which logs every pulse's hand, amplitude and duration: in
+  `game/airdefense1` the machinegun and shotgun draws and reload ticks, hits
+  from the head's right, left and front and from the room's forward with the
+  head turned, rocket blasts at 150, 400 and 900 units (`testVRHaptics`, a
+  cheat-gated dev command), `vr_hapticEvents 0` keeping the shot, and a
+  200-unit fall against a 30-unit drop; with `--game q4xbase`, The
+  Awakening's goob gun draws and ticks on each reload step (its cylinder's
+  reload animation also runs after every shot, with its sound) and
+  `vr_hapticEvents 0` holds, in `m01_stranarus_trench1`. Hits, blasts and the
+  fall share their code between the campaigns and are checked in Quake 4
+  only: that map opens in a battle whose own fire would muddle them. The
+  contract pins
+  the paths in `openxr_vr_contract.py`.
+
 ## Menus that fit phones, tablets and the Steam Deck, 27 November 2026
 
 - **The new interface now knows what it is running on.** On a phone, a
