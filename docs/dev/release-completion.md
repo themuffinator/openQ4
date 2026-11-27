@@ -45,6 +45,24 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## Smooth soft shadow edges on Vulkan, 27 November 2026
+
+- **Soft shadow edges are smooth on Vulkan.** The soft edge of a spotlight's or
+  the sun's shadow was drawn from nine all-or-nothing samples, which gave it a
+  grainy, stepped look up close. Vulkan now blends each sample across the four
+  shadow-map pixels around it, and the edge is an even ramp. Measured grain on
+  Air Defense 1 at Quality falls by more than half; where shadows fall does
+  not change.
+- **OpenGL is unchanged**, so soft shadow edges now look a little different
+  between the two renderers. `r_vkShadowBilinearPCSS 0` gives Vulkan the old
+  edge.
+- **Cost.** Roughly a tenth of a millisecond of graphics time at 1440p on the
+  test laptop, measured on a busy machine and still to be confirmed.
+- **What to do.** Nothing.
+- Developer detail:
+  [bilinear PCSS-lite taps on Vulkan](shadowmapping-audit-2026-11-27.md#bilinear-pcss-lite-taps-on-vulkan).
+  No ABI change.
+
 ## Characters behind you stop costing shadow time, and Vulkan hands back unused shadow memory, 27 November 2026
 
 - **Animated characters you cannot see no longer take shadow-map time.** A

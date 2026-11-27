@@ -9,8 +9,8 @@ FPS-03 in the [roadmap](roadmap.md).
 
 Five independent read-throughs produced about thirty candidates. Each was
 checked against the code before anything changed. Fourteen were fixed here, a
-fifteenth (the cascade collapse behind a light's source plane) and five more
-leads the same day, one
+fifteenth (the cascade collapse behind a light's source plane), five more
+leads and bilinear PCSS-lite taps on Vulkan the same day, one
 was measured and left, and the rest are recorded below as leads with the reason
 each was not taken.
 
@@ -161,6 +161,40 @@ state, as the opaque passes do; and **Vulkan's shadow timing spans are read
 only after their frame slot has retired**, so a span cannot be credited with
 the previous result of the queries it reuses (diagnostics only).
 
+## Bilinear PCSS-lite taps on Vulkan
+
+Asked for after the leads above, knowing it ends picture parity between the
+renderers for soft projected shadows.
+
+PCSS-lite reads raw depths for its blocker search, so it cannot use the
+comparison sampler, and it compared every filter tap against the one nearest
+texel: nine taps, ten grey levels, with the kernel turned per texel, so a soft
+edge was stipple. OpenGL 2.1 can do no better, since a texture there has one
+compare mode. On Vulkan each tap now weighs the four texels around it as a
+bilinear lookup would (`BilinearShadowCompare`, one `textureGather`). The
+comparison sampler itself is not used, because under the ownership union a
+texel's depth is the nearer of two tiles and that minimum has to be taken
+before the compare; the shader takes it across both gathers, so the union
+stays exact. `r_vkShadowBilinearPCSS 0` restores the nearest compare, which is
+the picture OpenGL draws.
+
+- **Grain.** Air Defense 1 at Quality, six frozen poses at 2560x1440, both
+  modes at the same moment. In the penumbra (pixels that keep between 10% and
+  90% of stencil's occlusion) the mean difference between a pixel's shadow
+  term and the mean of its four neighbours falls from 0.048 to 0.022.
+  Coverage does not change: 99.2% of stencil's shadow kept either way.
+- **Cost.** One more fetch on a lit pixel (the centre tap, which the nearest
+  mode takes from the search) and four compares a tap in place of one. Three
+  other projects' clients held the test machine's GPU at 66% during the
+  measurement, so the figure is rough: in the three quiet pairs of an
+  alternating run in the Air Defense 1 arena at 1440p the lit pass took
+  0.04 to 0.2 ms longer (about 6%). It wants confirming on a quiet machine.
+- **Validation.** Both modes under the validation layers at Quality on Air
+  Defense 1 (the union path) and at Maximum in Hub 2: no message.
+- The Maximum run logs the "required shadow resource unavailable" warning of
+  the 9 November audit's open list for one light. The 0.15.0 release build
+  logs it in the same view, with nineteen failed passes against one now.
+
 ## Measured and left
 
 **Skipping the blocker search under distant suns.** A distant point light's
@@ -188,12 +222,6 @@ Not done in this round. Each is real; the note says why it waited.
   and not the gap. A sun's penumbra should be `gap * tan(source angle)` in
   world units. It needs a per-cascade uniform on three receivers and a
   constant chosen by eye. Twelve stock parallel lights cast shadows.
-- **Vulkan's default projected taps are binary.** PCSS-lite turns hardware
-  comparison off for the whole receiver, so each of nine taps is a nearest
-  compare and penumbrae have ten grey levels. Vulkan binds a compare sampler
-  on the same image and could filter each tap bilinearly; OpenGL 2.1 cannot
-  have both on one texture. Changing it breaks picture parity between the
-  renderers and the PCSS ownership union.
 - **PBR receivers sample shadows before knowing the light reaches the pixel**
   (both renderers), and the modern OpenGL cluster loop does the same. Stock
   content has no PBR owners and the modern path is opt-in.

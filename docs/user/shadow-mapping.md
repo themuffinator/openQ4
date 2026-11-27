@@ -245,6 +245,7 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 | `r_shadowMapFilterTaps` | `9` | `1..13` | Samples per spotlight edge (1, 5, 9 or 13). More is smoother and costs more. |
 | `r_shadowMapPCSSLightRadius` | `4.0` | `0..16` | How far contact-hardening searches for the object casting a shadow, in shadow-map pixels. |
 | `r_shadowMapPCSSMaxRadius` | `8.0` | `0..16` | The widest edge contact-hardening can draw, in shadow-map pixels. |
+| `r_vkShadowBilinearPCSS` | `1` | `0..1` | Vulkan only. Blends each contact-hardening sample across the four shadow-map pixels around it, so soft edges are smooth ramps instead of grain. `0` uses one pixel per sample, which is what OpenGL draws. |
 | `r_shadowMapDistantFilterScale` | `0.35` | `0..1` | Narrows soft edges for sunlight and other distant lights, whose shadow pixels cover far more ground, so their outlines stay crisp. `1` uses the ordinary spotlight width. |
 | `r_shadowMapPointFilterMode` | `0` | `0..1` | Point-light edge style: `0` fixed blur, `1` even soft edge. Point lights don't use contact-hardening. |
 | `r_shadowMapPointFilterRadius` | `1.0` | `0..8` | Point-light edge width. Large lights cover a lot of ground per pixel, so wide values can wash out contact detail. |
@@ -267,7 +268,8 @@ On every platform, openQ4 never draws a half-finished shadow: it rejects incompl
 |---|---:|---:|---|
 | `r_shadowMapStaticCache` | `1` | `0..1` | Stores the shadows of still scenery and reuses them every frame. Moving objects are drawn on top. |
 | `r_shadowMapStaticCutouts` | `1` | `0..1` | Stores grates, railings and fences with the still scenery when their holes can't change, so a light reaching one isn't redrawn every frame. Cutouts that animate are still drawn each frame. `0` redraws every cutout each frame. |
-| `r_shadowMapResidentFrames` | `120` | `1..3600` | Frames an unused stored shadow is kept before its space can be reused. |
+| `r_shadowMapResidentFrames` | `120` | `1..3600` | How long an unused stored shadow is kept before its space can be reused, counted in frames at 60 a second: `120` is two seconds at any frame rate. |
+| `r_shadowMapCullOffscreenLiveCasters` | `1` | `0..1` | Leaves a moving or animating object out of a light's shadow map while none of its shadow from that light can reach the screen. Stored shadows of still scenery are never affected, and sunlight keeps every object. `0` draws them all every frame. |
 | `r_shadowMapStaticHysteresisFrames` | `2` | `0..120` | Frames to wait after moving objects leave before a point light that can't layer moving objects over its stored shadow is stored again. |
 | `r_shadowMapProjectedCacheSize` | `8` | `0..16` | How many full-size spotlight shadows to store (half-size ones count as a quarter each). `0` turns storing off. On Vulkan this caps the memory used, at most 128 MiB on Quality and 512 MiB on Ultra; on OpenGL the shadow atlas is the limit. Shadows in use on screen are never dropped. |
 | `r_shadowMapPointCacheSize` | `64` | `0..96` | How many point-light shadows to store. |

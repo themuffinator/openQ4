@@ -2090,7 +2090,10 @@ def validate_shadow_filtering_contract() -> None:
             "block.filterParams[ 0 ] = filterSettings.filterRadius;",
             "block.filterParams[ 1 ] = (float)filterSettings.filterTaps;",
             "block.filterParams[ 2 ] = (float)filterSettings.filterMode;",
-            "r_shadowMapDepthCompare.GetBool() && filterSettings.filterMode != 2",
+            # PCSS-lite never takes the comparison sampler; it compares raw
+            # depths, bilinearly unless r_vkShadowBilinearPCSS is off
+            "block.filterParams[ 3 ] = VK_Inter_ProjectedTapCompare(",
+            "r_shadowMapDepthCompare.GetBool(), filterSettings.filterMode );",
             "block.pcssParams[ 0 ] = filterSettings.pcssLightRadius;",
             "block.pcssParams[ 1 ] = filterSettings.pcssMaxRadius;",
             "block.pcssParams[ 2 ] = filterSettings.effectiveFilterRadius;",
@@ -2109,12 +2112,59 @@ def validate_shadow_filtering_contract() -> None:
         projected_compare,
         (
             "float compareDepth = depth - ShadowReceiverBias(cascadeIndex) - tapBias;",
+            "if (shadow.filterParams.w > 1.5)",
+            "return BilinearShadowCompare(uv, compareDepth);",
             "if (shadow.filterParams.w > 0.5)",
             "texture(shadowCompareMap, vec3(uv, compareDepth))",
             "RawShadowDepth(uv)",
             "compareDepth <= storedDepth ? 1.0 : 0.0",
         ),
         "projected runtime compare/raw selection",
+    )
+
+    # Each PCSS-lite tap weighs the four texels around it, as the comparison
+    # sampler would: one texel a tap gave nine taps ten grey levels. Under the
+    # ownership union a texel's depth is the nearer of two tiles, taken before
+    # the compare, which is why the shader does it and no sampler can.
+    interactions = read("src/renderer/Vulkan/vk_Interactions.cpp")
+    tap_mode = braced_body(
+        interactions,
+        "static float VK_Inter_ProjectedTapCompare(",
+        "projected tap compare mode",
+    )
+    require_order(
+        tap_mode,
+        (
+            "if ( filterMode == 2 ) {",
+            "return r_vkShadowBilinearPCSS.GetBool() ? 2.0f : 0.0f;",
+            "return hardwareCompare ? 1.0f : 0.0f;",
+        ),
+        "PCSS-lite compares raw depths, bilinearly by default",
+    )
+    require(
+        interactions,
+        "mapPass.projected.depthCompare, mapPass.projected.filter.filterMode );",
+        "the shared stream's block takes the same tap mode",
+    )
+    bilinear = braced_body(
+        projected,
+        "float BilinearShadowCompare(",
+        "bilinear raw-depth compare",
+    )
+    require_order(
+        bilinear,
+        (
+            "vec2 texel = uv * vec2(textureSize(shadowRawMap, 0)) - vec2(0.5);",
+            "vec2 f = fract(texel);",
+            "vec4 depths = textureGather(shadowRawMap, uv, 0);",
+            "if (any(notEqual(shadow.debugParams.zw, vec2(0.0)))) {",
+            "depths = min(depths, textureGather(shadowRawMap, uv + shadow.debugParams.zw, 0));",
+            "vec4 lit = step(vec4(compareDepth), depths);",
+            "vec4 weights = vec4((1.0 - f.x) * f.y, f.x * f.y,",
+            "f.x * (1.0 - f.y), (1.0 - f.x) * (1.0 - f.y));",
+            "return dot(lit, weights);",
+        ),
+        "four texels, the union's minimum first, in textureGather's order",
     )
 
     projected_rotation = braced_body(
@@ -2196,7 +2246,7 @@ def validate_shadow_filtering_contract() -> None:
         (
             """ShadowDebugModeIs(kShadowDebugPCFOff)
                 || shadow.filterParams.z < 1.5
-                || shadow.filterParams.w > 0.5""",
+                || (shadow.filterParams.w > 0.5 && shadow.filterParams.w < 1.5)""",
             "float compareDepth = depth - ShadowReceiverBias(cascadeIndex);",
             "float blockerDepth = 0.0;",
             "float blockerCount = 0.0;",

@@ -71,6 +71,25 @@
 extern idCVar r_vkShadowFallbackTest;
 extern idCVar r_vkPBRSpecularAA;
 
+// How a projected receiver compares each filter tap (ShadowBlock.filterParams.w):
+// 0 the nearest raw depth, 1 the hardware comparison sampler, 2 raw depths
+// weighted bilinearly in the shader. PCSS-lite reads raw depths for its
+// blocker search, so it cannot use the comparison sampler, and until November
+// 2026 it compared every tap against one texel: nine taps, ten grey levels,
+// the grain turning with the texel. OpenGL 2.1 can do no better, since a
+// texture there has one compare mode. Vulkan weights the four texels itself.
+// r_vkShadowBilinearPCSS 0 restores the nearest compare, which is the picture
+// OpenGL draws.
+static idCVar r_vkShadowBilinearPCSS( "r_vkShadowBilinearPCSS", "1", CVAR_RENDERER | CVAR_BOOL | CVAR_ARCHIVE,
+	"filter each PCSS-lite tap of a projected shadow bilinearly (0 = compare against the nearest texel, as OpenGL does)" );
+
+static float VK_Inter_ProjectedTapCompare( const bool hardwareCompare, const int filterMode ) {
+	if ( filterMode == 2 ) {
+		return r_vkShadowBilinearPCSS.GetBool() ? 2.0f : 0.0f;
+	}
+	return hardwareCompare ? 1.0f : 0.0f;
+}
+
 static idCVar r_vkPBRPrepareFailure( "r_vkPBRPrepareFailure", "0", CVAR_RENDERER | CVAR_INTEGER,
 	"diagnostic PBR preparation failure: 0=off, 1-4=coverage pipeline/descriptor/uniform/geometry, 5-8=direct, 9-12=environment, 13=environment image", 0, 13 );
 static idCVar r_vkPBRPrepareFailureAfter( "r_vkPBRPrepareFailureAfter", "0", CVAR_RENDERER | CVAR_INTEGER,
@@ -880,8 +899,8 @@ static bool VK_ClassicInteraction_BuildMappedShadowBlock(
 		mapPass.projected.filter.filterTaps );
 	block.filterParams[ 2 ] = static_cast<float>(
 		mapPass.projected.filter.filterMode );
-	block.filterParams[ 3 ] = mapPass.projected.depthCompare
-		&& mapPass.projected.filter.filterMode != 2 ? 1.0f : 0.0f;
+	block.filterParams[ 3 ] = VK_Inter_ProjectedTapCompare(
+		mapPass.projected.depthCompare, mapPass.projected.filter.filterMode );
 	block.pcssParams[ 0 ] = mapPass.projected.filter.pcssLightRadius;
 	block.pcssParams[ 1 ] = mapPass.projected.filter.pcssMaxRadius;
 	block.pcssParams[ 2 ] = mapPass.projected.filter.effectiveFilterRadius;
@@ -3890,9 +3909,8 @@ static int VK_Inter_WriteShadowSlice( const viewEntity_t *space ) {
 	block.filterParams[ 2 ] = (float)filterSettings.filterMode;
 	// PCSS-lite requires native blocker depths, irrespective of the general
 	// projected compare preference.
-	block.filterParams[ 3 ] =
-			( r_shadowMapDepthCompare.GetBool() &&
-			  filterSettings.filterMode != 2 ) ? 1.0f : 0.0f;
+	block.filterParams[ 3 ] = VK_Inter_ProjectedTapCompare(
+			r_shadowMapDepthCompare.GetBool(), filterSettings.filterMode );
 	block.pcssParams[ 0 ] = filterSettings.pcssLightRadius;
 	block.pcssParams[ 1 ] = filterSettings.pcssMaxRadius;
 	block.pcssParams[ 2 ] = filterSettings.effectiveFilterRadius;

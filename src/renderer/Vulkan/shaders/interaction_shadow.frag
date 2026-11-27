@@ -71,7 +71,8 @@ layout(set = 7, binding = 1, std140) uniform ShadowBlock {
     vec4 biasParams;   // x: constant bias, y: normal bias, z: cascade blend, w: cascade count
     vec4 texelSize;    // x,y: 1 / atlas dimensions, z: r_shadowMapTexelBiasScale,
                        // w: index + 1 of the whole-light cascade (0 = none)
-    vec4 filterParams; // x: radius, y: taps, z: mode, w: hardware compare
+    vec4 filterParams; // x: radius, y: taps, z: mode, w: how a tap compares: 0 = the nearest raw
+                       // depth, 1 = the hardware comparison sampler, 2 = raw depths, bilinear
     vec4 pcssParams;   // x: light radius, y: max radius, z: effective radius, w: receiver-plane bias
     vec4 debugParams;  // x: debug mode, y: fallback reason, zw: PCSS ownership UV offset
     // Translucent moments live in a separate atlas whose blocks mirror the
@@ -291,9 +292,33 @@ float RawShadowDepth(vec2 uv) {
     return depth;
 }
 
+// One tap compared against the four texels around it and weighted as a
+// bilinear lookup weights them: what the comparison sampler does, done here on
+// raw depths. PCSS-lite needs raw depths for its blocker search, and under the
+// ownership union a texel's depth is the nearer of two tiles, which no sampler
+// can take before it compares. Compared against the nearest texel alone, as
+// OpenGL 2.1 must, nine taps give a penumbra ten grey levels and no more.
+float BilinearShadowCompare(vec2 uv, float compareDepth) {
+    vec2 texel = uv * vec2(textureSize(shadowRawMap, 0)) - vec2(0.5);
+    vec2 f = fract(texel);
+    // textureGather: (0,1), (1,1), (1,0), (0,0) of the footprint
+    vec4 depths = textureGather(shadowRawMap, uv, 0);
+    if (any(notEqual(shadow.debugParams.zw, vec2(0.0)))) {
+        // tile-aligned, so both footprints hold the same four texels
+        depths = min(depths, textureGather(shadowRawMap, uv + shadow.debugParams.zw, 0));
+    }
+    vec4 lit = step(vec4(compareDepth), depths);
+    vec4 weights = vec4((1.0 - f.x) * f.y, f.x * f.y,
+        f.x * (1.0 - f.y), (1.0 - f.x) * (1.0 - f.y));
+    return dot(lit, weights);
+}
+
 float SampleShadowCompare(vec2 uv, float depth, int cascadeIndex,
         float tapBias) {
     float compareDepth = depth - ShadowReceiverBias(cascadeIndex) - tapBias;
+    if (shadow.filterParams.w > 1.5) {
+        return BilinearShadowCompare(uv, compareDepth);
+    }
     if (shadow.filterParams.w > 0.5) {
         return texture(shadowCompareMap, vec3(uv, compareDepth));
     }
@@ -312,8 +337,10 @@ float ProjectedPCSSRadius(vec2 uv, float depth, int cascadeIndex,
     centreLit = -1.0;
     float baseRadius = ShadowDebugModeIs(kShadowDebugPCFOff)
         ? 0.0 : shadow.filterParams.x;
+    // the comparison sampler (w = 1) has no raw depths to search
     if (ShadowDebugModeIs(kShadowDebugPCFOff)
-            || shadow.filterParams.z < 1.5 || shadow.filterParams.w > 0.5
+            || shadow.filterParams.z < 1.5
+            || (shadow.filterParams.w > 0.5 && shadow.filterParams.w < 1.5)
             || shadow.pcssParams.x <= 0.0
             || shadow.pcssParams.y <= 0.0) {
         return baseRadius;
@@ -327,7 +354,11 @@ float ProjectedPCSSRadius(vec2 uv, float depth, int cascadeIndex,
     float blockerDepth = 0.0;
     float blockerCount = 0.0;
     float d0 = RawShadowDepth(uv);
-    centreLit = compareDepth <= d0 ? 1.0 : 0.0;
+    // A bilinear centre tap weighs the texels around this one too: the
+    // filter takes it itself.
+    if (shadow.filterParams.w < 0.5) {
+        centreLit = compareDepth <= d0 ? 1.0 : 0.0;
+    }
     if (d0 < compareDepth) {
         blockerDepth += d0;
         blockerCount += 1.0;

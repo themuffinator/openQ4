@@ -2683,8 +2683,11 @@ are not yet measured.
   to 3.0 ms), Vulkan releases shadow memory unused for half a minute, caster passes
   keep one front face on both backends, OpenGL's moment passes prove their
   framebuffer, and Vulkan's shadow timing spans are read only after their frame slot
-  retires. Open leads are listed there: cascade scale stepping with yaw, PCSS-lite on
-  parallel lights, and Vulkan's binary PCSS taps.
+  retires. Vulkan then filters each PCSS-lite tap bilinearly (`r_vkShadowBilinearPCSS`,
+  default 1): penumbra grain at Air Defense 1 falls from 0.048 to 0.022 with coverage
+  unchanged, and soft projected shadows no longer match OpenGL pixel for pixel; `0`
+  restores the match. Open leads are listed there: cascade scale stepping with yaw and
+  PCSS-lite on parallel lights.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always
