@@ -145,6 +145,11 @@ typedef struct vkDeviceContext_s {
 	// (the texture video-memory budget in vk_Image.cpp); otherwise VMA
 	// estimates 80% of each heap against its own allocations.
 	bool				memoryBudgetEnabled;
+	// Windows: VK_KHR_get_surface_capabilities2 is enabled on the instance, and
+	// VK_EXT_full_screen_exclusive on the device, so each swapchain refuses
+	// driver-chosen exclusive control outside Exclusive Fullscreen.
+	bool				surfaceCapabilities2;
+	bool				fullScreenExclusiveControl;
 	// VK_FORMAT_R5G6B5_UNORM_PACK16 backs the light projection/falloff cookies.
 	// Metal only exposes the packed 16-bit formats on Apple GPUs, so this is
 	// probed and the image path widens to RGBA8 when it is missing.

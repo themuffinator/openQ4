@@ -4603,6 +4603,12 @@ void rvWeapon::PlayAnim( int channel, const char *animname, int blendFrames ) {
 		viewModel->Show();
 		viewAnimator->PlayAnim( channel, anim, startTime, FRAME2MS( blendFrames ) );
 		animDoneTime[channel] = viewAnimator->CurrentAnim( channel )->GetEndTime();
+
+		// openQ4 VR: the weapon hand feels the gun it just drew come up, as it
+		// is seen rising and its raise sounds play
+		if ( raise && owner ) {
+			owner->VREventPulse( true, false, 0.4f, 35, "draw" );
+		}
 		
 		// Play the animation on the world model as well
 		if ( worldAnimator ) {

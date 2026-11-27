@@ -53,7 +53,11 @@ the [development roadmap](../roadmap.md) for current scope.
   uses the in-game keyboard. Off never touches your VR software. During play
   the menu grows out of your off hand on a panel, with the level still around
   you: a light beam points from your other hand, buttons grow and light up
-  under it and your hand ticks as you move between them.
+  under it and your hand ticks as you move between them. The controllers now
+  tell you which side a hit came from and buzz with nearby blasts, each
+  reload step, a drawn weapon and a hard landing, always alongside a sound or
+  a sight (`vr_hapticEvents` turns those down without touching shots and
+  hits). See the [VR guide](../../user/vr.md#vr-mode-and-headset-detection).
 - **No HUD in your way in VR.** Health and armor show on your off-hand wrist
   and ammunition on your weapon hand's, in clear figures beside the HUD's own
   icons, turned towards you like a watch: the magazine and what you carry,

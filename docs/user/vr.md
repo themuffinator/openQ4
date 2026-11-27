@@ -315,12 +315,32 @@ The controllers vibrate: your weapon hand with every shot, and both hands when
 you are hit, harder for bigger hits. **New in 0.15.0:** the lightning gun's
 beam and the gauntlet's blade hum in your hand too.
 
+**Not in 0.15.0.** The controllers tell you more:
+
+- **Where a hit came from.** The hand on that side feels it most, judged
+  from where your head faces; a hit from straight ahead or behind still
+  shakes both hands alike.
+- **Blasts nearby.** A rocket, a grenade, an exploding barrel or vehicle,
+  even a heavy Strogg's footfall, rumbles both hands with its screen shake,
+  harder the nearer and bigger it is, whether or not it hurts you.
+- **Reloading.** Your off hand, the one that goes to the gun, ticks with each
+  step you hear: the magazine out, the magazine in, the bolt, each shotgun
+  shell.
+- **Drawing a weapon.** Your weapon hand feels the new gun come up.
+- **Landing from a fall.** Both hands jolt, harder the farther you fell; an
+  ordinary jump stays still.
+
+Every pulse comes with a sound or something you see, so you never miss one by
+touch alone. To keep the shots and hits but turn the rest down or off, use
+`vr_hapticEvents` in the console.
+
 | Setting | Default | What it does |
 | --- | --- | --- |
 | `vr_aimMode` | 1 | 1 aim with the controller, 0 aim with your head |
 | `vr_aimLaser` | 1 | 0 no marker, 1 laser dot, 2 laser dot and a beam from the gun |
 | `vr_twoHanded` | 1 | 1 the off-hand grip on the foregrip holds the gun in both hands, 0 it always opens the weapon wheel |
 | `vr_hapticStrength` | 1 | vibration strength, from 0 (off) to 1 (full) |
+| `vr_hapticEvents` | 1 | **Not in 0.15.0.** Vibration for blasts, reload steps, drawing a weapon and landing, from 0 (off) to 1; shots, hits, beams and the foregrip keep `vr_hapticStrength` alone |
 | `vr_leftHanded` | 0 | 1 holds the weapon in your left hand |
 
 ### Your body
