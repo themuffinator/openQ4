@@ -511,8 +511,8 @@ the [development roadmap](../roadmap.md) for current scope.
 - **3D headphone audio (HRTF) is now off unless you choose it.** If you had
   **Headphone HRTF** on Auto, which was the default, it is moved to Off once. To
   have it back, open Settings, then Audio, and set **Headphone HRTF** to **On**
-  or **Auto**. VR players who want sounds placed around the head should turn it
-  on.
+  or **Auto**. VR is not affected: the game uses it by itself while you wear
+  the headset (`vr_hrtf 0` stops that).
 
 - **Low** no longer draws shadows, so it holds its 60 FPS cap on low-end
   graphics. Select Low again (or accept the system check's recommendation) to
@@ -601,6 +601,9 @@ the [development roadmap](../roadmap.md) for current scope.
   is plugged in. It thinned the bass of every sound in the world beside your
   own weapon and the music. It is a choice in Settings, Audio: Off (default),
   On, or Auto for the old behaviour.
+- In VR, sounds are placed around your head whatever that desktop choice is:
+  the game turns 3D headphone audio on while it presents to a headset and back
+  to your choice afterwards, without interrupting the sound.
 - The **Low** preset holds its 60 FPS cap on low-end graphics again. Since the
   presets stopped lowering the resolution, Low drew every pixel and fell to
   44-55 FPS in battles and open areas on an Intel Iris Xe at 1080p. It now

@@ -786,4 +786,11 @@ public:
 
 extern	idSoundSystemLocal	soundSystemLocal;
 
+// The HRTF mode to ask the output for (0 auto, 1 off, 2 on): Headphone HRTF
+// (s_openALHRTF), or on while a VR headset session runs and vr_hrtf is set
+// (SoundHrtfPolicy.h). Main thread only.
+int		Sound_RequestedHrtfMode();
+// True when that mode is the headset's doing instead of the player's own choice.
+bool	Sound_HrtfRequestedForHeadset();
+
 #endif /* !__SND_LOCAL_H__ */

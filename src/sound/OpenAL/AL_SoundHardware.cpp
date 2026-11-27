@@ -361,7 +361,8 @@ static bool openQ4_LoadHardwareEfxProcs() {
 
 static int openQ4_GetHrtfMode()
 {
-	return idMath::ClampInt( OPENQ4_OPENAL_HRTF_AUTO, OPENQ4_OPENAL_HRTF_ON, s_openALHRTF.GetInteger() );
+	// Headphone HRTF, or on for a running VR headset session (Sound_RequestedHrtfMode)
+	return idMath::ClampInt( OPENQ4_OPENAL_HRTF_AUTO, OPENQ4_OPENAL_HRTF_ON, Sound_RequestedHrtfMode() );
 }
 
 static const char* openQ4_HrtfModeName( const int mode )
@@ -552,7 +553,7 @@ static void openQ4_ReportHrtfPreference( ALCdevice* device )
 	// alcGetStringiSOFT lists the HRTFs; the preference itself is applied
 	// through openQ4_BuildDeviceAttributes when the context is created.
 	openQ4_LoadHrtfProcs( device );
-	common->Printf( "OpenAL HRTF requested mode: %s\n", openQ4_HrtfModeName( mode ) );
+	common->Printf( "OpenAL HRTF requested mode: %s%s\n", openQ4_HrtfModeName( mode ), Sound_HrtfRequestedForHeadset() ? " (for the VR headset, vr_hrtf)" : "" );
 }
 
 static void openQ4_ReportHrtfStatus( ALCdevice* device )
@@ -1321,7 +1322,8 @@ bool idSoundHardware_OpenAL::UpdateDeviceMonitoring() {
 	// restart, which reloads every sample, is only the fallback.
 	const int hrtfMode = openQ4_GetHrtfMode();
 	if( hrtfMode != openedHrtfMode ) {
-		common->Printf( "OpenAL HRTF mode changed from %s to %s.\n", openQ4_HrtfModeName( openedHrtfMode ), openQ4_HrtfModeName( hrtfMode ) );
+		common->Printf( "OpenAL HRTF mode changed from %s to %s%s.\n", openQ4_HrtfModeName( openedHrtfMode ), openQ4_HrtfModeName( hrtfMode ),
+			Sound_HrtfRequestedForHeadset() ? " (for the VR headset, vr_hrtf)" : "" );
 		if( TryResetDevice( "HRTF mode changed" ) )
 		{
 			return false;

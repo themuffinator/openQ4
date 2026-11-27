@@ -22,7 +22,11 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   made the game sound thin. It is now off until you choose it.
 - **If you want it:** Settings > Audio > Headphone HRTF. **On** always uses it,
   **Auto** brings back the old behaviour. It helps you hear where sounds are on
-  headphones, VR headsets included, at the cost of that change in tone.
+  headphones, at the cost of that change in tone.
+- **In VR it is on by itself.** A headset's speakers sit on your ears, so the
+  game uses 3D headphone audio while it presents to a headset and goes back to
+  your desktop choice afterwards. `vr_hrtf 0` makes the headset follow that
+  choice instead.
 - **Upgrading:** a profile that had this on Auto, which was the default, is
   moved to Off once. A choice you make afterwards is kept.
 - Evidence: hidden launches show a fresh profile and a profile from an earlier
@@ -30,7 +34,10 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   staying where they are put. On a real output that Windows labels headphones,
   opened at zero volume, the default reports HRTF disabled where Auto reports
   it enabled. The gameplay run that switches HRTF on and off in the middle of a
-  line passes all 34 checks. Nobody has listened to it yet.
+  line passes all its checks. With the simulated headset, entering VR turns HRTF
+  on without restarting the sound, a session restart leaves it alone, leaving
+  VR turns it off after a five-second hold, and `vr_hrtf 0` keeps it off.
+  Nobody has listened to it yet, on headphones or in a headset.
   [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
 
 ## Sounds get their treble back, 27 November 2026

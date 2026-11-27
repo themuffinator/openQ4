@@ -29,6 +29,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "snd_local.h"
 #include "SoundSettings.h"
+#include "SoundHrtfPolicy.h"
 #include "SoundRestart.h"
 #include "SoundMemoryTrim.h"
 #include "SoundCapture.h"
@@ -58,6 +59,27 @@ idCVar s_useEAXReverb( "s_useEAXReverb", "1", CVAR_SOUND | CVAR_ARCHIVE | CVAR_B
 // endpoint the system labels headphones, whatever is plugged in, and its built-in HRTF
 // thins the bass of every positional sound (docs/dev/audio-modernization.md).
 idCVar s_openALHRTF( "s_openALHRTF", "1", CVAR_ARCHIVE | CVAR_INTEGER, "OpenAL Soft HRTF (3D headphone audio): 0 = auto (on when the output device says it is headphones), 1 = off, 2 = on", 0, 2, idCmdSystem::ArgCompletion_Integer<0,2> );
+// A headset is headphones: its session asks for HRTF by itself (vr_hrtf), and keeps it
+// through a short stop so the output is not reset twice (SoundHrtfPolicy.h).
+extern idCVar vr_hrtf;
+static soundVrHrtfState_t soundVrHrtf;
+
+static bool Sound_HeadsetEngaged()
+{
+	return SoundVrHrtfEngaged( soundVrHrtf, vrSystem != NULL && vrSystem->IsPacing(), Sys_Milliseconds() );
+}
+
+int Sound_RequestedHrtfMode()
+{
+	return SoundRequestedHrtfMode( s_openALHRTF.GetInteger(), vr_hrtf.GetBool(), Sound_HeadsetEngaged() );
+}
+
+bool Sound_HrtfRequestedForHeadset()
+{
+	const int chosen = SoundRequestedHrtfMode( s_openALHRTF.GetInteger(), false, false );
+	return chosen != Sound_RequestedHrtfMode();
+}
+
 idCVar s_openALEfxDebugMode( "s_openALEfxDebugMode", "0", CVAR_INTEGER, "OpenAL wet/dry debug mode (0=normal, 1=wet-only, 2=dry-only)" );
 // 0 leaves the layout to the output device, so headphones get stereo (and OpenAL
 // Soft's automatic HRTF) and a 5.1 or 7.1 system gets its own channels. Requesting

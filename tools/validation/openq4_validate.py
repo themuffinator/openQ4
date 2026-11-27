@@ -927,6 +927,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'sound_volume_retail_contract.py', []),
         (root / "tools" / "tests" / 'sound_screen_shake.py', []),
         (root / "tools" / "tests" / 'sound_resampler.py', []),
+        (root / "tools" / "tests" / 'sound_vr_hrtf.py', []),
         (root / "tools" / "tests" / 'audio_decode_budget.py', []),
         (root / "tools" / "tests" / 'audio_memory.py', []),
         (root / "tools" / "tests" / 'audio_stream_budget.py', []),

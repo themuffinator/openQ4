@@ -65,7 +65,7 @@ struct Entry {
 };
 bool DependenciesAt(std::uint64_t events) noexcept {
 	return !s_noSound.GetBool() && s_useOpenAL.GetBool() && !soundSystemLocal.needsRestart &&
-		s_openALHRTF.GetInteger()==state.baseline.requestedHrtf &&
+		Sound_RequestedHrtfMode()==state.baseline.requestedHrtf &&
 		s_openALEfxDebugMode.GetInteger()==state.debug &&
 		strcmp(s_deviceName.GetString(),state.baseline.requestedDevice)==0 &&
 		deviceLifetimeSerial && deviceLifetimeSerial==state.baseline.deviceLifetime &&
@@ -147,7 +147,7 @@ struct SoundSettingsAccess {
 		SOUND_READ_TEST(alcIsExtensionPresent(d,"ALC_SOFT_output_mode"));
 		SOUND_READ_TEST(alcIsExtensionPresent(d,"ALC_EXT_disconnect"));
 		SoundSettingsObservation c;
-		c.requested=Policy(); c.requestedHrtf=s_openALHRTF.GetInteger(); c.deviceLifetime=deviceLifetimeSerial;
+		c.requested=Policy(); c.requestedHrtf=Sound_RequestedHrtfMode(); c.deviceLifetime=deviceLifetimeSerial;
 		c.device=reinterpret_cast<std::uintptr_t>(d); c.context=reinterpret_cast<std::uintptr_t>(h.openalContext);
 		c.generation=generation; c.normalUpdate=updateSerial; c.muted=soundSystemLocal.IsMuted();
 		bool all=false; SOUND_READ_CALL(all=alcIsExtensionPresent(d,"ALC_ENUMERATE_ALL_EXT")!=ALC_FALSE);
@@ -187,7 +187,7 @@ struct SoundSettingsAccess {
 		}
 		SOUND_READ_TEST(alcGetError(d)==ALC_NO_ERROR); SOUND_READ_TEST(alGetError()==AL_NO_ERROR);
 		SOUND_READ_TEST(alcGetCurrentContext()==context);
-		if (!Same(c.requested,Policy()) || c.requestedHrtf!=s_openALHRTF.GetInteger() || strcmp(c.requestedDevice,s_deviceName.GetString())) return false;
+		if (!Same(c.requested,Policy()) || c.requestedHrtf!=Sound_RequestedHrtfMode() || strcmp(c.requestedDevice,s_deviceName.GetString())) return false;
 		out=c; return true;
 #else
 		(void)out; return false;
@@ -319,7 +319,7 @@ struct SoundSettingsAccess {
 		// These legacy monitoring fields are explicitly REQUEST caches. Actual
 		// output remains separately queried, including an existing legacy fallback.
 		soundSystemLocal.hardware.openedSpeakerCount=s_numberOfSpeakers.GetInteger();
-		soundSystemLocal.hardware.openedHrtfMode=s_openALHRTF.GetInteger();
+		soundSystemLocal.hardware.openedHrtfMode=Sound_RequestedHrtfMode();
 	}
 };
 
@@ -391,7 +391,7 @@ bool SoundSettings_Begin(std::uint64_t owner,std::uint64_t request,SoundSettings
 		captured.requestedHrtf<0 || captured.requestedHrtf>2 ||
 		(target.speakers!=captured.requested.speakers && target.speakers==6 && captured.requestedHrtf==2) ||
 		(target.efx!=captured.requested.efx && target.efx && !captured.filters) ||
-		!Same(Policy(),captured.requested) || s_openALHRTF.GetInteger()!=captured.requestedHrtf ||
+		!Same(Policy(),captured.requested) || Sound_RequestedHrtfMode()!=captured.requestedHrtf ||
 		strcmp(s_deviceName.GetString(),captured.requestedDevice) || !Advance(tokenSerial))
 		return Fail(error,size,"Audio settings are unsupported or the baseline is unverifiable.");
 	state.lease={owner,request,tokenSerial}; state.target=target; state.baseline=captured;

@@ -75,6 +75,8 @@ static void SoundVoiceChat_Render(){}
 static int Sys_Milliseconds(){return 2000;}
 // No capture runs here, so Render keeps the real-time clock and never mixes capture slices.
 static bool Sound_CaptureActive(){return false;}
+// No headset here: the requested HRTF mode is the Headphone HRTF choice (sound_vr_hrtf.py has the VR rule).
+static int Sound_RequestedHrtfMode(){return s_openALHRTF.GetInteger();}
 int idSoundSystemLocal::RealSoundTime() const{return Sys_Milliseconds();}
 static bool mainThread=true; bool SDL_IsMainThread(){return mainThread;}
 static int automaticMonitor=0;

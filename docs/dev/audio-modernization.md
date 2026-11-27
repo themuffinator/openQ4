@@ -740,9 +740,26 @@ opened at zero volume, the default reports HRTF disabled and basic stereo,
 where Auto and On both report HRTF enabled. `audio_output_recovery_runtime.py`
 still passes its 34 checks, which switch HRTF on and off during a line. The
 audio harnesses that passed `s_openALHRTF 0` only to mean the default now pass 1.
-VR is the exception worth a decision: a headset is headphones, and the
-[Alyx study](vr-half-life-alyx-study.md) counted on Auto. VR players choose On
-for now.
+
+**A VR headset asks for HRTF by itself (decided the same day).** A headset is
+headphones, and the [Alyx study](vr-half-life-alyx-study.md) had counted on
+Auto. A default Off cannot be told from a chosen one, so the headset gets its
+own setting instead of reading the desktop's: `vr_hrtf`, on by default. Every
+reader of the mode goes through `Sound_RequestedHrtfMode`: Headphone HRTF, or on
+while a headset session runs (`idVRSystem::IsPacing`) and `vr_hrtf` is set. The
+rule is `SoundHrtfPolicy.h`, which also holds the mode for five seconds after
+a session stops, so a session restart, the runtime's own menu or a headset
+lifted for a moment does not reset the output device twice. The device
+attributes, the periodic monitor and the checked settings transaction all use
+it, so changing Surround Speakers in VR keeps HRTF. Against the openQ4 OpenXR
+test runtime, hidden and rendered to a file: the device opens with HRTF off,
+the session presents and the mode changes to on in place (`for the VR headset,
+vr_hrtf` in the log) with HRTF enabled; `vr_restart` causes no reset; turning VR
+Mode off holds for 2.5 s and has gone back to off by 10 s; `vr_hrtf 0` never
+turns it on; and with Headphone HRTF already On nothing resets either way.
+`sound_vr_hrtf.py` pins the rule, the hold and the wiring. No real headset has
+been listened to, and whether each headset's audio device is the system's
+default output is the player's set-up, as before.
 
 **Stale test doubles.** `sound_settings.py` and `sound_recovery.py` had not
 compiled since the 23 November capture work added a loopback flag and a capture
@@ -755,9 +772,8 @@ machine and vary by a factor of two between runs.
 
 ## Deferred
 
-- **HRTF in VR.** Headphone HRTF is opt-in everywhere since 27 November. Whether a
-  presenting headset should request it without being asked is open; it needs
-  listening on headsets, and a way to tell a default Off from a chosen one.
+- **A menu row for `vr_hrtf`.** It is a console setting; the Virtual Reality tab
+  has no row for it yet. Listening on real headsets is still wanted.
 
 - **Audible distance units.** Current `DOOM_TO_METERS` and `METERS_TO_DOOM` are both
   `1.0f` in `src/sound/sound.h`; the earlier claim that the mixer necessarily converts

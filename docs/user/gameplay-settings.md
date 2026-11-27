@@ -219,7 +219,7 @@ Reverb needs OpenAL Soft, the sound library openQ4 ships on Windows and macOS an
 
 ### Speakers and headphones
 
-openQ4 follows your audio device by default: headphones and stereo speakers get stereo, and a 5.1 or 7.1 system gets all of its channels. 3D headphone audio (HRTF, which makes sounds seem to come from above, behind and around you) is off unless you turn it on. It helps you place sounds on headphones, but it also changes their tone: sounds in the world lose some bass beside your own weapon and the music. It does not suit speakers.
+openQ4 follows your audio device by default: headphones and stereo speakers get stereo, and a 5.1 or 7.1 system gets all of its channels. 3D headphone audio (HRTF, which makes sounds seem to come from above, behind and around you) is off unless you turn it on. It helps you place sounds on headphones, but it also changes their tone: sounds in the world lose some bass beside your own weapon and the music. It does not suit speakers. In VR the game turns it on by itself while you wear the headset; see the [VR guide](vr.md#sound).
 
 - **Settings → Audio → Surround Speakers**: **Auto** (default) uses the device's own layout, **Off** always plays stereo, as the original game did by default, and **On** always plays 5.1. On a stereo device 5.1 is downmixed and headphone audio cannot engage, so choose **On** only for a 5.1 system that reports the wrong layout.
 - **Settings → Audio → Headphone HRTF**: **Off** (default), **On**, or **Auto**, which turns it on whenever your system says the output is headphones. Many laptop and front-panel outputs say so whatever is plugged in, which is why Auto is no longer the default. If you played an earlier version with this on Auto, it was moved to Off once; choose **On** or **Auto** to have it back.
@@ -360,7 +360,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `s_useEAXReverb` | `1` | Room reverb and door muffling. Apply a console change with `s_restart`. |
 | `s_useEAXOcclusion` | `1` | Closed doors muffle sounds behind them while reverb is on. |
 | `s_numberOfSpeakers` | `0` | `0` follow the device, `2` stereo, `6` 5.1. |
-| `s_openALHRTF` | `1` | Headphone HRTF: `0` automatic, `1` off, `2` on. |
+| `s_openALHRTF` | `1` | Headphone HRTF: `0` automatic, `1` off, `2` on. A VR headset uses it regardless unless `vr_hrtf` is `0`. |
 | `s_sourceRadiusScale` | `0.5` | Sound size; `0` makes every sound a point. |
 | `s_directStereo` | `1` | Stereo sounds bypass 3D headphone audio. |
 | `s_resampler` | `auto` | Upsampling filter; `listResamplers` lists the choices. |

@@ -605,6 +605,7 @@ jobs:
             tools/tests/sound_volume_retail_contract.py \
             tools/tests/sound_screen_shake.py \
             tools/tests/sound_resampler.py \
+            tools/tests/sound_vr_hrtf.py \
             tools/tests/audio_asset_inventory.py \
             tools/tests/audio_center.py \
             tools/tests/audio_decode_budget.py \
@@ -1190,6 +1191,7 @@ jobs:
           python tools/tests/sound_volume_retail_contract.py
           python tools/tests/sound_screen_shake.py
           python tools/tests/sound_resampler.py
+          python tools/tests/sound_vr_hrtf.py
           python tools/tests/audio_decode_budget.py
           python tools/tests/audio_memory.py
           python tools/tests/audio_stream_budget.py

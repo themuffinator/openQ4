@@ -7851,8 +7851,11 @@ the non-verbal remainder is marked for players rather than counted as covered.
   turn it on for any endpoint Windows calls headphones. HRTF is opt-in now:
   the default is 1 (off), and an archived 0 moves to it once. Fresh, archived
   and chosen profiles are checked in hidden launches, and this machine's
-  headphone-labelled endpoint reports HRTF disabled by default. Open: whether a
-  presenting VR headset should request HRTF unasked.
+  headphone-labelled endpoint reports HRTF disabled by default. A VR headset
+  session asks for HRTF by itself (`vr_hrtf`, on by default) and gives the
+  desktop its choice back five seconds after it stops; the OpenXR test runtime
+  run and `sound_vr_hrtf.py` cover it. Open: listening on a real headset, and a
+  Virtual Reality tab row for `vr_hrtf`.
   [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
 - [ ] **AUD-05 — P1, implementation: functional multiplayer voice.** Capture,
   codec, transport and playback are implemented with explicit microphone consent,
