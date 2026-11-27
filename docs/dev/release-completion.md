@@ -45,6 +45,23 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## Outdoor lamps keep their sharp shadows when you look up, 27 November 2026
+
+- **Looking up no longer blurs every shadow of a big outdoor lamp.** On
+  Quality and Ultra the large lamps that light open areas draw their shadows
+  in several slices, finest near you. As soon as the view rose past the height
+  of the lamp itself, the game gave up on the slices and drew one coarse map
+  of the whole light, so the shadows around you went soft whenever you looked
+  up. The slices are now kept. On the landing site, looking up from under its
+  main lamp, the shadows near you resolve about 1 unit a texel where they
+  resolved 66, and 87% of the reference shadow is kept where 68% was, on
+  OpenGL and Vulkan alike. Spotlights on Maximum gain the same way when you
+  stand beside them.
+- **What to do.** Nothing.
+- Developer detail:
+  [a slice behind the source plane](shadowmapping-audit-2026-11-27.md#a-slice-behind-the-source-plane).
+  No ABI change.
+
 ## Sharper sunlight shadows close to you, and a shadow-map tidy-up on both renderers, 27 November 2026
 
 - **Sunlight shadows near the player are finer on Quality and Ultra.** A

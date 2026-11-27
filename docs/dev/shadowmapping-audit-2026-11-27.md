@@ -8,7 +8,8 @@ and the receivers that sample the maps. It follows the
 FPS-03 in the [roadmap](roadmap.md).
 
 Five independent read-throughs produced about thirty candidates. Each was
-checked against the code before anything changed. Fourteen were fixed here, one
+checked against the code before anything changed. Fourteen were fixed here, a
+fifteenth (the cascade collapse behind a light's source plane) the same day, one
 was measured and left, and the rest are recorded below as leads with the reason
 each was not taken.
 
@@ -43,6 +44,63 @@ each was not taken.
 | **A shadow program that failed to load was loaded again for every light of every view.** Each loader's cache test needs a program object to pass and a failed load leaves none: two file reads, a compile and a warning per light per view. Rendering fell back to stencil correctly; the frame rate and the log did not survive it. | **Fixed (OpenGL).** A failed load is remembered for its variant until the video restarts. |
 | **The projected filter read its centre texel twice.** The PCSS search's first probe is the texel the filter's centre tap compares, against the same biased depth. | **Fixed, both backends.** The filter takes the search's verdict: one fetch in ten fewer on a fully lit pixel, one in nineteen elsewhere (two under Vulkan's ownership union). Bit-identical. |
 
+## A slice behind the source plane
+
+Done as a follow-up the same day.
+
+**A cascaded light fell to one map as soon as a view slice reached behind its
+source plane.** The fit projects sample points of each slice of the view into
+the light's map. A point behind the plane the light shines from has a negative
+divide (`w`), and one such sample collapsed every cascade of the light into a
+single map of the whole light (`mixed-w-signs`). mcc_landing's `outdoor_Main`
+stands 280 units above its box: look up from the ground and the far slices rise
+past the source, and the three fitted cascades at 0.96, 2.9 and 53 units a
+texel became one map at 66. The same happened beside any cascaded spotlight at
+Maximum.
+
+A point behind the plane is outside the light and needs no place in its map, so
+the slice is now cut where the light begins (`R_ShadowMapLightNearW`: the
+smallest `w` of the light's own box or frustum). What is left of it is convex
+and in front of the plane, so its corners there, and the points where its
+twelve edges cross the plane, bound it exactly
+(`R_ShadowMapBuildCascadeBounds`). The fit still records `mixedWSigns`; no
+state reports the `mixed-w-signs` fallback any more. Samples between the source
+plane and the start of the light's volume, which used to stretch a crop
+towards the whole map, are cut the same way.
+
+A slice wholly behind the plane still falls back to one map
+(`insufficient-valid-samples`): it holds nothing the light reaches. In play
+that needs the camera outside the light, or more than a cascade's depth behind
+a spotlight's lamp.
+
+- **Before and after in one launch**, mcc_landing at Quality, twelve views from
+  the middle of the light looking up 35, 50 and 70 degrees at four headings,
+  1920x1080, scored against the stencil picture of the same frozen moment, with
+  a temporary switch restoring the collapse (removed before the commit). Every
+  view took the collapse before. OpenGL: 68.0% of stencil's shadow kept before,
+  87.1% after (82.7% to 95.3% allowing two pixels of offset), and 10,114
+  pixels darkened where stencil leaves them lit against 4,956. Vulkan: 68.7%
+  to 87.1%, and 10,565 to 5,198.
+- **What it does not improve.** The far slice of such a view reaches the top
+  of the light's box, where the light's fan is narrowest, so its crop has to
+  span nearly the whole map: 53 units a texel against the single map's 66. A
+  shadow one or two texels wide there is luck in either picture; in one view a
+  wedge that stencil draws is smeared by the old map and absent in the new.
+  The debug views show that region in the third cascade with no invalid
+  lookup: resolution, not coverage.
+- **Self-test.** `R_ShadowMapCascadeSourcePlaneSelfTest` builds that light and
+  45 views of it, from level to 85 degrees up. Every view keeps four cascades;
+  16,134 points spread through the slices and inside the light's box all land
+  inside their slice's crop; 24 slices are cut at the plane, 18 of them
+  reaching behind the source. The planner's diagnostic fixture, whose every
+  slice straddles the plane, now expects three cascades where it expected the
+  fallback.
+- **Found on the way:** the opt-in modern planner refused every far-shell
+  light. Its invariant required a positive cascade bias scale, and a map of
+  far faces scales its receiver bias to zero by design (24 November). It logged
+  `projected bias scale is invalid` and put the light on its stencil fallback.
+  Zero is accepted where the light's receiver bias scale is zero.
+
 ## Measured and left
 
 **Skipping the blocker search under distant suns.** A distant point light's
@@ -59,13 +117,6 @@ it is.
 
 Not done in this round. Each is real; the note says why it waited.
 
-- **A cascaded light collapses to one map when a view slice reaches behind
-  its source plane** (`fit.mixedWSigns`). Points behind the source are outside
-  the light, so only the part in front needs covering; clipping the slice's
-  twelve edges at the plane would keep the cascades. It matters for wide
-  sources at Quality and Ultra when the player looks up past the source's
-  height, and for spotlights at Maximum. Two self-tests and the diagnostic
-  contract pin the collapse, and the change needs a scene that shows it.
 - **Cascade scale steps with camera yaw.** Each slice's light-space box is
   quantised to a 1.25 ladder per axis, so the crop size changes fifteen to
   twenty-four times in a full turn at the Air Defense 1 fixture. A

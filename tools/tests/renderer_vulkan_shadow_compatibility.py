@@ -9371,6 +9371,81 @@ def validate_static_cutout_caster_contract() -> None:
     )
 
 
+def validate_source_plane_cascade_contract() -> None:
+    """A view slice that reaches behind a cascaded light's source plane is cut
+    where the light begins. It used to collapse the light to one map.
+
+    Looking up past the height of an outdoor lamp (mcc_landing's outdoor_Main
+    at Quality), one sample with a negative w traded three fitted cascades
+    for a map of the whole light at 66 units a texel. The fit now bounds the
+    part of the slice in front of the plane: its corners there and the points
+    where its edges cross the plane.
+    """
+    projected = read("src/renderer/ShadowMapProjected.cpp")
+    near_w = braced_body(projected, "static float R_ShadowMapLightNearW(", "light near w")
+    require_order(
+        near_w,
+        (
+            "if ( parms.pointLight ) {",
+            "parms.origin + local * parms.axis",
+            "lightDef->frustumTris->verts[i].xyz",
+            "if ( !( nearW > SHADOWMAP_CASCADE_W_EPSILON ) || nearW >= idMath::INFINITY ) {",
+            "return SHADOWMAP_CASCADE_W_EPSILON;",
+        ),
+        "the plane is where the light's own volume begins, or the old epsilon",
+    )
+    bounds = braced_body(projected, "static bool R_ShadowMapBuildCascadeBounds(", "cascade bounds")
+    require_order(
+        bounds,
+        (
+            "const float wClip = R_ShadowMapLightNearW( vLight, baseClipPlanes );",
+            "if ( clip.w <= wEpsilon || clip.w < wClip ) {",
+            "fit.mixedWSigns = ( fit.positiveWPoints > 0 && fit.negativeWPoints > 0 );",
+            "SHADOWMAP_SLICE_EDGES[edge][0]",
+            "if ( ( wa >= wClip ) == ( wb >= wClip ) ) {",
+            "const idVec4 crossing = cornerClip[a] + ( cornerClip[b] - cornerClip[a] ) * t;",
+            "planeCrossings++;",
+            "if ( fit.validPoints + planeCrossings < 4 ) {",
+            "fit.fallbackReason = SHADOWMAP_PROJECTED_FALLBACK_INSUFFICIENT_VALID_SAMPLES;",
+        ),
+        "a slice is bounded by its corners in front of the plane and its edges' crossings",
+    )
+    fit = braced_body(projected, "static void R_BuildShadowMapProjectedLightStateFit(", "projected state fit")
+    if "SHADOWMAP_PROJECTED_FALLBACK_MIXED_W_SIGNS" in fit:
+        raise AssertionError("A slice behind the source plane must not collapse the light's cascades")
+    selftest = braced_body(projected, "bool R_ShadowMapCascadeSourcePlaneSelfTest(", "source-plane self-test")
+    require_order(
+        selftest,
+        (
+            "R_ShadowMapCascadeSourcePlaneCase(",
+            "if ( receivers < 1000 || cutSlices < 4 || mixedSlices < 2 ) {",
+        ),
+        "the self-test's views reach behind the source",
+    )
+    case = braced_body(projected, "static bool R_ShadowMapCascadeSourcePlaneCase(", "source-plane case")
+    require_order(
+        case,
+        (
+            "if ( !state.valid || state.cascadeFallback || state.cascadeCount != cascades",
+            "state.worldTexelSize[0] < state.worldTexelSize[cascades - 1] * 0.25f",
+            "R_ShadowMapBuildSliceCorners( &view, state.sliceNear[cascade], state.sliceFar[cascade], corners );",
+            "R_ShadowMapTransformPointToClip( receiver, state.clipPlanes[cascade], clip );",
+        ),
+        "every point of a slice inside the light lands inside the slice's crop",
+    )
+    planner = read("src/renderer/ModernShadowPlanner.cpp")
+    require(planner, "if ( !R_ShadowMapCascadeSourcePlaneSelfTest() ) {", "diagnostic self-test runs the source-plane case")
+    ready = braced_body(planner, "static bool R_ModernShadowPlanner_ProjectedFallbackReasonReady(", "planner fallback contract")
+    if "projectedNegativeWPoints == 0" in ready:
+        raise AssertionError("A fitted light may have samples behind its source plane")
+    # A far-shell light scales its receiver bias to nothing; zero is valid there.
+    require_compact(
+        planner,
+        "( descriptor.receiverBiasScale <= 0.0f && descriptor.cascadeBiasScale[cascadeIndex] == 0.0f )",
+        "planner accepts the zero bias scale of a far-shell light",
+    )
+
+
 def validate_ci_registration() -> None:
     validator = read("tools/validation/openq4_validate.py")
     commit = read(".github/workflows/commit-validation.yml")
@@ -10672,6 +10747,7 @@ def main() -> None:
     validate_resident_projected_sampling_contract()
     validate_prelight_caster_contract()
     validate_layered_point_cube_contract()
+    validate_source_plane_cascade_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

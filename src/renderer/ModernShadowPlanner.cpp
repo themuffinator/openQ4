@@ -752,9 +752,9 @@ static bool R_ModernShadowPlanner_ProjectedSampleCountsReady( const modernShadow
 
 static bool R_ModernShadowPlanner_ProjectedFallbackReasonReady( const modernShadowLightDescriptor_t &descriptor ) {
 	if ( !descriptor.projectedCascadeFallback ) {
+		// Samples behind the source plane are no fallback: the fit cuts such
+		// a slice where the light begins (R_ShadowMapBuildCascadeBounds).
 		return descriptor.projectedFallbackReason == SHADOWMAP_PROJECTED_FALLBACK_NONE
-			&& descriptor.projectedMixedWSignCascades == 0
-			&& descriptor.projectedNegativeWPoints == 0
 			&& descriptor.projectedPositiveWPoints > 0;
 	}
 
@@ -1042,7 +1042,10 @@ static bool R_ModernShadowPlanner_ValidateProjectedDescriptor( modernShadowLight
 		valid &= R_ModernShadowPlanner_CheckDescriptorInvariant( descriptor, MODERN_SHADOW_DESCRIPTOR_INVARIANT_PROJECTED_STATE, R_ModernShadowPlanner_ProjectedPlanesReady( descriptor.projectedClipPlanes[cascadeIndex] ), stage, "projected clip planes contain invalid values" );
 		valid &= R_ModernShadowPlanner_CheckDescriptorInvariant( descriptor, MODERN_SHADOW_DESCRIPTOR_INVARIANT_SPLIT_DEPTHS, R_ModernShadowPlanner_FloatReady( descriptor.sliceNear[cascadeIndex] ) && R_ModernShadowPlanner_FloatReady( descriptor.sliceFar[cascadeIndex] ) && descriptor.sliceFar[cascadeIndex] > descriptor.sliceNear[cascadeIndex], stage, "projected slice range is invalid" );
 		valid &= R_ModernShadowPlanner_CheckDescriptorInvariant( descriptor, MODERN_SHADOW_DESCRIPTOR_INVARIANT_SPLIT_DEPTHS, R_ModernShadowPlanner_FloatReady( descriptor.depthRange[cascadeIndex] ) && descriptor.depthRange[cascadeIndex] > 0.0f, stage, "projected depth range is invalid" );
-		valid &= R_ModernShadowPlanner_CheckDescriptorInvariant( descriptor, MODERN_SHADOW_DESCRIPTOR_INVARIANT_SPLIT_DEPTHS, R_ModernShadowPlanner_FloatReady( descriptor.cascadeBiasScale[cascadeIndex] ) && descriptor.cascadeBiasScale[cascadeIndex] > 0.0f, stage, "projected bias scale is invalid" );
+		valid &= R_ModernShadowPlanner_CheckDescriptorInvariant( descriptor, MODERN_SHADOW_DESCRIPTOR_INVARIANT_SPLIT_DEPTHS, R_ModernShadowPlanner_FloatReady( descriptor.cascadeBiasScale[cascadeIndex] )
+			// a map of far faces scales its receiver bias to nothing: zero is its contract
+			&& ( descriptor.cascadeBiasScale[cascadeIndex] > 0.0f
+				|| ( descriptor.receiverBiasScale <= 0.0f && descriptor.cascadeBiasScale[cascadeIndex] == 0.0f ) ), stage, "projected bias scale is invalid" );
 		if ( cascadeIndex > 0 ) {
 			valid &= R_ModernShadowPlanner_CheckDescriptorInvariant( descriptor, MODERN_SHADOW_DESCRIPTOR_INVARIANT_SPLIT_DEPTHS, descriptor.sliceNear[cascadeIndex] >= descriptor.sliceFar[cascadeIndex - 1] - 0.25f, stage, "projected slice ranges are not monotonic" );
 		}
@@ -3155,6 +3158,10 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (whole-light cascade)\n" );
 		return false;
 	}
+	if ( !R_ShadowMapCascadeSourcePlaneSelfTest() ) {
+		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (source-plane cascade)\n" );
+		return false;
+	}
 	if ( !R_ShadowMapDistantNormalOffsetSelfTest() ) {
 		common->Printf( "RendererShadowProjectedDiagnostic self-test failed (distant normal offset)\n" );
 		return false;
@@ -3610,34 +3617,48 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 	mixedWLight.lightProject[2] = idPlane( 0.0f, 0.0f, 0.010f, 0.0f );
 	shadowMapProjectedLightState_t mixedWState;
 	R_BuildShadowMapProjectedLightState( &mixedWLight, &view, descriptor->resolution, mixedWState );
-	const int mixedWFallbackCascade = idMath::ClampInt( 0, SHADOWMAP_PROJECTED_MAX_CASCADES - 1, mixedWState.fallbackCascade );
-	const shadowMapProjectedCascadeFit_t &mixedWFit = mixedWState.cascadeFit[mixedWFallbackCascade];
-	if ( !mixedWState.valid || !mixedWState.cascadeFallback || mixedWState.fallbackReason != SHADOWMAP_PROJECTED_FALLBACK_MIXED_W_SIGNS || mixedWState.cascadeCount != 1 || mixedWState.atlasDiv != 1 || mixedWState.fallbackCascade < 0 || !mixedWFit.attempted || !mixedWFit.mixedWSigns || mixedWFit.sampleCount != SHADOWMAP_PROJECTED_CASCADE_SAMPLE_POINT_COUNT || mixedWFit.validPoints + mixedWFit.skippedPoints != mixedWFit.sampleCount || mixedWFit.positiveWPoints <= 0 || mixedWFit.negativeWPoints <= 0 || mixedWFit.skippedPoints <= 0 ) {
+	// The light's divide row now passes through the eye's height, so every
+	// slice of the view straddles the source plane. It used to fall to one
+	// map for that; the fit now cuts each slice at the plane and the light
+	// keeps the cascades of its twin above.
+	int mixedWSlices = 0;
+	int mixedWSamples = 0, mixedWValid = 0, mixedWSkipped = 0, mixedWPositive = 0, mixedWNegative = 0;
+	bool mixedWFitsReady = true;
+	for ( int cascadeIndex = 0; cascadeIndex < mixedWState.cascadeCount && cascadeIndex < SHADOWMAP_PROJECTED_MAX_CASCADES; cascadeIndex++ ) {
+		const shadowMapProjectedCascadeFit_t &fit = mixedWState.cascadeFit[cascadeIndex];
+		mixedWFitsReady = mixedWFitsReady && fit.attempted && fit.valid
+			&& fit.fallbackReason == SHADOWMAP_PROJECTED_FALLBACK_NONE
+			&& fit.sampleCount == SHADOWMAP_PROJECTED_CASCADE_SAMPLE_POINT_COUNT
+			&& fit.validPoints + fit.skippedPoints == fit.sampleCount;
+		mixedWSlices += fit.mixedWSigns ? 1 : 0;
+		mixedWSamples += fit.sampleCount;
+		mixedWValid += fit.validPoints;
+		mixedWSkipped += fit.skippedPoints;
+		mixedWPositive += fit.positiveWPoints;
+		mixedWNegative += fit.negativeWPoints;
+	}
+	if ( !mixedWState.valid || mixedWState.cascadeFallback || mixedWState.fallbackReason != SHADOWMAP_PROJECTED_FALLBACK_NONE || mixedWState.cascadeCount != 3 || mixedWState.atlasDiv != 2 || !mixedWFitsReady || mixedWSlices <= 0 || mixedWPositive <= 0 || mixedWNegative <= 0 || mixedWSkipped <= 0 ) {
 		common->Printf(
-			"RendererShadowProjectedDiagnostic self-test failed: mixed-W fallback valid=%d fallback=%d/%d reason=%s cascades=%d atlasDiv=%d fit(attempted=%d samples=%d valid=%d skipped=%d w=+%d/-%d/zero%d/nan%d invalidNdc=%d mixed=%d collapsed=%d)\n",
+			"RendererShadowProjectedDiagnostic self-test failed: source-plane slices valid=%d fallback=%d/%d reason=%s cascades=%d atlasDiv=%d fits=%d mixed=%d samples=%d valid=%d skipped=%d w=+%d/-%d\n",
 			mixedWState.valid ? 1 : 0,
 			mixedWState.cascadeFallback ? 1 : 0,
 			mixedWState.fallbackCascade,
 			R_ShadowMapProjectedFallbackReasonName( mixedWState.fallbackReason ),
 			mixedWState.cascadeCount,
 			mixedWState.atlasDiv,
-			mixedWFit.attempted ? 1 : 0,
-			mixedWFit.sampleCount,
-			mixedWFit.validPoints,
-			mixedWFit.skippedPoints,
-			mixedWFit.positiveWPoints,
-			mixedWFit.negativeWPoints,
-			mixedWFit.nearZeroWPoints,
-			mixedWFit.nanWPoints,
-			mixedWFit.invalidNdcPoints,
-			mixedWFit.mixedWSigns ? 1 : 0,
-			mixedWFit.collapsedBounds ? 1 : 0 );
+			mixedWFitsReady ? 1 : 0,
+			mixedWSlices,
+			mixedWSamples,
+			mixedWValid,
+			mixedWSkipped,
+			mixedWPositive,
+			mixedWNegative );
 		return false;
 	}
 	shadowMapArb2ParityState_t mixedWArb2State;
-	if ( !RB_ShadowMapBuildArb2ParityState( &mixedWLight, &view, descriptor->resolution, mixedWArb2State ) || !mixedWArb2State.valid || !mixedWArb2State.projectedCascadeFallback || mixedWArb2State.projectedState.fallbackReason != SHADOWMAP_PROJECTED_FALLBACK_MIXED_W_SIGNS || mixedWArb2State.cascadeCount != 1 || mixedWArb2State.atlasDiv != 1 ) {
+	if ( !RB_ShadowMapBuildArb2ParityState( &mixedWLight, &view, descriptor->resolution, mixedWArb2State ) || !mixedWArb2State.valid || mixedWArb2State.projectedCascadeFallback || mixedWArb2State.projectedState.fallbackReason != SHADOWMAP_PROJECTED_FALLBACK_NONE || mixedWArb2State.cascadeCount != 3 || mixedWArb2State.atlasDiv != 2 ) {
 		common->Printf(
-			"RendererShadowProjectedDiagnostic self-test failed: mixed-W ARB2 fallback valid=%d fallback=%d/%d reason=%s cascades=%d atlasDiv=%d\n",
+			"RendererShadowProjectedDiagnostic self-test failed: source-plane ARB2 state valid=%d fallback=%d/%d reason=%s cascades=%d atlasDiv=%d\n",
 			mixedWArb2State.valid ? 1 : 0,
 			mixedWArb2State.projectedCascadeFallback ? 1 : 0,
 			mixedWArb2State.projectedFallbackCascade,
@@ -3647,19 +3668,16 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 		return false;
 	}
 	common->Printf(
-		"SM projected-diagnostic fallbackValidation(light=%d reason=%s cascade=%d samples=%d valid=%d skipped=%d w=+%d/-%d/zero%d/nan%d invalidNdc=%d mixed=%d arb2=%d)\n",
+		"SM projected-diagnostic sourcePlaneValidation(light=%d cascades=%d fallback=%s mixedSlices=%d samples=%d valid=%d skipped=%d w=+%d/-%d arb2=%d)\n",
 		mixedWLightDef.index,
+		mixedWState.cascadeCount,
 		R_ShadowMapProjectedFallbackReasonName( mixedWState.fallbackReason ),
-		mixedWState.fallbackCascade,
-		mixedWFit.sampleCount,
-		mixedWFit.validPoints,
-		mixedWFit.skippedPoints,
-		mixedWFit.positiveWPoints,
-		mixedWFit.negativeWPoints,
-		mixedWFit.nearZeroWPoints,
-		mixedWFit.nanWPoints,
-		mixedWFit.invalidNdcPoints,
-		mixedWFit.mixedWSigns ? 1 : 0,
+		mixedWSlices,
+		mixedWSamples,
+		mixedWValid,
+		mixedWSkipped,
+		mixedWPositive,
+		mixedWNegative,
 		mixedWArb2State.valid ? 1 : 0 );
 
 	idVec4 localLightOrigin;
@@ -3778,7 +3796,7 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 		cascadeBlend,
 		arb2State.projectedState.cascadeCount );
 	common->Printf(
-		"RendererShadowProjectedDiagnostic self-test passed (light=%d classification=%s cascades=%d atlasDiv=%d projectedGate=%d/%d/%d/%d projectedTransform(pad=%.3f scale=%.6f baseS0=%.6f rawS0=%.6f) sampleValidation(samples=%d valid=%d skipped=%d w=+%d/-%d/zero%d/nan%d invalidNdc=%d mixed=%d reason=%s) fallbackValidation(reason=%s cascade=%d samples=%d valid=%d skipped=%d mixed=%d) parity=%d split0=%.3f split1=%.3f texel=%.7f status=%s)\n",
+		"RendererShadowProjectedDiagnostic self-test passed (light=%d classification=%s cascades=%d atlasDiv=%d projectedGate=%d/%d/%d/%d projectedTransform(pad=%.3f scale=%.6f baseS0=%.6f rawS0=%.6f) sampleValidation(samples=%d valid=%d skipped=%d w=+%d/-%d/zero%d/nan%d invalidNdc=%d mixed=%d reason=%s) sourcePlaneValidation(fallback=%s cascade=%d samples=%d valid=%d skipped=%d mixed=%d) parity=%d split0=%.3f split1=%.3f texel=%.7f status=%s)\n",
 		descriptor->lightDefIndex,
 		R_ShadowMapLightClassName( classification.lightClass ),
 		descriptor->cascadeCount,
@@ -3803,10 +3821,10 @@ bool RendererShadowProjectedDiagnostic_RunSelfTest( void ) {
 		R_ShadowMapProjectedFallbackReasonName( descriptor->projectedFallbackReason ),
 		R_ShadowMapProjectedFallbackReasonName( mixedWState.fallbackReason ),
 		mixedWState.fallbackCascade,
-		mixedWFit.sampleCount,
-		mixedWFit.validPoints,
-		mixedWFit.skippedPoints,
-		mixedWFit.mixedWSigns ? 1 : 0,
+		mixedWSamples,
+		mixedWValid,
+		mixedWSkipped,
+		mixedWSlices,
 		parityChecks,
 		descriptor->cascadeSplitDepths[0],
 		descriptor->cascadeSplitDepths[1],

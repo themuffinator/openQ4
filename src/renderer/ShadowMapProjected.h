@@ -15,6 +15,11 @@ static const int SHADOWMAP_PROJECTED_CASCADE_SAMPLE_POINT_COUNT = 23;
 typedef enum {
 	SHADOWMAP_PROJECTED_FALLBACK_NONE = 0,
 	SHADOWMAP_PROJECTED_FALLBACK_INSUFFICIENT_VALID_SAMPLES,
+	// No fit reports this since 27 November 2026: a view slice that reaches
+	// behind the light's source plane is cut where the light begins instead
+	// of collapsing the light to one map (R_ShadowMapBuildCascadeBounds). The
+	// fit still records the fact in mixedWSigns. The reason stays so that
+	// the one after it keeps its number in logs and reports.
 	SHADOWMAP_PROJECTED_FALLBACK_MIXED_W_SIGNS,
 	SHADOWMAP_PROJECTED_FALLBACK_COLLAPSED_BOUNDS
 } shadowMapProjectedFallbackReason_t;
@@ -126,6 +131,9 @@ int R_ShadowMapProjectedStateHash( int hash, const shadowMapProjectedLightState_
 // pins the stabilization guarantees (shadow plan invariant I5)
 bool R_ShadowMapCascadeStabilitySelfTest( void );
 bool R_ShadowMapCascadeWholeLightSelfTest( void );
+// A cascaded light keeps its cascades when a view slice reaches behind its
+// source plane: the slice is cut where the light begins.
+bool R_ShadowMapCascadeSourcePlaneSelfTest( void );
 bool R_ShadowMapDistantPointProjectionSelfTest( void );
 bool R_ShadowMapDistantNormalOffsetSelfTest( void );
 bool R_ShadowMapCasterFacesSelfTest( void );

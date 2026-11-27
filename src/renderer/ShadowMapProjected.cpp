@@ -692,6 +692,7 @@ static void R_ShadowMapFitCascadeAxis( float &minimum, float &maximum,
 }
 
 extern idCVar r_shadowMapNormalOffsetScale;
+extern idCVar r_shadowMapWideSources;
 
 // Texels of a fitted cascade that a receiver inside the slice can sample away
 // from where it stands. The filter's share matches
@@ -715,6 +716,54 @@ static float R_ShadowMapProjectedCascadeGuardTexels( const viewLight_t *vLight, 
 	return kernelRadius + offsetTexels;
 }
 
+static const float SHADOWMAP_CASCADE_W_EPSILON = 1.0e-5f;
+
+// The smallest w (the projection's divide row) that any point of the light's
+// own volume has: a distant point light's box, an authored projector's
+// frustum. A point of the view nearer the source plane than that is outside
+// the light, receives nothing from it and needs no place in its map. An
+// orthographic map has the constant w of 1. Where the volume is unknown or
+// reaches the source plane itself, the epsilon the fit has always used.
+static float R_ShadowMapLightNearW( const viewLight_t *vLight, const idPlane baseClipPlanes[4] ) {
+	if ( vLight == NULL || vLight->lightDef == NULL ) {
+		return SHADOWMAP_CASCADE_W_EPSILON;
+	}
+	const idRenderLightLocal *lightDef = vLight->lightDef;
+	const renderLight_t &parms = lightDef->parms;
+	float nearW = idMath::INFINITY;
+	if ( parms.pointLight ) {
+		for ( int corner = 0; corner < 8; ++corner ) {
+			const idVec3 local(
+				( corner & 1 ) ? parms.lightRadius.x : -parms.lightRadius.x,
+				( corner & 2 ) ? parms.lightRadius.y : -parms.lightRadius.y,
+				( corner & 4 ) ? parms.lightRadius.z : -parms.lightRadius.z );
+			idVec4 clip;
+			R_ShadowMapTransformPointToClip( parms.origin + local * parms.axis, baseClipPlanes, clip );
+			nearW = Min( nearW, clip.w );
+		}
+	} else if ( lightDef->frustumTris != NULL && lightDef->frustumTris->verts != NULL ) {
+		for ( int i = 0; i < lightDef->frustumTris->numVerts; ++i ) {
+			idVec4 clip;
+			R_ShadowMapTransformPointToClip( lightDef->frustumTris->verts[i].xyz, baseClipPlanes, clip );
+			nearW = Min( nearW, clip.w );
+		}
+	}
+	// NaN and a volume that reaches the source plane both fail the test
+	if ( !( nearW > SHADOWMAP_CASCADE_W_EPSILON ) || nearW >= idMath::INFINITY ) {
+		return SHADOWMAP_CASCADE_W_EPSILON;
+	}
+	// a part in ten thousand nearer: the corners themselves stay inside
+	return Max( SHADOWMAP_CASCADE_W_EPSILON, nearW * ( 1.0f - 1.0e-4f ) );
+}
+
+// The twelve edges of a view slice: R_ShadowMapBuildSliceCorners lays out
+// the near quad as corners 0-3 and the far quad as 4-7, in the same order.
+static const int SHADOWMAP_SLICE_EDGES[12][2] = {
+	{ 0, 1 }, { 1, 2 }, { 2, 3 }, { 3, 0 },
+	{ 4, 5 }, { 5, 6 }, { 6, 7 }, { 7, 4 },
+	{ 0, 4 }, { 1, 5 }, { 2, 6 }, { 3, 7 }
+};
+
 static bool R_ShadowMapBuildCascadeBounds( const viewLight_t *vLight, const idPlane baseClipPlanes[4], const viewDef_t *viewDef, const float sliceNear, const float sliceFar, const int tileSize, shadowMapProjectedCascadeFit_t &fit, idVec3 &ndcMins, idVec3 &ndcMaxs ) {
 	idVec3 samplePoints[SHADOWMAP_PROJECTED_CASCADE_SAMPLE_POINT_COUNT];
 	const int sampleCount = R_ShadowMapBuildSliceSamplePoints( viewDef, sliceNear, sliceFar, samplePoints );
@@ -732,12 +781,28 @@ static bool R_ShadowMapBuildCascadeBounds( const viewLight_t *vLight, const idPl
 	fit.fallbackReason = SHADOWMAP_PROJECTED_FALLBACK_NONE;
 	ndcMins.Set( 1.0e30f, 1.0e30f, 1.0e30f );
 	ndcMaxs.Set( -1.0e30f, -1.0e30f, -1.0e30f );
-	const float wEpsilon = 1.0e-5f;
+	const float wEpsilon = SHADOWMAP_CASCADE_W_EPSILON;
 	float minSampleW = idMath::INFINITY;
+	// A slice is fitted over the part of it in front of the plane where the
+	// light's volume begins. The part behind is outside the light. Until
+	// November 2026 one sample behind the source plane (a "mixed w" slice)
+	// collapsed every cascade of the light into a single map: looking up past
+	// the height of an outdoor lamp, or standing beside a spotlight, traded
+	// three fitted cascades for one map of the whole light. The slice is cut
+	// instead: its corners in front of the plane, and the points where its
+	// edges cross the plane, bound what is left of it exactly, since a convex
+	// piece of space in front of the plane projects to the hull of its corners.
+	const float wClip = R_ShadowMapLightNearW( vLight, baseClipPlanes );
+	idVec4 cornerClip[8];
+	bool cornerFinite[8] = { false, false, false, false, false, false, false, false };
 
 	for ( int i = 0; i < sampleCount; i++ ) {
 		idVec4 clip;
 		R_ShadowMapTransformPointToClip( samplePoints[i], baseClipPlanes, clip );
+		if ( i < 8 ) {
+			cornerClip[i] = clip;
+			cornerFinite[i] = clip.x == clip.x && clip.y == clip.y && clip.z == clip.z && clip.w == clip.w;
+		}
 		if ( clip.w != clip.w ) {
 			fit.nanWPoints++;
 			fit.skippedPoints++;
@@ -752,7 +817,7 @@ static bool R_ShadowMapBuildCascadeBounds( const viewLight_t *vLight, const idPl
 			fit.nearZeroWPoints++;
 		}
 
-		if ( clip.w <= wEpsilon ) {
+		if ( clip.w <= wEpsilon || clip.w < wClip ) {
 			fit.skippedPoints++;
 			continue;
 		}
@@ -773,9 +838,45 @@ static bool R_ShadowMapBuildCascadeBounds( const viewLight_t *vLight, const idPl
 		fit.validPoints++;
 	}
 
+	// still recorded: the slice reached behind the source plane
 	fit.mixedWSigns = ( fit.positiveWPoints > 0 && fit.negativeWPoints > 0 );
 
-	if ( fit.validPoints < 4 ) {
+	// where an edge of the slice crosses the plane
+	int planeCrossings = 0;
+	for ( int edge = 0; edge < 12 && sampleCount >= 8; ++edge ) {
+		const int a = SHADOWMAP_SLICE_EDGES[edge][0];
+		const int b = SHADOWMAP_SLICE_EDGES[edge][1];
+		if ( !cornerFinite[a] || !cornerFinite[b] ) {
+			continue;
+		}
+		const float wa = cornerClip[a].w;
+		const float wb = cornerClip[b].w;
+		if ( ( wa >= wClip ) == ( wb >= wClip ) ) {
+			continue;
+		}
+		const float t = idMath::ClampFloat( 0.0f, 1.0f, ( wClip - wa ) / ( wb - wa ) );
+		const idVec4 crossing = cornerClip[a] + ( cornerClip[b] - cornerClip[a] ) * t;
+		// Far outside the projection is all a bound needs to know: the fit
+		// clamps to the light's own edge, and an unbounded quotient must not
+		// reach its arithmetic.
+		const idVec3 ndc(
+			idMath::ClampFloat( -1.0e6f, 1.0e6f, crossing.x / wClip ),
+			idMath::ClampFloat( -1.0e6f, 1.0e6f, crossing.y / wClip ),
+			crossing.z );
+		if ( ndc.x != ndc.x || ndc.y != ndc.y || ndc.z != ndc.z ) {
+			continue;
+		}
+		for ( int axis = 0; axis < 3; axis++ ) {
+			ndcMins[axis] = Min( ndcMins[axis], ndc[axis] );
+			ndcMaxs[axis] = Max( ndcMaxs[axis], ndc[axis] );
+		}
+		minSampleW = Min( minSampleW, wClip );
+		planeCrossings++;
+	}
+
+	// A slice wholly behind the plane has nothing to fit. (One touching it at
+	// a point or along an edge, too: fewer than four bounding points.)
+	if ( fit.validPoints + planeCrossings < 4 ) {
 		fit.fallbackReason = SHADOWMAP_PROJECTED_FALLBACK_INSUFFICIENT_VALID_SAMPLES;
 		return false;
 	}
@@ -1160,6 +1261,148 @@ bool R_ShadowMapCascadeWholeLightSelfTest( void ) {
 		return false;
 	}
 	common->Printf( "ShadowMap whole-light cascade self-test passed: 3 layouts, receivers past the reach covered\n" );
+	return true;
+}
+
+// A view slice that reaches behind the plane where the light begins, on
+// mcc_landing's outdoor_Main: a point light whose source stands 280 units
+// above its box and looks down, cascaded on Quality and Ultra. Looking up from
+// the ground, the far slices rise past the top of the box and then past the
+// source itself. Pins that the light keeps every cascade there (it used to
+// fall to one map of the whole light as soon as one sample had a negative w),
+// that every point of a slice inside the light's box lands inside that
+// slice's crop, and that the nearest cascade stays finer than the whole map.
+static bool R_ShadowMapCascadeSourcePlaneCase( const float eyeZ, const float pitch, const float yaw,
+		int &receivers, int &cutSlices, int &mixedSlices ) {
+	idRenderLightLocal lightDef;
+	memset( &lightDef.parms, 0, sizeof( lightDef.parms ) );
+	renderLight_t &parms = lightDef.parms;
+	parms.pointLight = true;
+	parms.axis.Identity();
+	parms.origin.Set( 6464.0f, 2816.0f, 896.0f );
+	parms.lightRadius.Set( 2176.0f, 3128.0f, 1024.0f );
+	parms.lightCenter.Set( -64.0f, 1160.0f, 1304.0f );
+	viewLight_t light;
+	memset( &light, 0, sizeof( light ) );
+	light.lightDef = &lightDef;
+	light.pointLight = true;
+	light.lightRadius = parms.lightRadius;
+	light.globalLightOrigin = parms.origin + parms.lightCenter * parms.axis;
+
+	viewDef_t view;
+	memset( &view, 0, sizeof( view ) );
+	view.renderView.vieworg.Set( 6464.0f, 2816.0f, eyeZ );
+	view.renderView.viewaxis = idAngles( pitch, yaw, 0.0f ).ToMat3();
+	view.renderView.fov_x = 90.0f;
+	view.renderView.fov_y = 59.0f;
+
+	const int cascades = 4;
+	shadowMapProjectedLightState_t state;
+	R_BuildShadowMapProjectedLightState( &light, &view, 1024, state );
+	if ( !state.valid || state.cascadeFallback || state.cascadeCount != cascades
+			|| state.wholeLightCascade != cascades - 1 ) {
+		common->Printf( "ShadowMap source-plane cascade self-test failed: eye %.0f pitch %.0f yaw %.0f valid=%d fallback=%d/%s count=%d whole=%d\n",
+			eyeZ, pitch, yaw, state.valid ? 1 : 0, state.cascadeFallback ? 1 : 0,
+			R_ShadowMapProjectedFallbackReasonName( state.fallbackReason ), state.cascadeCount, state.wholeLightCascade );
+		return false;
+	}
+	if ( !( state.worldTexelSize[0] < state.worldTexelSize[cascades - 1] * 0.25f ) ) {
+		common->Printf( "ShadowMap source-plane cascade self-test failed: eye %.0f pitch %.0f nearest cascade %.2f a texel against the whole map's %.2f\n",
+			eyeZ, pitch, state.worldTexelSize[0], state.worldTexelSize[cascades - 1] );
+		return false;
+	}
+	for ( int cascade = 0; cascade < cascades - 1; ++cascade ) {
+		const shadowMapProjectedCascadeFit_t &fit = state.cascadeFit[cascade];
+		if ( !fit.attempted || !fit.valid || fit.validPoints + fit.skippedPoints != fit.sampleCount ) {
+			common->Printf( "ShadowMap source-plane cascade self-test failed: cascade %d fit attempted=%d valid=%d\n",
+				cascade, fit.attempted ? 1 : 0, fit.valid ? 1 : 0 );
+			return false;
+		}
+		cutSlices += fit.skippedPoints > 0 ? 1 : 0;
+		mixedSlices += fit.mixedWSigns ? 1 : 0;
+
+		// points throughout the slice, the blend band in front of it included
+		idVec3 corners[8];
+		R_ShadowMapBuildSliceCorners( &view, state.sliceNear[cascade], state.sliceFar[cascade], corners );
+		for ( int d = 0; d <= 4; ++d ) {
+			for ( int v = 0; v <= 4; ++v ) {
+				for ( int u = 0; u <= 4; ++u ) {
+					const float fu = u * 0.25f, fv = v * 0.25f, fd = d * 0.25f;
+					const idVec3 nearPoint = ( corners[0] * ( 1.0f - fu ) + corners[1] * fu ) * ( 1.0f - fv )
+						+ ( corners[3] * ( 1.0f - fu ) + corners[2] * fu ) * fv;
+					const idVec3 farPoint = ( corners[4] * ( 1.0f - fu ) + corners[5] * fu ) * ( 1.0f - fv )
+						+ ( corners[7] * ( 1.0f - fu ) + corners[6] * fu ) * fv;
+					const idVec3 receiver = nearPoint + ( farPoint - nearPoint ) * fd;
+					// only what the light reaches needs its map
+					const idVec3 local = ( receiver - parms.origin ) * parms.axis.Transpose();
+					if ( idMath::Fabs( local.x ) > parms.lightRadius.x || idMath::Fabs( local.y ) > parms.lightRadius.y
+							|| idMath::Fabs( local.z ) > parms.lightRadius.z ) {
+						continue;
+					}
+					idVec4 clip;
+					R_ShadowMapTransformPointToClip( receiver, state.clipPlanes[cascade], clip );
+					if ( !( clip.w > 0.0f ) || idMath::Fabs( clip.x / clip.w ) > 1.0f || idMath::Fabs( clip.y / clip.w ) > 1.0f
+							|| clip.z < 0.0f || clip.z > 1.0f ) {
+						common->Printf( "ShadowMap source-plane cascade self-test failed: eye %.0f pitch %.0f yaw %.0f cascade %d receiver (%.0f %.0f %.0f) at %.3f %.3f w %.3f\n",
+							eyeZ, pitch, yaw, cascade, receiver.x, receiver.y, receiver.z,
+							clip.w > 0.0f ? clip.x / clip.w : 0.0f, clip.w > 0.0f ? clip.y / clip.w : 0.0f, clip.w );
+						return false;
+					}
+					receivers++;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+bool R_ShadowMapCascadeSourcePlaneSelfTest( void ) {
+	struct cvarRestore_t {
+		idCVar &cvar;
+		idStr value;
+		cvarRestore_t( idCVar &c ) : cvar( c ), value( c.GetString() ) {}
+		~cvarRestore_t() { cvar.SetString( value.c_str() ); }
+	};
+	cvarRestore_t restoreCSM( r_shadowMapCSM ), restoreCount( r_shadowMapCascadeCount ),
+		restoreFar( r_shadowMapCascadeFarMap ), restoreDistance( r_shadowMapCascadeDistance ),
+		restoreLambda( r_shadowMapCascadeLambda ), restoreBlend( r_shadowMapCascadeBlend ),
+		restoreStabilize( r_shadowMapCascadeStabilize ), restorePoint( r_shadowMapPointLights ),
+		restoreZNear( r_znear ), restorePad( r_shadowMapProjectionPad ), restoreWide( r_shadowMapWideSources );
+	r_shadowMapCSM.SetBool( true );
+	r_shadowMapCascadeCount.SetInteger( 4 );
+	r_shadowMapCascadeFarMap.SetBool( true );
+	r_shadowMapCascadeDistance.SetFloat( 1536.0f );
+	r_shadowMapCascadeLambda.SetFloat( 0.75f );
+	r_shadowMapCascadeBlend.SetFloat( 0.15f );
+	r_shadowMapCascadeStabilize.SetBool( true );
+	r_shadowMapPointLights.SetBool( true );
+	r_znear.SetFloat( 3.0f );
+	r_shadowMapProjectionPad.SetFloat( 0.15f );
+	r_shadowMapWideSources.SetBool( true );
+
+	// level, then up past the top of the box (z 1920) and past the source (2200)
+	const float pitches[] = { 0.0f, -35.0f, -50.0f, -70.0f, -85.0f };
+	const float yaws[] = { 0.0f, 58.0f, 190.0f };
+	const float eyes[] = { 120.0f, 500.0f, 900.0f };
+	int receivers = 0, cutSlices = 0, mixedSlices = 0, views = 0;
+	for ( int e = 0; e < 3; ++e ) {
+		for ( int p = 0; p < 5; ++p ) {
+			for ( int y = 0; y < 3; ++y ) {
+				if ( !R_ShadowMapCascadeSourcePlaneCase( eyes[e], pitches[p], yaws[y], receivers, cutSlices, mixedSlices ) ) {
+					return false;
+				}
+				views++;
+			}
+		}
+	}
+	// the views have to reach what they are here for
+	if ( receivers < 1000 || cutSlices < 4 || mixedSlices < 2 ) {
+		common->Printf( "ShadowMap source-plane cascade self-test failed: fixture reached %d receivers, %d cut slices, %d behind the source\n",
+			receivers, cutSlices, mixedSlices );
+		return false;
+	}
+	common->Printf( "ShadowMap source-plane cascade self-test passed: %d views, %d receivers, %d slices cut at the light's near plane, %d of them behind the source\n",
+		views, receivers, cutSlices, mixedSlices );
 	return true;
 }
 
@@ -1730,11 +1973,8 @@ static void R_BuildShadowMapProjectedLightStateFit( const viewLight_t *vLight, c
 		fit.sliceFar = sliceFar;
 		fit.valid = R_ShadowMapBuildCascadeBounds( vLight, baseClipPlanes, viewDef, fitSliceNear, sliceFar, tileSize, fit, ndcMins, ndcMaxs );
 		if ( fit.valid ) {
-			if ( fit.mixedWSigns ) {
-				fit.fallbackReason = SHADOWMAP_PROJECTED_FALLBACK_MIXED_W_SIGNS;
-				R_ShadowMapCollapseProjectedStateToSingleCascade( state, vLight, baseClipPlanes, tileSize, zNear, maxDistance, cascadeIndex, SHADOWMAP_PROJECTED_FALLBACK_MIXED_W_SIGNS );
-				return;
-			}
+			// a slice that reaches behind the source plane was cut at the
+			// light's near plane by the fit (fit.mixedWSigns records it)
 			R_ShadowMapBuildCascadeClipPlanes( baseClipPlanes, ndcMins, ndcMaxs, state.clipPlanes[cascadeIndex] );
 			state.biasScale[cascadeIndex] = R_ShadowMapCascadeBiasScale( ndcMins, ndcMaxs );
 			state.clipZExtent[cascadeIndex] = ndcMaxs.z - ndcMins.z;

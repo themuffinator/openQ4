@@ -2674,10 +2674,12 @@ are not yet measured.
   resident maps expire by time and not by frames drawn, OpenGL releases cubes past
   a lowered slot limit, honours the stencil supplement of a hybrid light and
   remembers a failed program load, and the static-caster signature carries
-  ownership. Open leads are listed there: the single-map collapse when a slice
-  reaches behind the source plane, cascade scale stepping with yaw, off-screen live
-  casters, PCSS-lite on parallel lights, and Vulkan memory kept after shadow maps
-  are switched off.
+  ownership. A follow-up the same day ended the single-map collapse when a view
+  slice reaches behind a cascaded light's source plane: the slice is cut where the
+  light begins, and on mcc_landing, looking up under `outdoor_Main`, 68% to 87% of
+  stencil's shadow is kept on both backends. Open leads are listed there: cascade
+  scale stepping with yaw, off-screen live casters, PCSS-lite on parallel lights,
+  and Vulkan memory kept after shadow maps are switched off.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always
