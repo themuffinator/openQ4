@@ -29,8 +29,8 @@ extern idUserInterfaceManagerLocal uiManagerLocal;
 #include "../framework/VRSystem.h"
 #if defined(USE_SDL3)
 bool Sys_SDL_IsGameWindowFocused(void);
-int Sys_SDL_GamepadGlyphFamily(int faceLabels[4]);
 void Sys_SDL_InterfaceSignals(openq4::ui::InterfaceSignals& signals);
+int Sys_SDL_GamepadGlyphFamily(int faceLabels[4]);
 #endif
 
 struct retainedUIPreparedEditData;
