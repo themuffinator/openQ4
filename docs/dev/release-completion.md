@@ -214,7 +214,8 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **What to do.** Nothing. `r_shadowMapSunAngle` sets how large the sun
   appears, in degrees (default `1.0`; the real Sun is `0.53`): raise it for
   softer shadows from tall objects, lower it for crisper ones, or set `0` for
-  the old look. The widest edge is still limited by
+  the old look. Above about `2`, thin shadows thrown a long way (pipes,
+  railings) start to look grainy. The widest edge is still limited by
   `r_shadowMapPCSSMaxRadius`.
 - **Cost.** Next to nothing: about 0.05 to 0.1 ms of GPU time a frame at
   2560x1440 in the heaviest stock sunlit view, on either renderer. Scenes
