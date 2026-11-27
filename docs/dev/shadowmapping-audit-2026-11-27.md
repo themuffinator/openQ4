@@ -440,12 +440,34 @@ Measured at Quality, hidden, same frozen moment for every size:
   at 4 on Vulkan, 3.5% at 4 on OpenGL.
 - **The renderers agree.** That crop differs between OpenGL and Vulkan by
   0.27% of pixels with the rule off and 0.24% at 4 degrees.
-- **Parallel lights.** Stock single-player maps have three shadow-casting
-  parallel lights (two in Dispersal, one in Hangar 2). In Dispersal the one
-  in view lights little but the player's weapon, and that is where the
-  picture changes, by the same share on both renderers (0.32% and 0.31% of
-  the frame at 1 degree). No stock view was found where a parallel light
-  shadows scenery, so that branch rests on the self-test and this.
+- **Parallel lights.** The stock maps hold seven shadow-casting parallel
+  lights: two in Dispersal and one in Hangar 2, and four in multiplayer
+  (q4dm9 has two, q4dz3 and q4xdm10 one each). In Dispersal the one in view
+  lights little but the player's weapon, and that is where the picture
+  changes, by the same share on both renderers (0.32% and 0.31% of the frame
+  at 1 degree). Hangar 2's (`light_8020`, found by drawing it alone with
+  `r_singleLight`) is the sunlight on the rock outside the hangar, where the
+  buildings and their pipes shadow the terrain. Two views there
+  (`setviewpos -2300 800 -1900 60 0 0` and `-2800 32 -1800 50 0 0`), 1920x1080
+  at Quality, the HUD and the view weapon left out of the count:
+
+  | Sun size | Pixels moved by more than 6 levels from the rule off (Vulkan / OpenGL) | Pixels more than 12 levels from stencil (Vulkan; OpenGL within 0.03 points) |
+  | --- | --- | --- |
+  | 0 | 0 | 0.43% and 0.32% |
+  | 1 degree | 0.26% / 0.29% and 0.13% / 0.15% | 0.45% and 0.32% |
+  | 2 degrees | 0.51% / 0.54% and 0.22% / 0.26% | 0.58% and 0.42% |
+  | 4 degrees | 0.96% / 0.99% and 0.56% / 0.56% | 0.72% and 0.55% |
+
+  The two renderers move together at every size, and at the default the
+  picture is as close to stencil as with the rule off (within 0.02 points).
+- **Thin shadows turn grainy above about 2 degrees.** Seen in a crop of the
+  second Hangar 2 view, where thin pipes throw shadows down a slope: solid
+  at 0 and 1 degree on both renderers, speckled over the far part of their
+  length at 2, and broken into grain at 4. The likely reason is that the
+  penumbra is by then wider than the shadow, and nine taps over the maximum
+  radius cannot resolve the faint band that would be right. It is the filter's tap
+  count, the same limit a spotlight meets at the maximum radius, and it is a
+  reason to keep the default low. Judged by eye; no number was taken.
 - **Cost: about 0.05 to 0.1 ms on Vulkan, about the same on OpenGL.** Air Defense 1
   arena, full turn of the view at 2560x1440, the rule off and on in
   alternating windows of one launch, median GPU frame per window. The first
