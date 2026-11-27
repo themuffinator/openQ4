@@ -51,7 +51,11 @@ The settings pages (GAME OPTIONS, SYSTEM, AUDIO, CONTROLS and their
 Awakening copies) carry one, built by `tools/ui/retained_tooltips.py`:
 every value row names a tooltip, generation fails on a row without one,
 and a document whose card binds `ui_tooltips` hides it when the player
-turns them off.
+turns them off. Only those documents read it, so the Menu Tooltips row
+(Game Options, Accessibility) is on the retained page alone: the stock
+GAME OPTIONS page, which has no tooltips, owes it no row.
+`tools/tests/ui_retained_gate.py` holds that exemption only while no engine
+code and no stock GUI names `ui_tooltips`.
 
 ## Content
 
