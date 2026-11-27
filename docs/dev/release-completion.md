@@ -12,6 +12,28 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The start-up screen stays up through the first launch's settings restart, 27 November 2026
+
+- **The game window no longer vanishes and comes back black on a first
+  launch.** A new install starts on a cautious graphics preset until it has
+  looked at the graphics card, then restarts the renderer on the preset it
+  picked. That restart used to close the game window and open a new one,
+  which came up black until the menu or a level drew and was not always given
+  the focus, so the menu could ignore the mouse. The renderer is now rebuilt
+  on the window you are already looking at, as a game-module swap does, and
+  the start-up screen is drawn again straight away. The window is still
+  replaced in the one case that needs it: a window that carries its own
+  multisampling (`r_glWindowMultisample 1` or `r_glesContext 1`) whose sample
+  count the preset changes.
+- **What to do.** Nothing. Only a fresh profile runs this restart.
+- Ported from openQC, where it was found and fixed first (openQC 75595dba8).
+- Evidence: hidden-window `+map game/airdefense1` launches on a fresh
+  `fs_savepath` with OpenGL and Vulkan picked the Enhanced preset, logged
+  `SDL3: reusing preserved OpenGL window` (and `Vulkan`) for the restart,
+  loaded the map and quit with exit 0, no warnings or errors. A fresh-profile
+  log from the previous build shows the window torn down and created again at
+  the same point.
+
 ## Settings that explain themselves, 27 November 2026
 
 - **Every option on the new interface's Settings pages now has a tooltip.**

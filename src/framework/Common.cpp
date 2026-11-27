@@ -8482,11 +8482,30 @@ void idCommonLocal::InitGame( void ) {
 	// InitGame cannot mistake the temporary bootstrap for completed detection.
 	const bool startupRecovery = UI_SettingsStartupActive() || UI_SettingsRecoveryPending();
 	bool startupPresetReady = !detectStartupPreset;
+	const int bootstrapMultiSamples = cvarSystem->GetCVarInteger( "r_multiSamples" );
 	if ( detectStartupPreset && !startupRecovery && Common_ApplyStartupPerformancePreset( startupPresetBootstrap, startupPresetAssigned ) ) {
 		// Apply the selected AA/texture/resource policy to the live device before
 		// startup map commands run. Detection never changes the window mode.
-		cmdSystem->BufferCommandText( CMD_EXEC_NOW, "vid_restart\ns_restart\n" );
-		cmdSystem->ExecuteCommandBuffer();
+		// The device is rebuilt on the window the start-up screen is showing in,
+		// as a game-module swap keeps its window (ReloadEngine). A new window put
+		// the screen out from under the player, came up black and was not always
+		// given the focus. Only a window that carries its own samples must be
+		// replaced when the preset changes them.
+		struct preserveWindowScope_t {
+			explicit preserveWindowScope_t( bool preserve ) { GLimp_PreserveWindowOnShutdown( preserve ); }
+			~preserveWindowScope_t() { GLimp_PreserveWindowOnShutdown( false ); }
+		};
+		{
+			const bool windowSamples = cvarSystem->GetCVarBool( "r_glesContext" ) || cvarSystem->GetCVarBool( "r_glWindowMultisample" );
+			const bool preserveWindow = renderSystem != NULL && renderSystem->IsOpenGLRunning() && !R_RendererModule_SelectionReloadPending() &&
+				!( windowSamples && cvarSystem->GetCVarInteger( "r_multiSamples" ) != bootstrapMultiSamples );
+			preserveWindowScope_t preserveWindowScope( preserveWindow );
+			cmdSystem->BufferCommandText( CMD_EXEC_NOW, "vid_restart\ns_restart\n" );
+			cmdSystem->ExecuteCommandBuffer();
+		}
+		// The rebuilt device has presented nothing yet: show the start-up screen
+		// again at once, not a blank window until the menu or a level load draws.
+		PrintLoadingMessage( common->GetLanguageDict()->GetString( "#str_104351" ) );
 		startupPresetReady = true;
 		// This detection is the system check: a new configuration starts on the
 		// current presets, so the check has nothing to offer it.
