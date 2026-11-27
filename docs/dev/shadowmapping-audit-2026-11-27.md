@@ -453,9 +453,10 @@ Measured at Quality, hidden, same frozen moment for every size:
   Other sessions' game clients were on the GPU during these runs and a
   repeat scattered by more than the difference, so the Vulkan figure, up to
   0.7 ms, is an upper bound and not a measurement. It wants a quiet machine.
-- **Not judged:** the default of 1 degree is a starting point. It was chosen
-  as about twice the real Sun, enough to see at the texel sizes the cascades
-  have; whether it looks right is for eyes in motion.
+- **The default.** 1 degree, about twice the real Sun, enough to see at the
+  texel sizes the cascades have. **The owner chose to keep it** (27 November
+  2026) from a still comparison of the tank-pose crop at 0, 0.53, 1, 2 and 4
+  degrees. It has not been judged in motion.
 
 ## Measured and left
 
@@ -482,7 +483,8 @@ it is.
 Not done in this round. Each is real; the note says why it waited.
 
 - **The sun rule's cost on Vulkan** is not pinned down (see above), and its
-  default size has not been judged in motion.
+  default size, which the owner chose from stills, has not been judged in
+  motion.
 - **The modern OpenGL cluster loop samples shadows before knowing the light
   reaches the pixel.** The path is opt-in. (The PBR receivers of the shipped
   paths were done: see above.)

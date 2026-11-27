@@ -2710,8 +2710,9 @@ are not yet measured.
   caster and receiver times the sun's apparent size, where the point-source rule
   divided by the blocker's depth and left sunlight at the base radius. Contact
   shadows are unchanged, distant casters soften, coverage against stencil stays at
-  99.7%, and both renderers agree. Open: its Vulkan cost (at most 0.7 ms at 1440p,
-  measured on a busy GPU) and the default's look in motion.
+  99.7%, and both renderers agree. The owner kept the 1 degree default. Open: its
+  Vulkan cost (at most 0.7 ms at 1440p, measured on a busy GPU) and the default's
+  look in motion.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always
