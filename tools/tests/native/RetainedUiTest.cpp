@@ -1344,6 +1344,92 @@ static void CheckDetailCard(TestHost& host) {
 	Check(values.contains("subject") && runtime.GetStateValue("picked",values["picked"]) && !runtime.GetStateValue("absent",values["subject"]),
 		"one state reads without copying the rest; an undeclared one is refused");
 }
+// A tooltip (TooltipSpec). It waits 300 ms under a resting pointer and 500 ms
+// on focus a key moved, never shows for focus a program set, replaces itself
+// at once from one control to the next while the pointer moves on, sits
+// 12 dp after and 15 dp below the pointer (on its other sides near the view's
+// edges) or 4 dp under the focused control 21 dp in (over it near the foot),
+// stays 16 dp inside the view, hides on a press until the subject changes,
+// and never shows under a finger.
+static void CheckTooltip(TestHost& host) {
+	const auto box = [](const char* id, double left, double top, double width, double height) {
+		return std::string(R"({"id":")")+id+R"(","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},)"
+			R"("opacity":{"type":"number","value":1},"left":{"type":"length","value":)"+std::to_string(left)+R"(,"unit":"dp"},"top":{"type":"length","value":)"+std::to_string(top)+
+			R"(,"unit":"dp"},"width":{"type":"length","value":)"+std::to_string(width)+R"(,"unit":"dp"},"height":{"type":"length","value":)"+
+			std::to_string(height)+R"(,"unit":"dp"})";
+	};
+	const auto button = [](const char* id, const char* tooltip) {
+		const std::string lit = std::string(id)+"-lit";
+		return std::string(R"(,"control":{"role":"button","event":"pick","label":"#str_)")+id+R"(","states":{"default":")"+lit+
+			R"(","hover":")"+lit+R"(","focus":")"+lit+R"(","pressed":")"+lit+R"(","disabled":")"+lit+R"("})"+tooltip+"}}";
+	};
+	const auto lit = [](const char* id) {
+		return std::string(R"({"id":")")+id+R"(-lit","durationMs":100,"tracks":[{"node":")"+id+R"(","property":"opacity","keys":[)"
+			R"({"atMs":0,"value":{"type":"number","value":1}},{"atMs":100,"value":{"type":"number","value":0.8}}]}]})";
+	};
+	const std::string source = R"json({"format":"retained-ui","version":1,"id":"tooltip",
+	 "state":{"tip":{"type":"string","initial":""},"picked":{"type":"boolean","initial":false}},
+	 "root":{"id":"root","type":"group","properties":{"width":{"type":"length","value":100,"unit":"%"},"height":{"type":"length","value":100,"unit":"%"}},
+	  "children":[)json"+box("upper",40,40,1220,30)+"}"+button("upper",R"(,"tooltip":"#str_tip_upper")")+","+
+	   box("plain",40,300,300,30)+"}"+button("plain","")+","+
+	   box("lower",40,650,300,30)+"}"+button("lower",R"(,"tooltip":"#str_tip_lower")")+","+
+	   box("card",0,0,200,100)+R"json(,"display":{"type":"keyword","value":"none"},"pointer-events":{"type":"keyword","value":"none"}}}]},
+	 "timelines":[)json"+lit("upper")+","+lit("lower")+","+lit("plain")+R"json(,
+	  {"id":"in","durationMs":100,"tracks":[{"node":"card","property":"opacity","keys":[
+	   {"atMs":0,"value":{"type":"number","value":0}},{"atMs":100,"value":{"type":"number","value":1}}]}]}],
+	 "bindings":[{"id":"shown","node":"card","property":"display","value":{"op":"select","args":[{"op":"!=","args":[{"state":"tip"},""]},"block","none"]}}],
+	 "events":{"pick":[{"op":"setState","values":{"picked":true}}]},
+	 "tooltip":{"state":"tip","card":"card","enter":"in"}})json";
+	Runtime runtime(host);
+	std::vector<Diagnostic> diagnostics;
+	const bool loaded = runtime.Initialize() && runtime.LoadDocument(source,"tooltip.rui",diagnostics);
+	for (const auto& d : diagnostics) std::fprintf(stderr,"%s %s\n",d.pointer.c_str(),d.message.c_str());
+	Check(loaded,"the tooltip document loads");
+	Viewport viewport; viewport.width = 1280; viewport.height = 720;
+	const auto tip = [&] { StateValue value; return runtime.GetStateValue("tip",value) ? std::get<std::string>(value) : std::string("?"); };
+	const auto card = [&] { Bounds b{}; runtime.GetBounds("card",b); return b; };
+	Check(runtime.FocusControl("upper",1),"a program focuses the upper control");
+	runtime.Frame(viewport,1.1); runtime.Frame(viewport,2);
+	Check(tip().empty(),"focus a program set shows no tooltip: a page opening on its first control stays quiet");
+	runtime.MenuAction(MenuInput::Down,true,2.1); runtime.MenuAction(MenuInput::Down,false,2.11);
+	runtime.Frame(viewport,2.2);
+	Check(runtime.FocusedControl() == "plain" && tip().empty(),"a control without a tooltip shows none");
+	runtime.MenuAction(MenuInput::Down,true,2.3); runtime.MenuAction(MenuInput::Down,false,2.31);
+	runtime.Frame(viewport,2.4); runtime.Frame(viewport,2.7);
+	Check(runtime.FocusedControl() == "lower" && tip().empty(),"keyed focus waits 500 ms from the layout that finds it");
+	runtime.Frame(viewport,2.95);
+	Check(tip() == "#str_tip_lower","then shows the focused control's tooltip");
+	runtime.Frame(viewport,2.96);
+	Check(Near(card().x,40+21) && Near(card().y,650-4-100),"near the foot it sits 4 dp over the focused control, 21 dp in");
+	runtime.MenuAction(MenuInput::Left,true,3); runtime.MenuAction(MenuInput::Left,false,3.01); runtime.Frame(viewport,3.1);
+	runtime.Frame(viewport,4);
+	Check(tip().empty(),"a key hides it, and it stays hidden on the same control");
+	runtime.PointerMove(100,50,5); runtime.Frame(viewport,5.1);
+	Check(tip().empty(),"the pointer's control waits");
+	runtime.Frame(viewport,5.45);
+	Check(tip() == "#str_tip_upper","300 ms under a resting pointer shows its tooltip");
+	runtime.Frame(viewport,5.46);
+	Check(Near(card().x,112) && Near(card().y,65),"12 dp after and 15 dp below the pointer");
+	runtime.PointerMove(1250,60,5.5); runtime.Frame(viewport,5.55);
+	Check(Near(card().x,1250-12-200),"near the trailing edge it moves to the pointer's leading side");
+	runtime.PointerMove(900,500,5.6); runtime.Frame(viewport,5.65);
+	Check(tip().empty(),"the pointer over no control hides it");
+	runtime.PointerMove(100,660,5.7); runtime.Frame(viewport,5.71); runtime.Frame(viewport,5.72);
+	Check(tip() == "#str_tip_lower","moving straight on to the next control replaces it at once");
+	Check(Near(card().y,660-8-100),"near the foot it sits over the pointer");
+	runtime.PointerButton(true,5.8); runtime.PointerButton(false,5.81); runtime.Frame(viewport,5.9);
+	runtime.PointerMove(110,662,6); runtime.Frame(viewport,6.5);
+	Check(tip().empty(),"a press hides it until the pointer reaches another control");
+	runtime.PointerMove(900,500,7); runtime.Frame(viewport,7.1); runtime.Frame(viewport,8);
+	runtime.PointerMove(100,50,8.1); runtime.Frame(viewport,8.15);
+	Check(tip().empty(),"after a pause the next control waits again");
+	runtime.Frame(viewport,8.5);
+	Check(tip() == "#str_tip_upper","and then shows");
+	Check(runtime.FocusedControl() != "card","the card never takes the focus");
+	runtime.SetTouchPointer(true); runtime.PointerMove(100,660,9); runtime.Frame(viewport,9.1); runtime.Frame(viewport,10);
+	Check(tip().empty(),"a finger shows no tooltips");
+	runtime.SetTouchPointer(false);
+}
 // Accept's verb follows focus (section 13.4): the focused button's prompt,
 // a key or a string expression over state, the caller's fallback for a
 // control that names none, and nothing while no focused control can act.
@@ -2512,6 +2598,7 @@ int main(int argc, char** argv) {
 	Check(host.errors==0,"no library warnings or errors");
 	CheckCompletionPrograms(host);
 	CheckDetailCard(host);
+	CheckTooltip(host);
 	CheckAcceptPrompts(host);
 	CheckSharedDocument(host);
 	CheckPublicTextQueries(host);
@@ -2532,5 +2619,5 @@ int main(int argc, char** argv) {
 	CheckCoverageRaster();
 	CheckHiddenPresentation(host);
 	CheckCompoundPlateCache(host);
-	std::puts("Retained UI: density, layout, input, clipping, motion, bindings, independent contexts, bounded backend reuse, transactional instance snapshots, restart, completion programs, detail cards, accept prompts, shared documents, soft focus and retained meshes passed");
+	std::puts("Retained UI: density, layout, input, clipping, motion, bindings, independent contexts, bounded backend reuse, transactional instance snapshots, restart, completion programs, detail cards, tooltips, accept prompts, shared documents, soft focus and retained meshes passed");
 }

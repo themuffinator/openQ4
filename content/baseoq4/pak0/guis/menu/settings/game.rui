@@ -50,6 +50,7 @@
   "cvar.ui_cinematicShake": {"type": "number", "initial": 0, "cvar": "ui_cinematicShake"},
   "cvar.ui_reducedFlashing": {"type": "boolean", "initial": false, "cvar": "ui_reducedFlashing"},
   "cvar.ui_retainedOpaqueBacking": {"type": "boolean", "initial": false, "cvar": "ui_retainedOpaqueBacking"},
+  "cvar.ui_tooltips": {"type": "boolean", "initial": false, "cvar": "ui_tooltips"},
   "cvar.vr_enable": {"type": "boolean", "initial": false, "cvar": "vr_enable"},
   "cvar.vr_aimMode": {"type": "number", "initial": 0, "cvar": "vr_aimMode"},
   "cvar.vr_leftHanded": {"type": "number", "initial": 0, "cvar": "vr_leftHanded"},
@@ -82,6 +83,8 @@
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "tooltip.text": {"type": "string", "initial": ""},
+  "tooltip.enabled": {"type": "boolean", "initial": true, "cvar": "ui_tooltips"},
   "view.safeLeft": {"type": "number", "initial": 0, "view": "safeLeft"},
   "view.safeTop": {"type": "number", "initial": 0, "view": "safeTop"},
   "view.safeRight": {"type": "number", "initial": 0, "view": "safeRight"},
@@ -292,6 +295,11 @@
    "operation": "settings.player.set",
    "input": "boolean",
    "arguments": {"cvar": "ui_retainedOpaqueBacking", "value": {"input": "value"}}
+  },
+  "set.ui_tooltips": {
+   "operation": "settings.player.set",
+   "input": "boolean",
+   "arguments": {"cvar": "ui_tooltips", "value": {"input": "value"}}
   },
   "set.vr_enable": {
    "operation": "settings.player.set",
@@ -20925,6 +20933,227 @@
    }
   },
   {
+   "id": "tall.game_tooltips.width",
+   "node": "game_tooltips",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     880.5,
+     {"op": "*", "args": [430.5, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips.height",
+   "node": "game_tooltips",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-focus.width",
+   "node": "game_tooltips-focus",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     8.1812,
+     {"op": "*", "args": [4, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-focus.height",
+   "node": "game_tooltips-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-head.left",
+   "node": "game_tooltips-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {"op": "*", "args": [21, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-head.width",
+   "node": "game_tooltips-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     345.6551,
+     {"op": "*", "args": [169, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-head.height",
+   "node": "game_tooltips-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {"op": "*", "args": [36.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-label.font-size",
+   "node": "game_tooltips-label",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     14
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-label.line-height",
+   "node": "game_tooltips-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     13.0
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-box.left",
+   "node": "game_tooltips-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {"op": "*", "args": [198, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-box.top",
+   "node": "game_tooltips-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-box.width",
+   "node": "game_tooltips-box",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-box.height",
+   "node": "game_tooltips-box",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-checked.left",
+   "node": "game_tooltips-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     404.9686,
+     {"op": "*", "args": [198, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-checked.top",
+   "node": "game_tooltips-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {"op": "*", "args": [11.0, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-checked.width",
+   "node": "game_tooltips-checked",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
+   "id": "tall.game_tooltips-checked.height",
+   "node": "game_tooltips-checked",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {"op": "*", "args": [14, {"state": "view.text"}]}
+    ]
+   }
+  },
+  {
    "id": "game_viewkick.enabled",
    "node": "game_viewkick",
    "property": "enabled",
@@ -20951,6 +21180,12 @@
   {
    "id": "game_opaquebacking.enabled",
    "node": "game_opaquebacking",
+   "property": "enabled",
+   "value": {"op": "==", "args": [{"state": "page.tab"}, 3]}
+  },
+  {
+   "id": "game_tooltips.enabled",
+   "node": "game_tooltips",
    "property": "enabled",
    "value": {"op": "==", "args": [{"state": "page.tab"}, 3]}
   },
@@ -28059,6 +28294,20 @@
    "property": "line-height",
    "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
   },
+  {"id": "tooltip-text.text", "node": "tooltip-text", "property": "text", "value": {"state": "tooltip.text"}},
+  {
+   "id": "tooltip.display",
+   "node": "tooltip",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "tooltip.enabled"}, {"op": "!=", "args": [{"state": "tooltip.text"}, ""]}]},
+     "block",
+     "none"
+    ]
+   }
+  },
   {
    "id": "safe.field-vignette.left",
    "node": "field-vignette",
@@ -34358,6 +34607,150 @@
    ]
   },
   {
+   "id": "game_tooltips.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "game_tooltips-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_tooltips-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "game_tooltips-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_tooltips.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "game_tooltips-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_tooltips-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "game_tooltips-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_tooltips.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "game_tooltips-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_tooltips-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_tooltips-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_tooltips.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "game_tooltips-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_tooltips-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "game_tooltips-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "game_tooltips.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "game_tooltips-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_tooltips-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "game_tooltips-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
    "id": "game_vr.default",
    "durationMs": 300,
    "tracks": [
@@ -39796,6 +40189,29 @@
      ]
     }
    ]
+  },
+  {
+   "id": "tooltip.enter",
+   "durationMs": 100,
+   "tracks": [
+    {
+     "node": "tooltip",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 100, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "tooltip",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 4.0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 100, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    }
+   ]
   }
  ],
  "root": {
@@ -43228,7 +43644,8 @@
                   "disabled": "game_autoreload.disabled"
                  },
                  "parts": {"checked": "game_autoreload-checked"},
-                 "navigation": {"down": "game_autoswitch", "up": "tab-general", "right": "game_language", "left": "game_autoreload"}
+                 "navigation": {"down": "game_autoswitch", "up": "tab-general", "right": "game_language", "left": "game_autoreload"},
+                 "tooltip": "#str_233001"
                 }
                },
                {
@@ -43875,7 +44292,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_decals", "up": "game_autoreload", "right": "game_console", "left": "game_autoswitch"}
+                 "navigation": {"down": "game_decals", "up": "game_autoreload", "right": "game_console", "left": "game_autoswitch"},
+                 "tooltip": "#str_233002"
                 }
                },
                {
@@ -44096,7 +44514,8 @@
                   "disabled": "game_decals.disabled"
                  },
                  "parts": {"checked": "game_decals-checked"},
-                 "navigation": {"down": "game_corpsesink", "up": "game_autoswitch", "right": "game_screenshotformat", "left": "game_decals"}
+                 "navigation": {"down": "game_corpsesink", "up": "game_autoswitch", "right": "game_screenshotformat", "left": "game_decals"},
+                 "tooltip": "#str_233003"
                 }
                },
                {
@@ -44743,7 +45162,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_corpsetime", "up": "game_decals", "right": "game_simpleitems", "left": "game_corpsesink"}
+                 "navigation": {"down": "game_corpsetime", "up": "game_decals", "right": "game_simpleitems", "left": "game_corpsesink"},
+                 "tooltip": "#str_233004"
                 }
                },
                {
@@ -45846,7 +46266,8 @@
                   "up": "game_corpsesink",
                   "right": "game_opponentweapons",
                   "left": "game_corpsetime"
-                 }
+                 },
+                 "tooltip": "#str_233005"
                 }
                },
                {
@@ -46072,7 +46493,8 @@
                   "up": "game_corpsetime",
                   "right": "game_forcemodel",
                   "left": "game_enhancedphysics"
-                 }
+                 },
+                 "tooltip": "#str_233006"
                 }
                },
                {
@@ -46298,7 +46720,8 @@
                   "up": "game_enhancedphysics",
                   "right": "game_videoformat",
                   "left": "game_skipcinematics"
-                 }
+                 },
+                 "tooltip": "#str_233007"
                 }
                }
               ]
@@ -47789,7 +48212,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_console", "up": "game_skipcinematics", "left": "game_autoreload", "right": "game_language"}
+                 "navigation": {"down": "game_console", "up": "game_skipcinematics", "left": "game_autoreload", "right": "game_language"},
+                 "tooltip": "#str_233009"
                 }
                },
                {
@@ -48346,7 +48770,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_screenshotformat", "up": "game_language", "left": "game_autoswitch", "right": "game_console"}
+                 "navigation": {"down": "game_screenshotformat", "up": "game_language", "left": "game_autoswitch", "right": "game_console"},
+                 "tooltip": "#str_233010"
                 }
                },
                {
@@ -48903,7 +49328,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_simpleitems", "up": "game_console", "left": "game_decals", "right": "game_screenshotformat"}
+                 "navigation": {"down": "game_simpleitems", "up": "game_console", "left": "game_decals", "right": "game_screenshotformat"},
+                 "tooltip": "#str_233011"
                 }
                },
                {
@@ -49667,7 +50093,8 @@
                   "up": "game_screenshotformat",
                   "left": "game_corpsesink",
                   "right": "game_simpleitems"
-                 }
+                 },
+                 "tooltip": "#str_233012"
                 }
                },
                {
@@ -50229,7 +50656,8 @@
                   "up": "game_simpleitems",
                   "left": "game_corpsetime",
                   "right": "game_opponentweapons"
-                 }
+                 },
+                 "tooltip": "#str_233013"
                 }
                },
                {
@@ -50455,7 +50883,8 @@
                   "up": "game_opponentweapons",
                   "left": "game_enhancedphysics",
                   "right": "game_forcemodel"
-                 }
+                 },
+                 "tooltip": "#str_233014"
                 }
                },
                {
@@ -51399,7 +51828,8 @@
                   "up": "game_forcemodel",
                   "left": "game_skipcinematics",
                   "right": "game_videoformat"
-                 }
+                 },
+                 "tooltip": "#str_233015"
                 }
                },
                {
@@ -51979,7 +52409,8 @@
                   "up": "game_videoformat",
                   "left": "game_skipcinematics",
                   "right": "game_videoquality"
-                 }
+                 },
+                 "tooltip": "#str_233016"
                 }
                },
                {
@@ -52721,7 +53152,8 @@
                   "up": "game_videoquality",
                   "left": "game_skipcinematics",
                   "right": "game_videofps"
-                 }
+                 },
+                 "tooltip": "#str_233017"
                 }
                },
                {
@@ -53638,7 +54070,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_videoaudio", "up": "game_videofps", "left": "game_skipcinematics", "right": "game_videoheight"}
+                 "navigation": {"down": "game_videoaudio", "up": "game_videofps", "left": "game_skipcinematics", "right": "game_videoheight"},
+                 "tooltip": "#str_233018"
                 }
                },
                {
@@ -53864,7 +54297,8 @@
                   "up": "game_videoheight",
                   "left": "game_skipcinematics",
                   "right": "game_videoaudio"
-                 }
+                 },
+                 "tooltip": "#str_233019"
                 }
                },
                {
@@ -54516,7 +54950,8 @@
                   "up": "game_videoaudio",
                   "left": "game_skipcinematics",
                   "right": "game_videotiming"
-                 }
+                 },
+                 "tooltip": "#str_233020"
                 }
                }
               ]
@@ -55330,7 +55765,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_hudscale", "up": "tab-hud", "right": "game_customcrosshair", "left": "game_hudlayout"}
+                 "navigation": {"down": "game_hudscale", "up": "tab-hud", "right": "game_customcrosshair", "left": "game_hudlayout"},
+                 "tooltip": "#str_233021"
                 }
                },
                {
@@ -56048,7 +56484,8 @@
                   "thumb": "game_hudscale-thumb",
                   "value": "game_hudscale-value"
                  },
-                 "navigation": {"down": "game_hudwidth", "up": "game_hudlayout", "right": "game_crosshair", "left": "game_hudscale"}
+                 "navigation": {"down": "game_hudwidth", "up": "game_hudlayout", "right": "game_crosshair", "left": "game_hudscale"},
+                 "tooltip": "#str_233022"
                 }
                },
                {
@@ -56695,7 +57132,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_hudinset", "up": "game_hudscale", "right": "game_crosshairsize", "left": "game_hudwidth"}
+                 "navigation": {"down": "game_hudinset", "up": "game_hudscale", "right": "game_crosshairsize", "left": "game_hudwidth"},
+                 "tooltip": "#str_233023"
                 }
                },
                {
@@ -57273,7 +57711,8 @@
                   "thumb": "game_hudinset-thumb",
                   "value": "game_hudinset-value"
                  },
-                 "navigation": {"down": "game_hudopacity", "up": "game_hudwidth", "right": "game_crosshaircolor", "left": "game_hudinset"}
+                 "navigation": {"down": "game_hudopacity", "up": "game_hudwidth", "right": "game_crosshaircolor", "left": "game_hudinset"},
+                 "tooltip": "#str_233024"
                 }
                },
                {
@@ -57781,7 +58220,8 @@
                   "thumb": "game_hudopacity-thumb",
                   "value": "game_hudopacity-value"
                  },
-                 "navigation": {"down": "game_objectives", "up": "game_hudinset", "right": "game_hitmarker", "left": "game_hudopacity"}
+                 "navigation": {"down": "game_objectives", "up": "game_hudinset", "right": "game_hitmarker", "left": "game_hudopacity"},
+                 "tooltip": "#str_233025"
                 }
                },
                {
@@ -58007,7 +58447,8 @@
                   "up": "game_hudopacity",
                   "right": "game_crosshairanimated",
                   "left": "game_objectives"
-                 }
+                 },
+                 "tooltip": "#str_233026"
                 }
                },
                {
@@ -58233,7 +58674,8 @@
                   "up": "game_objectives",
                   "right": "game_crosshairanimated",
                   "left": "game_damagedirection"
-                 }
+                 },
+                 "tooltip": "#str_233027"
                 }
                },
                {
@@ -58459,7 +58901,8 @@
                   "up": "game_damagedirection",
                   "right": "game_crosshairanimated",
                   "left": "game_pickups"
-                 }
+                 },
+                 "tooltip": "#str_233028"
                 }
                },
                {
@@ -58685,7 +59128,8 @@
                   "up": "game_pickups",
                   "right": "game_crosshairanimated",
                   "left": "game_weaponstrip"
-                 }
+                 },
+                 "tooltip": "#str_233029"
                 }
                }
               ]
@@ -59281,7 +59725,8 @@
                   "up": "game_weaponstrip",
                   "left": "game_hudlayout",
                   "right": "game_customcrosshair"
-                 }
+                 },
+                 "tooltip": "#str_233030"
                 }
                },
                {
@@ -59861,7 +60306,8 @@
                   "up": "game_customcrosshair",
                   "left": "game_hudscale",
                   "right": "game_crosshair"
-                 }
+                 },
+                 "tooltip": "#str_233031"
                 }
                },
                {
@@ -60693,7 +61139,8 @@
                   "up": "game_crosshair",
                   "left": "game_hudwidth",
                   "right": "game_crosshairsize"
-                 }
+                 },
+                 "tooltip": "#str_233032"
                 }
                },
                {
@@ -61795,7 +62242,8 @@
                   "up": "game_crosshairsize",
                   "left": "game_hudinset",
                   "right": "game_crosshaircolor"
-                 }
+                 },
+                 "tooltip": "#str_233033"
                 }
                },
                {
@@ -62021,7 +62469,8 @@
                   "up": "game_crosshaircolor",
                   "left": "game_hudopacity",
                   "right": "game_hitmarker"
-                 }
+                 },
+                 "tooltip": "#str_233034"
                 }
                },
                {
@@ -62247,7 +62696,8 @@
                   "up": "game_hitmarker",
                   "left": "game_objectives",
                   "right": "game_crosshairanimated"
-                 }
+                 },
+                 "tooltip": "#str_233035"
                 }
                }
               ]
@@ -62525,7 +62975,8 @@
                   "disabled": "game_showgun.disabled"
                  },
                  "parts": {"checked": "game_showgun-checked"},
-                 "navigation": {"down": "game_gunposition", "up": "tab-viewweapon", "right": "game_gunfov", "left": "game_showgun"}
+                 "navigation": {"down": "game_gunposition", "up": "tab-viewweapon", "right": "game_gunfov", "left": "game_showgun"},
+                 "tooltip": "#str_233036"
                 }
                },
                {
@@ -63172,7 +63623,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_gunx", "up": "game_showgun", "right": "game_gunfovadjust", "left": "game_gunposition"}
+                 "navigation": {"down": "game_gunx", "up": "game_showgun", "right": "game_gunfovadjust", "left": "game_gunposition"},
+                 "tooltip": "#str_233037"
                 }
                },
                {
@@ -64036,7 +64488,8 @@
                    "decimals": 2,
                    "orientation": "horizontal",
                    "parts": {"track": "game_gunx-track", "fill": "game_gunx-fill", "thumb": "game_gunx-thumb", "value": "game_gunx-value"},
-                   "navigation": {"down": "game_gunx_number", "up": "game_gunposition", "right": "game_weaponkick", "left": "game_gunx"}
+                   "navigation": {"down": "game_gunx_number", "up": "game_gunposition", "right": "game_weaponkick", "left": "game_gunx"},
+                   "tooltip": "#str_233038"
                   }
                  },
                  {
@@ -64277,7 +64730,8 @@
                     "pressed": "game_gunx_number.pressed",
                     "disabled": "game_gunx_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233038"
                   }
                  }
                 ]
@@ -65143,7 +65597,8 @@
                    "decimals": 2,
                    "orientation": "horizontal",
                    "parts": {"track": "game_guny-track", "fill": "game_guny-fill", "thumb": "game_guny-thumb", "value": "game_guny-value"},
-                   "navigation": {"down": "game_guny_number", "up": "game_gunx_number", "right": "game_weaponkick", "left": "game_guny"}
+                   "navigation": {"down": "game_guny_number", "up": "game_gunx_number", "right": "game_weaponkick", "left": "game_guny"},
+                   "tooltip": "#str_233039"
                   }
                  },
                  {
@@ -65384,7 +65839,8 @@
                     "pressed": "game_guny_number.pressed",
                     "disabled": "game_guny_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233039"
                   }
                  }
                 ]
@@ -66250,7 +66706,8 @@
                    "decimals": 2,
                    "orientation": "horizontal",
                    "parts": {"track": "game_gunz-track", "fill": "game_gunz-fill", "thumb": "game_gunz-thumb", "value": "game_gunz-value"},
-                   "navigation": {"down": "game_gunz_number", "up": "game_guny_number", "right": "game_weaponkick", "left": "game_gunz"}
+                   "navigation": {"down": "game_gunz_number", "up": "game_guny_number", "right": "game_weaponkick", "left": "game_gunz"},
+                   "tooltip": "#str_233040"
                   }
                  },
                  {
@@ -66491,7 +66948,8 @@
                     "pressed": "game_gunz_number.pressed",
                     "disabled": "game_gunz_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233040"
                   }
                  }
                 ]
@@ -67095,7 +67553,8 @@
                     "thumb": "game_gunfov-thumb",
                     "value": "game_gunfov-value"
                    },
-                   "navigation": {"down": "game_gunfov_number", "up": "game_gunz_number", "left": "game_showgun"}
+                   "navigation": {"down": "game_gunfov_number", "up": "game_gunz_number", "left": "game_showgun"},
+                   "tooltip": "#str_233041"
                   }
                  },
                  {
@@ -67336,7 +67795,8 @@
                     "pressed": "game_gunfov_number.pressed",
                     "disabled": "game_gunfov_number.disabled"
                    },
-                   "integer": true
+                   "integer": true,
+                   "tooltip": "#str_233041"
                   }
                  }
                 ]
@@ -67900,7 +68360,8 @@
                   "up": "game_gunfov_number",
                   "left": "game_gunposition",
                   "right": "game_gunfovadjust"
-                 }
+                 },
+                 "tooltip": "#str_233042"
                 }
                },
                {
@@ -68121,7 +68582,8 @@
                   "disabled": "game_weaponkick.disabled"
                  },
                  "parts": {"checked": "game_weaponkick-checked"},
-                 "navigation": {"down": "game_showgun", "up": "game_gunfovadjust", "left": "game_gunx", "right": "game_weaponkick"}
+                 "navigation": {"down": "game_showgun", "up": "game_gunfovadjust", "left": "game_gunx", "right": "game_weaponkick"},
+                 "tooltip": "#str_233043"
                 }
                }
               ]
@@ -68638,7 +69100,8 @@
                   "up": "tab-accessibility",
                   "right": "game_reducedflashing",
                   "left": "game_viewkick"
-                 }
+                 },
+                 "tooltip": "#str_233044"
                 }
                },
                {
@@ -69081,7 +69544,8 @@
                   "up": "game_viewkick",
                   "right": "game_opaquebacking",
                   "left": "game_screenshake"
-                 }
+                 },
+                 "tooltip": "#str_233045"
                 }
                },
                {
@@ -69522,9 +69986,10 @@
                  "navigation": {
                   "down": "game_reducedflashing",
                   "up": "game_screenshake",
-                  "right": "game_opaquebacking",
+                  "right": "game_tooltips",
                   "left": "game_cinematicshake"
-                 }
+                 },
+                 "tooltip": "#str_233046"
                 }
                }
               ]
@@ -69784,7 +70249,8 @@
                   "up": "game_cinematicshake",
                   "left": "game_viewkick",
                   "right": "game_reducedflashing"
-                 }
+                 },
+                 "tooltip": "#str_233047"
                 }
                },
                {
@@ -70006,11 +70472,234 @@
                  },
                  "parts": {"checked": "game_opaquebacking-checked"},
                  "navigation": {
-                  "down": "game_viewkick",
+                  "down": "game_tooltips",
                   "up": "game_reducedflashing",
                   "left": "game_screenshake",
                   "right": "game_opaquebacking"
+                 },
+                 "tooltip": "#str_233048"
+                }
+               },
+               {
+                "id": "game_tooltips",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "game_tooltips-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_tooltips-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_tooltips-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_tooltips-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 169, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_tooltips-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_233000"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_tooltips-box",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"}
+                  },
+                  "paths": [
+                   {
+                    "id": "box",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "game_tooltips-checked",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 198, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "game_tooltips-mark",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "mark",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                     }
+                    ]
+                   }
+                  ]
                  }
+                ],
+                "control": {
+                 "role": "toggle",
+                 "label": "#str_233000",
+                 "action": "set.ui_tooltips",
+                 "value": {"state": "cvar.ui_tooltips"},
+                 "states": {
+                  "default": "game_tooltips.default",
+                  "hover": "game_tooltips.hover",
+                  "focus": "game_tooltips.focus",
+                  "pressed": "game_tooltips.pressed",
+                  "disabled": "game_tooltips.disabled"
+                 },
+                 "parts": {"checked": "game_tooltips-checked"},
+                 "navigation": {"down": "game_viewkick", "up": "game_opaquebacking", "left": "game_cinematicshake", "right": "game_tooltips"},
+                 "tooltip": "#str_233008"
                 }
                }
               ]
@@ -70288,7 +70977,8 @@
                   "disabled": "game_vr.disabled"
                  },
                  "parts": {"checked": "game_vr-checked"},
-                 "navigation": {"down": "game_vraim", "up": "tab-vr", "right": "game_vrroomscale", "left": "game_vr"}
+                 "navigation": {"down": "game_vraim", "up": "tab-vr", "right": "game_vrroomscale", "left": "game_vr"},
+                 "tooltip": "#str_233049"
                 }
                },
                {
@@ -70840,7 +71530,8 @@
                  ],
                  "placementBounds": "screen",
                  "scrollbar": {"track": "game_vraim-scroll-track", "thumb": "game_vraim-scroll-thumb", "lineStep": 22.0, "minimumThumb": 24},
-                 "navigation": {"down": "game_vrhand", "up": "game_vr", "right": "game_vrlaser", "left": "game_vraim"}
+                 "navigation": {"down": "game_vrhand", "up": "game_vr", "right": "game_vrlaser", "left": "game_vraim"},
+                 "tooltip": "#str_233050"
                 }
                },
                {
@@ -71397,7 +72088,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrturn", "up": "game_vraim", "right": "game_vrhaptics", "left": "game_vrhand"}
+                 "navigation": {"down": "game_vrturn", "up": "game_vraim", "right": "game_vrhaptics", "left": "game_vrhand"},
+                 "tooltip": "#str_233051"
                 }
                },
                {
@@ -71954,7 +72646,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrsnap", "up": "game_vrhand", "right": "game_vrtwohanded", "left": "game_vrturn"}
+                 "navigation": {"down": "game_vrsnap", "up": "game_vrhand", "right": "game_vrtwohanded", "left": "game_vrturn"},
+                 "tooltip": "#str_233052"
                 }
                },
                {
@@ -72691,7 +73384,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrmove", "up": "game_vrturn", "right": "game_vrvignette", "left": "game_vrsnap"}
+                 "navigation": {"down": "game_vrmove", "up": "game_vrturn", "right": "game_vrvignette", "left": "game_vrsnap"},
+                 "tooltip": "#str_233053"
                 }
                },
                {
@@ -73248,7 +73942,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrroomscale", "up": "game_vrsnap", "right": "game_vrcrouch", "left": "game_vrmove"}
+                 "navigation": {"down": "game_vrroomscale", "up": "game_vrsnap", "right": "game_vrcrouch", "left": "game_vrmove"},
+                 "tooltip": "#str_233054"
                 }
                }
               ]
@@ -73482,7 +74177,8 @@
                   "disabled": "game_vrroomscale.disabled"
                  },
                  "parts": {"checked": "game_vrroomscale-checked"},
-                 "navigation": {"down": "game_vrlaser", "up": "game_vrmove", "left": "game_vr", "right": "game_vrroomscale"}
+                 "navigation": {"down": "game_vrlaser", "up": "game_vrmove", "left": "game_vr", "right": "game_vrroomscale"},
+                 "tooltip": "#str_233055"
                 }
                },
                {
@@ -74129,7 +74825,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrhaptics", "up": "game_vrroomscale", "left": "game_vraim", "right": "game_vrlaser"}
+                 "navigation": {"down": "game_vrhaptics", "up": "game_vrroomscale", "left": "game_vraim", "right": "game_vrlaser"},
+                 "tooltip": "#str_233056"
                 }
                },
                {
@@ -74776,7 +75473,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrtwohanded", "up": "game_vrlaser", "left": "game_vrhand", "right": "game_vrhaptics"}
+                 "navigation": {"down": "game_vrtwohanded", "up": "game_vrlaser", "left": "game_vrhand", "right": "game_vrhaptics"},
+                 "tooltip": "#str_233057"
                 }
                },
                {
@@ -74997,7 +75695,8 @@
                   "disabled": "game_vrtwohanded.disabled"
                  },
                  "parts": {"checked": "game_vrtwohanded-checked"},
-                 "navigation": {"down": "game_vrvignette", "up": "game_vrhaptics", "left": "game_vrturn", "right": "game_vrtwohanded"}
+                 "navigation": {"down": "game_vrvignette", "up": "game_vrhaptics", "left": "game_vrturn", "right": "game_vrtwohanded"},
+                 "tooltip": "#str_233058"
                 }
                },
                {
@@ -75644,7 +76343,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrcrouch", "up": "game_vrtwohanded", "left": "game_vrsnap", "right": "game_vrvignette"}
+                 "navigation": {"down": "game_vrcrouch", "up": "game_vrtwohanded", "left": "game_vrsnap", "right": "game_vrvignette"},
+                 "tooltip": "#str_233059"
                 }
                },
                {
@@ -75865,7 +76565,8 @@
                   "disabled": "game_vrcrouch.disabled"
                  },
                  "parts": {"checked": "game_vrcrouch-checked"},
-                 "navigation": {"down": "game_vrplayspace", "up": "game_vrvignette", "left": "game_vrmove", "right": "game_vrcrouch"}
+                 "navigation": {"down": "game_vrplayspace", "up": "game_vrvignette", "left": "game_vrmove", "right": "game_vrcrouch"},
+                 "tooltip": "#str_233060"
                 }
                },
                {
@@ -76512,7 +77213,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_vrbody", "up": "game_vrcrouch", "left": "game_vrmove", "right": "game_vrplayspace"}
+                 "navigation": {"down": "game_vrbody", "up": "game_vrcrouch", "left": "game_vrmove", "right": "game_vrplayspace"},
+                 "tooltip": "#str_233061"
                 }
                },
                {
@@ -77159,7 +77861,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_stereo3d", "up": "game_vrplayspace", "left": "game_vrmove", "right": "game_vrbody"}
+                 "navigation": {"down": "game_stereo3d", "up": "game_vrplayspace", "left": "game_vrmove", "right": "game_vrbody"},
+                 "tooltip": "#str_233062"
                 }
                },
                {
@@ -78098,7 +78801,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "game_stereodepth", "up": "game_vrbody", "left": "game_vrmove", "right": "game_stereo3d"}
+                 "navigation": {"down": "game_stereodepth", "up": "game_vrbody", "left": "game_vrmove", "right": "game_stereo3d"},
+                 "tooltip": "#str_233063"
                 }
                },
                {
@@ -78620,7 +79324,8 @@
                   "thumb": "game_stereodepth-thumb",
                   "value": "game_stereodepth-value"
                  },
-                 "navigation": {"down": "game_stereoconvergence", "up": "game_stereo3d", "left": "game_vrmove", "right": "game_stereodepth"}
+                 "navigation": {"down": "game_stereoconvergence", "up": "game_stereo3d", "left": "game_vrmove", "right": "game_stereodepth"},
+                 "tooltip": "#str_233064"
                 }
                },
                {
@@ -79340,7 +80045,8 @@
                   "up": "game_stereodepth",
                   "left": "game_vrmove",
                   "right": "game_stereoconvergence"
-                 }
+                 },
+                 "tooltip": "#str_233065"
                 }
                },
                {
@@ -79561,7 +80267,8 @@
                   "disabled": "game_stereoswap.disabled"
                  },
                  "parts": {"checked": "game_stereoswap-checked"},
-                 "navigation": {"down": "game_vr", "up": "game_stereoconvergence", "left": "game_vrmove", "right": "game_stereoswap"}
+                 "navigation": {"down": "game_vr", "up": "game_stereoconvergence", "left": "game_vrmove", "right": "game_stereoswap"},
+                 "tooltip": "#str_233066"
                 }
                }
               ]
@@ -82600,7 +83307,107 @@
       }
      }
     ]
+   },
+   {
+    "id": "tooltip",
+    "type": "group",
+    "properties": {
+     "position": {"type": "keyword", "value": "absolute"},
+     "left": {"type": "length", "value": 0, "unit": "dp"},
+     "top": {"type": "length", "value": 0, "unit": "dp"},
+     "width": {"type": "keyword", "value": "auto"},
+     "max-width": {"type": "length", "value": 322.0, "unit": "dp"},
+     "padding-left": {"type": "length", "value": 11.0, "unit": "dp"},
+     "padding-right": {"type": "length", "value": 11.0, "unit": "dp"},
+     "padding-top": {"type": "length", "value": 7.0, "unit": "dp"},
+     "padding-bottom": {"type": "length", "value": 8.0, "unit": "dp"},
+     "display": {"type": "keyword", "value": "none"},
+     "pointer-events": {"type": "keyword", "value": "none"},
+     "opacity": {"type": "number", "value": 1},
+     "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+    },
+    "children": [
+     {
+      "id": "tooltip-frame",
+      "type": "vector",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 100, "unit": "%"},
+       "height": {"type": "length", "value": 100, "unit": "%"},
+       "pointer-events": {"type": "keyword", "value": "none"}
+      },
+      "paths": [
+       {
+        "id": "body",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[2.5, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -8.5}, 0.5]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 8.5]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, {"fraction": 1, "dp": -2.5}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 1, "dp": -2.5}, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p5", "op": "line", "points": [[8.5, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p6", "op": "line", "points": [[0.5, {"fraction": 1, "dp": -8.5}]]},
+         {"id": "p7", "op": "line", "points": [[0.5, 2.5]]},
+         {"id": "close", "op": "close"}
+        ],
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.94]}}
+       },
+       {
+        "id": "rail",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[2.5, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -8.5}, 0.5]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 8.5]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, {"fraction": 1, "dp": -2.5}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 1, "dp": -2.5}, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p5", "op": "line", "points": [[8.5, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p6", "op": "line", "points": [[0.5, {"fraction": 1, "dp": -8.5}]]},
+         {"id": "p7", "op": "line", "points": [[0.5, 2.5]]},
+         {"id": "close", "op": "close"}
+        ],
+        "stroke": {
+         "paint": {"type": "solid", "color": {"type": "color", "value": [0.6275, 0.6275, 0.251, 0.85]}},
+         "widthDp": 1,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       },
+       {
+        "id": "chevron",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[{"fraction": 1, "dp": -13.0}, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 13.0]]}
+        ],
+        "stroke": {
+         "paint": {"type": "solid", "color": {"type": "color", "value": [0.6275, 0.6275, 0.251, 0.45]}},
+         "widthDp": 1,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       }
+      ]
+     },
+     {
+      "id": "tooltip-text",
+      "type": "text",
+      "properties": {
+       "text": {"type": "text", "value": "#str_230030"},
+       "position": {"type": "keyword", "value": "relative"},
+       "display": {"type": "keyword", "value": "block"},
+       "font-family": {"type": "font", "value": "lowpixel"},
+       "font-size": {"type": "length", "value": 14, "unit": "dp"},
+       "line-height": {"type": "length", "value": 18, "unit": "dp"},
+       "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+       "white-space": {"type": "keyword", "value": "normal"}
+      }
+     }
+    ]
    }
   ]
- }
+ },
+ "tooltip": {"state": "tooltip.text", "card": "tooltip", "enter": "tooltip.enter"}
 }

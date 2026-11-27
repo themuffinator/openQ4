@@ -58,6 +58,8 @@ struct ScreenHost final : Host {
 		// The HUD settings (section 13.9) at their defaults.
 		{"ui_hudOpacity",1.0},{"ui_hudDamageDirection",true},{"ui_hudPickups",true},{"ui_hudWeaponStrip",true},
 		{"ui_reducedFlashing",false},
+		// Menu tooltips (TooltipSpec), on by default.
+		{"ui_tooltips",true},
 		// Join Game's list view: rows.
 		{"ui_browserView",0.0},
 		// The multiplayer HUD's options and spectating at their defaults
@@ -321,7 +323,7 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","ui_identity"
 	"in_touchscreen","in_joystickLowBatteryRumbleThreshold","in_joystickLowBatteryRumbleScale","in_promptStyle","in_swapConfirmBack",
 	"g_crosshairCustom","g_crosshairSize","g_crosshairColor","hud_hitMarker","hud_crosshairAnimated","ui_hudLayout","ui_hudScale","ui_hudWidth",
 	"ui_hudSafeInset","g_objectivesToggle","ui_hudOpacity","ui_hudDamageDirection","ui_hudPickups","ui_hudWeaponStrip",
-	"ui_reducedFlashing","ui_retainedOpaqueBacking","g_corpseSink","con_allowConsole","r_screenshotFormat","g_autoSkipCinematics","ui_cinematicShake","g_screenShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
+	"ui_reducedFlashing","ui_retainedOpaqueBacking","ui_tooltips","g_corpseSink","con_allowConsole","r_screenshotFormat","g_autoSkipCinematics","ui_cinematicShake","g_screenShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
 	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","g_viewKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
 	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch",
 	"vr_playSpace","vr_body",

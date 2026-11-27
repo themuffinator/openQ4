@@ -5449,6 +5449,12 @@ def main() -> int:
                  "arena_pause": arena_pause_document(), "audio": audio_document(),
                  "game": game_document(), "controls": controls_document(), "system": system_document(),
                  "settings": settings_page_document()}
+    # The settings pages' tooltips (retained_tooltips), before the Awakening
+    # family copies the pages.
+    from retained_tooltips import PAGES as TOOLTIP_PAGES, check_table, with_tooltips
+    for name in TOOLTIP_PAGES:
+        documents[name] = with_tooltips(documents[name])
+    check_table(documents)
     # The Awakening's in-game menus, carried from the Marine ones.
     from retained_awakening import AWAKENING_OUTPUTS, awakening_documents
     documents.update(awakening_documents(documents))

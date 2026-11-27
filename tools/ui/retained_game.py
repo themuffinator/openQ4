@@ -112,6 +112,7 @@ SECTIONS = (
     ("visibility", "#str_232544", (
         toggle("game_reducedflashing", "#str_231274", "ui_reducedFlashing"),
         toggle("game_opaquebacking", "#str_231592", "ui_retainedOpaqueBacking"),
+        toggle("game_tooltips", "#str_233000", "ui_tooltips"),
     )),
     # On and off settings are toggles here as everywhere else; the stock
     # page listed them as Disabled and Enabled.

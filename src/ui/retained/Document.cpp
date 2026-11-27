@@ -300,7 +300,7 @@ public:
 	// Returns the validated initial state, which the document keeps.
 	State Read(const Json::Value& root, bool treeCheck) {
 		if (treeCheck) FiniteTree(root);
-		Fields(root,"",{"format","version","id","canvas","tokens","symbols","root","timelines","state","bindings","actions","presentationVariables","aliases","events","detail","editor","extensions"});
+		Fields(root,"",{"format","version","id","canvas","tokens","symbols","root","timelines","state","bindings","actions","presentationVariables","aliases","events","detail","tooltip","editor","extensions"});
 		// "openq4-ui" is the name the format had before the id Tech 4 ports shared it.
 		Require(root["format"] == "retained-ui" || root["format"] == "openq4-ui",root,"/format","Expected format 'retained-ui'");
 		Require(root["version"].isUInt() && root["version"].asUInt() == 1,root["version"],"/version","Unsupported document version; expected 1");
@@ -369,6 +369,7 @@ public:
 		ValidateCompletions(root);
 		ValidateControls(root["root"],model.root,"/root",false);
 		ReadDetail(root);
+		ReadTooltip(root);
 		State initial; std::string stateError;
 		Require(initial.Reset(std::shared_ptr<const DocumentModel>(owner),stateError),root["bindings"],"/bindings",stateError);
 		std::string lastModal;
@@ -410,6 +411,40 @@ private:
 		for (const auto& [id,path] : detailControls)
 			Require(!Descendant(id,card->id),root,path,"A control naming a detail cannot sit inside the detail card");
 		model.detail = std::move(spec);
+	}
+	// The tooltip: a declared string state the runtime writes the shown text
+	// to, a card node holding no controls whose left and top the runtime
+	// owns, an optional entrance timeline, and a definition whenever a
+	// control names a tooltip.
+	void ReadTooltip(const Json::Value& root) {
+		if (!root.isMember("tooltip")) {
+			Require(tooltipControls.empty(),root,tooltipControls.empty() ? "" : tooltipControls.front().second,
+				"A control's tooltip requires the document's tooltip definition");
+			return;
+		}
+		const auto& tooltip = root["tooltip"];
+		Fields(tooltip,"/tooltip",{"state","card","enter","extensions"});
+		TooltipSpec spec;
+		spec.state = Id(tooltip["state"],"/tooltip/state");
+		const auto declared = model.state.find(spec.state);
+		Require(declared != model.state.end() && std::holds_alternative<std::string>(declared->second.initial),tooltip["state"],"/tooltip/state",
+			"The tooltip state must be a declared string");
+		Require(!model.detail || model.detail->state != spec.state,tooltip["state"],"/tooltip/state","The tooltip and the detail card need their own states");
+		spec.card = Id(tooltip["card"],"/tooltip/card");
+		const auto* card = model.FindNode(spec.card);
+		Require(card != nullptr && card->id != model.root.id,tooltip["card"],"/tooltip/card","The tooltip card must be a node below the root");
+		Require(!HasControl(*card),tooltip["card"],"/tooltip/card","The tooltip card cannot hold controls");
+		Require(!model.detail || model.detail->card != spec.card,tooltip["card"],"/tooltip/card","The tooltip and the detail card need their own cards");
+		for (const auto* property : {"left","top"}) {
+			Require(!trackTargets.contains({card->id,property}),tooltip["card"],"/tooltip/card","The runtime places the tooltip card; its left and top cannot be animated");
+			for (const auto& binding : model.bindings)
+				Require(!(binding.node == card->id && binding.property == property),tooltip["card"],"/tooltip/card","The runtime places the tooltip card; its left and top cannot be bound");
+		}
+		if (tooltip.isMember("enter")) {
+			spec.enter = Id(tooltip["enter"],"/tooltip/enter");
+			Require(timelineIndex.contains(spec.enter),tooltip["enter"],"/tooltip/enter","The tooltip's entrance must name a timeline");
+		}
+		model.tooltip = std::move(spec);
 	}
 	static bool HasControl(const Node& node) {
 		if (node.control) return true;
@@ -1264,12 +1299,12 @@ private:
 			const auto& control = value["control"]; const auto p = path+"/control";
 			Require(control.isObject() && control["role"].isString(),control,p,"Expected a semantic control role");
 			const auto role = control["role"].asString();
-			if (role == "button") Fields(control,p,{"role","action","event","input","focusable","label","enabled","states","navigation","detail","context","prompt","extensions"});
-			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","extensions"});
-			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","extensions"});
-			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","context","parts","visibleRows","options","optionCount","scrollbar","placementBounds","extensions"});
-			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","integer","decimals","maxBytes","parts","extensions"});
-			else if (role == "text") Fields(control,p,{"role","action","label","enabled","states","navigation","value","maxBytes","allowEmpty","masked","parts","extensions"});
+			if (role == "button") Fields(control,p,{"role","action","event","input","focusable","label","enabled","states","navigation","detail","context","prompt","tooltip","extensions"});
+			else if (role == "toggle") Fields(control,p,{"role","action","label","enabled","states","navigation","value","mixed","parts","tooltip","extensions"});
+			else if (role == "slider") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","step","decimals","orientation","parts","tooltip","extensions"});
+			else if (role == "choice") Fields(control,p,{"role","action","label","enabled","states","navigation","value","context","parts","visibleRows","options","optionCount","scrollbar","placementBounds","tooltip","extensions"});
+			else if (role == "number") Fields(control,p,{"role","action","label","enabled","states","navigation","value","minimum","maximum","exponent","integer","decimals","maxBytes","parts","tooltip","extensions"});
+			else if (role == "text") Fields(control,p,{"role","action","label","enabled","states","navigation","value","maxBytes","allowEmpty","masked","parts","tooltip","extensions"});
 			else if (role == "scrollbar") Fields(control,p,{"role","label","enabled","states","navigation","viewport","orientation","lineStep","minimumThumb","parts","extensions"});
             else Require(false,control["role"],p+"/role","Supported roles are button, toggle, slider, choice, number, text and scrollbar");
 			result.control.emplace(); auto& parsed = *result.control;
@@ -1301,6 +1336,12 @@ private:
 				parsed.prompt = ReadExpression(control["prompt"],p+"/prompt");
 				Require(parsed.prompt->type == 2 && LocalizedTextResult(*parsed.prompt),control["prompt"],p+"/prompt",
 					"A prompt verb must be a localization key or a string expression");
+			}
+			if (control.isMember("tooltip")) {
+				parsed.tooltip = ReadExpression(control["tooltip"],p+"/tooltip");
+				Require(parsed.tooltip->type == 2 && LocalizedTextResult(*parsed.tooltip),control["tooltip"],p+"/tooltip",
+					"A tooltip must be a localization key or a string expression");
+				tooltipControls.emplace_back(result.id,p+"/tooltip");
 			}
 			if (control.isMember("detail")) {
 				parsed.detail = Numeric(control["detail"],p+"/detail",-1e9,1e9);
@@ -1921,6 +1962,7 @@ private:
 	std::set<std::string> nodeIds;
 	unsigned nodeCount = 0, modelCount = 0;
 	std::vector<std::pair<std::string,std::string>> detailControls; // Controls naming a detail, with their JSON pointers.
+	std::vector<std::pair<std::string,std::string>> tooltipControls; // Controls naming a tooltip, with their JSON pointers.
 	// The (node, property) pairs that timeline tracks and bindings own, so
 	// ownership checks look a pair up instead of scanning every track.
 	std::set<std::pair<std::string,std::string>> trackTargets, bindingTargets;

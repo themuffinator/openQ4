@@ -1385,6 +1385,27 @@ SCENARIOS = {
     # Opted into, DISPLAY on the SETTINGS page goes one level deeper to the
     # SYSTEM page, captured mid-change and presented; its Back climbs out onto
     # DISPLAY mid-change and at rest.
+    # Menu tooltips (retained_tooltips, WID-012) on GAME OPTIONS: focus a
+    # program set shows none; a keyed step shows the focused row's after
+    # 500 ms, under it; a key hides it; the pointer's row shows its own after
+    # 300 ms beside the pointer; a click hides it; on ACCESSIBILITY the second
+    # column's; and with ui_tooltips 0 none. Each `inspect tooltip` reports the
+    # card's display and bounds.
+    'settings-tooltips': (None, [
+        'waitMsec 9500', 'openq4_retainedGui focus nav_settings', *menu_step('accept'), 'waitMsec 1200',
+        'openq4_retainedGui focus game', *menu_step('accept'), 'waitMsec 1500',
+        'openq4_retainedGui focus game_autoreload', 'waitMsec 900', 'openq4_retainedGui inspect tooltip',
+        *menu_step('down'), 'waitMsec 400', 'openq4_retainedGui inspect tooltip', 'openq4_retainedGui inspect tooltip-text',
+        'screenshot "screenshots/tooltip-focus.tga"',
+        'openq4_retainedGui menu right 1', 'openq4_retainedGui menu right 0', 'waitMsec 900', 'openq4_retainedGui inspect tooltip',
+        'openq4_retainedGui pointer 150 170', 'waitMsec 600', 'openq4_retainedGui report', 'openq4_retainedGui inspect tooltip',
+        'screenshot "screenshots/tooltip-pointer.tga"',
+        'openq4_retainedGui click', 'waitMsec 600', 'openq4_retainedGui inspect tooltip',
+        'openq4_retainedGui event tab_accessibility', 'waitMsec 600', 'openq4_retainedGui pointer 470 110', 'waitMsec 600',
+        'openq4_retainedGui report', 'openq4_retainedGui inspect tooltip', 'screenshot "screenshots/tooltip-accessibility.tga"',
+        'set ui_tooltips 0', 'openq4_retainedGui pointer 470 135', 'waitMsec 900', 'openq4_retainedGui report',
+        'openq4_retainedGui inspect tooltip', 'set ui_tooltips 1',
+    ]),
     'settings-system': (None, [
         'waitMsec 14000', 'openq4_retainedGui focus nav_settings', *menu_step('accept'), 'waitMsec 1200',
         'openq4_retainedGui focus display', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',

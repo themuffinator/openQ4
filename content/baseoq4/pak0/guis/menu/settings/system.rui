@@ -349,6 +349,8 @@
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
   "language": {"type": "string", "initial": "", "cvar": "sys_lang"},
+  "tooltip.text": {"type": "string", "initial": ""},
+  "tooltip.enabled": {"type": "boolean", "initial": true, "cvar": "ui_tooltips"},
   "view.safeLeft": {"type": "number", "initial": 0, "view": "safeLeft"},
   "view.safeTop": {"type": "number", "initial": 0, "view": "safeTop"},
   "view.safeRight": {"type": "number", "initial": 0, "view": "safeRight"},
@@ -27190,6 +27192,20 @@
    "property": "opacity",
    "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "settings.busy"}]}, 1, 0.4]}
   },
+  {"id": "tooltip-text.text", "node": "tooltip-text", "property": "text", "value": {"state": "tooltip.text"}},
+  {
+   "id": "tooltip.display",
+   "node": "tooltip",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "tooltip.enabled"}, {"op": "!=", "args": [{"state": "tooltip.text"}, ""]}]},
+     "block",
+     "none"
+    ]
+   }
+  },
   {
    "id": "safe.field-vignette.left",
    "node": "field-vignette",
@@ -36234,6 +36250,29 @@
      ]
     }
    ]
+  },
+  {
+   "id": "tooltip.enter",
+   "durationMs": 100,
+   "tracks": [
+    {
+     "node": "tooltip",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 100, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "tooltip",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 4.0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 100, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    }
+   ]
   }
  ],
  "root": {
@@ -40644,7 +40683,8 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_autodetect", "up": "tab-graphics", "right": "settings_ui_scale", "left": "settings_preset"}
+                   "navigation": {"down": "settings_autodetect", "up": "tab-graphics", "right": "settings_ui_scale", "left": "settings_preset"},
+                   "tooltip": "#str_233067"
                   }
                  },
                  {
@@ -40800,7 +40840,8 @@
                     "up": "settings_preset",
                     "right": "settings_text_scale",
                     "left": "settings_autodetect"
-                   }
+                   },
+                   "tooltip": "#str_233068"
                   }
                  },
                  {
@@ -41546,7 +41587,8 @@
                     "up": "settings_autodetect",
                     "right": "settings_ui_aspect",
                     "left": "settings_backend"
-                   }
+                   },
+                   "tooltip": "#str_233069"
                   }
                  },
                  {
@@ -45003,7 +45045,8 @@
                     "up": "settings_backend",
                     "right": "settings_reset_sizes",
                     "left": "settings_gpu"
-                   }
+                   },
+                   "tooltip": "#str_233070"
                   }
                  },
                  {
@@ -45565,7 +45608,8 @@
                     "up": "settings_gpu",
                     "right": "settings_reset_sizes",
                     "left": "settings_renderer"
-                   }
+                   },
+                   "tooltip": "#str_233071"
                   }
                  },
                  {
@@ -45742,7 +45786,8 @@
                     "up": "settings_renderer",
                     "right": "settings_reset_sizes",
                     "left": "settings_restart_renderer"
-                   }
+                   },
+                   "tooltip": "#str_233072"
                   }
                  },
                  {
@@ -46650,7 +46695,8 @@
                     "up": "settings_restart_renderer",
                     "left": "settings_preset",
                     "right": "settings_ui_scale"
-                   }
+                   },
+                   "tooltip": "#str_233073"
                   }
                  },
                  {
@@ -47392,7 +47438,8 @@
                     "up": "settings_ui_scale",
                     "left": "settings_autodetect",
                     "right": "settings_text_scale"
-                   }
+                   },
+                   "tooltip": "#str_233074"
                   }
                  },
                  {
@@ -47618,7 +47665,8 @@
                     "up": "settings_text_scale",
                     "left": "settings_backend",
                     "right": "settings_ui_aspect"
-                   }
+                   },
+                   "tooltip": "#str_233075"
                   }
                  },
                  {
@@ -47774,7 +47822,8 @@
                     "up": "settings_ui_aspect",
                     "left": "settings_gpu",
                     "right": "settings_reset_sizes"
-                   }
+                   },
+                   "tooltip": "#str_233076"
                   }
                  },
                  {
@@ -49080,7 +49129,8 @@
                     "up": "tab-screen",
                     "right": "settings_window_width",
                     "left": "settings_display_device"
-                   }
+                   },
+                   "tooltip": "#str_233077"
                   }
                  },
                  {
@@ -49661,7 +49711,8 @@
                     "up": "settings_display_device",
                     "right": "settings_window_height",
                     "left": "settings_multiscreen"
-                   }
+                   },
+                   "tooltip": "#str_233078"
                   }
                  },
                  {
@@ -50432,7 +50483,8 @@
                     "up": "settings_multiscreen",
                     "right": "settings_display_mode",
                     "left": "settings_window_mode"
-                   }
+                   },
+                   "tooltip": "#str_233079"
                   }
                  },
                  {
@@ -50994,7 +51046,8 @@
                     "up": "settings_window_mode",
                     "right": "settings_custom_width",
                     "left": "settings_vsync"
-                   }
+                   },
+                   "tooltip": "#str_233080"
                   }
                  },
                  {
@@ -52276,7 +52329,8 @@
                     "up": "settings_vsync",
                     "right": "settings_custom_height",
                     "left": "settings_framecap"
-                   }
+                   },
+                   "tooltip": "#str_233081"
                   }
                  }
                 ]
@@ -52646,7 +52700,8 @@
                     "up": "settings_framecap",
                     "left": "settings_display_device",
                     "right": "settings_window_width"
-                   }
+                   },
+                   "tooltip": "#str_233082"
                   }
                  },
                  {
@@ -52982,7 +53037,8 @@
                     "up": "settings_window_width",
                     "left": "settings_multiscreen",
                     "right": "settings_window_height"
-                   }
+                   },
+                   "tooltip": "#str_233083"
                   }
                  },
                  {
@@ -56925,7 +56981,8 @@
                     "up": "settings_window_height",
                     "left": "settings_window_mode",
                     "right": "settings_display_mode"
-                   }
+                   },
+                   "tooltip": "#str_233084"
                   }
                  },
                  {
@@ -57282,7 +57339,8 @@
                     "up": "settings_display_mode",
                     "left": "settings_vsync",
                     "right": "settings_custom_width"
-                   }
+                   },
+                   "tooltip": "#str_233085"
                   }
                  },
                  {
@@ -57618,7 +57676,8 @@
                     "up": "settings_custom_width",
                     "left": "settings_framecap",
                     "right": "settings_custom_height"
-                   }
+                   },
+                   "tooltip": "#str_233086"
                   }
                  },
                  {
@@ -59425,7 +59484,8 @@
                     "up": "settings_custom_height",
                     "left": "settings_framecap",
                     "right": "settings_display_refresh"
-                   }
+                   },
+                   "tooltip": "#str_233087"
                   }
                  }
                 ]
@@ -60026,7 +60086,8 @@
                       "up": "tab-image",
                       "right": "settings_specular",
                       "left": "settings_brightness"
-                     }
+                     },
+                     "tooltip": "#str_233088"
                     }
                    },
                    {
@@ -60275,7 +60336,8 @@
                         "pressed": "settings_brightness_number.pressed",
                         "disabled": "settings_brightness_number.disabled"
                        },
-                       "navigation": {"down": "settings_resolution_scale", "up": "settings_brightness"}
+                       "navigation": {"down": "settings_resolution_scale", "up": "settings_brightness"},
+                       "tooltip": "#str_233088"
                       }
                      }
                     ]
@@ -61471,7 +61533,8 @@
                     "up": "settings_brightness_number",
                     "right": "settings_bump",
                     "left": "settings_resolution_scale"
-                   }
+                   },
+                   "tooltip": "#str_233089"
                   }
                  },
                  {
@@ -62303,7 +62366,8 @@
                     "up": "settings_resolution_scale",
                     "right": "settings_sky",
                     "left": "settings_msaa"
-                   }
+                   },
+                   "tooltip": "#str_233090"
                   }
                  },
                  {
@@ -63177,7 +63241,8 @@
                     "up": "settings_msaa",
                     "right": "settings_ambient_enabled",
                     "left": "settings_postaa"
-                   }
+                   },
+                   "tooltip": "#str_233091"
                   }
                  },
                  {
@@ -64009,7 +64074,8 @@
                     "up": "settings_postaa",
                     "right": "settings_ambient",
                     "left": "settings_anisotropy"
-                   }
+                   },
+                   "tooltip": "#str_233092"
                   }
                  }
                 ]
@@ -64269,7 +64335,8 @@
                     "up": "settings_anisotropy",
                     "left": "settings_brightness",
                     "right": "settings_specular"
-                   }
+                   },
+                   "tooltip": "#str_233093"
                   }
                  },
                  {
@@ -64495,7 +64562,8 @@
                     "up": "settings_specular",
                     "left": "settings_resolution_scale",
                     "right": "settings_bump"
-                   }
+                   },
+                   "tooltip": "#str_233094"
                   }
                  },
                  {
@@ -64716,7 +64784,8 @@
                     "disabled": "settings_sky.disabled"
                    },
                    "parts": {"checked": "settings_sky-checked"},
-                   "navigation": {"down": "settings_ambient_enabled", "up": "settings_bump", "left": "settings_msaa", "right": "settings_sky"}
+                   "navigation": {"down": "settings_ambient_enabled", "up": "settings_bump", "left": "settings_msaa", "right": "settings_sky"},
+                   "tooltip": "#str_233095"
                   }
                  },
                  {
@@ -64942,7 +65011,8 @@
                     "up": "settings_sky",
                     "left": "settings_postaa",
                     "right": "settings_ambient_enabled"
-                   }
+                   },
+                   "tooltip": "#str_233096"
                   }
                  },
                  {
@@ -65811,7 +65881,8 @@
                       "thumb": "settings_ambient-thumb",
                       "value": "settings_ambient-value"
                      },
-                     "navigation": {"down": "settings_ambient_number", "up": "settings_ambient_enabled", "left": "settings_anisotropy"}
+                     "navigation": {"down": "settings_ambient_number", "up": "settings_ambient_enabled", "left": "settings_anisotropy"},
+                     "tooltip": "#str_233097"
                     }
                    },
                    {
@@ -66060,7 +66131,8 @@
                         "pressed": "settings_ambient_number.pressed",
                         "disabled": "settings_ambient_number.disabled"
                        },
-                       "navigation": {"down": "settings_brightness", "up": "settings_ambient", "right": "settings_ambient_number"}
+                       "navigation": {"down": "settings_brightness", "up": "settings_ambient", "right": "settings_ambient_number"},
+                       "tooltip": "#str_233097"
                       }
                      }
                     ]
@@ -66362,7 +66434,8 @@
                     "disabled": "settings_shadows.disabled"
                    },
                    "parts": {"checked": "settings_shadows-checked"},
-                   "navigation": {"down": "settings_shadowmaps", "up": "tab-effects", "right": "settings_bloom", "left": "settings_shadows"}
+                   "navigation": {"down": "settings_shadowmaps", "up": "tab-effects", "right": "settings_bloom", "left": "settings_shadows"},
+                   "tooltip": "#str_233098"
                   }
                  },
                  {
@@ -66588,7 +66661,8 @@
                     "up": "settings_shadows",
                     "right": "settings_ssao",
                     "left": "settings_shadowmaps"
-                   }
+                   },
+                   "tooltip": "#str_233099"
                   }
                  },
                  {
@@ -66814,7 +66888,8 @@
                     "up": "settings_shadowmaps",
                     "right": "settings_tonemap",
                     "left": "settings_character_self_shadow"
-                   }
+                   },
+                   "tooltip": "#str_233100"
                   }
                  },
                  {
@@ -67040,7 +67115,8 @@
                     "up": "settings_character_self_shadow",
                     "right": "settings_motionblur",
                     "left": "settings_irradiance"
-                   }
+                   },
+                   "tooltip": "#str_233101"
                   }
                  },
                  {
@@ -67266,7 +67342,8 @@
                     "up": "settings_irradiance",
                     "right": "settings_depthoffield",
                     "left": "settings_lightgrid_preload"
-                   }
+                   },
+                   "tooltip": "#str_233102"
                   }
                  },
                  {
@@ -67568,7 +67645,8 @@
                     "up": "settings_lightgrid_preload",
                     "left": "settings_shadows",
                     "right": "settings_bloom"
-                   }
+                   },
+                   "tooltip": "#str_233103"
                   }
                  },
                  {
@@ -68312,7 +68390,8 @@
                     "lineStep": 22.0,
                     "minimumThumb": 24
                    },
-                   "navigation": {"down": "settings_tonemap", "up": "settings_bloom", "left": "settings_shadowmaps", "right": "settings_ssao"}
+                   "navigation": {"down": "settings_tonemap", "up": "settings_bloom", "left": "settings_shadowmaps", "right": "settings_ssao"},
+                   "tooltip": "#str_233104"
                   }
                  },
                  {
@@ -68538,7 +68617,8 @@
                     "up": "settings_ssao",
                     "left": "settings_character_self_shadow",
                     "right": "settings_tonemap"
-                   }
+                   },
+                   "tooltip": "#str_233105"
                   }
                  },
                  {
@@ -68764,7 +68844,8 @@
                     "up": "settings_tonemap",
                     "left": "settings_irradiance",
                     "right": "settings_motionblur"
-                   }
+                   },
+                   "tooltip": "#str_233106"
                   }
                  },
                  {
@@ -68990,7 +69071,8 @@
                     "up": "settings_motionblur",
                     "left": "settings_lightgrid_preload",
                     "right": "settings_depthoffield"
-                   }
+                   },
+                   "tooltip": "#str_233107"
                   }
                  },
                  {
@@ -69216,7 +69298,8 @@
                     "up": "settings_depthoffield",
                     "left": "settings_lightgrid_preload",
                     "right": "settings_crt"
-                   }
+                   },
+                   "tooltip": "#str_233108"
                   }
                  }
                 ]
@@ -69464,7 +69547,8 @@
               "pressed": "settings_apply.pressed",
               "disabled": "settings_apply.disabled"
              },
-             "event": "apply"
+             "event": "apply",
+             "tooltip": "#str_233109"
             }
            }
           ]
@@ -73761,6 +73845,105 @@
      }
     ],
     "modal": {"initialFocus": "discard_keep_editing", "back": "continueEditing"}
+   },
+   {
+    "id": "tooltip",
+    "type": "group",
+    "properties": {
+     "position": {"type": "keyword", "value": "absolute"},
+     "left": {"type": "length", "value": 0, "unit": "dp"},
+     "top": {"type": "length", "value": 0, "unit": "dp"},
+     "width": {"type": "keyword", "value": "auto"},
+     "max-width": {"type": "length", "value": 322.0, "unit": "dp"},
+     "padding-left": {"type": "length", "value": 11.0, "unit": "dp"},
+     "padding-right": {"type": "length", "value": 11.0, "unit": "dp"},
+     "padding-top": {"type": "length", "value": 7.0, "unit": "dp"},
+     "padding-bottom": {"type": "length", "value": 8.0, "unit": "dp"},
+     "display": {"type": "keyword", "value": "none"},
+     "pointer-events": {"type": "keyword", "value": "none"},
+     "opacity": {"type": "number", "value": 1},
+     "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+    },
+    "children": [
+     {
+      "id": "tooltip-frame",
+      "type": "vector",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 100, "unit": "%"},
+       "height": {"type": "length", "value": 100, "unit": "%"},
+       "pointer-events": {"type": "keyword", "value": "none"}
+      },
+      "paths": [
+       {
+        "id": "body",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[2.5, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -8.5}, 0.5]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 8.5]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, {"fraction": 1, "dp": -2.5}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 1, "dp": -2.5}, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p5", "op": "line", "points": [[8.5, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p6", "op": "line", "points": [[0.5, {"fraction": 1, "dp": -8.5}]]},
+         {"id": "p7", "op": "line", "points": [[0.5, 2.5]]},
+         {"id": "close", "op": "close"}
+        ],
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.94]}}
+       },
+       {
+        "id": "rail",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[2.5, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -8.5}, 0.5]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 8.5]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, {"fraction": 1, "dp": -2.5}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 1, "dp": -2.5}, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p5", "op": "line", "points": [[8.5, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p6", "op": "line", "points": [[0.5, {"fraction": 1, "dp": -8.5}]]},
+         {"id": "p7", "op": "line", "points": [[0.5, 2.5]]},
+         {"id": "close", "op": "close"}
+        ],
+        "stroke": {
+         "paint": {"type": "solid", "color": {"type": "color", "value": [0.6275, 0.6275, 0.251, 0.85]}},
+         "widthDp": 1,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       },
+       {
+        "id": "chevron",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[{"fraction": 1, "dp": -13.0}, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 13.0]]}
+        ],
+        "stroke": {
+         "paint": {"type": "solid", "color": {"type": "color", "value": [0.6275, 0.6275, 0.251, 0.45]}},
+         "widthDp": 1,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       }
+      ]
+     },
+     {
+      "id": "tooltip-text",
+      "type": "text",
+      "properties": {
+       "text": {"type": "text", "value": "#str_230030"},
+       "position": {"type": "keyword", "value": "relative"},
+       "display": {"type": "keyword", "value": "block"},
+       "font-family": {"type": "font", "value": "lowpixel"},
+       "font-size": {"type": "length", "value": 14, "unit": "dp"},
+       "line-height": {"type": "length", "value": 18, "unit": "dp"},
+       "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+       "white-space": {"type": "keyword", "value": "normal"}
+      }
+     }
+    ]
    }
   ]
  },
@@ -73990,5 +74173,6 @@
     ]
    }
   }
- }
+ },
+ "tooltip": {"state": "tooltip.text", "card": "tooltip", "enter": "tooltip.enter"}
 }

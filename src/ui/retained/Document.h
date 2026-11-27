@@ -246,6 +246,10 @@ struct Control {
 	// on the focused control or Back, as its key would.
 	bool focusable = true;
 	ControlInput input = ControlInput::None;
+	// The tooltip this control explains itself with (DocumentModel::tooltip):
+	// a localization key, or a string expression whose result is one. An
+	// empty result shows none.
+	std::optional<Expression> tooltip;
 };
 // A document's detail card (section 7's hover card). While the pointer moved
 // last, the control it is over is the subject; otherwise the focused control
@@ -260,6 +264,22 @@ struct Control {
 struct DetailSpec {
 	std::string state, card;
 	double none = -1;
+};
+// A document's tooltip (section 7's small popover, WID-012). The subject is
+// chosen as the detail card's is, never under a finger. Once the pointer has
+// rested 300 ms on a control that names a tooltip, or keyboard or controller
+// focus 500 ms on one, the runtime writes the control's text to the string
+// `state` (empty while none shows) and places `card`: 12 dp after and 15 dp
+// below the pointer, flipping to the pointer's other side before it would
+// cross the view, or 4 dp under the focused control 21 dp in, over it near
+// the foot; always 16 dp inside the safe area. While one shows, the pointer
+// reaching the next control replaces it at once. Any press, key, wheel or
+// edit hides it until the subject changes, and an open list hides it.
+// `enter`, when named, is the timeline the runtime plays as a tooltip
+// appears (not as one replaces another). The card holds no controls and the
+// runtime owns its left and top.
+struct TooltipSpec {
+	std::string state, card, enter;
 };
 struct ControlReadback {
 	StateValue value;
@@ -329,6 +349,7 @@ struct DocumentModel {
 	std::map<std::string, PresentationAlias> aliases;
 	std::map<std::string, EventProgram> events; // Case-folded public event names.
 	std::optional<DetailSpec> detail;
+	std::optional<TooltipSpec> tooltip;
 	// Reference height in dp of a view-height canvas. A stock-composition screen
 	// (title, pause, loading) lays its 4:3 canvas out at this height and scales
 	// with the view's height; zero keeps display-density layout.

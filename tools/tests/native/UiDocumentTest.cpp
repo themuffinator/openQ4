@@ -478,8 +478,70 @@ static void CheckDetailSchema() {
 	Check(refused(document(R"(,"detail":{"card":"card"})",""),"stable ID"),"a definition always names its state");
 }
 
+// A tooltip: a control naming one needs the document's definition, whose
+// state is a declared string, whose card is a node below the root holding no
+// controls and whose left and top nothing else owns, and whose entrance, when
+// it names one, is a timeline. A control's tooltip is localized text.
+static void CheckTooltipSchema() {
+	const auto document = [](const std::string& tooltip, const std::string& control, const std::string& timelines = "",
+		const std::string& bindings = "") {
+		return R"json({"format":"retained-ui","version":1,"id":"tooltip-schema",
+		 "state":{"tip":{"type":"string","initial":""},"subject":{"type":"number","initial":-1},"flag":{"type":"boolean","initial":false}},
+		 "root":{"id":"root","type":"group","children":[
+		  {"id":"row","type":"group","properties":{"opacity":{"type":"number","value":1}},"control":{"role":"button","event":"pick",
+		   "label":"#str_row","states":{"default":"lit","hover":"lit","focus":"lit","pressed":"lit","disabled":"lit"})json"+control+R"json(}},
+		  {"id":"card","type":"group","properties":{"position":{"type":"keyword","value":"absolute"},"opacity":{"type":"number","value":1},
+		   "left":{"type":"length","value":0,"unit":"dp"},"top":{"type":"length","value":0,"unit":"dp"}}}]},
+		 "timelines":[{"id":"lit","durationMs":100,"tracks":[{"node":"row","property":"opacity","keys":[
+		  {"atMs":0,"value":{"type":"number","value":1}},{"atMs":100,"value":{"type":"number","value":0.5}}]}]},
+		  {"id":"in","durationMs":100,"tracks":[{"node":"card","property":"opacity","keys":[
+		  {"atMs":0,"value":{"type":"number","value":0}},{"atMs":100,"value":{"type":"number","value":1}}]}]})json"+timelines+R"json(],
+		 "events":{"pick":[{"op":"setState","values":{"flag":true}}]})json"+bindings+tooltip+"}";
+	};
+	const auto valid = [](const std::string& source, Document& out) {
+		std::vector<Diagnostic> errors;
+		if (out.Load(source,errors)) return true;
+		for (const auto& e : errors) std::fprintf(stderr,"%s %s\n",e.pointer.c_str(),e.message.c_str());
+		return false;
+	};
+	const auto refused = [](const std::string& source, const char* reason) {
+		Document out; std::vector<Diagnostic> errors;
+		if (out.Load(source,errors)) return false;
+		for (const auto& e : errors) if (e.message.find(reason) != std::string::npos) return true;
+		for (const auto& e : errors) std::fprintf(stderr,"%s %s\n",e.pointer.c_str(),e.message.c_str());
+		return false;
+	};
+	const std::string definition = R"(,"tooltip":{"state":"tip","card":"card","enter":"in"})";
+	Document model;
+	Check(valid(document(definition,R"(,"tooltip":"#str_tip")"),model) && model.Model().tooltip && model.Model().tooltip->state == "tip" &&
+		model.Model().tooltip->card == "card" && model.Model().tooltip->enter == "in" && model.Model().FindNode("row")->control->tooltip,
+		"a button names a tooltip the document's definition shows");
+	Check(valid(document(definition,R"(,"tooltip":{"op":"select","args":[{"state":"flag"},"#str_on","#str_off"]})"),model),
+		"a tooltip may be a string expression choosing between keys");
+	Check(valid(document(R"(,"tooltip":{"state":"tip","card":"card"})",""),model) && model.Model().tooltip->enter.empty(),
+		"a definition needs no entrance and no control naming a tooltip");
+	Check(refused(document("",R"(,"tooltip":"#str_tip")"),"requires the document's tooltip definition"),"a control's tooltip requires the definition");
+	Check(refused(document(definition,R"(,"tooltip":"Plain words")"),"localization key"),"a tooltip is localized text");
+	Check(refused(document(definition,R"(,"tooltip":3)"),"localization key"),"and text");
+	Check(refused(document(R"(,"tooltip":{"state":"missing","card":"card"})",""),"must be a declared string"),"the state must be declared");
+	Check(refused(document(R"(,"tooltip":{"state":"subject","card":"card"})",""),"must be a declared string"),"and a string");
+	Check(refused(document(R"(,"tooltip":{"state":"tip","card":"absent"})",""),"below the root"),"the card must exist");
+	Check(refused(document(R"(,"tooltip":{"state":"tip","card":"root"})",""),"below the root"),"below the root");
+	Check(refused(document(R"(,"tooltip":{"state":"tip","card":"row"})",""),"cannot hold controls"),"the card holds no controls");
+	Check(refused(document(R"(,"tooltip":{"state":"tip","card":"card","enter":"absent"})",""),"must name a timeline"),"the entrance is a timeline");
+	Check(refused(document(definition,"","",R"(,"bindings":[{"id":"left","node":"card","property":"left","value":{"state":"subject"}}])"),
+		"cannot be bound"),"nothing binds the card's left");
+	Check(refused(document(definition,"",R"(,{"id":"t","durationMs":100,"tracks":[{"node":"card","property":"top","keys":[
+		{"atMs":0,"value":{"type":"length","value":0,"unit":"dp"}},{"atMs":100,"value":{"type":"length","value":5,"unit":"dp"}}]}]})"),
+		"cannot be animated"),"or animates its top");
+	Check(refused(document(R"(,"tooltip":{"state":"tip","card":"card","delay":300})",""),"Unknown field"),"the definition has no other fields");
+	Check(refused(document(R"(,"tooltip":{"state":"tip","card":"card"},"detail":{"state":"subject","card":"card"})",""),"their own cards"),
+		"the tooltip and the detail card do not share a card");
+}
+
 int main() {
 	CheckDetailSchema();
+	CheckTooltipSchema();
 	CheckEventSchema();
 	CheckPresentationSchema();
 	CheckCompletionSchema();

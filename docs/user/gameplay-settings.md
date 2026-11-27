@@ -238,6 +238,10 @@ These are on by default and rarely need changing. Each takes effect after `s_res
 
 ## Other options
 
+### Menu tooltips
+
+In the new interface, every option on the **Settings** pages (Game Options, Display, Audio and Controls) explains itself. Rest the pointer on an option for a moment, or move to it with the keyboard or a controller and wait half a second, and a short note appears beside it saying what the option does and what it costs. It never gets in your way: it waits until you stop on an option, moves aside from the pointer, disappears as soon as you click, press a key or scroll, and doesn't come back on that option until you move to another one. Touch screens don't show them. Turn them off with **Settings → Game Options → Accessibility → Menu Tooltips** (`ui_tooltips 0`). The classic menus (`ui_retained 0`) don't have them.
+
 ### Cinematics
 
 **Settings → Game Options → General → Auto Skip Cinematics** (`g_autoSkipCinematics 1`) skips every cinematic as soon as it starts, which is handy for replays and speed runs. It is off by default and affects the next cinematic, not one already playing. **Cinematic Shake** (**Settings → Game Options → Accessibility**; **General** in 0.14.1) scales the extra camera movement added to cinematics (`ui_cinematicShake`, `0` none to `1` full); VR always turns it off.
@@ -315,6 +319,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `hud_crosshairAnimated` | `1` | Animated crosshair (new interface only). |
 | `ui_retainedReducedMotion` | `0` | `1` reduces decorative motion in the new interface, including the animated crosshair. |
 | `ui_retained` | `1` | `1` new interface, `0` classic interface. |
+| `ui_tooltips` | `1` | `1` explains the option you rest on in the new interface's settings pages; `0` turns those tooltips off. |
 
 ### Multiplayer feedback
 

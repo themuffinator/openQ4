@@ -890,6 +890,8 @@
   "view.aspect": {"type": "number", "initial": 1.3333, "view": "aspect"},
   "prompt.swapped": {"type": "boolean", "initial": false},
   "prompt.accept": {"type": "string", "initial": "#str_231042"},
+  "tooltip.text": {"type": "string", "initial": ""},
+  "tooltip.enabled": {"type": "boolean", "initial": true, "cvar": "ui_tooltips"},
   "view.safeLeft": {"type": "number", "initial": 0, "view": "safeLeft"},
   "view.safeTop": {"type": "number", "initial": 0, "view": "safeTop"},
   "view.safeRight": {"type": "number", "initial": 0, "view": "safeRight"},
@@ -91758,6 +91760,20 @@
    "property": "line-height",
    "value": {"op": "/", "args": [27.45, {"state": "view.text"}]}
   },
+  {"id": "tooltip-text.text", "node": "tooltip-text", "property": "text", "value": {"state": "tooltip.text"}},
+  {
+   "id": "tooltip.display",
+   "node": "tooltip",
+   "property": "display",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "&&", "args": [{"state": "tooltip.enabled"}, {"op": "!=", "args": [{"state": "tooltip.text"}, ""]}]},
+     "block",
+     "none"
+    ]
+   }
+  },
   {
    "id": "safe.field-vignette.left",
    "node": "field-vignette",
@@ -115151,6 +115167,29 @@
       {"atMs": 0, "value": {"type": "transform", "unit": "dp", "value": [-49.726, -13.533, 0.779, 0.779, 0]}},
       {"atMs": 150, "value": {"type": "transform", "unit": "dp", "value": [-49.726, -13.533, 0.779, 0.779, 0]}},
       {"atMs": 300, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "tooltip.enter",
+   "durationMs": 100,
+   "tracks": [
+    {
+     "node": "tooltip",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 100, "value": {"type": "number", "value": 1}}]
+    },
+    {
+     "node": "tooltip",
+     "property": "transform",
+     "keys": [
+      {
+       "atMs": 0,
+       "value": {"type": "transform", "unit": "dp", "value": [0, 4.0, 1, 1, 0]},
+       "easing": [0.16, 1, 0.3, 1]
+      },
+      {"atMs": 100, "value": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}}
      ]
     }
    ]
@@ -182063,7 +182102,8 @@
                   "up": "controls_bind_51",
                   "left": "controls_bind_44",
                   "right": "controls_touch_layout"
-                 }
+                 },
+                 "tooltip": "#str_233123"
                 }
                }
               ]
@@ -182361,7 +182401,8 @@
                   "disabled": "controls_freelook.disabled"
                  },
                  "parts": {"checked": "controls_freelook-checked"},
-                 "navigation": {"down": "controls_invertmouse", "up": "tab-mouse", "right": "controls_maccel", "left": "controls_freelook"}
+                 "navigation": {"down": "controls_invertmouse", "up": "tab-mouse", "right": "controls_maccel", "left": "controls_freelook"},
+                 "tooltip": "#str_233124"
                 }
                },
                {
@@ -182923,7 +182964,8 @@
                   "up": "controls_freelook",
                   "right": "controls_macceloffset",
                   "left": "controls_invertmouse"
-                 }
+                 },
+                 "tooltip": "#str_233125"
                 }
                },
                {
@@ -183149,7 +183191,8 @@
                   "up": "controls_invertmouse",
                   "right": "controls_maccelpower",
                   "left": "controls_togglezoom"
-                 }
+                 },
+                 "tooltip": "#str_233126"
                 }
                },
                {
@@ -183729,7 +183772,8 @@
                   "up": "controls_togglezoom",
                   "right": "controls_msenscap",
                   "left": "controls_scopesensitivity"
-                 }
+                 },
+                 "tooltip": "#str_233127"
                 }
                },
                {
@@ -184348,7 +184392,8 @@
                     "up": "controls_scopesensitivity",
                     "right": "controls_msenscap",
                     "left": "controls_msensitivity"
-                   }
+                   },
+                   "tooltip": "#str_233128"
                   }
                  },
                  {
@@ -184592,7 +184637,8 @@
                     "pressed": "controls_msensitivity_number.pressed",
                     "disabled": "controls_msensitivity_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233128"
                   }
                  }
                 ]
@@ -185356,7 +185402,8 @@
                     "up": "controls_msensitivity_number",
                     "right": "controls_msenscap",
                     "left": "controls_mcpi"
-                   }
+                   },
+                   "tooltip": "#str_233129"
                   }
                  },
                  {
@@ -185597,7 +185644,8 @@
                     "pressed": "controls_mcpi_number.pressed",
                     "disabled": "controls_mcpi_number.disabled"
                    },
-                   "integer": true
+                   "integer": true,
+                   "tooltip": "#str_233129"
                   }
                  }
                 ]
@@ -185997,7 +186045,8 @@
                   "up": "controls_mcpi_number",
                   "right": "controls_msenscap",
                   "left": "controls_msmooth"
-                 }
+                 },
+                 "tooltip": "#str_233130"
                 }
                },
                {
@@ -186731,7 +186780,8 @@
                   "up": "controls_msmooth",
                   "right": "controls_msenscap",
                   "left": "controls_mfilter"
-                 }
+                 },
+                 "tooltip": "#str_233131"
                 }
                }
               ]
@@ -187637,7 +187687,8 @@
                     "thumb": "controls_maccel-thumb",
                     "value": "controls_maccel-value"
                    },
-                   "navigation": {"down": "controls_maccel_number", "up": "controls_mfilter", "left": "controls_freelook"}
+                   "navigation": {"down": "controls_maccel_number", "up": "controls_mfilter", "left": "controls_freelook"},
+                   "tooltip": "#str_233132"
                   }
                  },
                  {
@@ -187886,7 +187937,8 @@
                     "pressed": "controls_maccel_number.pressed",
                     "disabled": "controls_maccel_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233132"
                   }
                  }
                 ]
@@ -188550,7 +188602,8 @@
                     "thumb": "controls_macceloffset-thumb",
                     "value": "controls_macceloffset-value"
                    },
-                   "navigation": {"down": "controls_macceloffset_number", "up": "controls_maccel_number", "left": "controls_invertmouse"}
+                   "navigation": {"down": "controls_macceloffset_number", "up": "controls_maccel_number", "left": "controls_invertmouse"},
+                   "tooltip": "#str_233133"
                   }
                  },
                  {
@@ -188799,7 +188852,8 @@
                     "pressed": "controls_macceloffset_number.pressed",
                     "disabled": "controls_macceloffset_number.disabled"
                    },
-                   "decimals": 1
+                   "decimals": 1,
+                   "tooltip": "#str_233133"
                   }
                  }
                 ]
@@ -189603,7 +189657,8 @@
                     "thumb": "controls_maccelpower-thumb",
                     "value": "controls_maccelpower-value"
                    },
-                   "navigation": {"down": "controls_maccelpower_number", "up": "controls_macceloffset_number", "left": "controls_togglezoom"}
+                   "navigation": {"down": "controls_maccelpower_number", "up": "controls_macceloffset_number", "left": "controls_togglezoom"},
+                   "tooltip": "#str_233134"
                   }
                  },
                  {
@@ -189852,7 +189907,8 @@
                     "pressed": "controls_maccelpower_number.pressed",
                     "disabled": "controls_maccelpower_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233134"
                   }
                  }
                 ]
@@ -190726,7 +190782,8 @@
                     "thumb": "controls_msenscap-thumb",
                     "value": "controls_msenscap-value"
                    },
-                   "navigation": {"down": "controls_msenscap_number", "up": "controls_maccelpower_number", "left": "controls_scopesensitivity"}
+                   "navigation": {"down": "controls_msenscap_number", "up": "controls_maccelpower_number", "left": "controls_scopesensitivity"},
+                   "tooltip": "#str_233135"
                   }
                  },
                  {
@@ -190975,7 +191032,8 @@
                     "pressed": "controls_msenscap_number.pressed",
                     "disabled": "controls_msenscap_number.disabled"
                    },
-                   "decimals": 1
+                   "decimals": 1,
+                   "tooltip": "#str_233135"
                   }
                  }
                 ]
@@ -191275,7 +191333,8 @@
                   "disabled": "controls_controller.disabled"
                  },
                  "parts": {"checked": "controls_controller-checked"},
-                 "navigation": {"down": "controls_device", "up": "tab-controller", "right": "controls_rumble", "left": "controls_controller"}
+                 "navigation": {"down": "controls_device", "up": "tab-controller", "right": "controls_rumble", "left": "controls_controller"},
+                 "tooltip": "#str_233136"
                 }
                },
                {
@@ -191837,7 +191896,8 @@
                   "up": "controls_controller",
                   "right": "controls_rumblescale",
                   "left": "controls_device"
-                 }
+                 },
+                 "tooltip": "#str_233137"
                 }
                },
                {
@@ -191993,7 +192053,8 @@
                   "up": "controls_device",
                   "right": "controls_triggerrumble",
                   "left": "controls_test"
-                 }
+                 },
+                 "tooltip": "#str_233138"
                 }
                },
                {
@@ -192555,7 +192616,8 @@
                   "up": "controls_test",
                   "right": "controls_adaptivetriggers",
                   "left": "controls_southpaw"
-                 }
+                 },
+                 "tooltip": "#str_233139"
                 }
                },
                {
@@ -193138,7 +193200,8 @@
                   "up": "controls_southpaw",
                   "right": "controls_directionalhits",
                   "left": "controls_wheelsensitivity"
-                 }
+                 },
+                 "tooltip": "#str_233140"
                 }
                },
                {
@@ -193998,7 +194061,8 @@
                   "up": "controls_wheelsensitivity",
                   "right": "controls_batterythreshold",
                   "left": "controls_wheeloffset"
-                 }
+                 },
+                 "tooltip": "#str_233141"
                 }
                },
                {
@@ -194852,7 +194916,8 @@
                   "up": "controls_wheeloffset",
                   "right": "controls_batteryscale",
                   "left": "controls_layout"
-                 }
+                 },
+                 "tooltip": "#str_233142"
                 }
                },
                {
@@ -195505,7 +195570,8 @@
                   "up": "controls_layout",
                   "right": "controls_light",
                   "left": "controls_trigger"
-                 }
+                 },
+                 "tooltip": "#str_233143"
                 }
                },
                {
@@ -195731,7 +195797,8 @@
                   "up": "controls_trigger",
                   "right": "controls_playerlight",
                   "left": "controls_togglecrouch"
-                 }
+                 },
+                 "tooltip": "#str_233144"
                 }
                },
                {
@@ -195957,7 +196024,8 @@
                   "up": "controls_togglecrouch",
                   "right": "controls_batterynotice",
                   "left": "controls_alwaysrun"
-                 }
+                 },
+                 "tooltip": "#str_233145"
                 }
                },
                {
@@ -196183,7 +196251,8 @@
                   "up": "controls_alwaysrun",
                   "right": "controls_promptstyle",
                   "left": "controls_context"
-                 }
+                 },
+                 "tooltip": "#str_233146"
                 }
                },
                {
@@ -196339,7 +196408,8 @@
                   "up": "controls_context",
                   "right": "controls_swapconfirm",
                   "left": "controls_resetcontroller"
-                 }
+                 },
+                 "tooltip": "#str_233147"
                 }
                },
                {
@@ -196495,7 +196565,8 @@
                   "up": "controls_resetcontroller",
                   "right": "controls_swapconfirm",
                   "left": "controls_resetkeyboard"
-                 }
+                 },
+                 "tooltip": "#str_233148"
                 }
                }
               ]
@@ -196755,7 +196826,8 @@
                   "up": "controls_resetkeyboard",
                   "left": "controls_controller",
                   "right": "controls_rumble"
-                 }
+                 },
+                 "tooltip": "#str_233149"
                 }
                },
                {
@@ -197618,7 +197690,8 @@
                   "up": "controls_rumble",
                   "left": "controls_device",
                   "right": "controls_rumblescale"
-                 }
+                 },
+                 "tooltip": "#str_233150"
                 }
                },
                {
@@ -197844,7 +197917,8 @@
                   "up": "controls_rumblescale",
                   "left": "controls_test",
                   "right": "controls_triggerrumble"
-                 }
+                 },
+                 "tooltip": "#str_233151"
                 }
                },
                {
@@ -198070,7 +198144,8 @@
                   "up": "controls_triggerrumble",
                   "left": "controls_southpaw",
                   "right": "controls_adaptivetriggers"
-                 }
+                 },
+                 "tooltip": "#str_233152"
                 }
                },
                {
@@ -198296,7 +198371,8 @@
                   "up": "controls_adaptivetriggers",
                   "left": "controls_wheelsensitivity",
                   "right": "controls_directionalhits"
-                 }
+                 },
+                 "tooltip": "#str_233153"
                 }
                },
                {
@@ -198946,7 +199022,8 @@
                   "up": "controls_directionalhits",
                   "left": "controls_wheeloffset",
                   "right": "controls_batterythreshold"
-                 }
+                 },
+                 "tooltip": "#str_233154"
                 }
                },
                {
@@ -199812,7 +199889,8 @@
                   "up": "controls_batterythreshold",
                   "left": "controls_layout",
                   "right": "controls_batteryscale"
-                 }
+                 },
+                 "tooltip": "#str_233155"
                 }
                },
                {
@@ -200060,7 +200138,8 @@
                   "up": "controls_batteryscale",
                   "left": "controls_trigger",
                   "right": "controls_light"
-                 }
+                 },
+                 "tooltip": "#str_233156"
                 }
                },
                {
@@ -200286,7 +200365,8 @@
                   "up": "controls_light",
                   "left": "controls_togglecrouch",
                   "right": "controls_playerlight"
-                 }
+                 },
+                 "tooltip": "#str_233157"
                 }
                },
                {
@@ -200936,7 +201016,8 @@
                   "up": "controls_playerlight",
                   "left": "controls_alwaysrun",
                   "right": "controls_batterynotice"
-                 }
+                 },
+                 "tooltip": "#str_233158"
                 }
                },
                {
@@ -201880,7 +201961,8 @@
                   "up": "controls_batterynotice",
                   "left": "controls_context",
                   "right": "controls_promptstyle"
-                 }
+                 },
+                 "tooltip": "#str_233159"
                 }
                },
                {
@@ -202532,7 +202614,8 @@
                   "up": "controls_promptstyle",
                   "left": "controls_resetcontroller",
                   "right": "controls_swapconfirm"
-                 }
+                 },
+                 "tooltip": "#str_233160"
                 }
                }
               ]
@@ -203346,7 +203429,8 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "controls_turnspeed", "up": "tab-aim", "right": "controls_gyro", "left": "controls_response"}
+                 "navigation": {"down": "controls_turnspeed", "up": "tab-aim", "right": "controls_gyro", "left": "controls_response"},
+                 "tooltip": "#str_233161"
                 }
                },
                {
@@ -203943,7 +204027,8 @@
                     "up": "controls_response",
                     "right": "controls_gyroturn",
                     "left": "controls_turnspeed"
-                   }
+                   },
+                   "tooltip": "#str_233162"
                   }
                  },
                  {
@@ -204187,7 +204272,8 @@
                     "pressed": "controls_turnspeed_number.pressed",
                     "disabled": "controls_turnspeed_number.disabled"
                    },
-                   "decimals": 1
+                   "decimals": 1,
+                   "tooltip": "#str_233162"
                   }
                  }
                 ]
@@ -204786,7 +204872,8 @@
                     "up": "controls_turnspeed_number",
                     "right": "controls_gyrotilt",
                     "left": "controls_pitchspeed"
-                   }
+                   },
+                   "tooltip": "#str_233163"
                   }
                  },
                  {
@@ -205030,7 +205117,8 @@
                     "pressed": "controls_pitchspeed_number.pressed",
                     "disabled": "controls_pitchspeed_number.disabled"
                    },
-                   "decimals": 1
+                   "decimals": 1,
+                   "tooltip": "#str_233163"
                   }
                  }
                 ]
@@ -205895,7 +205983,8 @@
                   "up": "controls_pitchspeed_number",
                   "right": "controls_gyrospace",
                   "left": "controls_lookcurve"
-                 }
+                 },
+                 "tooltip": "#str_233164"
                 }
                },
                {
@@ -206121,7 +206210,8 @@
                   "up": "controls_lookcurve",
                   "right": "controls_gyroactive",
                   "left": "controls_invertlook"
-                 }
+                 },
+                 "tooltip": "#str_233165"
                 }
                },
                {
@@ -206981,7 +207071,8 @@
                   "up": "controls_invertlook",
                   "right": "controls_gyroinvertturn",
                   "left": "controls_turnboost"
-                 }
+                 },
+                 "tooltip": "#str_233166"
                 }
                },
                {
@@ -207723,7 +207814,8 @@
                   "up": "controls_turnboost",
                   "right": "controls_gyroinverttilt",
                   "left": "controls_aimassist"
-                 }
+                 },
+                 "tooltip": "#str_233167"
                 }
                },
                {
@@ -208314,7 +208406,8 @@
                   "up": "controls_aimassist",
                   "right": "controls_gyrotightening",
                   "left": "controls_lookdeadzone"
-                 }
+                 },
+                 "tooltip": "#str_233168"
                 }
                },
                {
@@ -208967,7 +209060,8 @@
                   "up": "controls_lookdeadzone",
                   "right": "controls_gyropointer",
                   "left": "controls_lookouterzone"
-                 }
+                 },
+                 "tooltip": "#str_233169"
                 }
                },
                {
@@ -209536,7 +209630,8 @@
                   "up": "controls_lookouterzone",
                   "right": "controls_gyrocalibrate",
                   "left": "controls_movedeadzone"
-                 }
+                 },
+                 "tooltip": "#str_233170"
                 }
                },
                {
@@ -210189,7 +210284,8 @@
                   "up": "controls_movedeadzone",
                   "right": "controls_touchpad",
                   "left": "controls_moveouterzone"
-                 }
+                 },
+                 "tooltip": "#str_233171"
                 }
                },
                {
@@ -210751,7 +210847,8 @@
                   "up": "controls_moveouterzone",
                   "right": "controls_touchpadsensitivity",
                   "left": "controls_moveshape"
-                 }
+                 },
+                 "tooltip": "#str_233172"
                 }
                },
                {
@@ -211614,7 +211711,8 @@
                   "up": "controls_moveshape",
                   "right": "controls_touchscreen",
                   "left": "controls_movecurve"
-                 }
+                 },
+                 "tooltip": "#str_233173"
                 }
                }
               ]
@@ -211874,7 +211972,8 @@
                   "up": "controls_movecurve",
                   "left": "controls_response",
                   "right": "controls_gyro"
-                 }
+                 },
+                 "tooltip": "#str_233174"
                 }
                },
                {
@@ -212466,7 +212565,8 @@
                     "thumb": "controls_gyroturn-thumb",
                     "value": "controls_gyroturn-value"
                    },
-                   "navigation": {"down": "controls_gyroturn_number", "up": "controls_gyro", "left": "controls_turnspeed"}
+                   "navigation": {"down": "controls_gyroturn_number", "up": "controls_gyro", "left": "controls_turnspeed"},
+                   "tooltip": "#str_233175"
                   }
                  },
                  {
@@ -212715,7 +212815,8 @@
                     "pressed": "controls_gyroturn_number.pressed",
                     "disabled": "controls_gyroturn_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233175"
                   }
                  }
                 ]
@@ -213309,7 +213410,8 @@
                     "thumb": "controls_gyrotilt-thumb",
                     "value": "controls_gyrotilt-value"
                    },
-                   "navigation": {"down": "controls_gyrotilt_number", "up": "controls_gyroturn_number", "left": "controls_pitchspeed"}
+                   "navigation": {"down": "controls_gyrotilt_number", "up": "controls_gyroturn_number", "left": "controls_pitchspeed"},
+                   "tooltip": "#str_233176"
                   }
                  },
                  {
@@ -213558,7 +213660,8 @@
                     "pressed": "controls_gyrotilt_number.pressed",
                     "disabled": "controls_gyrotilt_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233176"
                   }
                  }
                 ]
@@ -214212,7 +214315,8 @@
                   "up": "controls_gyrotilt_number",
                   "left": "controls_lookcurve",
                   "right": "controls_gyrospace"
-                 }
+                 },
+                 "tooltip": "#str_233177"
                 }
                },
                {
@@ -214954,7 +215058,8 @@
                   "up": "controls_gyrospace",
                   "left": "controls_invertlook",
                   "right": "controls_gyroactive"
-                 }
+                 },
+                 "tooltip": "#str_233178"
                 }
                },
                {
@@ -215180,7 +215285,8 @@
                   "up": "controls_gyroactive",
                   "left": "controls_turnboost",
                   "right": "controls_gyroinvertturn"
-                 }
+                 },
+                 "tooltip": "#str_233179"
                 }
                },
                {
@@ -215406,7 +215512,8 @@
                   "up": "controls_gyroinvertturn",
                   "left": "controls_aimassist",
                   "right": "controls_gyroinverttilt"
-                 }
+                 },
+                 "tooltip": "#str_233180"
                 }
                },
                {
@@ -216269,7 +216376,8 @@
                   "up": "controls_gyroinverttilt",
                   "left": "controls_lookdeadzone",
                   "right": "controls_gyrotightening"
-                 }
+                 },
+                 "tooltip": "#str_233181"
                 }
                },
                {
@@ -216495,7 +216603,8 @@
                   "up": "controls_gyrotightening",
                   "left": "controls_lookouterzone",
                   "right": "controls_gyropointer"
-                 }
+                 },
+                 "tooltip": "#str_233182"
                 }
                },
                {
@@ -216651,7 +216760,8 @@
                   "up": "controls_gyropointer",
                   "left": "controls_movedeadzone",
                   "right": "controls_gyrocalibrate"
-                 }
+                 },
+                 "tooltip": "#str_233183"
                 }
                },
                {
@@ -217415,7 +217525,8 @@
                   "up": "controls_gyrocalibrate",
                   "left": "controls_moveouterzone",
                   "right": "controls_touchpad"
-                 }
+                 },
+                 "tooltip": "#str_233184"
                 }
                },
                {
@@ -218287,7 +218398,8 @@
                     "thumb": "controls_touchpadsensitivity-thumb",
                     "value": "controls_touchpadsensitivity-value"
                    },
-                   "navigation": {"down": "controls_touchpadsensitivity_number", "up": "controls_touchpad", "left": "controls_moveshape"}
+                   "navigation": {"down": "controls_touchpadsensitivity_number", "up": "controls_touchpad", "left": "controls_moveshape"},
+                   "tooltip": "#str_233185"
                   }
                  },
                  {
@@ -218536,7 +218648,8 @@
                     "pressed": "controls_touchpadsensitivity_number.pressed",
                     "disabled": "controls_touchpadsensitivity_number.disabled"
                    },
-                   "decimals": 2
+                   "decimals": 2,
+                   "tooltip": "#str_233185"
                   }
                  }
                 ]
@@ -218764,7 +218877,8 @@
                   "up": "controls_touchpadsensitivity_number",
                   "left": "controls_movecurve",
                   "right": "controls_touchscreen"
-                 }
+                 },
+                 "tooltip": "#str_233186"
                 }
                }
               ]
@@ -230610,7 +230724,107 @@
      }
     ],
     "modal": {"initialFocus": "controllerTestModal_yes", "back": "controllerTestModalHide"}
+   },
+   {
+    "id": "tooltip",
+    "type": "group",
+    "properties": {
+     "position": {"type": "keyword", "value": "absolute"},
+     "left": {"type": "length", "value": 0, "unit": "dp"},
+     "top": {"type": "length", "value": 0, "unit": "dp"},
+     "width": {"type": "keyword", "value": "auto"},
+     "max-width": {"type": "length", "value": 322.0, "unit": "dp"},
+     "padding-left": {"type": "length", "value": 11.0, "unit": "dp"},
+     "padding-right": {"type": "length", "value": 11.0, "unit": "dp"},
+     "padding-top": {"type": "length", "value": 7.0, "unit": "dp"},
+     "padding-bottom": {"type": "length", "value": 8.0, "unit": "dp"},
+     "display": {"type": "keyword", "value": "none"},
+     "pointer-events": {"type": "keyword", "value": "none"},
+     "opacity": {"type": "number", "value": 1},
+     "transform": {"type": "transform", "unit": "dp", "value": [0, 0, 1, 1, 0]}
+    },
+    "children": [
+     {
+      "id": "tooltip-frame",
+      "type": "vector",
+      "properties": {
+       "position": {"type": "keyword", "value": "absolute"},
+       "left": {"type": "length", "value": 0, "unit": "dp"},
+       "top": {"type": "length", "value": 0, "unit": "dp"},
+       "width": {"type": "length", "value": 100, "unit": "%"},
+       "height": {"type": "length", "value": 100, "unit": "%"},
+       "pointer-events": {"type": "keyword", "value": "none"}
+      },
+      "paths": [
+       {
+        "id": "body",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[2.5, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -8.5}, 0.5]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 8.5]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, {"fraction": 1, "dp": -2.5}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 1, "dp": -2.5}, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p5", "op": "line", "points": [[8.5, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p6", "op": "line", "points": [[0.5, {"fraction": 1, "dp": -8.5}]]},
+         {"id": "p7", "op": "line", "points": [[0.5, 2.5]]},
+         {"id": "close", "op": "close"}
+        ],
+        "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.94]}}
+       },
+       {
+        "id": "rail",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[2.5, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -8.5}, 0.5]]},
+         {"id": "p2", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 8.5]]},
+         {"id": "p3", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, {"fraction": 1, "dp": -2.5}]]},
+         {"id": "p4", "op": "line", "points": [[{"fraction": 1, "dp": -2.5}, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p5", "op": "line", "points": [[8.5, {"fraction": 1, "dp": -0.5}]]},
+         {"id": "p6", "op": "line", "points": [[0.5, {"fraction": 1, "dp": -8.5}]]},
+         {"id": "p7", "op": "line", "points": [[0.5, 2.5]]},
+         {"id": "close", "op": "close"}
+        ],
+        "stroke": {
+         "paint": {"type": "solid", "color": {"type": "color", "value": [0.6275, 0.6275, 0.251, 0.85]}},
+         "widthDp": 1,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       },
+       {
+        "id": "chevron",
+        "commands": [
+         {"id": "p0", "op": "move", "points": [[{"fraction": 1, "dp": -13.0}, 0.5]]},
+         {"id": "p1", "op": "line", "points": [[{"fraction": 1, "dp": -0.5}, 13.0]]}
+        ],
+        "stroke": {
+         "paint": {"type": "solid", "color": {"type": "color", "value": [0.6275, 0.6275, 0.251, 0.45]}},
+         "widthDp": 1,
+         "minimumPixels": 1,
+         "join": "miter",
+         "cap": "butt"
+        }
+       }
+      ]
+     },
+     {
+      "id": "tooltip-text",
+      "type": "text",
+      "properties": {
+       "text": {"type": "text", "value": "#str_230030"},
+       "position": {"type": "keyword", "value": "relative"},
+       "display": {"type": "keyword", "value": "block"},
+       "font-family": {"type": "font", "value": "lowpixel"},
+       "font-size": {"type": "length", "value": 14, "unit": "dp"},
+       "line-height": {"type": "length", "value": 18, "unit": "dp"},
+       "color": {"type": "color", "value": [1, 1, 1, 0.9]},
+       "white-space": {"type": "keyword", "value": "normal"}
+      }
+     }
+    ]
    }
   ]
- }
+ },
+ "tooltip": {"state": "tooltip.text", "card": "tooltip", "enter": "tooltip.enter"}
 }

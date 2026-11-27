@@ -2036,6 +2036,26 @@ struct Runtime::Impl {
 	bool detailByPointer = false;
 	float detailLeft = 0, detailTop = 0;
 	bool detailPlaced = false;
+	// The tooltip (DocumentModel::tooltip): the control it would describe and
+	// whether the pointer chose it, when that control became the subject,
+	// whether one shows and when one last showed, whether input quieted it,
+	// whether this subject was reached within a group (a tooltip shown
+	// moments before, so this one replaces it at once), and the card's last
+	// placement relative to its containing block.
+	std::string tooltipSubject;
+	bool tooltipByPointer = false, tooltipShown = false, tooltipQuiet = false, tooltipGroup = false, tooltipPlaced = false;
+	// Focus shows tooltips only once a key or button has moved it: a page
+	// opening on its first control shows none to a player at the mouse.
+	bool tooltipKeyed = false;
+	double tooltipSince = 0, tooltipHidden = -std::numeric_limits<double>::infinity();
+	float tooltipLeft = 0, tooltipTop = 0;
+	static constexpr double TooltipPointerSeconds = 0.3, TooltipFocusSeconds = 0.5, TooltipGroupSeconds = 0.3;
+	// Input hides a tooltip until the subject changes, and ends its group.
+	void QuietTooltip() { tooltipQuiet = true; tooltipHidden = -std::numeric_limits<double>::infinity(); }
+	void ResetTooltip() {
+		tooltipSubject.clear(); tooltipByPointer = tooltipShown = tooltipQuiet = tooltipGroup = tooltipPlaced = tooltipKeyed = false;
+		tooltipSince = 0; tooltipHidden = -std::numeric_limits<double>::infinity();
+	}
 	// A program's focus request that the current layout could not take: its
 	// control appears with the same state change. The next frame's layout
 	// takes it, or it lapses.
@@ -2495,6 +2515,86 @@ struct Runtime::Impl {
 		const float left = x-origin.x, top = y-origin.y;
 		if (detailPlaced && std::abs(left-detailLeft) < .25f && std::abs(top-detailTop) < .25f) return false;
 		detailLeft = left; detailTop = top; detailPlaced = true;
+		card->SetProperty(Rml::PropertyId::Left,Rml::Property(left,Rml::Unit::PX));
+		card->SetProperty(Rml::PropertyId::Top,Rml::Property(top,Rml::Unit::PX));
+		return true;
+	}
+	// Writes the tooltip's text to its state once its subject has waited its
+	// delay (TooltipSpec), and empties it otherwise. True when the state
+	// changed (its bindings are then applied).
+	bool UpdateTooltip() {
+		if (!canonical || !canonical->Model().tooltip) return false;
+		const auto& spec = *canonical->Model().tooltip;
+		const bool byPointer = pointerNavigation;
+		// A finger lands rather than browses: touch shows no tooltips.
+		std::string subject = touchPointer ? std::string{} : byPointer ? (pointerPresent ? interaction.Hovered() : std::string{}) :
+			tooltipKeyed ? interaction.Focused() : std::string{};
+		std::string text;
+		const auto* node = subject.empty() ? nullptr : canonical->Model().FindNode(subject);
+		if (node && node->control && node->control->tooltip) {
+			StateValue value; std::string error;
+			if (EvaluateStateExpression(*node->control->tooltip,state.Variables(),value,error)) {
+				if (const auto* result = std::get_if<std::string>(&value)) text = *result;
+			} else host.Log(true,error);
+		}
+		// An open list, or a field being typed in, holds the player's attention.
+		if (!text.empty()) {
+			if (interaction.HasEditor(subject)) text.clear();
+			if (!interaction.OpenPopup().empty()) text.clear();
+		}
+		if (text.empty()) subject.clear();
+		if (subject != tooltipSubject || byPointer != tooltipByPointer) {
+			tooltipGroup = !subject.empty() && byPointer && tooltipByPointer && time-tooltipHidden <= TooltipGroupSeconds;
+			tooltipSubject = subject; tooltipByPointer = byPointer; tooltipSince = time;
+			tooltipQuiet = false; tooltipPlaced = false;
+		}
+		const double delay = tooltipByPointer ? TooltipPointerSeconds : TooltipFocusSeconds;
+		const bool show = !tooltipSubject.empty() && !tooltipQuiet && (tooltipGroup || time-tooltipSince >= delay);
+		const bool enter = show && !tooltipShown && !tooltipGroup;
+		// The group runs from the last moment one showed.
+		if (show) tooltipHidden = time;
+		tooltipShown = show;
+		const StateValues change{{spec.state, show ? text : std::string{}}};
+		if (!state.WouldChange(change)) return false;
+		State candidate = state; std::string error;
+		if (!candidate.Set(change,error)) { host.Log(true,error); return false; }
+		state = std::move(candidate);
+		if (enter && !spec.enter.empty()) motion.Play(spec.enter,time);
+		ApplyControlBindings(); ApplyMotion(); return true;
+	}
+	// Places a shown tooltip by the card's measured box (TooltipSpec). True
+	// when it moved.
+	bool PlaceTooltip() {
+		if (!canonical || !canonical->Model().tooltip || !tooltipShown || tooltipSubject.empty()) return false;
+		auto* card = CanonicalElement(canonical->Model().tooltip->card);
+		auto* subject = CanonicalElement(tooltipSubject);
+		if (!card || !subject) return false;
+		const auto size = card->GetBox().GetSize(Rml::BoxArea::Border);
+		if (size.x <= 0 || size.y <= 0) return false;
+		auto* parent = card->GetOffsetParent();
+		const auto origin = parent ? parent->GetAbsoluteOffset(Rml::BoxArea::Padding) : Rml::Vector2f{};
+		const float dp = viewport.DpRatio(), edge = 16*dp;
+		const auto inset = [](float value) { return std::isfinite(value) ? std::max(value,0.f) : 0.f; };
+		const float leading = inset(viewport.safeLeft)+edge, top0 = inset(viewport.safeTop)+edge;
+		const float trailing = viewport.width-inset(viewport.safeRight)-edge, foot = viewport.height-inset(viewport.safeBottom)-edge;
+		float x = 0, y = 0;
+		if (tooltipByPointer) {
+			// Clear of the pointer's arrow: after and below it, and on its
+			// other side before the card would cross the view.
+			x = pointerX+12*dp; y = pointerY+15*dp;
+			if (x+size.x > trailing) x = pointerX-12*dp-size.x;
+			if (y+size.y > foot) y = pointerY-8*dp-size.y;
+		} else {
+			const auto at = subject->GetAbsoluteOffset(Rml::BoxArea::Border);
+			const auto box = subject->GetBox().GetSize(Rml::BoxArea::Border);
+			x = at.x+21*dp; y = at.y+box.y+4*dp;
+			if (y+size.y > foot) y = at.y-4*dp-size.y;
+		}
+		x = std::clamp(x,leading,std::max(leading,trailing-size.x));
+		y = std::clamp(y,top0,std::max(top0,foot-size.y));
+		const float left = x-origin.x, top = y-origin.y;
+		if (tooltipPlaced && std::abs(left-tooltipLeft) < .25f && std::abs(top-tooltipTop) < .25f) return false;
+		tooltipLeft = left; tooltipTop = top; tooltipPlaced = true;
 		card->SetProperty(Rml::PropertyId::Left,Rml::Property(left,Rml::Unit::PX));
 		card->SetProperty(Rml::PropertyId::Top,Rml::Property(top,Rml::Unit::PX));
 		return true;
@@ -3485,7 +3585,7 @@ void Runtime::Shutdown() {
 	impl->ReleaseModelScenes();
 	impl->canonicalElements.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->editableWidgets.clear(); impl->widgetsLive=impl->widgetsReplayBlocked=false; impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
+	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->editableWidgets.clear(); impl->widgetsLive=impl->widgetsReplayBlocked=false; impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0; impl->ResetTooltip();
 	impl->hud = nullptr;
 	impl->paintDirty=true;
 	impl->changedProjections.clear();
@@ -3507,7 +3607,7 @@ void Runtime::CloseDocument() {
 
 	impl->sourcePath.clear();
 	impl->boundsElements.clear();
-	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->editableWidgets.clear(); impl->widgetsLive=impl->widgetsReplayBlocked=false; impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0;
+	impl->inputBranches={}; impl->modalBranches={}; impl->inputAllowed.clear(); impl->eligibilityCached=false; impl->interactionAncestors.clear(); impl->elementIndex.clear(); impl->layoutWidgets.clear(); impl->editableWidgets.clear(); impl->widgetsLive=impl->widgetsReplayBlocked=false; impl->valuePaintRevision=~std::uint64_t{0}; impl->rmlUpdateDue=0; impl->ResetTooltip();
 	impl->hud = nullptr;
 	impl->valueView.Reset();
 	impl->scrollView.Reset();impl->scrollLayoutDirty=impl->preserveRestoredScroll=false;
@@ -4258,6 +4358,9 @@ bool Runtime::Layout(const Viewport& viewport,double seconds) {
 	bool detailChanged = false;
 	if (impl->UpdateDetailSubject()) { impl->context->Update(); detailChanged = true; }
 	if (impl->PlaceDetailCard()) { impl->context->Update(); detailChanged = true; }
+	// The tooltip after it, by the same subject rules and its own delay.
+	if (impl->UpdateTooltip()) { impl->context->Update(); detailChanged = true; }
+	if (impl->PlaceTooltip()) { impl->context->Update(); detailChanged = true; }
 	if (detailChanged) { impl->presentationDirty=false; impl->paintDirty=true; }
 	if (layoutUpdated || detailChanged) impl->context->GetRootElement()->UpdateGeometryForProjection();
 	if (layoutUpdated || settleInteraction || detailChanged) impl->RememberFocusLayout();
@@ -4439,7 +4542,7 @@ void Runtime::PointerButton(bool down, double seconds) {
  impl->SetPointerNavigation(true); if(!impl->UpdateInteraction(seconds,false,true))return;
  // A press stops inertia and closes a long-pressed detail; a lifted finger
  // settles its gesture before the release can activate anything.
- if(down) { impl->fling = {}; impl->detailPin.clear(); } else impl->ReleaseTouch();
+ if(down) { impl->fling = {}; impl->detailPin.clear(); impl->QuietTooltip(); } else impl->ReleaseTouch();
  impl->interaction.Pointer(down); impl->ApplyScrollCommands();
  if(down) { impl->RememberFocusLayout(); impl->BeginTouch(); }
  impl->Feedback(seconds); }
@@ -4451,6 +4554,7 @@ void Runtime::PointerWheel(int rows, double seconds) {
 	impl->fling = {};
 	if(!impl->UpdateInteraction(seconds,false,true))return;
 	if (!rows) return;
+	impl->QuietTooltip();
 	for (const auto& id : impl->controls) {
 		const auto widget = impl->interaction.Widget(id);
 		if (!widget || !widget->popupOpen) continue;
@@ -4503,7 +4607,7 @@ void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
 
     if(impl->viewport.width<=0 || impl->viewport.height<=0) {impl->interaction.QuarantineInput(input,down);return;}
 	if (down && input != MenuInput::Back && !impl->interaction.CapturedPointerControl().empty()) impl->interaction.Cancel();
-	if (down) { impl->pendingFocus.clear(); impl->fling = {}; impl->detailPin.clear(); }
+	if (down) { impl->pendingFocus.clear(); impl->fling = {}; impl->detailPin.clear(); impl->QuietTooltip(); impl->tooltipKeyed = true; }
 	const auto before = impl->interaction.Focused();
 	const auto lit = impl->LitTarget();
 	impl->SetPointerNavigation(false); if(!impl->UpdateInteraction(seconds,false,true))return;
@@ -4516,7 +4620,7 @@ void Runtime::MenuAction(MenuInput input, bool down, double seconds) {
 }
 void Runtime::CancelInput(double seconds) {
     if(!Mutate())return;
- impl->EndTouch(); impl->fling = {}; impl->detailPin.clear();
+ impl->EndTouch(); impl->fling = {}; impl->detailPin.clear(); impl->QuietTooltip();
  impl->pointerPresent = false; impl->SetPointerNavigation(false); impl->interaction.Cancel(); impl->Feedback(seconds); }
 void Runtime::ReleaseInputSources() {
     if(!Mutate())return;

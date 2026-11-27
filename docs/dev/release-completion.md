@@ -12,6 +12,28 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Settings that explain themselves, 27 November 2026
+
+- **Every option on the new interface's Settings pages now has a tooltip.**
+  Rest the pointer on an option for a moment, or stop on it with the
+  keyboard or a controller, and a short note says what it does and what it
+  costs: around 190 options across Game Options, Display, Audio and
+  Controls, in all twelve languages. Tooltips stay out of the way: they wait
+  until you stop, sit clear of the pointer, vanish on any click, key or
+  scroll, and don't return on that option until you move on. Touch screens
+  don't show them. **Menu Tooltips** under Game Options → Accessibility
+  (`ui_tooltips`) turns them off. The classic menus are unchanged.
+- Evidence: `UiDocumentTest` (`CheckTooltipSchema`) and `RetainedUiTest`
+  (`CheckTooltip`: delays, keyed focus, replacement, press dismissal, touch,
+  placement); the generator refuses a settings row without a tooltip.
+  In a hidden-window OpenGL client (`capture_retained_screens.py`
+  scenario `settings-tooltips`, English and French), Game Options showed
+  none for program focus, the focused row's under it after a key step,
+  none after a key, the pointer's row's beside the pointer, none after a
+  click, the second column's on Accessibility, and none with
+  `ui_tooltips 0`. Touch is covered by the native test only.
+  Contract: [ui/tooltips.md](ui/tooltips.md).
+
 ## Window Mode and several monitors, 27 November 2026
 
 - **Exclusive Fullscreen is greyed out in Window Mode while Expand Across

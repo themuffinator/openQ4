@@ -100,6 +100,9 @@ idCVar ui_retainedHalfBlur("ui_retainedHalfBlur", "1", CVAR_GUI | CVAR_BOOL | CV
 	"evaluate broad full-view soft focus at half resolution along each blurred axis");
 idCVar ui_retainedOpaqueBacking("ui_retainedOpaqueBacking", "0", CVAR_GUI | CVAR_BOOL | CVAR_ARCHIVE,
 	"draw the opaque scrim behind retained modals instead of softening the screen beneath");
+// Retained menus read this to show their tooltips (TooltipSpec).
+idCVar ui_tooltips("ui_tooltips", "1", CVAR_GUI | CVAR_BOOL | CVAR_ARCHIVE,
+	"show a short explanation beside the menu control the pointer rests on, or the one keyboard or controller focus rests on");
 // Documents read this to choose between soft focus and its scrim fallback.
 idCVar ui_retainedSoftFocus("ui_retainedSoftFocus", "0", CVAR_GUI | CVAR_BOOL | CVAR_ROM,
 	"whether retained modals soften the screen beneath: no opaque backing and a renderer that can blur it");
