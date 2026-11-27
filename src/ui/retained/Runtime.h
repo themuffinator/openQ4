@@ -13,6 +13,7 @@
 #include "Interaction.h"
 #include "DocumentEdit.h"
 #include "Hud.h"
+#include "InterfaceVariant.h"
 
 namespace openq4::ui {
 
@@ -38,6 +39,14 @@ struct Viewport {
 	// canvas fits the safe area, and documents read the insets in dp through
 	// the safe view sources; nothing else moves.
 	float safeLeft = 0, safeTop = 0, safeRight = 0, safeBottom = 0;
+	// The interface variant and device class (InterfaceVariant.h), and the
+	// keyboard and mouse present, which documents read through the variant,
+	// device, keyboard and mouse view sources. The touch and VR variants also
+	// give small controls a reach of at least TouchTargetDp physical dp
+	// (displayScale pixels each) for a press that lands beside them.
+	InterfaceVariant variant = InterfaceVariant::Desktop;
+	InterfaceDeviceClass device = InterfaceDeviceClass::Desk;
+	bool keyboard = true, mouse = true;
 	float SafeWidth() const;
 	float SafeHeight() const;
 	float DpRatio() const;

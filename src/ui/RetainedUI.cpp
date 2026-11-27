@@ -26,8 +26,10 @@ extern idUserInterfaceManagerLocal uiManagerLocal;
 #include <atomic>
 #include <limits>
 #include <thread>
+#include "../framework/VRSystem.h"
 #if defined(USE_SDL3)
 bool Sys_SDL_IsGameWindowFocused(void);
+void Sys_SDL_InterfaceSignals(openq4::ui::InterfaceSignals& signals);
 int Sys_SDL_GamepadGlyphFamily(int faceLabels[4]);
 #endif
 
@@ -110,6 +112,58 @@ idCVar ui_tooltips("ui_tooltips", "1", CVAR_GUI | CVAR_BOOL | CVAR_ARCHIVE,
 // Documents read this to choose between soft focus and its scrim fallback.
 idCVar ui_retainedSoftFocus("ui_retainedSoftFocus", "0", CVAR_GUI | CVAR_BOOL | CVAR_ROM,
 	"whether retained modals soften the screen beneath: no opaque backing and a renderer that can blur it");
+// The interface variant (docs/dev/ui/interface-variants.md). Documents read it
+// through the variant/device/keyboard/mouse view sources; engine code through
+// RetainedUI_InterfaceVariant and RetainedUI_InterfaceDeviceClass.
+const char* ui_interfaceVariantValues[] = { "auto", "desktop", "touch", "vr", NULL };
+idCVar ui_interfaceVariant("ui_interfaceVariant", "auto", CVAR_GUI | CVAR_ARCHIVE,
+	"interface variant: auto follows the device and the pointer used last (vr while a VR session presents); "
+	"desktop, touch or vr force one (vr lays the menus out for VR without starting a headset)",
+	ui_interfaceVariantValues, idCmdSystem::ArgCompletion_String<ui_interfaceVariantValues>);
+idCVar ui_interfaceVariantActive("ui_interfaceVariantActive", "desktop", CVAR_GUI | CVAR_ROM,
+	"the interface variant the retained UI presents: desktop, touch or vr");
+idCVar ui_interfaceDeviceClass("ui_interfaceDeviceClass", "desk", CVAR_GUI | CVAR_ROM,
+	"the device class the interface resolved: desk, couch, handheld, phone, tablet or headset");
+idCVar ui_interfaceTestDevices("ui_interfaceTestDevices", "", CVAR_GUI | CVAR_NOCHEAT,
+	"interface variant test: the keyboard and mouse the documents see instead of the real ones "
+	"('none', 'keyboard', 'mouse' or 'keyboard mouse'); empty uses the real devices");
+
+struct InterfaceVariantState {
+	openq4::ui::InterfaceVariantTracker tracker;
+	openq4::ui::InterfaceSignals signals;
+};
+InterfaceVariantState interfaceVariantState;
+
+// Observes the signals (SDL3's devices and pointer, the platform profile, the
+// VR session) and applies the variant, publishing it to the read-only CVars
+// and the console when it changes. Cheap: callers run it every frame.
+void RefreshInterfaceVariant() {
+	openq4::ui::InterfaceSignals signals;
+#if defined(USE_SDL3)
+	Sys_SDL_InterfaceSignals(signals);
+#endif
+	const char* profile = cvarSystem->GetCVarString("com_platformProfile");
+	signals.steamDeck = signals.steamDeck || idStr::Icmp(profile, "steamdeck") == 0;
+	signals.couch = idStr::Icmp(profile, "couch") == 0;
+	signals.vrActive = vrSystem != NULL && vrSystem->IsActive();
+	if (const char* test = ui_interfaceTestDevices.GetString(); test[0]) {
+		const idStr devices(test);
+		signals.keyboard = devices.Find("keyboard", false) >= 0;
+		signals.mouse = devices.Find("mouse", false) >= 0;
+	}
+	openq4::ui::InterfaceVariantRequest request = openq4::ui::InterfaceVariantRequest::Auto;
+	(void)openq4::ui::ParseInterfaceVariantRequest(ui_interfaceVariant.GetString(), request);
+	auto& state = interfaceVariantState;
+	state.signals = signals;
+	if (!state.tracker.Update(signals, request)) return;
+	const char* variant = openq4::ui::InterfaceVariantName(state.tracker.Variant());
+	const char* device = openq4::ui::InterfaceDeviceClassName(state.tracker.DeviceClass());
+	if (idStr::Cmp(ui_interfaceVariantActive.GetString(), variant) != 0) ui_interfaceVariantActive.SetString(variant);
+	if (idStr::Cmp(ui_interfaceDeviceClass.GetString(), device) != 0) ui_interfaceDeviceClass.SetString(device);
+	common->Printf("Interface variant: %s (%s device, %s pointer, keyboard %s, mouse %s, request %s)\n", variant, device,
+		openq4::ui::InterfacePointerName(signals.pointer), signals.keyboard ? "yes" : "no", signals.mouse ? "yes" : "no",
+		ui_interfaceVariant.GetString());
+}
 
 class EngineHost final : public openq4::ui::Host {
 public:
@@ -2160,8 +2214,23 @@ bool RetainedUI_DefaultViewport(openq4::ui::Viewport& viewport) {
 		static_cast<float>(engineWindowState.vidWidth-engineWindowState.uiViewportX-viewport.width));
 	viewport.safeBottom = inset(engineWindowState.safeAreaBottom,test[3],
 		static_cast<float>(engineWindowState.vidHeight-engineWindowState.uiViewportY-viewport.height));
+	RefreshInterfaceVariant();
+	viewport.variant = interfaceVariantState.tracker.Variant();
+	viewport.device = interfaceVariantState.tracker.DeviceClass();
+	viewport.keyboard = interfaceVariantState.signals.keyboard;
+	viewport.mouse = interfaceVariantState.signals.mouse;
 	return viewport.width > 0 && viewport.height > 0;
 }
+openq4::ui::InterfaceVariant RetainedUI_InterfaceVariant() {
+	RefreshInterfaceVariant();
+	return interfaceVariantState.tracker.Variant();
+}
+openq4::ui::InterfaceDeviceClass RetainedUI_InterfaceDeviceClass() {
+	RefreshInterfaceVariant();
+	return interfaceVariantState.tracker.DeviceClass();
+}
+bool RetainedUI_InterfaceKeyboard() { RefreshInterfaceVariant(); return interfaceVariantState.signals.keyboard; }
+bool RetainedUI_InterfaceMouse() { RefreshInterfaceVariant(); return interfaceVariantState.signals.mouse; }
 double RetainedUI_PresentationTime() { return PresentationTime(); }
 void RetainedUI_FrameSubmitted() { rootSubmissionPending = false; ++submittedFrames; }
 void RetainedUI_ClearModelWorlds() { host.ClearModelWorlds(); }
@@ -2519,6 +2588,10 @@ retainedUIPreparedEdit_t* RetainedUI_PrepareHistory(retainedUIView_t*,retainedUI
 bool RetainedUI_PublishEdit(retainedUIView_t*,retainedUIPreparedEdit_t*,openq4::ui::DocumentEditReceipt&) noexcept{return false;}
 void RetainedUI_DestroyPreparedEdit(retainedUIPreparedEdit_t*){}
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport&) { return false; }
+openq4::ui::InterfaceVariant RetainedUI_InterfaceVariant() { return openq4::ui::InterfaceVariant::Desktop; }
+openq4::ui::InterfaceDeviceClass RetainedUI_InterfaceDeviceClass() { return openq4::ui::InterfaceDeviceClass::Desk; }
+bool RetainedUI_InterfaceKeyboard() { return true; }
+bool RetainedUI_InterfaceMouse() { return true; }
 double RetainedUI_PresentationTime() { return 0; }
 void RetainedUI_FrameSubmitted() {}
 void RetainedUI_ClearModelWorlds() {}

@@ -21,6 +21,7 @@ If you run `openQ4-client_x64` directly on a Steam Deck or another SteamOS devic
 - The trackpads move the menu and console pointer (`in_touchpadMode 1`), and the touchscreen works the menus (`in_touchscreen 1`).
 - Vibration is limited while the battery is at 20% or below.
 - The HUD starts at 125% (`ui_hudScale 1.25`) so it stays readable on the small screen.
+- Menu text starts at 125% (`ui_retainedTextScale 1.25`), and the new interface uses its touch layout: settings stand in one column with taller rows, and a tap just beside a small button still reaches it. Moving the trackpad pointer switches the menus to their desktop layout; touching the screen switches back.
 - The frame rate is capped to suit the screen (see [Performance](#performance)).
 - Menu and HUD prompts show the Deck's own buttons once you use its controls.
 

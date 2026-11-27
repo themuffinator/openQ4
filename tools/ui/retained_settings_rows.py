@@ -30,9 +30,9 @@ from __future__ import annotations
 
 import math
 
-from build_retained_screens import (CANVAS_W, FULL, ORANGE, OLIVE, TEXT_LENGTHS, TEXT_STATE, U, VALUE, Document, absolute, colour,
-                                    fixed_text, group, keyword, label, length, linear, number, page_prompts, path, rgb, solid, stroke,
-                                    text_width, track, typeface, vector)
+from build_retained_screens import (CANVAS_W, FULL, ORANGE, OLIVE, TARGET_STATE, TEXT_LENGTHS, TEXT_STATE, U, VALUE, Document,
+                                    absolute, colour, fixed_text, group, keyword, label, length, linear, number, page_prompts, path,
+                                    rgb, solid, stroke, text_width, touch_target, track, typeface, vector)
 from retained_create_server import header_band
 from retained_mp_menus import (ERROR, KEYCAP_GAP, KEYCAP_W, PLACEHOLDER, STRIP_EDGE, TAB_FLARE, TAB_PAD, TAB_RISE, TAB_SHOULDER,
                                TAB_SIZE, any_text, label_column, row_face, row_states, tab_strip, value_row, wrapped_width)
@@ -67,9 +67,19 @@ TALL = {"op": "<", "args": [{"state": VIEW_STATE}, TALL_ASPECT]}
 # single column, so the note gives up the indent at its largest.
 NOTE_INSET = round(HEADING_INDENT * TALL_SCALE, 3)
 TEXT = {"state": TEXT_STATE}
-# The single column, in a tall view or at a text size above 100 %, where two
-# columns grown by the text size would not fit side by side.
-STACKED = {"op": "||", "args": [TALL, {"op": ">", "args": [TEXT, 1]}]}
+# The touch variant (docs/dev/ui/interface-variants.md): a row grows toward
+# section 13.6's 48 dp target, by the factor its 24 u pitch needs at the
+# device's physical density, at most twice its size, the largest a text size
+# grows it to. A phone in landscape needs more than that; a tablet about 1.2.
+# The runtime's view.target is that target in document dp, 0 outside the
+# touch variant, where the growth is therefore 1.
+TOUCH_GROWTH = {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": TARGET_STATE}, U * ROW_PITCH]}]}]}
+# A row's growth in a view of 3:4 and wider: the text size's, or the touch
+# variant's where that is larger.
+GROWTH = {"op": "max", "args": [TEXT, TOUCH_GROWTH]}
+# The single column, in a tall view or wherever the rows grow, where two
+# columns grown would not fit side by side.
+STACKED = {"op": "||", "args": [TALL, {"op": ">", "args": [GROWTH, 1]}]}
 ENTRY_W = 66.0                            # dp: a fine slider's typed number
 SCROLL_GUTTER = 4.0                       # dp: the rows' area past the rows on either side
 RANGE_MESSAGE = "#str_231560"             # "Enter a number from %s to %s.", the runtime filling the field's range
@@ -426,12 +436,14 @@ def _in_fractions(node: dict, width: float, height: float) -> None:
 
 def grown(value: float, text_length: bool = False):
     """A row length in the single column: TALL_SCALE times it in a tall view,
-    the text size times it at a larger text size. The runtime itself grows a
-    font length by the text size, so a font length takes only the rest."""
+    otherwise GROWTH times it, the text size's or the touch variant's. The
+    runtime itself grows a font length by the text size, so a font length
+    takes only the rest (none at all when the text size leads)."""
     tall = round(value * TALL_SCALE, 4)
     if text_length:
-        return {"op": "select", "args": [TALL, {"op": "/", "args": [tall, TEXT]}, value]}
-    return {"op": "select", "args": [TALL, tall, {"op": "*", "args": [value, TEXT]}]}
+        rest = {"op": "/", "args": [{"op": "*", "args": [value, GROWTH]}, TEXT]}
+        return {"op": "select", "args": [TALL, {"op": "/", "args": [tall, TEXT]}, rest]}
+    return {"op": "select", "args": [TALL, tall, {"op": "*", "args": [value, GROWTH]}]}
 
 
 def scale_tall(doc: Document, node: dict, skip: set = frozenset()) -> None:
@@ -539,6 +551,7 @@ def settings_subpage(doc: Document, prefix: str, title_key: str, tabs: list, *, 
     if portrait:
         doc.state[VIEW_STATE] = {"type": "number", "initial": round(4 / 3, 4), "view": "aspect"}
         doc.state[TEXT_STATE] = {"type": "number", "initial": 1, "view": "text"}
+        touch_target(doc)
     elif isinstance(note, dict):
         raise SystemExit(f"{prefix}: a note by tab needs the portrait layout")
     elif note is not None:

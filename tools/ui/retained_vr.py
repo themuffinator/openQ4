@@ -2,11 +2,10 @@
 what the menus add, take away or open first while the game presents to a
 headset.
 
-The adapter publishes `vr.active` (UserInterfaceRetained.cpp
-PublishPromptGlyphs) to every document that declares it: true while a VR
-session presents (idVRSystem::IsActive). Until the shared interface variant
-lands (the runtime's view source `variant`, "vr" from the same query), the
-VR layouts key on this state alone.
+The VR layouts key on the shared interface variant
+(docs/dev/ui/interface-variants.md): the runtime's view source `variant`
+reads "vr" while a VR session presents (idVRSystem::IsActive), or while
+ui_interfaceVariant forces it for testing.
 
 VR SETUP is the comfort dialog the session opens over the title or the pause
 the first time VR presents (vr_setupDone), and that the pause's VR SETUP
@@ -21,10 +20,9 @@ The notice symbol for a headset that Automatic VR Mode found after launch
 from __future__ import annotations
 
 from build_retained_screens import (ST_READ, U, Document, absolute, confirmation, group, keyword, label, length, path, rgb, solid, stroke,
-                                    typeface, vector)
+                                    typeface, variant_is, vector)
 from retained_settings_rows import COLUMN_W, ROW_PITCH, button_row, choice, cvar_row, requires, rows_value_column
 
-VR_ACTIVE = "vr.active"
 MODAL = "vrSetupModal"
 SHOW = f"{MODAL}Show"
 TITLE = "#str_233500"                      # VR SETUP
@@ -54,9 +52,8 @@ VERBS = ("vrCalibrateHeight", "vrRecenter")
 
 
 def vr_state(doc: Document) -> dict:
-    """The adapter's VR state, declared once; its condition."""
-    doc.state.setdefault(VR_ACTIVE, {"type": "boolean", "initial": False})
-    return {"state": VR_ACTIVE}
+    """The VR variant, the document's view.variant source declared once; its condition."""
+    return variant_is(doc, "vr")
 
 
 def desktop_only(doc: Document, condition: dict | None = None) -> dict:

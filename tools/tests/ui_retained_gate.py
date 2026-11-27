@@ -5787,6 +5787,16 @@ def main() -> int:
         assert not re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} has a stock row: drop it from STOCK_ROWS_PENDING'
     import retained_controls
     assert STOCK_ROWS_PENDING <= {cvar for cvar, _kind, _extra in retained_controls.setting_rows()}, 'a pending stock row names no retained setting'
+    # The built-in touch controls' settings (Android) stand on CONTROLS'
+    # ON-SCREEN CONTROLS rows, which the page shows only where the session
+    # reports those controls; the stock GUI has no Android rows, and Android's
+    # own setup also holds them.
+    TOUCH_SETTINGS = {'in_touchControls', 'in_touchLayoutPreset', 'in_touchControlsScale', 'in_touchLookSensitivity'}
+    android_touch = (ROOT / 'src/sys/android/android_touch_controls.cpp').read_text(encoding='utf-8', errors='replace')
+    for cvar in sorted(TOUCH_SETTINGS):
+        assert f'static idCVar {cvar}( "{cvar}"' in android_touch, f'{cvar} is no built-in touch control setting'
+        assert not re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}', stock_game), f'{cvar} has a stock row: drop its exemption'
+    assert TOUCH_SETTINGS <= {cvar for cvar, _kind, _extra in retained_controls.setting_rows()}, 'a touch setting names no retained row'
     controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.rui').read_text(encoding='utf-8'), flags=re.M))
     # The stock page's mouse and controller rows, with Free Look, Toggle Zoom
     # and Scope Sensitivity, stand on the CONTROLS page's device tabs (issue
@@ -5800,6 +5810,7 @@ def main() -> int:
             assert action['operation'] == 'settings.player.set' and action['arguments'] == {'cvar': cvar, 'value': {'input': 'value'}}, cvar
             assert cvar in rules and (kind != 'choice' or not isinstance(extra[1][0], str) or rules[cvar] == list(extra[1])), cvar
             assert cvar in RETAINED_ONLY_GAME_SETTINGS or cvar in RETAINED_DOCUMENT_SETTINGS or cvar in STOCK_ROWS_PENDING or \
+                cvar in TOUCH_SETTINGS or \
                 re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
     # The CONTROLS page: the button's and the multiplayer menu's routes as
     # GAME OPTIONS'; its rows are the stock page's bindings in its order, the

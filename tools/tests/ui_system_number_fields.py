@@ -80,8 +80,11 @@ def contract(page):
     sized(page,nodes,bindings)
     return nodes
 
-# The view sources the rows follow: the text size (1 to 2) and the view's shape.
-VIEWS=[{'view.text':text,'view.aspect':aspect} for text in (1,1.5,2) for aspect in (4/3,9/16)]
+# The view sources the rows follow: the text size (1 to 2), the view's shape
+# and, in the touch variant, the document dp a 48 dp touch target spans
+# (0 elsewhere; 43 a tablet's, 84 a landscape phone's).
+VIEWS=[{'view.text':text,'view.aspect':aspect,'view.target':target} for text in (1,1.5,2) for aspect in (4/3,9/16)
+       for target in (0,43,84)]
 TALL=880.5/430.5   # retained_settings_rows.TALL_SCALE: a column's rows across the content's width
 ROW_PITCH=36.0
 NUMBER_FONT=15.0
@@ -100,7 +103,8 @@ def sized(page,nodes,bindings):
         tall=state['view.aspect']<.76
         def grown(row):
             factor=length(row,'height')/ROW_PITCH
-            assert abs(factor-(TALL if tall else state['view.text']))<1e-3,(row,state)
+            touch=min(2,max(1,state['view.target']/ROW_PITCH))
+            assert abs(factor-(TALL if tall else max(state['view.text'],touch)))<1e-3,(row,state)
             return factor
         def field(row,viewport,text,factor):
             assert length(viewport,'top')+length(viewport,'height')<=length(row,'height')+1e-3,(viewport,state)
@@ -128,9 +132,10 @@ def evaluate(expression,state):
     if operation=='==':return evaluate(args[0],state)==evaluate(args[1],state)
     if operation=='select':return evaluate(args[1] if evaluate(args[0],state) else args[2],state)
     # The view-source geometry: comparisons and the lengths' scaling.
-    if operation in ('<','>','*','/'):
+    if operation in ('<','>','*','/','min','max'):
         left,right=evaluate(args[0],state),evaluate(args[1],state)
-        return {'<':lambda:left<right,'>':lambda:left>right,'*':lambda:left*right,'/':lambda:left/right}[operation]()
+        return {'<':lambda:left<right,'>':lambda:left>right,'*':lambda:left*right,'/':lambda:left/right,
+                'min':lambda:min(left,right),'max':lambda:max(left,right)}[operation]()
     raise AssertionError('Unexpected guarded expression '+operation)
 
 def execute(steps,state,events,actions):

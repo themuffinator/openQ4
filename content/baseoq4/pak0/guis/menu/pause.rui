@@ -25,7 +25,7 @@
   "motion_reduced": {"type": "boolean", "initial": false, "cvar": "ui_retainedReducedMotion"},
   "exitModal.visible": {"type": "boolean", "initial": false},
   "exitModal.contents": {"type": "boolean", "initial": false},
-  "vr.active": {"type": "boolean", "initial": false},
+  "view.variant": {"type": "string", "initial": "", "view": "variant"},
   "cvar.vr_playSpace": {"type": "number", "initial": 0, "cvar": "vr_playSpace"},
   "cvar.vr_turnMode": {"type": "number", "initial": 0, "cvar": "vr_turnMode"},
   "cvar.vr_leftHanded": {"type": "number", "initial": 0, "cvar": "vr_leftHanded"},
@@ -3517,7 +3517,7 @@
    "id": "link_vrsetup.display",
    "node": "link_vrsetup",
    "property": "display",
-   "value": {"op": "select", "args": [{"state": "vr.active"}, "block", "none"]}
+   "value": {"op": "select", "args": [{"op": "==", "args": [{"state": "view.variant"}, "vr"]}, "block", "none"]}
   },
   {
    "id": "level-objective-0-text.text",

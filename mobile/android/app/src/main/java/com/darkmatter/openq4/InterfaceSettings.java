@@ -63,13 +63,21 @@ final class InterfaceSettings {
         int selected = resolvedProfile(tablet);
         return selected == 2 ? 150 : selected == 3 ? 125 : 100;
     }
+    /**
+     * Phone and Tablet take the system font scale over the base the engine
+     * also starts a fresh install at: the retained menus' 720 dp canvas spans
+     * the view rather than following the platform's density, so a phone reads
+     * at 150 % and a tablet at 125 % (docs/dev/ui/interface-variants.md).
+     */
     int resolvedText(boolean tablet, float systemFontScale) {
         if (textPercent != 0) return textPercent;
         int selected = resolvedProfile(tablet);
         if (selected == 2) return 125;
         if (selected != 4 && selected != 5) return 100;
         float font = Float.isFinite(systemFontScale) ? systemFontScale : 1;
-        return Math.max(100, Math.min(200, Math.round(font * 20) * 5));
+        // The font scale to 5 %, as before, then the base, again to 5 %.
+        int fontPercent = Math.round(font * 20) * 5, base = selected == 4 ? 150 : 125;
+        return Math.max(100, Math.min(200, Math.round(base * fontPercent / 100f / 5) * 5));
     }
     String engineValues(boolean tablet, float systemFontScale) {
         return "1:" + revision + ":" + resolvedProfile(tablet) + ":" + resolvedUi(tablet) + ":" + resolvedText(tablet, systemFontScale);

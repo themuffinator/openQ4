@@ -86,11 +86,16 @@ game starts or you return to it from setup. **Discard changes** keeps your
 previous settings, and unsaved choices are kept as a draft if setup is
 interrupted.
 
+The same choices are in the game itself: **Settings → Controls → Touch**
+lists **Show in Play**, **Layout Preset**, **Control Size**, **Look
+Sensitivity** and **Touch Layout** under **On-Screen Controls**, and they
+take effect at once. With a mouse connected the tab is called **Mouse** and
+also shows the mouse settings.
+
 ### Edit the touch layout
 
 Select **Edit layout** on the Controls page, or in the game open
-**Settings → Controls** and select **Touch Layout** at the end of the Other
-tab. The editor shows your screen with every control and its name:
+**Settings → Controls** and select **Touch Layout** on the Touch tab. The editor shows your screen with every control and its name:
 
 - Drag a control to move it. It snaps to a grid and keeps clear of the other
   controls, the screen edges and the crosshair; if the spot is taken, it moves
@@ -118,9 +123,11 @@ text appear. **Viewing profile** sets the starting sizes:
 | Desk (monitor) | 100% | 100% |
 | Couch (television) | 150% | 125% |
 | Handheld | 125% | 100% |
-| Phone, Tablet | 100% | Your Android font size, 100–200% |
+| Phone | 100% | 150% of your Android font size, up to 200% |
+| Tablet | 100% | 125% of your Android font size, up to 200% |
 
-Choose a percentage under **Interface size** (75–200%) or **Text size**
+A new install starts at the Phone or Tablet text size before you visit
+this page. Choose a percentage under **Interface size** (75–200%) or **Text size**
 (100–200%) to override the profile; **Profile default** goes back to it. The
 sample heading and text preview the result, and the page shows the sizes the
 game will use. The game still fits its menus to the screen, so on a phone a
@@ -130,6 +137,11 @@ larger interface size may not make them bigger; text size always applies.
 **Landscape and portrait**, which turns the game with the device unless
 Android's rotation lock is on. Portrait play is new and still being tested on
 phones.
+
+On a phone or tablet the game's settings pages also stand in one column with
+taller rows that are easier to tap, and a tap just beside a small button still
+reaches it. Connecting a mouse switches the menus to their desktop layout;
+touching the screen switches back.
 
 Select **Apply interface** to save. The game uses these sizes and the
 orientation the next time it starts or you return to it from setup. Each Apply

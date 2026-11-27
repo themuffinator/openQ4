@@ -12,6 +12,33 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Menus that fit phones, tablets and the Steam Deck, 27 November 2026
+
+- **The new interface now knows what it is running on.** On a phone, a
+  tablet or a Steam Deck it takes a touch layout: Game Options, Controls,
+  Audio and Display stand in one column with taller rows that are easier to
+  tap, and a tap just beside a small button or tab still reaches it.
+  Connecting a mouse switches the menus to their desktop layout at once;
+  touching the screen switches back. Desktop players see no change.
+- **Touch controls in the game's own Settings (Android).** **Settings →
+  Controls → Touch** holds **Show in Play**, **Layout Preset**, **Control
+  Size**, **Look Sensitivity** and **Touch Layout**, applied at once. Without
+  a mouse the mouse-only settings step aside; with one the tab reads
+  **Mouse** and shows both.
+- **Readable text from the first launch.** A new Android install starts menu
+  text at 150% on a phone and 125% on a tablet, and the Steam Deck profile at
+  125%; a size you already chose is kept. Android setup's Automatic text size
+  follows the same base times your Android font size.
+- For testers and modders: `ui_interfaceVariant` (auto, desktop, touch or vr)
+  forces a layout, and `ui_interfaceVariantActive` shows the one in use.
+- Evidence: `openq4-ui-scrollbar-runtime` (variant resolution, the
+  pointer-held latch, view sources, touch reach at two densities),
+  `openq4-ui-retained-screens --controls/--game/--audio`, Android
+  setup JVM/JNI tests, and hidden-window OpenGL captures of Game Options,
+  Controls and Audio at desk, phone and tablet sizes in both orientations.
+  No phone, tablet, Steam Deck or desktop touchscreen has been used by hand.
+  Contract: [ui/interface-variants.md](ui/interface-variants.md).
+
 ## VR finds your headset, and the menus fit the headset, 27 November 2026
 
 - **VR Mode has three choices: Off, On and Automatic.** Off never asks your
@@ -65,8 +92,8 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   (`RM_AutomaticApi(VR_WantsRenderer())`); `StartIfRequested` creates an
   instance only while `InstanceWanted()`; the session side is
   `src/framework/Session_vr.cpp`; the menus' VR parts are
-  `tools/ui/retained_vr.py`, keyed on the adapter state `vr.active` until the
-  shared interface variant lands. A restated `vr_renderScale` no longer
+  `tools/ui/retained_vr.py`, keyed on the shared interface variant (`view.variant` is
+  `vr`; [ui/interface-variants.md](ui/interface-variants.md)). A restated `vr_renderScale` no longer
   restarts the session at launch, so the runtime is asked once. No game or
   renderer ABI change.
 
