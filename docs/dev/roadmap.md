@@ -2712,8 +2712,11 @@ are not yet measured.
   shadows are unchanged, distant casters soften, coverage against stencil stays at
   99.7%, and both renderers agree. The owner kept the 1 degree default. It costs
   about 0.05 to 0.1 ms of GPU at 1440p on Vulkan in the Air Defense 1 arena (paired
-  median +0.04 ms over 24 interleaved pairs) and about the same on OpenGL. Open: the
-  default's look in motion.
+  median +0.04 ms over 24 interleaved pairs) and about the same on OpenGL. The
+  parallel-light branch was checked on scenery in Hangar 2, whose sunlight outside
+  the hangar is a parallel light: the renderers move together at every size, and
+  thin shadows thrown far turn grainy above about 2 degrees (the nine-tap filter's
+  limit). Open: the default's look in motion.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always
