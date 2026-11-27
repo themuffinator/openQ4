@@ -1070,6 +1070,14 @@ if get_option('build_native_tests')
   )
   test('openq4-vr-math-core', openq4_vr_math_core_test, timeout: 30)
 
+  openq4_openxr_runtime_probe_test = executable(
+    'openq4-openxr-runtime-probe-test',
+    files('tools/tests/native/OpenXRRuntimeProbeTest.cpp'),
+    include_directories: root_include_dir,
+    install: false,
+  )
+  test('openq4-openxr-runtime-probe', openq4_openxr_runtime_probe_test, timeout: 30)
+
   openq4_temporal_presentation_core_test = executable(
     'openq4-temporal-presentation-core-test',
     files('tools/tests/native/TemporalPresentationCoreTest.cpp'),
@@ -3245,7 +3253,7 @@ if build_engine
   # The OpenXR session, input and frame loop are client-only for the same
   # reason: the dedicated snapshot above never contains them.
   if build_openxr
-    openq4_engine_sources += files('src/sys/openxr/OpenXRSystem.cpp')
+    openq4_engine_sources += files('src/sys/openxr/OpenXRSystem.cpp', 'src/sys/openxr/OpenXRRuntimeProbe.cpp')
     client_engine_cpp_args += ['-DOPENQ4_OPENXR=1']
   endif
 

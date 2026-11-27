@@ -5,7 +5,10 @@ sections 7, 9 and 13.7; UI-01): the stock page's rows
 columns: GENERAL (gameplay | interface, items and players, video capture),
 HUD (HUD | crosshair), VIEW WEAPON (its place | its view), ACCESSIBILITY
 (motion | visibility) and VIRTUAL REALITY (its rows | the rest of them,
-stereoscopic 3D). The stock page's mouse and
+stereoscopic 3D). In VR (retained_vr) the page opens on VIRTUAL REALITY,
+whose Comfort Setup row opens the VR SETUP dialog and Look for Headset asks
+the runtime (vr_detect), and the desktop-only rows (the gun's flat place and
+field of view, stereoscopic 3D) leave the page. The stock page's mouse and
 controller sections, with Free Look, Toggle Zoom and Scope Sensitivity, are
 the CONTROLS page's MOUSE and CONTROLLER tabs (retained_controls, issue
 #220).
@@ -31,8 +34,9 @@ from __future__ import annotations
 
 from build_retained_screens import U, Document, absolute, image, keyword, length, number
 from retained_mp_menus import value_row
-from retained_settings_rows import (COLUMN_W, ROW_PITCH, choice, cvar_row, cvar_settings, heading, requires, rows_value_column,
-                                    setting_row, settings_subpage, show_tab, slider, toggle)
+from retained_settings_rows import (COLUMN_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, heading, requires,
+                                    rows_value_column, setting_row, settings_subpage, show_tab, slider, toggle)
+from retained_vr import SHOW as VR_SETUP_SHOW, setup_modal, vr_state
 
 PREFIX = "game"
 CROSSHAIRS = 20                            # the custom crosshairs (player_marine_mp_ui's mtr_crosshair keys)
@@ -116,8 +120,12 @@ SECTIONS = (
     )),
     # On and off settings are toggles here as everywhere else; the stock
     # page listed them as Disabled and Enabled.
+    # VR Mode is Off, On or Automatic (VR-08); the two buttons under it open
+    # VR SETUP and look for a headset whatever the mode.
     ("vr", "#str_230120", (
-        toggle("game_vr", "#str_230121", "vr_enable"),
+        choice("game_vr", "#str_230121", "vr_enable", "#str_233505", (0, 1, 2)),
+        ("opener", "game_vrsetup", "#str_233506", VR_SETUP_SHOW, None),
+        ("button", "game_vrdetect", "#str_233507", "vrDetect", None),
         choice("game_vraim", "#str_230122", "vr_aimMode", "#str_230123", (1, 0)),
         choice("game_vrhand", "#str_230124", "vr_leftHanded", "#str_230125", (0, 1)),
         choice("game_vrturn", "#str_230126", "vr_turnMode", "#str_230127", (0, 1)),
@@ -171,7 +179,7 @@ TABS = (
     ("hud", "#str_231235", (("hud",), ("crosshair",))),
     ("viewweapon", "#str_229952", (("viewweapon", 0, VIEW_PLACE), ("viewweapon", VIEW_PLACE, None))),
     ("accessibility", "#str_232542", (("motion",), ("visibility",))),
-    ("vr", "#str_230120", (("vr", 0, 6), (("vr", 6, None), "stereo"))),
+    ("vr", "#str_230120", (("vr", 0, 8), (("vr", 8, None), "stereo"))),
 )
 
 
@@ -195,8 +203,9 @@ def dependencies() -> dict:
       leaves them out;
     - Weapon FOV with Show Gun off (the view weapon is not drawn), and
       Weapon FOV Aspect while Weapon FOV is 0 too (it adjusts only a set FOV);
-    - every VR row with VR Mode off (no OpenXR session), Snap Turn Angle with
-      smooth turning, and the Aim Laser and Two-Handed Grip with head aim;
+    - every VR row but Look for Headset with VR Mode off (no OpenXR
+      session), Snap Turn Angle with smooth turning, and the Aim Laser and
+      Two-Handed Grip with head aim;
     - Record Sound while the video format is GIF, which has no sound;
     - the stereo depth, convergence and eye swap with Stereoscopic 3D off.
     The gun's offsets, position and kick stay: they still move the hidden
@@ -205,14 +214,14 @@ def dependencies() -> dict:
     remastered = {"op": "!=", "args": [layout, 0]}
     trimmed = _all(remastered, {"op": "!=", "args": [layout, 2]})
     shown = _cvar("ui_showGun")
-    vr = _cvar("vr_enable")
+    vr = {"op": "!=", "args": [_cvar("vr_enable"), 0]}
     hand_aim = _all(vr, {"op": "==", "args": [_cvar("vr_aimMode"), 1]})
     return {
         **{ident: remastered for ident in ("game_hudscale", "game_hudwidth", "game_hudinset", "game_hudopacity")},
         **{ident: trimmed for ident in ("game_damagedirection", "game_pickups", "game_weaponstrip")},
         "game_gunfov": shown,
         "game_gunfovadjust": _all(shown, {"op": ">", "args": [_cvar("cl_gunfov"), 0]}),
-        **{row[1]: vr for row in next(rows for section, _heading, rows in SECTIONS if section == "vr")[1:]},
+        **{row[1]: vr for row in next(rows for section, _heading, rows in SECTIONS if section == "vr")[1:] if row[1] != "game_vrdetect"},
         "game_vrsnap": _all(vr, {"op": "!=", "args": [_cvar("vr_turnMode"), 1]}),
         "game_vrlaser": hand_aim,
         "game_vrtwohanded": hand_aim,
@@ -220,6 +229,15 @@ def dependencies() -> dict:
         **{ident: {"op": "!=", "args": [_cvar("r_stereo3D"), 0]}
            for ident in ("game_stereodepth", "game_stereoconvergence", "game_stereoswap")},
     }
+
+
+# The rows that change only the desktop's view, gone while the game
+# presents to a headset: the flat gun's place and field of view (the hand
+# holds the gun in VR) and stereoscopic 3D, with its heading (the VR tab's
+# second column: its rows, then the section's heading at that place).
+DESKTOP_ONLY = ("game_gunposition", "game_gunx", "game_guny", "game_gunz", "game_gunfov", "game_gunfovadjust",
+                "game_stereo3d", "game_stereodepth", "game_stereoconvergence", "game_stereoswap")
+STEREO_HEADING = "game-vr-head-1-8"
 
 
 def crosshair_row(doc: Document, ident: str, label: str, verb: str, value_x: float) -> dict:
@@ -253,6 +271,11 @@ def game_row(doc: Document, row: tuple, value_x: float) -> dict:
         return setting_row(doc, ident, label, "toggle", value_x, value={"state": "game.forceModel"}, action=binding)
     if kind == "crosshair":
         return crosshair_row(doc, ident, label, binding, value_x)
+    if kind == "opener":
+        return button_row(doc, ident, label, value_x, None, {"event": binding})
+    if kind == "button":
+        doc.session(binding, binding)
+        return button_row(doc, ident, label, value_x, None, {"action": binding})
     return cvar_row(doc, row, value_x)
 
 
@@ -272,6 +295,11 @@ def game_document() -> dict:
     built = {row[1]: game_row(doc, row, value_x) for _section, _heading, rows in SECTIONS for row in rows}
     for ident, condition in dependencies().items():
         requires(doc, built[ident], condition)
+    flat = {"op": "select", "args": [vr_state(doc), "none", "block"]}
+    for ident in DESKTOP_ONLY:
+        node = built[ident]
+        doc.bind(f"{node['id']}.display", node["id"], "display", flat)
+    doc.bind(f"{STEREO_HEADING}.display", STEREO_HEADING, "display", flat)
     tabs = []
     for ident, key, columns in TABS:
         laid = []
@@ -296,7 +324,11 @@ def game_document() -> dict:
     # ReloadGuis); the session marks it, so the page returns to Language.
     language_tab = next(index for index, (_ident, _key, laid) in enumerate(tabs)
                         if any(isinstance(node, dict) and node["id"] == "game_language" for column in laid for node in column))
+    # In VR the page opens on VIRTUAL REALITY, at VR Mode.
+    vr_tab = next(index for index, (ident, _key, _laid) in enumerate(tabs) if ident == "vr")
     activate = lambda focus: [{"op": "if", "condition": {"state": "game.languageReloaded"},
                                "then": [*show_tab(doc, "game", tabs, language_tab), {"op": "focus", "control": "game_language"}],
-                               "else": focus}]
-    return settings_subpage(doc, PREFIX, "#str_200084", tabs, activate=activate)
+                               "else": [{"op": "if", "condition": vr_state(doc),
+                                         "then": [*show_tab(doc, "game", tabs, vr_tab), {"op": "focus", "control": "game_vr"}],
+                                         "else": focus}]}]
+    return settings_subpage(doc, PREFIX, "#str_200084", tabs, activate=activate, overlays=[setup_modal(doc)])

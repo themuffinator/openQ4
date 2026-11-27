@@ -129,3 +129,23 @@ here: it waits on the AND-05 distribution decision.
 | 7.1 | Set `r_temporalAA 1`, look at railings and distant edges, standing still. | Edges settle in both eyes with no shimmer and no ghosting between the eyes. |
 | 7.2 | Turn your head fast, and strafe past a fence. | No smearing trails or double images; detail returns within a moment. |
 | 7.3 | Set `r_temporalAA 0`. | The image is unchanged apart from edges, with no flashes when switching. |
+
+## 8. Detection, VR Mode and the VR menus (VR-08, VR-09)
+
+Run the first four with each runtime you have (SteamVR, Meta Quest Link,
+Windows Mixed Reality, Monado, Virtual Desktop), and note the runtime and
+version in the report. The log's `VR_RUNTIME`, `VR_MODE`, `VR_OFFER` and
+`VR_DETECT` lines say what openQ4 found and decided.
+
+| # | Do this | Pass when |
+| --- | --- | --- |
+| 8.1 | With VR Mode off and the runtime not running, start openQ4. | The runtime does not start (no SteamVR window); the log names the runtime (`VR_RUNTIME source=registry` or `active_runtime.json`). On a profile that never chose, the title asks once whether to play in VR by itself. |
+| 8.2 | Answer **Yes** with the headset connected and awake. | VR starts at once, VR SETUP opens over the title, and the next launch starts in VR. |
+| 8.3 | Set VR Mode to Automatic, switch the headset off (or unplug it), and start openQ4. | The game plays on the desktop within about 20 seconds (`VR_MODE decision=desktop`); note whether the runtime opened its own window or complained. |
+| 8.4 | With Automatic on the desktop, switch the headset on mid-game, open the pause menu and choose **Play in VR** on the notice. | Play never switches by itself; **VR headset found** shows in the menus and Play in VR starts VR (on Vulkan after one renderer restart). |
+| 8.5 | Press **Look for Headset** on the Virtual Reality tab with the headset off, then on. | The notices say no headset answered, then that one was found. |
+| 8.6 | In VR, open the pause menu: VR SETUP, Measure My Height (standing), Recentre View, Turning, Weapon Hand, Comfort Vignette, DONE. | Every row is reachable with the laser and changes what it says; height and recentre take effect where you stand. |
+| 8.7 | Read Settings, Game Options and the pause menu in the headset; click small controls (tab strip, list arrows, sliders). | Text reads comfortably at the floating screen's distance (larger than on the desktop); small targets are easy to hit without hunting. |
+| 8.8 | Type a player name or server address in the headset. | The game's on-screen keyboard opens on the floating screen and the laser types on it; no keyboard opens on the desktop. |
+| 8.9 | With `vr_mirror 1`, open and close menus while someone watches the desktop. | The desktop shows the menu while one is up and the left eye in play. |
+| 8.10 | Repeat 8.6 in The Awakening (`q4xbase`). | VR SETUP opens in the Awakening's pause style and works the same. |

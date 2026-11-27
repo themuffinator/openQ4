@@ -113,6 +113,11 @@ TOOLTIPS = {
     "game_vrcrouch": "#str_233060",
     "game_vrplayspace": "#str_233061",
     "game_vrbody": "#str_233062",
+    # VR SETUP's rows on GAME OPTIONS (retained_vr) share the tab's tooltips.
+    "vrsetup_playspace": "#str_233061",
+    "vrsetup_turn": "#str_233052",
+    "vrsetup_hand": "#str_233051",
+    "vrsetup_vignette": "#str_233059",
     "game_stereo3d": "#str_233063",
     "game_stereodepth": "#str_233064",
     "game_stereoconvergence": "#str_233065",

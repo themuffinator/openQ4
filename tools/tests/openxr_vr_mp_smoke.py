@@ -167,7 +167,8 @@ def main(argv: list[str] | None = None) -> None:
         "fs_savepath": str(profile), "fs_devpath": str(profile),
         "g_autoExecAfterMapLoad": "openxr_vr_mp_smoke.cfg", "g_autoExecAfterMapLoadDelayMs": "1000",
         "com_skipLoadingContinue": "1", "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1",
-        "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_roomScale": "1",
+        # VR SETUP opens at the first VR entry (retained_vr); these runs test the rest
+        "vr_enable": "1", "vr_setupDone": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_roomScale": "1",
         "vr_headOffsetLimit": "16", "vr_comfortVignette": "0.5",
         # the HUD layer the damage number is placed on (HUD_* below)
         "vr_hudDistance": str(HUD_DISTANCE), "vr_hudWidth": str(HUD_WIDTH), "vr_hudHeightOffset": str(HUD_OFFSET),

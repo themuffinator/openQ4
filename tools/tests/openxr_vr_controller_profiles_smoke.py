@@ -122,7 +122,8 @@ def run_profile(options, staged: Path, executable: str, manifest: Path, output: 
         "g_autoExecAfterMapLoad": "openxr_vr_controller_profiles_smoke.cfg", "g_autoExecAfterMapLoadDelayMs": "1000",
         "g_autoSkipCinematics": "1", "com_skipLoadingContinue": "1",
         "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1",
-        "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "0", "vr_roomScale": "0", "vr_physicalCrouch": "0",
+        # VR SETUP opens at the first VR entry (retained_vr); these runs test the rest
+        "vr_enable": "1", "vr_setupDone": "1", "vr_debug": "1", "vr_aimMode": "0", "vr_roomScale": "0", "vr_physicalCrouch": "0",
         "vr_leftHanded": "0", "vr_turnMode": "0", "vr_snapTurnAngle": "45", "vr_hapticStrength": "0",
         "r_renderApi": options.render_api,
     }

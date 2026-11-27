@@ -246,11 +246,13 @@ enum {
 	RETAINED_NOTICE_FAVORITE = 1,		// the favorite's star
 	RETAINED_NOTICE_CONTROLLER = 2,		// a controller crossed out
 	RETAINED_NOTICE_BATTERY = 3,		// a controller: its battery is low, or it started charging
-	RETAINED_NOTICE_NEW_CONTROLLER = 4	// a controller family's first connection: where its prompts are chosen
+	RETAINED_NOTICE_NEW_CONTROLLER = 4,	// a controller family's first connection: where its prompts are chosen
+	RETAINED_NOTICE_VR_HEADSET = 5		// a VR headset: Automatic found one after launch, or vr_detect's answer (Session_vr.cpp)
 };
 enum {
 	RETAINED_NOTICE_UNDO_NONE,
-	RETAINED_NOTICE_UNDO_FAVORITE		// puts a server back among the favorites
+	RETAINED_NOTICE_UNDO_FAVORITE,		// puts a server back among the favorites
+	RETAINED_NOTICE_UNDO_VR_START		// not an undo: Play in VR takes the offered headset (vr_start)
 };
 
 class idSessionLocal : public idSession {

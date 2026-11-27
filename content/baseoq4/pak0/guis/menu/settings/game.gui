@@ -4114,8 +4114,8 @@
 							cvar	vr_enable
 							textscale	0.24
 							font	"fonts/lowpixel"
-							choices	"#str_200246"
-							values	"0;1"
+							choices	"#str_233505"
+							values	"0;1;2"
 							choiceType	1
 
 							onAction {

@@ -598,6 +598,10 @@ bool RB_ShadowMapResourcesKnownGood( bool pointLight ) {
 	return false;
 }
 
+bool RB_ShadowMapPointPoolHasRoom( void ) {
+	return false;
+}
+
 bool RB_ShadowMapTextureBindings( rendererShadowTextureBindings_t &bindings ) {
 	( void )bindings;
 	return false;

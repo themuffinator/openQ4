@@ -440,7 +440,8 @@ def main(argv: list[str] | None = None) -> None:
         "g_autoExecAfterMapLoad": "openxr_vr_smoke.cfg", "g_autoExecAfterMapLoadDelayMs": "1000",
         "g_autoSkipCinematics": "1", "com_skipLoadingContinue": "1",
         "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1",
-        "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_turnMode": "0", "vr_snapTurnAngle": "45",
+        # VR SETUP opens at the first VR entry (retained_vr); these runs test the rest
+        "vr_enable": "1", "vr_setupDone": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_turnMode": "0", "vr_snapTurnAngle": "45",
         "vr_screenDistance": "2.5", "vr_screenWidth": str(SCREEN_WIDTH_M), "vr_leftHanded": "0",
         # after the launch configuration's own r_renderApi, so this one wins
         "r_renderApi": options.render_api,

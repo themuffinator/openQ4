@@ -4235,16 +4235,17 @@
       ],
       "widget_type": "choice",
       "label_key": "#str_230121",
-      "choices_key": "#str_200246",
+      "choices_key": "#str_233505",
       "values": [
         "0",
-        "1"
+        "1",
+        "2"
       ],
       "target_type": "cvar",
       "target": "vr_enable",
       "default": "0",
       "restart_required": false,
-      "accessibility": "Focusable choiceDef row. Starts or ends the OpenXR session at once (OpenGL renderer)."
+      "accessibility": "Focusable choiceDef row. Off asks no runtime, On starts or ends the OpenXR session at once, Automatic plays in VR when a headset answers at launch."
     },
     {
       "id": "game.vr_aimmode",

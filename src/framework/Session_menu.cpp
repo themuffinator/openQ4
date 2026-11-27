@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "NativeInputDispatch.h"
 #include "Session_local.h"
 #include "SessionPresetCheck.h"
+#include "SessionVR.h"
 #include "NativeInputPublications.h"
 #include "../ui/Rectangle.h"
 #include "../sys/ControllerRoster.h"
@@ -6268,6 +6269,8 @@ void idSessionLocal::GuiFrameEvents() {
 	UpdateRetainedSettingsPage();
 	PrefetchRetainedNextPages();
 	UpdateControllerNotices();
+	// VR's question, notices and setup (Session_vr.cpp)
+	Session_UpdateVR();
 	UpdateControllerTestPanel();
 	UpdateOnScreenKeyboard();
 	UpdateRetainedNotices();
@@ -6699,14 +6702,18 @@ void idSessionLocal::HandleMsgCommands( const char *menuCommand ) {
 		guiMsgRestore = NULL;
 		msgRunning = false;
 		msgRetIndex = 0;
-		DispatchCommand( guiActive, msgFireBack[ 0 ].c_str() );
+		if ( !Session_VROfferAnswer( msgFireBack[ 0 ].c_str() ) ) {
+			DispatchCommand( guiActive, msgFireBack[ 0 ].c_str() );
+		}
 	} else if ( idStr::Icmp( cmd, "right" ) == 0 ) {
 		openq4::NativeInputBeforeSessionChange();
 		guiActive = guiMsgRestore;
 		guiMsgRestore = NULL;
 		msgRunning = false;
 		msgRetIndex = 1;
-		DispatchCommand( guiActive, msgFireBack[ 1 ].c_str() );
+		if ( !Session_VROfferAnswer( msgFireBack[ 1 ].c_str() ) ) {
+			DispatchCommand( guiActive, msgFireBack[ 1 ].c_str() );
+		}
 	}
 }
 
@@ -8261,6 +8268,11 @@ void idSessionLocal::HandleRetainedSessionRequest( idUserInterface *gui, const c
 			HandleMsgCommands( !idStr::Icmp( request, "msgLeft" ) ? "left" : !idStr::Icmp( request, "msgRight" ) ? "right" :
 				!idStr::Icmp( request, "msgMid" ) ? "mid" : "" );
 		}
+		return;
+	}
+	// VR SETUP's and the Virtual Reality tab's verbs (Session_vr.cpp), from
+	// whichever page carries them.
+	if ( request != NULL && gui != NULL && gui == guiActive && Session_VRRequest( gui, request ) ) {
 		return;
 	}
 	// The retained AUDIO and GAME OPTIONS pages' verbs, while they present.
@@ -10814,7 +10826,9 @@ void idSessionLocal::UpdateOnScreenKeyboard() {
 		}
 		return;
 	}
-	const bool wanted = edit != 0 && ( mode == 2 ||
+	// In a headset the system's own screen keyboard would open on the desktop
+	// no one is looking at: the laser pointer types on this one (VR-09).
+	const bool wanted = edit != 0 && ( mode == 2 || VR_HasInputFocus() ||
 		( ( idKeyInput::LastInputWasController() || idKeyInput::LastPointerWasTouch() ) && !Sys_HasScreenKeyboardSupport() ) );
 	if ( !wanted ) {
 		if ( oskOwner != NULL ) {
@@ -11166,6 +11180,9 @@ void idSessionLocal::HandleRetainedNoticeAction( idUserInterface *gui, int slot 
 		return;
 	}
 	retainedNotice_t &notice = retainedNotices[ index ];
+	if ( notice.undo == RETAINED_NOTICE_UNDO_VR_START ) {
+		Session_VRTakeOffer();
+	}
 	if ( notice.undo == RETAINED_NOTICE_UNDO_FAVORITE ) {
 		idServerScan &servers = idAsyncNetwork::client.serverList;
 		for ( int i = 0; i < servers.Num(); ++i ) {

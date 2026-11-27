@@ -25,7 +25,7 @@ UI toolkit/editor/corpus remain major completion gates.
 
 | Progress measure, 15 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **46 / 168 (27.4%)** | **122 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-10 and PAD-01 through PAD-10, not partial substeps. |
+| Formally closed roadmap tasks | **46 / 170 (27.1%)** | **124 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-10 and PAD-01 through PAD-10, not partial substeps. |
 | Estimated category progress | **21 categories: 2 at 100%, 17 partial, 2 at 0%** | Governance (GOV) and developer map tools (TOOL) are complete; engine loading (CORE) reopened on 24 November 2026 for the unified game module (CORE-07); the detailed estimates follow. |
 | UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
@@ -58,7 +58,7 @@ exact; the estimate column is deliberately approximate.
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **65%** | 5 / 13 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, partial). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026; temporal AA and dynamic resolution (REN-04) closed 23 November 2026; depth of field (REN-12, partial) 23 November, with scripted cinematic focus to follow (REN-13). |
 | [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **40%** | 4 / 9 | Shadow-map cost, equal-settings regressions (the retained HUD's composition and most of the Vulkan depth capture removed 22 November, unmeasured in fullscreen), hitches, front-end cost and the release gate. |
-| [Virtual reality](#virtual-reality) — VR | **75%** | 4 / 7 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05); desktop stereoscopic 3D on physical stereo displays (VR-07). |
+| [Virtual reality](#virtual-reality) — VR | **74%** | 4 / 9 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05); desktop stereoscopic 3D on physical stereo displays (VR-07); headset detection on real runtimes (VR-08) and the VR menus read in a headset (VR-09). |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **70%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest on a headset. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
 | [New user interface](#new-user-interface) — UI | **30%** | 1 / 11 | Production toolkit/editor, full source-bound migration, input/accessibility and seven gates. |
@@ -2686,8 +2686,16 @@ are not yet measured.
   retires. Vulkan then filters each PCSS-lite tap bilinearly (`r_vkShadowBilinearPCSS`,
   default 1): penumbra grain at Air Defense 1 falls from 0.048 to 0.022 with coverage
   unchanged, and soft projected shadows no longer match OpenGL pixel for pixel; `0`
-  restores the match. Open leads are listed there: cascade scale stepping with yaw and
-  PCSS-lite on parallel lights.
+  restores the match. A point light that found Vulkan's memory-bounded cube pool empty
+  was drawn for a frame with no shadow, because its stencil volumes had been elided:
+  the back end now reports the pool's pressure and the front end keeps point lights'
+  volumes while it lasts (Hub 2 at Maximum: the "required shadow resource
+  unavailable" warning in every run before, in none after). The pool ran out because
+  the 512 MiB point cache was sized for 512 cubes: cubes above 512, which only the top
+  shadow level draws, now get three times `r_shadowMapPointCacheMegs`, and that hall
+  goes from 21 cache slots and five cubes rendered a view to 64 slots and 0.2, with
+  no overflow. Open leads are listed
+  there: cascade scale stepping with yaw and PCSS-lite on parallel lights.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always
@@ -3170,7 +3178,7 @@ Sources: [OpenXR implementation history](archive/2026-10-18/plans/2026-10-02-ope
 
 ### VR completion checkpoints
 
-**Estimate: 75%; 4/7 tasks closed.** Credit the OpenGL and Vulkan PC paths,
+**Estimate: 74%; 4/9 tasks closed.** Credit the OpenGL and Vulkan PC paths,
 their fault handling, play spaces and per-eye TAA on the simulated runtime.
 Synthetic stereo results do not qualify a headset, its comfort, its frame
 budget or standalone Quest; those are the [headset checklist](vr-headset-qualification.md)
@@ -3184,6 +3192,8 @@ and AND-05.
 | VR-04 — Partial | `openxr_vr_stereo_cost.py` records flat/stereo/warm-stereo CPU, build, submit and GPU tails, now at a chosen preset (`--preset quality`); the simulated baselines on this GPU are recorded below. Uploads, dynamic geometry, remote cameras, cached static shadow maps and (8 November) world-GUI quads are shared between the eyes; culling, lights, draws, mirror/reflection/refraction/x-ray maps and dynamic shadow composition stay per eye. `openxr_vr_stereo_share_smoke.py` proves both by work count on OpenGL and Vulkan. | Headset tails against the refresh budgets (checklist 2.2), and sharing work where those tails show a view-independent cost. |
 | VR-05 — Closed (approved scope) | Decision: per-eye TAA only. Each eye has its own view identity, history images, motion vectors and resets in the SP game chain and both backends' own temporal scenes; dynamic resolution stays off in VR. SP/MP GL/Vulkan pass the simulated-runtime smoke. | Headset comfort is checklist section 7. Hand presence arrived with the body (VR-02, 17 November); physical-object interaction needs its own design. |
 | VR-06 — Closed | Active GL teardown/ownership repair passes native failure cases and simulated-runtime SP/MP gameplay. | Carry guarantees into VR-01 backends; physical controller/headset validation remains VR-02. |
+| VR-08 — Partial | 27 November 2026: VR Mode Off/On/Automatic (`vr_enable` 0/1/2; archived 0 and 1 keep their meaning), a side-effect-free stage-one runtime probe (`XR_RUNTIME_JSON`, the Windows registry, the XDG files, the Quest flavor), Automatic's launch-time headset question before the renderer is chosen (OpenGL under `r_renderApi best`), its 20 s settle window, a menu notice for a headset found later (Play in VR, `vr_start`), the title's one-time question when a runtime is installed (`vr_offerAnswered`), `vr_detect` and the `VR_RUNTIME`/`VR_MODE`/`VR_OFFER`/`VR_DETECT` log lines; `openxr_vr_detection_smoke.py` covers no runtime, a runtime without a headset, a headset at launch, one connected later and the once-only question. | Real runtimes (SteamVR, Meta Link, WMR, Monado, Virtual Desktop): their registration read correctly, how each answers `xrGetSystem` with the headset off, asleep or unplugged, and whether Automatic starting SteamVR at launch is acceptable; checklist section 8. |
+| VR-09 — Partial | 27 November 2026: the retained interface in VR (`tools/ui/retained_vr.py`, keyed on the shared interface variant `vr`, AND-04.1): VR SETUP (play space, height, recentre, turning, weapon hand, comfort vignette) opened over the title or pause at the first VR entry and from the pause's VR SETUP link and the Virtual Reality tab's Comfort Setup; Game Options opens on Virtual Reality in VR; the desktop-only rows (the flat gun's place and field of view, stereoscopic 3D) leave the page in VR; the Marine, Strogg and Awakening pauses and the Awakening settings pages carry it; menu text at least 1.25x in VR (`ui_retainedVRTextScale`); the game's on-screen keyboard instead of the desktop's whenever VR has the controllers; the desktop mirror shows the menu screen while a menu is up; all 12 languages; `openxr_vr_menu_smoke.py` sets VR SETUP's Turning by pointer before its Laser Sight round. | Readability, laser-pointer hit sizes and the desktop mirror judged in a headset; the on-screen keyboard reached by the pointer on a headset; checklist section 8. |
 | VR-07 — Partial | 24 November 2026: desktop stereoscopic 3D (`r_stereo3D`) on OpenGL and Vulkan: side by side (half and full width), top and bottom, red/cyan anaglyph (Dubois) and row interlaced, with depth, convergence and eye swap; SP, MP, menus, the paused menu's backdrop and window-sized screenshots captured in every layout; Settings rows on both interfaces in all 12 languages. | Physical stereo displays (a 3D TV or monitor, side-by-side glasses, a passive interlaced panel, anaglyph glasses); the zero-parallax crosshair; Apple GL and GLES, which decline it. |
 
 ### VR task evidence and acceptance
@@ -3415,6 +3425,51 @@ and AND-05.
   `game-stereo-stock`). Open: qualification on physical stereo displays, a
   crosshair at the target's depth, and the Apple GL 2.1 and GLES renderers,
   which keep a flat frame and say why.
+
+- [ ] **VR-08 — P2, implementation and qualification: headset detection and
+  automatic VR.** Find a headset without surprising a desktop player, and let
+  VR start by itself or be offered when one is present. Stage one reads which
+  OpenXR runtime the loader would load (`XR_RUNTIME_JSON`; Windows
+  `HKLM\SOFTWARE\Khronos\OpenXR\1\ActiveRuntime` and `AvailableRuntimes`;
+  Linux `active_runtime[.<arch>].json` under `$XDG_CONFIG_HOME`,
+  `$XDG_CONFIG_DIRS` and `/etc`; the Quest flavor is always a headset) and never
+  creates an instance, since `xrCreateInstance` can start SteamVR. Stage two
+  asks that runtime for a headset only when the player allowed it: VR Mode On
+  or Automatic, or `vr_detect`. Acceptance: VR Mode is Off / On / Automatic with
+  archived values and `+set vr_enable 1` unchanged; Automatic decides before
+  the renderer is chosen, so the automatic choice keeps VR on OpenGL, and a
+  headset taken later on Vulkan restarts the renderer once; a headset that
+  appears mid-session is offered without taking over play; the title asks
+  once, and remembers the answer, when a runtime is installed and VR Mode was
+  never chosen; every outcome is logged for support; and the test runtime
+  proves no runtime, a runtime with no headset, a headset at launch, one
+  connected later and the once-only question
+  (`openxr_vr_detection_smoke.py`), stage one loading no runtime at all.
+  Implemented 27 November 2026 (`src/sys/openxr/OpenXRRuntimeProbe.cpp`,
+  `idVRSystemOpenXR::BootDecide`/`StartIfRequested`, `src/framework/Session_vr.cpp`;
+  [player guide](../user/vr.md#vr-mode-and-headset-detection)). Open: every
+  real runtime's registration and its answers with the headset off, asleep or
+  unplugged, on a PC with that runtime installed (checklist section 8).
+- [ ] **VR-09 — P2, implementation and qualification: the VR interface.** A
+  retained-interface variant for play in a headset that keeps every function
+  players expect. Acceptance: menus readable at headset distance with large
+  laser-pointer targets and nothing that needs hover; the Virtual Reality
+  settings first, with comfort and handedness a step away; desktop-only rows
+  hidden or explained; recentre and seated/standing from the pause menu; text
+  entry through the PAD-05 on-screen keyboard by pointer; a short comfort
+  setup at the first VR entry that players can reopen; controller prompts
+  throughout; the desktop mirror considered; The Awakening's (`q4xbase`)
+  screens and weapons covered. Implemented 27 November 2026 on the shared interface
+  variant (`view.variant` is `vr`; [contract](ui/interface-variants.md)): VR
+  SETUP, Virtual Reality first, desktop-only rows hidden, the pause's VR SETUP
+  link on the Marine, Strogg and Awakening pauses, menu text at least 1.25x
+  (`ui_retainedVRTextScale`), the game's on-screen keyboard whenever VR has the
+  controllers (the desktop's own would open where no one looks), and a desktop
+  mirror that shows the menu screen while a menu is up. The pointer counts as
+  a controller for prompts (26 November), and the shared variant's touch reach
+  (a press beside a small control reaches it) applies to it once merged. Open: judging text
+  size, hit sizes, the mirror and the keyboard in a headset (checklist
+  section 8).
 
 ## Android and mobile rendering
 

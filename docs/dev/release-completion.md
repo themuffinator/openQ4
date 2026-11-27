@@ -39,6 +39,64 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   No phone, tablet, Steam Deck or desktop touchscreen has been used by hand.
   Contract: [ui/interface-variants.md](ui/interface-variants.md).
 
+## VR finds your headset, and the menus fit the headset, 27 November 2026
+
+- **VR Mode has three choices: Off, On and Automatic.** Off never asks your
+  VR software for anything. On is what turning VR on always did. Automatic
+  asks your VR runtime for a headset as the game starts: if one answers, you
+  start in VR (on OpenGL when the renderer is left to choose); if none does
+  within 20 seconds, you play on the desktop. A headset you switch on later
+  shows **VR headset found** in the menus with **Play in VR**, and never takes
+  over in the middle of play.
+- **The title asks once.** If a VR runtime is installed and you never chose a
+  VR Mode, the title asks whether to play in VR by itself whenever a headset
+  is connected. Yes sets Automatic, No keeps VR off, and the answer is kept.
+  openQ4 finds the runtime by reading which one is active, without starting
+  it, so a desktop start never opens SteamVR on its own.
+- **VR SETUP.** The first time VR starts, a short dialog opens over the title
+  or pause menu: seated or standing, Measure My Height, Recentre View, snap or
+  smooth turning, weapon hand and the comfort vignette. It stays on the pause
+  menu (VR SETUP, beside EXIT) and on the Virtual Reality tab (Comfort Setup).
+- **Menus in the headset.** Settings > Game Options opens on Virtual Reality;
+  the flat gun's position and field of view and stereoscopic 3D leave the page
+  while you're in VR; menu text is at least a quarter larger
+  (`ui_retainedVRTextScale`); typing opens the game's own keyboard for the
+  laser instead of the desktop's; and the desktop mirror shows the menu while
+  one is up. **Look for Headset** on the Virtual Reality tab asks the runtime
+  on demand.
+- **What to do.** Nothing. `vr_enable 0` and `1` keep their meaning, and
+  `+set vr_enable 1` still starts in VR. Every decision is logged
+  (`VR_RUNTIME`, `VR_MODE`, `VR_OFFER`, `VR_DETECT`), which helps reports.
+- Not yet checked on a real headset or runtime: how SteamVR, Meta Link, WMR,
+  Monado and Virtual Desktop answer with the headset off or asleep, and how
+  the larger text and the pointer's targets read in a headset (VR headset
+  checklist section 8).
+- Evidence: `tools/tests/openxr_vr_detection_smoke.py` on the OpenXR test
+  runtime, whose `OPENQ4_XR_TEST_HEADSET` makes it a runtime with no headset
+  or one that connects later: no runtime (missing manifest: no question, no
+  instance, `vr_detect` says no runtime answered); a runtime without a
+  headset and VR Mode off (the title asks once, No is kept across a relaunch,
+  and the runtime is never loaded: its log never opens); Yes with a headset
+  (Automatic presents and VR SETUP opens over the title); Automatic with a
+  headset appearing after 24 s (desktop, then an offer, then VR on
+  `vr_start`); and Automatic with a headset at launch under
+  `r_renderApi best` (OpenGL chosen, airdefense1 in stereo with the HUD).
+  `openxr_vr_menu_smoke.py` sets VR SETUP's Turning to Smooth with the
+  pointer before its Laser Sight round. The native
+  `OpenXRRuntimeProbeTest.cpp` pins the manifest parsing and the Linux
+  search order.
+- Development: stage one is `src/sys/openxr/OpenXRRuntimeProbe.cpp`
+  (`XR_RUNTIME_JSON`, `HKLM\SOFTWARE\Khronos\OpenXR\1`, the XDG
+  `active_runtime[.<arch>].json` files); `idVRSystemOpenXR::BootDecide` runs
+  from `R_RendererModule_BootEarly` before the renderer is chosen
+  (`RM_AutomaticApi(VR_WantsRenderer())`); `StartIfRequested` creates an
+  instance only while `InstanceWanted()`; the session side is
+  `src/framework/Session_vr.cpp`; the menus' VR parts are
+  `tools/ui/retained_vr.py`, keyed on the shared interface variant (`view.variant` is
+  `vr`; [ui/interface-variants.md](ui/interface-variants.md)). A restated `vr_renderScale` no longer
+  restarts the session at launch, so the runtime is asked once. No game or
+  renderer ABI change.
+
 ## One Shadows setting with six levels, and Custom settings you can undo, 27 November 2026
 
 - **Settings > Display > Effects has one Shadows list:** Off, Original,
@@ -72,6 +130,43 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## The highest Shadows setting keeps every light's shadow stored, 27 November 2026
+
+- **The highest Shadows setting no longer redraws half a room's shadows every
+  frame.** Its larger point-light shadow maps take four times the memory of the
+  other settings', but the store for them was sized for the small ones, so in
+  a room with dozens of lights only about half fitted and the rest were drawn
+  again on every frame. Larger shadow maps now get three times the memory
+  (1536 MiB at the default). In the hub level's processing hall on Vulkan at
+  the Maximum preset, five point-light shadows were redrawn per frame and now
+  almost none are, and shadow drawing falls from about 690 objects a frame to
+  about 250.
+- **Memory.** Shadow memory in that hall stays about the same, 1.9 to 2.4 GiB
+  on Vulkan, because the temporary maps the unstored lights used are no longer
+  needed. In levels with more stored lights it can grow by up to 1 GiB over
+  before. The other Shadows settings are unchanged.
+- **What to do.** Nothing. `r_shadowMapPointCacheMegs` still sets the figure;
+  it now means the budget for the standard size, and larger maps get three
+  times it.
+- Developer detail:
+  [the top level's point cache](shadowmapping-audit-2026-11-27.md#the-top-levels-point-cache).
+  No ABI change.
+
+## No more one-frame shadowless flashes in crowded rooms on Vulkan, 27 November 2026
+
+- **A light no longer flashes without its shadow on Vulkan's highest shadow
+  setting.** In rooms with dozens of shadow-casting lights the memory set
+  aside for point-light shadows can run out, and the lights that do not fit
+  are drawn with the classic stencil shadows instead. One of those lights
+  could be drawn for a single frame with no shadow at all, each time it came
+  into view. It now goes straight to its stencil shadow. Seen in the hub
+  level's processing hall at the Maximum preset; the lower shadow settings use
+  smaller shadow maps and do not run out there.
+- **What to do.** Nothing.
+- Developer detail:
+  [a point light with no cube and no volumes](shadowmapping-audit-2026-11-27.md#a-point-light-with-no-cube-and-no-volumes).
+  No ABI change.
+
 ## Smooth soft shadow edges on Vulkan, 27 November 2026
 
 - **Soft shadow edges are smooth on Vulkan.** The soft edge of a spotlight's or

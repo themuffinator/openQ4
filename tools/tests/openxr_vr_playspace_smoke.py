@@ -123,7 +123,8 @@ def run(options, staged: Path, executable: str, manifest: Path, profile: Path, s
         "g_autoSkipCinematics": "1", "com_skipLoadingContinue": "1",
         "com_loadingContinueAutoAdvance": "1", "com_allowConsole": "1",
         # the profile persists between runs: every setting this smoke reads starts fresh
-        "vr_enable": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_roomScale": "0", "vr_physicalCrouch": "1",
+        # VR SETUP opens at the first VR entry (retained_vr); these runs test the rest
+        "vr_enable": "1", "vr_setupDone": "1", "vr_debug": "1", "vr_aimMode": "1", "vr_roomScale": "0", "vr_physicalCrouch": "1",
         "vr_playSpace": "2", "vr_standingHeight": "0", "vr_headOffsetLimit": "16",
         # after the launch configuration's own r_renderApi, so this one wins
         "r_renderApi": options.render_api,

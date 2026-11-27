@@ -46,11 +46,14 @@ def with_notices(result: dict) -> dict:
     """A built document with the session's notice layer over it: its three
     slots join the root's last children (over the page and its dialogs), and
     their state, actions, events, bindings and timelines the document's. The
-    status symbols: 1 the favorite's star, 2 a lost controller."""
+    status symbols: 1 the favorite's star, 2 a lost controller, 5 a VR
+    headset (Automatic VR Mode found one after launch: Play in VR)."""
     from retained_join_game import symbol
+    from retained_vr import PLAY_IN_VR, headset_symbol
     doc = Document(result["id"])
-    slots = notice_stack(doc, "notice", "noticeAction", [(1, lambda ident: symbol(ident, "fav")), (2, controller_symbol)],
-                         ("#str_42904",))
+    slots = notice_stack(doc, "notice", "noticeAction", [(1, lambda ident: symbol(ident, "fav")), (2, controller_symbol),
+                                                         (5, headset_symbol)],
+                         ("#str_42904", PLAY_IN_VR))
     fragment = doc.build(group("notices", {}, slots))
     for key in ("state", "actions", "events"):
         if fragment.get(key):

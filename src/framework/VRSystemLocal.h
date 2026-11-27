@@ -13,6 +13,8 @@
 */
 
 extern idCVar vr_enable;
+extern idCVar vr_offerAnswered;
+extern idCVar vr_setupDone;
 extern idCVar vr_renderScale;
 extern idCVar vr_worldScale;
 extern idCVar vr_aimMode;
@@ -51,6 +53,55 @@ extern idCVar vr_debug;
 
 // The OpenXR implementation, when the client was built with it (OPENQ4_OPENXR).
 idVRSystem *		VR_GetOpenXRSystem( void );
+
+/*
+	VR mode and headset detection (VR-08).
+
+	vr_enable is the player's VR Mode: Off never asks a runtime for anything;
+	On plays in VR whenever a headset is there (the behaviour of vr_enable 1
+	since VR began); Automatic asks the runtime at launch and plays in VR
+	when a headset answers, else on the desktop, and offers a headset that
+	turns up later instead of switching to it mid-game.
+
+	Detection has two stages. Stage one (VR_RuntimeInstalled) reads which
+	runtime the OpenXR loader would load without loading it, since creating
+	an instance can start a runtime's server (SteamVR). Stage two asks that
+	runtime for a headset; it runs only for On, Automatic or vr_detect.
+*/
+enum {
+	VR_MODE_OFF,
+	VR_MODE_ON,
+	VR_MODE_AUTOMATIC
+};
+int					VR_Mode( void );
+
+// Stage one, from the boot probe: an active OpenXR runtime is installed, and
+// its name ("" when none).
+bool				VR_RuntimeInstalled( void );
+const char *		VR_RuntimeName( void );
+
+// The renderer boot (R_RendererModule_BootEarly), once vr_enable is read: logs
+// stage one and, for Automatic, runs stage two so the renderer can be chosen
+// for VR. True when VR wants the renderer that is about to start.
+bool				VR_BootDecide( void );
+// The automatic renderer choice (r_renderApi best): VR wants a renderer now.
+bool				VR_WantsRenderer( void );
+
+// Automatic found a headset after it settled on the desktop: true once, for
+// the session's notice that offers it.
+bool				VR_ConsumeHeadsetOffer( void );
+// A headset is offered and not taken yet (the notice's action is live).
+bool				VR_HeadsetOffered( void );
+// The player took the offer (Play in VR): Automatic plays in VR from now on
+// in this session. False when no headset is offered.
+bool				VR_TakeHeadsetOffer( void );
+// vr_detect's answer, once: VR_DETECT_*, or -1 while none is new.
+enum {
+	VR_DETECT_NO_RUNTIME,
+	VR_DETECT_NO_HEADSET,
+	VR_DETECT_HEADSET
+};
+int					VR_ConsumeDetectResult( void );
 
 // True once after a session that had the controllers lost them: the headset
 // came off, the runtime's own menu opened over the game, or the runtime went
