@@ -11171,7 +11171,7 @@ def validate_layered_point_cube_contract() -> None:
         }""",
         "the extension is enabled only where the device offers it",
     )
-    require(device, "const char *deviceExtensions[ 8 ];", "the extension list has room for it")
+    require(device, "const char *deviceExtensions[ 12 ];", "the extension list has room for it")
 
     # The layered stage is the per-face stage plus the layer: any other
     # difference would let the two paths draw different depth.

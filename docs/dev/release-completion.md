@@ -12,6 +12,31 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Alt+Tab out of Fullscreen and Borderless is instant, 27 November 2026
+
+- **Switching away from the game no longer takes a moment in Fullscreen or
+  Borderless.** On Windows the game minimized every fullscreen window when it
+  lost focus, including the desktop-resolution Fullscreen mode, which has no
+  display mode to give back; minimizing it, then rebuilding the picture on the
+  way back, made Alt+Tab slow both ways. Only Exclusive Fullscreen minimizes
+  now, as SDL itself does. Setting the `SDL_VIDEO_MINIMIZE_ON_FOCUS_LOSS`
+  environment variable still overrides this either way.
+- **Vulkan on Windows keeps a full-screen window a window.** Some drivers take
+  exclusive control of any window that covers the display, which blanks the
+  screen and delays Alt+Tab in Borderless too. Where the driver offers
+  `VK_EXT_full_screen_exclusive`, every swapchain outside Exclusive Fullscreen
+  now refuses that; Exclusive Fullscreen leaves the choice to the driver as
+  before. The log says which applies ("Vulkan: exclusive fullscreen ...").
+- Reported on Discord alongside #263, #264 and #265 (NVIDIA RTX 3070 Ti,
+  Vulkan).
+- Evidence: the SDL3 windowing source test checks both rules; the Vulkan
+  device-selection, display-presentation, probe-safety and portability tests
+  pass. A hidden-window Vulkan client (RTX 4060 Laptop, driver 591.74, with
+  the validation layer) enabled the extension, created its swapchains with
+  exclusive control refused and reached Air Defense 1 with no validation
+  messages. Alt+Tab itself was not timed: that needs a visible window and real
+  input, so the reporter's confirmation is still wanted.
+
 ## VR vibration that tells you where, and what happened, 27 November 2026
 
 - **Feel which side a hit came from.** The hand on that side takes the hit
