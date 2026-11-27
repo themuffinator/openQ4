@@ -2699,8 +2699,13 @@ are not yet measured.
   number of nearest cascades; the owner chose 2 as the default): at Air Defense 1 a
   full turn resamples each cascade 8 times with the tight box and never with the
   sphere, for texels at the tight fit's worst direction on the near two; the far one,
-  which would be about a third coarser, keeps the tight box. One open lead is listed there: PCSS-lite on parallel
-  lights.
+  which would be about a third coarser, keeps the tight box. The OpenGL fix for
+  lights that need a map and stencil together was then checked on screen with a
+  forced case (3.25% of the view wrong before, 0.05% after; no stock view takes the
+  path, and the shadow report now prints `hybrid=` to show when one does), and PBR
+  receivers on both renderers skip the shadow filter where the light does not reach
+  (pictures identical; the showcase overview 6.6 ms against 6.7 to 7.6 on OpenGL).
+  One open lead is listed there: PCSS-lite on parallel lights.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always

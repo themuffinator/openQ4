@@ -33,7 +33,7 @@ each was not taken.
 
 | Finding | What changed |
 |---|---|
-| **OpenGL drew the stencil supplement of a hybrid light and then ignored it.** A light whose map cannot hold every caster stencils the volumes of the missing ones and tests its mapped receivers against them. The receiver setup reset the stencil test to always-pass before every draw, so those casters shadowed nothing and their volumes were rasterised for no result. | **Fixed (OpenGL).** The receivers keep the test the supplement was stencilled for, PBR receivers included, and leave it open afterwards as before. Verified by reading the three call sites; no stock view was found that takes this path, so it has not been seen on screen. |
+| **OpenGL drew the stencil supplement of a hybrid light and then ignored it.** A light whose map cannot hold every caster stencils the volumes of the missing ones and tests its mapped receivers against them. The receiver setup reset the stencil test to always-pass before every draw, so those casters shadowed nothing and their volumes were rasterised for no result. | **Fixed (OpenGL).** The receivers keep the test the supplement was stencilled for, PBR receivers included, and leave it open afterwards as before. Verified by reading the three call sites, and later on screen with a forced case: see [the stencil supplement on screen](#the-stencil-supplement-on-screen). |
 | **A resting body kept the wrong cached map after `r_shadowMapCharacterSelfShadow` was switched.** The static-caster signature did not record which of a light's two maps holds a caster. The setting moves a still `noSelfShadow` caster between them with nothing else changed, and the LOCAL map cached before the switch was reused. | **Fixed, both backends.** The signature carries the ownership. Every signature changes once, so each cached map renders once more after the update. |
 | **Vulkan kept cached maps across `r_shadowMapDebugMode 10`.** Its signature hashed the caster offsets as set, while the mode draws with none; OpenGL hashes the offsets it draws with. | **Fixed (Vulkan).** |
 | **The point receivers passed NaN through their range test.** `depth <= 0.0 || depth >= 1.0` is false for NaN, so a degenerate vertex went on to the cube lookups. | **Fixed, both backends.** The test is written to reject it, as the projected receivers already do. |
@@ -335,7 +335,72 @@ With the default in place, the same turn counts 0 / 0 / 8 at texels of 0.72,
 and 99.2% on Vulkan; and Hub 2 at the Maximum preset, where spotlights are
 cascaded too, runs under the Vulkan validation layers with no message.
 
+## The stencil supplement on screen
+
+The first batch fixed OpenGL ignoring the stencil of casters a light's map
+cannot hold, and could only check it by reading: no stock view takes that
+path. That is now measured rather than assumed. The shadow report's metrics
+line gained `hybrid=`, the number of receiver passes drawn against such a
+stencil, and four stock scenes at Quality (Hub 2, Storage 2, Air Defense 1,
+Convoy 1, each over a full turn of the view) report `hybrid=0` and no
+`SM missing caster` line. Stock content at the shipped settings does not
+reach it; it is the safety net for a caster the map refuses.
+
+So the case was forced. A temporary switch kept every animated model out of
+the maps, which leaves its shadow to the stencil supplement, and a second one
+restored the old always-pass test. In Hub 2 with a marine spawned in front of
+the player and the game clock stopped, at 1920x1080 on OpenGL, four pictures
+of the same moment:
+
+| Picture | Pixels more than 12 levels from the stencil picture |
+| --- | --- |
+| shadow maps, nothing refused | 0.19% |
+| animated models refused, old stencil test | 3.25%, all of it brighter: the shadow across the far wall is missing |
+| animated models refused, fixed | 0.05% |
+
+`hybrid=4` receiver passes a frame in both refused runs. Vulkan, which has its
+own implementation of the same idea and was not changed, scores 0.05% in the
+same forced case. Blended receivers of such a light go through the same
+function and needed no change. Both switches were removed before the commit;
+the `hybrid=` field stays.
+
+## PBR receivers and the light's reach
+
+The classic receivers skip the shadow filter where the light does not reach
+the pixel. The PBR branch of the same four shaders ran the whole filter first
+and multiplied the result into a radiance that was already zero. The PBR
+evaluation builds its radiance from the light's falloff and projection
+samples (`OpenQ4PBRDirect` on OpenGL, `EvaluatePBRDirect` on Vulkan), so
+where their product is black the result is black whatever the shadow says;
+the branch now takes those two samples first and filters only where they are
+not black. The debug views still filter every pixel.
+
+- **Exact.** The PBR showcase map's 24 captures (12 cameras, lit and
+  ownership) are identical to the last bit before and after, on both
+  renderers, and its 26 checks pass on both.
+- **Cost.** OpenGL, the showcase overview at 2560x1440, Quality, three
+  interleaved pairs of launches with the old shaders put back as loose files:
+  6.58, 6.58 and 6.64 ms of GPU a frame with the change against 6.68, 7.13 and
+  7.56 without. Never slower; the size of the gain is not pinned down, because
+  the old shaders' three runs spread over 0.9 ms. That room is lit nearly
+  wall to wall, so it is the unfavourable case. Vulkan was not timed: the old
+  shader would have needed a second build.
+- **Not covered.** A surface turned away from the light still filters: the
+  PBR normal is resolved inside the evaluation. The modern OpenGL cluster
+  loop, which is opt-in, is unchanged.
+
+Stock content has no PBR owners, so nothing changes for the stock game; this
+is for materials a mod or texture pack adds.
+
 ## Measured and left
+
+**Building a light's cascade layout more than once a view.** Vulkan builds
+the projected state two or three times per light per view. Timed in the turn
+self-test (Air Defense 1's sun, four cascades, 7,200 builds): 1.3 microseconds
+each with the tight fit, 1.5 with the sphere fit. A view with ten cascaded
+lights spends under 0.05 ms on the repeats. Not worth a cache and its
+invalidation. The timing code was removed.
+
 
 **Skipping the blocker search under distant suns.** A distant point light's
 stored depth is distance from a source thousands of units away, so the
@@ -356,16 +421,18 @@ Not done in this round. Each is real; the note says why it waited.
   and not the gap. A sun's penumbra should be `gap * tan(source angle)` in
   world units. It needs a per-cascade uniform on three receivers and a
   constant chosen by eye. Twelve stock parallel lights cast shadows.
-- **PBR receivers sample shadows before knowing the light reaches the pixel**
-  (both renderers), and the modern OpenGL cluster loop does the same. Stock
-  content has no PBR owners and the modern path is opt-in.
+- **The modern OpenGL cluster loop samples shadows before knowing the light
+  reaches the pixel.** The path is opt-in. (The PBR receivers of the shipped
+  paths were done: see above.)
 - **Smaller items:** Vulkan takes a full-atlas layout round trip in views
-  where every projected map is read in place; it builds the projected state
-  two or three times per light per view; the point filter's rotated mode
+  where every projected map is read in place; the point filter's rotated mode (off by
+  default)
   hashes a fixed direction grid, seven to twenty-eight texels wide, where the
   projected one hashes the texel; the receiver-plane bias (off by default) mixes
   screen pixels with shadow texels; OpenGL asks for an unsized depth format
-  where its bias assumes 24 bits; the debug overlay draws its tile grid in
+  where its bias assumes 24 bits (the format is shared by every depth image
+  in the renderer, so sizing it is wider than shadows and wants the other
+  platforms' drivers checked); the debug overlay draws its tile grid in
   atlas coordinates.
 
 ## Evidence

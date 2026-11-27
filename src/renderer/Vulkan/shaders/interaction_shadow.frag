@@ -1044,8 +1044,19 @@ void main() {
     vec4 bumpSample = RetailTexture(bumpMap, bumpTexCoord, gPBRBumpDx, gPBRBumpDy);
     if (pc.d.x > 0.5) {
         vec3 localNormal = PBRDirectNormal(bumpTexCoord);
+        // EvaluatePBRDirect builds its radiance from these two samples, so
+        // where they are black the result is black whatever the shadow says:
+        // outside the projected image and past the falloff the filter, most
+        // of this shader's cost, has nothing to resolve.
+        vec3 reach = textureProj(lightFalloffMap, vLightFalloffTexCoord).rgb
+            * textureProj(lightProjectionMap, vLightProjectionTexCoord).rgb;
+        bool lit = max(reach.r, max(reach.g, reach.b)) > 0.0 || ShadowVisualDebugMode();
+        float shadowFactor = 1.0;
+        if (lit) {
+            shadowFactor = SampleShadowFactor();
+        }
         vec3 packed = EvaluatePBRDirect(localNormal,
-            diffuseTexCoord, specularTexCoord, SampleShadowFactor());
+            diffuseTexCoord, specularTexCoord, shadowFactor);
         // Sample first: the views describe the cascade the lit path chose.
         if (ShadowVisualDebugMode()) {
             outColor = ShadowDebugOutput();
@@ -1053,7 +1064,9 @@ void main() {
         }
         // Direct radiance is linear in the light color, so the colored
         // translucent transmittance can filter the evaluated result.
-        packed *= SampleTranslucentShadow();
+        if (lit) {
+            packed *= SampleTranslucentShadow();
+        }
         outColor = vec4(packed, PBRTransparentAlpha(diffuseTexCoord));
         return;
     }

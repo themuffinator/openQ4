@@ -9707,6 +9707,100 @@ def validate_point_cache_budget_by_cube_size_contract() -> None:
         require(selftest, case, "the self-test pins the budget rule")
 
 
+def validate_pbr_receiver_reach_contract() -> None:
+    """A PBR receiver skips the shadow filter where the light does not reach.
+
+    The PBR light evaluation builds its radiance from the light's falloff and
+    projection samples, so where their product is black the result is black
+    whatever the shadow says. The classic receivers already test this; the PBR
+    branch of the same four shaders ran the whole filter first.
+    """
+    for path, sampler in (
+        ("content/baseoq4/pak0/glprogs/shadow_interaction.fs", "pbrShadowInfo = SampleShadow();"),
+        ("content/baseoq4/pak0/glprogs/shadow_point_interaction.fs",
+         "pbrShadow = vec3( 1.0 ) * SamplePointShadow() * SamplePointTranslucentShadow();"),
+    ):
+        require_order(
+            read(path),
+            (
+                "vec3 pbrReach = texture2DProj( uLightFalloffMap, vLightFalloffTexCoord ).rgb",
+                "* texture2DProj( uLightProjectionMap, vLightProjectionTexCoord ).rgb;",
+                "bool pbrLit = max( pbrReach.r, max( pbrReach.g, pbrReach.b ) ) > 0.0 || ShadowVisualDebugMode();",
+                "if ( pbrLit ) {",
+                sampler,
+                "gl_FragColor = vec4( OpenQ4PBRDirect( pbrShadow ), OpenQ4PBRAlpha() );",
+            ),
+            f"{path}: the PBR branch filters only where the light reaches",
+        )
+    for path, translucent in (
+        ("src/renderer/Vulkan/shaders/interaction_shadow.frag", "packed *= SampleTranslucentShadow();"),
+        ("src/renderer/Vulkan/shaders/interaction_shadow_point.frag", "packed *= SamplePointTranslucentShadow();"),
+    ):
+        require_order(
+            read(path),
+            (
+                "vec3 reach = textureProj(lightFalloffMap, vLightFalloffTexCoord).rgb",
+                "* textureProj(lightProjectionMap, vLightProjectionTexCoord).rgb;",
+                "bool lit = max(reach.r, max(reach.g, reach.b)) > 0.0 || ShadowVisualDebugMode();",
+                "float shadowFactor = 1.0;",
+                "if (lit) {",
+                "shadowFactor = SampleShadowFactor();",
+                "diffuseTexCoord, specularTexCoord, shadowFactor);",
+                "if (lit) {",
+                translucent,
+            ),
+            f"{path}: the PBR branch filters only where the light reaches",
+        )
+    # The skip is exact only while the evaluation multiplies by the same two samples.
+    require_order(
+        read("src/renderer/Vulkan/shaders/pbr_direct.glsl"),
+        (
+            "vec3 radiance = PBRClassicLightIrradianceColor(",
+            "textureProj(lightFalloffMap, vLightFalloffTexCoord).rgb",
+            "* textureProj(lightProjectionMap, vLightProjectionTexCoord).rgb",
+            "* inter.diffuseColor.rgb) * shadowFactor;",
+        ),
+        "Vulkan PBR radiance is the light's falloff and projection times the shadow",
+    )
+    require_order(
+        read("src/renderer/draw_pbr.cpp"),
+        (
+            "vec3 radiance = PBRClassicLightIrradianceColor(",
+            "texture2DProj( uLightFalloffMap, vLightFalloffTexCoord ).rgb",
+            "* texture2DProj( uLightProjectionMap, vLightProjectionTexCoord ).rgb",
+            "* uDiffuseColor.rgb ) * shadow;",
+        ),
+        "OpenGL PBR radiance is the light's falloff and projection times the shadow",
+    )
+
+
+def validate_hybrid_receiver_report_contract() -> None:
+    """OpenGL counts the receiver passes drawn against the stencil of casters
+    their map cannot hold, and the passes that follow honour that stencil.
+
+    No stock view takes this path, so the report is the way to tell that a
+    test view does.
+    """
+    arb2 = read("src/renderer/draw_arb2.cpp")
+    prepare = braced_body(arb2, "static bool RB_ShadowMapPrepareMappedReceiverStencil(", "hybrid receiver stencil")
+    require_order(
+        prepare,
+        (
+            "g_shadowMapReceiverStencilSupplement = false;",
+            "glClear( GL_STENCIL_BUFFER_BIT );",
+            "RB_StencilShadowPass( globalSupplements );",
+            "RB_StencilShadowPass( localSupplements );",
+            "glStencilFunc( GL_GEQUAL, 128, 255 );",
+            "g_shadowMapReceiverStencilSupplement = true;",
+            "g_shadowMapStats.hybridReceiverPasses++;",
+        ),
+        "the supplement is stencilled, flagged and counted",
+    )
+    if arb2.count("glStencilFunc( g_shadowMapReceiverStencilSupplement ? GL_GEQUAL : GL_ALWAYS, 128, 255 );") != 2:
+        raise AssertionError("both mapped receiver draws test the supplement stencil")
+    require(arb2, "farSlot=%d/%d hybrid=%d", "the shadow report prints the hybrid pass count")
+
+
 def validate_cascade_stable_extent_contract() -> None:
     """A cascade sized by its view slice's bounding sphere keeps its scale
     while the view turns (r_shadowMapCascadeStableExtent nearest cascades).
@@ -11087,6 +11181,8 @@ def main() -> None:
     validate_point_pool_pressure_contract()
     validate_point_cache_budget_by_cube_size_contract()
     validate_cascade_stable_extent_contract()
+    validate_pbr_receiver_reach_contract()
+    validate_hybrid_receiver_report_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

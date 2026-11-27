@@ -130,6 +130,21 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## Less shadow work on physically based materials, 27 November 2026
+
+- **Materials with physically based (PBR) textures cost a little less to
+  light.** Where a light does not reach such a surface, the game no longer
+  works out a soft shadow for it first. The picture is identical. This applies
+  to PBR materials added by mods and texture packs on both OpenGL and Vulkan;
+  the stock game has none, so it looks and runs the same.
+- **What to do.** Nothing.
+- Developer detail:
+  [PBR receivers and the light's reach](shadowmapping-audit-2026-11-27.md#pbr-receivers-and-the-lights-reach)
+  and [the stencil supplement on screen](shadowmapping-audit-2026-11-27.md#the-stencil-supplement-on-screen):
+  the OpenGL fix for lights that need a shadow map and stencil shadows together
+  was verified with a forced case, and `r_shadowMapReport` now prints
+  `hybrid=`, the number of light passes drawn that way. No ABI change.
+
 ## Sunlight shadows near you hold still when you turn, 27 November 2026
 
 - **Shadows close to you no longer shift as you look around outdoors.** On

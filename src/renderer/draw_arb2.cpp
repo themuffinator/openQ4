@@ -2278,6 +2278,9 @@ typedef struct {
 	// whole-light cascades served from their cached still scenery / drawn and stored
 	int					wholeLightReuses;
 	int					wholeLightPublishes;
+	// mapped receiver passes drawn against the stencil of casters their map
+	// cannot hold (RB_ShadowMapPrepareMappedReceiverStencil)
+	int					hybridReceiverPasses;
 	int					projectedAtlasTilesAllocated;
 	int					projectedCacheSlotsUsed;
 	int					projectedCacheSlotsTotal;
@@ -7209,7 +7212,7 @@ static void RB_ShadowMapStatsReport( void ) {
 	}
 
 	common->Printf(
-		"SM metrics: updates=%d composed=%d subview(updates=%d reuse=%d fallback=%d) translucentReceivers=%d admissionDenied=%d scheduledSkip=%d atlasTiles=%d/%d pointFaces=%d pointHiP=%d pointCmp=%d cpu(render=%.2f mask=%.2f) gpuSync=%.2f gpuQuery=%.2f/%d pending=%d texelWorld=[%.3f %.3f] casterDraws=%d casterIndexes=%d farSlot=%d/%d\n",
+		"SM metrics: updates=%d composed=%d subview(updates=%d reuse=%d fallback=%d) translucentReceivers=%d admissionDenied=%d scheduledSkip=%d atlasTiles=%d/%d pointFaces=%d pointHiP=%d pointCmp=%d cpu(render=%.2f mask=%.2f) gpuSync=%.2f gpuQuery=%.2f/%d pending=%d texelWorld=[%.3f %.3f] casterDraws=%d casterIndexes=%d farSlot=%d/%d hybrid=%d\n",
 		g_shadowMapStats.shadowMapUpdates,
 		g_shadowMapStats.composePasses,
 		g_shadowMapStats.subviewUpdates,
@@ -7234,7 +7237,8 @@ static void RB_ShadowMapStatsReport( void ) {
 		g_shadowMapStats.projectedCasterDraws,
 		g_shadowMapStats.projectedCasterIndexes,
 		g_shadowMapStats.wholeLightReuses,
-		g_shadowMapStats.wholeLightPublishes );
+		g_shadowMapStats.wholeLightPublishes,
+		g_shadowMapStats.hybridReceiverPasses );
 	common->Printf(
 		"SM timings: cpu(map=%.2f reuse=%.2f mask=%.2f receiverFallback=%.2f stencilFallback=%.2f) gpuSync(map=%.2f reuse=%.2f mask=%.2f receiverFallback=%.2f stencilFallback=%.2f) gpuQuery(map=%.2f/%d reuse=%.2f/%d mask=%.2f/%d receiverFallback=%.2f/%d stencilFallback=%.2f/%d pending=%d:%d/%d/%d/%d/%d)\n",
 		g_shadowMapStats.cpuPhaseMilliseconds[SHADOWMAP_TIMING_MAP_RENDER],
@@ -13025,6 +13029,7 @@ static bool RB_ShadowMapPrepareMappedReceiverStencil(
 	}
 	glStencilFunc( GL_GEQUAL, 128, 255 );
 	g_shadowMapReceiverStencilSupplement = true;
+	g_shadowMapStats.hybridReceiverPasses++;
 	return true;
 }
 

@@ -1037,12 +1037,24 @@ void main() {
 			abs( dFdx( vShadowCoord2.z ) ) + abs( dFdy( vShadowCoord2.z ) ),
 			abs( dFdx( vShadowCoord3.z ) ) + abs( dFdy( vShadowCoord3.z ) ) );
 	}
-	vec4 pbrShadowInfo = SampleShadow();
+	// OpenQ4PBRDirect builds its radiance from these two samples, so where
+	// they are black the result is black whatever the shadow says: outside
+	// the projected image and past the falloff the filter, most of this
+	// shader's cost, has nothing to resolve.
+	vec3 pbrReach = texture2DProj( uLightFalloffMap, vLightFalloffTexCoord ).rgb
+		* texture2DProj( uLightProjectionMap, vLightProjectionTexCoord ).rgb;
+	bool pbrLit = max( pbrReach.r, max( pbrReach.g, pbrReach.b ) ) > 0.0 || ShadowVisualDebugMode();
+	vec4 pbrShadowInfo = vec4( 1.0, 0.0, 0.0, 0.0 );
+	vec3 pbrShadow = vec3( 1.0 );
+	if ( pbrLit ) {
+		pbrShadowInfo = SampleShadow();
+		pbrShadow = pbrShadowInfo.x * SampleTranslucentShadow();
+	}
 	if ( ShadowVisualDebugMode() ) {
 		gl_FragColor = ShadowDebugOutput( pbrShadowInfo );
 		return;
 	}
-	gl_FragColor = vec4( OpenQ4PBRDirect( pbrShadowInfo.x * SampleTranslucentShadow() ), OpenQ4PBRAlpha() );
+	gl_FragColor = vec4( OpenQ4PBRDirect( pbrShadow ), OpenQ4PBRAlpha() );
 #endif
 	return;
 #endif
