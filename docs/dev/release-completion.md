@@ -12,6 +12,20 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Window Width and Height grey out when Borderless Window fills the screen, 27 November 2026
+
+- **The display settings no longer offer a window size that does nothing**
+  (#265, #263). Borderless Window is a frameless window that covers the
+  whole display, so it ignores Window Width and Height, but those boxes
+  stayed editable while it was on. Players who set a size there still got a
+  full-screen game. The boxes are now greyed out with Borderless Window on,
+  as they already were in fullscreen. For a window of your chosen size, turn
+  off both Fullscreen and Borderless Window.
+- Evidence: the SYSTEM display-controls test drives the production page in
+  seven languages and checks that both rows are disabled and dimmed with
+  Borderless Window on and editable with it off; it fails on the previous
+  page. Not yet checked in a running game.
+
 ## Loading a save no longer closes the game when a light goes out at that moment, 26 November 2026
 
 - **Saves that closed the game on loading now load.** A save made at the

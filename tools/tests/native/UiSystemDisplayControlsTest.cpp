@@ -58,6 +58,16 @@ static void Run(const std::string& source,const std::string& directory,const cha
   Check(!v.runtime.CanActivateControl("settings_fullscreen_policy",v.time),"the Fullscreen Policy waits for a fullscreen draft");
   auto dimmed=v.runtime.PresentedValue("settings_fullscreen_policy","opacity");
   Check(dimmed&&std::abs(dimmed->data[0]-.45)<1e-6,"a windowed draft dims the Fullscreen Policy");
+  // #265: a borderless window covers the display, so only a bordered window
+  // takes the window size.
+  v.Show("settings_window_width");
+  for(const auto* id:{"settings_window_width","settings_window_height"}) {
+   Check(!v.runtime.CanActivateControl(id,v.time),"window size waits while Borderless covers the display");
+   auto faded=v.runtime.PresentedValue(id,"opacity");Check(faded&&std::abs(faded->data[0]-.45)<1e-6,"Borderless dims the window size");
+  }
+  Check(v.tx.Edit(View::Owner,{{"r_borderless",false}}).code==SettingsCode::Ok,"bordered window draft");v.Sync();v.Frame();
+  for(const auto* id:{"settings_window_width","settings_window_height"})Check(v.runtime.CanActivateControl(id,v.time),"a bordered window takes the window size");
+  Check(v.tx.Edit(View::Owner,{{"r_borderless",true}}).code==SettingsCode::Ok,"restore the borderless draft");v.Sync();v.Frame();v.Show("settings_msaa");
   Check(SettingsValuesEqual(v.host.live,baseline),"all display choices leave original host snapshot intact");
   // Existing popup cancellation must also preserve a nonlisted custom value.
   Check(v.tx.Edit(View::Owner,{{"r_multiSamples",3.0}}).code==SettingsCode::Ok,"counted host permits observed custom baseline shape");v.Sync();v.Frame();

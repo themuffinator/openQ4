@@ -2520,7 +2520,13 @@
          {"op": "!", "args": [{"state": "page.discardVisible"}]}
         ]
        },
-       {"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]}
+       {
+        "op": "&&",
+        "args": [
+         {"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]},
+         {"op": "!", "args": [{"state": "settings.draft.r_borderless"}]}
+        ]
+       }
       ]
      }
     ]
@@ -2530,7 +2536,20 @@
    "id": "settings_window_width.opacity",
    "node": "settings_window_width",
    "property": "opacity",
-   "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]}, 1, 0.45]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]},
+       {"op": "!", "args": [{"state": "settings.draft.r_borderless"}]}
+      ]
+     },
+     1,
+     0.45
+    ]
+   }
   },
   {
    "id": "settings_window_height.enabled",
@@ -2562,7 +2581,13 @@
          {"op": "!", "args": [{"state": "page.discardVisible"}]}
         ]
        },
-       {"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]}
+       {
+        "op": "&&",
+        "args": [
+         {"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]},
+         {"op": "!", "args": [{"state": "settings.draft.r_borderless"}]}
+        ]
+       }
       ]
      }
     ]
@@ -2572,7 +2597,20 @@
    "id": "settings_window_height.opacity",
    "node": "settings_window_height",
    "property": "opacity",
-   "value": {"op": "select", "args": [{"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]}, 1, 0.45]}
+   "value": {
+    "op": "select",
+    "args": [
+     {
+      "op": "&&",
+      "args": [
+       {"op": "!", "args": [{"state": "settings.draft.r_fullscreen"}]},
+       {"op": "!", "args": [{"state": "settings.draft.r_borderless"}]}
+      ]
+     },
+     1,
+     0.45
+    ]
+   }
   },
   {
    "id": "settings_custom_width.enabled",
@@ -118280,7 +118318,7 @@
    "dimensionControls": {
     "source": "Legacy custom-size entry selects r_mode=-1; new selection and dimension changes share one owned draft patch.",
     "validation": "Exact decimal integers within renderer bounds; intermediate size tuples remain drafts and cannot Apply until the complete display request validates.",
-    "availability": "Window size is editable in a windowed draft. Custom fullscreen size, Display Resolution and Refresh Rate are editable with Exclusive policy.",
+    "availability": "Window size is editable in a windowed, bordered draft. Custom fullscreen size, Display Resolution and Refresh Rate are editable with Exclusive policy.",
     "lists": "Display Resolution and Refresh Rate pick a slot of the published mode and refresh lists with the list token (display.mode, display.refresh)."
    },
    "renderOptions": {

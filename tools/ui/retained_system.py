@@ -662,7 +662,9 @@ def system_document() -> dict:
     framecap = choice(doc, "settings_framecap", "#str_232548", x, edit("com_maxfps"), draft("com_maxfps"),
                       listed("#str_232549", (30, 60, 75, 90, 120, 144, 165, 240, 360, 0)))
     gate(doc, "settings_framecap", EDITABLE)
-    windowed = no(draft("r_fullscreen"))
+    # A sized window (#265): Borderless Window covers the display, so only a
+    # bordered window takes the window size.
+    windowed = both(no(draft("r_fullscreen")), no(draft("r_borderless")))
     # The display resolution, custom size and refresh rate size only an
     # exclusive fullscreen (r_fullscreen 1, r_fullscreenDesktop 0); a window
     # takes the window size and desktop fullscreen the desktop's.
@@ -881,7 +883,7 @@ EXTENSIONS = {
                                     "draft patch.",
                           "validation": "Exact decimal integers within renderer bounds; intermediate size tuples remain drafts and "
                                         "cannot Apply until the complete display request validates.",
-                          "availability": "Window size is editable in a windowed draft. Custom fullscreen size, Display Resolution "
+                          "availability": "Window size is editable in a windowed, bordered draft. Custom fullscreen size, Display Resolution "
                                           "and Refresh Rate are editable with Exclusive policy.",
                           "lists": "Display Resolution and Refresh Rate pick a slot of the published mode and refresh lists with the "
                                    "list token (display.mode, display.refresh)."},
