@@ -12,6 +12,39 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## One Shadows setting with six levels, and Custom settings you can undo, 27 November 2026
+
+- **Settings > Display > Effects has one Shadows list:** Off, Original,
+  Soft (Low), Soft (Medium), Soft (High) and Soft (Ultra). It replaces the
+  Enable Shadows and Shadow Maps switches. Until now the soft shadow maps
+  were one switch, and their quality could only be changed by picking a
+  whole preset or from the console. Each level is the shadow recipe of a
+  preset: Original is what Performance and Balanced draw, Soft (Low) is
+  Enhanced, Medium is Quality, High is Ultra and Ultra is Maximum. The
+  classic interface keeps its Enable Shadows row.
+- **A setting you change away from its preset is marked, and one click puts
+  it back.** Performance Preset reads Custom once you change anything it
+  fills, and each changed setting shows a small orange return arrow before
+  its name. Select the arrow to return that setting to the preset's value,
+  or the arrow beside Performance Preset to return them all. Frame Rate Cap
+  never counts, because Auto-Detect matches it to your display.
+- **Presets are unchanged.** Every preset sets exactly what it set before,
+  so the System Check does not come up again for this update and nothing
+  needs choosing again.
+- Turning soft shadows on from the menu no longer keeps a low preset's limit
+  on shadow updates, which could leave moving shadows a frame or more
+  behind.
+- Evidence: the preset model test (551,767 checks) pins the preset system
+  version unchanged and covers the shadow ladder. The SYSTEM page runtime
+  test (520,030 checks, twelve languages) reads every level, follows a
+  changed row to its mark, resolves the mark to the preset's values and
+  shows Custom. The page source test evaluates all nine presets: none is
+  marked as written, and every mark returns exactly what the preset wrote.
+  In a hidden-window OpenGL client on a detected Enhanced, the list opened
+  with six levels, Soft (Medium) marked the row and Performance Preset read
+  Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
+  shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
+  measured: no preset's values changed.
 ## Sharper sunlight shadows close to you, and a shadow-map tidy-up on both renderers, 27 November 2026
 
 - **Sunlight shadows near the player are finer on Quality and Ultra.** A

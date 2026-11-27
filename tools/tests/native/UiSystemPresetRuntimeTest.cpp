@@ -22,7 +22,9 @@ static std::string Read(const std::string& p){std::ifstream f(p,std::ios::binary
 struct TestHost final:Host,SettingsHost {
  StateValues live;std::map<std::string,std::string> strings;unsigned writes=0,observations=0,errors=0,draws=0;std::uint64_t frame=0;float expansion=1;bool writable=false;
  bool ReadFile(const std::string&,std::string&)override{return false;}bool softFocus=false;std::string language="english";
- bool ReadCVar(const std::string& name,size_t type,StateValue& value)override{if(name=="sys_lang"&&type==2){value=language;return true;}if(name!="ui_retainedSoftFocus"||type!=1)return false;value=softFocus;return true;}
+ bool ReadCVar(const std::string& name,size_t type,StateValue& value)override{if(name=="sys_lang"&&type==2){value=language;return true;}
+  // Tooltips (ui_tooltips) stay off: this suite measures the page's rows.
+  if(name=="ui_tooltips"&&type==1){value=false;return true;}if(name!="ui_retainedSoftFocus"||type!=1)return false;value=softFocus;return true;}
  std::string Translate(const std::string& id)override{return strings.contains(id)?strings.at(id):id.starts_with("#str_")?"Localized label":id;}
  void Log(bool bad,const std::string& s)override{if(bad){++errors;std::fprintf(stderr,"Runtime: %s\n",s.c_str());}}
  std::uintptr_t LoadMaterial(const std::string&,int& w,int& h)override{w=h=256;return 1;}
@@ -42,7 +44,13 @@ struct View {
   // The prompt bar's key caps name their keys from the stock code strings.
   if(const auto at=locale.rfind("_openq4.lang");at!=std::string::npos){const auto code=locale.substr(0,at)+"_code.lang";if(std::ifstream(code))host.Locale(code);}host.expansion=expansion;Json::Value doc;Json::CharReaderBuilder b;auto reader=std::unique_ptr<Json::CharReader>(b.newCharReader());Check(reader->parse(s.data()+s.find('{'),s.data()+s.size(),&doc,&error),error.c_str());
   for(auto& k:doc["state"].getMemberNames())if(k.starts_with("settings.draft.")){auto d=doc["state"][k];StateValue v;auto type=d["type"].asString();if(type=="number")v=d["initial"].asDouble();else if(type=="boolean")v=d["initial"].asBool();else v=d["initial"].asString();host.live.emplace(k.substr(15),v);}
-  Check(host.live.size()==79,"full authored 79-key typed catalog");host.live["com_performancePreset"]=std::string("balanced");host.live["r_brightness"]=1.375;host.live["r_forceAmbient"]=.1375;host.live["r_renderer"]=std::string("best");Check(tx.Begin(Owner).code==SettingsCode::Ok,"begin real transaction");
+  Check(host.live.size()==79,"full authored 79-key typed catalog");host.live["com_performancePreset"]=std::string("balanced");
+  // The host starts on Balanced as the preset wrote it, so no row has left its
+  // preset and none shows a reset mark (Marks checks them).
+  {PerformancePresetAssignments written;Check(ExpandPerformancePreset(*FindPerformancePreset("balanced"),written,error),"Balanced expands");
+   for(const auto& x:written){auto& v=host.live.at(x.key);if(const auto* text=std::get_if<std::string>(&x.value))v=*text;
+    else if(std::holds_alternative<bool>(v))v=std::get<int>(x.value)!=0;else v=double(std::get<int>(x.value));}}
+  host.live["r_brightness"]=1.375;host.live["r_forceAmbient"]=.1375;host.live["r_renderer"]=std::string("best");Check(tx.Begin(Owner).code==SettingsCode::Ok,"begin real transaction");
   std::vector<Diagnostic> ds;bool loaded=runtime.LoadDocument(s,"guis/menu/settings/system.rui",ds);for(auto& d:ds)std::fprintf(stderr,"%s: %s\n",d.pointer.c_str(),d.message.c_str());Check(loaded,"actual SYSTEM compiles and loads");viewport.width=width;viewport.height=height;viewport.displayScale=density;
   // As the engine adapter lays the page out (UserInterfaceRetained): its 720 dp
   // canvas spans the view's height, at least 960 dp wide, whatever the density.
@@ -87,8 +95,8 @@ static const PageTab PageTabs[]={
   "settings_framecap","settings_window_width","settings_window_height"}},
  {"image",{"settings_brightness","settings_brightness_number","settings_resolution_scale","settings_msaa","settings_postaa","settings_anisotropy","settings_specular",
   "settings_bump","settings_sky","settings_ambient_enabled","settings_ambient","settings_ambient_number"}},
- // Shadow Maps and Character Self-Shadows wait for Enable Shadows, which the
- // host starts off (Tabs checks them).
+ // Character Self-Shadows waits for a shadow-map level of Shadows; the host
+ // starts on Balanced's stencil shadows (Tabs checks it).
  {"effects",{"settings_shadows","settings_irradiance","settings_lightgrid_preload","settings_bloom","settings_ssao","settings_tonemap","settings_motionblur",
   "settings_depthoffield","settings_crt"}}};
 static std::string PageDisplay(View& v,const PageTab& tab){auto shown=v.runtime.PresentedValue(("settings-page-"+std::string(tab.id)).c_str(),"display");Check(shown.has_value(),tab.id);return shown->text;}
@@ -137,20 +145,67 @@ static void Tabs(View& v){
  Check(leaving&&arriving&&leaving->data[0]<1&&arriving->data[0]<1&&!v.runtime.CanActivateControl("settings_preset",v.time),"mid-fade the leaving page fades out and no longer acts");
  for(int i=0;i<10;++i)v.Frame();
  Check(PageDisplay(v,PageTabs[0])=="none"&&PageDisplay(v,PageTabs[2])=="block"&&v.runtime.PresentedValue("settings-page-image","opacity")->data[0]==1,"after 150 ms only the new page shows");
- // Shadow Maps sits under Enable Shadows and acts only while shadows are on;
- // Character Self-Shadows (#238) follows it and acts only while shadow maps
- // are on as well. The order above walks EFFECTS with shadows off.
+ // Shadows is one choice over the presets' shadow ladder. Character
+ // Self-Shadows (#238) follows it and acts only at a shadow-map level. The
+ // order above walks EFFECTS on Balanced's stencil shadows.
  v.runtime.SetReducedMotion(true,v.time);
- auto shadows=[&](bool on,bool maps){Check(v.runtime.SetState({{"settings.draft.r_shadows",on},{"settings.draft.r_useShadowMap",maps}},v.error,v.time),v.error.c_str());v.Frame();
-  Check(v.Focus("settings_shadows"),"Enable Shadows focuses");v.Key(MenuInput::Next);v.Frame();};
- shadows(true,false);Check(v.runtime.FocusedControl()=="settings_shadowmaps","with shadows on Next reaches Shadow Maps");
+ const auto level=[&](int index){const ShadowQuality& l=ShadowQualities()[index];
+  Check(v.runtime.SetState({{"settings.draft.r_shadows",l.shadows!=0},{"settings.draft.r_useShadowMap",l.useShadowMap!=0},
+   {"settings.draft.r_shadowMapPointLights",l.pointLights!=0},{"settings.draft.r_shadowMapSize",double(l.size)},
+   {"settings.draft.r_shadowMapPointSize",double(l.pointSize)},{"settings.draft.r_shadowMapFilterTaps",double(l.filterTaps)},
+   {"settings.draft.r_shadowMapPointFilterTaps",double(l.pointFilterTaps)},{"settings.draft.r_shadowMapFilterMode",double(l.filterMode)},
+   {"settings.draft.r_shadowMapPointFilterMode",double(l.pointFilterMode)},{"settings.draft.r_shadowMapAtlasSize",double(l.atlasSize)},
+   {"settings.draft.r_shadowMapCSM",l.csm!=0},{"settings.draft.r_shadowMapProjectedCSM",l.projectedCSM!=0}},v.error,v.time),v.error.c_str());v.Frame();
+  const auto shown=v.runtime.GetWidgetState("settings_shadows");
+  Check(shown&&std::get<double>(shown->accepted)==index,"Shadows reads the level the draft holds");
+  Check(v.Focus("settings_shadows"),"Shadows focuses");v.Key(MenuInput::Next);v.Frame();};
+ const auto mark=[&](const char* id){const auto shown=v.runtime.PresentedValue(id,"display");Check(shown.has_value(),id);return shown->text=="block";};
+ level(ShadowQualityOriginal);Check(!mark("settings_shadows_reset")&&v.runtime.FocusedControl()=="settings_irradiance"&&
+  !v.runtime.FocusControl("settings_character_self_shadow",v.time)&&!v.runtime.FocusControl("settings_shadows_reset",v.time),
+  "on the preset's stencil shadows Next passes the hidden mark and Character Self-Shadows");
+ for(const int maps:{ShadowQualityLow,ShadowQualityMedium,ShadowQualityHigh,ShadowQualityUltra}){
+  // A level the preset does not name marks the row: its mark follows it.
+  level(maps);Check(mark("settings_shadows_reset")&&v.runtime.FocusedControl()=="settings_shadows_reset","a changed Shadows row is followed by its reset mark");
+  v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_character_self_shadow","at a shadow-map level Next reaches Character Self-Shadows");
+  v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_irradiance","Character Self-Shadows comes before Irradiance Volumes");}
+ level(ShadowQualityOff);Check(mark("settings_shadows_reset")&&v.runtime.FocusedControl()=="settings_shadows_reset","Off on a preset with shadows is marked too");
  v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_irradiance"&&!v.runtime.FocusControl("settings_character_self_shadow",v.time),
   "without shadow maps Character Self-Shadows is skipped and takes no focus");
- shadows(true,true);Check(v.runtime.FocusedControl()=="settings_shadowmaps","Shadow Maps still follows Enable Shadows");
- v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_character_self_shadow","with shadow maps on Next reaches Character Self-Shadows");
- v.Key(MenuInput::Next);v.Frame();Check(v.runtime.FocusedControl()=="settings_irradiance","Character Self-Shadows comes before Irradiance Volumes");
- shadows(false,true);Check(v.runtime.FocusedControl()=="settings_irradiance"&&!v.runtime.FocusControl("settings_shadowmaps",v.time)&&
-  !v.runtime.FocusControl("settings_character_self_shadow",v.time),"with shadows off both are skipped and take no focus");
+ // A shadow-map mix no level names reads Custom, the entry that cannot be chosen.
+ level(ShadowQualityMedium);Check(v.runtime.SetState({{"settings.draft.r_shadowMapSize",1024.0}},v.error,v.time),v.error.c_str());v.Frame();
+ Check(std::get<double>(v.runtime.GetWidgetState("settings_shadows")->accepted)==6,"a custom shadow mix reads Custom");
+ // The mark runs its row's reset, which returns what Balanced wrote; Right goes back to the row.
+ Check(v.runtime.FocusControl("settings_shadows_reset",v.time),"the mark takes the focus");v.runtime.TakeActions();
+ v.Key(MenuInput::Right);v.Frame();Check(v.runtime.FocusedControl()=="settings_shadows","Right returns from the mark to its row");
+ Check(v.runtime.FocusControl("settings_shadows_reset",v.time),"the mark takes the focus again");v.Key(MenuInput::Accept);
+ {auto acts=v.runtime.TakeActions();Check(acts.size()==1&&acts[0].event=="reset.settings_shadows"&&acts[0].action.empty()&&!acts[0].proposal,"the mark runs its row's reset");
+  const auto effects=v.Event("reset.settings_shadows");Check(effects.actions.size()==1&&v.runtime.FocusedControl()=="settings_shadows","the reset is one edit and hands the focus back to the row");
+  const ActionInvocation& call=effects.actions[0];
+  const ShadowQuality& balanced=ShadowQualities()[ShadowQualityOriginal];
+  Check(call.operation=="settings.system.edit"&&call.arguments.size()==13&&call.arguments.at("r_shadows")==StateValue(true)&&
+   call.arguments.at("r_useShadowMap")==StateValue(false)&&call.arguments.at("r_shadowMapSize")==StateValue(double(balanced.size))&&
+   call.arguments.at("r_shadowMapAtlasSize")==StateValue(double(balanced.atlasSize))&&
+   call.arguments.at("r_shadowMapMaxUpdatesPerView")==StateValue(0.0),"the reset writes Balanced's whole shadow recipe");
+  Check(v.runtime.SetState({{"settings.draft.r_shadows",true},{"settings.draft.r_useShadowMap",false}},v.error,v.time),v.error.c_str());v.Frame();
+  Check(!mark("settings_shadows_reset")&&v.runtime.FocusedControl()=="settings_shadows","once reset the mark goes and the row keeps the focus");
+  // A mark that is not shown runs nothing.
+  Check(v.Event("reset.settings_shadows").actions.empty(),"a row on its preset has nothing to reset");}
+ // The preset reads Custom while any row has left it, and its own mark returns them all.
+ Check(v.runtime.SetState({{"settings.draft.r_bloom",true},{"settings.draft.r_multiSamples",8.0}},v.error,v.time),v.error.c_str());v.Frame();
+ Check(mark("settings_bloom_reset")&&mark("settings_msaa_reset")&&mark("settings_preset_reset")&&!mark("settings_ssao_reset")&&
+  std::get<std::string>(v.Widget().accepted)=="custom"&&v.Alias("draftPreset")=="balanced","changed rows mark themselves and the preset reads Custom over Balanced");
+ // The frame cap is the display's: Auto-Detect's refresh rate is no change.
+ Check(v.Focus("settings_preset"),"the preset focuses");v.Key(MenuInput::Next);v.Frame();
+ Check(v.runtime.FocusedControl()=="settings_preset_reset","the preset's mark follows it");v.Key(MenuInput::Accept);
+ {auto acts=v.runtime.TakeActions();Check(acts.size()==1&&acts[0].event=="reset.settings_preset","the preset's mark runs the reset of every row");
+  const auto effects=v.Event("reset.settings_preset");Check(effects.actions.size()==1&&v.runtime.FocusedControl()=="settings_preset","the preset's reset hands the focus back too");
+  const ActionInvocation& call=effects.actions[0];
+  Check(call.operation=="settings.system.edit"&&call.arguments.at("r_bloom")==StateValue(false)&&call.arguments.at("r_multiSamples")==StateValue(2.0)&&
+   !call.arguments.contains("com_maxfps")&&!call.arguments.contains("com_performancePreset"),"it returns Balanced's values and leaves the frame cap");}
+ Check(v.runtime.SetState({{"settings.draft.r_bloom",false},{"settings.draft.r_multiSamples",2.0},{"settings.draft.com_maxfps",165.0}},v.error,v.time),v.error.c_str());v.Frame();
+ Check(!mark("settings_preset_reset")&&std::get<std::string>(v.Widget().accepted)=="balanced","a display's frame cap alone leaves the preset its name");
+ Check(v.runtime.SetState({{"settings.draft.com_maxfps",120.0}},v.error,v.time),v.error.c_str());v.Frame();
+ v.Show("settings_shadows");
  v.Event("tab_graphics");v.Frame();
  Check(v.Tab()==0&&!v.runtime.CanActivateControl("settings_shadows",v.time)&&v.runtime.CanActivateControl("settings_preset",v.time),"the tab switches at once");
  for(int i=0;i<5;++i)v.Frame();Check(PageDisplay(v,PageTabs[3])=="none","reduced motion bounds the fade to 80 ms");

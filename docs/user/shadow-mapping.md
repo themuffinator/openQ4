@@ -19,9 +19,24 @@ Choose a preset on **Settings → Display → Graphics → Performance Preset** 
 
 **New in 0.15.0:** in 0.14.1 only Maximum used cascades, so on Quality and Ultra the shadows of characters and nearby objects outdoors were blocky or missing.
 
-The change applies at once; you don't need to restart the renderer. **Settings → Display → Effects → Enable Shadows** (**Image Quality** in 0.14.1) turns all shadows off or on, whichever kind the preset uses.
+The change applies at once; you don't need to restart the renderer.
 
-To use shadow maps with any other preset, turn on **Settings → Display → Effects → Shadow Maps** under Enable Shadows and press **Apply Changes** (not in 0.14.1), or open the console and enter:
+**After 0.15.0:** to pick shadows yourself on any preset, open **Settings → Display → Effects → Shadows**, choose a level and press **Apply Changes**. The list holds the same six levels the presets use:
+
+| Shadows | Same as preset | Settings |
+|---|---|---|
+| Off | Minimum, Low Power, Low | `r_shadows 0` |
+| Original | Performance, Balanced | `r_shadows 1`, `r_useShadowMap 0` |
+| Soft (Low) | Enhanced | 1024 maps for spotlights and sunlight with a simple soft edge; point lights keep the original shadows (`r_shadowMapPointLights 0`) |
+| Soft (Medium) | Quality | Every light: 2048 maps with 9-sample contact-hardening edges, 512 point-light maps, cascaded sunlight |
+| Soft (High) | Ultra | 4096 maps with 13-sample edges in an 8192 atlas |
+| Soft (Ultra) | Maximum | 1024 point-light maps with 13-sample edges, cascades for spotlights too, a 16384 atlas |
+
+A level sets every shadow setting in its row at once, and the row shows a return arrow when it differs from your preset; see [Custom settings](display-settings.md#custom-settings). The list reads **Custom** when the console variables below have been set to a mix no level uses.
+
+In 0.15.0 and the classic menus, **Settings → Display → Effects → Enable Shadows** (**Image Quality** in 0.14.1) turns all shadows off or on, whichever kind the preset uses, and **Shadow Maps** under it switches shadow maps on with whatever quality the last preset left (not in 0.14.1).
+
+From the console, on any version:
 
 ```cfg
 seta r_shadows 1

@@ -7,9 +7,21 @@ display sizing), IMAGE QUALITY (resolution, anti-aliasing and filtering |
 rendering) and EFFECTS (lighting | post-processing). Both anti-aliasing rows
 stand on IMAGE QUALITY, and the four settings the performance presets set
 that players most often change by hand have rows of their own: Frame Rate
-Cap, Anisotropic Filtering, Shadow Maps and Motion Blur (the settings tree
+Cap, Anisotropic Filtering, Shadows and Motion Blur (the settings tree
 audit of 20 November 2026). They edit catalog settings the presets already
 fill, so the settings catalog is unchanged.
+
+Shadows is one choice over the presets' shadow ladder (ShadowQuality in
+src/framework/PerformancePreset.h): Off, Original and four shadow-map levels,
+each a whole recipe of the shadow settings a preset writes, so a preset and
+the row name the same six levels; a mix no level names reads Custom.
+
+A row that no longer holds its preset's value shows a reset mark before its
+label, a small button that returns that row to the preset, and Performance
+Preset then reads Custom with a mark that returns every row. The preset's
+values come from the tables in src/framework/PerformancePreset.cpp, read here
+when the page is generated. Frame Rate Cap is the display's, not a quality
+level (Auto-Detect sets it to the refresh rate), so it never counts.
 
 Unlike the other settings pages, nothing here applies at once. Every row edits
 the settings service's draft (settings.system.edit and its kin, the service's
@@ -33,6 +45,8 @@ use."""
 from __future__ import annotations
 
 import math
+import re
+from pathlib import Path
 
 from build_retained_screens import (OLIVE, ORANGE, U, VALUE, Document, absolute, colour, fixed_text, group, keyword, label, length,
                                     number, path, rgb, solid, stroke, text_width, typeface, vector)
@@ -92,7 +106,47 @@ EDITS = ("com_performancePreset", "r_bloom", "r_borderless", "r_brightness", "r_
          "s_maxSoundsPerShader", "s_numberOfSpeakers", "s_useEAXReverb", "ui_retainedScale", "ui_retainedTextScale",
          "r_shadowMapCharacterSelfShadow", "r_depthOfField")
 RENDER_SLOTS = 32                         # the renderer device list (RenderingSettings)
-PROFILES = ("minimum", "lowpower", "low", "performance", "balanced", "enhanced", "quality", "ultra", "maximum")   # PerformancePreset.cpp
+
+
+def preset_tables() -> tuple[list, dict]:
+    """The shadow ladder and the presets as src/framework/PerformancePreset.cpp
+    holds them: each level and preset its fields by name."""
+    framework = Path(__file__).resolve().parents[2] / "src" / "framework"
+    header = (framework / "PerformancePreset.h").read_text(encoding="utf-8")
+    source = re.sub(r"//[^\n]*", "", (framework / "PerformancePreset.cpp").read_text(encoding="utf-8"))
+    names = re.search(r"enum ShadowQualityLevel : int \{(.*?)\};", header, re.S).group(1)
+    levels = {name.strip(): index for index, name in enumerate(names.split(","))}
+
+    def table(struct: str, array: str) -> list:
+        fields = re.findall(r"^\s*(?:const char \*|int )(\w+);", re.search(r"struct %s \{(.*?)\n\};" % struct, header, re.S).group(1), re.M)
+        body = re.search(r"static const std::array<%s,\w+> %s\{\{(.*?)\n\}\};" % (struct, array), source, re.S).group(1)
+        rows = []
+        for row in re.findall(r"\{([^{}]*)\}", body):
+            values = [value.strip() for value in row.split(",")]
+            if len(values) != len(fields):
+                raise SystemExit(f"PerformancePreset.cpp: {values[0]} has {len(values)} values for {len(fields)} fields of {struct}")
+            rows.append({field: value[1:-1] if value.startswith('"') else levels[value] if value in levels else int(value)
+                         for field, value in zip(fields, values)})
+        return rows
+    ladder = table("ShadowQuality", "ShadowLevels")
+    presets = {row["name"]: row for row in table("PerformancePreset", "Presets")}
+    if len(ladder) != len(levels) or [row["name"] for row in ladder] != ["off", "original", "low", "medium", "high", "ultra"]:
+        raise SystemExit("PerformancePreset.cpp: the shadow ladder is not off, original, low, medium, high, ultra")
+    return ladder, presets
+
+
+SHADOW_LEVELS, PRESETS = preset_tables()
+PROFILES = tuple(PRESETS)
+if PROFILES != ("minimum", "lowpower", "low", "performance", "balanced", "enhanced", "quality", "ultra", "maximum"):
+    raise SystemExit(f"PerformancePreset.cpp: the page's preset list (#str_229977) does not name {PROFILES}")
+DEFAULT_PROFILE = "balanced"              # PerformancePresetDefaultName
+# The settings a shadow level writes: each its ShadowQuality field.
+SHADOW_SETTINGS = (("r_shadows", "shadows"), ("r_useShadowMap", "useShadowMap"), ("r_shadowMapPointLights", "pointLights"),
+                   ("r_shadowMapSize", "size"), ("r_shadowMapPointSize", "pointSize"), ("r_shadowMapFilterTaps", "filterTaps"),
+                   ("r_shadowMapPointFilterTaps", "pointFilterTaps"), ("r_shadowMapFilterMode", "filterMode"),
+                   ("r_shadowMapPointFilterMode", "pointFilterMode"), ("r_shadowMapAtlasSize", "atlasSize"),
+                   ("r_shadowMapCSM", "csm"), ("r_shadowMapProjectedCSM", "projectedCSM"))
+SHADOW_CUSTOM = len(SHADOW_LEVELS)        # the Shadows row's value for a mix no level names
 # The service's values as presentation variables: each its name and state.
 PRESENTED = (("open", "settings.open"), ("dirty", "settings.dirty"), ("busy", "settings.busy"), ("canApply", "settings.canApply"),
              ("phase", "settings.phase"), ("message", "settings.message"), ("request", "settings.request"),
@@ -163,6 +217,78 @@ EXCLUSIVE_LISTS = op("&&", st("settings.display.available"), no(st("settings.dra
 
 def dim(enabled, low: float = 0.4) -> dict:
     return op("select", enabled, 1, low)
+
+
+def typed(key: str, value):
+    """`value` as the setting's type: the tables hold switches as 0 and 1."""
+    return bool(value) if CATALOG[key][0] == "boolean" else value
+
+
+def by_level(level, key: str, field: str):
+    """The value `key` takes at the shadow level the expression `level` gives."""
+    values = [typed(key, row[field]) for row in SHADOW_LEVELS]
+    result = values[-1]
+    for index in range(len(values) - 2, -1, -1):
+        result = op("select", op("==", level, index), values[index], result)
+    return result
+
+
+def by_preset(values: dict):
+    """One of `values` (a literal for each preset) by the draft's preset; a
+    name the page does not know reads as the default preset."""
+    result = values[DEFAULT_PROFILE]
+    for name in reversed(PROFILES):
+        if values[name] != result or type(values[name]) is not type(result):
+            result = op("select", op("==", st("settings.draft.com_performancePreset"), name), values[name], result)
+    return result
+
+
+def preset_value(key: str, field: str):
+    return by_preset({name: typed(key, PRESETS[name][field]) for name in PROFILES})
+
+
+def shadow_level() -> dict:
+    """The shadow level the draft holds (ShadowQualityFor): Off and Original
+    by their switches alone, a shadow-map level by every value, else Custom."""
+    draft = lambda key: st(f"settings.draft.{key}")
+    maps = SHADOW_CUSTOM
+    for index in range(len(SHADOW_LEVELS) - 1, 1, -1):
+        match = both(*[op("==", draft(key), typed(key, SHADOW_LEVELS[index][field])) for key, field in SHADOW_SETTINGS[2:]])
+        maps = op("select", match, index, maps)
+    return op("select", draft("r_shadows"), op("select", draft("r_useShadowMap"), maps, 1), 0)
+
+
+def shadow_patch(level) -> dict:
+    """A shadow level's whole recipe as one draft patch. A shadow-map budget
+    makes moving shadows stale, so a level chosen here never keeps one, and
+    the cascade settings every preset writes go with it."""
+    return {**{key: by_level(level, key, field) for key, field in SHADOW_SETTINGS},
+            "r_shadowMapMaxUpdatesPerView": 0, "r_shadowMapCascadeCount": 4, "r_shadowMapCascadeStabilize": True}
+
+
+def preset_rows() -> dict:
+    """The rows a preset fills: each whether the draft has left the preset's
+    value, and the patch that returns it."""
+    draft = lambda key: st(f"settings.draft.{key}")
+    rows = {}
+    for ident, key, field in (("settings_msaa", "r_multiSamples", "multiSamples"), ("settings_postaa", "r_postAA", "postAA"),
+                              ("settings_anisotropy", "image_anisotropy", "anisotropy"), ("settings_bloom", "r_bloom", "bloom"),
+                              ("settings_ssao", "r_ssao", "ssao"), ("settings_tonemap", "r_hdrToneMap", "hdrToneMap"),
+                              ("settings_motionblur", "r_motionBlur", "motionBlur"),
+                              ("settings_depthoffield", "r_depthOfField", "depthOfField"), ("settings_crt", "r_crt", "crt"),
+                              ("settings_irradiance", "r_useLightGrid", "useLightGrid")):
+        rows[ident] = (op("!=", draft(key), preset_value(key, field)), {key: preset_value(key, field)})
+    # The presets request the HDR scene target with tone mapping.
+    rows["settings_tonemap"][1]["r_hdrSceneTarget"] = preset_value("r_hdrSceneTarget", "hdrToneMap")
+    # Every preset turns specular, bump maps and the sky back on.
+    for ident, key in (("settings_specular", "r_skipSpecular"), ("settings_bump", "r_skipBump"), ("settings_sky", "r_skipSky")):
+        rows[ident] = (draft(key), {key: False})
+    level = by_preset({name: PRESETS[name]["shadowQuality"] for name in PROFILES})
+    rows["settings_shadows"] = (op("!=", shadow_level(), level), {
+        **{key: by_preset({name: typed(key, SHADOW_LEVELS[PRESETS[name]["shadowQuality"]][field]) for name in PROFILES})
+           for key, field in SHADOW_SETTINGS},
+        "r_shadowMapMaxUpdatesPerView": by_preset({name: PRESETS[name]["shadowMapMaxUpdates"] for name in PROFILES})})
+    return rows
 
 
 def page_state() -> dict:
@@ -240,6 +366,12 @@ def page_actions(doc: Document) -> None:
                                                  "r_ssaoMethod": op("select", op(">", {"input": "value"}, 0),
                                                                     op("-", {"input": "value"}, 1),
                                                                     st("settings.draft.r_ssaoMethod"))}},
+        # Shadows: a level of the presets' shadow ladder, its whole recipe.
+        "edit.shadow-quality": {"input": "number", "operation": "settings.system.edit", "arguments": shadow_patch({"input": "value"})},
+        # A row back to its preset's value, and every row a preset fills.
+        **{f"reset.{ident}": {"operation": "settings.system.edit", "arguments": patch} for ident, (_changed, patch) in preset_rows().items()},
+        "reset.settings_preset": {"operation": "settings.system.edit",
+                                  "arguments": {key: value for _changed, patch in preset_rows().values() for key, value in patch.items()}},
         "applyExit": {"operation": "settings.system.applyExit", "arguments": {}},
         "focusNumberDraft": {"operation": "ui.numberDrafts.focus", "arguments": {}},
         "preset": {"input": "string", "operation": "settings.system.preset", "arguments": {"name": {"input": "value"}}},
@@ -304,6 +436,41 @@ def row(doc: Document, ident: str, label_key: str, kind: str, value_x: float, wi
 
 def choice(doc: Document, ident: str, label_key: str, value_x: float, action: str, value: dict, entries: list, **more) -> dict:
     return row(doc, ident, label_key, "choice", value_x, value=value, action=action, entries=entries, **more)
+
+
+MARKED: list = []                         # the rows that carry a reset mark, for their edges
+
+
+def preset_mark(doc: Document, row_node: dict, changed: dict) -> dict:
+    """A row a preset fills, with its reset mark: while `changed` (the draft
+    no longer holds the preset's value) a return arrow stands in the margin
+    between the focus rail and the label, a small button that runs the row's
+    reset and hands the focus back to the row (the mark goes as it acts).
+    The mark follows its row in the reading order, so Down reaches it (a
+    mark not shown is passed over), and Right returns from it to its row."""
+    ident, row_h = row_node["id"], U * ROW_PITCH
+    button = f"{ident}_reset"
+    whole = [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})]
+    arrow = vector(f"{button}-arrow", {**absolute(left=2, top=(row_h - 12) / 2, width=12, height=12), "opacity": number(0.85),
+                                       "pointer-events": keyword("none")}, [
+        path("head", [(0, 4), (4, 0), (4, 8)], fill=solid(rgb(ORANGE))),
+        path("tail", [(4, 4), (9, 4), (11, 6), (11, 9), (9, 11), (3, 11)], closed=False, stroke=stroke(solid(rgb(ORANGE)), 1.5))])
+    focus = vector(f"{button}-focus", {**absolute(left=0, top=(row_h - 16) / 2, width=16, height=16), "opacity": number(0),
+                                       "pointer-events": keyword("none")},
+                   [path("focus", whole, fill=solid(rgb(ORANGE, 0.18)), stroke=stroke(solid(rgb(ORANGE)), 1))])
+    states = doc.states(button, {state: [(f"{button}-arrow", "opacity", number(ink)), (f"{button}-focus", "opacity", number(ring))]
+                                 for state, ink, ring in (("default", 0.85, 0), ("hover", 1, 0.55), ("focus", 1, 1), ("pressed", 1, 1),
+                                                          ("disabled", 0.85, 0))})
+    mark = group(button, {**absolute(left=6, top=0, width=16, height=row_h), "display": keyword("none"), "opacity": number(1)},
+                 [focus, arrow], control={"role": "button", "label": "#str_233302", "event": f"reset.{ident}", "states": states,
+                                          "navigation": {"left": button, "right": ident}})
+    doc.events[f"reset.{ident}"] = [{"op": "if", "condition": both(EDITABLE, changed),
+                                     "then": [{"op": "action", "action": f"reset.{ident}"}, {"op": "focus", "control": ident}]}]
+    MARKED.append(row_node)
+    doc.bind(f"{button}.display", button, "display", op("select", changed, "block", "none"))
+    gate(doc, button, both(EDITABLE, changed), None)
+    return group(f"{ident}_marked", {"position": keyword("relative"), "display": keyword("block"), "width": length(U * COLUMN_W),
+                                     "height": length(row_h), "flex-shrink": number(0)}, [row_node, mark])
 
 
 def device_list(row_node: dict, entries: list) -> dict:
@@ -582,16 +749,24 @@ def system_document() -> dict:
     labels = ("#str_229976", "#str_229978", "#str_230141", "#str_230142", "#str_230153", "#str_41091", "#str_230015", "#str_230016",
               "#str_229944", "#str_230017", "#str_229912", "#str_229915", "#str_200147", "#str_229909", "#str_229910", "#str_41093",
               "#str_41092", "#str_229946", "#str_229947", "#str_229975", "#str_229948", "#str_229949", "#str_229945", "#str_200148",
-              "#str_200160", "#str_200161", "#str_200162", "#str_223009", "#str_41082", "#str_41088", "#str_41084", "#str_41094",
+              "#str_233300", "#str_200161", "#str_200162", "#str_223009", "#str_41082", "#str_41088", "#str_41084", "#str_41094",
               "#str_223002", "#str_223003", "#str_41090", "#str_41107", "#str_42820", "#str_41103", "#str_232513", "#str_232548",
-              "#str_232550", "#str_232552", "#str_232553", "#str_232914")
+              "#str_232550", "#str_232553", "#str_232914")
     x = value_column(labels)
     draft = lambda key: st(f"settings.draft.{key}")
     edit = lambda key: f"edit.{key}"
 
     # GRAPHICS: the preset and the renderer, and the interface's sizes.
-    preset = choice(doc, "settings_preset", "#str_229976", x, "preset", draft("com_performancePreset"), listed("#str_229977", PROFILES))
+    # A preset some row has left reads Custom (an entry that cannot be chosen:
+    # the draft still names the preset, which the reset marks return to).
+    changed = preset_rows()
+    any_changed = changed["settings_msaa"][0]
+    for ident in list(changed)[1:]:
+        any_changed = op("||", any_changed, changed[ident][0])
+    preset = choice(doc, "settings_preset", "#str_229976", x, "preset", op("select", any_changed, "custom", draft("com_performancePreset")),
+                    listed("#str_229977", PROFILES) + [("#str_233303", "custom", False)])
     gate(doc, "settings_preset", QUIET, None)
+    preset = preset_mark(doc, preset, any_changed)
     autodetect = button_row(doc, "settings_autodetect", "#str_229978", x, None, {"event": "autoDetect"})
     gate(doc, "settings_autodetect", both(QUIET, st("settings.render.autoDetect")))
     backend = choice(doc, "settings_backend", "#str_230141", x, "render.backend", st("settings.render.backend"),
@@ -708,10 +883,10 @@ def system_document() -> dict:
     brightness = slider_pair(doc, "settings_brightness", "#str_200148", x, "r_brightness", 0.5, 2, 0.1, 2)
     toggles = {}
     for ident, key, setting, action in (
-            ("settings_shadows", "#str_200160", "r_shadows", None), ("settings_specular", "#str_200161", "r_skipSpecular", "-enabled"),
+            ("settings_specular", "#str_200161", "r_skipSpecular", "-enabled"),
             ("settings_bump", "#str_200162", "r_skipBump", "-enabled"), ("settings_sky", "#str_223009", "r_skipSky", "-enabled"),
             ("settings_bloom", "#str_41082", "r_bloom", None),
-            ("settings_tonemap", "#str_41084", "r_hdrToneMap", None), ("settings_shadowmaps", "#str_232552", "r_useShadowMap", None),
+            ("settings_tonemap", "#str_41084", "r_hdrToneMap", None),
             ("settings_motionblur", "#str_232553", "r_motionBlur", None),
             # The game's depth of field: the weapon wheel's focus and scripted
             # cinematic focus (r_dof, the capture camera, stays console-only).
@@ -723,6 +898,11 @@ def system_document() -> dict:
     toggles["settings_ssao"] = choice(doc, "settings_ssao", "#str_232633", x, "edit.ambient-occlusion",
                                       op("select", draft("r_ssao"), op("+", op("min", draft("r_ssaoMethod"), 2), 1), 0),
                                       listed("#str_232634", (0, 1, 2, 3)))
+    # Shadows: one choice over the presets' shadow ladder, where Enable Shadows
+    # and Shadow Maps were two switches and the quality only a preset's.
+    levels = listed("#str_233301", tuple(range(SHADOW_CUSTOM + 1)))
+    levels[SHADOW_CUSTOM] = (*levels[SHADOW_CUSTOM], False)
+    toggles["settings_shadows"] = choice(doc, "settings_shadows", "#str_233300", x, "edit.shadow-quality", shadow_level(), levels)
     # #238: animated characters shadow themselves under shadow-mapped lights;
     # it means nothing while shadows or shadow maps are off.
     self_shadow = row(doc, "settings_character_self_shadow", "#str_232513", "toggle", x,
@@ -754,15 +934,19 @@ def system_document() -> dict:
     renderer_status["properties"]["display"] = keyword("none")
     doc.bind("settings_renderer-status.display", "settings_renderer-status", "display", op("select", op(
         "&&", st("settings.renderer.fallback"), op("==", draft("r_renderer"), st("settings.baseline.r_renderer"))), "block", "none"))
-    shadow_maps = both(EDITABLE, draft("r_shadows"))
-    gate(doc, "settings_shadowmaps", shadow_maps, opacity=dim(shadow_maps))
-    self_shadowing = both(shadow_maps, draft("r_useShadowMap"))
+    self_shadowing = both(EDITABLE, draft("r_shadows"), draft("r_useShadowMap"))
     gate(doc, "settings_character_self_shadow", self_shadowing, opacity=dim(self_shadowing))
     for ident in ("settings_brightness", "settings_brightness_number", "settings_shadows", "settings_specular", "settings_bump",
                   "settings_sky", "settings_bloom", "settings_ssao", "settings_tonemap", "settings_postaa", "settings_ambient_enabled",
                   "settings_ambient", "settings_ambient_number", "settings_crt", "settings_irradiance", "settings_anisotropy",
                   "settings_motionblur", "settings_depthoffield"):
         gate(doc, ident, EDITABLE, None if ident.endswith("_number") else 0.4)
+
+    marked = lambda node: preset_mark(doc, node, changed[node["id"]][0])
+    for ident in ("settings_shadows", "settings_specular", "settings_bump", "settings_sky", "settings_bloom", "settings_ssao",
+                  "settings_tonemap", "settings_motionblur", "settings_depthoffield"):
+        toggles[ident] = marked(toggles[ident])
+    msaa, postaa, anisotropy, crt, irradiance = (marked(node) for node in (msaa, postaa, anisotropy, crt, irradiance))
 
     tabs = [
         ("graphics", "#str_41098", [
@@ -775,7 +959,7 @@ def system_document() -> dict:
             [heading("#str_41101"), brightness, scale, msaa, msaa_help, msaa_status, postaa, anisotropy],
             [heading("#str_41102"), toggles["settings_specular"], toggles["settings_bump"], toggles["settings_sky"], ambient_on, ambient]]),
         ("effects", "#str_229963", [
-            [heading("#str_232546"), toggles["settings_shadows"], toggles["settings_shadowmaps"], self_shadow, irradiance, preload,
+            [heading("#str_232546"), toggles["settings_shadows"], self_shadow, irradiance, preload,
              preload_help, preload_status],
             [heading("#str_232547"), toggles["settings_bloom"], toggles["settings_ssao"], toggles["settings_tonemap"],
              toggles["settings_motionblur"], toggles["settings_depthoffield"], crt]]),
@@ -820,6 +1004,11 @@ def system_document() -> dict:
                                "else": [focus("settings_window_mode")]}]}]
     built = settings_subpage(doc, PREFIX, "#str_229900", tabs, activate=activate, overlays=dialogs(doc), back_event="onBack",
                              back_id="settings_back", slots=SLOTS, footer=[footer], body=BODY, first_focus={"screen": screen_first})
+    # A column's outer edge holds the focus on the row as it does on a row
+    # without a mark, whose mark is the last control of its unit.
+    for node in MARKED:
+        node["control"]["navigation"].setdefault("right", node["id"])
+    MARKED.clear()
     return finish(built)
 
 

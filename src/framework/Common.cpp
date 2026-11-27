@@ -4039,8 +4039,25 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 	bool passed = true;
 
 	// Enhanced is the affordable modern-effects tier; lower tiers retain stencil.
+	// Each tier names one level of the shadow ladder (PerformancePreset.h), which
+	// carries every shadow value: none for the three tiers for the documented
+	// minimum hardware and below, Quake 4's stencil shadows for Performance and
+	// Balanced, and one shadow-map level for each of the four modern tiers.
 	const bool shadowMapTier = Common_PerformancePresetIsNamed( preset, "enhanced" ) || Common_PerformancePresetIsNamed( preset, "quality" ) || Common_PerformancePresetIsNamed( preset, "ultra" ) || Common_PerformancePresetIsNamed( preset, "maximum" );
-	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_useShadowMap", preset.useShadowMap, shadowMapTier ? 1 : 0 );
+	const bool shadowlessTier = Common_PerformancePresetIsNamed( preset, "minimum" ) || Common_PerformancePresetIsNamed( preset, "lowpower" )
+		|| Common_PerformancePresetIsNamed( preset, "low" );
+	const int expectedShadowQuality = shadowlessTier ? openq4::ShadowQualityOff
+		: !shadowMapTier ? openq4::ShadowQualityOriginal
+		: Common_PerformancePresetIsNamed( preset, "enhanced" ) ? openq4::ShadowQualityLow
+		: Common_PerformancePresetIsNamed( preset, "quality" ) ? openq4::ShadowQualityMedium
+		: Common_PerformancePresetIsNamed( preset, "ultra" ) ? openq4::ShadowQualityHigh
+		: openq4::ShadowQualityUltra;
+	passed &= Common_PerformancePresetCheckExpectedInt( preset, "shadow level", preset.shadowQuality, expectedShadowQuality );
+	// A shadow-map budget makes moving shadows stale: the tiers that draw
+	// shadow maps leave it unlimited.
+	if ( shadowMapTier ) {
+		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapMaxUpdatesPerView", preset.shadowMapMaxUpdates, 0 );
+	}
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_bloom", preset.bloom, shadowMapTier ? 1 : 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_ssao", preset.ssao, shadowMapTier ? 1 : 0 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_hdrToneMap", preset.hdrToneMap, shadowMapTier ? 1 : 0 );
@@ -4048,16 +4065,9 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 	// The game's depth of field (weapon wheel, scripted cinematics) belongs to
 	// the top half of the ladder, the same tiers as the modern effects.
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_depthOfField", preset.depthOfField, shadowMapTier ? 1 : 0 );
-	// Only Enhanced leaves point lights on stencil shadows; every other shadow-map
-	// tier maps them, and the stencil tiers keep the inert default.
-	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointLights", preset.shadowMapPointLights, Common_PerformancePresetIsNamed( preset, "enhanced" ) ? 0 : 1 );
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_crt", preset.crt, 0 );
-	// The three tiers for the documented minimum hardware and below draw no
-	// shadows and skip the light-grid indirect pass; Performance restores both,
-	// and every tier above it keeps them.
-	const bool shadowlessTier = Common_PerformancePresetIsNamed( preset, "minimum" ) || Common_PerformancePresetIsNamed( preset, "lowpower" )
-		|| Common_PerformancePresetIsNamed( preset, "low" );
-	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadows", preset.shadows, shadowlessTier ? 0 : 1 );
+	// The shadowless tiers also skip the light-grid indirect pass; Performance
+	// restores it, and every tier above it keeps it.
 	passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_useLightGrid", preset.useLightGrid, shadowlessTier ? 0 : 1 );
 
 	if ( shadowlessTier ) {
@@ -4101,10 +4111,6 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_postAA", preset.postAA, 2 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "com_maxfps", preset.maxFps, 144 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 1024 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 512 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterMode", preset.shadowMapFilterMode, 0 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterTaps", preset.shadowMapFilterTaps, 5 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_ssaoSamples", preset.ssaoSamples, 12 );
 		passed &= Common_PerformancePresetCheckRestoredAudio( preset );
 	} else if ( Common_PerformancePresetIsNamed( preset, "quality" ) ) {
@@ -4113,12 +4119,6 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		// FPS-02 Quality holds 100 Hz with every light class shadow-mapped.
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 2 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 2048 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 512 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterMode", preset.shadowMapFilterMode, 2 );
-		// Sunlight and distant sources are cascaded; spotlights keep one map.
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapCSM", preset.shadowMapCSM, 1 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapProjectedCSM", preset.shadowMapProjectedCSM, 0 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_usePrecompressedTextures", preset.usePrecompressedTextures, 1 );
 		passed &= Common_PerformancePresetCheckIntAtLeast( preset, "r_rendererUploadMegs", preset.uploadMegs, 32 );
 		passed &= Common_PerformancePresetCheckRestoredAudio( preset );
@@ -4129,13 +4129,6 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 4 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_postAA", preset.postAA, 3 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 4096 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 512 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterTaps", preset.shadowMapFilterTaps, 13 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterMode", preset.shadowMapFilterMode, 2 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapAtlasSize", preset.shadowMapAtlasSize, 8192 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapCSM", preset.shadowMapCSM, 1 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapProjectedCSM", preset.shadowMapProjectedCSM, 0 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_ssaoSamples", preset.ssaoSamples, 32 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_usePrecompressedTextures", preset.usePrecompressedTextures, 1 );
 		passed &= Common_PerformancePresetCheckIntAtLeast( preset, "r_rendererUploadMegs", preset.uploadMegs, 32 );
@@ -4146,15 +4139,6 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_multiSamples", preset.multiSamples, 8 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "image_anisotropy", preset.anisotropy, 16 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_postAA", preset.postAA, 3 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapSize", preset.shadowMapSize, 4096 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointSize", preset.shadowMapPointSize, 1024 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterTaps", preset.shadowMapFilterTaps, 13 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointFilterTaps", preset.shadowMapPointFilterTaps, 13 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapFilterMode", preset.shadowMapFilterMode, 2 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapPointFilterMode", preset.shadowMapPointFilterMode, 1 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapAtlasSize", preset.shadowMapAtlasSize, 16384 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapCSM", preset.shadowMapCSM, 1 );
-		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_shadowMapProjectedCSM", preset.shadowMapProjectedCSM, 1 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_ssaoSamples", preset.ssaoSamples, 32 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_bloomMipCount", preset.bloomMipCount, 5 );
 		passed &= Common_PerformancePresetCheckExpectedInt( preset, "r_motionBlurSamples", preset.motionBlurSamples, 16 );
@@ -4167,6 +4151,57 @@ static bool Common_ValidatePerformancePresetIntent( const openQ4PerformancePrese
 		passed = false;
 	}
 
+	return passed;
+}
+
+// The shadow ladder: off and original draw no shadow maps, every later level
+// does, no level asks for less than the one before, and each shadow-map level
+// reads back as itself (the menu's Shadows choice shows a level by that match).
+static bool Common_ValidateShadowQualityLadder( void ) {
+	bool passed = true;
+	const auto &levels = openq4::ShadowQualities();
+	for ( int i = 0; i < openq4::ShadowQualityCount; ++i ) {
+		const openq4::ShadowQuality &level = levels[i];
+		const bool valid = level.name != NULL && level.name[0] != '\0'
+			&& level.shadows == ( i == openq4::ShadowQualityOff ? 0 : 1 )
+			&& level.useShadowMap == ( i >= openq4::ShadowQualityLow ? 1 : 0 )
+			&& ( level.pointLights == 0 || level.pointLights == 1 )
+			&& level.size >= 128 && level.size <= 4096
+			&& level.pointSize >= 128 && level.pointSize <= 2048
+			&& ( level.filterTaps == 1 || level.filterTaps == 5 || level.filterTaps == 9 || level.filterTaps == 13 )
+			&& ( level.pointFilterTaps == 1 || level.pointFilterTaps == 5 || level.pointFilterTaps == 9 || level.pointFilterTaps == 13 )
+			&& level.filterMode >= 0 && level.filterMode <= 2
+			&& level.pointFilterMode >= 0 && level.pointFilterMode <= 1
+			&& level.atlasSize >= 2048 && level.atlasSize <= 16384
+			&& ( level.csm == 0 || level.csm == 1 ) && ( level.projectedCSM == 0 || level.projectedCSM == 1 )
+			// a cascaded light takes a 2x2 block of cells: the atlas holds one
+			&& level.atlasSize >= level.size * ( level.csm != 0 ? 2 : 1 );
+		if ( !valid ) {
+			common->Printf( "PerformancePreset self-test failed: shadow level %d has out-of-range values\n", i );
+			passed = false;
+		}
+		if ( openq4::ShadowQualityFor( level ) != i ) {
+			common->Printf( "PerformancePreset self-test failed: shadow level %d reads back as %d\n", i, openq4::ShadowQualityFor( level ) );
+			passed = false;
+		}
+		if ( i >= openq4::ShadowQualityMedium ) {
+			const openq4::ShadowQuality &previous = levels[i - 1];
+			if ( level.size < previous.size || level.pointSize < previous.pointSize || level.filterTaps < previous.filterTaps
+					|| level.pointFilterTaps < previous.pointFilterTaps || level.filterMode < previous.filterMode
+					|| level.pointFilterMode < previous.pointFilterMode || level.atlasSize < previous.atlasSize
+					|| level.pointLights < previous.pointLights || level.csm < previous.csm ) {
+				common->Printf( "PerformancePreset self-test failed: shadow level %s asks for less than %s\n", level.name, previous.name );
+				passed = false;
+			}
+		}
+	}
+	// A mix no level names is custom, never the nearest level.
+	openq4::ShadowQuality mixed = levels[openq4::ShadowQualityMedium];
+	mixed.filterTaps = 13;
+	if ( openq4::ShadowQualityFor( mixed ) != -1 ) {
+		common->Printf( "PerformancePreset self-test failed: a custom shadow mix reads back as a level\n" );
+		passed = false;
+	}
 	return passed;
 }
 
@@ -4204,7 +4239,7 @@ static bool Common_ValidatePerformancePresetProgression( void ) {
 		// Entering the shadow-mapped tiers may trade MSAA for the modern effects
 		// (FPS-02: Enhanced spends its 144 Hz budget on them and keeps SMAA high);
 		// within a renderer class sample counts only rise.
-		if ( previousPreset.useShadowMap == preset.useShadowMap ) {
+		if ( ( previousPreset.shadowQuality >= openq4::ShadowQualityLow ) == ( preset.shadowQuality >= openq4::ShadowQualityLow ) ) {
 			passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_multiSamples", previousPreset.multiSamples, preset.multiSamples );
 		}
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_postAA", previousPreset.postAA, preset.postAA );
@@ -4212,16 +4247,8 @@ static bool Common_ValidatePerformancePresetProgression( void ) {
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "image_anisotropy", previousPreset.anisotropy, preset.anisotropy );
 		passed &= Common_PerformancePresetCheckNonDecreasingBudget( previousPreset, preset, "image_downSizeLimit", previousPreset.downSizeLimit, preset.downSizeLimit );
 		passed &= Common_PerformancePresetCheckNonDecreasingBudget( previousPreset, preset, "s_maxSoundsPerShader", previousPreset.maxSoundsPerShader, preset.maxSoundsPerShader );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadows", previousPreset.shadows, preset.shadows );
+		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "shadow level", previousPreset.shadowQuality, preset.shadowQuality );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_useLightGrid", previousPreset.useLightGrid, preset.useLightGrid );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_useShadowMap", previousPreset.useShadowMap, preset.useShadowMap );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapSize", previousPreset.shadowMapSize, preset.shadowMapSize );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapPointSize", previousPreset.shadowMapPointSize, preset.shadowMapPointSize );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapFilterTaps", previousPreset.shadowMapFilterTaps, preset.shadowMapFilterTaps );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapPointFilterTaps", previousPreset.shadowMapPointFilterTaps, preset.shadowMapPointFilterTaps );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapFilterMode", previousPreset.shadowMapFilterMode, preset.shadowMapFilterMode );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapPointFilterMode", previousPreset.shadowMapPointFilterMode, preset.shadowMapPointFilterMode );
-		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_shadowMapAtlasSize", previousPreset.shadowMapAtlasSize, preset.shadowMapAtlasSize );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_ssaoSamples", previousPreset.ssaoSamples, preset.ssaoSamples );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_bloomMipCount", previousPreset.bloomMipCount, preset.bloomMipCount );
 		passed &= Common_PerformancePresetCheckNonDecreasingInt( previousPreset, preset, "r_motionBlurSamples", previousPreset.motionBlurSamples, preset.motionBlurSamples );
@@ -4259,17 +4286,7 @@ static bool Common_ValidatePerformancePresetDefinition( const openQ4PerformanceP
 		 ( preset.ignoreHighQuality != 0 && preset.ignoreHighQuality != 1 ) ||
 		 preset.usePrecompressedTextures < 0 || preset.usePrecompressedTextures > 2 ||
 		 preset.maxSoundsPerShader < 0 ||
-		 ( preset.useShadowMap != 0 && preset.useShadowMap != 1 ) ||
-		 ( preset.shadows != 0 && preset.shadows != 1 ) ||
-		 preset.shadowMapSize < 128 || preset.shadowMapSize > 4096 ||
-		 preset.shadowMapPointSize < 128 || preset.shadowMapPointSize > 2048 ||
-		 preset.shadowMapFilterTaps < 1 || preset.shadowMapFilterTaps > 13 ||
-		 preset.shadowMapPointFilterTaps < 1 || preset.shadowMapPointFilterTaps > 13 ||
-		 preset.shadowMapFilterMode < 0 || preset.shadowMapFilterMode > 2 ||
-		 preset.shadowMapPointFilterMode < 0 || preset.shadowMapPointFilterMode > 1 ||
-		 preset.shadowMapAtlasSize < 2048 || preset.shadowMapAtlasSize > 16384 ||
-		 preset.shadowMapCSM < 0 || preset.shadowMapCSM > 1 ||
-		 preset.shadowMapProjectedCSM < 0 || preset.shadowMapProjectedCSM > 1 ||
+		 preset.shadowQuality < 0 || preset.shadowQuality >= openq4::ShadowQualityCount ||
 		 preset.ssaoSamples < 4 || preset.ssaoSamples > 32 ||
 		 preset.bloomMipCount < 1 || preset.bloomMipCount > 5 ||
 		 preset.motionBlurSamples < 1 || preset.motionBlurSamples > 16 ||
@@ -4357,12 +4374,14 @@ static bool Common_ValidatePerformancePresetDefinitions( void ) {
 			}
 		}
 	}
+	passed &= Common_ValidateShadowQualityLadder();
 	passed &= Common_ValidatePerformancePresetProgression();
 	return passed;
 }
 
 static bool Common_ValidatePerformancePresetApplied( const openQ4PerformancePreset_t &preset ) {
 	bool passed = true;
+	const openq4::ShadowQuality &shadow = openq4::ShadowQualities()[idMath::ClampInt( 0, openq4::ShadowQualityCount - 1, preset.shadowQuality )];
 	passed &= Common_CheckPerformancePresetString( preset.name, "com_performancePreset", preset.name );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "com_machineSpec", preset.machineSpec );
 	passed &= Common_CheckPerformancePresetString( preset.name, "r_rendererBenchmarkPreset", preset.rendererBenchmarkPreset );
@@ -4380,8 +4399,8 @@ static bool Common_ValidatePerformancePresetApplied( const openQ4PerformancePres
 	passed &= Common_CheckPerformancePresetInt( preset.name, "image_ignoreHighQuality", preset.ignoreHighQuality );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "image_writeGeneratedImages", 1 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "s_maxSoundsPerShader", preset.maxSoundsPerShader );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_useShadowMap", preset.useShadowMap );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapSize", preset.shadowMapSize );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_useShadowMap", shadow.useShadowMap );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapSize", shadow.size );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapMaxUpdatesPerView", preset.shadowMapMaxUpdates );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_bloom", preset.bloom );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_ssao", preset.ssao );
@@ -4394,25 +4413,25 @@ static bool Common_ValidatePerformancePresetApplied( const openQ4PerformancePres
 	passed &= Common_CheckPerformancePresetInt( preset.name, "s_numberOfSpeakers", preset.numberOfSpeakers );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "s_useEAXReverb", preset.useEAXReverb );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "s_maxEmitterChannels", preset.maxEmitterChannels );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointSize", preset.shadowMapPointSize );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapFilterTaps", preset.shadowMapFilterTaps );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointFilterTaps", preset.shadowMapPointFilterTaps );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapFilterMode", preset.shadowMapFilterMode );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointFilterMode", preset.shadowMapPointFilterMode );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapAtlasSize", preset.shadowMapAtlasSize );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointSize", shadow.pointSize );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapFilterTaps", shadow.filterTaps );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointFilterTaps", shadow.pointFilterTaps );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapFilterMode", shadow.filterMode );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointFilterMode", shadow.pointFilterMode );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapAtlasSize", shadow.atlasSize );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_ssaoSamples", preset.ssaoSamples );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_bloomMipCount", preset.bloomMipCount );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_motionBlurSamples", preset.motionBlurSamples );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointLights", preset.shadowMapPointLights );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapPointLights", shadow.pointLights );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_hdrSceneTarget", preset.hdrToneMap );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadows", preset.shadows );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadows", shadow.shadows );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_skipBump", 0 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_skipSpecular", 0 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_skipSky", 0 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "image_picmip", 0 );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapCSM", preset.shadowMapCSM );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapCSM", shadow.csm );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapCascadeCount", 4 );
-	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapProjectedCSM", preset.shadowMapProjectedCSM );
+	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapProjectedCSM", shadow.projectedCSM );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapCascadeStabilize", 1 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_motionBlurObjectVectors", 1 );
 	passed &= Common_CheckPerformancePresetInt( preset.name, "r_shadowMapHashedAlpha", 1 );

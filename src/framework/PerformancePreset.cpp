@@ -5,6 +5,42 @@
 
 namespace openq4 {
 namespace {
+// The shadow ladder (PerformancePreset.h). Columns: r_shadows, r_useShadowMap,
+// r_shadowMapPointLights, r_shadowMapSize, r_shadowMapPointSize,
+// r_shadowMapFilterTaps, r_shadowMapPointFilterTaps, r_shadowMapFilterMode,
+// r_shadowMapPointFilterMode, r_shadowMapAtlasSize, r_shadowMapCSM,
+// r_shadowMapProjectedCSM.
+//
+// low leaves point lights on the stencil shadows retail used: their cube maps
+// were the largest cost of a shadow-mapped frame, and 1024 maps for projected
+// and parallel lights cost nothing over stencil (performance-report.md 11.2).
+// medium and high cascade sunlight and distant sources only (spotlights keep
+// one map): Quake 4 lights outdoor areas with a few huge lights, whose single
+// map is ~25 world units a texel at the player and loses most near shadows.
+// Point cubes stay at 512 below ultra (larger cubes cost more than every other
+// upgrade together) and are 1024 there, not 2048: a 2048 cube is 96 MB, so the
+// default r_shadowMapPointCacheMegs held five and a Vulkan view's pool twelve,
+// and views with a hundred shadowing point lights (mcc_landing) put most of
+// them on stencil shadows (#258).
+static const std::array<ShadowQuality,ShadowQualityCount> ShadowLevels{{
+	{ "off",      0, 0, 1,  512,  512,  1,  1, 0, 0,  2048, 0, 1 },
+	{ "original", 1, 0, 1, 1024,  512,  5,  5, 0, 0,  2048, 0, 1 },
+	{ "low",      1, 1, 0, 1024,  512,  5,  5, 0, 0,  4096, 0, 1 },
+	{ "medium",   1, 1, 1, 2048,  512,  9,  9, 2, 0,  4096, 1, 0 },
+	{ "high",     1, 1, 1, 4096,  512, 13,  9, 2, 0,  8192, 1, 0 },
+	{ "ultra",    1, 1, 1, 4096, 1024, 13, 13, 2, 1, 16384, 1, 1 }
+}};
+// Columns: name, com_machineSpec, r_rendererBenchmarkPreset |
+// r_multiSamples, r_postAA, com_maxfps |
+// image_anisotropy, image_downSizeLimit, image_downSize, image_ignoreHighQuality,
+// image_usePrecompressedTextures, s_maxSoundsPerShader |
+// the shadow level, r_shadowMapMaxUpdatesPerView |
+// r_bloom, r_ssao, r_hdrToneMap, r_motionBlur, r_crt, r_useLightGrid, r_depthOfField |
+// r_ssaoSamples, r_bloomMipCount, r_motionBlurSamples |
+// r_rendererUploadMegs, r_rendererUploadFrameBuffers |
+// s_numberOfSpeakers, s_useEAXReverb, s_maxEmitterChannels.
+// tools/ui/retained_system.py reads both tables from this file for the menu's
+// Custom state: keep one initializer per level and per preset.
 static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 	// The three bottom recipes are for hardware at and below the documented
 	// minimum (4 GiB RAM, a 1 GiB ARB2-class GPU). No preset lowers the render
@@ -19,15 +55,21 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 	{ "minimum", 0, "low",
 		0, 0, 30,
 		1, 512, 1, 1, 1, 1,
-		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
-		0, 1, 24, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1, 0 },
+		ShadowQualityOff, 1,
+		0, 0, 0, 0, 0, 0, 0,
+		4, 1, 4,
+		8, 3,
+		0, 1, 24 },
 	// Low Power is the battery and small-board recipe: Raspberry Pi, low-memory
 	// phones and an explicit power request. No shadows, 30 Hz.
 	{ "lowpower", 0, "low",
 		0, 0, 30,
 		1, 1024, 1, 1, 1, 1,
-		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
-		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1, 0 },
+		ShadowQualityOff, 1,
+		0, 0, 0, 0, 0, 0, 0,
+		4, 1, 4,
+		8, 3,
+		0, 1, 32 },
 	// Low is the documented minimum PC at 60 Hz: Low Power's recipe with 2x
 	// anisotropic filtering. A GPU of the Intel Iris Xe class holds 60 Hz at
 	// 1080p only without the stencil shadows and the light grid: with them that
@@ -37,42 +79,52 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 	{ "low", 0, "low",
 		0, 0, 60,
 		2, 1024, 1, 1, 1, 1,
-		0, 512, 1, 0, 0, 0, 0, 0, 0, 8, 3,
-		0, 1, 32, 512, 1, 1, 0, 0, 2048, 4, 1, 4, 0, 1, 0, 1, 0 },
+		ShadowQualityOff, 1,
+		0, 0, 0, 0, 0, 0, 0,
+		4, 1, 4,
+		8, 3,
+		0, 1, 32 },
 	{ "performance", 1, "baseline",
 		0, 1, 60,
 		2, 0, 0, 0, 1, 0,
-		0, 1024, 2, 0, 0, 0, 0, 0, 1, 16, 4,
-		0, 1, 40, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1, 1, 0 },
+		ShadowQualityOriginal, 2,
+		0, 0, 0, 0, 0, 1, 0,
+		8, 3, 8,
+		16, 4,
+		0, 1, 40 },
 	{ "balanced", 2, "baseline",
 		2, 1, 120,
 		4, 0, 0, 0, 1, 0,
-		0, 1024, 0, 0, 0, 0, 0, 0, 1, 16, 4,
-		0, 1, 48, 512, 5, 5, 0, 0, 2048, 8, 3, 8, 0, 1, 1, 1, 0 },
+		ShadowQualityOriginal, 0,
+		0, 0, 0, 0, 0, 1, 0,
+		8, 3, 8,
+		16, 4,
+		0, 1, 48 },
 	// The three top recipes are built from measured feature costs to hold a
 	// refresh class on the reference machine (RTX 4060 Laptop, 2560x1440, both
 	// backends, every timed scene; docs/dev/performance-report.md section 11):
 	// Enhanced 144 Hz average / 90 Hz 1% low, Quality 100/60, Ultra 75/45.
 	//
-	// Enhanced spends its budget on the modern effects: projected and parallel
-	// lights keep 1024 shadow maps, point lights keep the stencil shadows retail
-	// used (their cube maps were its largest cost), and SMAA high replaces MSAA.
-	// Keep unlimited updates: a low budget can make moving shadows stale.
+	// Enhanced spends its budget on the modern effects, with the low shadow
+	// level and SMAA high in place of MSAA.
 	{ "enhanced", 2, "modern",
 		0, 2, 144,
 		16, 0, 0, 0, 1, 0,
-		1, 1024, 0, 1, 1, 1, 0, 0, 1, 16, 4,
-		0, 1, 48, 512, 5, 5, 0, 0, 4096, 12, 5, 8, 0, 0, 1, 1, 1 },
-	// Quality shadow-maps every light class: 2048 projected maps with PCSS and
-	// 512 point cubes, with 2x MSAA under SMAA high. Sunlight and distant
-	// sources are cascaded (spotlights keep one map): Quake 4 lights outdoor
-	// areas with a few huge lights, whose single map is ~25 world units a
-	// texel at the player and loses most near shadows outdoors.
+		ShadowQualityLow, 0,
+		1, 1, 1, 0, 0, 1, 1,
+		12, 5, 8,
+		16, 4,
+		0, 1, 48 },
+	// Quality shadow-maps every light class (the medium level), with 2x MSAA
+	// under SMAA high.
 	{ "quality", 3, "modern",
 		2, 2, 144,
 		16, 0, 0, 0, 1, 0,
-		1, 2048, 0, 1, 1, 1, 0, 0, 1, 32, 4,
-		0, 1, 48, 512, 9, 9, 2, 0, 4096, 20, 5, 8, 1, 1, 1, 0, 1 },
+		ShadowQualityMedium, 0,
+		1, 1, 1, 0, 0, 1, 1,
+		20, 5, 8,
+		32, 4,
+		0, 1, 48 },
 	// image_usePrecompressedTextures stays at 1 here even though retail's top
 	// machine spec used 0. In openQ4 that cvar also gates user-supplied DDS
 	// replacement packs, so 0 silently discarded a player's high-resolution BC7
@@ -80,31 +132,31 @@ static const std::array<PerformancePreset,PerformancePresetCount> Presets{{
 	// highest preset should do.
 	//
 	// Ultra is the best image that still holds 75 Hz: 4x MSAA under SMAA ultra,
-	// 4096 projected maps with 13-tap PCSS in an 8192 atlas, and 32 SSAO samples.
-	// Point cubes stay at 512 (larger cubes cost more than every other upgrade
-	// together). Sunlight is cascaded as on Quality; spotlight cascades and
-	// motion blur are left to Maximum.
+	// the high shadow level and 32 SSAO samples. Spotlight cascades and motion
+	// blur are left to Maximum.
 	{ "ultra", 3, "high-end",
 		4, 3, 240,
 		16, 0, 0, 0, 1, 0,
-		1, 4096, 0, 1, 1, 1, 0, 0, 1, 32, 4,
-		0, 1, 48, 512, 13, 9, 2, 0, 8192, 32, 5, 8, 1, 1, 1, 0, 1 },
+		ShadowQualityHigh, 0,
+		1, 1, 1, 0, 0, 1, 1,
+		32, 5, 8,
+		32, 4,
+		0, 1, 48 },
 	// Maximum requests every supported quality maximum and carries no frame-rate
 	// target (FPS-02): it is the choice for players who want everything on.
 	// MSAA is 8 samples, the most the Vulkan renderer draws, so Maximum is one
 	// image on both renderers (FPS-05); 16 stays a manual choice for OpenGL.
-	// Point cubes are 1024, not 2048: a 2048 cube is 96 MB, so the default
-	// r_shadowMapPointCacheMegs held five and a Vulkan view's pool twelve, and
-	// views with a hundred shadowing point lights (mcc_landing) put most of
-	// them on stencil shadows (#258).
 	// CRT and exposure/strength
 	// controls are artistic preferences, not quality levels; experimental
 	// rendering modes stay opt-in.
 	{ "maximum", 3, "high-end",
 		8, 3, 240,
 		16, 0, 0, 0, 1, 0,
-		1, 4096, 0, 1, 1, 1, 1, 0, 1, 32, 4,
-		0, 1, 48, 1024, 13, 13, 2, 1, 16384, 32, 5, 16, 1, 1, 1, 1, 1 }
+		ShadowQualityUltra, 0,
+		1, 1, 1, 1, 0, 1, 1,
+		32, 5, 16,
+		32, 4,
+		0, 1, 48 }
 }};
 static const std::array<const char*,PerformancePresetTargetCount> Targets{{
 	"com_performancePreset",
@@ -158,6 +210,19 @@ bool BoundedName(const char* text) noexcept {
  return false;
 }
 }
+const std::array<ShadowQuality,ShadowQualityCount>& ShadowQualities() noexcept{return ShadowLevels;}
+int ShadowQualityFor(const ShadowQuality& values) noexcept{
+ if(!values.shadows)return ShadowQualityOff;
+ if(!values.useShadowMap)return ShadowQualityOriginal;
+ for(int level=ShadowQualityLow;level<ShadowQualityCount;++level){
+  const ShadowQuality& known=ShadowLevels[level];
+  if(values.pointLights==known.pointLights&&values.size==known.size&&values.pointSize==known.pointSize&&
+     values.filterTaps==known.filterTaps&&values.pointFilterTaps==known.pointFilterTaps&&
+     values.filterMode==known.filterMode&&values.pointFilterMode==known.pointFilterMode&&
+     values.atlasSize==known.atlasSize&&values.csm==known.csm&&values.projectedCSM==known.projectedCSM)return level;
+ }
+ return -1;
+}
 const std::array<PerformancePreset,PerformancePresetCount>& PerformancePresets() noexcept{return Presets;}
 const std::array<const char*,PerformancePresetTargetCount>& PerformancePresetTargets() noexcept{return Targets;}
 const PerformancePreset* FindPerformancePreset(std::string_view name) noexcept {
@@ -170,6 +235,8 @@ const PerformancePreset* PerformancePresetForMachineSpec(int machineSpec) noexce
 }
 bool ExpandPerformancePreset(const PerformancePreset& preset,PerformancePresetAssignments& output,std::string& error){
  if(!BoundedName(preset.name)||!BoundedName(preset.rendererBenchmarkPreset)){error="Invalid performance profile name";return false;}
+ if(preset.shadowQuality<0||preset.shadowQuality>=ShadowQualityCount){error="Invalid performance profile shadow level";return false;}
+ const ShadowQuality& shadow=ShadowLevels[preset.shadowQuality];
  try{
   PerformancePresetAssignments candidate{{
   {"com_machineSpec",preset.machineSpec},
@@ -188,8 +255,8 @@ bool ExpandPerformancePreset(const PerformancePreset& preset,PerformancePresetAs
   {"image_ignoreHighQuality",preset.ignoreHighQuality},
   {"image_writeGeneratedImages",1},
   {"s_maxSoundsPerShader",preset.maxSoundsPerShader},
-  {"r_useShadowMap",preset.useShadowMap},
-  {"r_shadowMapSize",preset.shadowMapSize},
+  {"r_useShadowMap",shadow.useShadowMap},
+  {"r_shadowMapSize",shadow.size},
   {"r_shadowMapMaxUpdatesPerView",preset.shadowMapMaxUpdates},
   {"r_bloom",preset.bloom},
   {"r_ssao",preset.ssao},
@@ -202,25 +269,25 @@ bool ExpandPerformancePreset(const PerformancePreset& preset,PerformancePresetAs
   {"s_numberOfSpeakers",preset.numberOfSpeakers},
   {"s_useEAXReverb",preset.useEAXReverb},
   {"s_maxEmitterChannels",preset.maxEmitterChannels},
-  {"r_shadowMapPointSize",preset.shadowMapPointSize},
-  {"r_shadowMapFilterTaps",preset.shadowMapFilterTaps},
-  {"r_shadowMapPointFilterTaps",preset.shadowMapPointFilterTaps},
-  {"r_shadowMapFilterMode",preset.shadowMapFilterMode},
-  {"r_shadowMapPointFilterMode",preset.shadowMapPointFilterMode},
-  {"r_shadowMapAtlasSize",preset.shadowMapAtlasSize},
+  {"r_shadowMapPointSize",shadow.pointSize},
+  {"r_shadowMapFilterTaps",shadow.filterTaps},
+  {"r_shadowMapPointFilterTaps",shadow.pointFilterTaps},
+  {"r_shadowMapFilterMode",shadow.filterMode},
+  {"r_shadowMapPointFilterMode",shadow.pointFilterMode},
+  {"r_shadowMapAtlasSize",shadow.atlasSize},
   {"r_ssaoSamples",preset.ssaoSamples},
   {"r_bloomMipCount",preset.bloomMipCount},
   {"r_motionBlurSamples",preset.motionBlurSamples},
-  {"r_shadowMapPointLights",preset.shadowMapPointLights},
+  {"r_shadowMapPointLights",shadow.pointLights},
   {"r_hdrSceneTarget",preset.hdrToneMap},
-  {"r_shadows",preset.shadows},
+  {"r_shadows",shadow.shadows},
   {"r_skipBump",0},
   {"r_skipSpecular",0},
   {"r_skipSky",0},
   {"image_picmip",0},
-  {"r_shadowMapCSM",preset.shadowMapCSM},
+  {"r_shadowMapCSM",shadow.csm},
   {"r_shadowMapCascadeCount",4},
-  {"r_shadowMapProjectedCSM",preset.shadowMapProjectedCSM},
+  {"r_shadowMapProjectedCSM",shadow.projectedCSM},
   {"r_shadowMapCascadeStabilize",1},
   {"r_motionBlurObjectVectors",1},
   {"r_shadowMapHashedAlpha",1},

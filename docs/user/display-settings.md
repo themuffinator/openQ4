@@ -17,9 +17,11 @@ The Display page has four tabs (in 0.14.1, three: MSAA was on **Screen**, and th
 | **Graphics** | Performance Preset, Auto-Detect, Rendering Backend, Rendering Device, Restart Renderer, UI Scale, Text Size, UI Aspect |
 | **Screen** | Display Device, Expand Across Displays, Window Mode, V-Sync, Frame Rate Cap, window size, Display Resolution, custom fullscreen size, Refresh Rate |
 | **Image Quality** | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering, specular, bump maps, detailed sky, ambient light |
-| **Effects** | Lighting: shadows, Shadow Maps, character self-shadows, Irradiance Volumes, Preload Light Grids. Post-processing: Bloom, Ambient Occlusion, HDR Tonemap, Motion Blur, Depth of Field, CRT Emulation |
+| **Effects** | Lighting: Shadows, character self-shadows, Irradiance Volumes, Preload Light Grids. Post-processing: Bloom, Ambient Occlusion, HDR Tonemap, Motion Blur, Depth of Field, CRT Emulation |
 
 **Frame Rate Cap**, **Anisotropic Filtering**, **Shadow Maps** and **Motion Blur** are not in 0.14.1, where only the presets and the console set them. Choosing a preset still sets all four; change one afterwards and the rest of the preset stays as it was.
+
+**After 0.15.0:** one **Shadows** list replaces the **Enable Shadows** and **Shadow Maps** switches, and a setting you change away from its preset is marked so you can put it back; see [Shadows](#shadows) and [Custom settings](#custom-settings). 0.15.0 and the classic menus keep the switches.
 
 ## Performance presets
 
@@ -51,6 +53,31 @@ What the effects are:
 
 Brightness, exposure, CRT emulation and the experimental rendering modes are separate controls that presets leave alone. Choosing a lower preset restores all of its values, including those for effects you have switched off.
 
+### Shadows
+
+**After 0.15.0.** **Settings → Display → Effects → Shadows** is one list with the same six levels the presets use, so you can pick a preset's shadows by hand without the console:
+
+| Shadows | What you get | Preset that uses it |
+|---|---|---|
+| **Off** | No shadows. The cheapest choice on weak graphics. | Minimum, Low Power, Low |
+| **Original** | Quake 4's own sharp-edged (stencil) shadows on every light. | Performance, Balanced |
+| **Soft (Low)** | Soft shadow maps for spotlights, your flashlight and sunlight. Point lights, which are most of Quake 4's lights, keep the original shadows. Costs about the same as Original. | Enhanced |
+| **Soft (Medium)** | Soft shadow maps on every light, crisp where an object meets the floor and softer further away, with sharp sunlight shadows around you outdoors. | Quality |
+| **Soft (High)** | As Medium, with sharper spotlight and sunlight shadows and smoother edges. | Ultra |
+| **Soft (Ultra)** | Every shadow setting at its highest, including sharper point-light shadows. The most expensive. | Maximum |
+
+The list reads **Custom** when your shadow settings match none of these, which only happens if you set the shadow console variables yourself. Choosing a level replaces them with that level's values. [Shadow mapping](shadow-mapping.md) explains each level's settings.
+
+### Custom settings
+
+**After 0.15.0.** A preset is only a starting point. Change any setting it fills (MSAA, Post AA Mode, Anisotropic Filtering, Shadows, the lighting and post-processing switches, specular, bump maps or the sky) and:
+
+- **Performance Preset** reads **Custom**. openQ4 still remembers the preset you chose.
+- Each setting you changed shows a small orange return arrow before its name. Click it, or move down onto it and press Accept, to put that one setting back to the preset's value.
+- The arrow beside **Performance Preset** puts every changed setting back at once. Choosing a preset from the list does the same and also restores its frame-rate cap.
+
+As with every change on this page, nothing takes effect until you press **Apply Changes**. **Frame Rate Cap** never counts as a change, because Auto-Detect sets it to your display's refresh rate.
+
 ### System check
 
 When an update changes the presets or how openQ4 picks one, the next start shows a **System Check** screen before the main menu. It lists the graphics card, memory, processor and display openQ4 found, and shows the recommended preset next to your current one. You have three choices:
@@ -81,7 +108,7 @@ Choose the preset on **Settings → Display → Graphics** and press **Apply Cha
 - A preset that changes MSAA asks you to keep or revert. When OpenGL draws MSAA into the window itself (the default on macOS, or with `r_glWindowMultisample 1`), an MSAA change restarts the renderer.
 - The sound device restarts when the speaker layout or reverb setting changes. The per-sound sample limit only changes fully when the game next starts; the page tells you when that applies.
 - Anisotropic filtering (which keeps textures sharp at an angle) and MSAA are capped at what your graphics card supports.
-- Presets turn bump maps, specular highlights and the detailed sky back on, clear any `image_picmip` reduction, and every preset from Performance up turns shadows back on. [Texture replacement packs](texture-replacements.md) work at every preset.
+- Presets turn bump maps, specular highlights and the detailed sky back on, clear any `image_picmip` reduction, and set the [Shadows](#shadows) level: every preset from Performance up turns shadows back on. [Texture replacement packs](texture-replacements.md) work at every preset.
 
 **Updating an older configuration.** Select the preset again to adopt its current values; setting `com_performancePreset` on its own does not reapply it. A configuration saved with the earlier everything-on Ultra keeps those settings until you choose again: pick **Maximum** for that look, or **Ultra** for the 75 FPS recipe.
 

@@ -973,3 +973,123 @@ Vulkan depth capture (`feedbackDepthCopy`: the depth leaves its attachment layou
 for a blit) and a 3-5 ms portal-sky view at 1080p. Combat CPU work on a
 decade-old quad-core CPU is not measured here (5-11 ms on the i7-13700H). These
 are tracked under FPS-10 in the roadmap.
+
+## One shadow ladder and a Custom state, 27 November 2026
+
+The user asked whether presets should hard-set shadow mapping, asked for a
+shadow setting with options instead of two switches, and asked that a changed
+setting show as custom with a way back to the preset's value.
+
+### What was hard-set
+
+Every preset was already nothing but CVar assignments, but its shadow recipe
+was thirteen separate fields of the preset record, and the engine self-test
+repeated most of them by preset name. The menu offered only Enable Shadows and
+Shadow Maps: the sizes, filters, atlas and cascades that make Enhanced, Quality,
+Ultra and Maximum different could be reached only by choosing a whole preset
+or from the console. Turning Shadow Maps on by hand on a low tier also kept
+that tier's budget of one or two shadow-map updates a view, which leaves
+moving shadows stale.
+
+### The ladder
+
+`ShadowQuality` (`framework/PerformancePreset`) is one table of six levels, each
+a whole recipe:
+
+| Level | Shadows | Shadow maps | Point lights | Map / cube | Taps | Filter | Atlas | Cascades | Preset |
+|---|---|---|---|---|---|---|---:|---|---|
+| off | no | | | | | | | | Minimum, Low Power, Low |
+| original | stencil | | | | | | | | Performance, Balanced |
+| low | yes | spot and parallel lights | stencil | 1024 / 512 | 5 / 5 | fixed | 4096 | none | Enhanced |
+| medium | yes | every light | mapped | 2048 / 512 | 9 / 9 | PCSS / fixed | 4096 | sunlight | Quality |
+| high | yes | every light | mapped | 4096 / 512 | 13 / 9 | PCSS / fixed | 8192 | sunlight | Ultra |
+| ultra | yes | every light | mapped | 4096 / 1024 | 13 / 13 | PCSS / Poisson | 16384 | sunlight and spotlights | Maximum |
+
+A preset names a level (`PerformancePreset::shadowQuality`) and
+`ExpandPerformancePreset` writes that level's values. Every preset expands to
+exactly the values it did before, so the preset system version stays
+`1.d7f4b595` and nobody is offered the system check for this change.
+`ShadowQualityFor` reads a level back: off and original by their two switches
+alone, a shadow-map level by every value, and -1 for a mix no level names. The
+self-test checks the ladder once (ranges, order, round trip) and each tier's
+level, in place of the per-tier value lists.
+
+### Which tiers shadow-map
+
+Considered and left as measured. Every light is shadow-mapped only on the top
+three tiers (Quality, Ultra, Maximum). Enhanced's low level maps only projected
+and parallel lights; FPS-02 measured that as free over stencil and all-stencil
+as slightly slower on the tier with the least margin (performance-report.md
+11.2 and 11.7), and its budgets are declared against it. With the ladder,
+Enhanced with Quake 4's stencil shadows throughout is one field in the preset
+table and one menu choice for a player.
+
+### The menu
+
+The retained Display page's EFFECTS tab has one **Shadows** list in place of
+Enable Shadows and Shadow Maps: Off, Original, Soft (Low), Soft (Medium),
+Soft (High), Soft (Ultra), and a Custom entry that shows and cannot be chosen.
+Choosing a level drafts its whole recipe with the update budget unlimited
+(`edit.shadow-quality`, a `settings.system.edit`). The settings catalog, the
+effect plan and the journal are unchanged: every key was already a catalog
+field. The classic page keeps its Shadows row.
+
+### Custom
+
+`com_performancePreset` keeps naming the last chosen preset. On the retained
+page, each row a preset fills compares its draft with what that preset writes;
+a row that differs shows a reset mark, a small button before its label that
+drafts the preset's value back (`reset.<row>`). While any row is marked,
+Performance Preset reads Custom, and its own mark resets every row. The
+generator (`tools/ui/retained_system.py`) reads both tables from
+`PerformancePreset.cpp`, so the page cannot drift from the presets:
+`build_retained_screens.py --check` fails when a preset value changes without
+the page. Frame Rate Cap is not compared, because detection sets it to the
+display's refresh rate.
+
+Limits: a device without post AA is given `r_postAA 0` by Auto-Detect, which
+the page shows as a changed Post AA row. The marks compare the rows on the
+page; a preset value with no row (texture sizes, sample counts, sound) can
+differ without a mark. The stock interface has no marks.
+
+### Not changed, and open
+
+- The ladder of nine presets, their other values and the detection rules.
+- FPS-10: Auto-Detect still recommends Balanced for an integrated GPU with
+  8 GB or more at up to 1080p. The one integrated GPU measured (Iris Xe) holds
+  Low's 60 Hz there and not Performance's stencil shadows, so the measured
+  answer for non-Apple integrated graphics above the 720p class is Low; that
+  under-serves strong integrated GPUs, which have no capacity signal. Owner's
+  decision.
+
+### Validation
+
+- `openq4-ui-performance-presets` (551,767 checks) passes with the pinned
+  version unchanged, and a new section covers the ladder: round trip, custom
+  mixes, each tier's level and that a tier writes exactly its level.
+  `ui_performance_presets.py` gains three mutations (a level's recipe, a
+  tier's level, a custom mix read as a level).
+- `openq4-ui-choice-scroll-runtime` covers the preset list's end: End stops on
+  Maximum, revealed whole, short of the Custom entry that cannot be chosen.
+- `openq4-ui-system-presets` (520,030 checks, twelve languages, 40% wider
+  glyphs) drives the real page: the Shadows list reads each level, a changed
+  row is followed by its mark and a hidden mark is passed over, the mark's
+  event resolves to the preset's values and hands the focus back to its
+  row, the preset reads Custom, and a display's frame cap alone does not.
+  Its host now answers `ui_tooltips`, which had failed the suite since the
+  tooltips landed.
+- `ui_system_presets.py` evaluates the page's expressions for all nine
+  presets: nothing is marked on a preset as written, each row alone marks
+  itself and the preset, and each mark returns exactly what the preset wrote.
+- `capture_retained_screens.py --scenario settings-shadows` in a hidden-window
+  OpenGL client (RTX 4060 Laptop, fresh configuration, detected Enhanced):
+  the list shows six levels and a greyed Custom; Soft (Medium) marks the row
+  and Performance Preset reads Custom; Down reaches the mark and Accept
+  returns Soft (Low) with the focus on the row; Soft (High) applied reads
+  back `r_shadowMapSize 4096`, `r_shadowMapAtlasSize 8192`,
+  `r_shadowMapPointLights 1`, `r_shadowMapCSM 1` and an unlimited update
+  budget, with `com_performancePreset` still `enhanced`. Evidence:
+  `.tmp/presets/capture-gl/`.
+- Not run: Vulkan for this page (the page is renderer-independent and the
+  preset values did not change), the stock interface beyond its source
+  contract, and any frame-rate measurement.

@@ -21,6 +21,8 @@ import subprocess
 import time
 from zipfile import BadZipFile, ZipFile
 
+import retained_system
+
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = 'guis/menu/settings/system.rui'
 # Match the retained document loader's source bound, including CRLF checkouts.
@@ -46,7 +48,7 @@ EXTRA_CHANGED = (1,1,1,1,1,85,0)
 # is r_ssao 0, SSAO r_ssao 1 with method 0. The launch seeds the method at 0, so
 # its widget reads the same 0/1 as the r_ssao readback aliases.
 EXTRA_PICKS = {'settings_ssao':(1,0), 'settings_resolution_scale':(4,5)}
-EXTRA_LAUNCH = {'r_ssaoMethod':'0'}
+EXTRA_LAUNCH = {'r_ssaoMethod':'0', 'r_useShadowMap':'0'}
 # A choice row whose value derives from more than one draft.
 EXTRA_VALUES = {'settings_ssao':{'op':'select','args':[{'state':'settings.draft.r_ssao'},
     {'op':'+','args':[{'op':'min','args':[{'state':'settings.draft.r_ssaoMethod'},2]},1]},0]}}
@@ -55,9 +57,15 @@ EXTRA_ACTIONS = {'settings_ssao':{'input':'number','operation':'settings.system.
     'r_ssao':{'op':'>','args':[{'input':'value'},0]},
     'r_ssaoMethod':{'op':'select','args':[{'op':'>','args':[{'input':'value'},0]},
         {'op':'-','args':[{'input':'value'},1]},{'state':'settings.draft.r_ssaoMethod'}]}}}}
+# Shadows is a choice over the presets' shadow ladder (retained_system.py):
+# Off is level 0 and Original, the launch's stencil shadows, level 1, so its
+# widget reads the same 0/1 as the r_shadows readback aliases.
+EXTRA_VALUES['settings_shadows'] = retained_system.shadow_level()
+EXTRA_ACTIONS['settings_shadows'] = {'input':'number','operation':'settings.system.edit',
+    'arguments':retained_system.shadow_patch({'input':'value'})}
 FIELDS += tuple(prefix+row[1] for row in EXTRA_ROWS for prefix in ('draft','baseline'))
 CONTROLS += tuple(row[0] for row in EXTRA_ROWS)
-ROLES = (2,1,3)+tuple(row[3] for row in EXTRA_ROWS)
+ROLES = (2,3,3)+tuple(row[3] for row in EXTRA_ROWS)
 TYPES = tuple(1 if role==1 else 0 for role in ROLES)
 VALUE_INDICES = tuple(range(6,len(FIELDS),2))
 SCREENSHOTS = ('draft', 'applied', 'discard', 'choice', 'reloaded', 'extrasapplied', 'extrasrestored', 'returned', 'reopened')
@@ -227,7 +235,8 @@ def stages() -> list[dict]:
     add('brightness_dirty', tabs.on('settings_brightness') + ['openq4_retainedGui focus "settings_brightness"'] + key('right'),
         baseline=1, dirty=1, live=1, actions=[('edit', 1)], screenshot='draft')
     add('applied', activate('settings_apply'), actions=[('apply', 0)], events=[('apply', 1, 0)], screenshot='applied')
-    add('shadow_dirty', tabs.on('settings_shadows') + activate('settings_shadows'), shadows=0, dirty=1, actions=[('edit', 1)])
+    add('shadow_dirty', tabs.on('settings_shadows') + open_choice('settings_shadows') + key('home') + key('accept'),
+        shadows=0, dirty=1, actions=[('edit', 1)])
     add('discard_dialog', activate('settings_back'), shadows=0, dirty=1, discard=1,
         events=[('onback', 0, 1)], screenshot='discard')
     add('keep_editing', activate('discard_keep_editing'), shadows=0, dirty=1,

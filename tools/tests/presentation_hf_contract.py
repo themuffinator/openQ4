@@ -256,7 +256,8 @@ def check_frame_rate_policy(common: str | None = None) -> None:
     require(load, "return Max( ceilingMsec, common->GetUserCmdMsecFloat() );", f"{context}: uncapped dedicated pacifier at most once per tick")
     presets = read("src/framework/PerformancePreset.cpp")
     caps = {}
-    for name, fps in re.findall(r'\{ "(\w+)", \d+, "[\w-]+",\s*\d+, \d+, \d+, (\d+),', presets):
+    # A preset row: name, machine spec, renderer class, then MSAA, post AA and the cap.
+    for name, fps in re.findall(r'\{ "(\w+)", \d+, "[\w-]+",\s*\d+, \d+, (\d+),', presets):
         caps[name] = int(fps)
     expected = {"minimum": 30, "lowpower": 30, "low": 60, "performance": 60, "balanced": 120, "enhanced": 144, "quality": 144, "ultra": 240, "maximum": 240}
     if caps != expected:

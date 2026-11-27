@@ -8,6 +8,43 @@
 #include "../renderer/RendererHardware.h"
 
 namespace openq4 {
+// One shadow setting for the presets and the settings menu. A level is a whole
+// recipe: every shadow cvar a preset writes takes its value from this table,
+// and the menu's Shadows choice offers the same six levels, so a preset is
+// nothing but the levels a player could pick by hand.
+//   off       no shadows (the three tiers for minimum hardware and below)
+//   original  Quake 4's stencil shadows (Performance, Balanced)
+//   low       shadow maps for spotlights and sunlight; point lights, most of
+//             Quake 4's lights, keep the stencil shadows (Enhanced)
+//   medium    every light shadow-mapped: 2048 maps with PCSS, 512 point cubes,
+//             sunlight cascaded (Quality)
+//   high      4096 maps with 13-tap PCSS in an 8192 atlas (Ultra)
+//   ultra     1024 point cubes, spotlights cascaded too, 16384 atlas (Maximum)
+// The values under off and original only wait for shadow maps to be turned on.
+struct ShadowQuality {
+	const char *name;
+	int shadows;             // r_shadows
+	int useShadowMap;        // r_useShadowMap
+	int pointLights;         // r_shadowMapPointLights
+	int size;                // r_shadowMapSize
+	int pointSize;           // r_shadowMapPointSize
+	int filterTaps;          // r_shadowMapFilterTaps
+	int pointFilterTaps;     // r_shadowMapPointFilterTaps
+	int filterMode;          // r_shadowMapFilterMode
+	int pointFilterMode;     // r_shadowMapPointFilterMode
+	int atlasSize;           // r_shadowMapAtlasSize
+	int csm;                 // r_shadowMapCSM
+	int projectedCSM;        // r_shadowMapProjectedCSM
+};
+inline constexpr int ShadowQualityCount = 6;
+enum ShadowQualityLevel : int { ShadowQualityOff, ShadowQualityOriginal, ShadowQualityLow, ShadowQualityMedium,
+	ShadowQualityHigh, ShadowQualityUltra };
+const std::array<ShadowQuality,ShadowQualityCount>& ShadowQualities() noexcept;
+// The level whose recipe these values are: off and original by their switches
+// alone, a shadow-map level by every value. -1 when they match none (a custom
+// mix), which the menu shows as Custom.
+int ShadowQualityFor(const ShadowQuality& values) noexcept;
+
 struct PerformancePreset {
 	const char *name;
 	int machineSpec;
@@ -23,8 +60,12 @@ struct PerformancePreset {
 	int ignoreHighQuality;
 	int usePrecompressedTextures;
 	int maxSoundsPerShader;
-	int useShadowMap;
-	int shadowMapSize;
+	// A ShadowQualityLevel: the preset's whole shadow recipe.
+	int shadowQuality;
+	// Shadow-map passes a view may render, 0 unlimited. It waits for shadow
+	// maps on the tiers without them; every tier that draws them leaves it
+	// unlimited, because a budget makes moving shadows stale, and so does the
+	// menu when it turns a shadow-map level on.
 	int shadowMapMaxUpdates;
 	int bloom;
 	int ssao;
@@ -32,34 +73,17 @@ struct PerformancePreset {
 	int motionBlur;
 	int crt;
 	int useLightGrid;
+	// 1 lets the game's depth of field draw (the weapon wheel's focus and
+	// map scripts' cinematic focus): Enhanced and up.
+	int depthOfField;
+	int ssaoSamples;
+	int bloomMipCount;
+	int motionBlurSamples;
 	int uploadMegs;
 	int uploadFrameBuffers;
 	int numberOfSpeakers;
 	int useEAXReverb;
 	int maxEmitterChannels;
-	int shadowMapPointSize;
-	int shadowMapFilterTaps;
-	int shadowMapPointFilterTaps;
-	int shadowMapFilterMode;
-	int shadowMapPointFilterMode;
-	int shadowMapAtlasSize;
-	int ssaoSamples;
-	int bloomMipCount;
-	int motionBlurSamples;
-	int shadowMapCSM;
-	// 0 leaves point lights on the stencil shadows retail used; spot and
-	// parallel lights keep their shadow maps (FPS-02 Enhanced).
-	int shadowMapPointLights;
-	// 0 draws no shadows at all: Minimum and Low Power, for hardware below
-	// the documented minimum. Every tier from Low up keeps them.
-	int shadows;
-	// 0 keeps ordinary spotlights on one map while cascades are on, so only
-	// sunlight and distant sources are cascaded (Quality, Ultra); 1 lets
-	// spotlights cascade too (Maximum). Matters only with shadowMapCSM 1.
-	int shadowMapProjectedCSM;
-	// 1 lets the game's depth of field draw (the weapon wheel's focus and
-	// map scripts' cinematic focus): Enhanced and up.
-	int depthOfField;
 };
 inline constexpr const char* PerformancePresetDefaultName = "balanced";
 inline constexpr int PerformancePresetCount = 9;

@@ -216,7 +216,8 @@ static void Detection(){
  for(const auto& preset:PerformancePresets()){
   const std::string name=preset.name;
   const bool shadowless=name=="minimum"||name=="lowpower"||name=="low";
-  Check(preset.shadows==(shadowless?0:1),"only Minimum, Low Power and Low draw no shadows");
+  Check(preset.shadowQuality>=0&&preset.shadowQuality<ShadowQualityCount,"a preset names a shadow level");
+  Check((preset.shadowQuality==ShadowQualityOff)==shadowless&&ShadowQualities()[preset.shadowQuality].shadows==(shadowless?0:1),"only Minimum, Low Power and Low draw no shadows");
   Check(preset.useLightGrid==(shadowless?0:1),"only Minimum, Low Power and Low skip the light grid");
   // Their 30 Hz cap is what stands automatic temporal AA down in the renderer.
   Check((preset.maxFps<=30)==(name=="minimum"||name=="lowpower"),"only Minimum and Low Power cap at 30 Hz");
@@ -396,6 +397,55 @@ static void Generated(){
  SettingsAttempt attempt;Check(tx.PrepareApply(1,0,attempt).code==SettingsCode::Ok,"freeze for device");const int before=called;
  Check(tx.EditGenerated(1,good).code==SettingsCode::Busy&&called==before,"frozen device transaction never observes profile");
 }
+// The shadow ladder the presets and the menu's Shadows choice share: six levels,
+// each a whole recipe, and a preset's shadow values are exactly its level's.
+static void ShadowLadder(){
+ const auto& levels=ShadowQualities();
+ Check(levels.size()==6&&std::string(levels[ShadowQualityOff].name)=="off"&&std::string(levels[ShadowQualityOriginal].name)=="original"&&
+  std::string(levels[ShadowQualityLow].name)=="low"&&std::string(levels[ShadowQualityMedium].name)=="medium"&&
+  std::string(levels[ShadowQualityHigh].name)=="high"&&std::string(levels[ShadowQualityUltra].name)=="ultra","six named shadow levels");
+ for(int i=0;i<ShadowQualityCount;++i){
+  Check(levels[i].shadows==(i==ShadowQualityOff?0:1)&&levels[i].useShadowMap==(i>=ShadowQualityLow?1:0),"a level's switches follow its place");
+  Check(ShadowQualityFor(levels[i])==i,"every level reads back as itself");
+ }
+ // Off and original are their switches alone: the values waiting under them do not matter.
+ ShadowQuality mixed=levels[ShadowQualityUltra];mixed.shadows=0;Check(ShadowQualityFor(mixed)==ShadowQualityOff,"no shadows is off whatever waits beneath");
+ mixed=levels[ShadowQualityUltra];mixed.useShadowMap=0;Check(ShadowQualityFor(mixed)==ShadowQualityOriginal,"stencil shadows are original whatever waits beneath");
+ // A shadow-map mix no level names is custom, never the nearest level.
+ for(int field=0;field<10;++field){
+  mixed=levels[ShadowQualityMedium];
+  int* values[]={&mixed.pointLights,&mixed.size,&mixed.pointSize,&mixed.filterTaps,&mixed.pointFilterTaps,&mixed.filterMode,&mixed.pointFilterMode,&mixed.atlasSize,&mixed.csm,&mixed.projectedCSM};
+  *values[field]=field==0||field>=8?!*values[field]:*values[field]+1;
+  Check(ShadowQualityFor(mixed)==-1,"a changed shadow-map value is a custom mix");
+ }
+ Check(levels[ShadowQualityLow].pointLights==0&&levels[ShadowQualityMedium].pointLights==1,"only the low level leaves point lights on stencil shadows");
+ Check(levels[ShadowQualityMedium].csm==1&&levels[ShadowQualityMedium].projectedCSM==0&&levels[ShadowQualityUltra].projectedCSM==1,"sunlight cascades from medium, spotlights at ultra");
+ const std::pair<const char*,int> tiers[]={{"minimum",ShadowQualityOff},{"lowpower",ShadowQualityOff},{"low",ShadowQualityOff},
+  {"performance",ShadowQualityOriginal},{"balanced",ShadowQualityOriginal},{"enhanced",ShadowQualityLow},{"quality",ShadowQualityMedium},
+  {"ultra",ShadowQualityHigh},{"maximum",ShadowQualityUltra}};
+ int previous=0;
+ for(const auto& [name,level]:tiers){
+  const PerformancePreset* preset=FindPerformancePreset(name);
+  Check(preset&&preset->shadowQuality==level&&level>=previous,"each tier names its shadow level and none steps down");previous=level;
+  if(!preset)continue;
+  PerformancePresetAssignments out;std::string error;Check(ExpandPerformancePreset(*preset,out,error),"tier expands");
+  ShadowQuality written{};
+  for(const auto& assignment:out){
+   const std::string key=assignment.key;const int* number=std::get_if<int>(&assignment.value);if(!number)continue;
+   if(key=="r_shadows")written.shadows=*number;else if(key=="r_useShadowMap")written.useShadowMap=*number;
+   else if(key=="r_shadowMapPointLights")written.pointLights=*number;else if(key=="r_shadowMapSize")written.size=*number;
+   else if(key=="r_shadowMapPointSize")written.pointSize=*number;else if(key=="r_shadowMapFilterTaps")written.filterTaps=*number;
+   else if(key=="r_shadowMapPointFilterTaps")written.pointFilterTaps=*number;else if(key=="r_shadowMapFilterMode")written.filterMode=*number;
+   else if(key=="r_shadowMapPointFilterMode")written.pointFilterMode=*number;else if(key=="r_shadowMapAtlasSize")written.atlasSize=*number;
+   else if(key=="r_shadowMapCSM")written.csm=*number;else if(key=="r_shadowMapProjectedCSM")written.projectedCSM=*number;
+   else if(key=="r_shadowMapMaxUpdatesPerView"&&level>=ShadowQualityLow)Check(*number==0,"a tier with shadow maps never budgets their updates");
+  }
+  Check(ShadowQualityFor(written)==level,"a tier writes exactly its level, so the menu shows that level");
+ }
+ PerformancePreset broken=*FindPerformancePreset("balanced");broken.shadowQuality=ShadowQualityCount;
+ PerformancePresetAssignments untouched;untouched[0].key="sentinel";std::string error;
+ Check(!ExpandPerformancePreset(broken,untouched,error)&&std::string(untouched[0].key)=="sentinel","an unknown shadow level expands nothing");
+}
 // The preset system version (docs/dev/ui/performance-presets.md, "Preset
 // system version"): the revision and an automatic fingerprint of every preset
 // and of detection. The pin below is meant to move: any change to a preset,
@@ -418,4 +468,4 @@ int main(){
  _CrtSetReportMode(_CRT_ASSERT,_CRTDBG_MODE_FILE);_CrtSetReportFile(_CRT_ASSERT,_CRTDBG_FILE_STDERR);
  _CrtSetReportMode(_CRT_ERROR,_CRTDBG_MODE_FILE);_CrtSetReportFile(_CRT_ERROR,_CRTDBG_FILE_STDERR);
 #endif
- AssignmentCapture();Profiles();Detection();DetectionResolution();Generated();SystemVersion();std::printf("performance profiles and generated transaction: %d checks passed\n",checks);}
+ AssignmentCapture();Profiles();ShadowLadder();Detection();DetectionResolution();Generated();SystemVersion();std::printf("performance profiles and generated transaction: %d checks passed\n",checks);}
