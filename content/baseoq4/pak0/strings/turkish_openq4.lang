@@ -2203,4 +2203,12 @@
 	"#str_233510"	"Yüklü VR çalışma zamanı yok"
 	"#str_233511"	"Hiçbir VR başlığı yanıt vermedi"
 	"#str_233512"	"VR başlığı bulundu: kullanmak için bir VR modu seç"
+	"#str_233560"	"Durum Göstergesi"
+	"#str_233561"	"Bileklerde;HUD"
+	"#str_233562"	"Can ve zırh boştaki elin bileğinde, cephane silahlı elin bileğinde ya da tüm HUD gözlerinin önünde."
+	"#str_233563"	"YENİ GÖREV"
+	"#str_233564"	"GÖREV TAMAMLANDI"
+	"#str_233565"	"YENİDEN DOLDUR"
+	"#str_233566"	"CEPHANE YOK"
+	"#str_233567"	"BOSS"
 }

@@ -516,16 +516,22 @@ def check_engine() -> None:
         require(read(module), "\t\tSingleView( hud, &eyeView, RF_NO_GUI | RF_PRIMARY_VIEW );\n" + slot_restore +
                               "\t\t// the flat wash that stands in for the underwater pass belongs in the eyes\n"
                               "\t\tLiquidWash();\n"
+                              "\t\t// the wrists stand where the lens shows them, whatever a zoom magnifies\n"
+                              "\t\tVRWrist_DrawEye( lensView );\n"
                               "\t\tVR_DrawComfortVignette( lensView, headForward, vignette, vignetteMaterial );\n\t\tif ( drawAimMarker ) {\n"
                               "\t\t\tVR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );\n\t\t}\n"
                               "\t\tif ( vrFrame.menuPointer ) {\n"
                               "\t\t\tVR_DrawPointerBeam( eyeView, pointerHand, pointerForward, pointerEnd, vrFrame.menuPointerHit, aimMaterial );\n"
                               "\t\t}\n\t\tScreenFade();",
-                f"{module} washes, vignettes and marks the aim (or a menu's pointer beam, VR-09) in each eye over its 3D pass, under its fade")
+                f"{module} washes, draws the wrist displays, vignettes and marks the aim (or a menu's pointer beam, VR-09) in each eye "
+                "over its 3D pass, under its fade")
         require(read(module), "const bool drawAimMarker = !vrFrame.menuPointer && vrFrame.aimLaser != VR_AIM_LASER_OFF",
                 "with a menu up the hand's beam takes the place of the gun's laser")
-        require(read(module), "\tif ( !vrFrame.menuUp ) {\n\t\tSingleView( hud, view, RF_GUI_ONLY );\n\t}",
-                "with a menu up the HUD stays out of the screen image the menu's panel shows (VR-09)")
+        require(read(module), "\tif ( !vrFrame.menuUp ) {\n\t\tVRWrist_SetGuiPass( wrists );\n\t\tSingleView( hud, view, RF_GUI_ONLY );\n"
+                "\t\tVRWrist_SetGuiPass( false );\n\t}",
+                "with a menu up the HUD stays out of the screen image the menu's panel shows; the GUI pass knows when the "
+                "status is on the wrists (VR-09)")
+        check_wrists(module)
         # the vignette is fixed to the lens: a weapon's zoom, which narrows the eye's frustum, must not push it out of view
         # centred where the head looks, the same direction in both eyes, so canted displays fuse it
         require(read(module), "\t\theadForward = headAxis[0];\n", f"{module} centres the vignette on the head's forward")
@@ -767,6 +773,60 @@ def check_detection() -> None:
     runtime = read("tools/tests/openxr/OpenXRTestRuntime.cpp")
     require(runtime, '"OPENQ4_XR_TEST_HEADSET"', "the test runtime can have no headset, or one that connects later")
     require(runtime, "return XR_ERROR_FORM_FACTOR_UNAVAILABLE;", "a runtime without a headset answers as real ones do")
+
+
+def check_wrists(view_module: str) -> None:
+    """The status on the wrists (vr_hudMode 1, VR-09): two displays drawn in the eyes, and the stock HUD, the
+    objective notices and the engine's old wrist band standing down."""
+    view = read(view_module)
+    require(view, "VRWrist_Prepare( wristStatus, vrFrame, eyeOrigin, trackingYaw, wrists && !vrFrame.menuUp, wrists && !vrFrame.menuUp );",
+            "the wrists and the damage arcs stand down while a menu takes the hands")
+    require(view, "if ( player->objectiveSystem && ( !VRWrist_HudOnWrists() || player->VRObjectivesInFront() ) ) {",
+            "with the status on the wrists the objective notices go there; open objectives and a failure stay in front")
+    player = read("src/game/Player.cpp")
+    require(player, "\t\tif ( !VRWrist_HudOnWrists() ) {\n\t\t\tDrawHudWithStatusBar( _hud );\n\t\t}\n\t\tif ( !gameLocal.isMultiplayer ) {\n"
+            "\t\t\tDrawWeaponWheel();", "the stock HUD is not drawn while the status is on the wrists; the weapon wheel still is")
+    require(player, 'VRWrist_NotePickup( itemName, item->GetString( "inv_icon" ) );', "inventory pickups reach the off hand's display")
+    require(player, 'VRWrist_NotePickup( common->GetLocalizedString( langToken ), item->spawnArgs.GetString( "inv_icon" ) );',
+            "item pickups reach the off hand's display")
+    require(player, "VRWrist_NoteObjective( info.title.c_str(), false );", "a new objective reaches the off hand's display")
+    require(player, "VRWrist_NoteObjective( title, true );", "a completed objective reaches the off hand's display")
+    require(player, 'status.strogg = hud != NULL && idStr::FindText( hud->Name(), "strogg", false ) >= 0;',
+            "the Strogg HUD (hud_strogg, q4xhud_strogg) picks the Strogg colours")
+    wrist = read("src/game/VRWristDisplay.cpp")
+    for needle, why in (
+            ("const int weaponHand = frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT;", "left-handed play swaps the wrists"),
+            ('declManager->FindMaterial( "gfx/guis/hud/icons/item_health" )', "the stock health icon"),
+            ('declManager->FindMaterial( "gfx/guis/hud/icons/item_armor" )', "the stock armor icon"),
+            ('declManager->FindMaterial( "gfx/guis/hud/icons/icon_infinity" )', "the stock infinity sign for the blaster and gauntlet"),
+            ("uiManager->BuildHudText(", "text is shaped by the UI's localized font policy"),
+            ("panel.alpha *= HOLDING_DIM;", "the off hand's display dims while it holds the foregrip"),
+            ("VRWrist_NearFade( metres )", "a display near the eyes fades out"),
+            ("const palette_t &palette = status.strogg ? stroggPalette : marinePalette;", "the Strogg HUD's colours after the Stroggification")):
+        require(wrist, needle, why)
+    openxr = read("src/sys/openxr/OpenXRSystem.cpp")
+    for gone in ("VR_WRIST_BAND", "XrCompositionLayerQuad wrist;", "VR_WristCentre"):
+        if gone in openxr:
+            raise AssertionError(f"the engine no longer crops the HUD onto a wrist layer ({gone})")
+    cvars = read("src/framework/VRSystem.cpp")
+    require(cvars, 'idCVar vr_hudMode( "vr_hudMode", "1",', "the wrists are the default in a headset")
+    require(cvars, 'idCVar vr_wristWidth( "vr_wristWidth", "0.11",', "each wrist display is 11 cm wide")
+    require(read("src/ui/UserInterfaceRetained.cpp"), '{"vr_hudMode",{0,0,1,true,{},{1,0}}}', "the Status Display row may set vr_hudMode")
+    require(read("tools/ui/retained_game.py"), 'choice("game_vrhud", "#str_233560", "vr_hudMode", "#str_233561", (1, 0)),',
+            "the Virtual Reality tab offers On Wrists or HUD")
+    require(read("tools/ui/retained_vr.py"), 'choice("vrsetup_hud", "#str_233560", "vr_hudMode", "#str_233561", (1, 0)),',
+            "VR SETUP offers On Wrists or HUD")
+    for language in ("brazilian", "czech", "english", "french", "german", "hungarian", "italian", "polish", "russian", "spanish",
+                     "turkish", "ukrainian"):
+        table = read(f"content/baseoq4/pak0/strings/{language}_openq4.lang")
+        for number in range(233560, 233568):
+            require(table, f'"#str_{number}"', f"{language} has the wrist displays' strings")
+    require(read("meson.build"), "files('tools/tests/native/VRWristCoreTest.cpp')", "the wrist decisions are natively tested")
+    # the stereo heading's id counts the VR rows before it; a stale one fails the page's load
+    heading = re.search(r'STEREO_HEADING = "([^"]+)"', read("tools/ui/retained_game.py")).group(1)
+    for page in ("game", "game_awakening"):
+        require(read(f"content/baseoq4/pak0/guis/menu/settings/{page}.rui"), f'"id": "{heading}"',
+                f"the {page} page holds the stereo heading the VR variant hides")
 
 
 def check_haptics() -> None:

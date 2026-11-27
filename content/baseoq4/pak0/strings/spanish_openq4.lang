@@ -2203,4 +2203,12 @@
 	"#str_233510"	"No hay ningún entorno de RV instalado"
 	"#str_233511"	"Ningún casco de RV ha respondido"
 	"#str_233512"	"Casco de RV detectado: elige un Modo RV para usarlo"
+	"#str_233560"	"Indicadores de estado"
+	"#str_233561"	"En las muñecas;HUD"
+	"#str_233562"	"Salud y armadura en la muñeca de la mano libre y munición en la de la mano del arma, o todo el HUD delante de tus ojos."
+	"#str_233563"	"NUEVO OBJETIVO"
+	"#str_233564"	"OBJETIVO COMPLETADO"
+	"#str_233565"	"RECARGAR"
+	"#str_233566"	"SIN MUNICIÓN"
+	"#str_233567"	"JEFE"
 }

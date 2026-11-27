@@ -36,7 +36,8 @@ MARGIN = (WIDTH - U * COLUMN_W) / 2        # dp
 NOTE_TOP, NOTE_H = 44.0, 54.0              # dp: the note under the title, two lines at the VR text size
 ROWS_TOP = NOTE_TOP + NOTE_H + 6           # dp
 # The setup's rows: the play space and the height it measures, a recentre,
-# then how the player turns, holds the gun and takes the vignette.
+# then how the player turns, holds the gun and takes the vignette, and where
+# the status shows: on the wrists or on the HUD (VR-09).
 ROWS = (
     choice("vrsetup_playspace", "#str_231760", "vr_playSpace", "#str_231761", (0, 1, 2)),
     ("button", "vrsetup_calibrate", CALIBRATE, "vrCalibrateHeight", None),
@@ -44,10 +45,11 @@ ROWS = (
     choice("vrsetup_turn", "#str_230126", "vr_turnMode", "#str_230127", (0, 1)),
     choice("vrsetup_hand", "#str_230124", "vr_leftHanded", "#str_230125", (0, 1)),
     choice("vrsetup_vignette", "#str_230138", "vr_comfortVignette", "#str_230136", ("0", "0.5", "1")),
+    choice("vrsetup_hud", "#str_233560", "vr_hudMode", "#str_233561", (1, 0)),
 )
 # The tooltips the dialog's rows share with the Virtual Reality tab's.
 TOOLTIPS = {"vrsetup_playspace": "#str_233061", "vrsetup_turn": "#str_233052", "vrsetup_hand": "#str_233051",
-            "vrsetup_vignette": "#str_233059"}
+            "vrsetup_vignette": "#str_233059", "vrsetup_hud": "#str_233562"}
 VERBS = ("vrCalibrateHeight", "vrRecenter")
 
 

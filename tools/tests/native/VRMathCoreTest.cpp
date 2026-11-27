@@ -489,9 +489,6 @@ static void TestHandPanel( void ) {
 	vrHandPanel_t jump = panel;
 	VR_HandPanelStep( jump, VR_Add( moved, VR_Vec3( 1.0f, 0.0f, 0.0f ) ), head, 0.34f, 5.0f );
 	Check( jump.position.x <= VR_HandPanelRest( moved, 0.34f ).x + 1.0f, "a long frame does not overshoot" );
-	// the wrist: behind the grip along the controller, then up
-	const vrVec3_t wrist = VR_WristCentre( hand, VR_QuatIdentity() );
-	Check( NearVec( wrist, VR_Vec3( -0.2f, 1.1f + VR_WRIST_LIFT, -0.4f + VR_WRIST_BACK ) ), "the wrist display sits behind the grip, raised" );
 }
 
 int main() {

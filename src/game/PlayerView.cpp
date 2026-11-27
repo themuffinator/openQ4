@@ -8,6 +8,7 @@
 
 #include "Game_local.h"
 #include "gamesys/ScriptedDepthOfField.h"
+#include "VRWristDisplay.h"
 #include "gamesys/RetainedViewEffects.inl"
 #include "gamesys/Subtitles.inl"
 #include "awakening/M01Feedback.inl"
@@ -792,7 +793,9 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view, i
 		// Render the object system
 		// RAVEN BEGIN
 		// twhitaker: always draw objective system
-		if ( player->objectiveSystem ) {
+		// openQ4 VR: with the status on the wrists its notices go there too,
+		// and only the open objectives or a failure draw in front (VR-09)
+		if ( player->objectiveSystem && ( !VRWrist_HudOnWrists() || player->VRObjectivesInFront() ) ) {
 			player->objectiveSystem->Redraw( gameLocal.time );
 		}		
 		// RAVEN END
@@ -1204,6 +1207,16 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 	// the edges of each eye darken while the stick moves or turns the player
 	// (multiplayer measures the turn on the body yaw)
 	const float vignette = VRComfortVignette( vrFrame, gameLocal.isMultiplayer ? vrFrame.bodyYaw : trackingYaw );
+	// the status on the wrists (vr_hudMode 1, VR-09): health and armor on the
+	// off hand, ammunition on the weapon hand, and the damage direction round
+	// the line of sight, drawn in each eye; a menu takes the hands and the view
+	const bool wrists = VRWrist_Selected();
+	vrWristStatus_t wristStatus;
+	wristStatus.valid = false;
+	if ( wrists ) {
+		player->GetVRWristStatus( wristStatus );
+	}
+	VRWrist_Prepare( wristStatus, vrFrame, eyeOrigin, trackingYaw, wrists && !vrFrame.menuUp, wrists && !vrFrame.menuUp );
 	const idMaterial *vignetteMaterial = vignette > 0.01f ? declManager->FindMaterial( "_white" ) : NULL;
 	// vr_debug 2 logs every frame: where the drawn head stands in the world,
 	// which a room-scale walk must not move, and the vignette over it
@@ -1238,6 +1251,8 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 		gameLocal.SelectTemporalHistorySlot( 0 );
 		// the flat wash that stands in for the underwater pass belongs in the eyes
 		LiquidWash();
+		// the wrists stand where the lens shows them, whatever a zoom magnifies
+		VRWrist_DrawEye( lensView );
 		VR_DrawComfortVignette( lensView, headForward, vignette, vignetteMaterial );
 		if ( drawAimMarker ) {
 			VR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );
@@ -1252,7 +1267,9 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 	// the HUD shares the screen image with a menu, which shows the world round
 	// its buttons in VR: with a menu up only the menu draws there (VR-09)
 	if ( !vrFrame.menuUp ) {
+		VRWrist_SetGuiPass( wrists );
 		SingleView( hud, view, RF_GUI_ONLY );
+		VRWrist_SetGuiPass( false );
 	}
 }
 

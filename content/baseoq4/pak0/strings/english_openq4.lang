@@ -2203,4 +2203,12 @@
 	"#str_233510"	"No VR runtime is installed"
 	"#str_233511"	"No VR headset answered"
 	"#str_233512"	"VR headset found: choose a VR Mode to use it"
+	"#str_233560"	"Status Display"
+	"#str_233561"	"On Wrists;HUD"
+	"#str_233562"	"Health and armor on your off-hand wrist and ammunition on your gun hand's, or the whole HUD hung in front of your eyes."
+	"#str_233563"	"NEW OBJECTIVE"
+	"#str_233564"	"OBJECTIVE COMPLETE"
+	"#str_233565"	"RELOAD"
+	"#str_233566"	"NO AMMO"
+	"#str_233567"	"BOSS"
 }

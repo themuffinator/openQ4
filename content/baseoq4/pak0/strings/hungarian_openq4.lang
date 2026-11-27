@@ -2203,4 +2203,12 @@
 	"#str_233510"	"Nincs telepített VR-futtatókörnyezet"
 	"#str_233511"	"Egy VR-headset sem válaszolt"
 	"#str_233512"	"VR-headset található: válassz VR módot a használatához"
+	"#str_233560"	"Állapotkijelző"
+	"#str_233561"	"Csuklón;HUD"
+	"#str_233562"	"Életerő és páncél a szabad kéz csuklóján, lőszer a fegyvert tartó kézén, vagy a teljes HUD a szemed előtt."
+	"#str_233563"	"ÚJ CÉL"
+	"#str_233564"	"CÉL TELJESÍTVE"
+	"#str_233565"	"ÚJRATÖLTÉS"
+	"#str_233566"	"NINCS LŐSZER"
+	"#str_233567"	"FŐELLENSÉG"
 }

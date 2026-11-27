@@ -123,7 +123,7 @@ here: it waits on the AND-05 distribution decision.
 | # | Do this | Pass when |
 | --- | --- | --- |
 | 6.1 | Point at every main-menu item and every Settings tab and row, and pull the trigger. | Every one is reachable and responds; the weapon-hand and off-hand grips step between tabs. |
-| 6.2 | Read the HUD, objective text and a terminal screen. | Text is sharp and readable at the default HUD distance and width. |
+| 6.2 | Read the HUD (Status Display set to HUD), objective text and a terminal screen; the wrist displays are 8.13-8.18. | Text is sharp and readable at the default HUD distance and width. |
 | 6.3 | In single player, point the weapon hand at a door panel and a lift call screen and pull the trigger. | The cursor sits where the laser meets the screen and the screen responds. |
 | 6.4 | In multiplayer, look at the objective markers in CTF (`mp/q4ctf1`). | Markers sit at HUD depth, follow your head and stay inside the HUD. |
 | 6.5 | In multiplayer, hit another player (or `testHudOverlays`) and watch the damage number. | The number rises from the player you hit, not below or beside them. |
@@ -157,4 +157,9 @@ version in the report. The log's `VR_RUNTIME`, `VR_MODE`, `VR_OFFER` and
 | 8.10 | Repeat 8.6 in The Awakening (`q4xbase`). | VR SETUP opens in the Awakening's pause style and works the same. |
 | 8.11 | In play, press the menu button with your off hand held naturally, then move and steady that hand. | The menu grows out of the off hand onto a panel facing you, the level still around it; it follows a moved hand and stays still while you hold steady; the pointer's beam and dot are easy to put on a button. |
 | 8.12 | Rest the pointer on each pause button and on settings rows. | The button under it grows and lights up at once and the hand ticks once per new control; nothing depends on hovering to appear. |
-| 8.13 | Glance at your off-hand wrist in a fight, with `vr_hudMode 1`. | Health, armor and ammunition read at a glance; notices and objective updates still appear before your eyes. |
+| 8.13 | Glance at each wrist in a fight, with Status Display on the wrists (`vr_hudMode 1`, the default). | The off-hand wrist's health and armor figures and the weapon wrist's magazine and reserve read at a glance at arm's length, without squinting or bringing the hand closer; the icons are recognisable; nothing hangs in front of your eyes but captions, hit arcs, the weapon wheel, vehicle HUDs and the multiplayer overlay. |
+| 8.14 | Turn each wrist toward your eyes and away, raise and lower the arms, and hold the gun two-handed and aim down its sights. | Each display stays upright and facing you however the wrist turns; the weapon wrist's sits below the line of the gun; the support hand's dims on the foregrip; neither covers the sights, and one brought close to the face fades away rather than filling the view. |
+| 8.15 | Fire the machinegun dry, reload, switch to the blaster, drop below 25 health, and take hits from either side and behind. | The magazine figure turns amber, then red with RELOAD; the blaster shows the infinity sign; the low-health red pulse is noticeable at the edge of vision; the red arcs round the middle of the view point to each hit. Comfortable, not distracting. |
+| 8.16 | Pick up armor and get a new objective; take on a boss (Makron, Network Guardian). | The pickup and objective lines appear on the off-hand wrist and are noticed in time; the boss's bar shows there while the fight lasts. |
+| 8.17 | Repeat 8.13 left-handed, after Kane is Stroggified (Strogg colours), in The Awakening and in a multiplayer match. | The wrists swap; the Strogg colours read as well as the Marine ones; the multiplayer score, timer and chat stay in front and readable. |
+| 8.18 | Set Status Display to HUD (Virtual Reality tab and VR SETUP). | The whole HUD hangs in front of you again and the wrists are bare; set back, the wrists return. |

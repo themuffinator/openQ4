@@ -4,8 +4,9 @@
 
 openQ4 can play Quake 4 on a PC VR headset through OpenXR, the cross-vendor VR
 standard. You see the game in 3D at your headset's resolution, look around with
-your head and aim with a motion controller. The HUD floats in front of you, and
-menus, loading screens and cinematics appear on a floating screen. VR works in
+your head and aim with a motion controller. Your health and ammunition show on
+your wrists, menus grow out of your hand, and loading screens and cinematics
+appear on a floating screen. VR works in
 the single-player campaign and in multiplayer, and needs nothing beyond your
 Quake 4 game files.
 
@@ -16,7 +17,7 @@ hardware, so please report how it runs on yours (see
 **In this guide:** [what you need](#what-you-need) ·
 [quick start](#quick-start) · [turning VR on](#turning-vr-on) ·
 [VR Mode and headset detection](#vr-mode-and-headset-detection) ·
-[menus in VR](#menus-in-vr) · [controls](#controls) · [aiming and weapons](#aiming-and-weapons) ·
+[menus in VR](#menus-in-vr) · [your wrists](#health-and-ammunition-on-your-wrists) · [controls](#controls) · [aiming and weapons](#aiming-and-weapons) ·
 [your body](#your-body) · [comfort](#comfort) ·
 [seated or standing](#seated-or-standing) · [display](#display) ·
 [performance](#performance) · [weapon position](#weapon-position) ·
@@ -134,16 +135,15 @@ Objectives, Save, Load, Restart, Settings, VR Setup, Quit to Menu and Exit. Set 
 the screen hung in front of you instead; the title, loading screens and
 cinematics always use that screen.
 
-The HUD keeps out of your view too: health, armor and ammunition ride on your
-off-hand wrist, so you glance at your wrist to check them, and only notices,
-messages and objective updates stay before your eyes. Set **vr_hudMode 0** to
-have the whole HUD in front of you again.
+The HUD keeps out of your view too: your health and ammunition are on your
+wrists (see [Health and ammunition on your wrists](#health-and-ammunition-on-your-wrists)).
 
 The menus also adapt in other ways:
 
 - **VR SETUP** opens over the title or pause menu the first time VR starts:
   seated or standing, **Measure My Height**, **Recentre View**, snap or smooth
-  turning, your weapon hand and the comfort vignette. Open it again from
+  turning, your weapon hand, the comfort vignette and **Status Display** (on
+  your wrists or a HUD in front of you). Open it again from
   **VR SETUP** next to EXIT on the pause menu, **Comfort Setup** on the
   Virtual Reality tab, or `vr_setup`.
 - **Settings → Game Options** opens on the Virtual Reality tab.
@@ -154,6 +154,45 @@ The menus also adapt in other ways:
 - Typing a name or a server address opens the game's own on-screen keyboard,
   which you point at and click, instead of your desktop's.
 - Prompts show the controller's buttons, and the laser dot is the pointer.
+
+## Health and ammunition on your wrists
+
+**Not in 0.15.0.** In a headset there is no HUD in front of you. Instead, two
+small displays sit on your wrists, turned towards your face, so you read them at
+a glance however you hold your arms:
+
+- **Your weapon hand's wrist** shows the gun's own icon and, in large figures,
+  the rounds in its magazine with the rest you carry underneath. A weapon
+  without a magazine shows one count, and the blaster and the gauntlet, which
+  never run out, show the infinity sign. The bar under the figures empties with
+  the magazine; the figures turn amber when it runs low and red when it is
+  empty, with **RELOAD** (or **NO AMMO** when nothing is left) flashing
+  underneath. Change weapons and the new one's name shows for a moment.
+- **Your other wrist** shows your health and armor, each with its icon, its
+  figure and a bar. Below a quarter of your health the health figure, its bar
+  and the display's edge turn red and pulse. Underneath, rows appear only when
+  they matter: your air under water, a boss's health, your powerups and their
+  seconds left, a flag you carry, and the latest pickups and objective notices.
+
+The displays sit a few centimetres off each wrist: below the weapon hand's, out
+of the way of your sights, and above the other, as a watch would. They fade out
+when you bring one close to your face, for example while aiming down the gun,
+and the support hand's display dims while that hand holds the gun's foregrip.
+Left-handed (**Weapon Hand: Left**) the two swap wrists. They take the
+colours of the HUD you would otherwise see: the Marine HUD's greens, or the
+Strogg HUD's yellows and oranges after Kane is Stroggified. The Awakening uses
+the Marine colours, as its HUD does.
+
+Only what you must see without looking down stays in front of your eyes:
+captions, red arcs round the middle of your view that point to where a hit came
+from, the weapon wheel while it is open, a vehicle's or turret's own sights and
+gauges, and in multiplayer the scores, timer, chat and announcements. Damage
+numbers and objective markers stay where they were.
+
+Prefer the classic HUD? Set **Status Display** to **HUD** on the Virtual
+Reality tab or in VR SETUP (`vr_hudMode 0`), and the whole HUD hangs in front
+of you as before (see [Display](#display)). `vr_wristWidth` sets how wide each
+display is, from 6 to 20 cm (11 by default).
 
 ### When the headset or runtime goes away
 
@@ -435,6 +474,7 @@ and the size of your play area.
 | --- | --- | --- |
 | `vr_renderScale` | 1.0 | multiplies the headset's recommended resolution (0.5-2.0); VR restarts by itself to apply it |
 | `vr_worldScale` | 39.37 | game units per metre; lower makes the world feel bigger |
+| `vr_hudMode` | 1 | **Not in 0.15.0.** Status Display: 1 on your wrists, 0 the whole HUD in front of you |
 | `vr_hudDistance` | 1.4 | HUD distance in metres |
 | `vr_hudWidth` | 1.2 | HUD width in metres |
 | `vr_hudHeightOffset` | -0.3 | HUD height relative to your eyes, in metres, when you aim with the controller (head aiming centres the HUD so its crosshair lines up) |
@@ -454,7 +494,7 @@ The floating screen and the HUD take the shape of the game window, so menus
 look the same as on your monitor. Mirrors and other reflective surfaces show
 each eye its own reflection.
 
-**After 0.15.0**, when you aim with the controller, the HUD hangs below your
+With **Status Display** set to **HUD**: **after 0.15.0**, when you aim with the controller, the HUD hangs below your
 line of sight, its top edge at about eye level: glance down for your health
 and ammunition, and the middle of your view stays clear for what you are
 shooting at. In 0.15.0 it sat 0.1 m below eye level, with its panels around
@@ -678,8 +718,8 @@ General settings (the others are in the sections above):
 | `ui_retainedVRTextScale` | 1.25 | **Not in 0.15.0.** Menu text size while in VR, at least your usual text size |
 | `vr_menuAnchor` | 1 | **Not in 0.15.0.** Menus during play: 1 on a panel that grows out of your off hand, 0 on the screen hung in front of you |
 | `vr_menuWidth` | 0.5 | **Not in 0.15.0.** Width of the off-hand menu panel in metres (0.3 to 1.2) |
-| `vr_hudMode` | 1 | **Not in 0.15.0.** 1 health, armor and ammunition on your off-hand wrist and the rest before your eyes (a vehicle's HUD stays whole in front); 0 the whole HUD before your eyes |
-| `vr_wristWidth` | 0.24 | **Not in 0.15.0.** Width of the wrist display in metres |
+| `vr_hudMode` | 1 | **Not in 0.15.0.** Status Display: 1 health and armor on your off-hand wrist and ammunition on your weapon hand's, with only captions, damage direction, the weapon wheel, vehicle HUDs and the multiplayer overlay in front of you; 0 the whole HUD in front of you |
+| `vr_wristWidth` | 0.11 | **Not in 0.15.0.** Width of each wrist display in metres (0.06-0.2) |
 | `vr_menuHaptics` | 1 | **Not in 0.15.0.** 1 ticks the pointing hand as the pointer moves onto another control, and the off hand as its panel opens |
 | `vr_pauseOnFocusLoss` | 1 | single player: 1 opens the pause menu when the headset comes off or its own menu takes the controllers |
 | `vr_mirror` | 1 | desktop window: 0 black, 1 left eye, 2 the floating screen |
