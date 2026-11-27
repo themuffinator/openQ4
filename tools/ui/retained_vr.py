@@ -106,3 +106,100 @@ def headset_symbol(ident: str) -> dict:
              fill=solid([1, 1, 1, 0.9])),
         path("strap", [(2.0, 6.5), (1.0, 4.5), (15.0, 4.5), (14.0, 6.5)], closed=False, stroke=stroke(solid([1, 1, 1, 0.6]), 1.0)),
     ])
+
+
+# ----------------------------------------------------------- the hand menu
+
+# The pause as the off hand holds it (vr_menuAnchor 1): one card centred on
+# the panel over the hand, the world around it. Its buttons are big pointer
+# targets that grow and light up as the laser comes to rest on them (and the
+# hand ticks), with every action the desktop pause has.
+CARD_W = 380.0                              # dp
+CARD_PAD, CARD_HEAD = 22.0, 52.0            # dp: the margins, the title's band
+BUTTON_H, BUTTON_GAP = 52.0, 6.0            # dp
+CARD_CUT = 18.0                             # dp: the 45-degree corners
+HOVER_SCALE = 1.07                          # the button under the pointer grows by this
+HOVER_MS = 90                               # and takes this long
+CARD_ITEMS = (("vr_resume", "#str_200381", "resume", None), ("vr_objectives", "#str_200380", None, "objectivesShow"),
+              ("vr_savegame", "#str_200003", "saveGame", None), ("vr_loadgame", "#str_200001", "loadGame", None),
+              ("vr_restart", "#str_229983", "restartLevel", None), ("vr_settings", "#str_200009", "settings", None),
+              ("vr_vrsetup", TITLE, None, SHOW), ("vr_quit", "#str_230025", None, "quitModalShow"),
+              ("vr_exit", "#str_200013", None, "exitModalShow"))
+
+
+def card_button(doc: Document, ident: str, key: str, top: float, *, action: str | None, event: str | None,
+                tint: str, hot: str, face: str) -> dict:
+    """One of the card's buttons: a plate with the family's lower-leading cut,
+    its marker and label. Under the pointer or focus it grows by HOVER_SCALE
+    about its middle over HOVER_MS, fills with the hot colour and rims it."""
+    from build_retained_screens import (OLIVE as _OLIVE, colour, linear, marker_path, number, transform)
+    width = CARD_W - 2 * CARD_PAD
+    cut = 14.0
+    shape = [(0, 0), (width, 0), (width, BUTTON_H), (cut, BUTTON_H), (0, BUTTON_H - cut)]
+    rest = vector(f"{ident}-rest", {**absolute(left=0, top=0, width=width, height=BUTTON_H), "opacity": number(1)}, [
+        path("fill", shape, fill=linear((0, 0), (width, 0), [(0, rgb(tint, 0.42)), (1, rgb(tint, 0.16))])),
+        path("rim", shape, stroke=stroke(solid(rgb(tint, 0.75)), 1.2)),
+    ])
+    lit = vector(f"{ident}-lit", {**absolute(left=0, top=0, width=width, height=BUTTON_H), "opacity": number(0)}, [
+        path("fill", shape, fill=linear((0, 0), (width, 0), [(0, rgb(hot, 0.55)), (1, rgb(hot, 0.22))])),
+        path("rim", shape, stroke=stroke(solid(rgb(hot)), 2.0)),
+    ])
+    marker = vector(f"{ident}-marker", absolute(left=16, top=(BUTTON_H - 10) / 2, width=10, height=10),
+                    [marker_path("mark", 0, 0, 10, rgb(hot))])
+    text = label(f"{ident}-label", key, {**absolute(left=36, top=0, width=width - 48, height=BUTTON_H),
+                                         **typeface(face, 22, BUTTON_H, [1, 1, 1, 0.88]), "white-space": keyword("nowrap"),
+                                         "overflow": keyword("hidden")})
+    grown, still = transform(sx=HOVER_SCALE, sy=HOVER_SCALE), transform()
+    hot_text = colour([*rgb(hot)[:3], 1])
+    ids = doc.states(ident, {
+        "default": [(ident, "transform", still), (f"{ident}-lit", "opacity", number(0)), (f"{ident}-rest", "opacity", number(1)),
+                    (f"{ident}-label", "color", colour([1, 1, 1, 0.88]))],
+        "hover": [(ident, "transform", grown, HOVER_MS), (f"{ident}-lit", "opacity", number(1), HOVER_MS),
+                  (f"{ident}-rest", "opacity", number(0), HOVER_MS), (f"{ident}-label", "color", hot_text, HOVER_MS)],
+        "focus": [(ident, "transform", grown, HOVER_MS), (f"{ident}-lit", "opacity", number(1), HOVER_MS),
+                  (f"{ident}-rest", "opacity", number(0), HOVER_MS), (f"{ident}-label", "color", hot_text, HOVER_MS)],
+        "pressed": [(ident, "transform", transform(sx=1.02, sy=1.02)), (f"{ident}-lit", "opacity", number(1)),
+                    (f"{ident}-rest", "opacity", number(0)), (f"{ident}-label", "color", colour([1, 1, 1, 1]))],
+        "disabled": [(ident, "transform", still), (f"{ident}-lit", "opacity", number(0)), (f"{ident}-rest", "opacity", number(0.4)),
+                     (f"{ident}-label", "color", colour([1, 1, 1, 0.4]))],
+    })
+    control = {"role": "button", "label": key, "states": ids}
+    if action:
+        control["action"] = action
+    else:
+        control["event"] = event
+    return group(ident, {**absolute(left=CARD_PAD, top=top, width=width, height=BUTTON_H), "transform": transform()},
+                 [rest, lit, marker, text], control=control)
+
+
+def hand_menu(doc: Document, *, strogg: bool = False) -> dict:
+    """The card (CARD_ITEMS on a dark plate with the family's 45-degree
+    corners, GAME PAUSED in its head), shown only while the game presents to
+    a headset and the Objectives page is closed. Up and Down wrap through it."""
+    from build_retained_screens import ST_LINE, ST_SELECT, OLIVE as _OLIVE, ORANGE as _ORANGE, number
+    tint, hot, face = (ST_LINE, ST_SELECT, "r_strogg") if strogg else (_OLIVE, _ORANGE, "marine")
+    height = CARD_HEAD + len(CARD_ITEMS) * (BUTTON_H + BUTTON_GAP) - BUTTON_GAP + CARD_PAD
+    c = CARD_CUT
+    body = [(c, 0), (CARD_W, 0), (CARD_W, height - c), (CARD_W - c, height), (0, height), (0, c)]
+    plate = vector("vr-card-plate", absolute(left=0, top=0, width=CARD_W, height=height), [
+        path("body", body, fill=solid([0, 0, 0, 0.82])),
+        path("rim", body, stroke=stroke(solid(rgb(tint, 0.9)), 1.5)),
+        path("head-rule", [(CARD_PAD, CARD_HEAD - 10), (CARD_W - CARD_PAD, CARD_HEAD - 10)], closed=False,
+             stroke=stroke(solid(rgb(tint, 0.45)), 1.0)),
+    ])
+    title = label("vr-card-title", "#str_230031", {**absolute(left=CARD_PAD + 4, top=8, width=CARD_W - 2 * CARD_PAD, height=30),
+                                                   **typeface(face, 18, 30, [1, 1, 1, 0.6]), "white-space": keyword("nowrap")})
+    buttons = []
+    for index, (ident, key, action, event) in enumerate(CARD_ITEMS):
+        buttons.append(card_button(doc, ident, key, CARD_HEAD + index * (BUTTON_H + BUTTON_GAP), action=action, event=event,
+                                   tint=tint, hot=hot, face=face))
+    ids = [button["id"] for button in buttons]
+    for index, button in enumerate(buttons):
+        button["control"]["navigation"] = {"up": ids[index - 1], "down": ids[(index + 1) % len(ids)], "left": ids[index],
+                                           "right": ids[index]}
+    card = group("vr-card", {"position": keyword("absolute"), "left": length(50, "%"), "top": length(50, "%"),
+                             "margin-left": length(-CARD_W / 2), "margin-top": length(-height / 2), "width": length(CARD_W),
+                             "height": length(height), "display": keyword("none")}, [plate, title, *buttons])
+    shown = {"op": "&&", "args": [vr_state(doc), {"op": "!", "args": [{"state": "objectives.visible"}]}]}
+    doc.bind("vr-card.display", "vr-card", "display", {"op": "select", "args": [shown, "block", "none"]})
+    return card

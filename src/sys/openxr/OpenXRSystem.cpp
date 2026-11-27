@@ -33,6 +33,7 @@
 
 #include "../../framework/VRSystemLocal.h"
 #include "../../framework/VRMathCore.h"
+#include "../../framework/VRPanelCore.h"
 #include "../../framework/PresentationClock.h"
 #include "../../ui/RetainedUI.h"
 #include "OpenXRRuntimeProbe.h"
@@ -231,6 +232,12 @@ enum vrGraphicsApi_t {
 
 static const int VR_SCREEN_WIDTH = 1920;
 static const int VR_SCREEN_HEIGHT = 1080;
+// The wrist display (vr_hudMode 1) shows this part of the HUD: the band along
+// the bottom of the HUD, a centred span of its width, which holds the
+// Remastered status bar (ammunition, health and armor, specification 14.3).
+// The rest of the HUD stays in front of the eyes. Fractions of the screen.
+static const float VR_WRIST_BAND = 0.16f;
+static const float VR_WRIST_SPAN = 0.56f;
 static const int VR_SYSTEM_RETRY_MSEC = 3000;
 // Automatic VR Mode: how long after launch, or after the player chose
 // Automatic, a headset that answers still starts VR by itself. A runtime
@@ -505,7 +512,9 @@ private:
 	void					ApplyTwoHandedAim( int weaponHand );
 	void					UpdateMenuPointer( int weaponHand, bool menu );
 	void					AnchorScreen( void );
+	bool					PlaceHandPanel( int offHand );
 	void					ScreenQuadSize( float &width, float &height ) const;
+	XrRect2Di				ScreenRect( float left, float top, float right, float bottom ) const;
 	void					ScreenSizeForWindow( int &width, int &height ) const;
 	bool					ResizeScreenSwapchain( void );
 	bool					AcquireImages( void );
@@ -624,7 +633,19 @@ private:
 	int						screenResizeFailedHeight;
 	XrPosef					aimLocalPoses[VR_NUM_HANDS];	// raw LOCAL space, for the menu pointer
 	bool					aimLocalValid[VR_NUM_HANDS];
+	XrPosef					gripLocalPoses[VR_NUM_HANDS];	// the same for the grips: the hand panel and the wrist
+	bool					gripLocalValid[VR_NUM_HANDS];
+	XrPosef					headLocalPose;		// the head this frame, in the base space
+	bool					headLocalValid;
+	// The menu panel that grows out of the off hand (vr_menuAnchor 1, VR-09);
+	// while it shows, screenAnchor is its drawn pose and panelWidth its drawn width
+	vrHandPanel_t			handPanel;
+	bool					panelActive;
+	float					panelWidth;
+	int						panelMsec;			// when it last stepped
+	unsigned int			hoverGeneration;	// RetainedUI_HoverGeneration as the pointer last ticked for it
 	bool					pointerOnScreen;	// a menu took the pointer at ( pointerU, pointerV )
+	XrVector3f				pointerHitLocal;	// where the weapon hand's ray meets the menu, base space
 	float					pointerU;
 	float					pointerV;
 	const idMaterial *		pointerMaterial;
@@ -825,10 +846,20 @@ idVRSystemOpenXR::idVRSystemOpenXR( void ) {
 	screenAnchor = VR_IdentityPose();
 	screenAnchored = false;
 	lastFrameHud = false;
+	headLocalPose = VR_IdentityPose();
+	headLocalValid = false;
+	memset( &handPanel, 0, sizeof( handPanel ) );
+	panelActive = false;
+	panelWidth = 0.0f;
+	panelMsec = 0;
+	hoverGeneration = 0;
+	pointerHitLocal.x = pointerHitLocal.y = pointerHitLocal.z = 0.0f;
 	screenResizeFailedWidth = screenResizeFailedHeight = 0;
 	for ( int i = 0; i < VR_NUM_HANDS; i++ ) {
 		aimLocalPoses[i] = VR_IdentityPose();
 		aimLocalValid[i] = false;
+		gripLocalPoses[i] = VR_IdentityPose();
+		gripLocalValid[i] = false;
 	}
 	pointerOnScreen = false;
 	pointerU = pointerV = 0.0f;
@@ -3015,6 +3046,8 @@ void idVRSystemOpenXR::LocateFrame( XrTime time ) {
 	}
 
 	frame.head = ToEnginePose( head.pose, headValid );
+	headLocalPose = head.pose;
+	headLocalValid = headValid;
 	for ( int i = 0; i < VR_NUM_EYES; i++ ) {
 		frame.eyes[i].pose = ToEnginePose( views[i].pose, viewsValid );
 		const vrFovTangents_t fov = VR_FovTangentsFromAngles( views[i].fov.angleLeft, views[i].fov.angleRight, views[i].fov.angleUp, views[i].fov.angleDown );
@@ -3046,6 +3079,8 @@ void idVRSystemOpenXR::LocateFrame( XrTime time ) {
 		}
 		valid = gripSpaces[hand] != XR_NULL_HANDLE && ( location.locationFlags & required ) == required;
 		frame.grip[hand] = ToEnginePose( location.pose, valid );
+		gripLocalPoses[hand] = valid ? location.pose : VR_IdentityPose();
+		gripLocalValid[hand] = valid;
 	}
 }
 
@@ -3702,8 +3737,29 @@ bool idVRSystemOpenXR::ResizeScreenSwapchain( void ) {
 }
 
 void idVRSystemOpenXR::ScreenQuadSize( float &width, float &height ) const {
-	width = idMath::ClampFloat( 0.5f, 12.0f, vr_screenWidth.GetFloat() );
+	width = panelActive ? panelWidth : idMath::ClampFloat( 0.5f, 12.0f, vr_screenWidth.GetFloat() );
 	height = width * static_cast<float>( screenSwapchain.height ) / static_cast<float>( Max( 1, screenSwapchain.width ) );
+}
+
+/*
+====================
+idVRSystemOpenXR::ScreenRect
+
+A part of the screen image, as fractions from its top-left corner, in the
+image's own pixels. An OpenGL image's rows run up from its bottom edge
+(XR_KHR_opengl_enable), a Vulkan image's down from its top.
+====================
+*/
+XrRect2Di idVRSystemOpenXR::ScreenRect( float left, float top, float right, float bottom ) const {
+	const int width = screenSwapchain.width;
+	const int height = screenSwapchain.height;
+	XrRect2Di rect;
+	rect.offset.x = idMath::ClampInt( 0, width - 1, idMath::Ftoi( left * static_cast<float>( width ) ) );
+	rect.extent.width = idMath::ClampInt( 1, width - rect.offset.x, idMath::Ftoi( ( right - left ) * static_cast<float>( width ) ) );
+	const int y0 = idMath::ClampInt( 0, height - 1, idMath::Ftoi( top * static_cast<float>( height ) ) );
+	rect.extent.height = idMath::ClampInt( 1, height - y0, idMath::Ftoi( ( bottom - top ) * static_cast<float>( height ) ) );
+	rect.offset.y = graphicsApi == VR_GRAPHICS_VULKAN ? y0 : height - y0 - rect.extent.height;
+	return rect;
 }
 
 /*
@@ -3737,6 +3793,7 @@ void idVRSystemOpenXR::UpdateMenuPointer( int weaponHand, bool menu ) {
 		}
 		return;
 	}
+	pointerHitLocal = VR_ToXrVec( VR_Add( VR_FromXrVec( aim.position ), VR_Scale( direction, hit.distance ) ) );
 	const float deadBand = 0.0015f;
 	if ( wasOnScreen && idMath::Fabs( hit.u - pointerU ) < deadBand && idMath::Fabs( hit.v - pointerV ) < deadBand ) {
 		pointerOnScreen = true;
@@ -3746,6 +3803,15 @@ void idVRSystemOpenXR::UpdateMenuPointer( int weaponHand, bool menu ) {
 		pointerOnScreen = true;
 		pointerU = hit.u;
 		pointerV = hit.v;
+	}
+	// A light tick in the pointing hand as the pointer moves onto another
+	// control: the controls also grow and light up under it (VR-09).
+	const unsigned int hover = RetainedUI_HoverGeneration();
+	if ( pointerOnScreen && hover != hoverGeneration ) {
+		hoverGeneration = hover;
+		if ( vr_menuHaptics.GetBool() ) {
+			Vibrate( weaponHand, 0.15f, 12 );
+		}
 	}
 }
 
@@ -3900,6 +3966,42 @@ void idVRSystemOpenXR::DrawMenuPointer( void ) {
 	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
 }
 
+/*
+====================
+idVRSystemOpenXR::PlaceHandPanel
+
+A menu during play grows out of the off hand on a panel it holds
+(vr_menuAnchor 1, VRPanelCore.h): the world stays in view around it, and
+the weapon hand points at it. False when the off hand or the head is not
+tracked, and the screen hangs in front instead.
+====================
+*/
+bool idVRSystemOpenXR::PlaceHandPanel( int offHand ) {
+	if ( !gripLocalValid[offHand] || !headLocalValid ) {
+		return false;
+	}
+	const int now = Sys_Milliseconds();
+	const float seconds = panelMsec != 0 ? static_cast<float>( now - panelMsec ) * 0.001f : 0.0f;
+	panelMsec = now;
+	const float width = idMath::ClampFloat( 0.3f, 1.2f, vr_menuWidth.GetFloat() );
+	const float height = width * static_cast<float>( screenSwapchain.height ) / static_cast<float>( Max( 1, screenSwapchain.width ) );
+	const vrVec3_t hand = VR_FromXrVec( gripLocalPoses[offHand].position );
+	if ( VR_HandPanelStep( handPanel, hand, VR_FromXrVec( headLocalPose.position ), height, seconds ) ) {
+		if ( vr_menuHaptics.GetBool() ) {
+			Vibrate( offHand, 0.25f, 30 );
+		}
+		if ( vr_debug.GetInteger() > 0 ) {
+			common->Printf( "OpenXR: the menu panel grows out of the %s hand\n", offHand == VR_HAND_LEFT ? "left" : "right" );
+		}
+	}
+	screenAnchor.position = VR_ToXrVec( VR_HandPanelDrawnCentre( handPanel, hand ) );
+	screenAnchor.orientation = VR_ToXrQuat( handPanel.orientation );
+	panelWidth = width * VR_HandPanelDrawnScale( handPanel );
+	screenAnchored = true;
+	panelActive = true;
+	return true;
+}
+
 // The virtual screen hangs straight ahead of the head's current heading, at
 // eye height, whenever the view leaves gameplay.
 void idVRSystemOpenXR::AnchorScreen( void ) {
@@ -3995,6 +4097,20 @@ void idVRSystemOpenXR::BeginFrame( void ) {
 		return;
 	}
 
+	// the menu's pointer beam, for the eyes to draw from the weapon hand (VR-09)
+	{
+		const int weaponHand = vr_leftHanded.GetBool() ? VR_HAND_LEFT : VR_HAND_RIGHT;
+		frame.menuPointer = MenuMode() && screenAnchored && !lastFrameHud && aimLocalValid[weaponHand];
+		frame.menuPointerHit = frame.menuPointer && pointerOnScreen;
+		if ( frame.menuPointerHit ) {
+			XrPosef end = VR_IdentityPose();
+			end.position = pointerHitLocal;
+			frame.menuPointerEnd = ToEnginePose( end, true ).origin;
+		} else {
+			frame.menuPointerEnd.Zero();
+		}
+	}
+
 	frame.frameNumber++;
 	frame.focused = sessionFocused;
 	frame.aimMode = vr_aimMode.GetInteger();
@@ -4067,7 +4183,7 @@ void idVRSystemOpenXR::EndFrame( void ) {
 	XrCompositionLayerProjectionView projectionViews[VR_NUM_EYES];
 	XrCompositionLayerProjection projection;
 	XrCompositionLayerQuad quad;
-	const XrCompositionLayerBaseHeader *layers[2];
+	const XrCompositionLayerBaseHeader *layers[3];
 	uint32_t layerCount = 0;
 
 	const bool stereo = result.presented && result.eyeRendered[0] && result.eyeRendered[1] && viewsValid;
@@ -4091,10 +4207,24 @@ void idVRSystemOpenXR::EndFrame( void ) {
 		layers[layerCount++] = reinterpret_cast<const XrCompositionLayerBaseHeader *>( &projection );
 	}
 
+	XrCompositionLayerQuad wrist;
 	if ( result.presented ) {
-		// gameplay keeps the HUD in view; menus, loading and cinematics get a
-		// screen that stays where it was hung
+		// gameplay keeps the HUD in view; menus during play grow out of the off
+		// hand (vr_menuAnchor 1); the title, loading and cinematics get a screen
+		// that stays where it was hung
 		const bool hud = stereo && !MenuMode();
+		const int offHand = vr_leftHanded.GetBool() ? VR_HAND_RIGHT : VR_HAND_LEFT;
+		const bool handMenu = !hud && stereo && vr_menuAnchor.GetInteger() == 1 && PlaceHandPanel( offHand );
+		if ( !handMenu ) {
+			// the next panel grows out of the hand again; a screen hung in front
+			// is hung afresh rather than where the panel was
+			handPanel.valid = false;
+			panelMsec = 0;
+			if ( panelActive ) {
+				panelActive = false;
+				screenAnchored = false;
+			}
+		}
 		float screenWidth = 0.0f, screenHeight = 0.0f;
 		ScreenQuadSize( screenWidth, screenHeight );
 		memset( &quad, 0, sizeof( quad ) );
@@ -4113,6 +4243,29 @@ void idVRSystemOpenXR::EndFrame( void ) {
 			quad.pose.position.z = -idMath::ClampFloat( 0.5f, 5.0f, vr_hudDistance.GetFloat() );
 			quad.size.width = idMath::ClampFloat( 0.3f, 4.0f, vr_hudWidth.GetFloat() );
 			quad.size.height = quad.size.width * screenHeight / screenWidth;
+			// Health, armor and ammunition ride on the off-hand wrist
+			// (vr_hudMode 1): glance at it as at a watch. The rest of the HUD
+			// stays before the eyes without that band, where it was.
+			if ( vr_hudMode.GetInteger() == 1 && gripLocalValid[offHand] && headLocalValid ) {
+				const float fullHeight = quad.size.height;
+				quad.subImage.imageRect = ScreenRect( 0.0f, 0.0f, 1.0f, 1.0f - VR_WRIST_BAND );
+				quad.size.height = fullHeight * ( 1.0f - VR_WRIST_BAND );
+				quad.pose.position.y += fullHeight * VR_WRIST_BAND * 0.5f;
+				memset( &wrist, 0, sizeof( wrist ) );
+				wrist.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
+				wrist.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+				wrist.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+				wrist.space = localSpace;
+				wrist.subImage.swapchain = screenSwapchain.handle;
+				wrist.subImage.imageRect = ScreenRect( 0.5f - VR_WRIST_SPAN * 0.5f, 1.0f - VR_WRIST_BAND, 0.5f + VR_WRIST_SPAN * 0.5f, 1.0f );
+				const vrVec3_t centre = VR_WristCentre( VR_FromXrVec( gripLocalPoses[offHand].position ),
+					VR_QuatNormalize( VR_FromXrQuat( gripLocalPoses[offHand].orientation ) ) );
+				wrist.pose.position = VR_ToXrVec( centre );
+				wrist.pose.orientation = VR_ToXrQuat( VR_FacingQuat( centre, VR_FromXrVec( headLocalPose.position ) ) );
+				wrist.size.width = idMath::ClampFloat( 0.08f, 0.4f, vr_wristWidth.GetFloat() );
+				wrist.size.height = wrist.size.width * static_cast<float>( wrist.subImage.imageRect.extent.height ) /
+					static_cast<float>( Max( 1, wrist.subImage.imageRect.extent.width ) );
+			}
 		} else {
 			if ( !screenAnchored || lastFrameHud ) {
 				AnchorScreen();
@@ -4124,8 +4277,15 @@ void idVRSystemOpenXR::EndFrame( void ) {
 			quad.pose = screenAnchor;
 			quad.size.width = screenWidth;
 			quad.size.height = screenHeight;
+			// the panel in the hand lets the world show round what the menu draws
+			if ( handMenu ) {
+				quad.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+			}
 		}
 		layers[layerCount++] = reinterpret_cast<const XrCompositionLayerBaseHeader *>( &quad );
+		if ( hud && quad.subImage.imageRect.extent.height < screenSwapchain.height ) {
+			layers[layerCount++] = reinterpret_cast<const XrCompositionLayerBaseHeader *>( &wrist );
+		}
 		lastFrameHud = hud;
 	}
 

@@ -12,12 +12,18 @@ row. Nothing synthesises keyboard or mouse input: console commands write
 marker files, and the runtime acts on them.
 
 The pointer positions are fractions of the 16:9 virtual screen, measured on
-its captures of the retained pages (ui_retained 1, the launch default).
+its captures of the retained pages (ui_retained 1, the launch default). By
+default the menus grow out of the left hand on a panel (vr_menuAnchor 1,
+VR-09): the right hand is placed a little in front of the panel and aimed at
+each point on it, from the panel's pose as the engine builds it
+(src/framework/VRPanelCore.h) over the runtime's resting left hand and head.
+--menu-anchor 0 checks the screen hung in front instead.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -35,10 +41,42 @@ def canvas_to_screen(x: float, y: float) -> tuple[float, float]:
     return (160.0 + 1.5 * x) / 1280.0, (1.5 * y) / 720.0
 
 
+# The hand panel (vr_menuAnchor 1): the runtime's left hand rests at its grip's
+# default, the head at the stage's (0, 1.6, 0); VRPanelCore.h stands the
+# panel half its height plus 6 cm above the hand, turned to the head.
+PANEL_WIDTH_M = 0.5
+LEFT_HAND = (-0.2, 1.25, -0.35)
+HEAD = (0.0, 1.6, 0.0)
+MENU_ANCHOR = 1
+
+
+def panel_point(u: float, v: float) -> tuple[float, float, float]:
+    """(u, v) on the hand panel, in the stage space."""
+    height = PANEL_WIDTH_M / SCREEN_ASPECT
+    centre = (LEFT_HAND[0], LEFT_HAND[1] + height * 0.5 + 0.06, LEFT_HAND[2])
+    d = tuple(HEAD[i] - centre[i] for i in range(3))
+    yaw = math.atan2(d[0], d[2])
+    pitch = math.atan2(d[1], math.hypot(d[0], d[2]))
+    # the panel's right and up after its pitch (about +X), then its yaw (about +Y)
+    right = (math.cos(yaw), 0.0, -math.sin(yaw))
+    up = (-math.sin(pitch) * math.sin(yaw), math.cos(pitch), -math.sin(pitch) * math.cos(yaw))
+    x, y = (u - 0.5) * PANEL_WIDTH_M, (0.5 - v) * height
+    return tuple(centre[i] + right[i] * x + up[i] * y for i in range(3))
+
+
 def hand_pointing_at(u: float, v: float) -> str:
-    """A right-hand pose that points straight ahead at (u, v) on a screen hung 2.5 m ahead at eye height."""
-    height = SCREEN_WIDTH_M / SCREEN_ASPECT
-    return f"{(u - 0.5) * SCREEN_WIDTH_M:.3f} {1.6 + (0.5 - v) * height:.3f} 0 0 0 0"
+    """A right-hand pose that points at (u, v): on a screen hung 2.5 m ahead at
+    eye height, straight ahead; on the hand panel, from 25 cm before it."""
+    if MENU_ANCHOR == 0:
+        height = SCREEN_WIDTH_M / SCREEN_ASPECT
+        return f"{(u - 0.5) * SCREEN_WIDTH_M:.3f} {1.6 + (0.5 - v) * height:.3f} 0 0 0 0"
+    target = panel_point(u, v)
+    hand = (0.12, 1.3, -0.1)
+    d = tuple(target[i] - hand[i] for i in range(3))
+    # the runtime's yaw turns left about +Y, its pitch looks up about +X
+    yaw = math.degrees(math.atan2(-d[0], -d[2]))
+    pitch = math.degrees(math.atan2(d[1], math.hypot(d[0], d[2])))
+    return f"{hand[0]:.3f} {hand[1]:.3f} {hand[2]:.3f} {yaw:.3f} {pitch:.3f} 0"
 
 
 # where to click
@@ -66,7 +104,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--language", default="english", help="sys_lang, to check that translations fit")
     parser.add_argument("--render-api", choices=("gl", "vulkan"), default="gl")
+    parser.add_argument("--menu-anchor", type=int, choices=(0, 1), default=1,
+                        help="vr_menuAnchor: 1 the panel in the left hand (default), 0 the screen hung in front")
     options = parser.parse_args(argv)
+    global MENU_ANCHOR
+    MENU_ANCHOR = options.menu_anchor
     from PIL import Image
 
     staged = options.runtime_dir.resolve()
@@ -81,7 +123,7 @@ def main(argv: list[str] | None = None) -> None:
     output = (options.output_dir or ROOT / ".tmp/openxr-vr-menu-smoke").resolve()
     if output == staged or staged in output.parents or output in staged.parents:
         parser.error("output and staged runtime directories must not overlap")
-    profile = output / ( "sp-vulkan" if options.render_api == "vulkan" else "sp" )
+    profile = output / (("sp-vulkan" if options.render_api == "vulkan" else "sp") + ("" if MENU_ANCHOR == 1 else "-screen"))
     game = profile / "baseoq4"
     game.mkdir(parents=True, exist_ok=True)
     for stale in list(game.glob("vr_marker_*.txt")) + list(profile.glob("xr_*.tga")) + list(profile.glob("xr_*.png")):

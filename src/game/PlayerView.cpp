@@ -1181,8 +1181,20 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 
 	// where the shot lands, marked in each eye over its 3D pass
 	vrAimMarker_t aimMarker;
-	const bool drawAimMarker = vrFrame.aimLaser != VR_AIM_LASER_OFF && player->GetVRAimMarker( aimMarker );
-	const idMaterial *aimMaterial = drawAimMarker ? declManager->FindMaterial( "_white" ) : NULL;
+	// with a menu up the weapon hand is its pointer: its beam runs to the menu
+	// instead of the gun's laser (VR-09)
+	const bool drawAimMarker = !vrFrame.menuPointer && vrFrame.aimLaser != VR_AIM_LASER_OFF && player->GetVRAimMarker( aimMarker );
+	const idMaterial *aimMaterial = ( drawAimMarker || vrFrame.menuPointer ) ? declManager->FindMaterial( "_white" ) : NULL;
+	idVec3 pointerHand, pointerForward, pointerEnd;
+	if ( vrFrame.menuPointer ) {
+		const int pointing = vrFrame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT;
+		idMat3 handAxis, endAxis;
+		VR_PoseToWorld( vrFrame.aim[pointing], eyeOrigin, trackingYaw, pointerHand, handAxis );
+		pointerForward = handAxis[0];
+		vrPose_t end = vrFrame.aim[pointing];
+		end.origin = vrFrame.menuPointerEnd;
+		VR_PoseToWorld( end, eyeOrigin, trackingYaw, pointerEnd, endAxis );
+	}
 	// a weapon's zoom magnifies each eye by its own ratio, eased like the flat
 	// screen's field of view; the headset's own field of view cannot narrow
 	const float zoomScale = player->VRZoomScale();
@@ -1229,6 +1241,9 @@ void idPlayerView::VRView( idUserInterface *hud, const renderView_t *view, const
 		VR_DrawComfortVignette( lensView, headForward, vignette, vignetteMaterial );
 		if ( drawAimMarker ) {
 			VR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );
+		}
+		if ( vrFrame.menuPointer ) {
+			VR_DrawPointerBeam( eyeView, pointerHand, pointerForward, pointerEnd, vrFrame.menuPointerHit, aimMaterial );
 		}
 		ScreenFade();
 	}

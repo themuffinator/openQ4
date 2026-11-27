@@ -130,8 +130,8 @@ def check_abi() -> None:
     # game modules read the frame state by layout: new members go at the end
     frame = vr_system[vr_system.index("typedef struct vrFrameState_s {"):vr_system.index("} vrFrameState_t;")]
     members = re.findall(r"^\t(?:bool|int|float|idVec3|vrPose_t|vrEyeView_t)\s+(\w+)(?:\[\w+\])?;", frame, re.M)
-    if members[:1] != ["frameNumber"] or members[-3:] != ["roomScale", "twoHanded", "body"]:
-        raise AssertionError(f"vrFrameState_t grows at the end; twoHanded and body follow roomScale, found {members[-4:]}")
+    if members[:1] != ["frameNumber"] or members[-6:] != ["roomScale", "twoHanded", "body", "menuPointer", "menuPointerHit", "menuPointerEnd"]:
+        raise AssertionError(f"vrFrameState_t grows at the end; the menu pointer (VR-09) follows body, found {members[-7:]}")
 
     render_world = read("src/renderer/RenderWorld.h")
     for field in ("bool					asymmetricFov = false;", "float					fovTanLeft = 0.0f;",
@@ -140,7 +140,7 @@ def check_abi() -> None:
         require(render_world, field, "renderView_t keeps existing views symmetric")
 
     game = read("src/game/Game.h")
-    require(game, "const int GAME_API_VERSION\t\t= 65;", "game module ABI v65")
+    require(game, "const int GAME_API_VERSION\t\t= 66;", "game module ABI v66")
     import_block = game[game.index("struct gameImport_t {"):game.index("struct gameExport_t {")]
     # Append-only ABI: vrSystem (v50) keeps its slot; later members follow it.
     if not import_block.rstrip().rstrip("};").rstrip().endswith(
