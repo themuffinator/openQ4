@@ -87,6 +87,14 @@ typedef struct vrFrameState_s {
 	bool					roomScale;		// the body walks after the head (vr_roomScale)
 	bool					twoHanded;		// the off hand holds the gun's foregrip (vr_twoHanded)
 	int						body;			// vrBody_t: the player's own body in the eyes (vr_body)
+
+	// A menu during play takes the weapon hand as its pointer (VR-09): each eye
+	// draws a beam from that hand to where it meets the menu, in tracking space
+	// as aim, in place of the gun's laser and dot.
+	bool					menuPointer;	// a menu is up and the weapon hand points at its panel or screen
+	bool					menuPointerHit;	// the beam ends on the menu, at menuPointerEnd
+	idVec3					menuPointerEnd;	// tracking space, units
+	bool					menuUp;			// a session menu is up: the HUD stands down, as the menu shares its image
 } vrFrameState_t;
 
 // What the usercmd generator applies for one tic while VR drives input.
@@ -411,6 +419,67 @@ ID_INLINE void VR_DrawAimBeam( const renderView_t &view, const vrAimMarker_t &ma
 		renderSystem->DrawStretchTri( a0, b1, b0, vec2_origin, vec2_origin, vec2_origin, material );
 		renderSystem->DrawStretchTri( a0, a1, b1, vec2_origin, vec2_origin, vec2_origin, material );
 	}
+}
+
+// The menu pointer's beam (VR-09): a thin light ray from the hand to where it
+// meets the menu, brightest at the menu, with a glowing tip there; a ray that
+// meets nothing shows a short faint stub, so the hand still reads as a
+// pointer. Called between an eye's 3D pass and its fade, with "_white".
+ID_INLINE void VR_DrawPointerBeam( const renderView_t &view, const idVec3 &hand, const idVec3 &forward, const idVec3 &end, bool hit,
+	const idMaterial *material ) {
+	if ( material == NULL || !view.asymmetricFov ) {
+		return;
+	}
+	const float clearOfHand = 1.0f;				// units out of the controller
+	const float radius = 0.06f;					// units, about 1.5 mm
+	const float minimumHalfWidth = 0.0007f;		// tangent: about a pixel
+	const int segments = 8;
+	idVec3 direction = hit ? end - hand : forward;
+	float length = direction.Normalize();
+	if ( !hit ) {
+		length = 18.0f;							// about half a metre
+	}
+	if ( length <= clearOfHand ) {
+		return;
+	}
+	const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
+	renderSystem->SetUseUIViewportFor2D( false );
+	for ( int i = 0; i < segments; i++ ) {
+		const float nearDistance = clearOfHand + ( length - clearOfHand ) * static_cast<float>( i ) / static_cast<float>( segments );
+		const float farDistance = clearOfHand + ( length - clearOfHand ) * static_cast<float>( i + 1 ) / static_cast<float>( segments );
+		const float along = ( static_cast<float>( i ) + 0.5f ) / static_cast<float>( segments );
+		// fades in out of the hand; on the menu it brightens towards the tip,
+		// pointing at nothing it fades away again
+		const float alpha = hit ? 0.25f + 0.55f * along : 0.35f * ( 1.0f - along );
+		const vrEyeTangent_t a = VR_EyeTangent( view, hand + direction * nearDistance );
+		const vrEyeTangent_t b = VR_EyeTangent( view, hand + direction * farDistance );
+		if ( !a.inFront || !b.inFront ) {
+			continue;
+		}
+		idVec2 step( b.x - a.x, b.y - a.y );
+		if ( step.Normalize() <= 0.0f ) {
+			continue;
+		}
+		const idVec2 across( -step.y, step.x );
+		const float halfA = Max( radius / a.depth, minimumHalfWidth );
+		const float halfB = Max( radius / b.depth, minimumHalfWidth );
+		const idVec2 a0 = VR_EyeCanvasPoint( view, a.x + across.x * halfA, a.y + across.y * halfA );
+		const idVec2 a1 = VR_EyeCanvasPoint( view, a.x - across.x * halfA, a.y - across.y * halfA );
+		const idVec2 b0 = VR_EyeCanvasPoint( view, b.x + across.x * halfB, b.y + across.y * halfB );
+		const idVec2 b1 = VR_EyeCanvasPoint( view, b.x - across.x * halfB, b.y - across.y * halfB );
+		renderSystem->SetColor4( 0.8f, 0.92f, 1.0f, alpha );
+		renderSystem->DrawStretchTri( a0, b1, b0, vec2_origin, vec2_origin, vec2_origin, material );
+		renderSystem->DrawStretchTri( a0, a1, b1, vec2_origin, vec2_origin, vec2_origin, material );
+	}
+	if ( hit ) {
+		const vrEyeTangent_t tip = VR_EyeTangent( view, end );
+		if ( tip.inFront ) {
+			renderSystem->SetColor4( 0.8f, 0.92f, 1.0f, 0.35f );
+			VR_DrawEyeDisc( view, tip.x, tip.y, 0.0060f, material );
+		}
+	}
+	renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
+	renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
 }
 
 // Called between an eye's 3D pass and its fade, with the "_white" material.

@@ -4816,7 +4816,7 @@ def pause_document(strogg: bool = False) -> dict:
         plates = [navigation_plate(doc, ident, key, action=action, event=event) for ident, key, action, event in items]
     nav = group("nav", {**absolute(left=0, top=U * 182.2, width=U * 413), "display": keyword("flex"),
                         "flex-direction": keyword("column")}, plates)
-    from retained_vr import SHOW as VR_SETUP_SHOW, TITLE as VR_SETUP_TITLE, setup_modal, vr_state
+    from retained_vr import SHOW as VR_SETUP_SHOW, TITLE as VR_SETUP_TITLE, hand_menu, setup_modal, vr_state
     if strogg:
         # The actions translate 45 ms apart, EXIT after them, and the level
         # block's lines follow.
@@ -4838,6 +4838,12 @@ def pause_document(strogg: bool = False) -> dict:
                             **typeface("marine", 18, U * 24, [1, 1, 1, 0.5]), "white-space": keyword("nowrap")}),
                       nav, level_block(doc), plinth(doc, [exit_link, vr_link])]
     vr_modal = setup_modal(doc, strogg=strogg)
+    # In a headset the pause is a card over the off hand (retained_vr.hand_menu,
+    # VR-09): the desktop pause's backdrop, bands, level block, prompts and
+    # carried titles stand down, and the world shows round the card.
+    vr = vr_state(doc)
+    flat = {"op": "select", "args": [vr, "none", "block"]}
+    vr_card = hand_menu(doc, strogg=strogg)
     # GAME PAUSED is the screen's title; the level block's details grow.
     fixed_text(doc, home_parts[0])
     reflow_level_block(doc, home_parts[2], strogg)
@@ -4857,8 +4863,11 @@ def pause_document(strogg: bool = False) -> dict:
     doc.state["soft_focus"] = {"type": "boolean", "initial": False, "cvar": "ui_retainedSoftFocus"}
     softened = group("scene-softfocus", {**FULL, "display": keyword("none"), "backdrop-blur": length(SOFT_FOCUS_BLUR),
                                          "backdrop-saturate": number(SOFT_FOCUS_SATURATION)})
-    doc.bind("scene-softfocus.display", "scene-softfocus", "display", {"op": "select", "args": [{"state": "soft_focus"}, "block", "none"]})
-    doc.bind("scrim.display", "scrim", "display", {"op": "select", "args": [{"state": "soft_focus"}, "none", "block"]})
+    not_vr = {"op": "!", "args": [vr]}
+    doc.bind("scene-softfocus.display", "scene-softfocus", "display",
+             {"op": "select", "args": [{"op": "&&", "args": [{"state": "soft_focus"}, not_vr]}, "block", "none"]})
+    doc.bind("scrim.display", "scrim", "display",
+             {"op": "select", "args": [{"op": "||", "args": [{"state": "soft_focus"}, vr]}, "none", "block"]})
     scrim = vector("scrim", {**FULL, "display": keyword("block"), "opacity": number(1)}, [
         path("dim", [(0, 0), ({"fraction": 1}, 0), ({"fraction": 1}, {"fraction": 1}), (0, {"fraction": 1})], fill=solid([0, 0, 0, 0.45])),
         path("lead", [(0, 0), (vx(413), 0), (vx(413), {"fraction": 1}), (0, {"fraction": 1})],
@@ -4885,14 +4894,23 @@ def pause_document(strogg: bool = False) -> dict:
     # Everything but the softened view and its stand-in: returning to the
     # game hides it at once (section 8), while the backdrop releases.
     doc.state["pause.released"] = {"type": "boolean", "initial": False}
+    # The Objectives page in a headset reads off a plate of its own: the lit
+    # field and bands it stands on at the desktop stand down there.
+    vr_backing = group("vr-objectives-backing", {**FULL, "background-color": colour([0, 0, 0, 0.88]), "display": keyword("none"),
+                                                 "pointer-events": keyword("none")})
+    doc.bind("vr-objectives-backing.display", "vr-objectives-backing", "display",
+             {"op": "select", "args": [{"op": "&&", "args": [vr, {"state": "objectives.visible"}]}, "block", "none"]})
+    # The field, the Objectives bar, the bands and the home stay siblings, as
+    # the Awakening's frost reads them (retained_awakening.awaken_frame).
+    desktop = [group("desktop-home", {**FULL, "display": keyword("block")}, [*field, objectives_bar, *bands, content]),
+               vr_backing,
+               objectives,
+               group("desktop-prompts", {**FULL, "display": keyword("block")}, [prompt, carry])]
+    for ident in ("desktop-home", "desktop-prompts"):
+        doc.bind(f"{ident}.display", ident, "display", flat)
     chrome = group("chrome", {**FULL, "display": keyword("block")}, [
-        *field,
-        objectives_bar,
-        *bands,
-        content,
-        objectives,
-        prompt,
-        carry,
+        *desktop,
+        vr_card,
         quit_modal,
         exit_modal,
         vr_modal,
@@ -4923,7 +4941,8 @@ def pause_document(strogg: bool = False) -> dict:
     reset = {"op": "setState", "values": {"objectives.visible": False, "objectives.leaving": False, "pause.released": False}}
     # Each opening focuses RESUME, the primary action (section 13.4); a page's
     # Back (returnHome) keeps the focus on the item that led there.
-    resume = {"op": "focus", "control": "nav_resume"}
+    resume = {"op": "if", "condition": vr, "then": [{"op": "focus", "control": "vr_resume"}],
+              "else": [{"op": "focus", "control": "nav_resume"}]}
     doc.events["open"] = [reset, *doc.events.get("open", [{"op": "playTimeline", "timeline": "open"}]), resume]
     # Returning to the game closes the screen at once (section 8), but the
     # softened view, or the scrim standing in for it, releases over 250 ms as

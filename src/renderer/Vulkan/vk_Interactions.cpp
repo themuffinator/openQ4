@@ -248,11 +248,21 @@ typedef struct vkShadowBlock_s {
 	float			biasParams[ 4 ];	// x: constant, y: normal, z: cascade blend, w: cascade count
 	float			texelSize[ 4 ];		// x,y: 1 / atlas dimensions, z: r_shadowMapTexelBiasScale
 	float			filterParams[ 4 ];	// x: radius, y: taps, z: mode, w: hardware compare
-	float			pcssParams[ 4 ];	// x: light radius, y: max radius, z: effective radius, w: receiver-plane bias
+	float			pcssParams[ 4 ];	// x: light radius, y: max radius, z: effective radius, w: receiver-plane bias (0 or 1) + sun penumbra tangent (VK_Inter_PcssFlagAndSun)
 	float			debugParams[ 4 ];	// x: debug mode, y: fallback reason, zw: PCSS ownership UV offset
 	float			momentAtlas[ 4 ];	// translucent moments: depth->moment UV scale (0 = none), bias u, v, 1 / moment atlas size
 	float			momentParams[ 4 ];	// x: density, y: min variance, z: bleed reduction, w: filter radius
 } vkShadowBlock_t;
+
+// The block is full, so the last PCSS slot carries two things: the
+// receiver-plane bias flag as its whole part and, below it, the tangent of
+// half a sun-like light's apparent diameter (0 for every other light), which
+// the settings keep under SHADOWMAP_SUN_PENUMBRA_MAX_TAN. The receiver reads
+// the flag as "> 0.5" and the tangent as what is left.
+static float VK_Inter_PcssFlagAndSun( const bool receiverPlaneBias, const float sunPenumbraTan ) {
+	return ( receiverPlaneBias ? 1.0f : 0.0f )
+		+ idMath::ClampFloat( 0.0f, SHADOWMAP_SUN_PENUMBRA_MAX_TAN, sunPenumbraTan );
+}
 
 // r_shadowMapDebugMode reaches both receiver shaders through the shadow ABI
 // (glprogs uShadowDebugMode parity). Vulkan admits shadow maps per light
@@ -904,8 +914,9 @@ static bool VK_ClassicInteraction_BuildMappedShadowBlock(
 	block.pcssParams[ 0 ] = mapPass.projected.filter.pcssLightRadius;
 	block.pcssParams[ 1 ] = mapPass.projected.filter.pcssMaxRadius;
 	block.pcssParams[ 2 ] = mapPass.projected.filter.effectiveFilterRadius;
-	block.pcssParams[ 3 ] = mapPass.projected.receiverPlaneBias
-		? 1.0f : 0.0f;
+	block.pcssParams[ 3 ] = VK_Inter_PcssFlagAndSun(
+		mapPass.projected.receiverPlaneBias,
+		mapPass.projected.filter.sunPenumbraTan );
 	block.debugParams[ 0 ] = VK_ShadowMap_DebugModeValue();
 	return true;
 }
@@ -3914,8 +3925,9 @@ static int VK_Inter_WriteShadowSlice( const viewEntity_t *space ) {
 	block.pcssParams[ 0 ] = filterSettings.pcssLightRadius;
 	block.pcssParams[ 1 ] = filterSettings.pcssMaxRadius;
 	block.pcssParams[ 2 ] = filterSettings.effectiveFilterRadius;
-	block.pcssParams[ 3 ] =
-			r_shadowMapReceiverPlaneBias.GetBool() ? 1.0f : 0.0f;
+	block.pcssParams[ 3 ] = VK_Inter_PcssFlagAndSun(
+			r_shadowMapReceiverPlaneBias.GetBool(),
+			filterSettings.sunPenumbraTan );
 	block.debugParams[ 0 ] = VK_ShadowMap_DebugModeValue();
 	if ( passState->unionLocalDepth ) {
 		// Both blocks share the cascade layout; a tile-aligned UV translation

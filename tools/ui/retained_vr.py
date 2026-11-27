@@ -103,3 +103,82 @@ def headset_symbol(ident: str) -> dict:
              fill=solid([1, 1, 1, 0.9])),
         path("strap", [(2.0, 6.5), (1.0, 4.5), (15.0, 4.5), (14.0, 6.5)], closed=False, stroke=stroke(solid([1, 1, 1, 0.6]), 1.0)),
     ])
+
+
+# ----------------------------------------------------------- the hand menu
+
+# The pause as the off hand holds it (vr_menuAnchor 1): nothing but its
+# buttons, one column down the middle of the panel over the hand, the world
+# round it. No plate, title or ornament: every part drawn is a pointer target
+# that grows and lights up as the laser comes to rest on it (and the hand
+# ticks), with every action the desktop pause has. The family's 45-degree cut
+# is the buttons' own shape, not an addition.
+CARD_W = 520.0                              # dp: the column's width
+BUTTON_H, BUTTON_GAP = 70.0, 4.0            # dp: nine buttons take 662 of the canvas's 720
+BUTTON_CUT = 16.0                           # dp: the lower-leading 45-degree cut
+HOVER_SCALE = 1.06                          # the button under the pointer grows by this, at once
+CARD_ITEMS = (("vr_resume", "#str_200381", "resume", None), ("vr_objectives", "#str_200380", None, "objectivesShow"),
+              ("vr_savegame", "#str_200003", "saveGame", None), ("vr_loadgame", "#str_200001", "loadGame", None),
+              ("vr_restart", "#str_229983", "restartLevel", None), ("vr_settings", "#str_200009", "settings", None),
+              ("vr_vrsetup", TITLE, None, SHOW), ("vr_quit", "#str_230025", None, "quitModalShow"),
+              ("vr_exit", "#str_200013", None, "exitModalShow"))
+
+
+def card_button(doc: Document, ident: str, key: str, top: float, *, action: str | None, event: str | None,
+                hot: str, face: str) -> dict:
+    """One button: a dark plate cut at its lower-leading corner and its label,
+    nothing else. Under the pointer it grows by HOVER_SCALE about its middle at
+    once (focus over the shared 80 ms) and fills with the family's hot colour,
+    its label turning dark; a hover timeline runs 1 ms, so its keys take no
+    longer span. The growth is the body's, inside the control, whose hit box
+    stays put."""
+    from build_retained_screens import colour, number, transform
+    shape = [(0, 0), (CARD_W, 0), (CARD_W, BUTTON_H), (BUTTON_CUT, BUTTON_H), (0, BUTTON_H - BUTTON_CUT)]
+    box = absolute(left=0, top=0, width=CARD_W, height=BUTTON_H)
+    rest = vector(f"{ident}-rest", {**box, "opacity": number(1)}, [path("fill", shape, fill=solid([0, 0, 0, 0.62]))])
+    lit = vector(f"{ident}-lit", {**box, "opacity": number(0)}, [path("fill", shape, fill=solid(rgb(hot, 0.92)))])
+    light, dark = colour([1, 1, 1, 0.92]), colour([0, 0, 0, 1])
+    text = label(f"{ident}-label", key, {**box, **typeface(face, 28, BUTTON_H, [1, 1, 1, 0.92]), "text-align": keyword("center"),
+                                         "white-space": keyword("nowrap"), "overflow": keyword("hidden")})
+    grown, still = transform(sx=HOVER_SCALE, sy=HOVER_SCALE), transform()
+    body = f"{ident}-body"
+    hot_state = [(body, "transform", grown), (f"{ident}-lit", "opacity", number(1)), (f"{ident}-rest", "opacity", number(0)),
+                 (f"{ident}-label", "color", dark)]
+    ids = doc.states(ident, {
+        "default": [(body, "transform", still), (f"{ident}-lit", "opacity", number(0)), (f"{ident}-rest", "opacity", number(1)),
+                    (f"{ident}-label", "color", light)],
+        "hover": hot_state,
+        "focus": hot_state,
+        "pressed": [(body, "transform", transform(sx=1.02, sy=1.02)), (f"{ident}-lit", "opacity", number(1)),
+                    (f"{ident}-rest", "opacity", number(0)), (f"{ident}-label", "color", dark)],
+        "disabled": [(body, "transform", still), (f"{ident}-lit", "opacity", number(0)), (f"{ident}-rest", "opacity", number(0.4)),
+                     (f"{ident}-label", "color", colour([1, 1, 1, 0.4]))],
+    })
+    control = {"role": "button", "label": key, "states": ids}
+    if action:
+        control["action"] = action
+    else:
+        control["event"] = event
+    return group(ident, absolute(left=0, top=top, width=CARD_W, height=BUTTON_H),
+                 [group(body, {**box, "transform": transform()}, [rest, lit, text])], control=control)
+
+
+def hand_menu(doc: Document, *, strogg: bool = False) -> dict:
+    """The column of CARD_ITEMS, centred on the panel, shown only while the
+    game presents to a headset and the Objectives page is closed. Up and Down
+    wrap through it."""
+    from build_retained_screens import ST_SELECT, ORANGE as _ORANGE
+    hot, face = (ST_SELECT, "r_strogg") if strogg else (_ORANGE, "marine")
+    height = len(CARD_ITEMS) * (BUTTON_H + BUTTON_GAP) - BUTTON_GAP
+    buttons = [card_button(doc, ident, key, index * (BUTTON_H + BUTTON_GAP), action=action, event=event, hot=hot, face=face)
+               for index, (ident, key, action, event) in enumerate(CARD_ITEMS)]
+    ids = [button["id"] for button in buttons]
+    for index, button in enumerate(buttons):
+        button["control"]["navigation"] = {"up": ids[index - 1], "down": ids[(index + 1) % len(ids)], "left": ids[index],
+                                           "right": ids[index]}
+    card = group("vr-card", {"position": keyword("absolute"), "left": length(50, "%"), "top": length(50, "%"),
+                             "margin-left": length(-CARD_W / 2), "margin-top": length(-height / 2), "width": length(CARD_W),
+                             "height": length(height), "display": keyword("none")}, buttons)
+    shown = {"op": "&&", "args": [vr_state(doc), {"op": "!", "args": [{"state": "objectives.visible"}]}]}
+    doc.bind("vr-card.display", "vr-card", "display", {"op": "select", "args": [shown, "block", "none"]})
+    return card

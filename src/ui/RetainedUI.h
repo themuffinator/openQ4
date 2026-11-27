@@ -115,6 +115,9 @@ int RetainedUI_PromptGlyphs();
 // and Back); documents read it as the adapter-owned state prompt.swapped.
 bool RetainedUI_PromptSwapped();
 unsigned RetainedUI_InputGeneration();
+// Counts the times the pointer came to rest on another control of an active
+// retained document; the VR pointer ticks the pointing hand on each (VR-09).
+unsigned RetainedUI_HoverGeneration();
 // Registered retained views (documents holding an RmlUi context), for the
 // ui_retained gate report: zero while the stock interface presents everything.
 int RetainedUI_ViewCount();

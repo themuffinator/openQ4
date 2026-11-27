@@ -1848,6 +1848,7 @@ typedef struct {
 	GLint			shadowFilterMode;
 	GLint			shadowPCSSLightRadius;
 	GLint			shadowPCSSMaxRadius;
+	GLint			shadowSunPenumbra;
 	GLint			shadowAtlasRect;
 	GLint			shadowSplitDepths;
 	GLint			shadowCascadeBiasScale;
@@ -2278,6 +2279,9 @@ typedef struct {
 	// whole-light cascades served from their cached still scenery / drawn and stored
 	int					wholeLightReuses;
 	int					wholeLightPublishes;
+	// mapped receiver passes drawn against the stencil of casters their map
+	// cannot hold (RB_ShadowMapPrepareMappedReceiverStencil)
+	int					hybridReceiverPasses;
 	int					projectedAtlasTilesAllocated;
 	int					projectedCacheSlotsUsed;
 	int					projectedCacheSlotsTotal;
@@ -5701,6 +5705,7 @@ static const char *programBaseName = "glprogs/shadow_interaction";
 	g_shadowMapProgram.shadowFilterMode = glGetUniformLocationARB( programObject, "uShadowFilterMode" );
 	g_shadowMapProgram.shadowPCSSLightRadius = glGetUniformLocationARB( programObject, "uShadowPCSSLightRadius" );
 	g_shadowMapProgram.shadowPCSSMaxRadius = glGetUniformLocationARB( programObject, "uShadowPCSSMaxRadius" );
+	g_shadowMapProgram.shadowSunPenumbra = glGetUniformLocationARB( programObject, "uShadowSunPenumbra" );
 	g_shadowMapProgram.shadowAtlasRect = glGetUniformLocationARB( programObject, "uShadowAtlasRect[0]" );
 	g_shadowMapProgram.shadowSplitDepths = glGetUniformLocationARB( programObject, "uShadowSplitDepths[0]" );
 	g_shadowMapProgram.shadowCascadeBiasScale = glGetUniformLocationARB( programObject, "uShadowCascadeBiasScale[0]" );
@@ -7209,7 +7214,7 @@ static void RB_ShadowMapStatsReport( void ) {
 	}
 
 	common->Printf(
-		"SM metrics: updates=%d composed=%d subview(updates=%d reuse=%d fallback=%d) translucentReceivers=%d admissionDenied=%d scheduledSkip=%d atlasTiles=%d/%d pointFaces=%d pointHiP=%d pointCmp=%d cpu(render=%.2f mask=%.2f) gpuSync=%.2f gpuQuery=%.2f/%d pending=%d texelWorld=[%.3f %.3f] casterDraws=%d casterIndexes=%d farSlot=%d/%d\n",
+		"SM metrics: updates=%d composed=%d subview(updates=%d reuse=%d fallback=%d) translucentReceivers=%d admissionDenied=%d scheduledSkip=%d atlasTiles=%d/%d pointFaces=%d pointHiP=%d pointCmp=%d cpu(render=%.2f mask=%.2f) gpuSync=%.2f gpuQuery=%.2f/%d pending=%d texelWorld=[%.3f %.3f] casterDraws=%d casterIndexes=%d farSlot=%d/%d hybrid=%d\n",
 		g_shadowMapStats.shadowMapUpdates,
 		g_shadowMapStats.composePasses,
 		g_shadowMapStats.subviewUpdates,
@@ -7234,7 +7239,8 @@ static void RB_ShadowMapStatsReport( void ) {
 		g_shadowMapStats.projectedCasterDraws,
 		g_shadowMapStats.projectedCasterIndexes,
 		g_shadowMapStats.wholeLightReuses,
-		g_shadowMapStats.wholeLightPublishes );
+		g_shadowMapStats.wholeLightPublishes,
+		g_shadowMapStats.hybridReceiverPasses );
 	common->Printf(
 		"SM timings: cpu(map=%.2f reuse=%.2f mask=%.2f receiverFallback=%.2f stencilFallback=%.2f) gpuSync(map=%.2f reuse=%.2f mask=%.2f receiverFallback=%.2f stencilFallback=%.2f) gpuQuery(map=%.2f/%d reuse=%.2f/%d mask=%.2f/%d receiverFallback=%.2f/%d stencilFallback=%.2f/%d pending=%d:%d/%d/%d/%d/%d)\n",
 		g_shadowMapStats.cpuPhaseMilliseconds[SHADOWMAP_TIMING_MAP_RENDER],
@@ -11965,6 +11971,11 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 	if ( g_shadowMapProgram.shadowPCSSMaxRadius >= 0 ) {
 		glUniform1fARB( g_shadowMapProgram.shadowPCSSMaxRadius, filterSettings.pcssMaxRadius );
 	}
+	if ( g_shadowMapProgram.shadowSunPenumbra >= 0 ) {
+		float sunPenumbra[SHADOWMAP_MAX_CASCADES];
+		R_ShadowMapProjectedSunPenumbraScales( g_projectedShadowMapState, filterSettings.sunPenumbraTan, sunPenumbra );
+		glUniform1fvARB( g_shadowMapProgram.shadowSunPenumbra, SHADOWMAP_MAX_CASCADES, sunPenumbra );
+	}
 	if ( g_shadowMapProgram.shadowAtlasRect >= 0 ) {
 		// State rects stay in the per-light convention (planner parity depends
 		// on it); the light's atlas slot is composed here at upload time. For
@@ -13025,6 +13036,7 @@ static bool RB_ShadowMapPrepareMappedReceiverStencil(
 	}
 	glStencilFunc( GL_GEQUAL, 128, 255 );
 	g_shadowMapReceiverStencilSupplement = true;
+	g_shadowMapStats.hybridReceiverPasses++;
 	return true;
 }
 
@@ -16861,6 +16873,13 @@ static void RB_SharedWorldInteractionGLBeginMappedReceiver(
 			pass.projected.filter.pcssLightRadius );
 		glUniform1fARB( g_shadowMapProgram.shadowPCSSMaxRadius,
 			pass.projected.filter.pcssMaxRadius );
+		if ( g_shadowMapProgram.shadowSunPenumbra >= 0 ) {
+			float sunPenumbra[SHADOWMAP_MAX_CASCADES] = {};
+			R_ShadowMapProjectedSunPenumbraScales( pass.projected.state,
+				pass.projected.filter.sunPenumbraTan, sunPenumbra );
+			glUniform1fvARB( g_shadowMapProgram.shadowSunPenumbra,
+				SHADOWMAP_MAX_CASCADES, sunPenumbra );
+		}
 		const float slotU0 = preparedPass.projectedOriginX
 			/ static_cast<float>( atlasWidth );
 		const float slotV0 = preparedPass.projectedOriginY

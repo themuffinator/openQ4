@@ -149,3 +149,6 @@ version in the report. The log's `VR_RUNTIME`, `VR_MODE`, `VR_OFFER` and
 | 8.8 | Type a player name or server address in the headset. | The game's on-screen keyboard opens on the floating screen and the laser types on it; no keyboard opens on the desktop. |
 | 8.9 | With `vr_mirror 1`, open and close menus while someone watches the desktop. | The desktop shows the menu while one is up and the left eye in play. |
 | 8.10 | Repeat 8.6 in The Awakening (`q4xbase`). | VR SETUP opens in the Awakening's pause style and works the same. |
+| 8.11 | In play, press the menu button with your off hand held naturally, then move and steady that hand. | The menu grows out of the off hand onto a panel facing you, the level still around it; it follows a moved hand and stays still while you hold steady; the pointer's beam and dot are easy to put on a button. |
+| 8.12 | Rest the pointer on each pause button and on settings rows. | The button under it grows and lights up at once and the hand ticks once per new control; nothing depends on hovering to appear. |
+| 8.13 | Glance at your off-hand wrist in a fight, with `vr_hudMode 1`. | Health, armor and ammunition read at a glance; notices and objective updates still appear before your eyes. |

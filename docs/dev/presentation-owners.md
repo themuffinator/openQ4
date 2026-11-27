@@ -115,7 +115,8 @@ appear when the server spawns them.
 `viewAngles`, `deltaViewAngles`, `firstPersonViewOrigin/Axis` and the usercmd.
 [`presentation_hf_contract.py`](https://github.com/themuffinator/openQ4/blob/master/tools/tests/presentation_hf_contract.py)
 rejects writes to each of them from the late-look path, confines the correction
-to the presentation functions and checks the SP/MP bodies are identical;
+to the presentation functions and checks that none of them tests the game
+mode, so single-player and multiplayer run the same bodies;
 `--mutations` proves representative regressions fail it.
 
 ## Visual ownership inventory (HF-04)
@@ -218,7 +219,8 @@ Any other effect started in a draw is gameplay. The counts ride each
 `presentation_look_runtime.py` fails any case that records gameplay. The guard
 only reports and never changes what runs. The contract requires the call to come
 first in each entry point, the renderer scopes around scene submission and
-identical SP/MP bodies, and a mutation that removes a guard must fail.
+no mode gate in the presentation owners, and a mutation that removes a guard
+must fail.
 
 HF-06 is qualified engine-side by the runtime cases in Evidence. Every case
 passes the gameplay guard, including stereo draws (`vr`), a remote-camera
@@ -443,7 +445,8 @@ usercmds, steady and flick-speed turns through the wrap and both pitch clamps:
 the drawn view equals the input sampled at the draw within 0.02°, interpolation
 alone always trails by a tick, no draw turns further than the input did, and
 held rates draw without a staircase. Static: `presentation_hf_contract.py`
-(engine sampler, SP/MP owners, alternate views, AF history, mutations) and the
+(engine sampler, mode-independent owners, alternate views, AF history,
+mutations) and the
 updated `presentation_interpolation_contract.py`.
 
 Live single player, `game/airdefense1`, OpenGL, synthetic probe at 2000

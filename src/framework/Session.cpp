@@ -10614,7 +10614,10 @@ void idSessionLocal::Draw() {
 			DrawRetailPortalSky();
 			rw->RenderScene( &currentDemoRenderView );
 			renderSystem->DrawDemoPics();
-		} else if ( guiActive == guiSystem || guiActive->State().GetBool( "gameDraw" ) ) {
+		} else if ( guiActive == guiSystem || guiActive->State().GetBool( "gameDraw" ) ||
+				// In a headset every menu during play keeps the world around it:
+				// the menu is a panel in the off hand, not a screen in a void (VR-09).
+				( guiActive != guiTakeNotes && mapSpawned && vrSystem != NULL && vrSystem->IsActive() ) ) {
 			if ( mapSpawned && !com_skipGameDraw.GetBool() && GetLocalClientNum() >= 0 ) {
 				bool gameDraw = game->Draw( GetLocalClientNum() );
 				if ( !gameDraw ) {

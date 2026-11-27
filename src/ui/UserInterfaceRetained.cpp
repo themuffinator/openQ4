@@ -773,6 +773,11 @@ bool WriteString(idFile& file, const std::string& value) {
 }
 }
 
+// RetainedUI_HoverGeneration: one more each time the pointer comes to rest
+// on another control of an active document.
+static unsigned retainedHoverGeneration = 0;
+unsigned RetainedUI_HoverGeneration() { return retainedHoverGeneration; }
+
 struct idUserInterfaceRetained::Impl {
 	idDict state;
 	// The public dictionary is a pending batch. Keep it intact for saves and
@@ -1069,7 +1074,18 @@ struct idUserInterfaceRetained::Impl {
 	// Prompts follow the active device (section 13.5): a document that declares
 	// prompt.glyphs gets RetainedUI_PromptGlyphs in the frame it changes, the
 	// keyboard's keycaps or a controller family's face buttons.
+	// A control the pointer newly rests on, of the document that takes input.
+	std::string lastHovered;
+	void TrackPointerHover() {
+		auto* runtime = RuntimeView();
+		if (!runtime || !active || !interactive) return;
+		auto hovered = runtime->HoveredControl();
+		if (hovered == lastHovered) return;
+		if (!hovered.empty()) ++retainedHoverGeneration;
+		lastHovered = std::move(hovered);
+	}
 	void PublishPromptGlyphs() {
+		TrackPointerHover();
 		static const char* const name = "prompt.glyphs";
 		static const char* const swapped = "prompt.swapped";
 		StateValues changed;

@@ -1037,6 +1037,7 @@ static void HashProjectedShadowState( std::uint64_t &hash,
 	HashInt( hash, projected.filter.filterMode );
 	HashFloat( hash, projected.filter.pcssLightRadius );
 	HashFloat( hash, projected.filter.pcssMaxRadius );
+	HashFloat( hash, projected.filter.sunPenumbraTan );
 	HashFloat( hash, projected.filter.effectiveFilterRadius );
 	HashFloat( hash, projected.constantBias );
 	HashFloat( hash, projected.normalBias );

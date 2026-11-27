@@ -1,5 +1,6 @@
 // Copyright (C) 2026 DarkMatter Productions
 #include "../../../src/framework/VRMathCore.h"
+#include "../../../src/framework/VRPanelCore.h"
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
@@ -442,6 +443,57 @@ static void TestAuditLeads( void ) {
 	Check( VR_TrackpadRegion( std::nanf( "" ), 0.5f, 0.0f ) == VR_PAD_CENTRE, "a nonsense pad reads as the centre" );
 }
 
+// The menu panel grows out of the off hand and the wrist display rides on it
+// (VRPanelCore.h, VR-09).
+static void TestHandPanel( void ) {
+	const vrVec3_t head = VR_Vec3( 0.0f, 1.6f, 0.0f );
+	const vrVec3_t hand = VR_Vec3( -0.2f, 1.1f, -0.4f );
+	// facing: +Z of the panel points at the head, with no roll
+	const vrVec3_t rest = VR_HandPanelRest( hand, 0.34f );
+	Check( Near( rest.y, 1.1f + 0.17f + VR_PANEL_LIFT, 1.0e-5f ) && Near( rest.x, -0.2f ) && Near( rest.z, -0.4f ), "the panel stands on the hand" );
+	const vrQuat_t facing = VR_FacingQuat( rest, head );
+	const vrVec3_t toHead = VR_Sub( head, rest );
+	const vrVec3_t normal = VR_RotateVector( facing, VR_Vec3( 0.0f, 0.0f, 1.0f ) );
+	Check( NearVec( normal, VR_Scale( toHead, 1.0f / VR_Length( toHead ) ) ), "the panel's face turns to the head" );
+	const vrVec3_t side = VR_RotateVector( facing, VR_Vec3( 1.0f, 0.0f, 0.0f ) );
+	Check( Near( side.y, 0.0f, 1.0e-5f ), "the panel never rolls" );
+	Check( NearVec( VR_RotateVector( VR_FacingQuat( VR_Vec3( 0, 0, 0 ), VR_Vec3( 0, 0, 1 ) ), VR_Vec3( 0, 0, 1 ) ), VR_Vec3( 0, 0, 1 ) ),
+		"facing along +Z is no turn" );
+	// opening: it starts at the hand, a tenth of its size, and grows within 180 ms
+	vrHandPanel_t panel = {};
+	Check( VR_HandPanelStep( panel, hand, head, 0.34f, 0.011f ), "the first step opens the panel" );
+	Check( NearVec( VR_HandPanelDrawnCentre( panel, hand ), hand ) && Near( VR_HandPanelDrawnScale( panel ), 0.1f ),
+		"an opening panel starts at the hand, a tenth of its size" );
+	for ( int i = 0; i < 20; i++ ) {
+		Check( !VR_HandPanelStep( panel, hand, head, 0.34f, 0.011f ), "only the first step opens it" );
+	}
+	Check( Near( VR_HandPanelDrawnScale( panel ), 1.0f ) && NearVec( VR_HandPanelDrawnCentre( panel, hand ), rest ),
+		"after 180 ms it stands at full size on the hand" );
+	// tremor inside the dead zone moves nothing
+	const vrVec3_t shaken = VR_Add( hand, VR_Vec3( 0.006f, -0.005f, 0.004f ) );
+	VR_HandPanelStep( panel, shaken, head, 0.34f, 0.011f );
+	Check( NearVec( panel.position, rest ), "a steady hand's tremor leaves the panel still" );
+	// a real move is followed, and caught up within a tenth of a second
+	const vrVec3_t moved = VR_Add( hand, VR_Vec3( 0.15f, 0.05f, 0.0f ) );
+	VR_HandPanelStep( panel, moved, head, 0.34f, 0.011f );
+	Check( panel.following && VR_Length( VR_Sub( panel.position, rest ) ) > 0.005f, "moving the hand moves the panel" );
+	for ( int i = 0; i < 12; i++ ) {
+		VR_HandPanelStep( panel, moved, head, 0.34f, 0.011f );
+	}
+	Check( VR_Length( VR_Sub( panel.position, VR_HandPanelRest( moved, 0.34f ) ) ) < 0.02f, "the panel catches up with the hand" );
+	for ( int i = 0; i < 60; i++ ) {
+		VR_HandPanelStep( panel, moved, head, 0.34f, 0.011f );
+	}
+	Check( !panel.following, "the panel settles where the hand rests" );
+	// a long frame cannot overshoot
+	vrHandPanel_t jump = panel;
+	VR_HandPanelStep( jump, VR_Add( moved, VR_Vec3( 1.0f, 0.0f, 0.0f ) ), head, 0.34f, 5.0f );
+	Check( jump.position.x <= VR_HandPanelRest( moved, 0.34f ).x + 1.0f, "a long frame does not overshoot" );
+	// the wrist: behind the grip along the controller, then up
+	const vrVec3_t wrist = VR_WristCentre( hand, VR_QuatIdentity() );
+	Check( NearVec( wrist, VR_Vec3( -0.2f, 1.1f + VR_WRIST_LIFT, -0.4f + VR_WRIST_BACK ) ), "the wrist display sits behind the grip, raised" );
+}
+
 int main() {
 	TestBasis();
 	TestOrientation();
@@ -460,6 +512,7 @@ int main() {
 	TestHeadsetServices();
 	TestBody();
 	TestAuditLeads();
+	TestHandPanel();
 	std::printf( "VR math core: all checks passed\n" );
 	return 0;
 }

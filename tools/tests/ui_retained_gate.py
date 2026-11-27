@@ -6195,7 +6195,13 @@ def main() -> int:
             notices = ['notice-0', 'notice-1', 'notice-2'] if relative.endswith('/pause.rui') else []
             assert [child['id'] for child in document['root']['children']] == ['scene-softfocus', 'scrim', 'chrome', *notices], relative
         if 'pause' in relative:
-            layers = [child['id'] for child in document['root']['children'][2]['children']]
+            # The desktop home (field, Objectives bar, bands, page) stands down
+            # in VR as one group; its layers keep their order inside it.
+            layers = []
+            for child in document['root']['children'][2]['children']:
+                if child['id'] == 'desktop-home':
+                    layers += [inner['id'] for inner in child['children']]
+                layers.append(child['id'])
             assert layers.index('objectives-bar') < layers.index('band-top') < layers.index('objectives'), relative
         for action in document.get('actions', {}).values():
             if action['operation'] == 'settings.player.set':

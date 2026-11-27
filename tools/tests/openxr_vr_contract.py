@@ -130,8 +130,8 @@ def check_abi() -> None:
     # game modules read the frame state by layout: new members go at the end
     frame = vr_system[vr_system.index("typedef struct vrFrameState_s {"):vr_system.index("} vrFrameState_t;")]
     members = re.findall(r"^\t(?:bool|int|float|idVec3|vrPose_t|vrEyeView_t)\s+(\w+)(?:\[\w+\])?;", frame, re.M)
-    if members[:1] != ["frameNumber"] or members[-3:] != ["roomScale", "twoHanded", "body"]:
-        raise AssertionError(f"vrFrameState_t grows at the end; twoHanded and body follow roomScale, found {members[-4:]}")
+    if members[:1] != ["frameNumber"] or members[-7:] != ["roomScale", "twoHanded", "body", "menuPointer", "menuPointerHit", "menuPointerEnd", "menuUp"]:
+        raise AssertionError(f"vrFrameState_t grows at the end; the menu pointer and menu flag (VR-09) follow body, found {members[-8:]}")
 
     render_world = read("src/renderer/RenderWorld.h")
     for field in ("bool					asymmetricFov = false;", "float					fovTanLeft = 0.0f;",
@@ -140,7 +140,7 @@ def check_abi() -> None:
         require(render_world, field, "renderView_t keeps existing views symmetric")
 
     game = read("src/game/Game.h")
-    require(game, "const int GAME_API_VERSION\t\t= 65;", "game module ABI v65")
+    require(game, "const int GAME_API_VERSION\t\t= 66;", "game module ABI v66")
     import_block = game[game.index("struct gameImport_t {"):game.index("struct gameExport_t {")]
     # Append-only ABI: vrSystem (v50) keeps its slot; later members follow it.
     if not import_block.rstrip().rstrip("};").rstrip().endswith(
@@ -517,8 +517,15 @@ def check_engine() -> None:
                               "\t\t// the flat wash that stands in for the underwater pass belongs in the eyes\n"
                               "\t\tLiquidWash();\n"
                               "\t\tVR_DrawComfortVignette( lensView, headForward, vignette, vignetteMaterial );\n\t\tif ( drawAimMarker ) {\n"
-                              "\t\t\tVR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );\n\t\t}\n\t\tScreenFade();",
-                f"{module} washes, vignettes and marks the aim in each eye over its 3D pass, under its fade")
+                              "\t\t\tVR_DrawAimMarker( eyeView, aimMarker, aimLaser, aimMaterial );\n\t\t}\n"
+                              "\t\tif ( vrFrame.menuPointer ) {\n"
+                              "\t\t\tVR_DrawPointerBeam( eyeView, pointerHand, pointerForward, pointerEnd, vrFrame.menuPointerHit, aimMaterial );\n"
+                              "\t\t}\n\t\tScreenFade();",
+                f"{module} washes, vignettes and marks the aim (or a menu's pointer beam, VR-09) in each eye over its 3D pass, under its fade")
+        require(read(module), "const bool drawAimMarker = !vrFrame.menuPointer && vrFrame.aimLaser != VR_AIM_LASER_OFF",
+                "with a menu up the hand's beam takes the place of the gun's laser")
+        require(read(module), "\tif ( !vrFrame.menuUp ) {\n\t\tSingleView( hud, view, RF_GUI_ONLY );\n\t}",
+                "with a menu up the HUD stays out of the screen image the menu's panel shows (VR-09)")
         # the vignette is fixed to the lens: a weapon's zoom, which narrows the eye's frustum, must not push it out of view
         # centred where the head looks, the same direction in both eyes, so canted displays fuse it
         require(read(module), "\t\theadForward = headAxis[0];\n", f"{module} centres the vignette on the head's forward")

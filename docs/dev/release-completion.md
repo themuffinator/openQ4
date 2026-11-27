@@ -47,6 +47,37 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   No phone, tablet, Steam Deck or desktop touchscreen has been used by hand.
   Contract: [ui/interface-variants.md](ui/interface-variants.md).
 
+## VR menus from your hand and a HUD on your wrist, 27 November 2026
+
+- **Menus grow out of your off hand.** Press the menu button during play and
+  a panel grows out of your off hand and stands above it, facing you, with
+  the level still around you. It follows your hand when you move it and holds
+  still while you hold steady, so the button you point at stays put. Hold it
+  closer to read small text. `vr_menuAnchor 0` puts menus back on the screen
+  hung in front of you; the title, loading screens and cinematics stay there.
+- **A pointer you can see, and buttons that answer it.** A light beam runs
+  from your pointing hand to the panel. The pause is nothing but a column of
+  big, plain buttons, and the one under the beam grows and lights up while
+  your hand ticks lightly as the pointer moves onto another control
+  (`vr_menuHaptics`).
+- **Your HUD on your wrist.** Health, armor and ammunition ride on your
+  off-hand wrist; glance at it as at a watch. Notices, messages and
+  objective updates stay before your eyes. `vr_hudMode 0` brings the whole
+  HUD back in front.
+- **What to do.** Nothing; your bindings are unchanged.
+- Inspiration: Half-Life: Alyx's hand-held menus and wrist readouts (ideas
+  only; nothing taken from it).
+- Not yet checked on a real headset: the panel's place, the beam and the
+  wrist display's readability (VR headset checklist 8.11 to 8.13).
+- Development: `src/framework/VRPanelCore.h` (panel and wrist placement,
+  native tests in `VRMathCoreTest.cpp`), `idVRSystemOpenXR::PlaceHandPanel`
+  and the wrist's two quad layers from the HUD image (`ScreenRect`, which
+  flips rows for OpenGL), the session drawing the world behind in-game menus
+  in VR, `retained_vr.hand_menu` in the pause families, the
+  `vrFrameState_t::menuPointer` beam (game API 66), `RetainedUI_HoverGeneration`
+  for the tick, and `vrFrameState_t::menuUp`, which keeps the HUD out of the
+  screen image the menu shares while a menu is up.
+
 ## VR finds your headset, and the menus fit the headset, 27 November 2026
 
 - **VR Mode has three choices: Off, On and Automatic.** Off never asks your
@@ -138,6 +169,41 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## Sunlight shadows soften with distance, 27 November 2026
+
+- **Outdoor shadows are sharp where things touch the ground and softer the
+  further they are thrown.** With soft shadows on (Quality and above), the
+  shadow of a tower or a rock face now has a gentler edge than the shadow at
+  the foot of a crate, as sunlight does. Before, sunlight shadows were almost
+  uniformly sharp however far away the object casting them was.
+- **What to do.** Nothing. `r_shadowMapSunAngle` sets how large the sun
+  appears, in degrees (default `1.0`; the real Sun is `0.53`): raise it for
+  softer shadows from tall objects, lower it for crisper ones, or set `0` for
+  the old look. Above about `2`, thin shadows thrown a long way (pipes,
+  railings) start to look grainy. The widest edge is still limited by
+  `r_shadowMapPCSSMaxRadius`.
+- **Cost.** Next to nothing: about 0.05 to 0.1 ms of GPU time a frame at
+  2560x1440 in the heaviest stock sunlit view, on either renderer. Scenes
+  without sunlight are unaffected.
+- Developer detail:
+  [sunlight softens with the gap](shadowmapping-audit-2026-11-27.md#sunlight-softens-with-the-gap-not-with-height-in-the-lights-box).
+  No ABI change.
+
+## Less shadow work on physically based materials, 27 November 2026
+
+- **Materials with physically based (PBR) textures cost a little less to
+  light.** Where a light does not reach such a surface, the game no longer
+  works out a soft shadow for it first. The picture is identical. This applies
+  to PBR materials added by mods and texture packs on both OpenGL and Vulkan;
+  the stock game has none, so it looks and runs the same.
+- **What to do.** Nothing.
+- Developer detail:
+  [PBR receivers and the light's reach](shadowmapping-audit-2026-11-27.md#pbr-receivers-and-the-lights-reach)
+  and [the stencil supplement on screen](shadowmapping-audit-2026-11-27.md#the-stencil-supplement-on-screen):
+  the OpenGL fix for lights that need a shadow map and stencil shadows together
+  was verified with a forced case, and `r_shadowMapReport` now prints
+  `hybrid=`, the number of light passes drawn that way. No ABI change.
+
 ## Sunlight shadows near you hold still when you turn, 27 November 2026
 
 - **Shadows close to you no longer shift as you look around outdoors.** On

@@ -33,7 +33,7 @@ each was not taken.
 
 | Finding | What changed |
 |---|---|
-| **OpenGL drew the stencil supplement of a hybrid light and then ignored it.** A light whose map cannot hold every caster stencils the volumes of the missing ones and tests its mapped receivers against them. The receiver setup reset the stencil test to always-pass before every draw, so those casters shadowed nothing and their volumes were rasterised for no result. | **Fixed (OpenGL).** The receivers keep the test the supplement was stencilled for, PBR receivers included, and leave it open afterwards as before. Verified by reading the three call sites; no stock view was found that takes this path, so it has not been seen on screen. |
+| **OpenGL drew the stencil supplement of a hybrid light and then ignored it.** A light whose map cannot hold every caster stencils the volumes of the missing ones and tests its mapped receivers against them. The receiver setup reset the stencil test to always-pass before every draw, so those casters shadowed nothing and their volumes were rasterised for no result. | **Fixed (OpenGL).** The receivers keep the test the supplement was stencilled for, PBR receivers included, and leave it open afterwards as before. Verified by reading the three call sites, and later on screen with a forced case: see [the stencil supplement on screen](#the-stencil-supplement-on-screen). |
 | **A resting body kept the wrong cached map after `r_shadowMapCharacterSelfShadow` was switched.** The static-caster signature did not record which of a light's two maps holds a caster. The setting moves a still `noSelfShadow` caster between them with nothing else changed, and the LOCAL map cached before the switch was reused. | **Fixed, both backends.** The signature carries the ownership. Every signature changes once, so each cached map renders once more after the update. |
 | **Vulkan kept cached maps across `r_shadowMapDebugMode 10`.** Its signature hashed the caster offsets as set, while the mode draws with none; OpenGL hashes the offsets it draws with. | **Fixed (Vulkan).** |
 | **The point receivers passed NaN through their range test.** `depth <= 0.0 || depth >= 1.0` is false for NaN, so a degenerate vertex went on to the cube lookups. | **Fixed, both backends.** The test is written to reject it, as the projected receivers already do. |
@@ -335,7 +335,172 @@ With the default in place, the same turn counts 0 / 0 / 8 at texels of 0.72,
 and 99.2% on Vulkan; and Hub 2 at the Maximum preset, where spotlights are
 cascaded too, runs under the Vulkan validation layers with no message.
 
+## The stencil supplement on screen
+
+The first batch fixed OpenGL ignoring the stencil of casters a light's map
+cannot hold, and could only check it by reading: no stock view takes that
+path. That is now measured rather than assumed. The shadow report's metrics
+line gained `hybrid=`, the number of receiver passes drawn against such a
+stencil, and four stock scenes at Quality (Hub 2, Storage 2, Air Defense 1,
+Convoy 1, each over a full turn of the view) report `hybrid=0` and no
+`SM missing caster` line. Stock content at the shipped settings does not
+reach it; it is the safety net for a caster the map refuses.
+
+So the case was forced. A temporary switch kept every animated model out of
+the maps, which leaves its shadow to the stencil supplement, and a second one
+restored the old always-pass test. In Hub 2 with a marine spawned in front of
+the player and the game clock stopped, at 1920x1080 on OpenGL, four pictures
+of the same moment:
+
+| Picture | Pixels more than 12 levels from the stencil picture |
+| --- | --- |
+| shadow maps, nothing refused | 0.19% |
+| animated models refused, old stencil test | 3.25%, all of it brighter: the shadow across the far wall is missing |
+| animated models refused, fixed | 0.05% |
+
+`hybrid=4` receiver passes a frame in both refused runs. Vulkan, which has its
+own implementation of the same idea and was not changed, scores 0.05% in the
+same forced case. Blended receivers of such a light go through the same
+function and needed no change. Both switches were removed before the commit;
+the `hybrid=` field stays.
+
+## PBR receivers and the light's reach
+
+The classic receivers skip the shadow filter where the light does not reach
+the pixel. The PBR branch of the same four shaders ran the whole filter first
+and multiplied the result into a radiance that was already zero. The PBR
+evaluation builds its radiance from the light's falloff and projection
+samples (`OpenQ4PBRDirect` on OpenGL, `EvaluatePBRDirect` on Vulkan), so
+where their product is black the result is black whatever the shadow says;
+the branch now takes those two samples first and filters only where they are
+not black. The debug views still filter every pixel.
+
+- **Exact.** The PBR showcase map's 24 captures (12 cameras, lit and
+  ownership) are identical to the last bit before and after, on both
+  renderers, and its 26 checks pass on both.
+- **Cost.** OpenGL, the showcase overview at 2560x1440, Quality, three
+  interleaved pairs of launches with the old shaders put back as loose files:
+  6.58, 6.58 and 6.64 ms of GPU a frame with the change against 6.68, 7.13 and
+  7.56 without. Never slower; the size of the gain is not pinned down, because
+  the old shaders' three runs spread over 0.9 ms. That room is lit nearly
+  wall to wall, so it is the unfavourable case. Vulkan was not timed: the old
+  shader would have needed a second build.
+- **Not covered.** A surface turned away from the light still filters: the
+  PBR normal is resolved inside the evaluation. The modern OpenGL cluster
+  loop, which is opt-in, is unchanged.
+
+Stock content has no PBR owners, so nothing changes for the stock game; this
+is for materials a mod or texture pack adds.
+
+## Sunlight softens with the gap, not with height in the light's box
+
+The owner asked for this lead after the batch above. PCSS-lite widens the
+filter by `separation / blockerDepth`, the rule for a point source: the
+penumbra grows with the gap over the blocker's distance from the light. Stock
+sunlight comes two ways, and the rule fits neither. A parallel light stores
+depth across its box, so the divisor was the blocker's height in the box. A
+distant point light (Air Defense 1's sun) stores depth from a source thousands
+of units away, so the quotient was nearly zero. Sunlight shadows therefore sat
+at the base filter radius almost everywhere, however far the caster.
+
+A sun's rays arrive parallel, so the penumbra is the gap times the source's
+apparent size, wherever the pair sits. `r_shadowMapSunAngle` is that size in
+degrees across (default 1.0; the real Sun is 0.53; 0 keeps the old rule), and
+parallel and distant point lights use it when PCSS-lite is the filter:
+
+- **One scale per cascade** turns a gap in stored depth into texels at the
+  receiver: `tan(angle / 2) * tileSize / 2 * (S and T rows across the w axis,
+  the coarser) / (depth row's length)`, divided by the receiver's `w`
+  (`R_ShadowMapProjectedSunPenumbraScales`). A parallel light's `w` is 1; a
+  distant point light's texel grows with `w`, which the division follows. The
+  result still lies between the base radius and `r_shadowMapPCSSMaxRadius`.
+- **OpenGL is handed the scales** (`uShadowSunPenumbra`). **Vulkan's block
+  is full**, so the tangent rides in the fraction of the receiver-plane
+  flag's slot (the flag is still read as "> 0.5") and the shader builds the
+  same scale from the cascade rows it already has.
+- **The blocker search reaches the maximum radius** for these lights, where
+  it reached the light radius, because a blocker that far to the side can
+  now put the receiver in its penumbra.
+- The modern OpenGL cluster loop (opt-in) keeps the old rule.
+
+Measured at Quality, hidden, same frozen moment for every size:
+
+- **Self-test.** Extended `R_ShadowMapDistantNormalOffsetSelfTest`: for Air
+  Defense 1's sun, a caster 100 units from its receiver, at eleven receivers
+  in each cascade of two layouts, the scale gives the texels that
+  `100 * tan / (the texel measured through the map's planes)` does, to half
+  a percent; the same for the light made parallel, to one percent.
+- **Coverage is unchanged.** Air Defense 1, four poses at 2560x1440 on
+  Vulkan, at 0, 0.53, 1, 2 and 4 degrees: 99.7% of stencil's shadow kept at
+  every size (99.9% within two pixels).
+- **What changes.** Contact shadows do not (the wreck's shadow where it
+  meets the ground stays within one level at every size). Shadows
+  thrown from a distance soften: in a 600x300 crop of rock shadows in the
+  tank pose, 0.5% of pixels move by more than 6 levels at 1 degree and 3.2%
+  at 4 on Vulkan, 3.5% at 4 on OpenGL.
+- **The renderers agree.** That crop differs between OpenGL and Vulkan by
+  0.27% of pixels with the rule off and 0.24% at 4 degrees.
+- **Parallel lights.** The stock maps hold seven shadow-casting parallel
+  lights: two in Dispersal and one in Hangar 2, and four in multiplayer
+  (q4dm9 has two, q4dz3 and q4xdm10 one each). In Dispersal the one in view
+  lights little but the player's weapon, and that is where the picture
+  changes, by the same share on both renderers (0.32% and 0.31% of the frame
+  at 1 degree). Hangar 2's (`light_8020`, found by drawing it alone with
+  `r_singleLight`) is the sunlight on the rock outside the hangar, where the
+  buildings and their pipes shadow the terrain. Two views there
+  (`setviewpos -2300 800 -1900 60 0 0` and `-2800 32 -1800 50 0 0`), 1920x1080
+  at Quality, the HUD and the view weapon left out of the count:
+
+  | Sun size | Pixels moved by more than 6 levels from the rule off (Vulkan / OpenGL) | Pixels more than 12 levels from stencil (Vulkan; OpenGL within 0.03 points) |
+  | --- | --- | --- |
+  | 0 | 0 | 0.43% and 0.32% |
+  | 1 degree | 0.26% / 0.29% and 0.13% / 0.15% | 0.45% and 0.32% |
+  | 2 degrees | 0.51% / 0.54% and 0.22% / 0.26% | 0.58% and 0.42% |
+  | 4 degrees | 0.96% / 0.99% and 0.56% / 0.56% | 0.72% and 0.55% |
+
+  The two renderers move together at every size, and at the default the
+  picture is as close to stencil as with the rule off (within 0.02 points).
+- **Thin shadows turn grainy above about 2 degrees.** Seen in a crop of the
+  second Hangar 2 view, where thin pipes throw shadows down a slope: solid
+  at 0 and 1 degree on both renderers, speckled over the far part of their
+  length at 2, and broken into grain at 4. The likely reason is that the
+  penumbra is by then wider than the shadow, and nine taps over the maximum
+  radius cannot resolve the faint band that would be right. It is the filter's tap
+  count, the same limit a spotlight meets at the maximum radius, and it is a
+  reason to keep the default low. Judged by eye; no number was taken.
+- **Cost: about 0.05 to 0.1 ms on Vulkan, about the same on OpenGL.** Air Defense 1
+  arena, full turn of the view at 2560x1440, the rule off and on in
+  alternating windows of one launch, median GPU frame per window. The first
+  three pairs read up to 0.7 ms apart on Vulkan, but other sessions' game
+  clients held the GPU at about 40% and single windows scattered by a
+  millisecond either way, so the cost was timed again over many short pairs:
+  - 24 pairs of 1.2 s: paired median +0.04 ms (quartiles -0.07 and +0.12);
+    the quietest window 5.07 ms off against 5.17 on.
+  - 14 pairs of 2 s: quietest window 4.93 off against 4.99 at 1 degree and
+    4.99 at 4 degrees; the two undisturbed pairs +0.05 and +0.15.
+  - 6 rounds that also held the search at its old reach: in the two
+    undisturbed rounds the rule cost +0.01 and +0.06 with the wider search
+    and +0.04 without, so the wider search is not what costs.
+  - OpenGL, 12 pairs of 2 s: paired median +0.04 ms (quartiles -0.02 and
+    +0.15).
+
+  That is one to two percent of the frame in the heaviest stock sunlit
+  view, and too small to split into parts on this machine. Nothing was
+  trimmed.
+- **The default.** 1 degree, about twice the real Sun, enough to see at the
+  texel sizes the cascades have. **The owner chose to keep it** (27 November
+  2026) from a still comparison of the tank-pose crop at 0, 0.53, 1, 2 and 4
+  degrees. It has not been judged in motion.
+
 ## Measured and left
+
+**Building a light's cascade layout more than once a view.** Vulkan builds
+the projected state two or three times per light per view. Timed in the turn
+self-test (Air Defense 1's sun, four cascades, 7,200 builds): 1.3 microseconds
+each with the tight fit, 1.5 with the sphere fit. A view with ten cascaded
+lights spends under 0.05 ms on the repeats. Not worth a cache and its
+invalidation. The timing code was removed.
+
 
 **Skipping the blocker search under distant suns.** A distant point light's
 stored depth is distance from a source thousands of units away, so the
@@ -351,21 +516,20 @@ it is.
 
 Not done in this round. Each is real; the note says why it waited.
 
-- **PCSS-lite on parallel lights** divides the caster-to-receiver gap by the
-  blocker's depth into the light box, so softness follows height in the box
-  and not the gap. A sun's penumbra should be `gap * tan(source angle)` in
-  world units. It needs a per-cascade uniform on three receivers and a
-  constant chosen by eye. Twelve stock parallel lights cast shadows.
-- **PBR receivers sample shadows before knowing the light reaches the pixel**
-  (both renderers), and the modern OpenGL cluster loop does the same. Stock
-  content has no PBR owners and the modern path is opt-in.
+- **The sun rule's default size**, which the owner chose from stills, has
+  not been judged in motion.
+- **The modern OpenGL cluster loop samples shadows before knowing the light
+  reaches the pixel.** The path is opt-in. (The PBR receivers of the shipped
+  paths were done: see above.)
 - **Smaller items:** Vulkan takes a full-atlas layout round trip in views
-  where every projected map is read in place; it builds the projected state
-  two or three times per light per view; the point filter's rotated mode
+  where every projected map is read in place; the point filter's rotated mode (off by
+  default)
   hashes a fixed direction grid, seven to twenty-eight texels wide, where the
   projected one hashes the texel; the receiver-plane bias (off by default) mixes
   screen pixels with shadow texels; OpenGL asks for an unsized depth format
-  where its bias assumes 24 bits; the debug overlay draws its tile grid in
+  where its bias assumes 24 bits (the format is shared by every depth image
+  in the renderer, so sizing it is wider than shadows and wants the other
+  platforms' drivers checked); the debug overlay draws its tile grid in
   atlas coordinates.
 
 ## Evidence

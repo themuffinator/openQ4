@@ -2097,7 +2097,10 @@ def validate_shadow_filtering_contract() -> None:
             "block.pcssParams[ 0 ] = filterSettings.pcssLightRadius;",
             "block.pcssParams[ 1 ] = filterSettings.pcssMaxRadius;",
             "block.pcssParams[ 2 ] = filterSettings.effectiveFilterRadius;",
-            "r_shadowMapReceiverPlaneBias.GetBool() ? 1.0f : 0.0f",
+            # the flag shares its slot with a sun-like light's penumbra tangent
+            "block.pcssParams[ 3 ] = VK_Inter_PcssFlagAndSun(",
+            "r_shadowMapReceiverPlaneBias.GetBool(),",
+            "filterSettings.sunPenumbraTan );",
         ),
         "shared projected and point runtime filter upload",
     )
@@ -2263,8 +2266,12 @@ def validate_shadow_filtering_contract() -> None:
             "return 0.0;",
             "float averageBlocker = blockerDepth / blockerCount;",
             "float separation = max(compareDepth - averageBlocker, 0.0);",
-            "float penumbra = separation / max(averageBlocker, 1.0e-4);",
-            "return clamp(max(baseRadius, penumbra * shadow.pcssParams.x), baseRadius, maxRadius);",
+            # a sun-like light: the gap times its apparent size; every other
+            # light: the point-source rule
+            "float penumbraRadius = sunPenumbra > 0.0",
+            "? separation * sunPenumbra / max(receiverW, 1.0e-4)",
+            ": separation / max(averageBlocker, 1.0e-4) * shadow.pcssParams.x;",
+            "return clamp(max(baseRadius, penumbraRadius), baseRadius, maxRadius);",
         ),
         "projected PCSS blocker search",
     )
@@ -2301,7 +2308,7 @@ def validate_shadow_filtering_contract() -> None:
         projected_samples,
         (
             "float centreLit;",
-            "float filterRadius = ProjectedPCSSRadius(uv, depth, cascadeIndex, clampMin, clampMax, texelStep, rotation, centreLit);",
+            "float filterRadius = ProjectedPCSSRadius(uv, depth, shadowCoord.w, cascadeIndex, tileTexels, clampMin, clampMax, texelStep, rotation, centreLit);",
             "if (centreLit < 0.0) {",
             "centreLit = SampleShadowCompare(uv, depth, cascadeIndex, 0.0);",
             "if (filterRadius <= 0.0) {",
@@ -2460,7 +2467,7 @@ def validate_shadow_filtering_contract() -> None:
         gl_projected_samples,
         (
             "mat2 rotation = ShadowOffsetRotation( tileTexel, depth );",
-            "ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax, rotation, centreLit )",
+            "ProjectedPCSSRadius( uv, depth, shadowCoord.w, cascadeIndex, clampMin, clampMax, rotation, centreLit )",
             "if ( centreLit < 0.0 ) {",
             "centreLit = SampleShadowCompare( uv, depth, cascadeIndex, 0.0 );",
             "float shadow = centreLit;",
@@ -9707,6 +9714,244 @@ def validate_point_cache_budget_by_cube_size_contract() -> None:
         require(selftest, case, "the self-test pins the budget rule")
 
 
+def validate_pbr_receiver_reach_contract() -> None:
+    """A PBR receiver skips the shadow filter where the light does not reach.
+
+    The PBR light evaluation builds its radiance from the light's falloff and
+    projection samples, so where their product is black the result is black
+    whatever the shadow says. The classic receivers already test this; the PBR
+    branch of the same four shaders ran the whole filter first.
+    """
+    for path, sampler in (
+        ("content/baseoq4/pak0/glprogs/shadow_interaction.fs", "pbrShadowInfo = SampleShadow();"),
+        ("content/baseoq4/pak0/glprogs/shadow_point_interaction.fs",
+         "pbrShadow = vec3( 1.0 ) * SamplePointShadow() * SamplePointTranslucentShadow();"),
+    ):
+        require_order(
+            read(path),
+            (
+                "vec3 pbrReach = texture2DProj( uLightFalloffMap, vLightFalloffTexCoord ).rgb",
+                "* texture2DProj( uLightProjectionMap, vLightProjectionTexCoord ).rgb;",
+                "bool pbrLit = max( pbrReach.r, max( pbrReach.g, pbrReach.b ) ) > 0.0 || ShadowVisualDebugMode();",
+                "if ( pbrLit ) {",
+                sampler,
+                "gl_FragColor = vec4( OpenQ4PBRDirect( pbrShadow ), OpenQ4PBRAlpha() );",
+            ),
+            f"{path}: the PBR branch filters only where the light reaches",
+        )
+    for path, translucent in (
+        ("src/renderer/Vulkan/shaders/interaction_shadow.frag", "packed *= SampleTranslucentShadow();"),
+        ("src/renderer/Vulkan/shaders/interaction_shadow_point.frag", "packed *= SamplePointTranslucentShadow();"),
+    ):
+        require_order(
+            read(path),
+            (
+                "vec3 reach = textureProj(lightFalloffMap, vLightFalloffTexCoord).rgb",
+                "* textureProj(lightProjectionMap, vLightProjectionTexCoord).rgb;",
+                "bool lit = max(reach.r, max(reach.g, reach.b)) > 0.0 || ShadowVisualDebugMode();",
+                "float shadowFactor = 1.0;",
+                "if (lit) {",
+                "shadowFactor = SampleShadowFactor();",
+                "diffuseTexCoord, specularTexCoord, shadowFactor);",
+                "if (lit) {",
+                translucent,
+            ),
+            f"{path}: the PBR branch filters only where the light reaches",
+        )
+    # The skip is exact only while the evaluation multiplies by the same two samples.
+    require_order(
+        read("src/renderer/Vulkan/shaders/pbr_direct.glsl"),
+        (
+            "vec3 radiance = PBRClassicLightIrradianceColor(",
+            "textureProj(lightFalloffMap, vLightFalloffTexCoord).rgb",
+            "* textureProj(lightProjectionMap, vLightProjectionTexCoord).rgb",
+            "* inter.diffuseColor.rgb) * shadowFactor;",
+        ),
+        "Vulkan PBR radiance is the light's falloff and projection times the shadow",
+    )
+    require_order(
+        read("src/renderer/draw_pbr.cpp"),
+        (
+            "vec3 radiance = PBRClassicLightIrradianceColor(",
+            "texture2DProj( uLightFalloffMap, vLightFalloffTexCoord ).rgb",
+            "* texture2DProj( uLightProjectionMap, vLightProjectionTexCoord ).rgb",
+            "* uDiffuseColor.rgb ) * shadow;",
+        ),
+        "OpenGL PBR radiance is the light's falloff and projection times the shadow",
+    )
+
+
+def validate_hybrid_receiver_report_contract() -> None:
+    """OpenGL counts the receiver passes drawn against the stencil of casters
+    their map cannot hold, and the passes that follow honour that stencil.
+
+    No stock view takes this path, so the report is the way to tell that a
+    test view does.
+    """
+    arb2 = read("src/renderer/draw_arb2.cpp")
+    prepare = braced_body(arb2, "static bool RB_ShadowMapPrepareMappedReceiverStencil(", "hybrid receiver stencil")
+    require_order(
+        prepare,
+        (
+            "g_shadowMapReceiverStencilSupplement = false;",
+            "glClear( GL_STENCIL_BUFFER_BIT );",
+            "RB_StencilShadowPass( globalSupplements );",
+            "RB_StencilShadowPass( localSupplements );",
+            "glStencilFunc( GL_GEQUAL, 128, 255 );",
+            "g_shadowMapReceiverStencilSupplement = true;",
+            "g_shadowMapStats.hybridReceiverPasses++;",
+        ),
+        "the supplement is stencilled, flagged and counted",
+    )
+    if arb2.count("glStencilFunc( g_shadowMapReceiverStencilSupplement ? GL_GEQUAL : GL_ALWAYS, 128, 255 );") != 2:
+        raise AssertionError("both mapped receiver draws test the supplement stencil")
+    require(arb2, "farSlot=%d/%d hybrid=%d", "the shadow report prints the hybrid pass count")
+
+
+def validate_sun_penumbra_contract() -> None:
+    """A sun-like light's PCSS-lite penumbra is the caster-to-receiver gap
+    times the source's apparent size (r_shadowMapSunAngle).
+
+    The point-source rule divides the gap by the blocker's depth, which for a
+    parallel light is its height in the light's box and for a distant point
+    light thousands of units, so sunlight hardly ever softened. Both renderers
+    turn the gap in stored depth into texels at the receiver with one scale
+    per cascade: OpenGL is handed it, Vulkan (whose block is full) carries the
+    tangent in the fraction of the receiver-plane flag's slot and builds the
+    same scale from the cascade rows.
+    """
+    init = read("src/renderer/RenderSystem_init.cpp")
+    require(init, 'idCVar r_shadowMapSunAngle( "r_shadowMapSunAngle", "1.0", CVAR_RENDERER | CVAR_ARCHIVE | CVAR_FLOAT,', "the sun's apparent diameter")
+    header = read("src/renderer/ShadowMapClassification.h")
+    require(header, "float\t\t\t\tsunPenumbraTan;", "the filter settings carry the tangent")
+    require(header, "static const float SHADOWMAP_SUN_PENUMBRA_MAX_TAN = 0.25f;", "the tangent stays under the flag")
+    settings = braced_body(
+        read("src/renderer/ShadowMapClassification.cpp"),
+        "shadowMapProjectedFilterSettings_t R_ShadowMapProjectedFilterSettings(",
+        "projected filter settings",
+    )
+    require_order(
+        settings,
+        (
+            "const bool sunLike = classification.projectedLight && vLight != NULL",
+            "&& ( vLight->parallel || classification.distantPointLight );",
+            "if ( sunLike && settings.filterMode == 2 ) {",
+            "r_shadowMapSunAngle.GetFloat() ) * 0.5f );",
+            "settings.sunPenumbraTan = idMath::ClampFloat( 0.0f, SHADOWMAP_SUN_PENUMBRA_MAX_TAN, idMath::Tan( halfAngle ) );",
+        ),
+        "only parallel and distant point lights get a sun's penumbra",
+    )
+    require(read("src/renderer/ClassicInteractionDomain.cpp"), "HashFloat( hash, projected.filter.sunPenumbraTan );", "the pass hash follows the sun size")
+
+    projected = read("src/renderer/ShadowMapProjected.cpp")
+    scales = braced_body(projected, "void R_ShadowMapProjectedSunPenumbraScales(", "sun penumbra scales")
+    require_order(
+        scales,
+        (
+            "scales[cascadeIndex] = 0.0f;",
+            "if ( !state.valid || state.tileSize <= 0 || !( sunPenumbraTan > 0.0f ) ) {",
+            "const idVec3 depthAxis = planes[3].Normal();",
+            "R_ShadowMapRowAcrossDepthLength( planes[0].Normal(), depthAxis ),",
+            "R_ShadowMapRowAcrossDepthLength( planes[1].Normal(), depthAxis ) );",
+            "const float depthRate = planes[2].Normal().Length();",
+            "scales[cascadeIndex] = sunPenumbraTan * 0.5f * static_cast<float>( state.tileSize ) * across / depthRate;",
+        ),
+        "texels of penumbra per unit of stored depth, at w = 1",
+    )
+    selftest = braced_body(projected, "bool R_ShadowMapDistantNormalOffsetSelfTest(", "distant normal offset self-test")
+    require_order(
+        selftest,
+        (
+            "const float sunTan = idMath::Tan( DEG2RAD( 0.5f ) );",
+            "R_ShadowMapProjectedSunPenumbraScales( state, sunTan, sunScales );",
+            "const float sunTexels = ( clip.z - blockerClip.z ) * sunScales[cascade] / clip.w;",
+            "const float sunExpected = sunGap * sunTan / measured;",
+            "R_ShadowMapProjectedSunPenumbraScales( parallelState, sunTan, parallelSun );",
+            "const float parallelExpected = sunGap * sunTan / parallelState.worldTexelSize[0];",
+        ),
+        "the self-test measures the penumbra through the map's planes",
+    )
+
+    arb2 = read("src/renderer/draw_arb2.cpp")
+    require(arb2, 'g_shadowMapProgram.shadowSunPenumbra = glGetUniformLocationARB( programObject, "uShadowSunPenumbra" );', "OpenGL uniform")
+    require_compact(
+        arb2,
+        "R_ShadowMapProjectedSunPenumbraScales( g_projectedShadowMapState, filterSettings.sunPenumbraTan, sunPenumbra );",
+        "OpenGL legacy receiver upload",
+    )
+    require_compact(
+        arb2,
+        "R_ShadowMapProjectedSunPenumbraScales( pass.projected.state, pass.projected.filter.sunPenumbraTan, sunPenumbra );",
+        "OpenGL domain receiver upload",
+    )
+    gl = read("content/baseoq4/pak0/glprogs/shadow_interaction.fs")
+    require(gl, "uniform float uShadowSunPenumbra[4];", "OpenGL receiver uniform")
+    gl_search = braced_body(gl, "float ProjectedPCSSRadius(", "OpenGL PCSS blocker search")
+    require_order(
+        gl_search,
+        (
+            "float sunPenumbra = CascadeSunPenumbra( cascadeIndex );",
+            "float searchRadius = max( sunPenumbra > 0.0 ? uShadowPCSSMaxRadius : uShadowPCSSLightRadius, 0.5 );",
+            "float penumbraRadius = sunPenumbra > 0.0",
+            "? separation * sunPenumbra / max( receiverW, 1.0e-4 )",
+            ": separation / max( averageBlocker, 1.0e-4 ) * uShadowPCSSLightRadius;",
+            "return clamp( max( baseRadius, penumbraRadius ), baseRadius, maxRadius );",
+        ),
+        "OpenGL sun penumbra rule",
+    )
+
+    interactions = read("src/renderer/Vulkan/vk_Interactions.cpp")
+    pack = braced_body(interactions, "static float VK_Inter_PcssFlagAndSun(", "Vulkan flag and tangent packing")
+    require_order(
+        pack,
+        (
+            "return ( receiverPlaneBias ? 1.0f : 0.0f )",
+            "+ idMath::ClampFloat( 0.0f, SHADOWMAP_SUN_PENUMBRA_MAX_TAN, sunPenumbraTan );",
+        ),
+        "the tangent rides below the flag",
+    )
+    if interactions.count("block.pcssParams[ 3 ] = VK_Inter_PcssFlagAndSun(") != 2:
+        raise AssertionError("both Vulkan projected block uploads pack the sun tangent")
+    require_compact(
+        interactions,
+        "block.pcssParams[ 3 ] = VK_Inter_PcssFlagAndSun( mapPass.projected.receiverPlaneBias, mapPass.projected.filter.sunPenumbraTan );",
+        "Vulkan domain block upload",
+    )
+    vulkan = read("src/renderer/Vulkan/shaders/interaction_shadow.frag")
+    require_order(
+        braced_body(vulkan, "float ShadowSunTan(", "Vulkan sun tangent"),
+        ("return shadow.pcssParams.w - (shadow.pcssParams.w > 0.5 ? 1.0 : 0.0);",),
+        "what is left of the slot below the flag",
+    )
+    require_order(
+        braced_body(vulkan, "float SunPenumbraScale(", "Vulkan sun penumbra scale"),
+        (
+            "vec3 s = shadow.shadowRow0[index].xyz;",
+            "vec3 t = shadow.shadowRow1[index].xyz;",
+            "vec3 wAxis = shadow.shadowRow3[index].xyz;",
+            "s -= wAxis * (dot(s, wAxis) / wAxisSqr);",
+            "t -= wAxis * (dot(t, wAxis) / wAxisSqr);",
+            "float across = min(length(s) * tileTexels.x, length(t) * tileTexels.y);",
+            "float depthRate = length(shadow.shadowRow2[index].xyz);",
+            "return sunTan * 0.5 * across / depthRate;",
+        ),
+        "Vulkan builds the scale OpenGL is handed",
+    )
+    require_order(
+        braced_body(vulkan, "float ProjectedPCSSRadius(", "Vulkan PCSS blocker search"),
+        (
+            "float sunPenumbra = SunPenumbraScale(cascadeIndex, tileTexels);",
+            "float searchRadius = max(sunPenumbra > 0.0",
+            "? shadow.pcssParams.y : shadow.pcssParams.x, 0.5);",
+        ),
+        "Vulkan sun search reach",
+    )
+    # every reader of the flag still reads it as "> 0.5"
+    if "shadow.pcssParams.w > 1.5" in vulkan or "shadow.pcssParams.w == 1.0" in vulkan:
+        raise AssertionError("the receiver-plane flag is the slot's whole part")
+    require(read("docs/user/shadow-mapping.md"), "`r_shadowMapSunAngle`", "the player guide lists the setting")
+
+
 def validate_cascade_stable_extent_contract() -> None:
     """A cascade sized by its view slice's bounding sphere keeps its scale
     while the view turns (r_shadowMapCascadeStableExtent nearest cascades).
@@ -11087,6 +11332,9 @@ def main() -> None:
     validate_point_pool_pressure_contract()
     validate_point_cache_budget_by_cube_size_contract()
     validate_cascade_stable_extent_contract()
+    validate_pbr_receiver_reach_contract()
+    validate_hybrid_receiver_report_contract()
+    validate_sun_penumbra_contract()
     validate_ci_registration()
     print("renderer_vulkan_shadow_compatibility: ok")
 

@@ -4,8 +4,9 @@
 
 Late look (in_presentationView), weapon view lights, unbound client debris and
 alternate views are draw-only. These checks pin the read-only engine sampler,
-the frozen per-draw correction, the identical SP/MP bodies and the gameplay
-state each owner must never write, and the HF-06 guard that makes event
+the frozen per-draw correction, the gameplay state each owner must never
+write, the absence of any single-player/multiplayer gate in those owners (one
+game tree serves both modes since CORE-07, so both run the same bodies), and the HF-06 guard that makes event
 dispatch, scripts, physics and effect spawns report themselves when they run
 inside a prepared draw, and HF-07's declared frame-rate policy (hidden-window,
 loading-screen and preset caps). Behaviour of the look policy itself is
@@ -21,7 +22,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-TREES = ("src/game",)
+GAME_TREE = "src/game"
+# Mode gates (docs/dev/unified-game-module.md). The presentation owners are the
+# same in single-player and multiplayer; a gate in one of them is mode drift.
+MODE_GATE = re.compile(r"\b(?:isMultiplayer|IsMultiplayerMode)\b")
 
 
 def read(relative: str) -> str:
@@ -162,7 +166,7 @@ def check_engine(usercmd_h: str, usercmd_cpp: str, game_h: str, common_cpp: str)
     require(console, "if ( Usercmd_ConsumeLatencyFlash() && com_latencyFlash.GetBool() ) {", "latency flash consumed every frame, drawn when enabled")
     require(console, '"latencyFlashTest", Con_LatencyFlashTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT', "latency flash test is cheat-gated")
 
-    require(game_h, "const int GAME_API_VERSION\t\t= 65;", "game ABI v65")
+    require(game_h, "const int GAME_API_VERSION\t\t= 66;", "game ABI v66")
     require(game_h, "idUsercmdGen *\t\t\t\tusercmdGen;", "gameImport_t carries the generator")
     require(common_cpp, "gameImport.usercmdGen\t\t\t\t= ::usercmdGen;", "engine hands the generator to the game")
 
@@ -523,13 +527,17 @@ def check_tree(tree: str) -> dict[str, str]:
     }
 
 
+def check_mode_independent(bodies: dict[str, str]) -> None:
+    for name, body in bodies.items():
+        match = MODE_GATE.search(body)
+        if match:
+            raise AssertionError(f"SP/MP presentation drift: {name} tests {match.group(0)}")
+
+
 def run() -> None:
     check_engine(read("src/framework/UsercmdGen.h"), read("src/framework/UsercmdGen.cpp"),
                  read("src/game/Game.h"), read("src/framework/Common.cpp"))
-    sp, mp = (check_tree(tree) for tree in TREES)
-    for name, body in sp.items():
-        if body != mp[name]:
-            raise AssertionError(f"SP/MP presentation drift: {name}")
+    check_mode_independent(check_tree(GAME_TREE))
 
 
 def mutations() -> None:
@@ -572,6 +580,16 @@ def mutations() -> None:
         pass
     else:
         raise AssertionError("mutation survived: late look writes the view")
+    gated = player.replace("\tpresentationLookActive = true;\n}",
+                           "\tif ( !gameLocal.isMultiplayer ) {\n\t\tpresentationLookActive = true;\n\t}\n}", 1)
+    if gated == player:
+        raise AssertionError("mutation did not apply: late look forks by mode")
+    try:
+        check_mode_independent({"look": normalized(function(gated, "void idPlayer::UpdatePresentationLook( void )", "mutation"))})
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("mutation survived: late look forks by mode")
     event = read("src/game/gamesys/Event.cpp")
     unguarded = event.replace('\tgameLocal.NotePresentationGameplay( "idEvent::ServiceEvents" );\n', "", 1)
     if unguarded == event:
@@ -608,7 +626,7 @@ def mutations() -> None:
         pass
     else:
         raise AssertionError("mutation survived: the waiter keeps a retiring swapchain")
-    print("presentation_hf_contract mutations: 11 rejected")
+    print("presentation_hf_contract mutations: 12 rejected")
 
 
 def main() -> None:
