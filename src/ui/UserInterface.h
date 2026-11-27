@@ -130,6 +130,12 @@ public:
 	// this GUI where a same-named window and variable exist.
 	// Appended last so the vtable slots above stay where earlier modules expect.
 	virtual bool				ReadFromSaveGameWithLayout( idFile *savefile, const char *layoutPath, int &restoredWindowValues ) { restoredWindowValues = 0; return false; }
+
+	// The control under the cursor: 0 while it rests on none, otherwise a number
+	// that changes each time it moves onto another one (a window with an action
+	// to run on a click). The VR hand ticks a world screen's controls with it.
+	// Appended last for the same reason as the slot above.
+	virtual int					HoverControl( void ) { return 0; }
 };
 
 

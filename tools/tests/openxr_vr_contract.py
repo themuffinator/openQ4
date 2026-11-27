@@ -485,7 +485,7 @@ def check_engine() -> None:
     require(read("src/game/Player.cpp"), "barrel, grip * GetVRWeaponScale(), origin, axis );",
             "the scaled gun still meets the hand at its grip")
     for call in ("VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );\n\t\t\tShortenVRViewForearm( arm, scale, vrArmJoints );",
-                 "VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );\n\t\t\tShortenVRViewForearm( arm, scale, vrArmJoints );\n\t\t}\n\t}\n\treturn vrArmJoints;"):
+                 "VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );\n\t\t\tShortenVRViewForearm( arm, scale, vrArmJoints );\n\t\t}\n\t\t// The free hand's index fingertip as drawn"):
         require(read("src/game/Weapon.cpp"), call, "each scaled forearm is pressed back to the length its elbow was solved for")
     # the menu pointer is a controller: its motion and clicks keep controller prompts
     key_input = read("src/framework/KeyInput.cpp")
@@ -750,11 +750,16 @@ def check_detection() -> None:
 def check_documents() -> None:
     for relative in ("docs/user/vr.md", "docs/dev/archive/2026-10-18/plans/2026-10-02-openxr-vr.md", "LICENSES/openxr-sdk.txt",
                      "tools/tests/openxr_vr_smoke.py", "tools/tests/openxr_vr_menu_smoke.py",
+                     "tools/tests/openxr_vr_touch_smoke.py", "src/framework/VRTouchCore.h",
                      "tools/tests/openxr_vr_mp_smoke.py", "tools/tests/openxr_vr_detection_smoke.py",
                      "tools/tests/openxr/OpenXRTestRuntime.cpp",
                      "tools/tests/native/VRMathCoreTest.cpp"):
         if not (ROOT / relative).is_file():
             raise AssertionError(f"missing {relative}")
+    # fingertip presses: the hysteresis is natively tested, and single player only
+    require(read("tools/tests/native/VRMathCoreTest.cpp"), "TestFingertipTouch();", "the fingertip's one-poke-one-click is natively tested")
+    player = read("src/game/Player.cpp")
+    require(player, "const bool touching = !gameLocal.isMultiplayer && FindVRTouch(", "fingertip focus stays out of multiplayer")
     guide = read("docs/user/vr.md")
     for cvar in ("vr_enable", "vr_aimMode", "vr_aimLaser", "vr_hapticStrength", "vr_turnMode", "vr_recenter",
                  "vr_restart", "vr_twoHanded", "vr_comfortVignette", "vr_physicalCrouch", "vr_vehicleStereo",

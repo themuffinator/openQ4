@@ -39,6 +39,47 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   No phone, tablet, Steam Deck or desktop touchscreen has been used by hand.
   Contract: [ui/interface-variants.md](ui/interface-variants.md).
 
+## Press screens with a fingertip in VR, 27 November 2026
+
+- **Press door panels, lift calls and terminals with your finger.** In single
+  player, reach out with your free hand (the off hand, or the weapon hand
+  when you have no weapon) and the screen's cursor moves under your fingertip
+  once it is within about 6 cm. Push in to press: one poke is one click, a
+  firm tick in that hand confirms it, and drawing back lets go. A hand resting
+  near a screen, or reaching through one, presses nothing. Pointing with the
+  laser and the trigger works as before.
+- **Your fingertip, as you see it.** With **Your Body** on With Arms
+  (`vr_body 2`) the press comes from the off hand's drawn index fingertip;
+  otherwise from a point about 8 cm ahead of the controller.
+- **The hand menu answers your finger too.** Press its buttons with the
+  weapon hand's fingertip as on a touch screen, or point and pull the
+  trigger as before.
+- **Feel the buttons.** Your hand ticks lightly as the cursor, from the laser
+  or a fingertip, moves onto another button of a screen in the world, as the
+  menus already do, and more firmly for a click or a press
+  (`vr_menuHaptics`).
+- **What to do.** Nothing. Multiplayer is unchanged: there world screens
+  still follow your view, as the server decides what you look at.
+- Inspiration: Half-Life: Alyx's touchable screens and menus (ideas only;
+  nothing taken from it).
+- Not yet checked on a real headset: where the drawn fingertip sits against
+  a real finger, how the contact distances feel, and the tick strengths (VR
+  headset checklist 3.20, 6.6 to 6.8 and 8.14).
+- Development: `src/framework/VRTouchCore.h` (the one-poke-one-click
+  hysteresis and the panel touch, native tests in `VRMathCoreTest.cpp`),
+  `idPlayer::GetVRFingertip`, `FindVRTouch` and `UpdateVRTouchPress` (single
+  player: the focus trace runs along the screen's normal through the
+  fingertip), `rvWeapon::GetVRFingertip` (the drawn support hand's
+  `lft_ndx_2`/`lft_ndx_3`), `idVRSystemOpenXR::TouchPanel`, and
+  `idUserInterface::HoverControl` (appended after the existing slots) for the
+  world screens' hover ticks. `tools/tests/openxr_vr_touch_smoke.py` drives
+  the scripted hands step by step from the game's log; it pokes airdefense2's
+  lift calls with `vr_body` 2, 1 and 0, left-handed and with no weapon, the
+  hand panel right- and left-handed, and Prison's dead-lift call and the
+  Awakening pause with `--game q4xbase`. The Awakening's freeze gun has no
+  measured hold, so its support hand stays as animated and a touch comes
+  from the point ahead of the controller instead of the drawn fingertip.
+
 ## VR menus from your hand and a HUD on your wrist, 27 November 2026
 
 - **Menus grow out of your off hand.** Press the menu button during play and

@@ -330,6 +330,10 @@ public:
 	const idJointMat *	PoseVRArms					( const idJointMat *joints, int numJoints, const idVec3 &origin, const idMat3 &axis, int &hideSurfaces );
 	static void			ShortenVRViewForearm		( const vrViewArm_t &arm, float scale, idJointMat *joints );
 	bool				VROffHandBusy				( void ) const;
+	// openQ4 VR: the free support hand's index fingertip as this frame drew
+	// it (PoseVRArms), in its controller's frame (forward, left, up; units).
+	// False while that hand is on the gun or was not drawn lately.
+	bool				GetVRFingertip				( idVec3 &local ) const;
 
 	// Script state management
 	struct weaponStateFlags_s {
@@ -511,6 +515,11 @@ protected:
 	int								vrArmJointCount;
 	float							vrOffHandFree;		// 0 on the gun as animated, 1 with its controller
 	int								vrOffHandTime;
+	// openQ4 VR: the support hand's last two index joints, measured with the
+	// hold, and where the free hand's fingertip was drawn (GetVRFingertip)
+	mutable jointHandle_t			vrFingerJoints[ 2 ];
+	idVec3							vrFingertipLocal;
+	int								vrFingertipTime;	// Sys_Milliseconds of that draw, 0 none
 
 	rvStateThread					stateThread;
 	int								animDoneTime[ANIM_NumAnimChannels];

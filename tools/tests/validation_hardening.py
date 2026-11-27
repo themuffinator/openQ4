@@ -966,6 +966,7 @@ def validate_validation_wiring() -> None:
         # Need a staged OpenXR client, the built test runtime and retail assets.
         "openxr_vr_smoke.py",
         "openxr_vr_menu_smoke.py",
+        "openxr_vr_touch_smoke.py",
         "openxr_vr_mp_smoke.py",
         "openxr_objective_markers.py",
         # Imported by the UI harnesses that compile wrap sources; the workflows

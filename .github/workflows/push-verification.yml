@@ -724,6 +724,7 @@ jobs:
             tools/tests/openxr_vr_smoke.py \
             tools/tests/openxr_objective_markers.py \
             tools/tests/openxr_vr_menu_smoke.py \
+            tools/tests/openxr_vr_touch_smoke.py \
             tools/tests/openxr_vr_mp_smoke.py \
             tools/tests/openxr_vr_controller_profiles_smoke.py \
             tools/tests/openxr_vr_hold_closeup.py \

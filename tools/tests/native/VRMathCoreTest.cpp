@@ -1,6 +1,7 @@
 // Copyright (C) 2026 DarkMatter Productions
 #include "../../../src/framework/VRMathCore.h"
 #include "../../../src/framework/VRPanelCore.h"
+#include "../../../src/framework/VRTouchCore.h"
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
@@ -494,6 +495,99 @@ static void TestHandPanel( void ) {
 	Check( NearVec( wrist, VR_Vec3( -0.2f, 1.1f + VR_WRIST_LIFT, -0.4f + VR_WRIST_BACK ) ), "the wrist display sits behind the grip, raised" );
 }
 
+
+// A fingertip presses screens: one poke is one click, a hand resting near a
+// screen never clicks (VRTouchCore.h, VR-09).
+static void TestFingertipTouch( void ) {
+	vrTouch_t touch;
+	VR_TouchReset( touch );
+	int now = 1000;
+	// approaching from 6 cm in 5 mm steps presses once, at contact
+	int downs = 0, ups = 0;
+	float pressedAt = 1.0f;
+	for ( float d = 0.06f; d > -0.03f; d -= 0.005f ) {
+		const vrTouchEvent_t event = VR_TouchStep( touch, true, d, now += 11 );
+		if ( event == VR_TOUCH_DOWN ) {
+			downs++;
+			pressedAt = d;
+		}
+		ups += event == VR_TOUCH_UP;
+	}
+	Check( downs == 1 && ups == 0 && pressedAt <= VR_TOUCH_CONTACT && pressedAt > VR_TOUCH_CONTACT - 0.006f, "a poke presses once, at contact" );
+	// pressing on through and back out releases once, 2 cm back out
+	float releasedAt = -1.0f;
+	for ( float d = -0.03f; d < 0.06f; d += 0.005f ) {
+		const vrTouchEvent_t event = VR_TouchStep( touch, true, d, now += 11 );
+		downs += event == VR_TOUCH_DOWN;
+		if ( event == VR_TOUCH_UP ) {
+			ups++;
+			releasedAt = d;
+		}
+	}
+	Check( downs == 1 && ups == 1 && releasedAt > VR_TOUCH_RELEASE && releasedAt < VR_TOUCH_RELEASE + 0.006f, "drawing back releases once" );
+	// a second poke clicks again
+	for ( float d = 0.06f; d > -0.01f; d -= 0.005f ) {
+		downs += VR_TouchStep( touch, true, d, now += 11 ) == VR_TOUCH_DOWN;
+	}
+	Check( downs == 2, "a second poke is a second click" );
+
+	// resting near a screen, with a tremor, never clicks
+	VR_TouchReset( touch );
+	downs = 0;
+	for ( int i = 0; i < 600; i++ ) {
+		const float tremor = 0.004f * std::sin( static_cast<float>( i ) * 0.7f );
+		downs += VR_TouchStep( touch, true, 0.03f + tremor, now += 11 ) == VR_TOUCH_DOWN;
+	}
+	Check( downs == 0, "a hand resting 3 cm from a screen does not click" );
+	// nor does one resting a centimetre away, which never armed
+	VR_TouchReset( touch );
+	for ( int i = 0; i < 600; i++ ) {
+		const float tremor = 0.009f * std::sin( static_cast<float>( i ) * 0.9f );
+		downs += VR_TouchStep( touch, true, 0.01f + tremor, now += 11 ) == VR_TOUCH_DOWN;
+	}
+	Check( downs == 0, "a hand arriving close and trembling there does not click" );
+	// a hand that arrives already through a screen does not click
+	VR_TouchReset( touch );
+	for ( int i = 0; i < 30; i++ ) {
+		downs += VR_TouchStep( touch, true, -0.02f, now += 11 ) == VR_TOUCH_DOWN;
+	}
+	Check( downs == 0, "a hand already through a screen does not click" );
+	// a pressed fingertip let go of when it leaves the screen, or passes through it
+	VR_TouchReset( touch );
+	VR_TouchStep( touch, true, 0.04f, now += 11 );
+	Check( VR_TouchStep( touch, true, 0.0f, now += 11 ) == VR_TOUCH_DOWN, "contact presses" );
+	Check( VR_TouchStep( touch, false, 0.0f, now += 11 ) == VR_TOUCH_UP, "leaving the screen releases" );
+	VR_TouchStep( touch, true, 0.04f, now += 200 );
+	Check( VR_TouchStep( touch, true, 0.0f, now += 11 ) == VR_TOUCH_DOWN, "contact presses again" );
+	Check( VR_TouchStep( touch, true, -0.09f, now += 11 ) == VR_TOUCH_UP, "a hand past the screen releases" );
+	Check( VR_TouchStep( touch, true, std::nanf( "" ), now += 11 ) == VR_TOUCH_NONE && !touch.pressed, "nonsense is no touch" );
+	// a release's tremor cannot click twice within the repeat time
+	VR_TouchReset( touch );
+	VR_TouchStep( touch, true, 0.04f, now += 11 );
+	VR_TouchStep( touch, true, 0.0f, now += 11 );
+	Check( VR_TouchStep( touch, true, 0.021f, now += 11 ) == VR_TOUCH_UP, "a quick release" );
+	Check( VR_TouchStep( touch, true, 0.0f, now += 11 ) == VR_TOUCH_NONE, "an instant re-touch waits" );
+	VR_TouchStep( touch, true, 0.04f, now += 200 );
+	Check( VR_TouchStep( touch, true, 0.0f, now += 11 ) == VR_TOUCH_DOWN, "a later poke clicks" );
+
+	// the fingertip ahead of the grip, along the aim
+	const vrVec3_t tip = VR_FingertipPoint( VR_Vec3( 0.1f, 1.2f, -0.3f ), VR_QuatIdentity() );
+	Check( NearVec( tip, VR_Vec3( 0.1f, 1.2f, -0.3f - VR_FINGERTIP_REACH ) ), "the fingertip points down -Z from the grip" );
+	// against a quad facing +Z: u, v from its top-left, distance in front
+	const vrVec3_t centre = VR_Vec3( 0.0f, 1.5f, -0.5f );
+	const vrQuadTouch_t front = VR_QuadTouch( VR_Vec3( 0.1f, 1.55f, -0.47f ), centre, VR_QuatIdentity(), 0.4f, 0.2f );
+	Check( front.inReach && Near( front.u, 0.75f, 1.0e-4f ) && Near( front.v, 0.25f, 1.0e-4f ) && Near( front.distance, 0.03f, 1.0e-4f ),
+		"a fingertip 3 cm in front of a panel, a quarter in from its top right" );
+	Check( !VR_QuadTouch( VR_Vec3( 0.3f, 1.5f, -0.47f ), centre, VR_QuatIdentity(), 0.4f, 0.2f ).inReach, "beside the panel is out of reach" );
+	Check( !VR_QuadTouch( VR_Vec3( 0.0f, 1.5f, -0.4f ), centre, VR_QuatIdentity(), 0.4f, 0.2f ).inReach, "10 cm in front is out of reach" );
+	const vrQuadTouch_t behind = VR_QuadTouch( VR_Vec3( 0.0f, 1.5f, -0.52f ), centre, VR_QuatIdentity(), 0.4f, 0.2f );
+	Check( behind.inReach && behind.distance < 0.0f, "a little through the panel still touches it" );
+	// a panel turned to face the head across its left: +Z along +X
+	const vrQuat_t turned = VR_FacingQuat( centre, VR_Add( centre, VR_Vec3( 1.0f, 0.0f, 0.0f ) ) );
+	const vrQuadTouch_t side = VR_QuadTouch( VR_Add( centre, VR_Vec3( 0.02f, 0.0f, 0.0f ) ), centre, turned, 0.4f, 0.2f );
+	Check( side.inReach && Near( side.distance, 0.02f, 1.0e-4f ) && Near( side.u, 0.5f, 1.0e-4f ), "a turned panel measures along its own normal" );
+}
+
 int main() {
 	TestBasis();
 	TestOrientation();
@@ -513,6 +607,7 @@ int main() {
 	TestBody();
 	TestAuditLeads();
 	TestHandPanel();
+	TestFingertipTouch();
 	std::printf( "VR math core: all checks passed\n" );
 	return 0;
 }

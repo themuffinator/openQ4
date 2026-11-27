@@ -80,6 +80,7 @@ here: it waits on the AND-05 distribution decision.
 | 3.17 | On Windows Mixed Reality controllers, press each touchpad in its upper and lower half; click both thumbsticks. | Upper half: crouch (right), flashlight (left). Lower half: jump (right), reload (left). The thumbstick clicks keep their own actions. |
 | 3.18 | With a mirror or your shadow in view, point the gun straight up, then straight down, rolling your wrist. | Your character in the mirror or shadow keeps facing one way; it no longer spins on the spot. |
 | 3.19 | Set **Weapon Hand** to Left. Hold each gun close to your face, turn it, and let go of it with the right hand and take hold again. | A left hand grips each gun as the right hand did, the right hand supports it and follows its controller when free; no arm is dark, see-through or inside out, and the gun's displays read the right way round. |
+| 3.20 | With **Your Body** on With Arms, hold the off hand out with its index finger pointing, and watch where the drawn fingertip is against your own. Repeat left-handed. | The drawn index fingertip is within about 2 cm of where your real fingertip is, in both hands; note the offset in the report if not. |
 
 ## 4. Body, space and movement (VR-02, VR-03)
 
@@ -121,6 +122,9 @@ here: it waits on the AND-05 distribution decision.
 | 6.3 | In single player, point the weapon hand at a door panel and a lift call screen and pull the trigger. | The cursor sits where the laser meets the screen and the screen responds. |
 | 6.4 | In multiplayer, look at the objective markers in CTF (`mp/q4ctf1`). | Markers sit at HUD depth, follow your head and stay inside the HUD. |
 | 6.5 | In multiplayer, hit another player (or `testHudOverlays`) and watch the damage number. | The number rises from the player you hit, not below or beside them. |
+| 6.6 | In single player, press a door panel and a lift call with the off hand's fingertip (airdefense2 has a lift call by its first lift). Then rest the fingertip a few centimetres from the screen for ten seconds. | The cursor follows the fingertip once it is a few centimetres away; one poke is one click with a firm tick; resting near the screen, holding still or with a natural tremor, clicks nothing. Note whether the contact point feels early or late. |
+| 6.7 | Repeat 6.6 with **Your Body** on Legs and Torso, with **Weapon Hand** set to Left, and with no weapon in hand (the weapon hand then presses). In The Awakening (`q4xbase`), press a lift call in Prison with the blaster in hand, then with the freeze gun. | Every case presses where the fingertip meets the screen; with the body's arms off, and with the freeze gun (whose support hand stays on the gun), the press point is a little ahead of the controller. |
+| 6.8 | Sweep the laser, then the fingertip, across a screen with several buttons (a terminal with choices). | The hand ticks lightly once per new button and not while the cursor stays on one; a click or a press ticks more firmly. `vr_menuHaptics 0` stops the ticks. |
 
 ## 7. Temporal anti-aliasing by eye (VR-05)
 
@@ -152,3 +156,4 @@ version in the report. The log's `VR_RUNTIME`, `VR_MODE`, `VR_OFFER` and
 | 8.11 | In play, press the menu button with your off hand held naturally, then move and steady that hand. | The menu grows out of the off hand onto a panel facing you, the level still around it; it follows a moved hand and stays still while you hold steady; the pointer's beam and dot are easy to put on a button. |
 | 8.12 | Rest the pointer on each pause button and on settings rows. | The button under it grows and lights up at once and the hand ticks once per new control; nothing depends on hovering to appear. |
 | 8.13 | Glance at your off-hand wrist in a fight, with `vr_hudMode 1`. | Health, armor and ammunition read at a glance; notices and objective updates still appear before your eyes. |
+| 8.14 | Open the pause from the off hand and press RESUME, then another button, with the weapon hand's fingertip instead of the trigger; rest the fingertip just in front of a button for a few seconds first. Repeat left-handed. | The pointer follows the fingertip near the panel; a poke presses the button under it once, with a firm tick; resting in front presses nothing. |

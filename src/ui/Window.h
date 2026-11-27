@@ -384,6 +384,10 @@ public:
 	void		AddDefinedVar		( idWinVar* var );
 
 	idWindow*	FindChildByPoint	( float x, float y, idWindow* below = NULL );
+	// The control a click at x, y would reach, routed as the mouse is: the
+	// topmost shown child that takes events, down to the deepest window with
+	// an action to run. NULL over none.
+	idWindow*	ControlAt			( float x, float y );
 	int			GetChildIndex		( idWindow* window );
 	int			GetChildCount		( void );
 	idWindow*	GetChild			( int index );

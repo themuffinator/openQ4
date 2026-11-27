@@ -1490,6 +1490,11 @@ idPlayer::idPlayer() {
 	vrBodyPosed = false;
 	vrBodyMode = VR_BODY_OFF;
 	vrBodySeated = false;
+	VR_TouchReset( vrTouch );
+	vrTouchHand = -1;
+	vrTouchUI = NULL;
+	vrHoverUI = NULL;
+	vrHoverControl = 0;
 	vrModelYaw = 0.0f;
 	vrModelYawValid = false;
 	unarmedArmsModel = NULL;
@@ -8252,6 +8257,14 @@ void idPlayer::Weapon_GUI( void ) {
 
 		idUserInterface *ui = ActiveGui();
 		if ( ui ) {
+			// openQ4 VR (single player): a click on a world screen gives the
+			// pointing hand a firmer tick than its hovers (UpdateVRGuiHover)
+			vrFrameState_t frame;
+			float trackingYaw;
+			if ( !gameLocal.isMultiplayer && ( usercmd.buttons & BUTTON_ATTACK ) != 0 && ui == focusUI && vrSystem != NULL
+					&& GetVRView( frame, trackingYaw ) && cvarSystem->GetCVarBool( "vr_menuHaptics" ) ) {
+				vrSystem->Vibrate( frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT, 0.5f, 25 );
+			}
  			ev = sys->GenerateMouseButtonEvent( 1, ( usercmd.buttons & BUTTON_ATTACK ) != 0 );
 			command = ui->HandleEvent( &ev, gameLocal.time, &updateVisuals );
 			if ( updateVisuals && focusEnt && ui == focusUI ) {
@@ -8953,6 +8966,15 @@ void idPlayer::UpdateFocus( void ) {
 		}
 	}
 	end = start + viewAngles.ToForward() * 768.0f;
+	// openQ4 VR (single player): a free fingertip near a world screen takes
+	// its focus from the laser, along a short ray through the fingertip that
+	// puts the cursor under it (FindVRTouch); UpdateVRTouchPress clicks it
+	idVec3 touchStart;
+	idVec3 touchEnd;
+	float touchDistance = 0.0f;
+	int touchHand = -1;
+	idEntity *touchScreen = NULL;
+	const bool touching = !gameLocal.isMultiplayer && FindVRTouch( touchStart, touchEnd, touchDistance, touchHand, touchScreen );
 
  	// player identification -> names to the hud
  	if ( gameLocal.isMultiplayer && IsLocalClient() ) {
@@ -9163,8 +9185,18 @@ void idPlayer::UpdateFocus( void ) {
 
 #endif
 
+	if ( touching ) {
+		start = touchStart;
+		end = touchEnd;
+	}
+
 	idBounds bounds( start );
 	bounds.AddPoint( end );
+	if ( touching ) {
+		// the short ray can be thinner than a screen's clip model is found by
+		// (FindVRTouch looks in a box round the fingertip); the traces keep to the ray
+		bounds.ExpandSelf( 4.0f );
+	}
 	
 	listedClipModels = gameLocal.ClipModelsTouchingBounds( this, bounds, -1, clipModelList, MAX_GENTITIES );
 
@@ -9449,7 +9481,8 @@ void idPlayer::UpdateFocus( void ) {
 				ui->SetStateString( "player_armor", va( "%i%%", inventory.armor ) );
 				if ( !gameLocal.isMultiplayer ) {
 					if ( vrSystem != NULL && vrSystem->IsActive() && cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
-						gameLocal.Printf( "VR GUI focus %s at %.2f %.2f\n", ent->GetName(), pt.x, pt.y );
+						const idVec3 hit = start + ( end - start ) * pt.fraction;
+						gameLocal.Printf( "VR GUI focus %s at %.2f %.2f, world %.2f %.2f %.2f\n", ent->GetName(), pt.x, pt.y, hit.x, hit.y, hit.z );
 					}
 				}
 
@@ -9488,6 +9521,17 @@ void idPlayer::UpdateFocus( void ) {
 			SetFocus ( FOCUS_GUI, FOCUS_GUI_TIME, ent, ui );
 			break;
 		}
+	}
+
+	if ( !gameLocal.isMultiplayer ) {
+		// openQ4 VR: the fingertip presses the screen it focused; the hand
+		// pointing at or touching a world screen feels each control it crosses
+		const bool touched = touching && focusType == FOCUS_GUI && focusUI != NULL && focusEnt.GetEntity() == touchScreen;
+		UpdateVRTouchPress( touched, touchDistance, touchHand );
+		vrFrameState_t frame;
+		float trackingYaw;
+		const int pointingHand = GetVRView( frame, trackingYaw ) && frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT;
+		UpdateVRGuiHover( focusType == FOCUS_GUI ? focusUI : NULL, touched ? touchHand : pointingHand );
 	}
 
 #ifdef _XENON
@@ -15507,6 +15551,297 @@ bool idPlayer::GetVRHandPose( int hand, idVec3 &palm, idMat3 &aimAxis ) const {
 		VR_PoseToWorld( pose, eyeOrigin, trackingYaw, palm, gripAxis );
 	}
 	return true;
+}
+
+/*
+===============
+idPlayer::GetVRFingertip
+
+openQ4 VR (single player): where a free hand's index fingertip is this tic,
+for pressing world screens (VRTouchCore.h). The tic's eye places the
+controller, as GetVRAimOrigin does. Where the body's arms draw the support
+hand free (vr_body 2) the fingertip is the drawn one, carried in the
+controller's own frame; otherwise it is a point ahead of the controller,
+where a finger pointing along it would end.
+===============
+*/
+bool idPlayer::GetVRFingertip( int hand, idVec3 &tip, idVec3 &pointing ) const {
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( gameLocal.isMultiplayer || health <= 0 || hand < 0 || hand >= VR_NUM_HANDS || !GetVRView( frame, trackingYaw )
+			|| !frame.aim[ hand ].valid || frame.unitsPerMetre <= 0.0f ) {
+		return false;
+	}
+	const int weaponHand = frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT;
+	if ( hand == weaponHand ) {
+		// the weapon hand holds the gun, unless there is none or the head aims
+		if ( frame.aimMode == VR_AIM_HAND && !IsBodyUnarmed() ) {
+			return false;
+		}
+	} else if ( frame.twoHanded ) {
+		// the off hand holds the foregrip
+		return false;
+	}
+	idVec3 eyeOrigin = firstPersonViewOrigin;
+	eyeOrigin.z += VRCrouchLift( frame );
+	const idVec3 correction = VR_HeadOffsetCorrection( frame );
+	vrPose_t pose = frame.aim[ hand ];
+	pose.origin += correction;
+	idVec3 palm;
+	idMat3 aimAxis;
+	VR_PoseToWorld( pose, eyeOrigin, trackingYaw, palm, aimAxis );
+	if ( frame.grip[ hand ].valid ) {
+		pose = frame.grip[ hand ];
+		pose.origin += correction;
+		idMat3 gripAxis;
+		VR_PoseToWorld( pose, eyeOrigin, trackingYaw, palm, gripAxis );
+	}
+	pointing = aimAxis[ 0 ];
+	idVec3 local;
+	if ( hand != weaponHand && weapon != NULL && weapon->GetVRFingertip( local ) ) {
+		tip = palm + local * aimAxis;
+	} else {
+		tip = palm + aimAxis[ 0 ] * ( VR_FINGERTIP_REACH * frame.unitsPerMetre );
+	}
+	return true;
+}
+
+/*
+===============
+idPlayer::FindVRTouch
+
+openQ4 VR (single player): the world screen nearest a free fingertip, within
+hovering range in front of it or a little through it. A screen is found
+along the way the hand points, or failing that from the head through the
+fingertip; three traces a little apart give its plane, so the distance is
+the fingertip's own from the face, however the finger meets it. start and
+end are then a short ray through the fingertip along the face's normal: the
+focus trace along it puts the cursor right under the fingertip.
+===============
+*/
+bool idPlayer::FindVRTouch( idVec3 &start, idVec3 &end, float &distance, int &hand, idEntity *&screen ) {
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( gameLocal.isMultiplayer || !GetVRView( frame, trackingYaw ) || frame.unitsPerMetre <= 0.0f || gameRenderWorld == NULL ) {
+		return false;
+	}
+	const float unitsPerMetre = frame.unitsPerMetre;
+	// how far either side of the fingertip a screen is looked for
+	const float reach = ( VR_TOUCH_HOVER + 0.04f ) * unitsPerMetre;
+	idVec3 head;
+	const bool headKnown = GetVRHeadOrigin( head );
+	bool found = false;
+	float nearest = idMath::INFINITY;
+	for ( int h = 0; h < VR_NUM_HANDS; h++ ) {
+		idVec3 tip;
+		idVec3 pointing;
+		if ( !GetVRFingertip( h, tip, pointing ) ) {
+			continue;
+		}
+		// (debug: where each fingertip is, once a second, for tuning on a headset)
+		static int loggedMsec[ VR_NUM_HANDS ] = { 0, 0 };
+		if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 1 && Sys_Milliseconds() - loggedMsec[ h ] > 1000 ) {
+			loggedMsec[ h ] = Sys_Milliseconds();
+			idVec3 local;
+			const bool drawn = weapon != NULL && weapon->GetVRFingertip( local );
+			gameLocal.Printf( "VR fingertip %s hand (%.1f %.1f %.1f)%s\n", h == VR_HAND_LEFT ? "left" : "right", tip.x, tip.y, tip.z,
+				drawn ? va( ", drawn support hand %.1f %.1f %.1f from its controller", local.x, local.y, local.z ) : "" );
+		}
+		idBounds bounds( tip );
+		bounds.ExpandSelf( reach );
+		idClipModel *clipModels[ 64 ];
+		const int count = gameLocal.ClipModelsTouchingBounds( this, bounds, -1, clipModels, 64 );
+		for ( int i = 0; i < count; i++ ) {
+			idEntity *ent = clipModels[ i ]->GetEntity();
+			if ( ent == NULL || ent == this || ent->IsHidden() || ent->GetModelDefHandle() < 0
+					|| !Player_HasInteractiveGui( ent->GetRenderEntity() ) || ent->spawnArgs.GetBool( "inv_item" ) ) {
+				continue;
+			}
+			const qhandle_t handle = ent->GetModelDefHandle();
+			idVec3 directions[ 2 ];
+			int numDirections = 0;
+			directions[ numDirections++ ] = pointing;
+			if ( headKnown ) {
+				idVec3 fromHead = tip - head;
+				if ( fromHead.Normalize() > 0.0f ) {
+					directions[ numDirections++ ] = fromHead;
+				}
+			}
+			for ( int d = 0; d < numDirections; d++ ) {
+				const idVec3 &dir = directions[ d ];
+				const guiPoint_t centre = gameRenderWorld->GuiTrace( handle, tip - dir * reach, tip + dir * reach );
+				if ( centre.x == -1 ) {
+					continue;
+				}
+				const renderEntity_t *renderEntity = ent->GetRenderEntity();
+				idUserInterface *ui = ( renderEntity != NULL && centre.guiId >= 1 && centre.guiId <= MAX_RENDERENTITY_GUI ) ? renderEntity->gui[ centre.guiId - 1 ] : NULL;
+				if ( ui == NULL || !ui->IsInteractive() ) {
+					continue;
+				}
+				// the face's plane from three hits a little apart
+				idVec3 across;
+				idVec3 up;
+				dir.OrthogonalBasis( across, up );
+				const float spread = 0.5f;
+				const guiPoint_t side = gameRenderWorld->GuiTrace( handle, tip + across * spread - dir * reach, tip + across * spread + dir * reach );
+				const guiPoint_t above = gameRenderWorld->GuiTrace( handle, tip + up * spread - dir * reach, tip + up * spread + dir * reach );
+				if ( side.x == -1 || above.x == -1 ) {
+					continue;
+				}
+				const idVec3 hit = tip + dir * ( reach * ( 2.0f * centre.fraction - 1.0f ) );
+				const idVec3 hitSide = tip + across * spread + dir * ( reach * ( 2.0f * side.fraction - 1.0f ) );
+				const idVec3 hitAbove = tip + up * spread + dir * ( reach * ( 2.0f * above.fraction - 1.0f ) );
+				idVec3 normal = ( hitSide - hit ).Cross( hitAbove - hit );
+				if ( normal.Normalize() <= 0.0f ) {
+					continue;
+				}
+				// the normal faces where the fingertip comes from
+				if ( normal * dir > 0.0f ) {
+					normal = -normal;
+				}
+				// a hand sliding along a screen is not pressing it
+				if ( -( normal * dir ) < 0.2f ) {
+					continue;
+				}
+				const float metres = ( ( tip - hit ) * normal ) / unitsPerMetre;
+				if ( !VR_TouchInRange( metres ) ) {
+					continue;
+				}
+				// the cursor goes under the fingertip, where the normal through it meets the face
+				const idVec3 rayStart = tip + normal * reach;
+				const idVec3 rayEnd = tip - normal * reach;
+				const guiPoint_t under = gameRenderWorld->GuiTrace( handle, rayStart, rayEnd );
+				if ( under.x == -1 ) {
+					continue;
+				}
+				if ( idMath::Fabs( metres ) < nearest ) {
+					nearest = idMath::Fabs( metres );
+					found = true;
+					start = rayStart;
+					end = rayEnd;
+					distance = metres;
+					hand = h;
+					screen = ent;
+				}
+				break;
+			}
+		}
+	}
+	return found;
+}
+
+/*
+===============
+idPlayer::UpdateVRTouchPress
+
+openQ4 VR (single player): one poke of a fingertip is one click on the
+screen it touches (VR_TouchStep): the mouse button goes down on contact and
+up as the fingertip draws back, with a firmer tick in the hand than a hover's.
+touching is whether the focus this tic is the fingertip's screen.
+===============
+*/
+void idPlayer::UpdateVRTouchPress( bool touching, float distance, int hand ) {
+	idUserInterface *ui = touching ? focusUI : NULL;
+	if ( ui != vrTouchUI || ( ui != NULL && hand != vrTouchHand ) ) {
+		// another screen, another hand, or none (a screen that goes inactive
+		// once pressed, as a lift call does): a press held on the last one lets
+		// go there if it is still the focus (SetFocus already deactivated it if not)
+		if ( vrTouch.pressed ) {
+			const char *command = NULL;
+			if ( vrTouchUI != NULL && vrTouchUI == focusUI ) {
+				sysEvent_t ev = sys->GenerateMouseButtonEvent( 1, false );
+				command = focusUI->HandleEvent( &ev, gameLocal.time );
+			}
+			if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+				gameLocal.Printf( "VR GUI touch release, the fingertip left the screen%s%s\n",
+					( command != NULL && command[ 0 ] != '\0' ) ? ": " : "", command != NULL ? command : "" );
+			}
+			if ( command != NULL ) {
+				HandleGuiCommands( focusEnt.GetEntity() != NULL ? focusEnt.GetEntity() : this, command );
+			}
+		}
+		const int releasedMsec = vrTouch.pressed ? Sys_Milliseconds() : vrTouch.releasedMsec;
+		VR_TouchReset( vrTouch );
+		vrTouch.releasedMsec = releasedMsec;
+		vrTouchUI = ui;
+		vrTouchHand = ui != NULL ? hand : -1;
+		if ( ui != NULL && cvarSystem->GetCVarInteger( "vr_debug" ) > 0 && focusEnt.GetEntity() != NULL ) {
+			// which fingertip: the one the arms draw, or the point ahead of the controller
+			vrFrameState_t frame;
+			float trackingYaw;
+			idVec3 local;
+			const bool drawn = GetVRView( frame, trackingYaw ) && hand != ( frame.weaponHand == VR_HAND_LEFT ? VR_HAND_LEFT : VR_HAND_RIGHT )
+				&& weapon != NULL && weapon->GetVRFingertip( local );
+			gameLocal.Printf( "VR GUI touch near %s, %s hand, %s, %.1f mm\n", focusEnt.GetEntity()->GetName(),
+				hand == VR_HAND_LEFT ? "left" : "right", drawn ? "drawn fingertip" : "controller fingertip", distance * 1000.0f );
+		}
+	}
+	if ( ui == NULL ) {
+		return;
+	}
+	// (debug: the hovering distance, each time it changes by 5 mm, so a check
+	// can tell how close a hand rested)
+	static float loggedDistance = -1.0f;
+	if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 && idMath::Fabs( distance - loggedDistance ) >= 0.005f ) {
+		loggedDistance = distance;
+		gameLocal.Printf( "VR GUI touch hover %.1f mm\n", distance * 1000.0f );
+	}
+	const int now = Sys_Milliseconds();
+	const vrTouchEvent_t event = VR_TouchStep( vrTouch, true, distance, now );
+	if ( event == VR_TOUCH_NONE ) {
+		return;
+	}
+	idEntity *screen = focusEnt.GetEntity();
+	sysEvent_t ev = sys->GenerateMouseButtonEvent( 1, event == VR_TOUCH_DOWN );
+	bool updateVisuals = false;
+	const char *command = ui->HandleEvent( &ev, gameLocal.time, &updateVisuals );
+	if ( updateVisuals && screen != NULL ) {
+		screen->UpdateVisuals();
+	}
+	if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+		gameLocal.Printf( "VR GUI touch %s %s at %.2f %.2f, %.1f mm%s%s\n", event == VR_TOUCH_DOWN ? "press" : "release",
+			screen != NULL ? screen->GetName() : "(none)", ui->CursorX() / SCREEN_WIDTH, ui->CursorY() / SCREEN_HEIGHT,
+			distance * 1000.0f, ( command != NULL && command[ 0 ] != '\0' ) ? ": " : "", command != NULL ? command : "" );
+	}
+	if ( event == VR_TOUCH_DOWN && vrSystem != NULL && cvarSystem->GetCVarBool( "vr_menuHaptics" ) ) {
+		vrSystem->Vibrate( hand, 0.5f, 25 );
+	}
+	HandleGuiCommands( screen != NULL ? screen : this, command );
+}
+
+/*
+===============
+idPlayer::UpdateVRGuiHover
+
+openQ4 VR (single player): the hand that points at a world screen, or touches
+it, feels a light tick each time the cursor moves onto another of its
+controls, as the menus' controls tick (vr_menuHaptics). ui is the focused
+world screen this tic, or NULL.
+===============
+*/
+void idPlayer::UpdateVRGuiHover( idUserInterface *ui, int hand ) {
+	vrFrameState_t frame;
+	float trackingYaw;
+	if ( ui == NULL || gameLocal.isMultiplayer || vrSystem == NULL || !GetVRView( frame, trackingYaw ) ) {
+		vrHoverUI = NULL;
+		vrHoverControl = 0;
+		return;
+	}
+	if ( ui != vrHoverUI ) {
+		vrHoverUI = ui;
+		vrHoverControl = 0;
+	}
+	const int control = ui->HoverControl();
+	if ( control == vrHoverControl ) {
+		return;
+	}
+	vrHoverControl = control;
+	if ( control != 0 && cvarSystem->GetCVarBool( "vr_menuHaptics" ) ) {
+		vrSystem->Vibrate( hand, 0.15f, 12 );
+		if ( cvarSystem->GetCVarInteger( "vr_debug" ) > 0 ) {
+			gameLocal.Printf( "VR GUI hover tick, %s hand\n", hand == VR_HAND_LEFT ? "left" : "right" );
+		}
+	}
 }
 
 /*

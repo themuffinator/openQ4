@@ -6574,6 +6574,29 @@ idWindow* idWindow::FindChildByPoint ( float x, float y, idWindow* below )
 
 /*
 ================
+idWindow::ControlAt
+
+openQ4: the control a click at x, y reaches, routed as RouteMouseCoords
+routes the mouse: the topmost shown child under the point that takes events
+covers its siblings, and inside it the deepest window with an action wins.
+================
+*/
+idWindow* idWindow::ControlAt( float x, float y ) {
+	for ( int i = children.Num() - 1; i >= 0; i-- ) {
+		idWindow *child = children[ i ];
+		if ( child != NULL && child->visible && !child->noEvents && child->Contains( child->drawRect, x, y ) ) {
+			idWindow *control = child->ControlAt( x, y );
+			if ( control != NULL ) {
+				return control;
+			}
+			break;
+		}
+	}
+	return ( scripts[ ON_ACTION ] != NULL || scripts[ ON_ACTIONRELEASE ] != NULL ) ? this : NULL;
+}
+
+/*
+================
 idWindow::GetChildCount
 
 Returns the number of children
