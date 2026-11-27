@@ -233,6 +233,10 @@ bool R_ShadowMapOwnershipsShareResidentDepth( bool localStaticCasters, bool loca
 // The pure form, for the self-test: the window in frames for a smoothed frame
 // interval in milliseconds.
 int R_ShadowMapDynamicCasterFramesFor( float frameMsec );
+// Frames an unused resident map is kept: r_shadowMapResidentFrames counted at
+// 60 frames a second and scaled up to the rate frames are being drawn at.
+int R_ShadowMapResidentFramesFor( int configuredFrames, float frameMsec );
+int R_ShadowMapResidentFrames( void );
 // The projected atlas is shared by every projected, parallel and distant point
 // light of a view, and each of them asks for one block per receiver ownership.
 // Blocks are placed as power-of-two squares inside the largest power-of-two

@@ -887,7 +887,14 @@ static void R_ModernClusteredLighting_CopyPlannerShadowDescriptor( rendererModer
 		dst.cascadeSplitDepths[cascadeIndex] = src.cascadeSplitDepths[cascadeIndex];
 		dst.cascadeBiasScale[cascadeIndex] = src.cascadeBiasScale[cascadeIndex];
 		dst.texelDepthBias[cascadeIndex] = src.texelDepthBias[cascadeIndex];
-		dst.worldTexelSize[cascadeIndex] = src.worldTexelSize[cascadeIndex];
+		// The receivers read the texel for two things, the normal offset and
+		// the bias of their off-centre taps, and the classic receivers scale
+		// both by the light's receiver bias scale
+		// (R_ShadowMapProjectedNormalOffsetWorld, R_ShadowMapProjectedTexelDepthSteps).
+		// Unscaled, a far-shell sun kept a whole-light texel of each here, the
+		// leak behind the shell that the scale was added to remove.
+		dst.worldTexelSize[cascadeIndex] = src.worldTexelSize[cascadeIndex]
+			* ( src.projectedStateReady ? src.receiverBiasScale : 1.0f );
 		dst.sliceNear[cascadeIndex] = src.sliceNear[cascadeIndex];
 		dst.sliceFar[cascadeIndex] = src.sliceFar[cascadeIndex];
 		dst.depthRange[cascadeIndex] = src.depthRange[cascadeIndex];

@@ -12,6 +12,37 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Sharper sunlight shadows close to you, and a shadow-map tidy-up on both renderers, 27 November 2026
+
+- **Sunlight shadows near the player are finer on Quality and Ultra.** A
+  cascaded light keeps a safety margin around each slice of the view, and the
+  margin was being measured in the wrong unit: close to the player it was as
+  wide as the slice itself, so the nearest shadows were drawn coarser than the
+  map could hold. On Air Defense 1 the nearest slice now resolves 0.58 units a
+  texel where it resolved 0.91, and the next one is a step finer in most
+  views. The ground right at your feet also stops borrowing the next, coarser
+  slice. OpenGL and Vulkan both; no setting changes and no extra cost.
+- **A spotlight sharing the view with the sun keeps its full resolution** when
+  the shadow atlas has room for it, where it used to be halved along with
+  everything else.
+- **Shadows you looked away from are still there when you look back at high
+  frame rates.** A light's cached shadow map was kept for a number of frames,
+  which is two seconds at 60 FPS and a quarter of a second at 480. It is now
+  two seconds at any frame rate (`r_shadowMapResidentFrames`).
+- **OpenGL gives back shadow memory** when a larger point-shadow size or a
+  smaller cache lowers the number of cached lights, instead of holding up to
+  several hundred megabytes until the next video restart, and no longer
+  re-reads and recompiles a shadow shader every frame if one fails to load.
+  On lights that need both a shadow map and stencil shadows, the stencil part
+  now takes effect.
+- **Vulkan: cel-shaded highlights look the same under a shadow-mapped light**
+  as under any other (`r_celShading 1`).
+- **What to do.** Nothing. Each cached shadow map is rendered once more after
+  the update.
+- Developer detail, measurements and the leads left open:
+  [27 November shadow-mapping audit](shadowmapping-audit-2026-11-27.md).
+  No ABI change.
+
 ## The start-up screen stays up through the first launch's settings restart, 27 November 2026
 
 - **The game window no longer vanishes and comes back black on a first

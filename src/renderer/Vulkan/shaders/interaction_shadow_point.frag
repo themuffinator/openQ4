@@ -376,7 +376,7 @@ vec3 SamplePointTranslucentShadow() {
         return vec3(1.0);
     }
     float depth = PointShadowRadialDepth(vPointShadowVector, far);
-    if (depth <= 0.0 || depth >= 1.0) {
+    if (!(depth > 0.0 && depth < 1.0)) {
         return vec3(1.0);
     }
 
@@ -419,7 +419,7 @@ float SampleShadowFactor() {
     }
 
     float depth = PointShadowRadialDepth(vPointShadowVector, far);
-    if (depth <= 0.0 || depth >= 1.0) {
+    if (!(depth > 0.0 && depth < 1.0)) {
         return 1.0;
     }
     vec3 direction = SafeNormalize(vPointShadowVector);
@@ -545,7 +545,7 @@ vec4 PointShadowDebugOutput() {
     }
 
     float depth = PointShadowRadialDepth(vPointShadowVector, far);
-    if (depth <= 0.0 || depth >= 1.0) {
+    if (!(depth > 0.0 && depth < 1.0)) {
         return vec4(1.0, 1.0, 0.0, 1.0);
     }
     vec3 direction = SafeNormalize(vPointShadowVector);
@@ -703,8 +703,11 @@ void main() {
         specularTerm = CelSpecularTerm(EnhancedSpecularTerm(halfAngle, SafeNormalize(vViewVector), localNormal, specularSample));
     } else {
         float specularDot = clamp(dot(halfAngle, localNormal), 0.0, 1.0);
+        // The doubling is inside the term, as interaction.frag and the OpenGL
+        // receivers have it: cel banding clamps and steps the same value
+        // whether or not the light is shadow mapped.
         specularTerm = texture(specularTableMap, vec2(specularDot, 0.5)).r * 2.0;
-        specularTerm = CelSpecularTerm(specularTerm * 0.5) * 2.0;
+        specularTerm = CelSpecularTerm(specularTerm);
     }
     vec3 specular = specularSample * inter.specularColor.rgb * specularTerm;
 

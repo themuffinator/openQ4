@@ -138,6 +138,9 @@ typedef struct modernShadowLightDescriptor_s {
 	float				clipZExtent[MODERN_SHADOW_DESCRIPTOR_MAX_CASCADES];
 	float				bias[4];
 	float				normalOffsetScale;
+	// shadowMapProjectedLightState_t::receiverBiasScale: 0 under a map of far
+	// faces, which needs no texel-sized bias or normal offset at its receivers
+	float				receiverBiasScale;
 	int					faceIndex;
 	int					cascadeIndex;
 	int					projectedFallbackCascade;

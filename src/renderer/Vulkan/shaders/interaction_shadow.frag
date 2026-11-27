@@ -301,8 +301,15 @@ float SampleShadowCompare(vec2 uv, float depth, int cascadeIndex,
     return compareDepth <= storedDepth ? 1.0 : 0.0;
 }
 
+// centreLit returns the centre tap's verdict when the search read it, and -1
+// when it did not: the search's first probe is the texel the filter's centre
+// tap compares, against the same biased depth, so the filter takes the answer
+// instead of reading the map again (twice, under the ownership union). A
+// search that finds no blocker has by that found the centre lit.
 float ProjectedPCSSRadius(vec2 uv, float depth, int cascadeIndex,
-        vec2 clampMin, vec2 clampMax, vec2 texelStep, mat2 rotation) {
+        vec2 clampMin, vec2 clampMax, vec2 texelStep, mat2 rotation,
+        out float centreLit) {
+    centreLit = -1.0;
     float baseRadius = ShadowDebugModeIs(kShadowDebugPCFOff)
         ? 0.0 : shadow.filterParams.x;
     if (ShadowDebugModeIs(kShadowDebugPCFOff)
@@ -320,6 +327,7 @@ float ProjectedPCSSRadius(vec2 uv, float depth, int cascadeIndex,
     float blockerDepth = 0.0;
     float blockerCount = 0.0;
     float d0 = RawShadowDepth(uv);
+    centreLit = compareDepth <= d0 ? 1.0 : 0.0;
     if (d0 < compareDepth) {
         blockerDepth += d0;
         blockerCount += 1.0;
@@ -460,16 +468,20 @@ float SampleShadowCascade(vec4 shadowCoord, vec4 atlasRect,
         max(tileTexels - vec2(guardRadius), vec2(guardRadius)));
     mat2 rotation = ShadowOffsetRotation(tileTexel, depth);
 
+    float centreLit;
     float filterRadius = ProjectedPCSSRadius(uv, depth, cascadeIndex,
-        clampMin, clampMax, texelStep, rotation);
+        clampMin, clampMax, texelStep, rotation, centreLit);
+    if (centreLit < 0.0) {
+        centreLit = SampleShadowCompare(uv, depth, cascadeIndex, 0.0);
+    }
     if (filterRadius <= 0.0) {
-        return SampleShadowCompare(uv, depth, cascadeIndex, 0.0);
+        return centreLit;
     }
 
     vec2 tap = texelStep * filterRadius;
     // Each tap's bias grows with its distance from the centre, filterRadius * |o|.
     float tapBias = ShadowFootprintBias(cascadeIndex) * filterRadius;
-    float result = SampleShadowCompare(uv, depth, cascadeIndex, 0.0);
+    float result = centreLit;
     if (shadow.filterParams.y <= 1.0) {
         return result;
     }
@@ -1049,8 +1061,11 @@ void main() {
         specularTerm = CelSpecularTerm(EnhancedSpecularTerm(halfAngle, SafeNormalize(vViewVector), localNormal, specularSample));
     } else {
         float specularDot = clamp(dot(halfAngle, localNormal), 0.0, 1.0);
+        // The doubling is inside the term, as interaction.frag and the OpenGL
+        // receivers have it: cel banding clamps and steps the same value
+        // whether or not the light is shadow mapped.
         specularTerm = texture(specularTableMap, vec2(specularDot, 0.5)).r * 2.0;
-        specularTerm = CelSpecularTerm(specularTerm * 0.5) * 2.0;
+        specularTerm = CelSpecularTerm(specularTerm);
     }
     vec3 specular = specularSample * inter.specularColor.rgb * specularTerm;
 

@@ -2665,6 +2665,19 @@ are not yet measured.
   CPU, the premium over stencil point shadows down from 5.7/4.1 ms to 1.1/0.8 ms;
   on Vulkan the mapped frame is within 0.1 ms of GPU of the stencil one in hub2 and
   storage2. These are hidden-window probe figures, not fullscreen budgets.
+  Audit round (27 November 2026). A [second audit](shadowmapping-audit-2026-11-27.md)
+  of planning, map rendering and receivers on both backends fixed fourteen items.
+  The cascade guard is sized in the cascade's own texels (Air Defense 1's nearest
+  cascade 0.91 to 0.58 units a texel at Quality; 98.8% to 99.1% of stencil's shadow
+  kept on both backends), eye depth is interpolated unclamped so pixels at the
+  player's feet keep their cascade, atlas room freed by a halving is handed back,
+  resident maps expire by time and not by frames drawn, OpenGL releases cubes past
+  a lowered slot limit, honours the stencil supplement of a hybrid light and
+  remembers a failed program load, and the static-caster signature carries
+  ownership. Open leads are listed there: the single-map collapse when a slice
+  reaches behind the source plane, cascade scale stepping with yaw, off-screen live
+  casters, PCSS-lite on parallel lights, and Vulkan memory kept after shadow maps
+  are switched off.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always

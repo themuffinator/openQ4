@@ -153,7 +153,10 @@ void main() {
     vShadowCoord2 = BuildShadowCoord(position, shadowNormal, shadowSinTheta, 2);
     vShadowCoord3 = BuildShadowCoord(position, shadowNormal, shadowSinTheta, 3);
     vShadowLightCos = shadowLightCos;
-    vViewDepth = max(dot(position, shadow.viewDepthRow), 0.0);
+    // Unclamped, as shadow_interaction.vs: a vertex behind the eye clamped to
+    // zero bends the depth interpolated across its triangle, and the pixels at
+    // the player's feet took the next cascade.
+    vViewDepth = dot(position, shadow.viewDepthRow);
 
     vVertexColor = inColor.rgb * pc.a.x + vec3(pc.a.y);
 

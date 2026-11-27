@@ -666,7 +666,7 @@ static bool R_ShadowMapCasterIsDynamic( const idRenderEntityLocal *entityDef, co
 static void R_RecordShadowMapCaster( viewLight_t *vLight,
 		const idRenderEntityLocal *entityDef, const idMaterial *shader,
 		const srfTriangles_t *casterTris, const bool translucent,
-		const bool expandedCaster ) {
+		const bool expandedCaster, const bool localOwnership ) {
 	if ( vLight == NULL ) {
 		return;
 	}
@@ -711,6 +711,12 @@ static void R_RecordShadowMapCaster( viewLight_t *vLight,
 	hash = R_ShadowMapHashInt( hash,
 		shader != NULL ? static_cast<int>( shader->GetCullType() ) : -1 );
 	hash = R_ShadowMapHashInt( hash, translucent ? 1 : 0 );
+	// Which of the light's two maps holds the caster: a noSelfShadow caster
+	// is drawn into the GLOBAL pass only, any other into both. Turning
+	// r_shadowMapCharacterSelfShadow moves a resting body from one to the
+	// other with nothing else about it changed, and the LOCAL map cached
+	// without it, or with it, was reused as it stood.
+	hash = R_ShadowMapHashInt( hash, localOwnership ? 1 : 0 );
 	// expandedCaster is not part of it. It says whether this view also sees
 	// the caster's stencil volume, which changes as the camera moves, and the
 	// depth the caster writes into the map is the same either way. Hashed, it
@@ -2739,7 +2745,7 @@ void idInteraction::AddActiveInteraction( void ) {
 					R_TouchShadowMapCache( casterTris->ambientCache );
 					R_TouchShadowMapCache( casterTris->indexCache );
 					R_RecordShadowMapCaster( vLight, entityDef, shadowShader,
-						casterTris, false, shadowMapCasterOnly );
+						casterTris, false, shadowMapCasterOnly, shadowMapNoSelfShadow );
 
 					// dynamic casters go to their own chains so cached static
 					// tiles stay valid while they move (composed per frame)
@@ -2763,7 +2769,7 @@ void idInteraction::AddActiveInteraction( void ) {
 					R_TouchShadowMapCache( casterTris->ambientCache );
 					R_TouchShadowMapCache( casterTris->indexCache );
 					R_RecordShadowMapCaster( vLight, entityDef, shadowShader,
-						casterTris, true, shadowMapCasterOnly );
+						casterTris, true, shadowMapCasterOnly, shadowMapNoSelfShadow );
 
 					if ( shadowMapNoSelfShadow ) {
 						R_LinkShadowMapCasterSurf( &vLight->localTranslucentShadowMapCasters,

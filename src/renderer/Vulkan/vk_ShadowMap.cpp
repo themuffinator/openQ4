@@ -1595,10 +1595,17 @@ static int VK_ShadowMap_BuildPassSignatureForView(
 	hash = VK_ShadowMap_HashInt( hash, cascadeCount );
 	hash = VK_ShadowMap_HashInt( hash,
 			r_shadowMapStableAlphaHash.GetBool() ? 1 : 0 );
+	// The offsets the casters are drawn with, as OpenGL hashes them:
+	// r_shadowMapDebugMode 10 draws with none, and a map cached before the
+	// mode was switched kept its offset beside fresh ones drawn without.
+	const bool casterOffsetOff = idMath::ClampInt( 0,
+			SHADOWMAP_DEBUGMODE_COUNT - 1,
+			r_shadowMapDebugMode.GetInteger() )
+				== SHADOWMAP_DEBUGMODE_CASTER_OFFSET_OFF;
 	hash = VK_ShadowMap_HashFloat( hash,
-			r_shadowMapPolygonFactor.GetFloat() );
+			casterOffsetOff ? 0.0f : r_shadowMapPolygonFactor.GetFloat() );
 	hash = VK_ShadowMap_HashFloat( hash,
-			r_shadowMapPolygonOffset.GetFloat() );
+			casterOffsetOff ? 0.0f : r_shadowMapPolygonOffset.GetFloat() );
 	hash = VK_ShadowMap_HashInt( hash, R_ShadowMapCasterCullingMode() );
 
 	if ( pointLight ) {
@@ -1942,8 +1949,8 @@ static void VK_ShadowMap_BeginCacheView( const viewDef_t *viewDef ) {
 	const int mapNameHash = VK_ShadowMap_MapNameHash( viewDef );
 	const int projectedLimit = VK_ShadowMap_ProjectedCacheSlotLimit();
 	const int pointLimit = VK_ShadowMap_PointCacheSlotLimit();
-	const int residentFrames =
-			Max( 1, r_shadowMapResidentFrames.GetInteger() );
+	// two seconds at the default, at any display rate
+	const int residentFrames = R_ShadowMapResidentFrames();
 
 	if ( vkShadow.cacheRenderWorld != renderWorld
 			|| vkShadow.cacheMapFileCRC != mapFileCRC

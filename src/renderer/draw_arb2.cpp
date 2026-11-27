@@ -2481,6 +2481,9 @@ typedef enum {
 } shadowMapGlobalMapped_t;
 static shadowMapGlobalMapped_t			g_shadowMapGlobalPassMapped = SHADOWMAP_GLOBAL_MAPPED_NONE;
 static bool						g_shadowMapGlobalPassHybrid = false;
+// The mapped receivers about to be drawn are tested against the stencil of
+// the light's supplement volumes (RB_ShadowMapPrepareMappedReceiverStencil).
+static bool						g_shadowMapReceiverStencilSupplement = false;
 // A translucent-only GLOBAL ownership prepares the resource in the opaque
 // light walk but cannot claim a mapped result until its ordered receiver draw
 // actually succeeds. Keep that result pending so diagnostics match the final
@@ -3905,8 +3908,10 @@ static bool RB_ShadowMapProjectedCacheEntryStorageValid(
 static bool RB_ShadowMapPointCacheEntryStorageValid(
 	const pointShadowMapCacheEntry_t *entry );
 
+static void RB_PointShadowMapReleaseCube( idImage *&colorImage, idImage *&depthImage, idRenderTexture *&renderTexture );
+
 static void RB_ShadowMapExpireCaches( void ) {
-	const int residentFrames = Max( 1, r_shadowMapResidentFrames.GetInteger() );
+	const int residentFrames = R_ShadowMapResidentFrames();
 	const int projectedLimit = RB_ShadowMapProjectedCacheSlotLimit();
 	const int pointLimit = RB_ShadowMapPointCacheSlotLimit();
 	for ( int i = 0; i < SHADOWMAP_PROJECTED_CACHE_MAX_SLOTS; i++ ) {
@@ -3932,6 +3937,27 @@ static void RB_ShadowMapExpireCaches( void ) {
 						> residentFrames ) ) {
 			g_pointShadowMapCache[i].valid = false;
 			g_shadowMapStats.cacheExpired++;
+		}
+		// A slot past the limit is never handed out again while the limit
+		// stands, so its cube goes back now. The limit follows the cube size
+		// and two live cvars: raising r_shadowMapPointSize from 512 to 1024
+		// takes it from 64 slots to 21, and the 43 old cubes left standing
+		// beside the new ones put about 760 MiB under a 512 MiB bound until
+		// the next video restart.
+		pointShadowMapCacheEntry_t &entry = g_pointShadowMapCache[i];
+		if ( i >= pointLimit
+				&& ( entry.renderTexture != NULL || entry.depthImage != NULL || entry.colorImage != NULL ) ) {
+			if ( g_activePointShadowMapCache == &entry ) {
+				g_activePointShadowMapCache = NULL;
+			}
+			if ( g_pointShadowMapRenderTexture == entry.renderTexture ) {
+				g_pointShadowMapRenderTexture = NULL;
+				g_pointShadowMapColorImage = NULL;
+				g_pointShadowMapDepthImage = NULL;
+			}
+			RB_PointShadowMapReleaseCube( entry.colorImage, entry.depthImage, entry.renderTexture );
+			entry.colorStorageGeneration = 0;
+			entry.depthStorageGeneration = 0;
 		}
 	}
 }
@@ -5212,8 +5238,11 @@ static void RB_ShadowMapResetProgramStateNoGL( void ) {
 	memset( &g_shadowDebugOverlayProgram, 0, sizeof( g_shadowDebugOverlayProgram ) );
 }
 
+static void RB_ShadowProgramResetFailedAttempts( void );
+
 void RB_ShutdownShadowMapResources( void ) {
 	RB_ModernShadowMapsShutdown();
+	RB_ShadowProgramResetFailedAttempts();
 	if ( glConfig.isInitialized ) {
 		RB_ShadowMapFreePBRPrograms();
 		RB_GLPBR_Shutdown();
@@ -5478,6 +5507,54 @@ static bool RB_MaterialInteractionLoadProgram( void ) {
 	return true;
 }
 
+// A shadow program that failed to load is not loaded again until the video
+// restarts or the programs are reset. Each loader's cache test needs a program
+// object to pass, and a failed load leaves none, so every light of every view
+// read both sources again, compiled them again and printed the warning again:
+// the renderer fell back to stencil as it should and the frame did not survive
+// it. The key carries the variant (hardware compare, layered), since one
+// variant failing says nothing about another. The PBR variants are built
+// through the classic receiver loaders and keep their own record
+// (RB_ShadowMapLoadPBRVariant), so they pass no slot here.
+enum shadowProgramSlot_t {
+	SHADOW_PROGRAM_SLOT_RECEIVER,
+	SHADOW_PROGRAM_SLOT_CASTER,
+	SHADOW_PROGRAM_SLOT_TRANSLUCENT_CASTER,
+	SHADOW_PROGRAM_SLOT_POINT_RECEIVER,
+	SHADOW_PROGRAM_SLOT_POINT_CASTER,
+	SHADOW_PROGRAM_SLOT_POINT_TRANSLUCENT_CASTER,
+	SHADOW_PROGRAM_SLOT_DEBUG_OVERLAY,
+	SHADOW_PROGRAM_SLOT_COUNT
+};
+static int g_shadowProgramFailedAttempt[SHADOW_PROGRAM_SLOT_COUNT] = { -1, -1, -1, -1, -1, -1, -1 };
+
+static void RB_ShadowProgramResetFailedAttempts( void ) {
+	for ( int i = 0; i < SHADOW_PROGRAM_SLOT_COUNT; i++ ) {
+		g_shadowProgramFailedAttempt[i] = -1;
+	}
+}
+
+static int RB_ShadowProgramAttemptKey( const int variant ) {
+	return tr.videoRestartCount * 4 + ( variant & 3 );
+}
+
+static bool RB_ShadowProgramAttemptFailed( const int slot, const int key ) {
+	return slot >= 0 && g_shadowProgramFailedAttempt[slot] == key;
+}
+
+// records the attempt as failed when the loader returns without a valid program
+struct shadowProgramAttempt_t {
+	shadowProgramAttempt_t( const int _slot, const int _key, const bool *_valid ) : slot( _slot ), key( _key ), valid( _valid ) {}
+	~shadowProgramAttempt_t() {
+		if ( slot >= 0 && !*valid ) {
+			g_shadowProgramFailedAttempt[slot] = key;
+		}
+	}
+	const int	slot;
+	const int	key;
+	const bool *valid;
+};
+
 static bool RB_ShadowMapLoadProgram( void ) {
 static const char *programBaseName = "glprogs/shadow_interaction";
 
@@ -5489,6 +5566,12 @@ static const char *programBaseName = "glprogs/shadow_interaction";
 	if ( g_shadowMapProgram.programObject != 0 && g_shadowMapProgram.programGeneration == tr.videoRestartCount && g_shadowMapProgram.depthCompareMode == depthCompareMode ) {
 		return g_shadowMapProgram.programValid;
 	}
+	const int attemptSlot = g_receiverProgramDefines == NULL ? SHADOW_PROGRAM_SLOT_RECEIVER : -1;
+	const int attemptKey = RB_ShadowProgramAttemptKey( depthCompareMode ? 1 : 0 );
+	if ( RB_ShadowProgramAttemptFailed( attemptSlot, attemptKey ) ) {
+		return false;
+	}
+	const shadowProgramAttempt_t attempt( attemptSlot, attemptKey, &g_shadowMapProgram.programValid );
 
 	RB_ShadowMapFreeProgram();
 
@@ -5647,6 +5730,11 @@ static const char *programBaseName = "glprogs/shadow_proj_caster";
 	if ( g_shadowMapCasterProgram.programObject != 0 && g_shadowMapCasterProgram.programGeneration == tr.videoRestartCount ) {
 		return g_shadowMapCasterProgram.programValid;
 	}
+	const int attemptKey = RB_ShadowProgramAttemptKey( 0 );
+	if ( RB_ShadowProgramAttemptFailed( SHADOW_PROGRAM_SLOT_CASTER, attemptKey ) ) {
+		return false;
+	}
+	const shadowProgramAttempt_t attempt( SHADOW_PROGRAM_SLOT_CASTER, attemptKey, &g_shadowMapCasterProgram.programValid );
 
 	RB_ShadowMapFreeCasterProgram();
 
@@ -5756,6 +5844,11 @@ static const char *programBaseName = "glprogs/shadow_proj_translucent_caster";
 	if ( g_translucentShadowCasterProgram.programObject != 0 && g_translucentShadowCasterProgram.programGeneration == tr.videoRestartCount ) {
 		return g_translucentShadowCasterProgram.programValid;
 	}
+	const int attemptKey = RB_ShadowProgramAttemptKey( 0 );
+	if ( RB_ShadowProgramAttemptFailed( SHADOW_PROGRAM_SLOT_TRANSLUCENT_CASTER, attemptKey ) ) {
+		return false;
+	}
+	const shadowProgramAttempt_t attempt( SHADOW_PROGRAM_SLOT_TRANSLUCENT_CASTER, attemptKey, &g_translucentShadowCasterProgram.programValid );
 
 	RB_TranslucentShadowMapFreeCasterProgram();
 
@@ -5874,6 +5967,12 @@ static const char *programBaseName = "glprogs/shadow_point_interaction";
 	if ( g_pointShadowMapProgram.programObject != 0 && g_pointShadowMapProgram.programGeneration == tr.videoRestartCount && g_pointShadowMapProgram.depthCompareMode == depthCompareMode ) {
 		return g_pointShadowMapProgram.programValid;
 	}
+	const int attemptSlot = g_receiverProgramDefines == NULL ? SHADOW_PROGRAM_SLOT_POINT_RECEIVER : -1;
+	const int attemptKey = RB_ShadowProgramAttemptKey( depthCompareMode ? 1 : 0 );
+	if ( RB_ShadowProgramAttemptFailed( attemptSlot, attemptKey ) ) {
+		return false;
+	}
+	const shadowProgramAttempt_t attempt( attemptSlot, attemptKey, &g_pointShadowMapProgram.programValid );
 
 	RB_PointShadowMapFreeProgram();
 
@@ -6059,6 +6158,11 @@ static const char *programBaseName = "glprogs/shadow_point_caster";
 			&& g_pointShadowCasterProgram.depthCompareMode == depthCompareMode && g_pointShadowCasterProgram.layered == layered ) {
 		return g_pointShadowCasterProgram.programValid;
 	}
+	const int attemptKey = RB_ShadowProgramAttemptKey( ( depthCompareMode ? 1 : 0 ) | ( layered ? 2 : 0 ) );
+	if ( RB_ShadowProgramAttemptFailed( SHADOW_PROGRAM_SLOT_POINT_CASTER, attemptKey ) ) {
+		return false;
+	}
+	const shadowProgramAttempt_t attempt( SHADOW_PROGRAM_SLOT_POINT_CASTER, attemptKey, &g_pointShadowCasterProgram.programValid );
 
 	RB_PointShadowMapFreeCasterProgram();
 
@@ -6234,6 +6338,11 @@ static const char *programBaseName = "glprogs/shadow_point_translucent_caster";
 	if ( g_pointTranslucentShadowCasterProgram.programObject != 0 && g_pointTranslucentShadowCasterProgram.programGeneration == tr.videoRestartCount ) {
 		return g_pointTranslucentShadowCasterProgram.programValid;
 	}
+	const int attemptKey = RB_ShadowProgramAttemptKey( 0 );
+	if ( RB_ShadowProgramAttemptFailed( SHADOW_PROGRAM_SLOT_POINT_TRANSLUCENT_CASTER, attemptKey ) ) {
+		return false;
+	}
+	const shadowProgramAttempt_t attempt( SHADOW_PROGRAM_SLOT_POINT_TRANSLUCENT_CASTER, attemptKey, &g_pointTranslucentShadowCasterProgram.programValid );
 
 	RB_PointTranslucentShadowMapFreeCasterProgram();
 
@@ -6352,6 +6461,11 @@ static const char *programBaseName = "glprogs/shadow_debug_overlay";
 	if ( g_shadowDebugOverlayProgram.programObject != 0 && g_shadowDebugOverlayProgram.programGeneration == tr.videoRestartCount ) {
 		return g_shadowDebugOverlayProgram.programValid;
 	}
+	const int attemptKey = RB_ShadowProgramAttemptKey( 0 );
+	if ( RB_ShadowProgramAttemptFailed( SHADOW_PROGRAM_SLOT_DEBUG_OVERLAY, attemptKey ) ) {
+		return false;
+	}
+	const shadowProgramAttempt_t attempt( SHADOW_PROGRAM_SLOT_DEBUG_OVERLAY, attemptKey, &g_shadowDebugOverlayProgram.programValid );
 
 	RB_ShadowMapDebugOverlayFreeProgram();
 
@@ -11892,7 +12006,11 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 
 	glStencilMask( 255 );
 	glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
-	glStencilFunc( GL_ALWAYS, 128, 255 );
+	// A hybrid light keeps the test its supplement volumes were stencilled
+	// for. Set to GL_ALWAYS here without exception, as it was until November
+	// 2026, the casters the map cannot hold were drawn into the stencil and
+	// then shadowed nothing.
+	glStencilFunc( g_shadowMapReceiverStencilSupplement ? GL_GEQUAL : GL_ALWAYS, 128, 255 );
 
 	glEnableVertexAttribArrayARB( 8 );
 	glEnableVertexAttribArrayARB( 9 );
@@ -11978,6 +12096,8 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 	glUseProgramObjectARB( 0 );
 	backEnd.glState.currenttmu = -1;
 	GL_SelectTexture( 0 );
+	// what follows a mapped receiver draw has always found the test open
+	glStencilFunc( GL_ALWAYS, 128, 255 );
 	const bool submittedInteractions = g_shadowMapInteractionDrawCount != drawCountStart;
 	const bool processedReceivers = debugPreparedCount > 0;
 	if ( RB_ShadowMapVerboseReport() && !submittedInteractions ) {
@@ -12141,7 +12261,11 @@ static bool RB_GLSLPointShadowMap_CreateDrawInteractions( const drawSurf_t *surf
 
 	glStencilMask( 255 );
 	glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
-	glStencilFunc( GL_ALWAYS, 128, 255 );
+	// A hybrid light keeps the test its supplement volumes were stencilled
+	// for. Set to GL_ALWAYS here without exception, as it was until November
+	// 2026, the casters the map cannot hold were drawn into the stencil and
+	// then shadowed nothing.
+	glStencilFunc( g_shadowMapReceiverStencilSupplement ? GL_GEQUAL : GL_ALWAYS, 128, 255 );
 
 	glEnableVertexAttribArrayARB( 8 );
 	glEnableVertexAttribArrayARB( 9 );
@@ -12260,6 +12384,8 @@ static bool RB_GLSLPointShadowMap_CreateDrawInteractions( const drawSurf_t *surf
 	glUseProgramObjectARB( 0 );
 	backEnd.glState.currenttmu = -1;
 	GL_SelectTexture( 0 );
+	// what follows a mapped receiver draw has always found the test open
+	glStencilFunc( GL_ALWAYS, 128, 255 );
 	const bool submittedInteractions = g_pointShadowMapInteractionDrawCount != drawCountStart;
 	const bool processedReceivers = pointDebugPreparedCount > 0;
 	if ( RB_ShadowMapVerboseReport() && !submittedInteractions ) {
@@ -12823,6 +12949,7 @@ static bool RB_ShadowMapMapOrHybridAvailableForPass(
 static bool RB_ShadowMapPrepareMappedReceiverStencil(
 		const viewLight_t *vLight, const shadowMapPassKind_t passKind,
 		const bool hybrid ) {
+	g_shadowMapReceiverStencilSupplement = false;
 	if ( !hybrid ) {
 		glStencilFunc( GL_ALWAYS, 128, 255 );
 		return true;
@@ -12856,6 +12983,7 @@ static bool RB_ShadowMapPrepareMappedReceiverStencil(
 		glDisable( GL_VERTEX_PROGRAM_ARB );
 	}
 	glStencilFunc( GL_GEQUAL, 128, 255 );
+	g_shadowMapReceiverStencilSupplement = true;
 	return true;
 }
 

@@ -127,7 +127,12 @@ void main() {
 
 	vVertexColor = gl_Color.rgb * uVertexColorParams.x + vec3( uVertexColorParams.y );
 	vShadowLightCos = shadowLightCos;
-	vViewDepth = max( -viewPosition.z, 0.0 );
+	// Unclamped: eye depth is linear across a triangle, and a vertex behind the
+	// eye clamped to zero bends it. A floor triangle reaching from behind the
+	// player to 400 units ahead then read 228 where the pixel stands at 100,
+	// and took the next cascade there. Every fragment drawn lies in front of
+	// the near plane, so the interpolated depth needs no clamp of its own.
+	vViewDepth = -viewPosition.z;
 
 	gl_Position = ftransform();
 }

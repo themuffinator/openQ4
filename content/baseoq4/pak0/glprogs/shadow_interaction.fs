@@ -436,7 +436,13 @@ float RawShadowDepth( vec2 uv ) {
 }
 
 #ifndef OPENQ4_SHADOW_COMPARE
-float ProjectedPCSSRadius( vec2 uv, float depth, int cascadeIndex, vec2 clampMin, vec2 clampMax, mat2 rotation ) {
+// centreLit returns the centre tap's verdict when the search read it, and -1
+// when it did not: the search's first probe is the texel the filter's centre
+// tap compares, against the same biased depth, so the filter takes the answer
+// instead of reading the map again. A search that finds no blocker has by
+// that found the centre lit.
+float ProjectedPCSSRadius( vec2 uv, float depth, int cascadeIndex, vec2 clampMin, vec2 clampMax, mat2 rotation, out float centreLit ) {
+	centreLit = -1.0;
 	// The CPU already applies the distant-source scale to every radius. Keep
 	// the contact floor at the configured PCF radius; the larger PCSS search and
 	// maximum radii are guard/search bounds, not minimum blur.
@@ -453,6 +459,7 @@ float ProjectedPCSSRadius( vec2 uv, float depth, int cascadeIndex, vec2 clampMin
 	float blockerDepth = 0.0;
 	float blockerCount = 0.0;
 	float d0 = RawShadowDepth( uv );
+	centreLit = ( compareDepth <= d0 ) ? 1.0 : 0.0;
 	if ( d0 < compareDepth ) {
 		blockerDepth += d0;
 		blockerCount += 1.0;
@@ -539,20 +546,23 @@ vec4 SampleShadowCascade( vec4 shadowCoord, vec4 atlasRect, int cascadeIndex ) {
 	mat2 rotation = ShadowOffsetRotation( tileTexel, depth );
 
 	float filterRadius = EffectiveShadowFilterRadius();
+	float centreLit = -1.0;
 #ifndef OPENQ4_SHADOW_COMPARE
 	if ( !ShadowDebugModeIs( kShadowDebugPCFOff ) ) {
-		filterRadius = ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax, rotation );
+		filterRadius = ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax, rotation, centreLit );
 	}
 #endif
+	if ( centreLit < 0.0 ) {
+		centreLit = SampleShadowCompare( uv, depth, cascadeIndex, 0.0 );
+	}
 	if ( filterRadius <= 0.0 ) {
-		return vec4( SampleShadowCompare( uv, depth, cascadeIndex, 0.0 ), localUv.x, localUv.y, depth );
+		return vec4( centreLit, localUv.x, localUv.y, depth );
 	}
 
 	vec2 tap = uShadowTexelSize * filterRadius;
 	// Each tap's bias grows with its distance from the centre, filterRadius * |o|.
 	float tapBias = ShadowFootprintBias( cascadeIndex ) * filterRadius;
-	float shadow = 0.0;
-	shadow += SampleShadowCompare( uv, depth, cascadeIndex, 0.0 );
+	float shadow = centreLit;
 	if ( uShadowFilterTaps <= 1.0 ) {
 		return vec4( shadow, localUv.x, localUv.y, depth );
 	}

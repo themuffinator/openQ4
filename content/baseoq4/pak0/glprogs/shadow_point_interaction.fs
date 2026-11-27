@@ -490,7 +490,7 @@ float SamplePointShadow() {
 	}
 
 	float depth = length( vPointShadowVector ) / uPointShadowFar;
-	if ( depth <= 0.0 || depth >= 1.0 ) {
+	if ( !( depth > 0.0 && depth < 1.0 ) ) {
 		return 1.0;
 	}
 
@@ -599,7 +599,7 @@ vec4 PointShadowDebugOutput() {
 	}
 
 	float depth = length( vPointShadowVector ) / uPointShadowFar;
-	if ( depth <= 0.0 || depth >= 1.0 ) {
+	if ( !( depth > 0.0 && depth < 1.0 ) ) {
 		return vec4( 1.0, 1.0, 0.0, 1.0 );
 	}
 	vec3 direction = SafeNormalize( vPointShadowVector );
@@ -628,7 +628,7 @@ vec3 SamplePointTranslucentShadow() {
 	}
 
 	float depth = length( vPointShadowVector ) / uPointShadowFar;
-	if ( depth <= 0.0 || depth >= 1.0 ) {
+	if ( !( depth > 0.0 && depth < 1.0 ) ) {
 		return vec3( 1.0 );
 	}
 

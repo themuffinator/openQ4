@@ -852,6 +852,7 @@ static void R_ModernShadowPlanner_ClearDescriptorContract( modernShadowLightDesc
 		descriptor.cascadeBiasScale[cascadeIndex] = 1.0f;
 		descriptor.texelDepthBias[cascadeIndex] = 0.0f;
 		descriptor.worldTexelSize[cascadeIndex] = 0.0f;
+		descriptor.receiverBiasScale = 1.0f;
 		descriptor.sliceNear[cascadeIndex] = 0.0f;
 		descriptor.sliceFar[cascadeIndex] = 0.0f;
 		descriptor.depthRange[cascadeIndex] = 0.0f;
@@ -879,6 +880,7 @@ static void R_ModernShadowPlanner_ApplyProjectedContract( modernShadowLightDescr
 	}
 
 	descriptor.projectedStateReady = true;
+	descriptor.receiverBiasScale = Max( 0.0f, projectedState.receiverBiasScale );
 	descriptor.projectedCascadeFallback = projectedState.cascadeFallback;
 	descriptor.projectedFallbackCascade = projectedState.fallbackCascade;
 	descriptor.projectedFallbackReason = projectedState.fallbackReason;

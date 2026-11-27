@@ -1678,11 +1678,24 @@ def validate_csm_atlas_and_receiver_contract() -> None:
         "layout(location = 14) out float vViewDepth;",
         "projected receiver view depth",
     )
+    # Unclamped on both renderers: a vertex behind the eye clamped to zero bends
+    # the depth interpolated across its triangle, and pixels at the player's
+    # feet selected the next cascade.
     require_compact(
         vertex_main,
-        "vViewDepth = max(dot(position, shadow.viewDepthRow), 0.0);",
+        "vViewDepth = dot(position, shadow.viewDepthRow);",
         "projected receiver view depth",
     )
+    if "vViewDepth = max(" in vertex_main:
+        raise AssertionError("projected receiver view depth is clamped per vertex")
+    gl_vertex_shader = read("content/baseoq4/pak0/glprogs/shadow_interaction.vs")
+    require_compact(
+        gl_vertex_shader,
+        "vViewDepth = -viewPosition.z;",
+        "OpenGL projected receiver view depth",
+    )
+    if "vViewDepth = max(" in gl_vertex_shader:
+        raise AssertionError("OpenGL projected receiver view depth is clamped per vertex")
 
     fragment_shader = read("src/renderer/Vulkan/shaders/interaction_shadow.frag")
     coord_select = braced_body(
@@ -1952,11 +1965,18 @@ def validate_shadow_descriptor_abi() -> None:
         )
 
 
-def validate_exact_filter_tiers(sample_body: str, sample_call: str, context: str) -> None:
-    tier_start = sample_body.find("float result = " + sample_call)
+def validate_exact_filter_tiers(
+    sample_body: str, sample_call: str, context: str, center: str | None = None
+) -> None:
+    # `center` names a centre verdict taken before the tiers start (the
+    # projected receiver's, which the PCSS search may already have read); the
+    # tiers then issue the twelve off-centre samples only.
+    center_start = "float result = " + (center if center is not None else sample_call)
+    tier_start = sample_body.find(center_start)
     if tier_start == -1:
         raise AssertionError(f"{context} is missing the center sample that starts its tiered kernel")
-    if sample_body[tier_start:].count(sample_call) != 13:
+    expected_samples = 12 if center is not None else 13
+    if sample_body[tier_start:].count(sample_call) != expected_samples:
         raise AssertionError(f"{context} must issue exactly 13 samples at its maximum tier")
     if sample_body.count("rotation * vec2(") != 12:
         raise AssertionError(
@@ -1980,7 +2000,7 @@ def validate_exact_filter_tiers(sample_body: str, sample_call: str, context: str
     require_order(
         sample_body,
         (
-            "float result = " + sample_call,
+            center_start,
             "if (shadow.filterParams.y <= 1.0)",
             "return result;",
             "if (shadow.filterParams.y <= 5.0)",
@@ -2213,6 +2233,32 @@ def validate_shadow_filtering_contract() -> None:
         projected_samples,
         "SampleShadowCompare(",
         "projected Poisson shadow filter",
+        center="centreLit;",
+    )
+    # The search's first probe is the texel the centre tap compares, against
+    # the same biased depth: the filter takes that verdict and reads the map
+    # for the centre only when no search ran.
+    require_order(
+        blocker_search,
+        (
+            "centreLit = -1.0;",
+            "float d0 = RawShadowDepth(uv);",
+            "centreLit = compareDepth <= d0 ? 1.0 : 0.0;",
+        ),
+        "projected PCSS search hands its centre verdict to the filter",
+    )
+    require_order(
+        projected_samples,
+        (
+            "float centreLit;",
+            "float filterRadius = ProjectedPCSSRadius(uv, depth, cascadeIndex, clampMin, clampMax, texelStep, rotation, centreLit);",
+            "if (centreLit < 0.0) {",
+            "centreLit = SampleShadowCompare(uv, depth, cascadeIndex, 0.0);",
+            "if (filterRadius <= 0.0) {",
+            "return centreLit;",
+            "float result = centreLit;",
+        ),
+        "projected filter reuses the search's centre texel",
     )
     if projected_samples.count("ShadowOffsetRotation(") != 1:
         raise AssertionError("Projected blocker search and PCF taps must share one stable rotation")
@@ -2338,9 +2384,24 @@ def validate_shadow_filtering_contract() -> None:
         "vec4 SampleShadowCascade(",
         "OpenGL projected Poisson shadow filter",
     )
-    gl_projected_tier_start = gl_projected_samples.find("float shadow = 0.0;")
-    if gl_projected_tier_start == -1 or gl_projected_samples[gl_projected_tier_start:].count("SampleShadowCompare(") != 13:
+    # The centre verdict is taken before the tiers start: from the PCSS
+    # search when it ran (its first probe is that texel, compared against the
+    # same biased depth), from one compare otherwise. The tiers then issue the
+    # twelve off-centre samples.
+    gl_projected_tier_start = gl_projected_samples.find("float shadow = centreLit;")
+    if gl_projected_tier_start == -1 or gl_projected_samples[gl_projected_tier_start:].count("SampleShadowCompare(") != 12:
         raise AssertionError("OpenGL projected PCF must issue exactly 13 samples at its maximum tier")
+    if gl_projected_samples.count("SampleShadowCompare( uv, depth, cascadeIndex, 0.0 )") != 1:
+        raise AssertionError("OpenGL projected PCF must compare its centre texel once")
+    require_order(
+        gl_blocker_search,
+        (
+            "centreLit = -1.0;",
+            "float d0 = RawShadowDepth( uv );",
+            "centreLit = ( compareDepth <= d0 ) ? 1.0 : 0.0;",
+        ),
+        "OpenGL PCSS search hands its centre verdict to the filter",
+    )
     if gl_projected_samples.count("rotation * vec2(") != 12:
         raise AssertionError("OpenGL projected PCF must transform twelve off-center taps")
     if gl_projected_samples.count("ShadowOffsetRotation(") != 1:
@@ -2349,8 +2410,10 @@ def validate_shadow_filtering_contract() -> None:
         gl_projected_samples,
         (
             "mat2 rotation = ShadowOffsetRotation( tileTexel, depth );",
-            "ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax, rotation )",
-            "shadow += SampleShadowCompare( uv, depth, cascadeIndex, 0.0 );",
+            "ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax, rotation, centreLit )",
+            "if ( centreLit < 0.0 ) {",
+            "centreLit = SampleShadowCompare( uv, depth, cascadeIndex, 0.0 );",
+            "float shadow = centreLit;",
             "if ( uShadowFilterTaps <= 1.0 )",
             "if ( uShadowFilterTaps <= 5.0 )",
             "if ( uShadowFilterTaps <= 9.0 )",
@@ -2468,7 +2531,8 @@ def validate_projected_footprint_bias_contract() -> None:
         "float tapBias = ShadowFootprintBias( cascadeIndex ) * filterRadius;",
         "OpenGL projected Poisson shadow filter",
     )
-    if gl_samples.count("SampleShadowCompare( uv, depth, cascadeIndex, 0.0 )") != 2:
+    # one centre compare, shared by the unfiltered return and the tiers
+    if gl_samples.count("SampleShadowCompare( uv, depth, cascadeIndex, 0.0 )") != 1:
         raise AssertionError("OpenGL projected centre samples must keep the plain receiver bias")
     for tap_index in range(1, 13):
         require(
@@ -2512,7 +2576,7 @@ def validate_projected_footprint_bias_contract() -> None:
         "float tapBias = ShadowFootprintBias(cascadeIndex) * filterRadius;",
         "Vulkan projected Poisson shadow filter",
     )
-    if vulkan_samples.count("SampleShadowCompare(uv, depth, cascadeIndex, 0.0)") != 2:
+    if vulkan_samples.count("SampleShadowCompare(uv, depth, cascadeIndex, 0.0)") != 1:
         raise AssertionError("Vulkan projected centre samples must keep the plain receiver bias")
     for tap_index in range(1, 13):
         require(
@@ -4966,7 +5030,9 @@ def validate_exact_static_cache_and_admission_contract() -> None:
             "VK_ShadowMap_MapNameHash( viewDef )",
             "VK_ShadowMap_ProjectedCacheSlotLimit()",
             "VK_ShadowMap_PointCacheSlotLimit()",
-            "r_shadowMapResidentFrames.GetInteger()",
+            # the setting counted at 60 frames a second, scaled to the display
+            # rate: two seconds at the default whatever the frame rate
+            "const int residentFrames = R_ShadowMapResidentFrames();",
             "vkShadow.cacheRenderWorld != renderWorld",
             "vkShadow.cacheMapFileCRC != mapFileCRC",
             "vkShadow.cacheMapNameHash != mapNameHash",
@@ -8736,9 +8802,27 @@ def validate_atlas_tile_assignment_contract() -> None:
         "three[0].tileSize != 2048 || three[1].tileSize != 1024 || three[2].tileSize != 1024",
         "!R_ShadowMapFitAtlasTiles( 4096, many, 32 )",
         "R_ShadowMapFitAtlasTiles( 4096, many, 33 )",
-        "cascaded[0].tileSize != 1024 || cascaded[1].tileSize != 1024",
+        # the spotlight that halved before the sun takes its tile back from
+        # the three quarters of the atlas the sun's one halving frees
+        "cascaded[0].tileSize != 1024 || cascaded[1].tileSize != 2048",
+        "cascadedBoth[0].tileSize != 1024 || cascadedBoth[1].tileSize != 2048",
+        "full[0].tileSize != 1024 || full[1].tileSize != 1024 || full[2].tileSize != 2048",
     ):
         require(selftest, case, "the self-test pins the atlas fit")
+    require_order(
+        braced_body(classification, "bool R_ShadowMapFitAtlasTiles(", "atlas fit"),
+        (
+            "wanted[i] = requests[i].tileSize;",
+            "while ( demand > capacity ) {",
+            "for ( int i = count - 1; i >= 0 && demand <= capacity; --i ) {",
+            "while ( request.tileSize * 2 <= wanted[order[i]] ) {",
+            "if ( demand - before + after > capacity ) {",
+            "request.tileSize /= 2;",
+            "demand += after - before;",
+            "return demand <= capacity;",
+        ),
+        "room a round frees beyond its need goes back, largest light first",
+    )
     require(classification_h, "static const int SHADOWMAP_ATLAS_MAX_REQUESTS = 64;", "atlas request bound")
 
     # the front end: counted before the interactions are known, assigned after
