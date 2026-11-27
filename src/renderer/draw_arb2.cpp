@@ -1848,6 +1848,7 @@ typedef struct {
 	GLint			shadowFilterMode;
 	GLint			shadowPCSSLightRadius;
 	GLint			shadowPCSSMaxRadius;
+	GLint			shadowSunPenumbra;
 	GLint			shadowAtlasRect;
 	GLint			shadowSplitDepths;
 	GLint			shadowCascadeBiasScale;
@@ -5704,6 +5705,7 @@ static const char *programBaseName = "glprogs/shadow_interaction";
 	g_shadowMapProgram.shadowFilterMode = glGetUniformLocationARB( programObject, "uShadowFilterMode" );
 	g_shadowMapProgram.shadowPCSSLightRadius = glGetUniformLocationARB( programObject, "uShadowPCSSLightRadius" );
 	g_shadowMapProgram.shadowPCSSMaxRadius = glGetUniformLocationARB( programObject, "uShadowPCSSMaxRadius" );
+	g_shadowMapProgram.shadowSunPenumbra = glGetUniformLocationARB( programObject, "uShadowSunPenumbra" );
 	g_shadowMapProgram.shadowAtlasRect = glGetUniformLocationARB( programObject, "uShadowAtlasRect[0]" );
 	g_shadowMapProgram.shadowSplitDepths = glGetUniformLocationARB( programObject, "uShadowSplitDepths[0]" );
 	g_shadowMapProgram.shadowCascadeBiasScale = glGetUniformLocationARB( programObject, "uShadowCascadeBiasScale[0]" );
@@ -11969,6 +11971,11 @@ static bool RB_GLSLShadowMap_CreateDrawInteractions( const drawSurf_t *surf ) {
 	if ( g_shadowMapProgram.shadowPCSSMaxRadius >= 0 ) {
 		glUniform1fARB( g_shadowMapProgram.shadowPCSSMaxRadius, filterSettings.pcssMaxRadius );
 	}
+	if ( g_shadowMapProgram.shadowSunPenumbra >= 0 ) {
+		float sunPenumbra[SHADOWMAP_MAX_CASCADES];
+		R_ShadowMapProjectedSunPenumbraScales( g_projectedShadowMapState, filterSettings.sunPenumbraTan, sunPenumbra );
+		glUniform1fvARB( g_shadowMapProgram.shadowSunPenumbra, SHADOWMAP_MAX_CASCADES, sunPenumbra );
+	}
 	if ( g_shadowMapProgram.shadowAtlasRect >= 0 ) {
 		// State rects stay in the per-light convention (planner parity depends
 		// on it); the light's atlas slot is composed here at upload time. For
@@ -16866,6 +16873,13 @@ static void RB_SharedWorldInteractionGLBeginMappedReceiver(
 			pass.projected.filter.pcssLightRadius );
 		glUniform1fARB( g_shadowMapProgram.shadowPCSSMaxRadius,
 			pass.projected.filter.pcssMaxRadius );
+		if ( g_shadowMapProgram.shadowSunPenumbra >= 0 ) {
+			float sunPenumbra[SHADOWMAP_MAX_CASCADES] = {};
+			R_ShadowMapProjectedSunPenumbraScales( pass.projected.state,
+				pass.projected.filter.sunPenumbraTan, sunPenumbra );
+			glUniform1fvARB( g_shadowMapProgram.shadowSunPenumbra,
+				SHADOWMAP_MAX_CASCADES, sunPenumbra );
+		}
 		const float slotU0 = preparedPass.projectedOriginX
 			/ static_cast<float>( atlasWidth );
 		const float slotV0 = preparedPass.projectedOriginY

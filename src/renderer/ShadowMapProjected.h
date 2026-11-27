@@ -124,6 +124,17 @@ void R_ShadowMapProjectedTexelDepthSteps( const shadowMapProjectedLightState_t &
 // texel grows with distance from the source, and one distance sized for the
 // far end of the volume pushed nearer receivers further than a texel.
 float R_ShadowMapProjectedNormalOffsetWorld( const shadowMapProjectedLightState_t &state, int cascadeIndex, float normalOffsetScale, bool depthScaled );
+// The penumbra of a sun-like light for PCSS-lite: its radius in shadow texels
+// per unit of stored depth between blocker and receiver, for a receiver at
+// light depth w = 1 (the receiver divides by its own w; a parallel light's w
+// is the constant 1). sunPenumbraTan is the tangent of half the source's
+// apparent diameter. A gap of g world units along the light leaves a
+// penumbra g * tan wide to each side, the stored depth changes by the depth
+// row's length per world unit, and a texel spans 2 w / ( tileSize * the
+// coarser of the S and T rows across the depth axis ) world units. Zero for
+// unused cascades and when the tangent is zero. Vulkan's receiver computes
+// the same from the rows it is handed (interaction_shadow.frag).
+void R_ShadowMapProjectedSunPenumbraScales( const shadowMapProjectedLightState_t &state, float sunPenumbraTan, float scales[SHADOWMAP_PROJECTED_MAX_CASCADES] );
 extern idCVar r_shadowMapDistantNormalOffsetDepth;
 float R_ShadowMapQuantizeCascadeExtent( float rawExtent, int tileSize );
 float R_ShadowMapQuantizeCascadeExtent( float rawExtent, int tileSize, float ladder );

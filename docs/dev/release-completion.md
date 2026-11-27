@@ -130,6 +130,25 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   Custom, the mark returned Soft (Low), and Soft (High) applied as 4096
   shadow maps in an 8192 atlas with cascaded sunlight. Frame rates were not
   measured: no preset's values changed.
+## Sunlight shadows soften with distance, 27 November 2026
+
+- **Outdoor shadows are sharp where things touch the ground and softer the
+  further they are thrown.** With soft shadows on (Quality and above), the
+  shadow of a tower or a rock face now has a gentler edge than the shadow at
+  the foot of a crate, as sunlight does. Before, sunlight shadows were almost
+  uniformly sharp however far away the object casting them was.
+- **What to do.** Nothing. `r_shadowMapSunAngle` sets how large the sun
+  appears, in degrees (default `1.0`; the real Sun is `0.53`): raise it for
+  softer shadows from tall objects, lower it for crisper ones, or set `0` for
+  the old look. The widest edge is still limited by
+  `r_shadowMapPCSSMaxRadius`.
+- **Cost.** A little GPU time on Vulkan outdoors (at most 0.7 ms a frame at
+  2560x1440 in the heaviest stock sunlit view, measured on a busy machine);
+  about 0.1 ms on OpenGL. Scenes without sunlight are unaffected.
+- Developer detail:
+  [sunlight softens with the gap](shadowmapping-audit-2026-11-27.md#sunlight-softens-with-the-gap-not-with-height-in-the-lights-box).
+  No ABI change.
+
 ## Less shadow work on physically based materials, 27 November 2026
 
 - **Materials with physically based (PBR) textures cost a little less to

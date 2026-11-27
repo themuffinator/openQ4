@@ -209,6 +209,14 @@ shadowMapProjectedFilterSettings_t R_ShadowMapProjectedFilterSettings( const vie
 		settings.effectiveFilterRadius = Max( settings.effectiveFilterRadius,
 			Max( settings.pcssLightRadius, settings.pcssMaxRadius ) );
 	}
+	// Sunlight: rays that arrive parallel, or from a point source far outside
+	// its own box. A global projector keeps the point-source rule.
+	const bool sunLike = classification.projectedLight && vLight != NULL
+		&& ( vLight->parallel || classification.distantPointLight );
+	if ( sunLike && settings.filterMode == 2 ) {
+		const float halfAngle = DEG2RAD( idMath::ClampFloat( 0.0f, 10.0f, r_shadowMapSunAngle.GetFloat() ) * 0.5f );
+		settings.sunPenumbraTan = idMath::ClampFloat( 0.0f, SHADOWMAP_SUN_PENUMBRA_MAX_TAN, idMath::Tan( halfAngle ) );
+	}
 	return settings;
 }
 

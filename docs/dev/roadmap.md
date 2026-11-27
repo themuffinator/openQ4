@@ -2705,7 +2705,13 @@ are not yet measured.
   path, and the shadow report now prints `hybrid=` to show when one does), and PBR
   receivers on both renderers skip the shadow filter where the light does not reach
   (pictures identical; the showcase overview 6.6 ms against 6.7 to 7.6 on OpenGL).
-  One open lead is listed there: PCSS-lite on parallel lights.
+  Sunlight's soft edge then got its own rule (`r_shadowMapSunAngle`, default 1
+  degree): for parallel and distant point lights PCSS-lite widens by the gap between
+  caster and receiver times the sun's apparent size, where the point-source rule
+  divided by the blocker's depth and left sunlight at the base radius. Contact
+  shadows are unchanged, distant casters soften, coverage against stencil stays at
+  99.7%, and both renderers agree. Open: its Vulkan cost (at most 0.7 ms at 1440p,
+  measured on a busy GPU) and the default's look in motion.
   Stencil front-end work (10 November 2026). A mapped light no longer builds or
   submits the volumes it does not draw: prelit lights shed them like any other, an
   animated model gets none (the old test asked the instantiated snapshot, always

@@ -392,6 +392,71 @@ not black. The debug views still filter every pixel.
 Stock content has no PBR owners, so nothing changes for the stock game; this
 is for materials a mod or texture pack adds.
 
+## Sunlight softens with the gap, not with height in the light's box
+
+The owner asked for this lead after the batch above. PCSS-lite widens the
+filter by `separation / blockerDepth`, the rule for a point source: the
+penumbra grows with the gap over the blocker's distance from the light. Stock
+sunlight comes two ways, and the rule fits neither. A parallel light stores
+depth across its box, so the divisor was the blocker's height in the box. A
+distant point light (Air Defense 1's sun) stores depth from a source thousands
+of units away, so the quotient was nearly zero. Sunlight shadows therefore sat
+at the base filter radius almost everywhere, however far the caster.
+
+A sun's rays arrive parallel, so the penumbra is the gap times the source's
+apparent size, wherever the pair sits. `r_shadowMapSunAngle` is that size in
+degrees across (default 1.0; the real Sun is 0.53; 0 keeps the old rule), and
+parallel and distant point lights use it when PCSS-lite is the filter:
+
+- **One scale per cascade** turns a gap in stored depth into texels at the
+  receiver: `tan(angle / 2) * tileSize / 2 * (S and T rows across the w axis,
+  the coarser) / (depth row's length)`, divided by the receiver's `w`
+  (`R_ShadowMapProjectedSunPenumbraScales`). A parallel light's `w` is 1; a
+  distant point light's texel grows with `w`, which the division follows. The
+  result still lies between the base radius and `r_shadowMapPCSSMaxRadius`.
+- **OpenGL is handed the scales** (`uShadowSunPenumbra`). **Vulkan's block
+  is full**, so the tangent rides in the fraction of the receiver-plane
+  flag's slot (the flag is still read as "> 0.5") and the shader builds the
+  same scale from the cascade rows it already has.
+- **The blocker search reaches the maximum radius** for these lights, where
+  it reached the light radius, because a blocker that far to the side can
+  now put the receiver in its penumbra.
+- The modern OpenGL cluster loop (opt-in) keeps the old rule.
+
+Measured at Quality, hidden, same frozen moment for every size:
+
+- **Self-test.** Extended `R_ShadowMapDistantNormalOffsetSelfTest`: for Air
+  Defense 1's sun, a caster 100 units from its receiver, at eleven receivers
+  in each cascade of two layouts, the scale gives the texels that
+  `100 * tan / (the texel measured through the map's planes)` does, to half
+  a percent; the same for the light made parallel, to one percent.
+- **Coverage is unchanged.** Air Defense 1, four poses at 2560x1440 on
+  Vulkan, at 0, 0.53, 1, 2 and 4 degrees: 99.7% of stencil's shadow kept at
+  every size (99.9% within two pixels).
+- **What changes.** Contact shadows do not (the wreck's shadow where it
+  meets the ground stays within one level at every size). Shadows
+  thrown from a distance soften: in a 600x300 crop of rock shadows in the
+  tank pose, 0.5% of pixels move by more than 6 levels at 1 degree and 3.2%
+  at 4 on Vulkan, 3.5% at 4 on OpenGL.
+- **The renderers agree.** That crop differs between OpenGL and Vulkan by
+  0.27% of pixels with the rule off and 0.24% at 4 degrees.
+- **Parallel lights.** Stock single-player maps have three shadow-casting
+  parallel lights (two in Dispersal, one in Hangar 2). In Dispersal the one
+  in view lights little but the player's weapon, and that is where the
+  picture changes, by the same share on both renderers (0.32% and 0.31% of
+  the frame at 1 degree). No stock view was found where a parallel light
+  shadows scenery, so that branch rests on the self-test and this.
+- **Cost.** Air Defense 1 arena, full turn of the view at 2560x1440, three
+  interleaved pairs in one launch, median GPU frame: Vulkan 4.76, 4.85 and
+  4.91 ms with the rule off against 5.52, 5.46 and 4.97 with it; OpenGL 5.93
+  and 5.99 against 5.94 and 6.10 (the third OpenGL pair was disturbed).
+  Other sessions' game clients were on the GPU during these runs and a
+  repeat scattered by more than the difference, so the Vulkan figure, up to
+  0.7 ms, is an upper bound and not a measurement. It wants a quiet machine.
+- **Not judged:** the default of 1 degree is a starting point. It was chosen
+  as about twice the real Sun, enough to see at the texel sizes the cascades
+  have; whether it looks right is for eyes in motion.
+
 ## Measured and left
 
 **Building a light's cascade layout more than once a view.** Vulkan builds
@@ -416,11 +481,8 @@ it is.
 
 Not done in this round. Each is real; the note says why it waited.
 
-- **PCSS-lite on parallel lights** divides the caster-to-receiver gap by the
-  blocker's depth into the light box, so softness follows height in the box
-  and not the gap. A sun's penumbra should be `gap * tan(source angle)` in
-  world units. It needs a per-cascade uniform on three receivers and a
-  constant chosen by eye. Twelve stock parallel lights cast shadows.
+- **The sun rule's cost on Vulkan** is not pinned down (see above), and its
+  default size has not been judged in motion.
 - **The modern OpenGL cluster loop samples shadows before knowing the light
   reaches the pixel.** The path is opt-in. (The PBR receivers of the shipped
   paths were done: see above.)

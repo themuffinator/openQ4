@@ -33,6 +33,10 @@ uniform float uShadowFilterTaps;
 uniform float uShadowFilterMode;
 uniform float uShadowPCSSLightRadius;
 uniform float uShadowPCSSMaxRadius;
+// A sun-like light's penumbra radius in shadow texels per unit of stored depth
+// between blocker and receiver, at light depth w = 1; 0 for every other light
+// (R_ShadowMapProjectedSunPenumbraScales).
+uniform float uShadowSunPenumbra[4];
 uniform vec4 uShadowAtlasRect[4];
 uniform float uShadowSplitDepths[4];
 uniform float uShadowCascadeBiasScale[4];
@@ -368,6 +372,19 @@ float CascadeTexelDepthStep( int cascadeIndex ) {
 	return uShadowTexelDepthStep[3];
 }
 
+float CascadeSunPenumbra( int cascadeIndex ) {
+	if ( cascadeIndex <= 0 ) {
+		return uShadowSunPenumbra[0];
+	}
+	if ( cascadeIndex == 1 ) {
+		return uShadowSunPenumbra[1];
+	}
+	if ( cascadeIndex == 2 ) {
+		return uShadowSunPenumbra[2];
+	}
+	return uShadowSunPenumbra[3];
+}
+
 float ShadowDepthGradient( int cascadeIndex ) {
 	if ( cascadeIndex <= 0 ) {
 		return gShadowDepthGradients.x;
@@ -441,7 +458,7 @@ float RawShadowDepth( vec2 uv ) {
 // tap compares, against the same biased depth, so the filter takes the answer
 // instead of reading the map again. A search that finds no blocker has by
 // that found the centre lit.
-float ProjectedPCSSRadius( vec2 uv, float depth, int cascadeIndex, vec2 clampMin, vec2 clampMax, mat2 rotation, out float centreLit ) {
+float ProjectedPCSSRadius( vec2 uv, float depth, float receiverW, int cascadeIndex, vec2 clampMin, vec2 clampMax, mat2 rotation, out float centreLit ) {
 	centreLit = -1.0;
 	// The CPU already applies the distant-source scale to every radius. Keep
 	// the contact floor at the configured PCF radius; the larger PCSS search and
@@ -452,7 +469,10 @@ float ProjectedPCSSRadius( vec2 uv, float depth, int cascadeIndex, vec2 clampMin
 	}
 
 	float compareDepth = depth - ShadowReceiverBias( cascadeIndex, depth );
-	float searchRadius = max( uShadowPCSSLightRadius, 0.5 );
+	// A sun's penumbra can reach the maximum radius from a blocker that far
+	// to the side, so its search looks that far.
+	float sunPenumbra = CascadeSunPenumbra( cascadeIndex );
+	float searchRadius = max( sunPenumbra > 0.0 ? uShadowPCSSMaxRadius : uShadowPCSSLightRadius, 0.5 );
 	vec2 searchTap = uShadowTexelSize * searchRadius;
 	// Without the footprint bias a tilted receiver finds itself as a blocker.
 	float searchBias = ShadowFootprintBias( cascadeIndex ) * searchRadius;
@@ -494,11 +514,16 @@ float ProjectedPCSSRadius( vec2 uv, float depth, int cascadeIndex, vec2 clampMin
 
 	float averageBlocker = blockerDepth / blockerCount;
 	float separation = max( compareDepth - averageBlocker, 0.0 );
-	float penumbra = separation / max( averageBlocker, 1.0e-4 );
+	// A point source's penumbra grows with the gap over the blocker's
+	// distance from it. A sun's rays are parallel: the gap times its
+	// apparent size, in this cascade's texels at the receiver's depth.
+	float penumbraRadius = sunPenumbra > 0.0
+		? separation * sunPenumbra / max( receiverW, 1.0e-4 )
+		: separation / max( averageBlocker, 1.0e-4 ) * uShadowPCSSLightRadius;
 	// Keep the clamp ordered when a user deliberately sets a PCSS maximum
 	// below the base PCF radius.  A zero maximum still disables PCSS above.
 	float maxRadius = max( baseRadius, uShadowPCSSMaxRadius );
-	return clamp( max( baseRadius, penumbra * uShadowPCSSLightRadius ), baseRadius, maxRadius );
+	return clamp( max( baseRadius, penumbraRadius ), baseRadius, maxRadius );
 }
 #endif
 
@@ -549,7 +574,7 @@ vec4 SampleShadowCascade( vec4 shadowCoord, vec4 atlasRect, int cascadeIndex ) {
 	float centreLit = -1.0;
 #ifndef OPENQ4_SHADOW_COMPARE
 	if ( !ShadowDebugModeIs( kShadowDebugPCFOff ) ) {
-		filterRadius = ProjectedPCSSRadius( uv, depth, cascadeIndex, clampMin, clampMax, rotation, centreLit );
+		filterRadius = ProjectedPCSSRadius( uv, depth, shadowCoord.w, cascadeIndex, clampMin, clampMax, rotation, centreLit );
 	}
 #endif
 	if ( centreLit < 0.0 ) {
