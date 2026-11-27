@@ -2117,6 +2117,27 @@ bool idUserInterfaceLocal::ReadFromSaveGame( idFile *savefile ) {
 	return true;
 }
 
+/*
+==============
+idUserInterfaceLocal::HoverControl
+
+openQ4 (VR-09): which control the cursor rests on, as a number that changes
+whenever it moves onto another, for the hand that points at a world screen
+to feel each control it crosses. Looked up when asked, so the cursor's
+moves cost nothing more.
+==============
+*/
+int idUserInterfaceLocal::HoverControl( void ) {
+	const idWindow *control = ( desktop != NULL && interactive ) ? desktop->ControlAt( cursorX, cursorY ) : NULL;
+	if ( control != hoverControl ) {
+		hoverControl = control;
+		if ( control != NULL ) {
+			hoverControlCount = hoverControlCount >= 0x3fffffff ? 1 : hoverControlCount + 1;
+		}
+	}
+	return control != NULL ? hoverControlCount : 0;
+}
+
 namespace {
 
 struct uiSavedWindowVar_t {

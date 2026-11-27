@@ -8,6 +8,7 @@
 
 #include "PlayerAirReadout.h"
 #include "mp/WeaponOrder.h"
+#include "../framework/VRTouchCore.h"
 
 /*
 ===============================================================================
@@ -532,6 +533,14 @@ public:
 	bool					vrBodyViewArm[ VR_NUM_HANDS ];	// the view weapon draws this arm's forearm and hand
 	idVec3					vrBodyElbow[ VR_NUM_HANDS ];	// in the body's own space
 	idVec3					vrBodyWrist[ VR_NUM_HANDS ];
+	// openQ4 VR (single player): a free fingertip pressing a world screen
+	// (VRTouchCore.h), and the hover ticks a world screen's controls give the
+	// hand that points at or touches them. Transient: never saved or sent.
+	vrTouch_t				vrTouch;
+	int						vrTouchHand;		// the hand the fingertip belongs to, -1 none
+	idUserInterface *		vrTouchUI;			// the screen it hovers (compared, never followed)
+	idUserInterface *		vrHoverUI;			// the world screen the hover ticks follow
+	int						vrHoverControl;		// its HoverControl as last ticked
 	// in an exposed seat the body is the seat's own animation, its neck under
 	// the head: the arms stay on the controls
 	bool					vrBodySeated;
@@ -825,6 +834,22 @@ public:
 	bool					VRObjectivesInFront( void ) const;
 	// The tracked head in the world this tic. False outside a headset view.
 	bool					GetVRHeadOrigin( idVec3 &origin ) const;
+	// openQ4 VR (single player): a free hand's index fingertip in the world
+	// this tic, and the way the hand points. The drawn support hand's
+	// fingertip where the arms show it free (vr_body 2), otherwise a point
+	// ahead of the controller (VR_FINGERTIP_REACH). The off hand is free
+	// unless it holds the foregrip; the weapon hand only without a weapon.
+	bool					GetVRFingertip( int hand, idVec3 &tip, idVec3 &pointing ) const;
+	// The world screen a free fingertip hovers (VRTouchCore.h): the short ray
+	// through the fingertip along the screen's normal, which focuses it with
+	// the cursor under the fingertip, and how far in front of it the
+	// fingertip is, in metres. False when no fingertip is near one.
+	bool					FindVRTouch( idVec3 &start, idVec3 &end, float &distance, int &hand, idEntity *&screen );
+	// The fingertip's press: a mouse button on the focused screen.
+	void					UpdateVRTouchPress( bool touching, float distance, int hand );
+	// A light tick in a hand as a world screen's cursor moves onto another
+	// control, as the menus give (vr_menuHaptics).
+	void					UpdateVRGuiHover( idUserInterface *ui, int hand );
 	// Room scale: report a new tic's predicted progress to the tracking space.
 	void					ReportVRRoomScaleWalk( void );
 	idVec3					VRRoomScaleLag( float fraction ) const;

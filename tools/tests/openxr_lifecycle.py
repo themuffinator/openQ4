@@ -175,6 +175,10 @@ public:
     bool bodyYawFromHead=false,bodyYawResetPending=true,recenterHeld=true;
     int recenterHoldMsec=1;
     bool pointerOnScreen=false,physicalCrouch=false,roomScaleWalking=false,roomScaleStickIdle=true;
+    // the fingertip on the hand panel (VRTouchCore.h)
+    struct Touch { bool armed=false,pressed=false; int releasedMsec=0; };
+    bool fingerOnPanel=false; Touch panelTouch;
+    static void VR_TouchReset(Touch& touch) { touch=Touch(); }
     bool aimLocalValid[2]={};
     int hands[2]={};
     float moveForward=0,moveRight=0;
@@ -228,10 +232,13 @@ void run(const std::string& test) {
         assert(rt.destroySessions==1 && rt.releaseCalls==0);
     } else if(test=="input_teardown") {
         app.pointerOnScreen=app.physicalCrouch=app.roomScaleWalking=true;
+        app.fingerOnPanel=app.panelTouch.pressed=app.panelTouch.armed=true;
         app.moveForward=1; app.moveRight=-1; app.hands[0]=1; app.aimLocalValid[0]=true;
         app.heldKeys[0]=4;app.heldKeys[5]=7;
         app.DestroySession(); app.DestroySession();
         assert(!app.pointerOnScreen && !app.physicalCrouch && !app.roomScaleWalking);
+        // a fingertip press on the hand panel ends with the session
+        assert(!app.fingerOnPanel && !app.panelTouch.pressed && !app.panelTouch.armed);
         // a closed session leaves nothing held and takes its next facing from the head
         assert(!app.inputValid && !app.twoHanded && !app.recenterHeld && app.recenterHoldMsec==0);
         assert(!app.bodyYawValid && app.bodyYawFromHead && !app.bodyYawResetPending);

@@ -34,6 +34,7 @@
 #include "../../framework/VRSystemLocal.h"
 #include "../../framework/VRMathCore.h"
 #include "../../framework/VRPanelCore.h"
+#include "../../framework/VRTouchCore.h"
 #include "../../framework/PresentationClock.h"
 #include "../../ui/RetainedUI.h"
 #include "OpenXRRuntimeProbe.h"
@@ -505,6 +506,8 @@ private:
 	void					ApplyTrackpadRegions( int weaponHand );
 	void					ApplyTwoHandedAim( int weaponHand );
 	void					UpdateMenuPointer( int weaponHand, bool menu );
+	// The weapon hand's fingertip pressing the hand panel (VRTouchCore.h)
+	void					TouchPanel( int hand, bool touching, float distance, float u, float v );
 	void					AnchorScreen( void );
 	bool					PlaceHandPanel( int offHand );
 	void					ScreenQuadSize( float &width, float &height ) const;
@@ -638,6 +641,8 @@ private:
 	int						panelMsec;			// when it last stepped
 	unsigned int			hoverGeneration;	// RetainedUI_HoverGeneration as the pointer last ticked for it
 	bool					pointerOnScreen;	// a menu took the pointer at ( pointerU, pointerV )
+	bool					fingerOnPanel;		// the weapon hand's fingertip, not its beam, holds the pointer
+	vrTouch_t				panelTouch;			// that fingertip's press on the hand panel
 	XrVector3f				pointerHitLocal;	// where the weapon hand's ray meets the menu, base space
 	float					pointerU;
 	float					pointerV;
@@ -846,6 +851,8 @@ idVRSystemOpenXR::idVRSystemOpenXR( void ) {
 	panelWidth = 0.0f;
 	panelMsec = 0;
 	hoverGeneration = 0;
+	fingerOnPanel = false;
+	VR_TouchReset( panelTouch );
 	pointerHitLocal.x = pointerHitLocal.y = pointerHitLocal.z = 0.0f;
 	screenResizeFailedWidth = screenResizeFailedHeight = 0;
 	for ( int i = 0; i < VR_NUM_HANDS; i++ ) {
@@ -2036,6 +2043,8 @@ void idVRSystemOpenXR::ReleaseInput( void ) {
 		pointerOnScreen = false;
 		Sys_PostVRPointer( false, 0.0f, 0.0f );
 	}
+	fingerOnPanel = false;
+	VR_TouchReset( panelTouch );
 	for ( int i = 0; i < 16; i++ ) {
 		UpdateKey( i, heldKeys[i], false );
 	}
@@ -3226,7 +3235,8 @@ enum vrKeySlot_t {
 	VR_SLOT_OFF_STICK_CLICK,
 	VR_SLOT_WEAPON_STICK_Y,
 	VR_SLOT_MENU_STICK_X,
-	VR_SLOT_MENU_STICK_Y
+	VR_SLOT_MENU_STICK_Y,
+	VR_SLOT_FINGER_PRESS		// the weapon hand's fingertip on the hand panel (TouchPanel)
 };
 
 void idVRSystemOpenXR::SyncInput( float frameSeconds ) {
@@ -3348,6 +3358,10 @@ void idVRSystemOpenXR::SyncInput( float frameSeconds ) {
 	const int heldTrigger = heldKeys[VR_SLOT_WEAPON_TRIGGER];
 	UpdateKey( VR_SLOT_WEAPON_TRIGGER, heldTrigger != 0 ? heldTrigger : ( pointerOnScreen ? K_MOUSE1 : K_JOY15 ),
 		weapon.trigger > ( heldTrigger != 0 ? 0.55f : 0.75f ) );
+	// a click on a menu ticks the hand more firmly than a hover does
+	if ( heldTrigger != K_MOUSE1 && heldKeys[VR_SLOT_WEAPON_TRIGGER] == K_MOUSE1 && vr_menuHaptics.GetBool() ) {
+		Vibrate( weaponHand, 0.5f, 25 );
+	}
 	UpdateKey( VR_SLOT_OFF_TRIGGER, K_JOY16, off.trigger > ( heldKeys[VR_SLOT_OFF_TRIGGER] ? 0.55f : 0.75f ) );
 	UpdateKey( VR_SLOT_WEAPON_SQUEEZE, K_JOY2, weapon.squeeze > ( heldKeys[VR_SLOT_WEAPON_SQUEEZE] ? 0.55f : 0.75f ) );
 	// The off-hand squeeze opens the weapon wheel, unless it closes on the
@@ -3746,26 +3760,51 @@ would also take focus from stick navigation.
 void idVRSystemOpenXR::UpdateMenuPointer( int weaponHand, bool menu ) {
 	const bool wasOnScreen = pointerOnScreen;
 	pointerOnScreen = false;
+	fingerOnPanel = false;
 	// the screen re-anchors on the first menu frame: point from the next one
 	if ( !menu || !screenAnchored || lastFrameHud || !aimLocalValid[weaponHand] ) {
 		if ( wasOnScreen && menu ) {
 			Sys_PostVRPointer( false, 0.0f, 0.0f );
 		}
+		TouchPanel( weaponHand, false, 0.0f, 0.0f, 0.0f );
 		return;
 	}
 	float width = 0.0f, height = 0.0f;
 	ScreenQuadSize( width, height );
 	const XrPosef &aim = aimLocalPoses[weaponHand];
 	const vrVec3_t direction = VR_RotateVector( VR_FromXrQuat( aim.orientation ), VR_Vec3( 0.0f, 0.0f, -1.0f ) );
-	const vrQuadHit_t hit = VR_RayQuadIntersect( VR_FromXrVec( aim.position ), direction,
-		VR_FromXrVec( screenAnchor.position ), VR_FromXrQuat( screenAnchor.orientation ), width, height );
+	// The weapon hand's fingertip near the hand panel takes the pointer from
+	// its beam and presses the panel like a touch screen (VRTouchCore.h), once
+	// the panel has grown into place
+	vrQuadTouch_t touch = { false, 0.0f, 0.0f, 0.0f };
+	if ( panelActive && handPanel.open >= 1.0f && gripLocalValid[weaponHand] ) {
+		const vrVec3_t tip = VR_FingertipPoint( VR_FromXrVec( gripLocalPoses[weaponHand].position ), VR_FromXrQuat( aim.orientation ) );
+		touch = VR_QuadTouch( tip, VR_FromXrVec( screenAnchor.position ), VR_FromXrQuat( screenAnchor.orientation ), width, height );
+	}
+	vrQuadHit_t hit = { false, 0.0f, 0.0f, 0.0f };
+	if ( touch.inReach ) {
+		hit.hit = true;
+		hit.u = touch.u;
+		hit.v = touch.v;
+		fingerOnPanel = true;
+		// the pointer sits on the face, under the fingertip
+		const vrVec3_t onFace = VR_Vec3( ( touch.u - 0.5f ) * width, ( 0.5f - touch.v ) * height, 0.0f );
+		pointerHitLocal = VR_ToXrVec( VR_Add( VR_FromXrVec( screenAnchor.position ),
+			VR_RotateVector( VR_QuatNormalize( VR_FromXrQuat( screenAnchor.orientation ) ), onFace ) ) );
+	} else {
+		hit = VR_RayQuadIntersect( VR_FromXrVec( aim.position ), direction,
+			VR_FromXrVec( screenAnchor.position ), VR_FromXrQuat( screenAnchor.orientation ), width, height );
+		if ( hit.hit ) {
+			pointerHitLocal = VR_ToXrVec( VR_Add( VR_FromXrVec( aim.position ), VR_Scale( direction, hit.distance ) ) );
+		}
+	}
 	if ( !hit.hit ) {
 		if ( wasOnScreen ) {
 			Sys_PostVRPointer( false, 0.0f, 0.0f );
 		}
+		TouchPanel( weaponHand, false, 0.0f, 0.0f, 0.0f );
 		return;
 	}
-	pointerHitLocal = VR_ToXrVec( VR_Add( VR_FromXrVec( aim.position ), VR_Scale( direction, hit.distance ) ) );
 	const float deadBand = 0.0015f;
 	if ( wasOnScreen && idMath::Fabs( hit.u - pointerU ) < deadBand && idMath::Fabs( hit.v - pointerV ) < deadBand ) {
 		pointerOnScreen = true;
@@ -3774,6 +3813,8 @@ void idVRSystemOpenXR::UpdateMenuPointer( int weaponHand, bool menu ) {
 		pointerU = hit.u;
 		pointerV = hit.v;
 	}
+	// the pointer moves before the button goes down, so the press lands under the fingertip
+	TouchPanel( weaponHand, fingerOnPanel && pointerOnScreen, touch.distance, hit.u, hit.v );
 	// A light tick in the pointing hand as the pointer moves onto another
 	// control: the controls also grow and light up under it (VR-09). The menu
 	// finds the control a frame after the pointer moves, while the hand holds
@@ -3783,6 +3824,35 @@ void idVRSystemOpenXR::UpdateMenuPointer( int weaponHand, bool menu ) {
 		hoverGeneration = hover;
 		if ( pointerOnScreen && vr_menuHaptics.GetBool() ) {
 			Vibrate( weaponHand, 0.15f, 12 );
+		}
+	}
+}
+
+/*
+====================
+idVRSystemOpenXR::TouchPanel
+
+One poke of the weapon hand's fingertip on the hand panel is one click
+(VR_TouchStep), a mouse button pressed on contact and released as the finger
+draws back, with a firmer tick than a hover's. While the trigger already
+holds a click there, the fingertip leaves it alone.
+====================
+*/
+void idVRSystemOpenXR::TouchPanel( int hand, bool touching, float distance, float u, float v ) {
+	const bool triggerClicks = heldKeys[VR_SLOT_WEAPON_TRIGGER] == K_MOUSE1;
+	const vrTouchEvent_t event = VR_TouchStep( panelTouch, touching && !triggerClicks, distance, Sys_Milliseconds() );
+	if ( event == VR_TOUCH_DOWN ) {
+		UpdateKey( VR_SLOT_FINGER_PRESS, K_MOUSE1, true );
+		if ( vr_menuHaptics.GetBool() ) {
+			Vibrate( hand, 0.5f, 25 );
+		}
+		if ( vr_debug.GetInteger() > 0 ) {
+			common->Printf( "OpenXR: fingertip press on the hand panel at %.3f %.3f, %.1f mm\n", u, v, distance * 1000.0f );
+		}
+	} else if ( event == VR_TOUCH_UP ) {
+		UpdateKey( VR_SLOT_FINGER_PRESS, 0, false );
+		if ( vr_debug.GetInteger() > 0 ) {
+			common->Printf( "OpenXR: fingertip release on the hand panel\n" );
 		}
 	}
 }

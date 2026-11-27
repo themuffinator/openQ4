@@ -79,6 +79,7 @@ public:
 	virtual bool				WriteToSaveGame( idFile *savefile ) const;
 	virtual bool				ReadFromSaveGame( idFile *savefile );
 	virtual bool				ReadFromSaveGameWithLayout( idFile *savefile, const char *layoutPath, int &restoredWindowValues );
+	virtual int					HoverControl( void ) override;
 	virtual void				SetKeyBindingNames( void );
 	virtual bool				IsUniqued() const { return uniqued; };
 	virtual void				SetUniqued( bool b ) { uniqued = b; };
@@ -153,6 +154,10 @@ private:
 	// The match summary's exit prompt key last published (-1 none yet); -2
 	// for every other GUI.
 	int							summaryExitKey = -2;
+	// HoverControl: the control the cursor last rested on (compared, never followed)
+	// and how many times it moved onto another
+	const idWindow *			hoverControl = nullptr;
+	int							hoverControlCount = 0;
 public:
 	// The Remastered layout draws this stock HUD in place of its own windows.
 	bool                        RemasteredActive() const;

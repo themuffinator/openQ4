@@ -86,6 +86,7 @@ here: it waits on the AND-05 distribution decision.
 | 3.23 | Reload the machine gun, shotgun, nailgun, hyperblaster and rocket launcher, and in `q4xbase` the goob gun. | The off hand ticks with each reload sound (magazine out, magazine in, bolt, each shell), in time with it. A gun whose reload makes no sound (the spike gun) stays still. |
 | 3.24 | Switch weapons several times, then drop off a ledge of about two metres, a bigger fall, and jump on level ground. | The weapon hand feels each gun come up; both hands jolt on landing, harder for the bigger fall; an ordinary jump stays still. |
 | 3.25 | Set `vr_hapticEvents 0` and repeat 3.22 to 3.24, then fire and take a hit. | Blasts, reloads, draws and landings stop; shots and hits still vibrate. Set it back to 1. |
+| 3.26 | With **Your Body** on With Arms, hold the off hand out with its index finger pointing, and watch where the drawn fingertip is against your own. Repeat left-handed. | The drawn index fingertip is within about 2 cm of where your real fingertip is, in both hands; note the offset in the report if not. |
 
 ## 4. Body, space and movement (VR-02, VR-03)
 
@@ -127,6 +128,9 @@ here: it waits on the AND-05 distribution decision.
 | 6.3 | In single player, point the weapon hand at a door panel and a lift call screen and pull the trigger. | The cursor sits where the laser meets the screen and the screen responds. |
 | 6.4 | In multiplayer, look at the objective markers in CTF (`mp/q4ctf1`). | Markers sit at HUD depth, follow your head and stay inside the HUD. |
 | 6.5 | In multiplayer, hit another player (or `testHudOverlays`) and watch the damage number. | The number rises from the player you hit, not below or beside them. |
+| 6.6 | In single player, press a door panel and a lift call with the off hand's fingertip (airdefense2 has a lift call by its first lift). Then rest the fingertip a few centimetres from the screen for ten seconds. | The cursor follows the fingertip once it is a few centimetres away; one poke is one click with a firm tick; resting near the screen, holding still or with a natural tremor, clicks nothing. Note whether the contact point feels early or late. |
+| 6.7 | Repeat 6.6 with **Your Body** on Legs and Torso, with **Weapon Hand** set to Left, and with no weapon in hand (the weapon hand then presses). In The Awakening (`q4xbase`), press a lift call in Prison with the blaster in hand, then with the freeze gun. | Every case presses where the fingertip meets the screen; with the body's arms off, and with the freeze gun (whose support hand stays on the gun), the press point is a little ahead of the controller. |
+| 6.8 | Sweep the laser, then the fingertip, across a screen with several buttons (a terminal with choices). | The hand ticks lightly once per new button and not while the cursor stays on one; a click or a press ticks more firmly. `vr_menuHaptics 0` stops the ticks. |
 
 ## 7. Temporal anti-aliasing by eye (VR-05)
 
@@ -163,3 +167,4 @@ version in the report. The log's `VR_RUNTIME`, `VR_MODE`, `VR_OFFER` and
 | 8.16 | Pick up armor and get a new objective; take on a boss (Makron, Network Guardian). | The pickup and objective lines appear on the off-hand wrist and are noticed in time; the boss's bar shows there while the fight lasts. |
 | 8.17 | Repeat 8.13 left-handed, after Kane is Stroggified (Strogg colours), in The Awakening and in a multiplayer match. | The wrists swap; the Strogg colours read as well as the Marine ones; the multiplayer score, timer and chat stay in front and readable. |
 | 8.18 | Set Status Display to HUD (Virtual Reality tab and VR SETUP). | The whole HUD hangs in front of you again and the wrists are bare; set back, the wrists return. |
+| 8.19 | Open the pause from the off hand and press RESUME, then another button, with the weapon hand's fingertip instead of the trigger; rest the fingertip just in front of a button for a few seconds first. Repeat left-handed. | The pointer follows the fingertip near the panel; a poke presses the button under it once, with a firm tick; resting in front presses nothing. |

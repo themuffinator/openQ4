@@ -130,7 +130,11 @@ move it, but a steady hand's small shake leaves it still, so what you point at
 stays put; hold it closer to read small text. Point with the weapon hand: a
 light beam runs from your hand to the panel, the button under it grows and
 lights up, and your hand ticks lightly as the pointer moves onto another
-control. The pause is nothing but its buttons, big and plain: Resume,
+control. You can also press the buttons with a fingertip of your weapon hand,
+as on a touch screen: bring the hand up to the panel, and the pointer follows
+your fingertip once it is within a few centimetres; push into the button to
+press it, with a firmer tick than a hover's. A hand that only rests near the
+panel presses nothing. The pause is nothing but its buttons, big and plain: Resume,
 Objectives, Save, Load, Restart, Settings, VR Setup, Quit to Menu and Exit. Set **vr_menuAnchor 0** for
 the screen hung in front of you instead; the title, loading screens and
 cinematics always use that screen.
@@ -268,6 +272,25 @@ terminals, answer your weapon hand the same way: point at one and its cursor
 appears where your laser meets it. Characters you can talk to and things you
 can use also respond where you point. In multiplayer the server decides what
 you are looking at, so there they follow your view instead.
+
+**After 0.15.0**, in single player, you can also press those screens with a
+fingertip, the way you would a real one:
+
+- Reach out with your free hand: your off hand, or your weapon hand when you
+  have no weapon. Within about 6 cm of a screen, its cursor moves to the
+  point under your fingertip.
+- Push in until your fingertip meets the screen to press it. Each poke is one
+  click, a firm tick in that hand tells you it went in, and drawing your hand
+  back about 2 cm lets go. Resting a hand near a screen, or reaching through
+  it, presses nothing.
+- With **Your Body** set to With Arms (`vr_body 2`) the fingertip is the one
+  you see on your off hand. Otherwise, and for the weapon hand, it is a point
+  about 8 cm ahead of the controller, where a pointing finger would end.
+- Your hand ticks lightly each time the cursor, from your laser or your
+  fingertip, moves onto another button of a screen, as in the menus.
+  `vr_menuHaptics 0` turns these ticks off.
+- Holding the gun in both hands keeps the off hand on the gun, so it doesn't
+  press anything.
 
 ### Aiming and weapons
 
@@ -720,7 +743,7 @@ General settings (the others are in the sections above):
 | `vr_menuWidth` | 0.5 | **Not in 0.15.0.** Width of the off-hand menu panel in metres (0.3 to 1.2) |
 | `vr_hudMode` | 1 | **Not in 0.15.0.** Status Display: 1 health and armor on your off-hand wrist and ammunition on your weapon hand's, with only captions, damage direction, the weapon wheel, vehicle HUDs and the multiplayer overlay in front of you; 0 the whole HUD in front of you |
 | `vr_wristWidth` | 0.11 | **Not in 0.15.0.** Width of each wrist display in metres (0.06-0.2) |
-| `vr_menuHaptics` | 1 | **Not in 0.15.0.** 1 ticks the pointing hand as the pointer moves onto another control, and the off hand as its panel opens |
+| `vr_menuHaptics` | 1 | **Not in 0.15.0.** 1 ticks the pointing hand as the pointer moves onto another control, and the off hand as its panel opens; **after 0.15.0** also on a world screen's controls (single player), with a firmer tick for each click and fingertip press |
 | `vr_pauseOnFocusLoss` | 1 | single player: 1 opens the pause menu when the headset comes off or its own menu takes the controllers |
 | `vr_mirror` | 1 | desktop window: 0 black, 1 left eye, 2 the floating screen |
 | `vr_debug` | 0 | 1 logs VR session events, 2 also logs every frame (for problem reports) |

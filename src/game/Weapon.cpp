@@ -779,6 +779,9 @@ rvWeapon::rvWeapon ( void ) {
 	vrArmJointCount = 0;
 	vrOffHandFree = 0.0f;
 	vrOffHandTime = 0;
+	vrFingerJoints[ 0 ] = vrFingerJoints[ 1 ] = INVALID_JOINT;
+	vrFingertipLocal.Zero();
+	vrFingertipTime = 0;
 	ResetPresentationViewModelState();
 }
 
@@ -1660,6 +1663,10 @@ void rvWeapon::GetVRHold( idVec3 &barrel, idVec3 &grip, bool leftHand ) const {
 		vrArmsMirrorable = false;
 		vrArmsValid = false;
 		vrArmSurfaces = 0;
+		// the support hand's index finger, which presses world screens
+		// (GetVRFingertip): its middle and last joints
+		vrFingerJoints[ 0 ] = viewAnimator->GetJointHandle( "lft_ndx_2" );
+		vrFingerJoints[ 1 ] = viewAnimator->GetJointHandle( "lft_ndx_3" );
 		const idRenderModel *model = viewAnimator->ModelHandle();
 		const int idleAnim = viewAnimator->GetAnim( "idle" );
 		const idAnim *idle = idleAnim ? viewAnimator->GetAnim( idleAnim ) : NULL;
@@ -1907,8 +1914,38 @@ const idJointMat *rvWeapon::PoseVRArms( const idJointMat *joints, int numJoints,
 			VRBody_AimViewArm( arm, ( elbow - origin ) * toModel, vrArmJoints );
 			ShortenVRViewForearm( arm, scale, vrArmJoints );
 		}
+		// The free hand's index fingertip as drawn, in its controller's own
+		// frame, for pressing world screens (idPlayer::GetVRFingertip): the
+		// last joint is the fingertip's knuckle, and the tip about as far again
+		// along the finger. The placement carries any mirroring, the controller
+		// axes are the real ones.
+		vrFingertipTime = 0;
+		idVec3 controllerPalm;
+		idMat3 controllerAxis;
+		if ( tracked && blend >= 0.999f && vrFingerJoints[ 0 ] != INVALID_JOINT && vrFingerJoints[ 1 ] != INVALID_JOINT
+				&& vrFingerJoints[ 0 ] < numJoints && vrFingerJoints[ 1 ] < numJoints
+				&& owner->GetVRHandPose( offHand, controllerPalm, controllerAxis ) ) {
+			const idVec3 middle = origin + vrArmJoints[ vrFingerJoints[ 0 ] ].ToVec3() * axis;
+			const idVec3 last = origin + vrArmJoints[ vrFingerJoints[ 1 ] ].ToVec3() * axis;
+			const idVec3 tip = last + ( last - middle ) * 0.8f;
+			vrFingertipLocal = ( tip - controllerPalm ) * controllerAxis.Transpose();
+			vrFingertipTime = Sys_Milliseconds();
+		}
 	}
 	return vrArmJoints;
+}
+
+/*
+================
+rvWeapon::GetVRFingertip
+================
+*/
+bool rvWeapon::GetVRFingertip( idVec3 &local ) const {
+	if ( vrFingertipTime == 0 || Sys_Milliseconds() - vrFingertipTime > 250 ) {
+		return false;
+	}
+	local = vrFingertipLocal;
+	return true;
 }
 
 /*
