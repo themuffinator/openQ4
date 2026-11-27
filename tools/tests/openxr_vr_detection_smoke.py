@@ -245,8 +245,8 @@ def main(argv: list[str] | None = None) -> None:
             "the automatic renderer choice did not keep VR on OpenGL"
         assert "OpenXR: presenting to the headset" in text
         frames = [e for e in events if e.get("event") == "end_frame" and e.get("layers")]
-        # the HUD before the eyes, and with vr_hudMode 1 (the default) its status band on the off-hand wrist
-        assert any(tuple(layer.get("type") for layer in f["layers"]) in (("projection", "quad"), ("projection", "quad", "quad")) for f in frames), \
+        # the HUD's layer before the eyes; with vr_hudMode 1 (the default) the wrist displays draw in the eyes
+        assert any(tuple(layer.get("type") for layer in f["layers"]) == ("projection", "quad") for f in frames), \
             "the level never presented a stereo projection layer with the HUD"
     print(f"OpenXR VR detection smoke: PASS ({', '.join(sorted(cases))}); evidence={output}")
 

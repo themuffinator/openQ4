@@ -29,6 +29,23 @@ void idPlayer::DebugStatusBar( const idCmdArgs &args ) {
 			shown->HandleNamedEvent( args.Argc() >= 4 ? "showBossShieldWarn" : "showBossShieldBar" );
 		}
 	}
+	// pickup <entityDef>: the pickup line an item gives, on the HUD and the
+	// wrist (VR-09); objective <title> [complete]: an objective notice
+	if ( args.Argc() == 3 && !idStr::Icmp( args.Argv( 1 ), "pickup" ) ) {
+		const idDict *item = gameLocal.FindEntityDefDict( args.Argv( 2 ), false );
+		if ( item != NULL ) {
+			const char *name = common->GetLocalizedString( item->GetString( "inv_name" ) );
+			if ( hud ) {
+				hud->SetStateString( "itemtext", name );
+				hud->SetStateString( "itemicon", item->GetString( "inv_icon" ) );
+				hud->HandleNamedEvent( "itemPickup" );
+			}
+			VRWrist_NotePickup( name, item->GetString( "inv_icon" ) );
+		}
+	}
+	if ( args.Argc() >= 3 && !idStr::Icmp( args.Argv( 1 ), "objective" ) ) {
+		VRWrist_NoteObjective( common->GetLocalizedString( args.Argv( 2 ) ), args.Argc() >= 4 && !idStr::Icmp( args.Argv( 3 ), "complete" ) );
+	}
 	idStr remastered;
 	const bool active = hud && hud->GetPresentationValue( "__remastered::active", remastered ) && remastered == "1";
 	gameLocal.Printf( "STATUS_BAR gui=%s layout=%s health=%d armor=%d ammo=%d clip=%d maximum=%d\n",

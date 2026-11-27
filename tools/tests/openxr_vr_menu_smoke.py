@@ -80,9 +80,9 @@ def hand_pointing_at(u: float, v: float) -> str:
 
 
 # where to click
-SETUP_TURNING = (0.464, 0.545)                  # VR SETUP's Turning value
-SETUP_SMOOTH = (0.420, 0.617)                   # "Smooth", second in the list it unfolds
-SETUP_DONE = (0.380, 0.716)                     # VR SETUP's DONE
+SETUP_TURNING = (0.464, 0.518)                  # VR SETUP's Turning value (seven rows since Status Display)
+SETUP_SMOOTH = (0.420, 0.590)                   # "Smooth", second in the list it unfolds
+SETUP_DONE = (0.380, 0.741)                     # VR SETUP's DONE
 PAUSE_SETTINGS = (0.500, 0.603)                 # SETTINGS in the pause's VR column (retained_vr.hand_menu)
 NAV_GAME_OPTIONS = canvas_to_screen(105, 227)   # Settings' left-hand Game Options button
 VR_TAB = (0.746, 0.116)                         # Game Options' VIRTUAL REALITY tab

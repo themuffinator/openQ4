@@ -233,12 +233,6 @@ enum vrGraphicsApi_t {
 
 static const int VR_SCREEN_WIDTH = 1920;
 static const int VR_SCREEN_HEIGHT = 1080;
-// The wrist display (vr_hudMode 1) shows this part of the HUD: the band along
-// the bottom of the HUD, a centred span of its width, which holds the
-// Remastered status bar (ammunition, health and armor, specification 14.3).
-// The rest of the HUD stays in front of the eyes. Fractions of the screen.
-static const float VR_WRIST_BAND = 0.16f;
-static const float VR_WRIST_SPAN = 0.56f;
 static const int VR_SYSTEM_RETRY_MSEC = 3000;
 // Automatic VR Mode: how long after launch, or after the player chose
 // Automatic, a headset that answers still starts VR by itself. A runtime
@@ -517,7 +511,6 @@ private:
 	void					AnchorScreen( void );
 	bool					PlaceHandPanel( int offHand );
 	void					ScreenQuadSize( float &width, float &height ) const;
-	XrRect2Di				ScreenRect( float left, float top, float right, float bottom ) const;
 	void					ScreenSizeForWindow( int &width, int &height ) const;
 	bool					ResizeScreenSwapchain( void );
 	bool					AcquireImages( void );
@@ -636,7 +629,7 @@ private:
 	int						screenResizeFailedHeight;
 	XrPosef					aimLocalPoses[VR_NUM_HANDS];	// raw LOCAL space, for the menu pointer
 	bool					aimLocalValid[VR_NUM_HANDS];
-	XrPosef					gripLocalPoses[VR_NUM_HANDS];	// the same for the grips: the hand panel and the wrist
+	XrPosef					gripLocalPoses[VR_NUM_HANDS];	// the same for the grips: the hand panel
 	bool					gripLocalValid[VR_NUM_HANDS];
 	XrPosef					headLocalPose;		// the head this frame, in the base space
 	bool					headLocalValid;
@@ -3757,27 +3750,6 @@ void idVRSystemOpenXR::ScreenQuadSize( float &width, float &height ) const {
 
 /*
 ====================
-idVRSystemOpenXR::ScreenRect
-
-A part of the screen image, as fractions from its top-left corner, in the
-image's own pixels. An OpenGL image's rows run up from its bottom edge
-(XR_KHR_opengl_enable), a Vulkan image's down from its top.
-====================
-*/
-XrRect2Di idVRSystemOpenXR::ScreenRect( float left, float top, float right, float bottom ) const {
-	const int width = screenSwapchain.width;
-	const int height = screenSwapchain.height;
-	XrRect2Di rect;
-	rect.offset.x = idMath::ClampInt( 0, width - 1, idMath::Ftoi( left * static_cast<float>( width ) ) );
-	rect.extent.width = idMath::ClampInt( 1, width - rect.offset.x, idMath::Ftoi( ( right - left ) * static_cast<float>( width ) ) );
-	const int y0 = idMath::ClampInt( 0, height - 1, idMath::Ftoi( top * static_cast<float>( height ) ) );
-	rect.extent.height = idMath::ClampInt( 1, height - y0, idMath::Ftoi( ( bottom - top ) * static_cast<float>( height ) ) );
-	rect.offset.y = graphicsApi == VR_GRAPHICS_VULKAN ? y0 : height - y0 - rect.extent.height;
-	return rect;
-}
-
-/*
-====================
 idVRSystemOpenXR::UpdateMenuPointer
 
 In menus the weapon hand points at the virtual screen like a mouse. A small
@@ -4256,7 +4228,7 @@ void idVRSystemOpenXR::EndFrame( void ) {
 	XrCompositionLayerProjectionView projectionViews[VR_NUM_EYES];
 	XrCompositionLayerProjection projection;
 	XrCompositionLayerQuad quad;
-	const XrCompositionLayerBaseHeader *layers[3];
+	const XrCompositionLayerBaseHeader *layers[2];
 	uint32_t layerCount = 0;
 
 	const bool stereo = result.presented && result.eyeRendered[0] && result.eyeRendered[1] && viewsValid;
@@ -4280,7 +4252,6 @@ void idVRSystemOpenXR::EndFrame( void ) {
 		layers[layerCount++] = reinterpret_cast<const XrCompositionLayerBaseHeader *>( &projection );
 	}
 
-	XrCompositionLayerQuad wrist;
 	if ( result.presented ) {
 		// gameplay keeps the HUD in view; menus during play grow out of the off
 		// hand (vr_menuAnchor 1); the title, loading and cinematics get a screen
@@ -4316,31 +4287,10 @@ void idVRSystemOpenXR::EndFrame( void ) {
 			quad.pose.position.z = -idMath::ClampFloat( 0.5f, 5.0f, vr_hudDistance.GetFloat() );
 			quad.size.width = idMath::ClampFloat( 0.3f, 4.0f, vr_hudWidth.GetFloat() );
 			quad.size.height = quad.size.width * screenHeight / screenWidth;
-			// Health, armor and ammunition ride on the off-hand wrist
-			// (vr_hudMode 1): glance at it as at a watch. The rest of the HUD
-			// stays before the eyes without that band, where it was. A
-			// vehicle's HUD is its own sights and status: it stays whole on the
-			// line of sight (vr_hudOnSight).
-			if ( vr_hudMode.GetInteger() == 1 && !vr_hudOnSight.GetBool() && gripLocalValid[offHand] && headLocalValid ) {
-				const float fullHeight = quad.size.height;
-				quad.subImage.imageRect = ScreenRect( 0.0f, 0.0f, 1.0f, 1.0f - VR_WRIST_BAND );
-				quad.size.height = fullHeight * ( 1.0f - VR_WRIST_BAND );
-				quad.pose.position.y += fullHeight * VR_WRIST_BAND * 0.5f;
-				memset( &wrist, 0, sizeof( wrist ) );
-				wrist.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
-				wrist.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
-				wrist.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-				wrist.space = localSpace;
-				wrist.subImage.swapchain = screenSwapchain.handle;
-				wrist.subImage.imageRect = ScreenRect( 0.5f - VR_WRIST_SPAN * 0.5f, 1.0f - VR_WRIST_BAND, 0.5f + VR_WRIST_SPAN * 0.5f, 1.0f );
-				const vrVec3_t centre = VR_WristCentre( VR_FromXrVec( gripLocalPoses[offHand].position ),
-					VR_QuatNormalize( VR_FromXrQuat( gripLocalPoses[offHand].orientation ) ) );
-				wrist.pose.position = VR_ToXrVec( centre );
-				wrist.pose.orientation = VR_ToXrQuat( VR_FacingQuat( centre, VR_FromXrVec( headLocalPose.position ) ) );
-				wrist.size.width = idMath::ClampFloat( 0.08f, 0.4f, vr_wristWidth.GetFloat() );
-				wrist.size.height = wrist.size.width * static_cast<float>( wrist.subImage.imageRect.extent.height ) /
-					static_cast<float>( Max( 1, wrist.subImage.imageRect.extent.width ) );
-			}
+			// With the status on the wrists (vr_hudMode 1) the game draws the
+			// wrist displays in the eyes and leaves on this layer only what
+			// must be seen without looking down: captions, the weapon wheel, a
+			// vehicle's HUD, the multiplayer overlay (VR-09).
 		} else {
 			if ( !screenAnchored || lastFrameHud ) {
 				AnchorScreen();
@@ -4358,9 +4308,6 @@ void idVRSystemOpenXR::EndFrame( void ) {
 			}
 		}
 		layers[layerCount++] = reinterpret_cast<const XrCompositionLayerBaseHeader *>( &quad );
-		if ( hud && quad.subImage.imageRect.extent.height < screenSwapchain.height ) {
-			layers[layerCount++] = reinterpret_cast<const XrCompositionLayerBaseHeader *>( &wrist );
-		}
 		lastFrameHud = hud;
 	}
 

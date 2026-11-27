@@ -303,6 +303,8 @@ enum {
 	PRESENTATION_ALT_VIEW_DEATH
 };
 
+struct vrWristStatus_t;
+
 class idPlayer : public idActor {
 public:
 
@@ -825,6 +827,11 @@ public:
 	// A controller in the world as this draw shows it: the palm, and the axes
 	// it aims along. False when it is not tracked.
 	bool					GetVRHandPose( int hand, idVec3 &palm, idMat3 &aimAxis ) const;
+	// The status the wrist displays show this frame (VR-09, VRWristDisplay.h).
+	void					GetVRWristStatus( vrWristStatus_t &status );
+	// The objectives draw in front of the eyes while the status is on the
+	// wrists: open, or a failure that ends the mission.
+	bool					VRObjectivesInFront( void ) const;
 	// The tracked head in the world this tic. False outside a headset view.
 	bool					GetVRHeadOrigin( idVec3 &origin ) const;
 	// openQ4 VR (single player): a free hand's index fingertip in the world

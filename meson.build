@@ -1070,6 +1070,14 @@ if get_option('build_native_tests')
   )
   test('openq4-vr-math-core', openq4_vr_math_core_test, timeout: 30)
 
+  openq4_vr_wrist_core_test = executable(
+    'openq4-vr-wrist-core-test',
+    files('tools/tests/native/VRWristCoreTest.cpp'),
+    include_directories: root_include_dir,
+    install: false,
+  )
+  test('openq4-vr-wrist-core', openq4_vr_wrist_core_test, timeout: 30)
+
   openq4_openxr_runtime_probe_test = executable(
     'openq4-openxr-runtime-probe-test',
     files('tools/tests/native/OpenXRRuntimeProbeTest.cpp'),

@@ -2203,4 +2203,12 @@
 	"#str_233510"	"Není nainstalováno prostředí VR"
 	"#str_233511"	"Žádný headset VR neodpověděl"
 	"#str_233512"	"Nalezen headset VR: zvolte režim VR, chcete-li ho použít"
+	"#str_233560"	"Zobrazení stavu"
+	"#str_233561"	"Na zápěstích;HUD"
+	"#str_233562"	"Zdraví a brnění na zápěstí volné ruky a munice na zápěstí ruky se zbraní, nebo celý HUD před očima."
+	"#str_233563"	"NOVÝ ÚKOL"
+	"#str_233564"	"ÚKOL SPLNĚN"
+	"#str_233565"	"PŘEBÍT"
+	"#str_233566"	"DOŠLA MUNICE"
+	"#str_233567"	"BOSS"
 }

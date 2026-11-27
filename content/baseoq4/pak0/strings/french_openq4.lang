@@ -2212,4 +2212,12 @@
 	"#str_233510"	"Aucun runtime RV n'est installé"
 	"#str_233511"	"Aucun casque RV n'a répondu"
 	"#str_233512"	"Casque RV détecté : choisissez un Mode RV pour l'utiliser"
+	"#str_233560"	"Affichage de l'état"
+	"#str_233561"	"Aux poignets;HUD"
+	"#str_233562"	"La santé et l'armure au poignet de la main libre et les munitions à celui de la main armée, ou tout le HUD devant vos yeux."
+	"#str_233563"	"NOUVEL OBJECTIF"
+	"#str_233564"	"OBJECTIF ACCOMPLI"
+	"#str_233565"	"RECHARGER"
+	"#str_233566"	"PLUS DE MUNITIONS"
+	"#str_233567"	"BOSS"
 }

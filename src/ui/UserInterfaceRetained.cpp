@@ -453,7 +453,7 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"vr_moveDirection",{0,0,1,true,{},{0,1}}},{"vr_roomScale",{1}},{"vr_aimLaser",{0,0,2,true,{},{0,1,2}}},
 		{"vr_hapticStrength",{2,0,0,false,{"0","0.5","1"}}},{"vr_twoHanded",{1}},
 		{"vr_comfortVignette",{2,0,0,false,{"0","0.5","1"}}},{"vr_physicalCrouch",{1}},
-		{"vr_playSpace",{0,0,2,true,{},{0,1,2}}},{"vr_body",{0,0,2,true,{},{0,1,2}}},
+		{"vr_playSpace",{0,0,2,true,{},{0,1,2}}},{"vr_body",{0,0,2,true,{},{0,1,2}}},{"vr_hudMode",{0,0,1,true,{},{1,0}}},
 		// GENERAL's VIDEO CAPTURE section (recordVideo, src/framework/VideoCapture.cpp).
 		{"com_videoFormat",{2,0,0,false,{"mp4","mkv","webm","mov","avi","gif"}}},{"com_videoQuality",{0,1,100,true}},
 		{"com_videoFPS",{0,24,120,true,{},{24,30,60,120}}},{"com_videoHeight",{0,0,2160,true,{},{0,480,720,1080,1440,2160}}},

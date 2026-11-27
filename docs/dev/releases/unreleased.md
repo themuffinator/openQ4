@@ -53,12 +53,20 @@ the [development roadmap](../roadmap.md) for current scope.
   uses the in-game keyboard. Off never touches your VR software. During play
   the menu grows out of your off hand on a panel, with the level still around
   you: a light beam points from your other hand, buttons grow and light up
-  under it and your hand ticks as you move between them. Health, armor and
-  ammunition sit on your off-hand wrist. The controllers now tell you which
-  side a hit came from and buzz with nearby blasts, each reload step, a drawn
-  weapon and a hard landing, always alongside a sound or a sight
-  (`vr_hapticEvents` turns those down without touching shots and hits). See the
-  [VR guide](../../user/vr.md#vr-mode-and-headset-detection).
+  under it and your hand ticks as you move between them. The controllers now
+  tell you which side a hit came from and buzz with nearby blasts, each
+  reload step, a drawn weapon and a hard landing, always alongside a sound or
+  a sight (`vr_hapticEvents` turns those down without touching shots and
+  hits). See the [VR guide](../../user/vr.md#vr-mode-and-headset-detection).
+- **No HUD in your way in VR.** Health and armor show on your off-hand wrist
+  and ammunition on your weapon hand's, in clear figures beside the HUD's own
+  icons, turned towards you like a watch: the magazine and what you carry,
+  the infinity sign for the blaster, amber when low, red with RELOAD when
+  empty, and a red pulse when your health runs low. Only captions, hit
+  arrows, the weapon wheel, vehicle HUDs and multiplayer's scores and chat
+  stay in front of your eyes. **Status Display** on the Virtual Reality tab
+  and in VR SETUP brings the classic HUD back. See the
+  [VR guide](../../user/vr.md#health-and-ammunition-on-your-wrists).
 - **Play in 3D without a headset.** Turn on **Stereoscopic 3D** in Settings >
   Game Options > Virtual Reality and the game draws a view for each eye: side
   by side or top and bottom for 3D televisions and monitors, full-resolution

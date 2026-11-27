@@ -5,7 +5,7 @@
 /*
 ===============================================================================
 
-	Menus and the HUD on the hands (VR-09), engine-free so the native test
+	The menu panel on the off hand (VR-09), engine-free so the native test
 	(tools/tests/native/VRMathCoreTest.cpp) runs it directly.
 
 	In OpenXR axes: +Y up, -Z forward, metres. A quad layer shows its face
@@ -19,9 +19,6 @@
 	hand's tremor never moves what the pointer aims at. Opening, it grows from
 	the hand to its place over 180 ms.
 
-	The wrist display hangs just above the off hand's wrist, behind the grip,
-	also turned to the head.
-
 ===============================================================================
 */
 
@@ -32,8 +29,6 @@ const float VR_PANEL_DEAD_ZONE = 0.012f;	// metres the hand moves before the pan
 const float VR_PANEL_DEAD_TURN = 3.0f;		// degrees the facing turns before the panel follows
 const float VR_PANEL_SETTLE = 0.05f;		// seconds: the follow's time constant
 const float VR_PANEL_OPEN = 0.18f;			// seconds to grow out of the hand
-const float VR_WRIST_BACK = 0.07f;			// metres from the grip back toward the wrist
-const float VR_WRIST_LIFT = 0.05f;			// metres above it
 
 struct vrHandPanel_t {
 	vrVec3_t	position;		// where the panel rests, its centre
@@ -120,13 +115,6 @@ inline vrVec3_t VR_HandPanelDrawnCentre( const vrHandPanel_t &panel, const vrVec
 }
 inline float VR_HandPanelDrawnScale( const vrHandPanel_t &panel ) {
 	return 0.1f + 0.9f * VR_HandPanelGrowth( panel.open );
-}
-
-// The wrist display's centre for an off-hand grip pose: back along the
-// controller toward the wrist, then up.
-inline vrVec3_t VR_WristCentre( const vrVec3_t &grip, const vrQuat_t &gripOrientation ) {
-	const vrVec3_t back = VR_RotateVector( gripOrientation, VR_Vec3( 0.0f, 0.0f, VR_WRIST_BACK ) );
-	return VR_Add( VR_Add( grip, back ), VR_Vec3( 0.0f, VR_WRIST_LIFT, 0.0f ) );
 }
 
 #endif /* !__VR_PANEL_CORE_H__ */

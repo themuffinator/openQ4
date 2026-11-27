@@ -6200,7 +6200,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 // jshepard: fade music in / out
 	cmdSystem->AddCommand( "fadeSound",				Cmd_FadeSound_f,			CMD_FL_GAME|CMD_FL_CHEAT,	"fades all sound by X decibles over Y seconds" );
 	cmdSystem->AddCommand( "testRadioChatter", Cmd_TestRadioChatter_f, CMD_FL_GAME|CMD_FL_CHEAT, "plays or probes the radio HUD audio graph", idCmdSystem::ArgCompletion_SoundName );
-	cmdSystem->AddCommand( "testStatusBar", Cmd_TestStatusBar_f, CMD_FL_GAME|CMD_FL_CHEAT, "status bar: probe or stats <health> <armor>" );
+	cmdSystem->AddCommand( "testStatusBar", Cmd_TestStatusBar_f, CMD_FL_GAME|CMD_FL_CHEAT, "status bar: probe, stats <health> <armor>, consume <ammo>, boss [shield [warn]], pickup <entityDef> or objective <title> [complete]" );
 	cmdSystem->AddCommand( "testWeaponWheel", Cmd_TestWeaponWheel_f, CMD_FL_GAME|CMD_FL_CHEAT, "weapon wheel: open, slot N, release, cancel, family marine|strogg, probe" );
 	cmdSystem->AddCommand( "testQuickChat", Cmd_TestQuickChat_f, CMD_FL_GAME|CMD_FL_CHEAT, "quick-chat wheel: open, slot N, channel, release, cancel" );
 	cmdSystem->AddCommand( "testScoreboard", Cmd_TestScoreboard_f, CMD_FL_GAME|CMD_FL_CHEAT, "holds the scoreboard open for <msec>" );

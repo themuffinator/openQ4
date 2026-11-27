@@ -64,18 +64,20 @@ idCVar vr_screenDistance( "vr_screenDistance", "2.5", CVAR_SYSTEM | CVAR_ARCHIVE
 idCVar vr_screenWidth( "vr_screenWidth", "3.0", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"width of the virtual screen in metres", 0.5f, 12.0f );
 // Menus and the HUD in the world (VR-09): in play, the menus grow out of the
-// off hand on a panel it holds, and health, armor and ammunition ride on the
-// off-hand wrist, so the game world stays in view.
+// off hand on a panel it holds, and health and armor show on the off-hand
+// wrist and ammunition on the weapon hand's, so the game world stays in view.
+// The game reads vr_hudMode and vr_wristWidth by name (VRWristDisplay.cpp).
 idCVar vr_menuAnchor( "vr_menuAnchor", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
 	"menus during play: 0 = on the virtual screen hung in front of you, 1 = on a panel that grows out of your off hand "
 	"and stays above it (the title, loading screens and cinematics keep the screen)", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1> );
 idCVar vr_menuWidth( "vr_menuWidth", "0.5", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
 	"width of the off-hand menu panel in metres", 0.3f, 1.2f );
 idCVar vr_hudMode( "vr_hudMode", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
-	"the HUD in VR: 0 = all of it hung in front of your eyes, 1 = health, armor and ammunition on your off-hand wrist and "
-	"the rest in front of your eyes", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1> );
-idCVar vr_wristWidth( "vr_wristWidth", "0.24", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
-	"width of the wrist display (vr_hudMode 1) in metres", 0.08f, 0.4f );
+	"the status in VR: 0 = the whole HUD hung in front of your eyes, 1 = on your wrists, health and armor on the off hand "
+	"and ammunition on the weapon hand, with only captions, damage direction, the weapon wheel, vehicle HUDs and the "
+	"multiplayer overlay in front of your eyes", 0, 1, idCmdSystem::ArgCompletion_Integer<0,1> );
+idCVar vr_wristWidth( "vr_wristWidth", "0.11", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_FLOAT,
+	"width of each wrist display (vr_hudMode 1) in metres", 0.06f, 0.2f );
 idCVar vr_menuHaptics( "vr_menuHaptics", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_BOOL,
 	"1 = the pointing hand ticks as the pointer moves onto another menu control, and the off hand as its panel opens" );
 idCVar vr_mirror( "vr_mirror", "1", CVAR_SYSTEM | CVAR_ARCHIVE | CVAR_INTEGER,
