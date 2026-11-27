@@ -44370,8 +44370,8 @@
    "value": {"op": "==", "args": [{"state": "card.tab"}, 7]}
   },
   {
-   "id": "page-admin-row-banreason.display",
-   "node": "page-admin-row-banreason",
+   "id": "page-admin.display",
+   "node": "page-admin",
    "property": "display",
    "value": {
     "op": "select",
@@ -320347,7 +320347,7 @@
         ]
        },
        {
-        "id": "page-admin-row-banreason",
+        "id": "page-admin",
         "type": "group",
         "properties": {
          "position": {"type": "keyword", "value": "absolute"},

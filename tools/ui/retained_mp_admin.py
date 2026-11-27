@@ -367,10 +367,10 @@ def admin_page(doc: Document, index: int, ident: str, width: float, height: floa
         doc.state[state_key] = {"type": "number", "initial": 0}
         doc.actions[verb] = {"operation": "session.menuValue", "input": "number",
                              "arguments": {"command": verb, "value": {"input": "value"}}}
-        ident = f"admin-row-{key.replace('_', '')}"
-        ban_rows.append(value_row(doc, ident, label_key, "choice", right_w, ban_value_x, value={"state": state_key}, action=verb,
+        row_id = f"admin-row-{key.replace('_', '')}"
+        ban_rows.append(value_row(doc, row_id, label_key, "choice", right_w, ban_value_x, value={"state": state_key}, action=verb,
                                   entries=[((options_key, option), option) for option in range(count)], wrap=True))
-        doc.bind(f"{ident}.enabled", ident, "enabled", {"op": "==", "args": [{"state": "card.tab"}, index]})
+        doc.bind(f"{row_id}.enabled", row_id, "enabled", {"op": "==", "args": [{"state": "card.tab"}, index]})
     ban_choices = group("admin-ban-choices", {**b.absolute(left=right_x, top=len(ACTIONS) * SLOT_PITCH + 44, width=right_w,
                                                            height=len(BAN_CHOICES) * VOTE_ROW_H), "display": keyword("flex"),
                                               "flex-direction": keyword("column")}, ban_rows)
