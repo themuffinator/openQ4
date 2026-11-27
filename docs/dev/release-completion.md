@@ -173,9 +173,9 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   softer shadows from tall objects, lower it for crisper ones, or set `0` for
   the old look. The widest edge is still limited by
   `r_shadowMapPCSSMaxRadius`.
-- **Cost.** A little GPU time on Vulkan outdoors (at most 0.7 ms a frame at
-  2560x1440 in the heaviest stock sunlit view, measured on a busy machine);
-  about 0.1 ms on OpenGL. Scenes without sunlight are unaffected.
+- **Cost.** Next to nothing: about 0.05 to 0.1 ms of GPU time a frame at
+  2560x1440 in the heaviest stock sunlit view, on either renderer. Scenes
+  without sunlight are unaffected.
 - Developer detail:
   [sunlight softens with the gap](shadowmapping-audit-2026-11-27.md#sunlight-softens-with-the-gap-not-with-height-in-the-lights-box).
   No ABI change.

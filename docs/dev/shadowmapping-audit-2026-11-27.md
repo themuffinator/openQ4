@@ -446,13 +446,25 @@ Measured at Quality, hidden, same frozen moment for every size:
   picture changes, by the same share on both renderers (0.32% and 0.31% of
   the frame at 1 degree). No stock view was found where a parallel light
   shadows scenery, so that branch rests on the self-test and this.
-- **Cost.** Air Defense 1 arena, full turn of the view at 2560x1440, three
-  interleaved pairs in one launch, median GPU frame: Vulkan 4.76, 4.85 and
-  4.91 ms with the rule off against 5.52, 5.46 and 4.97 with it; OpenGL 5.93
-  and 5.99 against 5.94 and 6.10 (the third OpenGL pair was disturbed).
-  Other sessions' game clients were on the GPU during these runs and a
-  repeat scattered by more than the difference, so the Vulkan figure, up to
-  0.7 ms, is an upper bound and not a measurement. It wants a quiet machine.
+- **Cost: about 0.05 to 0.1 ms on Vulkan, about the same on OpenGL.** Air Defense 1
+  arena, full turn of the view at 2560x1440, the rule off and on in
+  alternating windows of one launch, median GPU frame per window. The first
+  three pairs read up to 0.7 ms apart on Vulkan, but other sessions' game
+  clients held the GPU at about 40% and single windows scattered by a
+  millisecond either way, so the cost was timed again over many short pairs:
+  - 24 pairs of 1.2 s: paired median +0.04 ms (quartiles -0.07 and +0.12);
+    the quietest window 5.07 ms off against 5.17 on.
+  - 14 pairs of 2 s: quietest window 4.93 off against 4.99 at 1 degree and
+    4.99 at 4 degrees; the two undisturbed pairs +0.05 and +0.15.
+  - 6 rounds that also held the search at its old reach: in the two
+    undisturbed rounds the rule cost +0.01 and +0.06 with the wider search
+    and +0.04 without, so the wider search is not what costs.
+  - OpenGL, 12 pairs of 2 s: paired median +0.04 ms (quartiles -0.02 and
+    +0.15).
+
+  That is one to two percent of the frame in the heaviest stock sunlit
+  view, and too small to split into parts on this machine. Nothing was
+  trimmed.
 - **The default.** 1 degree, about twice the real Sun, enough to see at the
   texel sizes the cascades have. **The owner chose to keep it** (27 November
   2026) from a still comparison of the tank-pose crop at 0, 0.53, 1, 2 and 4
@@ -482,9 +494,8 @@ it is.
 
 Not done in this round. Each is real; the note says why it waited.
 
-- **The sun rule's cost on Vulkan** is not pinned down (see above), and its
-  default size, which the owner chose from stills, has not been judged in
-  motion.
+- **The sun rule's default size**, which the owner chose from stills, has
+  not been judged in motion.
 - **The modern OpenGL cluster loop samples shadows before knowing the light
   reaches the pixel.** The path is opt-in. (The PBR receivers of the shipped
   paths were done: see above.)
