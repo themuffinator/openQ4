@@ -491,11 +491,19 @@ int R_ShadowMapPointCacheSlotLimitFor( int requestedSlots, int budgetMegs,
 		Max( SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS, budgetSlots ) );
 }
 
+int R_ShadowMapPointCacheBudgetMegsFor( int configuredMegs, int faceSize ) {
+	const int megs = Max( 0, configuredMegs );
+	if ( faceSize <= SHADOWMAP_POINT_CACHE_BASE_FACE_SIZE ) {
+		return megs;
+	}
+	// the cvar's ceiling is 8192: three times it is far inside an int
+	return megs * SHADOWMAP_POINT_CACHE_LARGE_CUBE_BUDGET_SCALE;
+}
 int R_ShadowMapPointCacheSlotLimit( int faceSize, int bytesPerTexel,
 		int maxSlots ) {
 	return R_ShadowMapPointCacheSlotLimitFor(
 		r_shadowMapPointCacheSize.GetInteger(),
-		r_shadowMapPointCacheMegs.GetInteger(),
+		R_ShadowMapPointCacheBudgetMegsFor( r_shadowMapPointCacheMegs.GetInteger(), faceSize ),
 		faceSize, bytesPerTexel, maxSlots );
 }
 
@@ -747,6 +755,21 @@ bool R_ShadowMapCachePolicySelfTest( void ) {
 	}
 	// depth-only 512 cubes are 6 MiB: the requested 64 fit
 	if ( R_ShadowMapPointCacheSlotLimitFor( 64, 512, 512, 4, maxSlots ) != 64 ) {
+		return false;
+	}
+	// Cubes above 512 get three times the configured figure: the top shadow
+	// level's 1024 depth cubes are 24 MiB each and all 64 fit in 1536 MiB,
+	// where 512 MiB held 21. Cubes of 512 and below keep the figure itself.
+	if ( R_ShadowMapPointCacheBudgetMegsFor( 512, 512 ) != 512
+			|| R_ShadowMapPointCacheBudgetMegsFor( 512, 256 ) != 512
+			|| R_ShadowMapPointCacheBudgetMegsFor( 512, 1024 ) != 1536
+			|| R_ShadowMapPointCacheBudgetMegsFor( 512, 2048 ) != 1536
+			|| R_ShadowMapPointCacheBudgetMegsFor( -5, 1024 ) != 0
+			|| R_ShadowMapPointCacheSlotLimitFor( 64, 512, 1024, 4, maxSlots ) != 21
+			|| R_ShadowMapPointCacheSlotLimitFor( 64,
+				R_ShadowMapPointCacheBudgetMegsFor( 512, 1024 ), 1024, 4, maxSlots ) != 64
+			|| R_ShadowMapPointCacheSlotLimitFor( 64,
+				R_ShadowMapPointCacheBudgetMegsFor( 512, 1024 ), 1024, 8, maxSlots ) != 32 ) {
 		return false;
 	}
 	// 2048 cubes are 192 MiB each, yet the first twelve slots stay available

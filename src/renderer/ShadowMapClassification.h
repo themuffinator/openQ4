@@ -170,9 +170,18 @@ static const int SHADOWMAP_POINT_CACHE_MAX_SLOTS = 96;
 // Slots that are always available, so a large cube size cannot starve the
 // cache below what earlier builds offered.
 static const int SHADOWMAP_POINT_CACHE_MIN_BUDGET_SLOTS = 12;
+// The memory point cubes of this face size may fill, in MiB.
+// r_shadowMapPointCacheMegs is the figure for cubes of up to 512 texels a side,
+// which every shadow level but the top one uses: 512 MiB holds all 64 of them.
+// A 1024 cube has four times the texels, and the same figure held 21: half of
+// a dense view's lights, the rest rendered again every frame. Larger cubes get
+// three times the figure, 1536 MiB at the default, which holds 64 at 1024.
+static const int SHADOWMAP_POINT_CACHE_BASE_FACE_SIZE = 512;
+static const int SHADOWMAP_POINT_CACHE_LARGE_CUBE_BUDGET_SCALE = 3;
+int R_ShadowMapPointCacheBudgetMegsFor( int configuredMegs, int faceSize );
 // Usable point cache slots for a cube of faceSize texels whose six faces
 // cost bytesPerTexel each: r_shadowMapPointCacheSize, bounded by
-// r_shadowMapPointCacheMegs and by maxSlots.
+// r_shadowMapPointCacheMegs (scaled for the cube size) and by maxSlots.
 int R_ShadowMapPointCacheSlotLimit( int faceSize, int bytesPerTexel,
 	int maxSlots );
 // The pure form, for the self-test.

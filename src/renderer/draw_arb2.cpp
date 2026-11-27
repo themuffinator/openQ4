@@ -3139,6 +3139,12 @@ bool RB_ShadowMapResourcesKnownGood( bool pointLight ) {
 	return generation == tr.videoRestartCount;
 }
 
+// OpenGL draws a point light's receivers as soon as its cube is rendered, so
+// one scratch cube serves every uncached light of a view: no view exhausts it.
+bool RB_ShadowMapPointPoolHasRoom( void ) {
+	return true;
+}
+
 // Shadow casters render in light space, where the mirrored-view logic in
 // GL_Cull does not apply. idTech4 winding makes the engine-front (visible)
 // side of a front-sided material the GL_BACK face, so culling GL_FRONT stores

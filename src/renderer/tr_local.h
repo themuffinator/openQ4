@@ -1727,6 +1727,10 @@ void R_ShadowMapReceiverScanPrintInfo( const bool reset );
 void R_ShadowMapAssignAtlasTiles( viewDef_t *viewDef );
 // backend-published: shadow-map resources were successfully prepared this video generation (draw_arb2.cpp)
 bool RB_ShadowMapResourcesKnownGood( bool pointLight );
+// Whether every point pass of the next view is sure of a cube to render into.
+// False on a back end whose cube pool is bounded and nearly full: the front
+// end then keeps point lights' stencil volumes (R_ShadowMapLightWillUseShadowMaps).
+bool RB_ShadowMapPointPoolHasRoom( void );
 extern idCVar r_shadowMapStaticCache;		// 1 = reuse resident static-only shadow-map passes
 extern idCVar r_shadowMapStaticHysteresisFrames;	// frames after dynamic casters before static reuse
 extern idCVar r_shadowMapResidentFrames;	// frames a resident static shadow map may remain unused
