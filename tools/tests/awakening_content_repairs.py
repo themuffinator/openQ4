@@ -62,6 +62,16 @@ CRYOFAC_REPLIES = (
     ("nava_sorryserg", "tak", "tak_darnman"),
     ("tak_die", "navajas", "nava_takthatbitch"),
 )
+# Revision 5 of Cryofac (LateMissions.inl): (the anchor as the installed script
+# spells it, a token the edit adds). docs/dev/awakening-missions.md, "M08 revision 5".
+M08_SCRIPT = "maps/game/m08_cryofac.script"
+M08_MAP = "maps/game/m08_cryofac"
+M08_V5_EDITS = (
+    ("$freezer_doors2_frame.setShaderParm( 7, 1 );",
+     r"if ( $item_objectivecomplete_3 ) { sys.trigger( $item_objectivecomplete_3 ); }"),
+    ('aiScriptedAnimWait( $navajas, "cr_ladder_descend", 0, 0 );',
+     r"if ( $exit_trigger ) { sys.trigger( $exit_trigger ); }"),
+)
 # Revision 5 of the finale (LateMissions.inl): each anchor as the C++ string
 # literal spells it, and a token its replacement adds.
 M09_SCRIPT = "scripts/maps/m09_valkaryne.script"
@@ -196,8 +206,15 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
             "StartSoundShader (declManager->FindSound ( speechSound ? speechSound : lipsync )", "idAI::Speak")
     late = read(ROOT / "src/game/awakening/LateMissions.inl")
     require(late, 'awakeningM08Version4 = "maps/game/m08_cryofac.openq4-v4.script"', "LateMissions.inl")
-    require(late, "return awakeningM08Version4;", "LateMissions.inl")
+    require(late, 'awakeningM08Version5 = "maps/game/m08_cryofac.openq4-v5.script"', "LateMissions.inl")
+    require(late, "return awakeningM08Version5;", "LateMissions.inl")
     require(late, "cryoProgram.Icmp( awakeningM08Version4 ) == 0", "LateMissions.inl")
+    require(late, "cryoProgram.Icmp( awakeningM08Version5 ) == 0", "LateMissions.inl")
+    require(late, "const bool cryoVersion4 = cryoVersion5 || path.Icmp( awakeningM08Version4 ) == 0;",
+            "Cryofac revision 5 builds on revision 4")
+    for before, after in M08_V5_EDITS:
+        require(late, '{ "%s",' % before.replace('"', '\\"'), "LateMissions.inl M08 v5 anchors")
+        require(late, after.replace('"', '\\"'), "LateMissions.inl M08 v5 edits")
     for line, speaker, reply in CRYOFAC_REPLIES:
         require(late, f'aiSpeakWait( ${speaker}, \\"lipsync_{reply}\\" );', "LateMissions.inl v4 edits")
     # Cryofac's opening: the squad and Navajas's first mark move out of the
@@ -457,7 +474,54 @@ def check_m09_finale(awakening: Path) -> None:
         raise AssertionError(f"{M09_SCRIPT}: the shaft timeout no longer starts the explosions")
 
 
+def map_entities(path: Path) -> dict[str, dict[str, str]]:
+    entities = {}
+    for match in re.finditer(r"^\{\n(.*?)^\}", read(path), re.S | re.M):
+        head = match.group(1).split("\n{", 1)[0]       # an entity's keys precede its brushes
+        keys = {key: value for key, value in re.findall(r'^"([^"]*)" "([^"]*)"$', head, re.M)}
+        if "name" in keys:
+            entities[keys["name"]] = keys
+    return entities
+
+
+def check_m08_cryofac(awakening: Path) -> None:
+    """Each Cryofac revision 5 repair still answers the installed level."""
+    script = read(awakening / M08_SCRIPT).replace("\r\n", "\n")
+    for anchor, _ in M08_V5_EDITS:
+        if script.count(anchor) != 1:
+            raise AssertionError(f"{M08_SCRIPT}: revision 5 anchor {anchor!r} matches {script.count(anchor)} times")
+    live = strip_comments(script)
+    named = map_entities(awakening / f"{M08_MAP}.map")
+
+    def sources(name: str) -> list[str]:
+        # a brush entity's "model" is its own name
+        return [entity.get("name", "?") for entity in named.values()
+                for key, value in entity.items() if value == name and key not in ("name", "model")]
+
+    # objective 3 is given, and its completion item matches it and is never collected
+    given, done = named.get("item_objective_3"), named.get("item_objectivecomplete_3")
+    if not given or not done or given.get("objectivetitle") != done.get("objectivetitle"):
+        raise AssertionError(f"{M08_MAP}: no completion item for item_objective_3's title")
+    if not sources("item_objective_3"):
+        raise AssertionError(f"{M08_MAP}: nothing gives item_objective_3")
+    if sources("item_objectivecomplete_3") or re.search(r"item_objectivecomplete_3\b", live):
+        raise AssertionError(f"{M08_MAP}: item_objectivecomplete_3 is collected already; the repair is obsolete")
+    shutdown = re.search(r"void TurnOffFreeze\(\)\s*\{", live)
+    if not shutdown or "$freezer_doors2_lock" not in block(live, shutdown.end()):
+        raise AssertionError(f"{M08_SCRIPT}: TurnOffFreeze no longer opens the laboratory's exit")
+    # the exit alert waits to be armed, and nothing arms it
+    trigger = named.get("exit_trigger", {})
+    alert = named.get(trigger.get("target", ""), {})
+    if trigger.get("triggerFirst") != "1" or alert.get("classname") != "target_exitareaalert":
+        raise AssertionError(f"{M08_MAP}: exit_trigger is not an armed-later exit alert")
+    if sources("exit_trigger") or re.search(r"\$exit_trigger\b", live):
+        raise AssertionError(f"{M08_MAP}: something arms exit_trigger already; the repair is obsolete")
+    if not re.search(r"void FinalValkaryne\(\)\s*\{.*?cr_ladder_descend", live, re.S):
+        raise AssertionError(f"{M08_SCRIPT}: Navajas no longer goes down the ladder in FinalValkaryne")
+
+
 def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, retail: Path) -> None:
+    check_m08_cryofac(awakening)
     check_m09_finale(awakening)
     content = Content(awakening, retail)
     check_m09_taunts(content)

@@ -12,6 +12,22 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Cryofac's last objectives, 28 November 2026
+
+- **"Cryogenic Security Station and Deep Freeze Laboratory" completes**
+  (m08) when you shut down the cooling and the laboratory's exit opens. The
+  level placed its completion and nothing collected it, so it stayed in the
+  objective list for the rest of the level.
+- **The HUD points you to the exit** over the ladder down to the finale once
+  Navajas starts down it. The level's exit marker waited to be switched on
+  and nothing switched it on.
+- Fresh starts only: a save keeps the mission revision it was made with.
+- Evidence: hidden, input-free probes on the rebuilt module (revision 5
+  loads, the objective completes at the shutdown and stays open with the
+  corrections off, the exit alert fires only once armed, v4 and v5 save
+  restores) and `awakening_content_repairs.py`.
+  [M08 revision 5](awakening-missions.md#m08-revision-5--28-november-2026).
+
 ## Skipping a cinematic answers at once, 28 November 2026
 
 - **Pressing Esc to skip a cinematic turns the screen black straight away.**

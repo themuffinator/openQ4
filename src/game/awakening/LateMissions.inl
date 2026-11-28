@@ -10,6 +10,7 @@ static const char * const awakeningM08Version1 = "maps/game/m08_cryofac.openq4-v
 static const char * const awakeningM08Version2 = "maps/game/m08_cryofac.openq4-v2.script";
 static const char * const awakeningM08Version3 = "maps/game/m08_cryofac.openq4-v3.script";
 static const char * const awakeningM08Version4 = "maps/game/m08_cryofac.openq4-v4.script";
+static const char * const awakeningM08Version5 = "maps/game/m08_cryofac.openq4-v5.script";
 static const char * const awakeningM09Source = "scripts/maps/m09_valkaryne.script";
 static const char * const awakeningM09Version1 = "maps/game/m09_valkaryne.openq4-v1.script";
 static const char * const awakeningM09Version2 = "maps/game/m09_valkaryne.openq4-v2.script";
@@ -92,7 +93,8 @@ static bool Awakening_CorrectColdBreath( idStr &source ) {
 static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source ) {
 	idStr path = filename;
 	path.BackSlashesToSlashes();
-	const bool cryoVersion4 = path.Icmp( awakeningM08Version4 ) == 0;
+	const bool cryoVersion5 = path.Icmp( awakeningM08Version5 ) == 0;
+	const bool cryoVersion4 = cryoVersion5 || path.Icmp( awakeningM08Version4 ) == 0;
 	const bool cryoVersion3 = cryoVersion4 || path.Icmp( awakeningM08Version3 ) == 0;
 	const bool cryo = cryoVersion3 || path.Icmp( awakeningM08Version1 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
 	const bool version5 = path.Icmp( awakeningM09Version5 ) == 0;
@@ -257,6 +259,27 @@ static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source
 		};
 		if ( !Awakening_ApplyCorrections( source, fourthCryoEdits, sizeof( fourthCryoEdits ) / sizeof( fourthCryoEdits[0] ) ) ) { return false; }
 	}
+	if ( cryoVersion5 ) {
+		// docs/dev/awakening-missions.md, "M08 revision 5".
+		static const awakeningCorrection_t fifthCryoEdits[] = {
+			// trigger_once_16 gives "Cryogenic Security Station and Deep Freeze
+			// Laboratory" and the map places its completion item, but nothing
+			// collects it: the objective stayed open beside the next one. The
+			// laboratory is secured when the cooling stops and its exit opens.
+			// The item ignores the trigger unless the objective was given.
+			{ "$freezer_doors2_frame.setShaderParm( 7, 1 );",
+			  "$freezer_doors2_frame.setShaderParm( 7, 1 );\n"
+			  "\tif ( $item_objectivecomplete_3 ) { sys.trigger( $item_objectivecomplete_3 ); }", 1 },
+			// exit_trigger (target_exitareaalert_1, over the ladder down to
+			// M09) waits to be armed (triggerFirst), as m03's and m06's do,
+			// and nothing armed it: the HUD never pointed at the exit.
+			// Navajas going down the ladder is where the level leads on.
+			{ "aiScriptedAnimWait( $navajas, \"cr_ladder_descend\", 0, 0 );",
+			  "if ( $exit_trigger ) { sys.trigger( $exit_trigger ); }\n"
+			  "\taiScriptedAnimWait( $navajas, \"cr_ladder_descend\", 0, 0 );", 1 },
+		};
+		if ( !Awakening_ApplyCorrections( source, fifthCryoEdits, sizeof( fifthCryoEdits ) / sizeof( fifthCryoEdits[0] ) ) ) { return false; }
+	}
 	if ( version3 ) {
 		static const awakeningCorrection_t thirdFinaleEdits[] = {
 			// The bomb is ready at this warning. The ensuing scripted death must
@@ -400,9 +423,9 @@ static const char *Awakening_LateMissionScriptName( const char *filename ) {
 	path.BackSlashesToSlashes();
 	if ( g_awakeningLateMissions.GetBool() && Awakening_LateCampaignActive() && path.Icmp( awakeningM08Source ) == 0 ) {
 		idStr source;
-		if ( Awakening_LoadLateMissionScript( awakeningM08Version4, source ) ) {
-			gameLocal.Printf( "Awakening M08: mission corrections v4 enabled\n" );
-			return awakeningM08Version4;
+		if ( Awakening_LoadLateMissionScript( awakeningM08Version5, source ) ) {
+			gameLocal.Printf( "Awakening M08: mission corrections v5 enabled\n" );
+			return awakeningM08Version5;
 		}
 		gameLocal.Warning( "Awakening M08: unrecognized script; keeping installed mission behaviour" );
 	}
@@ -440,7 +463,8 @@ static bool Awakening_CorrectedCryofac() {
 	idStr cryoProgram = main ? gameLocal.program.GetFilename( main->filenum ) : "";
 	cryoProgram.BackSlashesToSlashes();
 	return cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 ||
-		cryoProgram.Icmp( awakeningM08Version3 ) == 0 || cryoProgram.Icmp( awakeningM08Version4 ) == 0;
+		cryoProgram.Icmp( awakeningM08Version3 ) == 0 || cryoProgram.Icmp( awakeningM08Version4 ) == 0 ||
+		cryoProgram.Icmp( awakeningM08Version5 ) == 0;
 }
 
 // Cryofac placements the recovered map gets wrong. Each repair names the

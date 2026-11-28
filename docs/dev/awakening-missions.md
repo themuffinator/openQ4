@@ -1842,3 +1842,122 @@ fight or that one cut off at her death goes quiet. Revision 5 had not left
 this checkout when the taunts were added to it, so no save carries the
 earlier form of it. Saves made before this change keep their revision and
 its behaviour. Vulkan, Linux and macOS were not run.
+
+## M08 revision 5 — 28 November 2026
+
+The user asked for Cryofac to be scrutinised for bugs and for gaps in what its
+developers meant, as M09 was. This pass cross-checked every entity the
+recovered `m08_cryofac.script` names against the map (including the names
+`TakOpenDoor` and `FrostBlaster` build from strings), every `call`,
+`script_death`, `gui_Parm1`, `target` and door `triggerOpened`/`triggerClosed`
+key against the script and the map, the objective items against what gives
+and collects them, and every triggered-only entity (relays, counters, locks,
+light fades, speakers, effects, hidden actors) against whatever can fire it.
+
+### Fixed
+
+Fresh M08 starts compile `maps/game/m08_cryofac.openq4-v5.script`. Revisions 1
+to 4 are unchanged, and a save keeps the revision it was made with. Each edit
+must match the installed script exactly once, or the level keeps its installed
+behaviour. The 18 November entity repairs apply to revision 5 as well.
+
+| Defect | Evidence | Repair |
+| --- | --- | --- |
+| "Cryogenic Security Station and Deep Freeze Laboratory" never completes. | `trigger_once_16`, just past cryodoor 5, gives `item_objective_3`. The map places `item_objectivecomplete_3` with the same title, and nothing targets it or names it. Every other objective the level gives before it is completed (1 at the lift, 2 in the first laboratory), so this one stayed in the list beside "Cryoclys Generator Destruction" until the level ended. | When the cooling shuts down (`TurnOffFreeze`) and the laboratory's exit unlocks, the completion item is triggered. It ignores the trigger unless the objective was given. |
+| The exit indicator never appears. | `exit_trigger` covers the ladder down to M09 and targets `target_exitareaalert_1`, which shows the HUD's exit marker. It is a `trigger_multiple` with `triggerFirst 1`: it does nothing until something triggers it once. Nothing does. m03 (`playerchairtrigger`) and m06's invasion (`exitareaalert`) use the same pattern and arm theirs from script. | Navajas's descent of the ladder (`FinalValkaryne`) arms it. |
+
+### Checked and left alone
+
+- **Objective 4 stays open into M09.** "Cryoclys Generator Destruction:
+  Locate Cryoclys Generator and destroy its source" is given after the
+  freezer and nothing in M08 destroys a generator. In M09 Navajas plants the
+  bomb that destroys the facility. M09 has its own objectives, and objectives
+  do not carry between maps, so leaving it open at the ladder was left as the
+  hand-off it reads as.
+- **`freezer_doors2_lock` names `func_door_370` twice.** Target locks toggle,
+  but this one carries `locked 0`, so the second toggle leaves the door
+  unlocked. The cooling shutdown opens the exit, as the November traversal
+  showed.
+- **The fog lights' second fade-in.** `TurnOffFreeze` triggers
+  `fog_light_fade_in` again rather than a fade-out. The fog light is bound to
+  `fog_lifter`, which the same function lowers back under the floor, so the
+  fog still goes.
+- **The Valkaryne monitor's light fades** (`valkaryne_monitor_fadeout`/`_fadein`)
+  name the same seventeen lights, so the room returns to its own lighting.
+- **The final room's camera console** (`func_static_54167`) uses the cooling
+  button GUI to toggle `CoreMonitor2`. The button's one-way red-to-blue
+  animation does not match a toggle, but the camera view toggles correctly.
+- **`team_elevator_block`** is non-solid and has no `hide` key, so the
+  `sys.trigger` in `TeamOnElevator` does nothing. The lift ride already works
+  with both marines aboard.
+- **`maiden_2_trigger`** triggers `new_maiden_2` twice in the same frame; the
+  second activation of an awake actor changes nothing.
+- **Revision 1's cryodoor-frame correction is inert.** It corrects
+  `UnlockCryoDoor`, which nothing calls (`LockCryoDoor`, `OpenStartDoor`,
+  `TakNavajasJumpDown` and `DarnellForwardPos` are never called either). It
+  stays, since revision 1 is a published save input.
+- **Load warnings.** The level's 31 "entity in solid" pickups sit on their
+  floors, as in the alpha; nothing here was moved.
+
+### Not placed
+
+None of these has a scene or trigger the content supplies, so nothing was
+invented for them.
+
+- **The cut gravity-gun thread.** `item_objective_5` ("Locate Cryoclys
+  Generator", with objective 4's text) is never given. Its completion item,
+  fired by `trigger_once_22` in the tunnel, carries a different title
+  ("Locate Gravity Gun and destroy Valkaryne before she can escape") that no
+  objective has, so it completes nothing. Objectives 6 and 7 ("Use Gravity
+  Gun to gain access to Valkaryne's Core", "Follow the Valkaryne to her
+  Lair") have `*TEMP*` texts; only an untriggered `trigger_relay_3` names
+  objective 7.
+- **Superseded relays.** The forward-position relays for positions 4, 6 and 9
+  (`trigger_relay_30`/`31`, `34`/`35`, `41`/`42`), `trigger_relay_107` and
+  the `TakOpenDoor` relays for cryodoors 2 to 6 (`trigger_relay_102` to
+  `_106`) are never fired; the scenes move the marines and open those doors
+  themselves.
+- **The cut start door.** `trigger_relay_12` and `OpenStartDoor` name
+  `entrance_strogg_grunt_1`, `entrance_strogg_marine_1`/`_2`, `func_door_158`
+  and `func_static_54504`, none of which the map has.
+- **Unfired content.** `lab1_scientist_4` (on a ledge above the second cave),
+  the looping `intruder_alarm_1` in the first lit room, the empty
+  `trigger_once_126` before cryodoor 1, the cameras `intro_cam_1` to `_3` and
+  `makron_cam_2`/`_3`, `cryo_radiochatter_1`/`_2`, and the objective beacons
+  (`obj_target_4` is absent, `obj_target_6` unfired; nothing reads beacons).
+  Steam relays named by seven doors and `maze_door_steam_relay`'s effects are
+  absent, and 73 steam effects bind to the absent `vents_low_south`.
+- **Markswell's call repeated at the end.** `FinalValkaryne` starts
+  `vo_marks_falconsqkn`, already played in the tunnel, on the Valkaryne's
+  voice and replaces it at once with "Reborn". Left as authored.
+
+### Validation
+
+Windows x64 OpenGL, hidden, no input, `developer 1`, the user-supplied alpha
+content, `fs_awakeningpath` pointing at it. The runtime is
+`.tmp/runtime/awakening-missions`: `.install`'s client, renderers and packs of
+28 November 11:12 with the rebuilt `game_x64.dll` (SHA-256 `8c32df5e…`). Logs
+are in `.tmp/awk/runs/<probe>`.
+
+| Probe | Result |
+| --- | --- |
+| `m08v5obj` | "mission corrections v5 enabled". `trigger trigger_once_16` lists the objective; with the shutdown's readiness latch set, `TurnOffFreeze` runs and the objective is gone from the list and the completion item removed. |
+| `m08v5obj_base` (`g_awakeningLateMissions 0`) | The same steps leave the objective in the list and the completion item in place. |
+| `m08v5exit` | With `g_debugTriggers 1`: standing over the ladder before the scene fires nothing. After `trigger_relay_113` (`FinalValkaryne`) `exit_trigger` is armed as Navajas goes down the ladder, and over the ladder `target_exitareaalert_1` then fires every three seconds. |
+| `m08v4save` (`.install` module), `m08v4load` | A revision 4 save restores with the new module and recompiles `m08_cryofac.openq4-v4.script`. |
+| `m08v5save`, `m08v5load` | A revision 5 save restores in a fresh process, recompiling `m08_cryofac.openq4-v5.script`. |
+
+`awakening_content_repairs.py` pins both edits and, with the content present,
+checks them against the installed map and script: each anchor matches once,
+objective 3 is given and its completion item shares its title and is never
+collected, `TurnOffFreeze` still opens the exit, and `exit_trigger` is an
+armed-later exit alert that nothing arms. Five negative controls (the item
+already collected, the exit already armed, a differing completion title, an
+exit trigger without `triggerFirst`, a missing anchor) were each rejected.
+
+Limits. The shutdown ran from the console with its latch set and the marines
+away from the scene (their moves to `tak_pos_33`/`navajas_pos_33` could not
+start), and the final scene ran with the marines placed at their marks; no
+route was played with player movement. The HUD's exit marker was proved
+through its trigger, not seen on screen. Saves made before this change keep
+their revision. Vulkan, Linux and macOS were not run.

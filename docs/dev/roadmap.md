@@ -5002,6 +5002,13 @@ Completion substeps must keep three forms of evidence distinct:
   order (timing checked without a sound device; not yet heard). Other unwired
   content is listed, not placed. See
   [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026).
+  M08 revision 5, 28 November: the same cross-check of Cryofac found two
+  gaps; fresh starts now complete "Cryogenic Security Station and Deep
+  Freeze Laboratory" at the cooling shutdown and arm the level's exit marker
+  as Navajas goes down the ladder. v4 and v5 saves restore. Objective 4 is
+  left open into M09, and the cut gravity-gun objectives and other unwired
+  content are listed, not placed. See
+  [M08 revision 5](awakening-missions.md#m08-revision-5--28-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented
