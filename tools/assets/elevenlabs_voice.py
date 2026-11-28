@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import io
 import json
 import math
 import os
@@ -119,7 +120,21 @@ def request(method: str, path: str, body: dict | None = None, query: dict | None
 
 
 def pcm_to_game(pcm: bytes, rate: int) -> np.ndarray:
+    """Speech: headerless mono 16-bit PCM."""
     audio = np.frombuffer(pcm, dtype="<i2").astype(np.float64) / 32768.0
+    if rate != GAME_RATE:
+        g = math.gcd(GAME_RATE, rate)
+        audio = signal.resample_poly(audio, GAME_RATE // g, rate // g)
+    return audio
+
+
+def wav_to_game(data: bytes) -> np.ndarray:
+    """Sound effects: a WAV, whose header gives the channels. Their raw PCM is
+    stereo (measured 28 November 2026), so a headerless read doubles its length."""
+    rate, audio = wavfile.read(io.BytesIO(data))
+    audio = audio.astype(np.float64) / (32768.0 if audio.dtype == np.int16 else 1.0)
+    if audio.ndim > 1:
+        audio = audio.mean(axis=1)
     if rate != GAME_RATE:
         g = math.gcd(GAME_RATE, rate)
         audio = signal.resample_poly(audio, GAME_RATE // g, rate // g)
@@ -234,8 +249,9 @@ def cmd_speak(args) -> None:
             body = {"text": l["text"], "duration_seconds": l.get("duration_seconds"),
                     "loop": bool(l.get("loop")), "prompt_influence": 0.5,
                     "model_id": profile.get("sfx_model", "eleven_text_to_sound_v2")}
-            pcm = request("POST", "/v1/sound-generation", body, {"output_format": args.format}, expect_json=False)
-            write_wav(path, pcm_to_game(pcm, rate))
+            data = request("POST", "/v1/sound-generation", body,
+                           {"output_format": "wav_" + args.format.split("_")[1]}, expect_json=False)
+            write_wav(path, wav_to_game(data))
             print(f"  {path.relative_to(ROOT)}")
 
 
@@ -411,6 +427,16 @@ def cmd_process(args) -> None:
     picks = json.loads(picks_path.read_text()) if picks_path.exists() else {}
     target = out_dir(args.voice) / ("processed" if not args.input else "audition")
     done = 0
+    if args.all_takes:
+        # every take, processed, for choosing: processed/takes/<id>.takeN.wav
+        for l in lines:
+            for found in sorted(source.glob(f"{l['id']}.take*.wav")):
+                audio = process(read_wav(found), l.get("preset", "nexus"), bool(l.get("hive")))
+                write_wav(target / "takes" / found.name, audio)
+                done += 1
+        print(f"{done} takes processed into {(target / 'takes').relative_to(ROOT)}; "
+              f"record the choices in {picks_path.relative_to(ROOT)}, then run process")
+        return
     for l in lines:
         candidates = [source / f"{l['id']}.take{picks.get(l['id'], 0)}.wav", source / f"{l['id']}.wav",
                       source / f"{l['id'][3:]}.wav", source / f"{l['id']}.take0.wav"]
@@ -451,6 +477,8 @@ def main() -> int:
             p.add_argument("--dry-run", action="store_true")
         if name == "process":
             p.add_argument("--input", help="a folder of <id>.wav or <id>.takeN.wav files (local auditions)")
+            p.add_argument("--all-takes", action="store_true",
+                           help="process every take into processed/takes/, to choose between them")
     args = parser.parse_args()
     {"list": cmd_list, "design": cmd_design, "create": cmd_create, "speak": cmd_speak,
      "process": cmd_process}[args.command](args)

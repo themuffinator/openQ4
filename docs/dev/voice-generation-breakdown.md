@@ -134,10 +134,12 @@ done for the Valkaryne's voice on 28 November.
 2. `create --preview <generated_voice_id>` saves it as a voice in the account.
 3. `speak --takes 3 [--sfx]` writes three takes of each line (`dry/<id>.takeN.wav`).
    It requests 24 kHz PCM, which every plan has, and resamples to the game's
-   44.1 kHz; `--format pcm_44100` needs Pro. `--dry-run` prints the text and the
-   character count without a request.
-4. Write `picks.json` (`{"vo_valk_useless": 2, ...}`) with the chosen takes,
-   then run `process` (`processed/<id>.wav`).
+   44.1 kHz; `--format pcm_44100` needs Pro. Sound effects are requested as WAV,
+   because their PCM is stereo. `--dry-run` prints the text and the character
+   count without a request.
+4. `process --all-takes` processes every take into `processed/takes/`, so takes
+   are compared as they will sound. Write the choices in `picks.json`
+   (`{"vo_valk_useless": 2, ...}`), then run `process` (`processed/<id>.wav`).
 
 **Cost.** 723 characters × 3 takes is 2,169 characters for the speech. Add the
 Voice Design previews, and, with `--sfx`, six sound effects × 3, billed by the
@@ -174,7 +176,27 @@ to `.tmp/voice/valkaryne/audition/`, for a local listen only:
 - speech lands at −13.1 to −13.4 dBFS (the monitor line at −14.7, after its
   band), with peaks −1.1 to −2.2 dBFS.
 
-No line has been generated and nothing has been listened to.
+**Generated, 28 November 2026.** The user designed the voice in the
+ElevenLabs app. A three-line pilot was approved, and then `speak --takes 3
+--sfx` produced 111 speech takes (`eleven_v3`, 2,169 characters) and 18
+sound-effect takes. None was silent, and every speech take runs 0.64-4.40 s.
+
+- **Her voice is synthetic before any processing:** the raw takes sit at
+  117-165 Hz and already carry a 14-18 dB comb at about 0.86 ms.
+- **Effect PCM is stereo.** The effects first came back twice their length,
+  because their headerless PCM is stereo and was read as mono. The received
+  streams were de-interleaved and averaged, which restored 1, 3 and 4 s, and
+  the tool now asks for WAV.
+- **Processed takes** measure −14.7 to −12.5 dBFS while speaking, with peaks
+  −2.2 to −0.9 dBFS. Every finale line fits the 7-second taunt slot.
+- **Cryofac's monitor lines** come within 0.7 s of the originals.
+  `vo_valk_timedie` and `vo_valk_youcntstop` now total 3.5 s against 13.9 s,
+  which would fit the 9-second monitor scene that could not hold them.
+- **The idle breath** loops in the game, so it must go in without the reverb
+  tail and trim the processing adds.
+
+The audio stays local under `.tmp/voice/valkaryne/` until takes are chosen and
+the in-game redirect exists. Only the pilot has been listened to, by the user.
 
 ### Putting it in the game (not done)
 
