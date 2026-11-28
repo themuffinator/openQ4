@@ -45,10 +45,16 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   could stay behind to fire on the exit pipes.
 - **The exit shaft's explosions run once**, and a refinery tower's light no
   longer fades while its part still moves.
+- **The Valkaryne taunts you through the boss fight.** Twelve recorded lines
+  the level set up and never played ("You will serve me" to "You see the
+  power of the Strogg") now play once each, in the writers' order, about
+  every 20 seconds, holding back around her undock line and stopping when
+  she dies.
 - Fresh starts only: a save keeps the mission revision it was made with.
 - Evidence: hidden, input-free probes on the rebuilt module (revision 5
   loads, retreat, once-only relay, objective completion, the Patton ending,
-  v4 and v5 save restores) and `awakening_content_repairs.py`.
+  v4 and v5 save restores, taunt timing through the fight) and
+  `awakening_content_repairs.py`.
   [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026).
 
 ## Check boxes for on/off settings, and subtitles under Accessibility, 28 November 2026

@@ -345,6 +345,50 @@ void exitDoorOneDisable()
 			  "\t$mvr_valk01.decelTime( 0.5 );\n\t$valkaryne01.becomePassive( 1 );\n"
 			  "\t$mvr_valk01.startSpline( $spline_valk04 );\n\tsys.waitFor( $mvr_valk01 );\n}\n\n"
 			  "void valk01_attacks_player()\n{", 1 },
+			// valk_speaker_15 to _26 are twelve recorded, global taunts the map
+			// numbers in the writers' order between the dome room's line (_14)
+			// and the boss's own three (_27 intro, _28 undock, _29 death), and
+			// nothing plays them. The fight is where she still speaks: give
+			// them to it, once each and in that order, clear of her own lines.
+			{ "void initValk()\n{", R"script(float openq4_valkQuietUntil = 0;
+float openq4_valkTaunt = 0;
+
+void openq4_valkTaunts()
+{
+	float n;
+	entity speaker;
+	// the intro line (_27, 8 s) is still playing as the fight opens
+	sys.wait( 14 );
+	for ( n = 15; n <= 26; n++ ) {
+		while ( VALK_ALIVE && sys.getTime() < openq4_valkQuietUntil ) { sys.wait( 0.5 ); }
+		if ( !VALK_ALIVE ) { return; }
+		speaker = sys.getEntity( "valk_speaker_" + n );
+		if ( speaker ) {
+			openq4_valkTaunt = n;
+			sys.trigger( speaker );
+		}
+		// the longest take is 6.4 s
+		sys.wait( 7 + 9 + sys.random( 6 ) );
+	}
+	openq4_valkTaunt = 0;
+}
+
+void openq4_valkSilence()
+{
+	entity speaker;
+	if ( openq4_valkTaunt ) {
+		speaker = sys.getEntity( "valk_speaker_" + openq4_valkTaunt );
+		if ( speaker ) { speaker.Off(); }
+	}
+}
+
+void initValk()
+{
+	thread openq4_valkTaunts();)script", 1 },
+			// The sphere's death leads to her undock line 8 s later (3.7 s).
+			{ "void makSphereDead()\n{", "void makSphereDead()\n{\n\topenq4_valkQuietUntil = sys.getTime() + 13;", 1 },
+			// Her death line must not play over a taunt.
+			{ "\tsys.trigger( $valk_speaker_29 );", "\topenq4_valkSilence();\n\tsys.trigger( $valk_speaker_29 );", 1 },
 		};
 		if ( !Awakening_ApplyCorrections( source, fifthFinaleEdits, sizeof( fifthFinaleEdits ) / sizeof( fifthFinaleEdits[0] ) ) ) { return false; }
 	}

@@ -1736,12 +1736,40 @@ level keeps its installed behaviour.
 | The shaft explosions can run twice. | `escapeSeqExplosions` starts from `trigger_once_44` on the lift ride and from `esc_playerEnteredShaft`'s 15-second timeout. Every `sys.trigger` on its hurt volumes and effects toggles them, so a second run switched each hurt volume it reached back off. | The sequence runs once. |
 | The second refinery tower's light fades early. | `steamersLoop` moves `steamer_2_part_2`, then waits on `steamer_1_part_2`, which is at rest; the copy for the first tower waits on its own part. | It waits on `steamer_2_part_2`. |
 
-`awakening_content_repairs.py` pins the five repairs and, with the content
+### The Valkaryne's taunts in the fight
+
+`valk_speaker_15` to `_26` are twelve global speakers, numbered in the
+writers' order between `_14` (the dome room's line) and the boss's own three
+(`_27` as she is introduced, `_28` as she undocks, `_29` as she dies): "You
+will serve me", her laugh, "Witness your oblivion", "Behold Strogg glory",
+"Your persistence is your weakness", "Suffer", "Pain", "Conquest", "Humanity
+is mine", "My power is beyond limits", "You see my power" and "You see the
+power of the Strogg". All are declared and recorded (2.9 to 6.4 seconds).
+Nothing in the map, the script or the older `m10_valkaryne.script` plays them,
+and no trigger lacks a speaker. Their numbers place them after the last scene
+before the arena; the fight is the only stretch left where she speaks, so at
+the user's request revision 5 gives them to it.
+
+- `initValk` starts `openq4_valkTaunts`. It waits 14 seconds, past her
+  8-second introduction, then plays the twelve once each, in order, 16 to 22
+  seconds apart (seven seconds for the longest take, then 9 to 15 of quiet).
+  Twelve lines span the three minutes the freezing fog allows and a little
+  more; a quicker fight simply hears fewer.
+- The sphere's death holds the next taunt for 13 seconds, clear of her undock
+  line, which starts 8 seconds after it.
+- Her death stops a taunt still playing before her death line, and no taunt
+  starts after it.
+
+The pacing (when each starts, the gaps, the 13-second hold) is openQ4's
+choice; the lines, their order and their speakers are the content's.
+
+`awakening_content_repairs.py` pins the repairs and, with the content
 present, checks each against the installed map and script: every anchor
 matches once, the completion item is still uncollected, the two relays still
-repeat beside the puzzle's once-only ones, and both explosion entry points
-remain. Three negative controls (the typo already fixed, the item already
-collected, the relay already once-only) were each rejected.
+repeat beside the puzzle's once-only ones, both explosion entry points
+remain, and each taunt is a global, untriggered speaker with its recording.
+Four negative controls (the typo already fixed, the item already collected,
+the relay already once-only, a taunt already targeted) were each rejected.
 
 ### Checked and left alone
 
@@ -1764,14 +1792,6 @@ collected, the relay already once-only) were each rejected.
 None of these has a scene or trigger the content supplies, so nothing was
 invented for them.
 
-- **Twelve Valkaryne taunts.** `valk_speaker_15` to `_26` are global speakers
-  numbered in the writers' order between `_14` (the dome room) and `_27` (the
-  boss introduction): "You will serve me", her laugh, "Witness your
-  oblivion", "Behold Strogg glory", "Your persistence is your weakness",
-  "Suffer", "Pain", "Conquest", "Humanity is mine", "My power is beyond
-  limits", "You see my power" and "You see the power of the Strogg". All are
-  declared and recorded. Nothing in the map, the script or the older
-  `m10_valkaryne.script` plays them, and no trigger is missing a speaker.
 - **Machine sounds in the dome room.** `machine_2_stop_spk`,
   `machine_3_stop_spk` and `machine_4_stop_spk` wait for a trigger beside the
   running loops `machine_2_spk` to `_4`. `machine_N_off` only fades the light.
@@ -1808,11 +1828,17 @@ Logs are in `.tmp/awk/runs/<probe>`.
 | `m09v5end` | The same boarding: the player rides the dropship, is placed in the Patton bay scene, and the ending runs for about 78 seconds with no script warning. |
 | `m09v5save`, `m09v5load` | A save after the retreat restores in a fresh process, recompiling `m09_valkaryne.openq4-v5.script`. |
 | `m09v4save`, `m09v4load` | A save made with the previous module (revision 4) restores with the new one and keeps revision 4. |
+| `m09taunts` (taunt module, SHA-256 `039473a9…`) | Docked from 1.6 s: taunt 15 at 25.8 s, 16 at 46.0 s, 17 at 67.1 s. The sphere dies at 77.2 s; taunt 18 waits until 90.3 s. She dies at 105 s; no taunt follows. |
+| `m09taunts2` | Sphere at 27.9 s, her death at 43.0 s while the sequence is on taunt 15: the death path, including the silencing call, runs with no script warning, and no later taunt starts. |
 
 Limits. Console triggers stood in for walking into the triggers and pressing
 the panel; no route was played with player movement, so the call panel's
 repeat was established from the map's keys and the relay's once-only firing,
 not by pressing the panel twice in play. The end-of-game hand-off after the
 Patton scene was not separately logged (`g_nightmare` was already 1 in the
-shared probe profile). Saves made before this change keep their revision and
+shared probe profile). The taunt probes ran without a sound device: they
+prove when each speaker is triggered, not how the lines sound against the
+fight or that one cut off at her death goes quiet. Revision 5 had not left
+this checkout when the taunts were added to it, so no save carries the
+earlier form of it. Saves made before this change keep their revision and
 its behaviour. Vulkan, Linux and macOS were not run.

@@ -4997,8 +4997,10 @@ Completion substeps must keep three forms of evidence distinct:
   call panel's ambush and taunt once, always send the first Valkaryne down
   the tunnel at her retreat trigger, run the shaft explosions once and time
   the second refinery tower on its own part. Docked and mobile boss behaviour
-  rechecked unchanged; v4 and v5 saves restore. Twelve unused Valkaryne taunts
-  and other unwired content are listed, not placed. See
+  rechecked unchanged; v4 and v5 saves restore. At the user's request the
+  twelve unused Valkaryne taunts play through the boss fight, in the writers'
+  order (timing checked without a sound device; not yet heard). Other unwired
+  content is listed, not placed. See
   [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption

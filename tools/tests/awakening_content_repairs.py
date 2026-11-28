@@ -72,7 +72,12 @@ M09_V5_EDITS = (
      r"sys.waitFor( $steamer_2_part_2 );"),
     (r'"void escapeSeqExplosions()\n{"', r"if ( openq4_escapeExplosions ) { return; }"),
     (r'"void valk01_attacks_player()\n{"', r"$mvr_valk01.startSpline( $spline_valk04 );"),
+    (r'"void initValk()\n{"', "\tthread openq4_valkTaunts();"),
+    (r'"void makSphereDead()\n{"', "openq4_valkQuietUntil = sys.getTime() + 13;"),
+    (r'"\tsys.trigger( $valk_speaker_29 );"', r"\topenq4_valkSilence();\n\tsys.trigger( $valk_speaker_29 );"),
 )
+# the boss fight's taunts: speakers the map sets up and nothing plays
+M09_TAUNTS = tuple(f"valk_speaker_{n}" for n in range(15, 27))
 # the installed script each anchor must match exactly once (as the loader
 # compares it, after the v1-v4 edits, none of which touch these lines)
 M09_V5_ANCHORS = (
@@ -80,6 +85,9 @@ M09_V5_ANCHORS = (
     "$steamer_2_part_2.move( DOWN, 60 );\n\t\tsys.waitFor( $steamer_1_part_2 );",
     "void escapeSeqExplosions()\n{",
     "void valk01_attacks_player()\n{",
+    "void initValk()\n{",
+    "void makSphereDead()\n{",
+    "\tsys.trigger( $valk_speaker_29 );",
 )
 # relays the lift call panel fires on every press: (relay, its call)
 M09_ONCE_RELAYS = (("trigger_relay_7", "domeRoomJump1"), ("trigger_relay_26", "valktauntThree"))
@@ -388,6 +396,20 @@ class Content:
         raise AssertionError(f"No mesh for model {model}")
 
 
+def check_m09_taunts(content: "Content") -> None:
+    """The fight's taunts are global speakers nothing else plays, each recorded."""
+    text = read(content.awakening / f"{M09_MAP}.map")
+    live = strip_comments(read(content.awakening / M09_SCRIPT))
+    for name in M09_TAUNTS:
+        speaker = content.map_entity(M09_MAP, name)
+        if speaker.get("classname") != "speaker" or speaker.get("s_global") != "1" or speaker.get("s_waitfortrigger") != "1":
+            raise AssertionError(f"{M09_MAP}: {name} is not a global speaker waiting for a trigger")
+        if re.search(r'"(?!name")[^"]+" "' + re.escape(name) + '"', text, re.I) or re.search(r"\$" + name + r"\b", live):
+            raise AssertionError(f"{M09_MAP}: something already plays {name}; the taunts would play twice")
+        if not content.has_sample(speaker.get("s_shader", "")):
+            raise AssertionError(f"{M09_MAP}: {name}'s {speaker.get('s_shader')} has no recording")
+
+
 def check_m09_finale(awakening: Path) -> None:
     """Each revision 5 repair still answers the installed finale."""
     script = read(awakening / M09_SCRIPT).replace("\r\n", "\n")
@@ -438,6 +460,7 @@ def check_m09_finale(awakening: Path) -> None:
 def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, retail: Path) -> None:
     check_m09_finale(awakening)
     content = Content(awakening, retail)
+    check_m09_taunts(content)
 
     for map_name, entity, key, source in tables["dialogue"]:
         script = strip_comments(read(awakening / DIALOGUE_SCRIPTS[map_name]))
