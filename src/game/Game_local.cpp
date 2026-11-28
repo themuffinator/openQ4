@@ -909,6 +909,8 @@ void idGameLocal::Init( void ) {
 	// this module was loaded for
 	idModeCVar::ApplyModuleMode( IsMultiplayerMode() );
 	idCVar::RegisterStaticVars();
+	// a mode cvar the player never set takes this mode's default
+	idModeCVar::ApplyModeDefaults();
 
 	// initialize processor specific SIMD
 	idSIMD::InitProcessor( "game", com_forceGenericSIMD.GetBool() );
@@ -2937,6 +2939,9 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 	
 	this->isServer = isServer;
 	this->isClient = isClient;
+	if ( isClient ) {
+		idModeCVar::NoteClientSession();
+	}
 // RAVEN BEGIN
 // ddynerman: listen server
 	this->isListenServer = isServer && !cvarSystem->GetCVarBool( "net_serverDedicated" );

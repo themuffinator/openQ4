@@ -12,6 +12,28 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Servers you host play like dedicated servers, 28 November 2026
+
+- **Hosted servers use multiplayer's player collision.** A server started from
+  the main menu, or after playing the campaign, kept the campaign's box-shaped
+  player collision instead of multiplayer's rounded one. It also saved that
+  setting, so every server you hosted afterwards kept it. Hosted servers now
+  use multiplayer's collision, as dedicated servers always did, and the
+  campaign keeps its own.
+- **Upgrade note:** if your settings saved the campaign's collision, they are
+  read as the default and corrected automatically. A different value you set
+  yourself with `pm_usecylinder` is kept. Nothing to reinstall.
+- For developers: `pm_usecylinder`'s value follows the mode (`game_sp` or
+  `game_mp`) until the player sets it. A value synced by a server, or an
+  archived default, does not count as set. `si_pure` keeps its value, because
+  the Create Server page shows and sets it. See
+  [unified game module](unified-game-module.md) (CORE-07).
+- Evidence, Windows x64: `game_mode_switch_smoke.py` (campaign, listen server,
+  campaign in one process: 0, 1, 0); seeded configs with the campaign's `0`
+  (the listen server uses 1) and a custom `12` (kept in all three phases);
+  `mp_client_demo_smoke.py`; `unified_game_mode_parity_contract.py`, whose
+  fixture fails on the previous rule.
+
 ## A first launch starts the renderer once, from openPR06, 27 November 2026
 
 Issue #61 in openPR06 (danperisse-hue) measured a first launch bringing the

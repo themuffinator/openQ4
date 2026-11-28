@@ -17,6 +17,12 @@
 	cvars, so registration, reset and the archive see the mode's declaration.
 	A value the player set is kept, as for any cvar.
 
+	A value the player never set follows the mode, for the mode cvars that
+	FollowsMode names: the engine keeps every cvar's value across the module
+	reload, so without this the next mode would inherit the last one's
+	default (a listen server started from the menu kept the campaign's box
+	collision, pm_usecylinder 0, and archived it).
+
 ===============================================================================
 */
 
@@ -31,6 +37,11 @@ public:
 
 	// Call once per module load, before idCVar::RegisterStaticVars().
 	static void				ApplyModuleMode( bool multiplayer );
+	// Call right after idCVar::RegisterStaticVars().
+	static void				ApplyModeDefaults( void );
+	// A client or demo session ran in this load: the server set the
+	// network-synced values, so they stay the mode's, not the player's.
+	static void				NoteClientSession( void );
 	// Call as the module finalizes, while the cvar system is still there.
 	static void				ReleaseModuleMode( void );
 
@@ -40,8 +51,13 @@ private:
 	const char *			mpValue;
 	int						mpFlags;
 	idModeCVar *			nextModeCVar;
+	bool					followingDefault;	// this load gives it the mode's default
+	bool					FollowsMode( void ) const;
+	bool					FollowsDefaultAtLoad( void ) const;
+	void					SetModeValue( const char *newValue );
 	static idModeCVar *		modeCVars;
 	static bool				registeredInImage;	// RegisterStaticVars has run in this loaded image
+	static bool				clientSessionSeen;	// a client or demo session ran in this load
 };
 extern idCVar	developer;
 

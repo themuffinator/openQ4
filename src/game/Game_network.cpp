@@ -136,6 +136,7 @@ idGameLocal::InitLocalClient
 void idGameLocal::InitLocalClient( int clientNum ) {
 	isServer = false;
 	isClient = true;
+	idModeCVar::NoteClientSession();
 	localClientNum = clientNum;
 
 	if ( clientNum == MAX_CLIENTS && !entities[ ENTITYNUM_NONE ] ) {

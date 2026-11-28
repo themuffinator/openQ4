@@ -67,6 +67,8 @@ struct idPlayer : idEntity {
     void SpawnFromSpawnSpot() { ++spawns; }
     void SpectateFreeFly(bool force) { assert(force); spectator = entityNumber; }
 };
+// InitLocalClient notes the client session for the mode cvars (CORE-07)
+struct idModeCVar { static void NoteClientSession() {} };
 struct State { bool locked = false; bool WeaponsLocked() const { return locked; } };
 struct MP {
     bool ingame = true, hasState = true; State state;

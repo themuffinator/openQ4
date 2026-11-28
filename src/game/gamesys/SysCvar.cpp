@@ -1078,6 +1078,12 @@ idCVar bot_profile(						"bot_profile",						"0",			CVAR_GAME | CVAR_INTEGER | C
 
 idModeCVar *idModeCVar::modeCVars = NULL;
 bool idModeCVar::registeredInImage = false;
+bool idModeCVar::clientSessionSeen = false;
+
+// Mode cvars whose value follows the mode until the player sets one. si_pure,
+// whose defaults also differ, is left out: the Create Server page shows its
+// value and sets it, so the server starts with the value the page showed.
+static const char *const modeFollowingCVars[] = { "pm_usecylinder" };
 
 idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, const char *mpValue, int mpFlags,
 						const char *description, argCompletion_t valueCompletion ) :
@@ -1086,7 +1092,8 @@ idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, cons
 	spFlags( spFlags ),
 	mpValue( mpValue ),
 	mpFlags( mpFlags ),
-	nextModeCVar( modeCVars ) {
+	nextModeCVar( modeCVars ),
+	followingDefault( false ) {
 	modeCVars = this;
 }
 
@@ -1097,7 +1104,8 @@ idModeCVar::idModeCVar( const char *name, const char *spValue, int spFlags, cons
 	spFlags( spFlags ),
 	mpValue( mpValue ),
 	mpFlags( mpFlags ),
-	nextModeCVar( modeCVars ) {
+	nextModeCVar( modeCVars ),
+	followingDefault( false ) {
 	modeCVars = this;
 }
 
@@ -1118,7 +1126,11 @@ cvar system again here, exactly as a fresh load's registration would.
 ================
 */
 void idModeCVar::ApplyModuleMode( bool multiplayer ) {
+	clientSessionSeen = false;
 	for ( idModeCVar *cvar = modeCVars; cvar != NULL; cvar = cvar->nextModeCVar ) {
+		// decided from the value the last load (or the config) left, before
+		// this load's declaration reaches the cvar system
+		cvar->followingDefault = cvar->FollowsMode() && cvar->FollowsDefaultAtLoad();
 		cvar->value = multiplayer ? cvar->mpValue : cvar->spValue;
 		cvar->flags = ( multiplayer ? cvar->mpFlags : cvar->spFlags ) | CVAR_STATIC;
 		if ( registeredInImage ) {
@@ -1145,6 +1157,107 @@ void idModeCVar::ReleaseModuleMode( void ) {
 		return;
 	}
 	for ( idModeCVar *cvar = modeCVars; cvar != NULL; cvar = cvar->nextModeCVar ) {
+		// A client cannot set a network-synced cvar; what changed it was the
+		// server it joined or the demo it played, so it still follows the mode.
+		if ( cvar->followingDefault && clientSessionSeen && ( cvar->GetFlags() & CVAR_NETWORKSYNC ) ) {
+			cvar->ClearModified();
+		}
 		cvar->RemoveFlag( CVAR_STATIC );
 	}
+}
+
+/*
+================
+idModeCVar::FollowsMode
+================
+*/
+bool idModeCVar::FollowsMode( void ) const {
+	for ( int i = 0; i < (int)( sizeof( modeFollowingCVars ) / sizeof( modeFollowingCVars[0] ) ); i++ ) {
+		if ( idStr::Icmp( name, modeFollowingCVars[i] ) == 0 ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/*
+================
+idModeCVar::FollowsDefaultAtLoad
+
+Whether the player never set this cvar, judged before this load declares it.
+- Nothing has created it: the declaration's default stands.
+- A previous load in this process declared it (CVAR_GAME): ApplyModeDefaults
+  cleared its modified mark when that load gave it the mode's default, and a
+  set since then (the console, a cfg, a server it hosted) marked it again.
+- The first load of the process, with a value from the config or the command
+  line: network play archives pm_usecylinder, so a config holds whichever
+  default the last network session ended with (the campaign's 0, before this
+  rule existed, since a session started from the menu inherited it). An
+  archived value equal to either mode's default is therefore not a choice;
+  another archived value, or one from the command line or a plain set, is.
+================
+*/
+bool idModeCVar::FollowsDefaultAtLoad( void ) const {
+	const idCVar *existing = cvarSystem->Find( name );
+	if ( existing == NULL ) {
+		return true;
+	}
+	const int existingFlags = existing->GetFlags();
+	if ( existingFlags & CVAR_GAME ) {
+		return !existing->IsModified();
+	}
+	if ( !( existingFlags & CVAR_ARCHIVE ) ) {
+		return false;
+	}
+	const char *current = existing->GetString();
+	return idStr::Cmp( current, spValue ) == 0 || idStr::Cmp( current, mpValue ) == 0;
+}
+
+/*
+================
+idModeCVar::SetModeValue
+================
+*/
+void idModeCVar::SetModeValue( const char *newValue ) {
+	if ( idStr::Cmp( GetString(), newValue ) == 0 ) {
+		return;
+	}
+	common->DPrintf( "%s takes the %s default: %s -> %s\n", name,
+		gameLocal.IsMultiplayerMode() ? "network play" : "campaign", GetString(), newValue );
+	if ( GetFlags() & CVAR_NETWORKSYNC ) {
+		// a connected client refuses a local set of a network-synced cvar; the
+		// mode's default is not the player's value, so set it as the server does
+		idDict values;
+		values.Set( name, newValue );
+		cvarSystem->SetCVarsFromDictByFlags( values, CVAR_NETWORKSYNC );
+	} else {
+		SetString( newValue );
+	}
+}
+
+/*
+================
+idModeCVar::ApplyModeDefaults
+
+Gives every mode cvar the player never set this mode's default, and clears its
+modified mark, so the next load can tell whether anything set it since.
+================
+*/
+void idModeCVar::ApplyModeDefaults( void ) {
+	for ( idModeCVar *cvar = modeCVars; cvar != NULL; cvar = cvar->nextModeCVar ) {
+		if ( !cvar->followingDefault ) {
+			continue;
+		}
+		cvar->SetModeValue( cvar->value );
+		cvar->ClearModified();
+	}
+}
+
+/*
+================
+idModeCVar::NoteClientSession
+================
+*/
+void idModeCVar::NoteClientSession( void ) {
+	clientSessionSeen = true;
 }

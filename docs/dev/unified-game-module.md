@@ -76,6 +76,21 @@ merged code follows, and the compatibility guarantees and their evidence.
   the campaign took the multiplayer declaration (`si_useReady`,
   `net_mpLagCompensation`); `g_fov` and `g_gunX/Y/Z` are archived in both modes,
   since the campaign already inherited the archived values.
+- The engine keeps every cvar's value across the reload, so a mode would
+  inherit the previous mode's value with its own default. `pm_usecylinder`'s
+  value therefore follows the mode until the player sets it
+  (`idModeCVar::ApplyModeDefaults`, right after the registration). A value
+  counts as the player's when it was set after a load gave it the mode's
+  default (the console, a cfg, a server this process hosts), when it came from
+  the command line, or when a config archived a value that is neither mode's
+  default. A config's archived default is not a choice, because network play
+  archives whichever default its session had. A value the server synced to a
+  client, or a demo played, is not the player's either: the module notes each
+  client session (`NoteClientSession`) and lets the value follow the mode again
+  at the next load. `si_pure` keeps its value across a mode change, because the
+  Create Server page shows it and sets it, so a server starts with the value
+  the page showed. `unified_game_mode_parity_contract.py` runs these cases
+  against a stand-in cvar system.
 - Code the campaign always ran through the multiplayer game object
   (`idMultiplayerGame::Reset`, `Precache`, `Shutdown`) keeps network-play-only
   work behind the mode: the match session, evidence and live-event logs,
@@ -435,27 +450,28 @@ comparison with openPR06, the PREY port that also runs one game library.
   being redone per session. PREY needs no `idModeCVar` because its retail
   library has one default per cvar. Quake 4's `pm_usecylinder` and `si_pure`
   really differ between the retail libraries, so openQ4 keeps them.
-- **Mode cvar values carry across a switch.** A reload keeps every cvar's
-  value, so a listen server started after the campaign, or from the main menu
-  (which runs `game_sp`), keeps the campaign's `pm_usecylinder 0` (box
-  collision) although network play's default is 1 (cylinder). Network play
-  archives `pm_usecylinder`, so the first such session writes
-  `seta pm_usecylinder "0"` and every later one keeps the box. A dedicated
-  server starts in `game_mp` and uses the cylinder. `si_pure` carries over the
-  same way, but the Create Server page sets it. The pre-merge build behaves
-  the same, so this is not a CORE-07 regression. Changing it changes
-  listen-server play, so it is a follow-up below and is left as it is until
-  that is decided.
+- **Mode cvar values carried across a switch, fixed the same day.** A
+  reload keeps every cvar's value, so a listen server started after the
+  campaign, or from the main menu (which runs `game_sp`), kept the campaign's
+  `pm_usecylinder 0` (box collision), although network play's default is 1
+  (cylinder). Network play archives `pm_usecylinder`, so the first such
+  session wrote `seta pm_usecylinder "0"` and every later one kept the box. A
+  dedicated server starts in `game_mp` and used the cylinder. The pre-merge
+  build behaved the same. On the user's decision, the value now follows the
+  mode until the player sets it (see the game-side contract above), and a
+  config holding either mode's default is read as that default, which also
+  repairs the configs that archived the box. The checks, on Windows x64:
+  - The mode-switch smoke now also requires the value to be 0, then 1, then 0.
+    It passes, where the earlier build gave the listen server 0.
+  - Seeded with `seta pm_usecylinder "0"`, the listen server uses 1.
+  - Seeded with `seta pm_usecylinder "12"`, all three phases keep 12.
+  - `mp_client_demo_smoke` passes (a dedicated server, a joined client and its
+    recording), and no network-synced value is refused on the client.
 
 ## Follow-ups
 
 - Keep one loaded library across a mode change instead of reloading it, once no
   module-lifetime state depends on the mode.
-- Decide whether a mode cvar the player never set should take the new
-  mode's default on a mode change (see the fourth check). The fix would
-  belong in `idModeCVar::ApplyModuleMode`. It would also need a one-time
-  migration for configs that already archive the campaign's
-  `pm_usecylinder 0`.
 - Remove engine-side workarounds for the split: the multiplayer menu cvars the
   engine declares for the single-player module (`Session_DeclareMultiplayerMenuGameCVars`)
   and the comments that explain the other module's settings as bare console cvars.

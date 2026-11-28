@@ -8848,12 +8848,13 @@ than CORE-01.
   `tools/tests/game_mode_switch_smoke.py`, which passes on Windows x64.
   openPR06 (PREY, always one library) has no merge technique to adopt. It
   never reloads its module between modes, which is the first follow-up here.
-  Found: a mode cvar's value survives a mode change, so a listen server
-  started after the campaign or from the main menu keeps the campaign's
-  `pm_usecylinder 0` (box collision) and archives it. A dedicated server uses
-  the cylinder. The pre-merge build does the same. Whether the mode default
-  should win for a value the player never set is a third follow-up, awaiting
-  a decision ([unified game module](unified-game-module.md#fourth-check-28-november-2026)).
+  Found and fixed the same day (user decision): a mode cvar's value survived
+  a mode change, so a listen server started after the campaign or from the
+  main menu kept the campaign's `pm_usecylinder 0` (box collision) and
+  archived it, where a dedicated server used the cylinder. The pre-merge build
+  did the same. The value now follows the mode until the player sets it, and
+  an archived default is read as that default, which repairs affected configs
+  ([unified game module](unified-game-module.md#fourth-check-28-november-2026)).
 
 ### TOOL completion checkpoints
 

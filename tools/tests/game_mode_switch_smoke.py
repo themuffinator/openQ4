@@ -16,6 +16,9 @@ and passes when
     cfg runs in gameplay (the network phase also checks it is a live server);
   * the mode cvars (idModeCVar) take each mode's default: si_pure 0/1/0, and
     pm_usecylinder differs between the modes and is the same in both campaigns;
+  * pm_usecylinder, which nothing in the run sets, also takes each mode's
+    default as its value, so the listen server uses network play's cylinder
+    rather than the campaign's box;
   * nothing logs an error, and no mode cvar is reported as declared twice.
 
 With --loader-trace on Linux the dynamic loader's log must also show the module
@@ -84,13 +87,17 @@ def phase_block(text: str, phase: str) -> str:
     return m.group(1) if m else ""
 
 
-def cvar_default(block: str, name: str) -> str | None:
+def cvar_field(block: str, name: str, field: str) -> str | None:
     for line in block.splitlines():
         line = COLOR.sub("", line).strip()
         if line.startswith(f'"{name}"'):
-            m = re.search(r'default:"([^"]*)"', line)
+            m = re.search(rf'{field}:"([^"]*)"', line)
             return m.group(1) if m else None
     return None
+
+
+def cvar_default(block: str, name: str) -> str | None:
+    return cvar_field(block, name, "default")
 
 
 def evaluate(text: str, binary: str, loader: dict | None = None) -> dict:
@@ -103,6 +110,9 @@ def evaluate(text: str, binary: str, loader: dict | None = None) -> dict:
                     if "declared multiple times" in l and any(f"'{c}'" in l for c in MODE_CVARS)})
     inits = text.count("------------- Initializing Game -------------")
     defaults = {p: {c: cvar_default(phase_block(text, p), c) for c in MODE_CVARS} for p in PHASES}
+    # pm_usecylinder follows the mode while nothing sets it: the campaign's box,
+    # network play's cylinder, the box again
+    shapes = [cvar_field(phase_block(text, p), "pm_usecylinder", "is") for p in PHASES]
     mp_block = phase_block(text, "MP")
     # serverInfo answers only on a running server: "server '<name>' IP = ..." and "si_map = <map>"
     live_server = bool(re.search(r"^server '", mp_block, re.M) and re.search(r"^si_map = mp/q4dm1\s*$", mp_block, re.M | re.I))
@@ -125,6 +135,8 @@ def evaluate(text: str, binary: str, loader: dict | None = None) -> dict:
     if None in (sp1["pm_usecylinder"], mp["pm_usecylinder"]) or sp1["pm_usecylinder"] != sp2["pm_usecylinder"] \
             or sp1["pm_usecylinder"] == mp["pm_usecylinder"]:
         failures.append(f"pm_usecylinder defaults {sp1['pm_usecylinder']}/{mp['pm_usecylinder']}/{sp2['pm_usecylinder']}")
+    if None in shapes or shapes[0] != sp1["pm_usecylinder"] or shapes[1] != mp["pm_usecylinder"]             or shapes[2] != sp2["pm_usecylinder"]:
+        failures.append(f"pm_usecylinder values {shapes} do not follow the mode")
     if errors:
         failures.append(f"errors: {errors[:3]}")
     if twice:
@@ -132,7 +144,8 @@ def evaluate(text: str, binary: str, loader: dict | None = None) -> dict:
     if loader is not None and (loader.get("init") != 3 or loader.get("fini", 0) < 2):
         failures.append(f"loader trace init {loader.get('init')} fini {loader.get('fini')}")
     return {"passed": not failures, "failures": failures, "modules": modules, "loads": loads,
-            "phases": phases, "gameInits": inits, "modeCvarDefaults": defaults, "loader": loader}
+            "phases": phases, "gameInits": inits, "modeCvarDefaults": defaults, "shapes": shapes,
+            "loader": loader}
 
 
 def read_loader_trace(home: Path, module_file: str) -> dict:
@@ -215,14 +228,16 @@ def run(args: argparse.Namespace) -> int:
     report["exitCode"] = proc.returncode
     (home / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({k: report[k] for k in ("passed", "failures", "seconds", "modules", "loads",
-                                             "phases", "gameInits", "modeCvarDefaults")}))
+                                             "phases", "gameInits", "modeCvarDefaults", "shapes")}))
     return 0 if report["passed"] else 1
 
 
-def synthetic_log(mp_pure: str = "1", modules=MODES, twice: bool = False, error: bool = False) -> str:
+def synthetic_log(mp_pure: str = "1", modules=MODES, twice: bool = False, error: bool = False,
+                  mp_shape: str = "1") -> str:
     out = []
     pure = {"SP1": "0", "MP": mp_pure, "SP2": "0"}
     cyl = {"SP1": "0", "MP": "1", "SP2": "0"}
+    shape = {"SP1": "0", "MP": mp_shape, "SP2": "0"}
     for phase, module, map_name in zip(PHASES, modules, MAPS):
         out.append(f"Selected game module: logical='{module}' binary='game_x64' path='x'")
         out.append("------------- Initializing Game -------------")
@@ -231,7 +246,7 @@ def synthetic_log(mp_pure: str = "1", modules=MODES, twice: bool = False, error:
         out.append("    12 msec to load collision")
         out.append(f"  1234 msec to load {map_name}")
         out.append(f"MS_PHASE_{phase}")
-        out.append(f'"pm_usecylinder" is:"{cyl[phase]}"^7 default:"{cyl[phase]}"')
+        out.append(f'"pm_usecylinder" is:"{shape[phase]}"^7 default:"{cyl[phase]}"')
         out.append(f'"si_pure" is:"{pure[phase]}"^7 default:"{pure[phase]}"')
         if phase == "MP":
             out.append("server 'openQ4 Server' IP = localhost:28713")
@@ -249,6 +264,7 @@ def self_test() -> int:
     assert not evaluate(synthetic_log(modules=("game_sp", "game_sp", "game_sp")), "game_x64")["passed"]
     assert not evaluate(synthetic_log(twice=True), "game_x64")["passed"], "declared-twice warning not checked"
     assert not evaluate(synthetic_log(error=True), "game_x64")["passed"], "errors not checked"
+    assert not evaluate(synthetic_log(mp_shape="0"), "game_x64")["passed"], "the carried-over box not checked"
     assert not evaluate(synthetic_log(), "game-sp_x64")["passed"], "binary name not checked"
     assert not evaluate(synthetic_log().replace("MS_PHASE_SP2_END", ""), "game_x64")["passed"]
     assert not evaluate(synthetic_log().replace("si_map = mp/q4dm1", ""), "game_x64")["passed"]
