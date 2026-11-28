@@ -232,7 +232,9 @@ def check_stereo(args, root):
     paused_moved = resumed.get('dialogue', {}).get('offset', 0) - paused.get('dialogue', {}).get('offset', 0)
     checks['paused_line_resumes_in_place'] = bool(paused.get('dialogue') and resumed.get('dialogue')) and \
         resumed['dialogue']['state'] == 'playing' and abs(paused_moved - paused_elapsed) < 350 and resumed['dialogue']['offset'] > 2000
-    checks['stream_without_eos_streams'] = bool(re.search(r'Compressed stream: sound/audio_test/noeos\.ogg, \d+ Hz, 1 channels, \d+ frames\r?$', log, re.M))
+    # A track loaded outside a level load builds its envelope on a job worker, and says so; it still has its length.
+    checks['stream_without_eos_streams'] = bool(re.search(
+        r'Compressed stream: sound/audio_test/noeos\.ogg, \d+ Hz, 1 channels, \d+ frames(?: \(envelope on a job worker\))?\r?$', log, re.M))
     checks['stream_without_length_counted'] = 'Compressed stream: sound/audio_test/nogranule.ogg' in log and \
         bool(re.search(r'nogranule\.ogg, \d+ Hz, 1 channels, \d+ frames \(counted; no length metadata\)', log))
     checks['streams_playing'] = {'noeos', 'nogranule'} <= set(playing(s.get('STREAMS', '')))

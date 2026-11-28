@@ -65,7 +65,9 @@ public:
 struct World { int updates=0,budget=0; bool throws=false; void Update(){++updates;budget=s_maxEmitterChannels.GetInteger();if(throws)throw std::runtime_error("world failure");} float CurrentRumbleAmplitude(){return 0;} };
 struct idSoundSystemLocal { idSoundHardware_OpenAL hardware; bool muted=false,needsRestart=false; World* currentSoundWorld=nullptr; int soundTime=0,restarts=0;
 	bool IsMuted() const{return muted;} void Render(); void Restart(){++restarts;}
-	int RealSoundTime() const; void MixCapture(bool){CHECK(false);} };
+	int RealSoundTime() const; void MixCapture(bool){CHECK(false);}
+	// Envelope jobs of tracks loaded outside a level load (LoadSampleOutsideLevelLoad): none here, so Render joins nothing.
+	bool insideLevelLoad=false; List<int> decodingSamples; void FinishSampleDecodes(bool){CHECK(false);} };
 idSoundSystemLocal soundSystemLocal; idSoundSystemLocal* soundSystem=&soundSystemLocal;
 struct Session {World* sw=nullptr;} sessionValue; Session* session=&sessionValue;
 static void Sound_UpdateControllerRumble(float){}
