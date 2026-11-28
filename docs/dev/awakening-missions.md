@@ -2197,3 +2197,54 @@ harnesses (`awakening_prison_runtime.py`, `awakening_chapter_followup.py`)
 were not rerun: they require `.install` to match `builddir`, which a peer had
 staged, so the rescue fixture ran in the kit instead. Vulkan, Linux and
 macOS were not run.
+
+## Activation poses in M05 and M07 — 28 November 2026
+
+After [M04 revision 4](#m04-revision-4--28-november-2026), the user asked for
+the same dead `on_activate` key to be checked in the other maps that use it.
+Besides M04's 30 keys, M05 has six and the three M07 races have sixteen;
+three empty ones in `m01_stranarus_trench2` play nothing either way.
+
+- **M05: nothing to do.** The six `tubemarine` actors name `floating_tube`.
+  `tubeTransportSystem` and `tubeTransportSystem2` trigger each one and loop
+  that pose straight away. A probe shows `tubemarine1` and `tubemarine4`
+  floating 8 seconds in.
+- **`m07_race1`: Tak and Darnell sat upright on their speeders all race.**
+  Both are passive, non-solid riders bound to their speeders with
+  `on_activate "speeder_idle"`. The other two races loop that pose on the
+  riders they script; this race's script never names Tak or Darnell, so they
+  stood in `relaxed_idle` for the whole level.
+- **`m07_race2`'s ending riders** (`tak_cine`, `darnell_cine`,
+  `dekard_cine`) stood in `relaxed_idle` until the ending loops their pose,
+  parked on their speeders in the meantime.
+
+Repair: `Awakening_RestoreActivationPose` (`ContentRepairs.inl`), run with
+each map entity's arguments after its definition's defaults. An actor whose
+`on_activate` is `speeder_idle`, who is bound to something, and whose own
+model has the pose, gets the `oq4_activatePose` that revision 4 added, so
+`idAI::State_WakeUp` holds it from the moment the rider wakes. A visible
+rider wakes at spawn, a hidden one when triggered. The races' own loops
+replace it with the same pose, and a later scripted move, death or removal
+ends it. Prisoner poses that need another model stay with their map's
+repair. It is behind `g_awakeningContentRepairs` like the other content
+repairs, and applies to fresh starts.
+
+`m07_race`'s `cine_tak_speeder` dies about 27 seconds in. That is the
+intro's `cineTakExplodes`, which blows up his speeder; both builds do it.
+
+`awakening_content_repairs.py` checks that the five riders still name the
+pose, that their class's model has it, and that `m07_race1.script` still
+never names Tak or Darnell; two negative controls (race1 scripting Tak, the
+pose renamed) were each rejected.
+
+| Probe | Result |
+| --- | --- |
+| `m05tubes` | Both tube marines in `floating_tube` under the unchanged build. |
+| `riders_m07_race1`, `riders2_m07_race1` | Baseline: Tak and Darnell in `relaxed_idle` at 6 and 16 seconds. Candidate: both in `speeder_idle` at 6 and 44 seconds, into the race. |
+| `riders_m07_race2`, `riders2_m07_race2` | Baseline: `tak_cine` in `relaxed_idle`. Candidate: all three ending riders in `speeder_idle`; the racers as before. |
+| `riders2_m07_race`, `riders2b_m07_race` | Both builds: `RS_rider_1` in `speeder_idle`, `bridge_rider_1` still hidden, and the unplayed race ending on its timer before the late sample. |
+| `r1save`, `r1load` | A candidate `m07_race1` save restores in a fresh process, recompiles `m07_race1.openq4-v3.script` and keeps both riders in the pose. |
+
+The baseline is the module before revision 4 (`1689a9bc…`); the candidate is
+`builddir` with this change (`f13bd657…`). Limits as for revision 4: staged
+by console, not raced, and not watched in play.

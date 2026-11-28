@@ -113,6 +113,27 @@ void Awakening_RestoreDialogueKeys( idDict &args ) {
 	}
 }
 
+// on_activate is a Doom 3 key no Quake 4 code reads. The races' riders name
+// their seated pose in it; the race scripts loop that pose on the riders they
+// script, but m07_race1 never does, so its Tak and Darnell stood upright on
+// their speeders. A rider whose own model has the pose holds it once awake
+// (idAI::State_WakeUp), until a script plays something else. Prisoner poses
+// need a different model and are repaired per map (CampaignRepairs.inl).
+void Awakening_RestoreActivationPose( idDict &args ) {
+	if ( !Awakening_ContentRepairsActive() || args.FindKey( "oq4_activatePose" ) != NULL ) {
+		return;
+	}
+	const char *pose = args.GetString( "on_activate" );
+	if ( idStr::Icmp( pose, "speeder_idle" ) != 0 || !args.GetString( "bind" )[ 0 ] ) {
+		return;
+	}
+	const idDeclModelDef *model = static_cast<const idDeclModelDef *>(
+		declManager->FindType( DECL_MODELDEF, args.GetString( "model" ), false ) );
+	if ( model != NULL && model->GetAnim( pose ) ) {
+		args.Set( "oq4_activatePose", pose );
+	}
+}
+
 typedef struct awakeningRadioLine_s {
 	const char *stale;		// the sound the mission script names
 	const char *recorded;	// the same line under the name it was recorded as

@@ -35,7 +35,7 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   and the [matrix rehearsal](presentation-owners.md#automated-240-hz-matrix-rehearsal-28-november-2026).
   Physical VSync/VRR, sensor latency and the by-eye review remain open.
 
-## The Awakening's prison, 28 November 2026
+## The Awakening's prison and first race, 28 November 2026
 
 - **Losing Tak fails the mission** (m04). Tak becomes mortal while you hold
   the turret for him; if the Strogg killed him, the level carried on without
@@ -52,6 +52,10 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - **More of the squad's recorded lines:** Tak radios while you cross the heat
   exchanger alone, Markswell urges you out of the control room, and Mitchell
   warns that something is coming up the lift at the end.
+- **Your squad sits on their speeders in the first race** (m07). Tak and
+  Darnell rode the whole of the first race standing upright on their
+  speeders; they now sit, as in the other two races, and so do the riders
+  waiting for the last race's ending.
 - Fresh starts only: a save keeps the mission revision it was made with.
 - Evidence: hidden, input-free scene probes before and after on a null audio
   device, Tak killed in the turret defence, the cellblock evacuation with

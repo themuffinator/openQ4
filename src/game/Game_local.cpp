@@ -7961,6 +7961,7 @@ void idGameLocal::SpawnMapEntities( int instance, unsigned short* entityNumIn, u
 		args.SetDefaults( &(entityDef->dict) );
 		Awakening_CorrectM05M06Entity( args );
 		Awakening_RestoreDialogueKeys( args );
+		Awakening_RestoreActivationPose( args );
 // RAVEN END
 		if ( profileMapSpawn ) {
 			mapDefaultsTimer.Stop();

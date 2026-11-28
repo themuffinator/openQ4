@@ -388,6 +388,12 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     require(campaign, 'const char *modelName = tube ? "model_char_marine_naked" : "model_char_q4x_marine";', "poses")
     require(campaign, 'args.Set( "classname", "char_marine_naked" );', "the tube marines")
     require(campaign, 'args.Set( "oq4_activatePose", pose );', "poses")
+    repairs = read(ROOT / "src/game/awakening/ContentRepairs.inl")
+    require(repairs, 'if ( idStr::Icmp( pose, "speeder_idle" ) != 0 || !args.GetString( "bind" )[ 0 ] ) {',
+            "only bound riders take the seated pose")
+    require(read(ROOT / "src/game/Game_local.cpp"),
+            "\t\tAwakening_RestoreDialogueKeys( args );\n\t\tAwakening_RestoreActivationPose( args );",
+            "riders' poses are restored after their definition's defaults")
     require(read(ROOT / "src/game/ai/AI_States.cpp"),
             'spawnArgs.GetString ( "oq4_activatePose", "", &triggerAnim ) && *triggerAnim && '
             'HasAnim ( ANIMCHANNEL_TORSO, triggerAnim ) ) {\n\t\tScriptedAnim ( triggerAnim, 4, true, false );',
@@ -621,6 +627,22 @@ def check_m04_revision4(content: "Content") -> None:
         raise AssertionError(f"{M04_MAP}: fewer posed prisoners than revision 4 was written for")
 
 
+def check_m07_riders(content: "Content") -> None:
+    """m07_race1's riders name speeder_idle, which nothing else plays on them."""
+    for race, riders in (("m07_race1", ("tak", "darnell")), ("m07_race2", ("tak_cine", "darnell_cine", "dekard_cine"))):
+        map_name = f"maps/game/{race}"
+        for rider in riders:
+            args = content.map_entity(map_name, rider)
+            if args.get("on_activate") != "speeder_idle" or not args.get("bind"):
+                raise AssertionError(f"{map_name}: {rider} no longer rides with speeder_idle")
+            model = content.keys(args["classname"]).get("model", "")
+            if "speeder_idle" not in model_anims(content, model):
+                raise AssertionError(f"{model}: no longer has speeder_idle")
+    race1 = strip_comments(read(content.awakening / "maps/game/m07_race1.script"))
+    if re.search(r"\$(tak|darnell)\b", race1):
+        raise AssertionError("maps/game/m07_race1.script: scripts its riders now; the pose repair may be obsolete")
+
+
 def check_m09_taunts(content: "Content") -> None:
     """The fight's taunts are global speakers nothing else plays, each recorded."""
     text = read(content.awakening / f"{M09_MAP}.map")
@@ -764,6 +786,7 @@ def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, ret
     content = Content(awakening, retail)
     check_m05_revision3(content)
     check_m04_revision4(content)
+    check_m07_riders(content)
     check_m09_taunts(content)
 
     for map_name, entity, key, source in tables["dialogue"]:

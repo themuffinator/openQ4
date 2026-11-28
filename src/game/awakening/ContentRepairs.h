@@ -15,6 +15,10 @@
 // Call with the map entity's arguments after its definition's defaults.
 void Awakening_RestoreDialogueKeys( idDict &args );
 
+// Gives a vehicle rider the seated pose its on_activate names. Call with the
+// map entity's arguments after its definition's defaults.
+void Awakening_RestoreActivationPose( idDict &args );
+
 // Replaces a map entity's sound key that names nothing, or a line left over
 // from the retail map it was built from. Call wherever the entity's media is
 // gathered: its spawn arguments and both precache passes.

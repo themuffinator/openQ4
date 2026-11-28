@@ -191,8 +191,8 @@ stateResult_t idAI::State_WakeUp ( const stateParms_t& parms ) {
 	} else if ( spawnArgs.GetString ( "trigger_anim", "", &triggerAnim) && *triggerAnim && HasAnim ( ANIMCHANNEL_TORSO, triggerAnim ) ) {
 		PostState ( "State_TriggerAnim" );
 		return SRESULT_DONE;
-	// openQ4: hold the pose an Awakening campaign repair assigned until a script
-	// moves the actor on (awakening/CampaignRepairs.inl, Awakening_RepairPrisonerPose).
+	// openQ4: hold the pose an Awakening repair assigned until a script moves the
+	// actor on (Awakening_RepairPrisonerPose, Awakening_RestoreActivationPose).
 	} else if ( !gameLocal.isMultiplayer && spawnArgs.GetString ( "oq4_activatePose", "", &triggerAnim ) && *triggerAnim && HasAnim ( ANIMCHANNEL_TORSO, triggerAnim ) ) {
 		ScriptedAnim ( triggerAnim, 4, true, false );
 		return SRESULT_DONE;

@@ -5073,6 +5073,11 @@ Completion substeps must keep three forms of evidence distinct:
   Quake 4 code reads). Fresh and original saves restore. Fox Squad's five
   combat calls and the abandoned ending cinematic are listed, not placed. See
   [M04 revision 4](awakening-missions.md#m04-revision-4--28-november-2026).
+  The same key in M05 and M07, 28 November: M05's tube marines already float
+  (their script loops the pose). `m07_race1`'s Tak and Darnell, never named by
+  their race's script, rode upright; riders bound with `speeder_idle` now
+  hold it from waking. See
+  [activation poses in M05 and M07](awakening-missions.md#activation-poses-in-m05-and-m07--28-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented
