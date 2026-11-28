@@ -2699,9 +2699,7 @@ int main() {
               page->state["audio.device.1.label"] == "Speakers" && page->state["audio.device.2.label"] == "Headset \"Pro\"" &&
               page->state["audio.device.3.label"] == "" &&
               page->state["audio.eax"] == "1" && page->state["audio.speakers"] == "2" && page->state["audio.hrtf"] == "2" && page->state["audio.retailUpsampling"] == "1" &&
-              page->state["audio.subtitles"] == "1" && page->state["audio.subtitleSize"] == "150" &&
-              page->state["audio.subtitleBackground"] == "30" && page->state["audio.subtitleSpeakers"] == "0" &&
-              page->state["audio.subtitleUntranscribed"] == "1");
+              !page->state.count("audio.subtitles"));
         s.played.clear();
         s.HandleRetainedSessionRequest(page, "audioVolume 80");
         CHECK(cvarSystemObject.strings["s_volume"] == "0.8" && page->state["audio.volume"] == "80" &&
@@ -2721,13 +2719,8 @@ int main() {
         s.HandleRetainedSessionRequest(page, "audioHrtf 1"); CHECK(cvarSystemObject.strings["s_openALHRTF"] == "1" && s.played.back() == "sound drivar");
         s.played.clear(); s.HandleRetainedSessionRequest(page, "audioRetailUpsampling 0");
         CHECK(cvarSystemObject.strings["s_retailUpsampling"] == "0" && s.played.back() == "sound drivar" && page->state["audio.retailUpsampling"] == "0");
-        s.HandleRetainedSessionRequest(page, "audioSubtitleSize 250"); CHECK(cvarSystemObject.strings["ui_subtitleScale"] == "2");
-        s.HandleRetainedSessionRequest(page, "audioSubtitleBackground 50"); CHECK(cvarSystemObject.strings["ui_subtitleBackground"] == "0.5");
-        s.HandleRetainedSessionRequest(page, "audioSubtitles 0"); s.HandleRetainedSessionRequest(page, "audioSubtitleSpeakers 1");
-        CHECK(cvarSystemObject.strings["ui_subtitles"] == "0" && cvarSystemObject.strings["ui_subtitleSpeakers"] == "1" &&
-              page->state["audio.subtitles"] == "0" && page->state["audio.subtitleSpeakers"] == "1");
-        s.HandleRetainedSessionRequest(page, "audioSubtitleUntranscribed 0");
-        CHECK(cvarSystemObject.strings["ui_subtitleUntranscribed"] == "0" && page->state["audio.subtitleUntranscribed"] == "0");
+        // The dialogue subtitles are GAME OPTIONS' rows now: the AUDIO page's old verbs do nothing.
+        s.HandleRetainedSessionRequest(page, "audioSubtitles 0"); CHECK(cvarSystemObject.strings["ui_subtitles"] == "1");
         // A malformed request, or the page's verbs from another screen, does nothing.
         s.played.clear(); s.HandleRetainedSessionRequest(page, "audioVolume"); s.HandleRetainedSessionRequest(page, "audioVolume x");
         s.HandleRetainedSessionRequest(page, "audioLoudness 5"); CHECK(s.played.empty() && cvarSystemObject.strings["s_volume"] == "0.8");
@@ -5697,7 +5690,7 @@ def main() -> int:
     sys.path.insert(0, str(ROOT / 'tools' / 'ui'))
     import retained_audio
     adapter_audio = [verb for verb in cpp_allowlist(adapter, 'bool SessionMenuValueCommand(') if verb.startswith('audio')]
-    assert set(adapter_audio) == set(audio_verbs) and len(adapter_audio) == len(audio_verbs) == 14
+    assert set(adapter_audio) == set(audio_verbs) and len(adapter_audio) == len(audio_verbs) == 9
     assert [verb for _section, _heading, rows in retained_audio.SECTIONS for _kind, _ident, _label, verb, _state, _extra in rows] == audio_verbs
     audio_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/audio.rui').read_text(encoding='utf-8'), flags=re.M))
     assert audio_document['canvas']['height'] == 720 and audio_document['actions']['back'] == {'operation': 'session.menu', 'arguments': {'command': 'audioBack'}}
@@ -5799,6 +5792,13 @@ def main() -> int:
         assert f'static idCVar {cvar}( "{cvar}"' in android_touch, f'{cvar} is no built-in touch control setting'
         assert not re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}', stock_game), f'{cvar} has a stock row: drop its exemption'
     assert TOUCH_SETTINGS <= {cvar for cvar, _kind, _extra in retained_controls.setting_rows()}, 'a touch setting names no retained row'
+    # The dialogue subtitles stand on the stock-style AUDIO page and, in the
+    # retained menus, on GAME OPTIONS' ACCESSIBILITY tab.
+    SUBTITLE_SETTINGS = {'ui_subtitles', 'ui_subtitleScale', 'ui_subtitleBackground', 'ui_subtitleSpeakers', 'ui_subtitleUntranscribed'}
+    stock_audio = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/audio.gui').read_text(encoding='utf-8', errors='replace')
+    for cvar in sorted(SUBTITLE_SETTINGS):
+        assert re.search(rf'cvar\s+"?{cvar}\b', stock_audio), f'{cvar} has no stock AUDIO row: drop its exemption'
+    assert SUBTITLE_SETTINGS <= {cvar for cvar, _kind, _extra in retained_game.setting_rows()}, 'a subtitle setting names no retained row'
     controls_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/controls.rui').read_text(encoding='utf-8'), flags=re.M))
     # The stock page's mouse and controller rows, with Free Look, Toggle Zoom
     # and Scope Sensitivity, stand on the CONTROLS page's device tabs (issue
@@ -5808,11 +5808,18 @@ def main() -> int:
     assert not set(game_cvars) & set(controls_cvars) and {'in_freeLook', 'pm_zoomedSlow', 'sensitivity', 'in_joystick'} <= set(controls_cvars)
     for document, settings in ((game_document, retained_game.setting_rows()), (controls_document, retained_controls.setting_rows())):
         for cvar, kind, extra in settings:
-            action = document['actions'][f'set.{cvar}']
-            assert action['operation'] == 'settings.player.set' and action['arguments'] == {'cvar': cvar, 'value': {'input': 'value'}}, cvar
-            assert cvar in rules and (kind != 'choice' or not isinstance(extra[1][0], str) or rules[cvar] == list(extra[1])), cvar
+            if kind == 'flag':
+                # A check box over a CVar of two texts (Invert Mouse's m_pitch): checked sets the second.
+                action = document['actions'][f'flag.{cvar}']
+                assert action == {'operation': 'settings.player.set', 'input': 'boolean', 'arguments': {
+                    'cvar': cvar, 'value': {'op': 'select', 'args': [{'input': 'value'}, extra[1], extra[0]]}}}, cvar
+                assert cvar in rules and rules[cvar] == list(extra), cvar
+            else:
+                action = document['actions'][f'set.{cvar}']
+                assert action['operation'] == 'settings.player.set' and action['arguments'] == {'cvar': cvar, 'value': {'input': 'value'}}, cvar
+                assert cvar in rules and (kind != 'choice' or not isinstance(extra[1][0], str) or rules[cvar] == list(extra[1])), cvar
             assert cvar in RETAINED_ONLY_GAME_SETTINGS or cvar in RETAINED_DOCUMENT_SETTINGS or cvar in STOCK_ROWS_PENDING or \
-                cvar in TOUCH_SETTINGS or \
+                cvar in TOUCH_SETTINGS or cvar in SUBTITLE_SETTINGS or \
                 re.search(rf'(cvar\s+"?|consoleCMD\s+"){cvar}\b', stock_game), f'{cvar} is not a stock GAME OPTIONS setting'
     # The CONTROLS page: the button's and the multiplayer menu's routes as
     # GAME OPTIONS'; its rows are the stock page's bindings in its order, the

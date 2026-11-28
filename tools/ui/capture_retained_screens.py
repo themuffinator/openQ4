@@ -1168,10 +1168,45 @@ SCENARIOS = {
         'openq4_retainedGui focus audio_device', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
         'waitMsec 600', 'openq4_retainedGui report', 'screenshot "screenshots/audio-devices.tga"',
         'openq4_retainedGui menu back 1', 'openq4_retainedGui menu back 0', 'waitMsec 400',
-        'openq4_retainedGui focus audio_subtitle_size', 'waitMsec 400', 'openq4_retainedGui report',
-        'screenshot "screenshots/audio-subtitles.tga"',
+        'openq4_retainedGui focus audio_retail', 'waitMsec 400', 'openq4_retainedGui report',
+        'screenshot "screenshots/audio-effects.tga"',
         'openq4_retainedGui event onBack', 'waitMsec 1500', 'ui_retainedStatus', 'openq4_guiGet p_settings_audio::visible',
         'screenshot "screenshots/audio-back.tga"',
+    ]),
+    # Settings rows that are on or off are check boxes, and the dialogue
+    # subtitles stand on GAME OPTIONS' ACCESSIBILITY tab: Dialogue Subtitles
+    # toggles there; a press on the page's background, the pointer placed
+    # without a device, lets go of the focus (report's focus=), and Down
+    # resumes on the row it left; Invert Mouse on CONTROLS' MOUSE tab is a
+    # check box over m_pitch's sign; AUDIO has no subtitle rows left.
+    'settings-checkboxes': (None, [
+        'waitMsec 4000', 'openq4_guiAction main_b_settings', 'waitMsec 1500', 'openq4_guiAction set_b_gameoptions',
+        'waitMsec 1500', 'openq4_retainedGui event tab_accessibility', 'waitMsec 600',
+        'openq4_retainedGui focus game_subtitles', 'waitMsec 400', 'openq4_retainedGui report',
+        'screenshot "screenshots/checkboxes-accessibility.tga"',
+        'ui_subtitles', *menu_step('accept'), 'ui_subtitles', *menu_step('accept'), 'ui_subtitles',
+        'openq4_retainedGui pointer 160 330', 'waitMsec 300', 'openq4_retainedGui report', 'openq4_retainedGui click',
+        'waitMsec 400', 'openq4_retainedGui report', 'screenshot "screenshots/checkboxes-deselected.tga"',
+        *menu_step('down'), 'openq4_retainedGui report',
+        'openq4_retainedGui event onBack', 'waitMsec 1500', 'openq4_guiAction set_b_controls', 'waitMsec 1500',
+        'openq4_retainedGui event tab_mouse', 'waitMsec 600', 'openq4_retainedGui focus controls_invertmouse', 'waitMsec 400',
+        'screenshot "screenshots/checkboxes-mouse.tga"',
+        'm_pitch', *menu_step('accept'), 'm_pitch', 'screenshot "screenshots/checkboxes-mouse-inverted.tga"',
+        *menu_step('accept'), 'm_pitch',
+        'openq4_retainedGui event onBack', 'waitMsec 1500', 'openq4_guiAction set_b_audio', 'waitMsec 1500',
+        'openq4_retainedGui report', 'screenshot "screenshots/checkboxes-audio.tga"',
+    ]),
+    # SYSTEM's V-Sync and Expand Across Displays are check boxes: Accept on
+    # V-Sync drafts the other setting (openq4_system report's draft).
+    'settings-checkboxes-system': (None, [
+        'waitMsec 14000', 'openq4_retainedGui focus nav_settings', *menu_step('accept'), 'waitMsec 1200',
+        'openq4_retainedGui focus display', 'openq4_retainedGui menu accept 1', 'openq4_retainedGui menu accept 0',
+        'waitMsec 1500', 'openq4_retainedGui event tab_screen', 'waitMsec 600',
+        'openq4_retainedGui focus settings_vsync', 'waitMsec 400', 'openq4_retainedGui widget settings_vsync',
+        'openq4_guiGet draftVSync', 'screenshot "screenshots/checkboxes-system.tga"',
+        *menu_step('accept'), 'waitMsec 400', 'openq4_retainedGui widget settings_vsync', 'openq4_guiGet draftVSync',
+        'screenshot "screenshots/checkboxes-system-vsync.tga"',
+        'openq4_retainedGui pointer 600 120', 'waitMsec 300', 'openq4_retainedGui click', 'waitMsec 400', 'openq4_retainedGui report',
     ]),
     # The retained GAME OPTIONS page (UI-01): the GAME OPTIONS button opens it
     # on GENERAL's first row; the HUD tab's custom crosshair turns on and steps

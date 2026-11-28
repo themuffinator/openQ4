@@ -246,7 +246,7 @@ static void CheckPage(View& v,int width,int height,float density,float textScale
     v.Key(MenuInput::Back);v.Frame();
     // An exclusive fullscreen draft: the resolution and refresh lists answer only there.
     Check(v.tx.Edit(View::Owner,{{"r_fullscreen",true}}).code==SettingsCode::Ok,"exclusive fullscreen draft");v.Sync();v.Frame();
-    for(auto* id:{"settings_preset","settings_renderer","settings_display_device","settings_multiscreen","settings_display_mode","settings_display_refresh","settings_window_mode","settings_msaa","settings_vsync","settings_postaa","settings_resolution_scale","settings_framecap","settings_anisotropy"}) {
+    for(auto* id:{"settings_preset","settings_renderer","settings_display_device","settings_display_mode","settings_display_refresh","settings_window_mode","settings_msaa","settings_postaa","settings_resolution_scale","settings_framecap","settings_anisotropy"}) {
         Check(v.Focus(id),"large-text choice can receive focus");v.Frame();
         v.Key(MenuInput::Accept);v.Frame();
         auto state=v.runtime.GetWidgetState(id);

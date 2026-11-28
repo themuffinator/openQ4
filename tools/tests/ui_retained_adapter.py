@@ -638,6 +638,8 @@ public:
         if(failRestore || !snapshots.contains(input))return false;
         state=snapshots.at(input); return true;
     }
+    // The fake's snapshots name no other revision of a document: a refused restore stays refused.
+    bool SnapshotNamesOtherRevision(const std::string&) const { return false; }
     void CancelInput(double) { ++cancels; accept=pointer=false; actions.clear(); }
     void ReleaseInputSources() { ++releases; accept=pointer=false; }
     std::vector<ControlAction> TakeActions() {
@@ -724,6 +726,9 @@ bool RetainedUI_LoadParsedView(retainedUIView_t*,const openq4::ui::Document&,con
 bool UI_RetainedTakePrefetched(const std::string&,int,std::string&,ID_TIME_T&,openq4::ui::Document&) { return false; }
 bool RetainedUI_DefaultViewport(openq4::ui::Viewport& result) { result=viewport; return viewport.width>0 && viewport.height>0; }
 double RetainedUI_PresentationTime() { return presentationTime; }
+// The desktop interface at the device's own text size, as the dedicated server's stand-ins answer.
+openq4::ui::InterfaceVariant RetainedUI_InterfaceVariant() { return openq4::ui::InterfaceVariant::Desktop; }
+float RetainedUI_DeviceTextDefault() { return 1.f; }
 int promptGlyphsValue=0;
 int RetainedUI_PromptGlyphs() { return promptGlyphsValue; }
 bool promptSwappedValue=false;
@@ -1509,6 +1514,23 @@ static void CheckEventBridge() {
     assert(ValidOperation(literalValue));
     literalValue.arguments.at("value").literal=0.0; assert(!ValidOperation(literalValue));
     auto unknown=settingAction; unknown.arguments.at("cvar").literal=std::string("g_password"); assert(!ValidOperation(unknown));
+    // A check box over a setting of two texts (Invert Mouse): its Boolean
+    // picks one of two literal values the setting takes, and nothing else.
+    {
+        Action flag; flag.operation="settings.player.set"; flag.inputType=1;
+        Expression pitch; pitch.type=2; pitch.literal=std::string("m_pitch");
+        Expression checked; checked.type=1; checked.inputValue=true;
+        Expression inverted; inverted.type=2; inverted.literal=std::string("-0.022");
+        Expression upright; upright.type=2; upright.literal=std::string("0.022");
+        Expression pick; pick.type=2; pick.op="select"; pick.args={checked,inverted,upright};
+        flag.arguments={{"cvar",pitch},{"value",pick}};
+        assert(ValidOperation(flag));
+        auto stray=flag; stray.arguments.at("value").args[1].literal=std::string("-1"); assert(!ValidOperation(stray));
+        auto computed=flag; computed.arguments.at("value").args[2].state="settings.pitch"; assert(!ValidOperation(computed));
+        auto fixed=flag; fixed.arguments.at("value").args[0].inputValue=false; fixed.arguments.at("value").args[0].literal=true;
+        assert(!ValidOperation(fixed));
+        auto numeric=flag; numeric.arguments.at("value").args[0].type=0; assert(!ValidOperation(numeric));
+    }
     auto eventControl=modelTemplate; eventControl.events["selected"]={"selected",{}};
     eventControl.root.control->action.clear(); eventControl.root.control->event="SELECTED";
     assert(ValidateApplication(eventControl,error)); eventControl.events.clear(); assert(!ValidateApplication(eventControl,error));

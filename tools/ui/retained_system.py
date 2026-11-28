@@ -348,6 +348,9 @@ def page_actions(doc: Document) -> None:
                                    "arguments": {key: no({"input": "value"})}} for key in ("r_skipSpecular", "r_skipBump", "r_skipSky")},
         "edit.ambient-enabled": {"input": "boolean", "operation": "settings.system.edit",
                                  "arguments": {"r_forceAmbient": op("select", {"input": "value"}, 0.7, 0)}},
+        # V-Sync and Expand Across Displays are check boxes over CVars of 0 or 1.
+        **{f"edit.{key}-on": {"input": "boolean", "operation": "settings.system.edit",
+                              "arguments": {key: op("select", {"input": "value"}, 1, 0)}} for key in ("r_swapInterval", "r_multiScreen")},
         # Ambient Occlusion: 0 Off, else r_ssaoMethod + 1 (SSAO, HBAO, GTAO). Off
         # keeps the method, so turning it back on restores the choice.
         # Window Mode: 0 Windowed, 1 Borderless, 2 Fullscreen (the desktop's
@@ -827,9 +830,12 @@ def system_document(touch: bool = False) -> dict:
     doc.bind("settings_display_device.display", "settings_display_device", "display", op("select", op("&&", st("settings.display.available"), op(
         "||", op("||", op(">", st("settings.display.count"), 1), op(">=", draft("r_screen"), st("settings.display.count"))),
         op("!=", draft("r_screen"), st("settings.baseline.r_screen")))), "block", "none"))
-    span = choice(doc, "settings_multiscreen", "#str_229915", x, edit("r_multiScreen"), draft("r_multiScreen"),
-                  [(("#str_200059", 0), 0), (("#str_200059", 1), 1, SPAN_ALLOWED)])
-    gate(doc, "settings_multiscreen", both(QUIET, st("settings.display.available")), None)
+    # A check box: turning it on waits for a mode that can span (SPAN_ALLOWED,
+    # the status note under it says why); one that is on can always go off.
+    spanning = op("!=", draft("r_multiScreen"), 0)
+    span = row(doc, "settings_multiscreen", "#str_229915", "toggle", x, value=spanning, action="edit.r_multiScreen-on")
+    span_offered = op("||", SPAN_ALLOWED, spanning)
+    gate(doc, "settings_multiscreen", both(QUIET, st("settings.display.available"), span_offered), opacity=dim(span_offered, 0.45))
     span_shown = op("&&", st("settings.display.available"), op(
         "||", op("||", op(">", st("settings.display.count"), 1), op("!=", draft("r_multiScreen"), 0)),
         op("!=", draft("r_multiScreen"), st("settings.baseline.r_multiScreen"))))
@@ -861,7 +867,7 @@ def system_document(touch: bool = False) -> dict:
     doc.bind("settings_msaa-status.display", "settings_msaa-status", "display",
              op("select", st("settings.msaa.clamped"), "block", "none"))
     doc.bind("settings_msaa-status.text", "settings_msaa-status", "text", st("settings.msaa.status"))
-    vsync = choice(doc, "settings_vsync", "#str_41092", x, edit("r_swapInterval"), draft("r_swapInterval"), listed("#str_200059", (0, 1)))
+    vsync = row(doc, "settings_vsync", "#str_41092", "toggle", x, value=op("!=", draft("r_swapInterval"), 0), action="edit.r_swapInterval-on")
     gate(doc, "settings_vsync", EDITABLE)
     # The presets' frame cap (com_maxfps, 0 uncapped); a cap the list lacks
     # (Auto-Detect's display refresh on a power-limited device) shows none.

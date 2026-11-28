@@ -1342,6 +1342,13 @@ void Interaction::Pointer(bool down) {
 				if (pointerFraction) { dragging = id; dragPreview = SliderValue(std::get<SliderSpec>(items.at(id).control.widget),*pointerFraction); }
 				else armed.clear();
 			}
+		} else if (hovered.empty() && armed.empty() && modals.empty() && !focusPending && !focused.empty()) {
+			// A press on the page's background, off every control, lets go of
+			// the focus. A dialog keeps its focus: it always holds one. The
+			// next navigation key resumes from the control it left.
+			const auto released = focused;
+			Focus(std::string{});
+			lostFocus = released;
 		}
 	} else {
 		if (!pointerHeld) return;

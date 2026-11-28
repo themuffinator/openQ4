@@ -47,7 +47,7 @@ from retained_controller_test import ROW_LABEL as TEST_LABEL, SHOW as TEST_SHOW,
 from retained_key_glyphs import bound_keys, em
 from retained_mp_menus import (KEYCAP_GAP, KEYCAP_W, PLACEHOLDER, STRIP_EDGE, TAB_FLARE, TAB_PAD, TAB_SHOULDER, TAB_SIZE, any_text,
                                row_face, row_states)
-from retained_settings_rows import (COLUMN_W, CONTENT_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, heading, requires,
+from retained_settings_rows import (COLUMN_W, CONTENT_W, ROW_PITCH, button_row, choice, cvar_row, cvar_settings, flag, heading, requires,
                                     row_chrome, rows_value_column, settings_subpage, slider, toggle, value_column)
 
 PREFIX = "controls"
@@ -101,11 +101,11 @@ DEVICES = (
     ("mouse", "#str_231777", (
         (heading("#str_232555"),
          toggle("controls_freelook", "#str_200133", "in_freeLook"),
-         choice("controls_invertmouse", "#str_200139", "m_pitch", "#str_200059", ("0.022", "-0.022")),
+         flag("controls_invertmouse", "#str_200139", "m_pitch", ("0.022", "-0.022")),
          toggle("controls_togglezoom", "#str_41108", "in_toggleZoom"),
          slider("controls_scopesensitivity", "#str_229972", "pm_zoomedSlow", 1, 100, 1),
          heading("#str_229935"),
-         slider("controls_msensitivity", "#str_200141", "sensitivity", 0.01, 30, 0.01, 2),
+         slider("controls_msensitivity", "#str_200141", "sensitivity", 0.1, 30, 0.1, 2),
          slider("controls_mcpi", "#str_229936", "m_cpi", 0, 32000, 50),
          slider("controls_msmooth", "#str_200140", "m_smooth", 1, 8, 1),
          slider("controls_mfilter", "#str_229937", "m_filter", 0, 31, 1)),
@@ -139,7 +139,7 @@ DEVICES = (
          slider("controls_wheeloffset", "#str_230140", "ui_weaponWheelOffset", -40, 40, 1),
          heading("#str_232749"),
          choice("controls_layout", "#str_232742", "in_joystickLayout", "#str_232743", (0, 1, 2, 3, 4)),
-         slider("controls_trigger", "#str_229927", "in_joystickTriggerThreshold", 0, 1, 0.01, 2),
+         slider("controls_trigger", "#str_229927", "in_joystickTriggerThreshold", 0, 1, 0.05, 2),
          toggle("controls_togglecrouch", "#str_232745", "in_toggleCrouch"),
          toggle("controls_alwaysrun", "#str_232746", "in_alwaysRun"),
          toggle("controls_context", "#str_232744", "in_joystickContextActions"),
@@ -151,12 +151,12 @@ DEVICES = (
          toggle("controls_triggerrumble", "#str_232736", "in_joystickTriggerRumble"),
          toggle("controls_adaptivetriggers", "#str_232737", "in_joystickAdaptiveTriggers"),
          toggle("controls_directionalhits", "#str_232738", "in_joystickDirectionalRumble"),
-         slider("controls_batterythreshold", "#str_229970", "in_joystickLowBatteryRumbleThreshold", 0, 100, 1),
+         slider("controls_batterythreshold", "#str_229970", "in_joystickLowBatteryRumbleThreshold", 0, 100, 5),
          slider("controls_batteryscale", "#str_229971", "in_joystickLowBatteryRumbleScale", 0, 2, 0.05, 2),
          heading("#str_232735"),
          toggle("controls_light", "#str_232739", "in_joystickLight"),
          toggle("controls_playerlight", "#str_232740", "in_joystickPlayerLight"),
-         slider("controls_batterynotice", "#str_232741", "in_joystickLowBatteryNotice", 0, 100, 1),
+         slider("controls_batterynotice", "#str_232741", "in_joystickLowBatteryNotice", 0, 100, 5),
          heading("#str_232560"),
          choice("controls_promptstyle", "#str_231526", "in_promptStyle", "#str_231527", (0, 1, 2, 3, 4, 5)),
          choice("controls_swapconfirm", "#str_231528", "in_swapConfirmBack", "#str_231529", (0, 1, 2))),
@@ -164,8 +164,8 @@ DEVICES = (
     ("aim", "#str_232702", (
         (heading("#str_232705"),
          choice("controls_response", "#str_232707", "in_joystickResponse", "#str_232708", (0, 1, 2, 3)),
-         slider("controls_turnspeed", "#str_232709", "in_joystickYawSpeed", 30, 720, 5, 1),
-         slider("controls_pitchspeed", "#str_232710", "in_joystickPitchSpeed", 30, 720, 5, 1),
+         slider("controls_turnspeed", "#str_232709", "in_joystickYawSpeed", 30, 720, 10),
+         slider("controls_pitchspeed", "#str_232710", "in_joystickPitchSpeed", 30, 720, 10),
          slider("controls_lookcurve", "#str_229932", "in_joystickLookCurve", 1, 3, 0.05, 2),
          toggle("controls_invertlook", "#str_229933", "in_joystickInvertLook"),
          slider("controls_turnboost", "#str_232711", "in_joystickTurnBoost", 0, 400, 10),
@@ -190,7 +190,7 @@ DEVICES = (
          button("controls_gyrocalibrate", "#str_232732", "controlsCalibrateGyro"),
          heading("#str_232733"),
          choice("controls_touchpad", "#str_229966", "in_touchpadMode", "#str_229967", (0, 1, 2, 3)),
-         slider("controls_touchpadsensitivity", "#str_229968", "in_touchpadSensitivity", 0, 8, 0.05, 2),
+         slider("controls_touchpadsensitivity", "#str_229968", "in_touchpadSensitivity", 0, 8, 0.1, 1),
          toggle("controls_touchscreen", "#str_229969", "in_touchscreen")),
     )),
 )

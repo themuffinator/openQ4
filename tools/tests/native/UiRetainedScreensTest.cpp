@@ -310,7 +310,6 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"createFallDamage","createWeaponRespawn","createPreset","createMapRotation","createMapQueue","createItemTimers",
 		"createTimeouts","createSpectatorLock","createInactivity","createMaxBrightskin","createForcedModels","weaponOrderEnable",
 	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf","audioRetailUpsampling",
-	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 // The player settings the multiplayer card's Settings and Voice pages and the
 // GAME OPTIONS page change.
@@ -329,7 +328,9 @@ static const std::set<std::string> PlayerSettings = {"ui_handicap","ui_identity"
 	"in_touchControls","in_touchLayoutPreset","in_touchControlsScale","in_touchLookSensitivity",
 	"g_crosshairCustom","g_crosshairSize","g_crosshairColor","hud_hitMarker","hud_crosshairAnimated","ui_hudLayout","ui_hudScale","ui_hudWidth",
 	"ui_hudSafeInset","g_objectivesToggle","ui_hudOpacity","ui_hudDamageDirection","ui_hudPickups","ui_hudWeaponStrip",
-	"ui_reducedFlashing","ui_retainedOpaqueBacking","ui_tooltips","g_corpseSink","con_allowConsole","r_screenshotFormat","g_autoSkipCinematics","ui_cinematicShake","g_screenShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
+	"ui_reducedFlashing","ui_retainedOpaqueBacking","ui_tooltips",
+	// openQ4: ACCESSIBILITY's SUBTITLES section
+	"ui_subtitles","ui_subtitleScale","ui_subtitleBackground","ui_subtitleSpeakers","ui_subtitleUntranscribed","g_corpseSink","con_allowConsole","r_screenshotFormat","g_autoSkipCinematics","ui_cinematicShake","g_screenShake","g_enhancedPhysics","cl_gunfov","cl_gunfov_adjust","cl_gun_x",
 	"cl_gun_y","cl_gun_z","g_weaponMuzzleKick","g_viewKick","vr_enable","vr_aimMode","vr_leftHanded","vr_turnMode","vr_snapTurnAngle",
 	"vr_moveDirection","vr_roomScale","vr_aimLaser","vr_hapticStrength","vr_twoHanded","vr_comfortVignette","vr_physicalCrouch",
 	"vr_playSpace","vr_body","vr_hudMode","vr_hrtf",
@@ -376,8 +377,12 @@ static void CheckSessionActions(const Document& document) {
 					"Join Game's layout button asks for rows or tiles alone");
 				continue;
 			}
+			// A check box over a CVar of two texts (Invert Mouse) picks one of them by its value.
+			const auto& value = action.arguments.at("value");
+			const bool flag = id.rfind("flag.",0) == 0 && value.op == "select" && value.args.size() == 3 && value.args[0].inputValue &&
+				value.args[1].type == 2 && value.args[2].type == 2;
 			Check(cvar != action.arguments.end() && action.arguments.size() == 2 && PlayerSettings.contains(std::get<std::string>(cvar->second.literal)) &&
-				action.arguments.at("value").inputValue && action.inputType,"a setting control sets an allowlisted player setting");
+				(value.inputValue || flag) && action.inputType,"a setting control sets an allowlisted player setting");
 			continue;
 		}
 		const bool value = action.operation == "session.menuValue";
@@ -4804,7 +4809,7 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	for (const char* tab : {"tab-move","tab-weapons","tab-attack","tab-other","tab-mouse","tab-controller","tab-aim"})
 		Check(document.Model().FindNode(tab) != nullptr,"the stock tabs, then the devices'");
 	CheckCvarRows(document,{{"controls_freelook","in_freeLook"},{"controls_togglezoom","in_toggleZoom"},
-		{"controls_scopesensitivity","pm_zoomedSlow"},{"controls_msensitivity","sensitivity"},{"controls_invertmouse","m_pitch"},
+		{"controls_scopesensitivity","pm_zoomedSlow"},{"controls_msensitivity","sensitivity"},
 		{"controls_controller","in_joystick"},{"controls_promptstyle","in_promptStyle"},{"controls_swapconfirm","in_swapConfirmBack"}});
 	Check(document.Model().FindNode("controls-move-note") && document.Model().FindNode("controls-other-note") &&
 		!document.Model().FindNode("controls-mouse-note") && !document.Model().FindNode("controls-controller-note"),
@@ -4928,9 +4933,20 @@ static void CheckControlsPage(ScreenHost& host, const char* path) {
 	auto invocation = TakeOneAction(runtime,"set.in_freeLook");
 	Check(std::get<std::string>(invocation.arguments.at("cvar")) == "in_freeLook" && !std::get<bool>(invocation.arguments.at("value")),
 		"Accept turns Free Look off");
+	// Invert Mouse is a check box over m_pitch's sign: checked sets -0.022.
+	{
+		const auto* invert = document.Model().FindNode("controls_invertmouse");
+		Check(invert && invert->control && invert->control->role == ControlRole::Toggle && invert->control->action == "flag.m_pitch",
+			"Invert Mouse is a check box");
+	}
+	Check(runtime.FocusControl("controls_invertmouse",0.93),"focus Invert Mouse");
+	press(MenuInput::Accept,0.94);
+	invocation = TakeOneAction(runtime,"flag.m_pitch");
+	Check(std::get<std::string>(invocation.arguments.at("cvar")) == "m_pitch" &&
+		std::get<std::string>(invocation.arguments.at("value")) == "-0.022","checking Invert Mouse sets the pitch's sign");
 	Check(runtime.FocusControl("controls_msensitivity",0.95),"focus the mouse sensitivity");
 	press(MenuInput::Right,0.96);
-	Check(std::abs(std::get<double>(TakeOneAction(runtime,"set.sensitivity").arguments.at("value"))-5.01) < 1e-9,
+	Check(std::abs(std::get<double>(TakeOneAction(runtime,"set.sensitivity").arguments.at("value"))-5.1) < 1e-9,
 		"Right raises the sensitivity a step");
 	// Its typed number follows it: a third decimal place is refused, a value
 	// to the slider's places sets the CVar, and it settles once the CVar
@@ -5170,7 +5186,9 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 		{"game_videoformat","com_videoFormat"},{"game_videoquality","com_videoQuality"},{"game_videofps","com_videoFPS"},
 		{"game_videoheight","com_videoHeight"},{"game_videoaudio","com_videoAudio"},{"game_videotiming","com_videoTiming"},
 		{"game_stereo3d","r_stereo3D"},{"game_stereodepth","r_stereoSeparation"},{"game_stereoconvergence","r_stereoConvergence"},
-		{"game_stereoswap","r_stereoSwapEyes"}});
+		{"game_stereoswap","r_stereoSwapEyes"},{"game_subtitles","ui_subtitles"},{"game_subtitlesize","ui_subtitleScale"},
+		{"game_subtitlebackground","ui_subtitleBackground"},{"game_subtitlespeakers","ui_subtitleSpeakers"},
+		{"game_subtitleuntranscribed","ui_subtitleUntranscribed"}});
 	for (const char* moved : {"game_freelook","game_togglezoom","game_scopesensitivity","game_msensitivity","game_controller","game_promptstyle"})
 		Check(!document.Model().FindNode(moved),"the mouse, controller and aim rows are on CONTROLS");
 	for (const char* setting : {"set.in_freeLook","set.sensitivity","set.in_joystick"})
@@ -5266,6 +5284,12 @@ static void CheckGamePage(ScreenHost& host, const char* path) {
 	Check(tab() == 3 && runtime.FocusedControl() == "game_viewkick","ACCESSIBILITY follows VIEW WEAPON, on View Kick");
 	const auto kick = bounds("game_viewkick"), flashing = bounds("game_reducedflashing");
 	Check(flashing.x > kick.x+kick.width && bounds("game_cinematicshake").y > kick.y,"MOTION and VISIBILITY stand in two columns");
+	const auto subtitles = bounds("game_subtitles"), untranscribed = bounds("game_subtitleuntranscribed");
+	Check(std::abs(subtitles.x-flashing.x) < .5f && subtitles.y > bounds("game_tooltips").y && untranscribed.y > subtitles.y,
+		"the dialogue subtitles stand under VISIBILITY");
+	Check(runtime.FocusControl("game_subtitles",1.637),"focus Dialogue Subtitles");
+	press(MenuInput::Accept,1.638);
+	Check(std::get<std::string>(taken("set.ui_subtitles").arguments.at("cvar")) == "ui_subtitles","Dialogue Subtitles sets its CVar");
 	// VIRTUAL REALITY: VR Mode is Off, On or Automatic (VR-08).
 	Check(runtime.RunEvent("onTabNext",1.64,effects,error),"the next tab");
 	runtime.Frame(viewport,1.641);
@@ -5313,9 +5337,7 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	CheckSessionActions(document);
 	const std::pair<const char*,const char*> rows[] = {{"audio_volume","audioVolume"},{"audio_music","audioMusic"},
 		{"audio_dialogue","audioDialogue"},{"audio_backend","audioBackend"},{"audio_device","audioDevice"},{"audio_eax","audioEax"},
-		{"audio_speakers","audioSpeakers"},{"audio_hrtf","audioHrtf"},{"audio_retail","audioRetailUpsampling"},{"audio_subtitles","audioSubtitles"},
-		{"audio_subtitle_size","audioSubtitleSize"},{"audio_subtitle_background","audioSubtitleBackground"},
-		{"audio_subtitle_speakers","audioSubtitleSpeakers"},{"audio_subtitle_untranscribed","audioSubtitleUntranscribed"}};
+		{"audio_speakers","audioSpeakers"},{"audio_hrtf","audioHrtf"},{"audio_retail","audioRetailUpsampling"}};
 	for (const auto& [control, verb] : rows) {
 		const auto* node = document.Model().FindNode(control);
 		const auto found = document.Model().actions.find(verb);
@@ -5327,6 +5349,7 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	Check(back != document.Model().actions.end() && std::get<std::string>(back->second.arguments.at("command").literal) == "audioBack",
 		"BACK asks the session to return");
 	Check(!document.Model().FindNode("tab-audio"),"one screen of rows has no tab strip");
+	Check(!document.Model().FindNode("audio_subtitles"),"the dialogue subtitles are GAME OPTIONS' ACCESSIBILITY rows");
 	Runtime runtime(host);
 	Check(runtime.Initialize() && runtime.LoadDocument(source,"guis/menu/settings/audio.rui",diagnostics),"the page loads into a runtime");
 	auto viewport = SettingsViewport(document); std::string error; Runtime::EventEffects effects;
@@ -5347,13 +5370,11 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 		if (!actions.empty() && actions[0].proposalToken) runtime.AcknowledgeControlProposal(actions[0].node,actions[0].proposalToken,true);
 		return invocation;
 	};
-	// The session's readback: 140% volume (of the stock 0 to 200%), the second of three devices, EAX on,
-	// 5.1 speakers and the subtitles at 150%.
+	// The session's readback: 140% volume (of the stock 0 to 200%), the second of three devices, EAX on
+	// and 5.1 speakers.
 	Check(runtime.SetState({{"audio.volume",140.0},{"audio.music",40.0},{"audio.dialogue",100.0},{"audio.backend",1.0},
 		{"audio.device.count",3.0},{"audio.device.0.label",std::string("Default device")},{"audio.device.1.label",std::string("Speakers")},
-		{"audio.device.2.label",std::string("Headset")},{"audio.device",1.0},{"audio.eax",true},{"audio.speakers",2.0},{"audio.hrtf",0.0},{"audio.retailUpsampling",false},
-		{"audio.subtitles",true},{"audio.subtitleSize",150.0},{"audio.subtitleBackground",30.0},{"audio.subtitleSpeakers",false},
-		{"audio.subtitleUntranscribed",true}},error,0.1),
+		{"audio.device.2.label",std::string("Headset")},{"audio.device",1.0},{"audio.eax",true},{"audio.speakers",2.0},{"audio.hrtf",0.0},{"audio.retailUpsampling",false}},error,0.1),
 		"the session publishes the values");
 	Check(runtime.RunEvent("onActivate",0.2,effects,error),"the page arrives");
 	runtime.Frame(viewport,0.5);
@@ -5385,26 +5406,20 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	Check(runtime.FocusControl("audio_retail",0.72),"focus Original Game Sound");
 	press(MenuInput::Accept,0.725);
 	Check(std::get<bool>(taken("audioRetailUpsampling").arguments.at("value")),"Accept asks the session for the original game's upsampling");
-	Check(runtime.FocusControl("audio_subtitle_speakers",0.73),"focus Speaker Names");
-	press(MenuInput::Accept,0.74);
-	Check(std::get<bool>(taken("audioSubtitleSpeakers").arguments.at("value")),"Accept asks the session to name the speakers");
-	Check(runtime.FocusControl("audio_subtitle_untranscribed",0.75),"focus Untranscribed Speech");
-	press(MenuInput::Accept,0.76);
-	Check(!std::get<bool>(taken("audioSubtitleUntranscribed").arguments.at("value")),"Accept asks the session to stop marking untranscribed speech");
 	// The back input asks the session to return.
 	Check(runtime.RunEvent("onBack",0.8,effects,error) && effects.actions.size() == 1 &&
 		std::get<std::string>(effects.actions[0].arguments.at("command")) == "audioBack","Back asks the session to return");
 	// A portrait view: the panel and its rows stay inside the view.
 	const auto portrait = SettingsViewport(document,540,960);
 	runtime.Frame(portrait,1.0);
-	const auto panel = bounds("audio-panel"), last = bounds("audio_subtitle_untranscribed");
+	const auto panel = bounds("audio-panel"), last = bounds("audio_retail");
 	Check(panel.x >= -.5f && panel.x+panel.width <= 540.5f && panel.y+panel.height <= 960.5f && last.x+last.width <= 540.5f,
 		"the panel fits a portrait view");
-	CheckSettingsPortrait(runtime,document,"audio_device","audio_eax","audio_subtitle_untranscribed","audio-audio-rows",1.1);
+	CheckSettingsPortrait(runtime,document,"audio_device","audio_eax","audio_retail","audio-audio-rows",1.1);
 	runtime.Frame(portrait,1.2);
 	const auto band = runtime.PresentedValue("audio-header","display");
 	Check(band && band->text == "none","the tall column's headings stand in its rows, not the header band");
-	CheckSettingsTextScale(host,runtime,document,"audio-audio","audio_device","audio_eax","audio_subtitle_untranscribed",1.3);
+	CheckSettingsTextScale(host,runtime,document,"audio-audio","audio_device","audio_eax","audio_retail",1.3);
 	// The single column at a larger text size takes its headings into its rows too.
 	auto larger = SettingsViewport(document); larger.textScale = 1.5f;
 	runtime.Frame(larger,1.6);

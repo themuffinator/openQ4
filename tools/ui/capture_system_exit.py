@@ -11,7 +11,6 @@ import argparse
 from collections import Counter
 import hashlib
 import json
-import math
 import os
 from pathlib import Path
 import re
@@ -64,8 +63,8 @@ def stages():
     # Each edit first brings its row's tab forward (before any dialog, which
     # blocks the tab events).
     brightness_edit = lambda: tabs.on('settings_brightness') + ['openq4_retainedGui focus "settings_brightness"'] + key('right')
-    # Home then Accept selects the authored first option (0); no physical input.
-    vsync_edit = lambda: tabs.on('settings_vsync') + page.open_choice('settings_vsync') + key('home') + ['wait 3'] + key('accept')
+    # V-Sync is a check box: Accept on it turns the drafted V-Sync off; no physical input.
+    vsync_edit = lambda: tabs.on('settings_vsync') + ['openq4_retainedGui focus "settings_vsync"'] + key('accept')
     add('open', ['openq4_system open'], brightness=1, baseline=1, live=1,
         opening=True, actions=begin, events=onactivate)
     add('discard_draft', brightness_edit(), baseline=1, dirty=1, live=1, actions=edit)
@@ -149,9 +148,9 @@ def source_contract(runtime):
     slider = nodes.get('settings_brightness',{}).get('control',{})
     if any(slider.get(key) != value for key,value in dict(role='slider',minimum=.5,maximum=2,step=.1).items()):
         raise ValueError('Production brightness tick contract changed')
-    choice = nodes.get('settings_vsync',{}).get('control',{})
-    if choice.get('role') != 'choice' or [option.get('value') for option in choice.get('options',[])] != [0,1]:
-        raise ValueError('Production VSync choice contract changed')
+    toggle = nodes.get('settings_vsync',{}).get('control',{})
+    if toggle.get('role') != 'toggle' or toggle.get('action') != 'edit.r_swapInterval-on':
+        raise ValueError('Production VSync check box contract changed')
     aliases = model.get('aliases',{})
     for field in FIELDS:
         if field not in aliases: raise ValueError(f'Missing readback alias: {field}')
@@ -234,7 +233,7 @@ def qualify(log, mode, renderer):
     if completion != [COMPLETE]: errors.append('Missing, malformed or replayed completion')
     expected = stages()
     if [row['name'] for row in records] != [row['name'] for row in expected]: errors.append('Stage order/count differs')
-    owners, owner, display_reports, requests, devices, choice_cache, catalogs = [], None, [], [], [], None, []
+    owners, owner, display_reports, requests, devices, catalogs = [], None, [], [], [], []
     for record, stage in zip(records,expected):
         at, lines = stage['name'], record['lines']
         def fail(detail): errors.append(at+': '+detail)
@@ -266,7 +265,7 @@ def qualify(log, mode, renderer):
                 dismisses.append(page._fields(line,'RETAINED_GUI_DISPATCH ',set('path operation value brightness shadows close'.split())))
             else: fail('Unexpected or malformed observation: '+line[:150])
         wanted_sequence = ['route']*(2 if stage['opening'] else 1)
-        if stage['child']: wanted_sequence += ['read']*len(FIELDS)+['widget']*2+['scroll','report']
+        if stage['child']: wanted_sequence += ['read']*len(FIELDS)+['widget']*2+['report']
         if sequence != wanted_sequence+['display']: fail('Settled route/readback/renderer observation order differs')
         if route_ops != (['OPENQ4_SYSTEM operation=open result=1'] if stage['opening'] else []): fail('Session open failed or replayed')
         if loads != (['RETAINED_GUI_LOADED '+PAGE] if stage['opening'] else []): fail('Unexpected page lifetime/load')
@@ -306,29 +305,11 @@ def qualify(log, mode, renderer):
                 elif not page._number(row[1],value): fail('Service-backed draft/baseline/readiness mismatch: '+field)
             for index,widget in enumerate(widgets):
                 if not widget or index>=2: fail('Malformed widget'); continue
-                fixed=dict(id=CONTROLS[index],role=str((2,3)[index]),type='0',pending='0',proposed='0',rejected='0',token='0',popup='0',firstVisible='0')
+                # The brightness slider reads a number, the V-Sync check box a Boolean.
+                fixed=dict(id=CONTROLS[index],role=str((2,1)[index]),type=str((0,1)[index]),pending='0',proposed='0',rejected='0',token='0',popup='0',firstVisible='0')
                 if any(widget[key]!=value for key,value in fixed.items()) or not page._number(widget['accepted'],stage['values'][6+index*2]): fail('Widget accepted/pending state differs')
-            expected_scroll={key:'0' for key in SCROLL_FIELDS}
-            expected_scroll.update(id='settings_vsync',density='1')
-            if at in ('display_draft','display_dialog','keep_draft','keep_dialog'):
-                # Closing a painted popup retains its measured scroll cache.
-                # The two-option VSync list fits, and the following dirty-exit
-                # modal must leave that exact closed cache untouched.
-                row=scrolls[0] if len(scrolls)==1 else None
-                fixed={key:'0' for key in ('open','opening','offsetDp','usable','range','offset','position','travel')}
-                fixed.update(id='settings_vsync',available='1')
-                if not row or any(row[key]!=value for key,value in fixed.items()): fail('Closed choice cache state differs')
-                else:
-                    try:
-                        numeric={key:float(row[key]) for key in ('density','viewport','track','thumb')}
-                        valid=all(math.isfinite(value) for value in numeric.values()) and 0<numeric['density']<=4 and 0<numeric['viewport']<=720
-                        valid=valid and numeric['track']==numeric['viewport'] and numeric['thumb']==numeric['track']
-                        valid=valid and uint(row['revision'],positive=True) is not None and uint(row['geometry'],positive=True) is not None
-                    except ValueError: valid=False
-                    if not valid: fail('Invalid fitting choice cache geometry')
-                    if at.endswith('_draft'): choice_cache=row
-                    elif row!=choice_cache: fail('Closed choice cache changed during the dirty-exit modal')
-            elif scrolls != [expected_scroll]: fail('Fresh or recreated choice retained unexpected geometry')
+            # The probed controls are a slider and a check box: no list reports its scroll.
+            if scrolls: fail('Unexpected choice scroll observation')
             for report in reports:
                 if not report or any(report[key]!=value for key,value in dict(path=PAGE,active='1',contexts=str(1+len(peers)),shadows='1').items()) or uint(report['revision']) is None or not page._number(report['brightness'],stage['live']): fail('Rendered owner/live brightness differs')
                 if report and stage['values'][5] and report['focus']!='discard_keep_editing': fail('Dirty modal lacks its safe initial focus')

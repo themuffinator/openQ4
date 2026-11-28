@@ -363,7 +363,6 @@ bool SessionMenuValueCommand(const std::string& command) {
 		"createFallDamage","createWeaponRespawn","createPreset","createMapRotation","createMapQueue","createItemTimers",
 		"createTimeouts","createSpectatorLock","createInactivity","createMaxBrightskin","createForcedModels","weaponOrderEnable",
 		"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf","audioRetailUpsampling",
-		"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 		"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 	return commands.contains(command);
 }
@@ -444,7 +443,11 @@ const PlayerSetting* FindPlayerSetting(const std::string& cvar) {
 		{"hud_hitMarker",{1}},{"hud_crosshairAnimated",{1}},{"ui_hudLayout",{0,0,3,true,{},{0,1,2,3}}},{"ui_hudScale",{0,0.5,2,false}},
 		{"ui_hudWidth",{0,0,2,true,{},{0,1,2}}},{"ui_hudSafeInset",{0,0,10,false}},{"g_objectivesToggle",{1}},
 		{"ui_hudOpacity",{0,0.25,1,false}},{"ui_hudDamageDirection",{1}},{"ui_hudPickups",{1}},{"ui_hudWeaponStrip",{1}},
-		{"ui_reducedFlashing",{1}},{"ui_retainedOpaqueBacking",{1}},{"ui_tooltips",{1}},{"g_corpseSink",{0,0,2,true,{},{0,1,2}}},{"con_allowConsole",{0,0,1,true,{},{0,1}}},
+		{"ui_reducedFlashing",{1}},{"ui_retainedOpaqueBacking",{1}},{"ui_tooltips",{1}},
+		// ACCESSIBILITY's SUBTITLES section (AUD-07), once the AUDIO page's.
+		{"ui_subtitles",{1}},{"ui_subtitleScale",{0,1,2,false}},{"ui_subtitleBackground",{0,0,1,false}},
+		{"ui_subtitleSpeakers",{1}},{"ui_subtitleUntranscribed",{1}},
+		{"g_corpseSink",{0,0,2,true,{},{0,1,2}}},{"con_allowConsole",{0,0,1,true,{},{0,1}}},
 		{"r_screenshotFormat",{0,0,1,true,{},{0,1}}},{"g_autoSkipCinematics",{1}},{"ui_cinematicShake",{0,0,1,false}},{"g_screenShake",{0,0,1,false}},{"g_enhancedPhysics",{1}},
 		{"cl_gunfov",{0,0,179,false}},{"cl_gunfov_adjust",{0,0,1,true,{},{0,1}}},
 		{"cl_gun_x",{0,-5,5,false}},{"cl_gun_y",{0,-5,5,false}},{"cl_gun_z",{0,-5,5,false}},{"g_weaponMuzzleKick",{1}},{"g_viewKick",{0,0,1,false}},
@@ -542,7 +545,14 @@ bool ValidOperation(const Action& action) {
 		};
 		const auto* setting = literal(cvar->second) ? FindPlayerSetting(std::get<std::string>(cvar->second.literal)) : nullptr;
 		if (!setting || value->second.type != setting->type) return false;
-		return value->second.inputValue || (literal(value->second) && PlayerSettingValue(std::get<std::string>(cvar->second.literal),value->second.literal));
+		const auto& name = std::get<std::string>(cvar->second.literal);
+		const auto allowed = [&](const Expression& expression) { return literal(expression) && PlayerSettingValue(name,expression.literal); };
+		// A check box over a setting of two values (Invert Mouse's m_pitch
+		// sign): its Boolean picks one of two literal values the setting takes.
+		const auto& pick = value->second.args;
+		if (value->second.op == "select")
+			return pick.size() == 3 && pick[0].inputValue && pick[0].type == 1 && allowed(pick[1]) && allowed(pick[2]);
+		return value->second.inputValue || allowed(value->second);
 	}
 	if (action.operation == "session.menuValue") {
 		// A literal value verb, and the control's own value as its operand.

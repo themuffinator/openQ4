@@ -908,10 +908,10 @@
    "input": "boolean",
    "arguments": {"cvar": "in_freeLook", "value": {"input": "value"}}
   },
-  "set.m_pitch": {
+  "flag.m_pitch": {
    "operation": "settings.player.set",
-   "input": "string",
-   "arguments": {"cvar": "m_pitch", "value": {"input": "value"}}
+   "input": "boolean",
+   "arguments": {"cvar": "m_pitch", "value": {"op": "select", "args": [{"input": "value"}, "-0.022", "0.022"]}}
   },
   "set.in_toggleZoom": {
    "operation": "settings.player.set",
@@ -139789,41 +139789,24 @@
               ]
              },
              {
-              "id": "controls_invertmouse-value",
-              "type": "text",
-              "properties": {
-               "text": {"type": "text", "value": "#str_230030"},
-               "position": {"type": "keyword", "value": "absolute"},
-               "left": {"type": "length", "value": 196.0, "unit": "dp"},
-               "top": {"type": "length", "value": 0, "unit": "dp"},
-               "width": {"type": "length", "value": 144.0, "unit": "dp"},
-               "height": {"type": "length", "value": 56.0, "unit": "dp"},
-               "font-family": {"type": "font", "value": "lowpixel"},
-               "font-size": {"type": "length", "value": 14, "unit": "dp"},
-               "line-height": {"type": "length", "value": 56.0, "unit": "dp"},
-               "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]},
-               "white-space": {"type": "keyword", "value": "nowrap"},
-               "overflow": {"type": "keyword", "value": "hidden"},
-               "text-overflow": {"type": "keyword", "value": "ellipsis"}
-              }
-             },
-             {
-              "id": "controls_invertmouse-chevron",
+              "id": "controls_invertmouse-box",
               "type": "vector",
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
-               "left": {"type": "length", "value": 344.0, "unit": "dp"},
-               "top": {"type": "length", "value": 25.0, "unit": "dp"},
-               "width": {"type": "length", "value": 12, "unit": "dp"},
-               "height": {"type": "length", "value": 6, "unit": "dp"}
+               "left": {"type": "length", "value": 196.0, "unit": "dp"},
+               "top": {"type": "length", "value": 21.0, "unit": "dp"},
+               "width": {"type": "length", "value": 14, "unit": "dp"},
+               "height": {"type": "length", "value": 14, "unit": "dp"}
               },
               "paths": [
                {
-                "id": "chevron",
+                "id": "box",
                 "commands": [
-                 {"id": "p0", "op": "move", "points": [[0, 0]]},
-                 {"id": "p1", "op": "line", "points": [[6, 6]]},
-                 {"id": "p2", "op": "line", "points": [[12, 0]]}
+                 {"id": "p0", "op": "move", "points": [[0.75, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[13.25, 0.75]]},
+                 {"id": "p2", "op": "line", "points": [[13.25, 13.25]]},
+                 {"id": "p3", "op": "line", "points": [[0.75, 13.25]]},
+                 {"id": "close", "op": "close"}
                 ],
                 "stroke": {
                  "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
@@ -139836,19 +139819,19 @@
               ]
              },
              {
-              "id": "controls_invertmouse-popup",
+              "id": "controls_invertmouse-checked",
               "type": "group",
               "properties": {
                "position": {"type": "keyword", "value": "absolute"},
-               "left": {"type": "length", "value": 188.0, "unit": "dp"},
-               "top": {"type": "length", "value": 56.0, "unit": "dp"},
-               "width": {"type": "length", "value": 168.0, "unit": "dp"},
-               "height": {"type": "length", "value": 48.0, "unit": "dp"},
+               "left": {"type": "length", "value": 196.0, "unit": "dp"},
+               "top": {"type": "length", "value": 21.0, "unit": "dp"},
+               "width": {"type": "length", "value": 14, "unit": "dp"},
+               "height": {"type": "length", "value": 14, "unit": "dp"},
                "display": {"type": "keyword", "value": "none"}
               },
               "children": [
                {
-                "id": "controls_invertmouse-popup-frame",
+                "id": "controls_invertmouse-mark",
                 "type": "vector",
                 "properties": {
                  "position": {"type": "keyword", "value": "absolute"},
@@ -139859,295 +139842,15 @@
                 },
                 "paths": [
                  {
-                  "id": "rim",
+                  "id": "mark",
                   "commands": [
-                   {"id": "p0", "op": "move", "points": [[0, 0]]},
-                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
+                   {"id": "p0", "op": "move", "points": [[3.5, 3.5]]},
+                   {"id": "p1", "op": "line", "points": [[10.5, 3.5]]},
+                   {"id": "p2", "op": "line", "points": [[10.5, 10.5]]},
+                   {"id": "p3", "op": "line", "points": [[3.5, 10.5]]},
                    {"id": "close", "op": "close"}
                   ],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 1]}},
-                   "widthDp": 4,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "body",
-                  "commands": [
-                   {"id": "p0", "op": "move", "points": [[0, 0]]},
-                   {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-                   {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-                   {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
-                   {"id": "close", "op": "close"}
-                  ],
-                  "fill": {"type": "solid", "color": {"type": "color", "value": [0, 0, 0, 0.96]}},
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [0.698, 0.8039, 0.2627, 0.2]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 }
-                ]
-               },
-               {
-                "id": "controls_invertmouse-viewport",
-                "type": "group",
-                "properties": {
-                 "position": {"type": "keyword", "value": "relative"},
-                 "display": {"type": "keyword", "value": "block"},
-                 "width": {"type": "length", "value": 150.0, "unit": "dp"},
-                 "height": {"type": "length", "value": 44.0, "unit": "dp"},
-                 "margin-left": {"type": "length", "value": 2, "unit": "dp"},
-                 "margin-top": {"type": "length", "value": 2, "unit": "dp"}
-                },
-                "children": [
-                 {
-                  "id": "controls_invertmouse-content",
-                  "type": "group",
-                  "properties": {
-                   "position": {"type": "keyword", "value": "absolute"},
-                   "left": {"type": "length", "value": 0, "unit": "dp"},
-                   "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 100, "unit": "%"}
-                  },
-                  "children": [
-                   {
-                    "id": "controls_invertmouse-option-0",
-                    "type": "group",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "relative"},
-                     "display": {"type": "keyword", "value": "block"},
-                     "width": {"type": "length", "value": 100, "unit": "%"},
-                     "height": {"type": "length", "value": 22.0, "unit": "dp"}
-                    },
-                    "children": [
-                     {
-                      "id": "controls_invertmouse-option-0-selected",
-                      "type": "vector",
-                      "properties": {
-                       "position": {"type": "keyword", "value": "absolute"},
-                       "left": {"type": "length", "value": 0, "unit": "dp"},
-                       "top": {"type": "length", "value": 0, "unit": "dp"},
-                       "width": {"type": "length", "value": 100, "unit": "%"},
-                       "height": {"type": "length", "value": 100, "unit": "%"},
-                       "display": {"type": "keyword", "value": "none"}
-                      },
-                      "paths": [
-                       {
-                        "id": "band",
-                        "commands": [
-                         {"id": "p0", "op": "move", "points": [[0, 0]]},
-                         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-                         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-                         {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
-                         {"id": "close", "op": "close"}
-                        ],
-                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
-                       }
-                      ]
-                     },
-                     {
-                      "id": "controls_invertmouse-option-0-highlight",
-                      "type": "vector",
-                      "properties": {
-                       "position": {"type": "keyword", "value": "absolute"},
-                       "left": {"type": "length", "value": 0, "unit": "dp"},
-                       "top": {"type": "length", "value": 0, "unit": "dp"},
-                       "width": {"type": "length", "value": 100, "unit": "%"},
-                       "height": {"type": "length", "value": 100, "unit": "%"},
-                       "display": {"type": "keyword", "value": "none"}
-                      },
-                      "paths": [
-                       {
-                        "id": "band",
-                        "commands": [
-                         {"id": "p0", "op": "move", "points": [[0, 0]]},
-                         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-                         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-                         {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
-                         {"id": "close", "op": "close"}
-                        ],
-                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
-                       }
-                      ]
-                     },
-                     {
-                      "id": "controls_invertmouse-option-0-label",
-                      "type": "text",
-                      "properties": {
-                       "text": {"type": "text", "value": "#str_200059"},
-                       "position": {"type": "keyword", "value": "relative"},
-                       "display": {"type": "keyword", "value": "block"},
-                       "padding-left": {"type": "length", "value": 8, "unit": "dp"},
-                       "font-family": {"type": "font", "value": "lowpixel"},
-                       "font-size": {"type": "length", "value": 15, "unit": "dp"},
-                       "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
-                       "color": {"type": "color", "value": [1, 1, 1, 0.9]},
-                       "white-space": {"type": "keyword", "value": "nowrap"},
-                       "overflow": {"type": "keyword", "value": "hidden"}
-                      }
-                     }
-                    ]
-                   },
-                   {
-                    "id": "controls_invertmouse-option-1",
-                    "type": "group",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "relative"},
-                     "display": {"type": "keyword", "value": "block"},
-                     "width": {"type": "length", "value": 100, "unit": "%"},
-                     "height": {"type": "length", "value": 22.0, "unit": "dp"}
-                    },
-                    "children": [
-                     {
-                      "id": "controls_invertmouse-option-1-selected",
-                      "type": "vector",
-                      "properties": {
-                       "position": {"type": "keyword", "value": "absolute"},
-                       "left": {"type": "length", "value": 0, "unit": "dp"},
-                       "top": {"type": "length", "value": 0, "unit": "dp"},
-                       "width": {"type": "length", "value": 100, "unit": "%"},
-                       "height": {"type": "length", "value": 100, "unit": "%"},
-                       "display": {"type": "keyword", "value": "none"}
-                      },
-                      "paths": [
-                       {
-                        "id": "band",
-                        "commands": [
-                         {"id": "p0", "op": "move", "points": [[0, 0]]},
-                         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-                         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-                         {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
-                         {"id": "close", "op": "close"}
-                        ],
-                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.35]}}
-                       }
-                      ]
-                     },
-                     {
-                      "id": "controls_invertmouse-option-1-highlight",
-                      "type": "vector",
-                      "properties": {
-                       "position": {"type": "keyword", "value": "absolute"},
-                       "left": {"type": "length", "value": 0, "unit": "dp"},
-                       "top": {"type": "length", "value": 0, "unit": "dp"},
-                       "width": {"type": "length", "value": 100, "unit": "%"},
-                       "height": {"type": "length", "value": 100, "unit": "%"},
-                       "display": {"type": "keyword", "value": "none"}
-                      },
-                      "paths": [
-                       {
-                        "id": "band",
-                        "commands": [
-                         {"id": "p0", "op": "move", "points": [[0, 0]]},
-                         {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 0]]},
-                         {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1}]]},
-                         {"id": "p3", "op": "line", "points": [[0, {"fraction": 1}]]},
-                         {"id": "close", "op": "close"}
-                        ],
-                        "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 0.3]}}
-                       }
-                      ]
-                     },
-                     {
-                      "id": "controls_invertmouse-option-1-label",
-                      "type": "text",
-                      "properties": {
-                       "text": {"type": "text", "value": "#str_200059"},
-                       "position": {"type": "keyword", "value": "relative"},
-                       "display": {"type": "keyword", "value": "block"},
-                       "padding-left": {"type": "length", "value": 8, "unit": "dp"},
-                       "font-family": {"type": "font", "value": "lowpixel"},
-                       "font-size": {"type": "length", "value": 15, "unit": "dp"},
-                       "line-height": {"type": "length", "value": 22.0, "unit": "dp"},
-                       "color": {"type": "color", "value": [1, 1, 1, 0.9]},
-                       "white-space": {"type": "keyword", "value": "nowrap"},
-                       "overflow": {"type": "keyword", "value": "hidden"}
-                      }
-                     }
-                    ]
-                   }
-                  ]
-                 }
-                ]
-               },
-               {
-                "id": "controls_invertmouse-scroll-track",
-                "type": "group",
-                "properties": {
-                 "position": {"type": "keyword", "value": "absolute"},
-                 "left": {"type": "length", "value": 156.0, "unit": "dp"},
-                 "top": {"type": "length", "value": 2, "unit": "dp"},
-                 "width": {"type": "length", "value": 8, "unit": "dp"},
-                 "height": {"type": "length", "value": 44.0, "unit": "dp"}
-                },
-                "children": [
-                 {
-                  "id": "controls_invertmouse-scroll-trough",
-                  "type": "vector",
-                  "properties": {
-                   "position": {"type": "keyword", "value": "absolute"},
-                   "left": {"type": "length", "value": 0, "unit": "dp"},
-                   "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 100, "unit": "%"},
-                   "height": {"type": "length", "value": 100, "unit": "%"}
-                  },
-                  "paths": [
-                   {
-                    "id": "trough",
-                    "commands": [
-                     {"id": "p0", "op": "move", "points": [[3, 0]]},
-                     {"id": "p1", "op": "line", "points": [[5, 0]]},
-                     {"id": "p2", "op": "line", "points": [[5, {"fraction": 1}]]},
-                     {"id": "p3", "op": "line", "points": [[3, {"fraction": 1}]]},
-                     {"id": "close", "op": "close"}
-                    ],
-                    "fill": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.12]}}
-                   }
-                  ]
-                 },
-                 {
-                  "id": "controls_invertmouse-scroll-thumb",
-                  "type": "group",
-                  "properties": {
-                   "position": {"type": "keyword", "value": "absolute"},
-                   "left": {"type": "length", "value": 0, "unit": "dp"},
-                   "top": {"type": "length", "value": 0, "unit": "dp"},
-                   "width": {"type": "length", "value": 8, "unit": "dp"},
-                   "height": {"type": "length", "value": 24, "unit": "dp"}
-                  },
-                  "children": [
-                   {
-                    "id": "controls_invertmouse-scroll-ink",
-                    "type": "vector",
-                    "properties": {
-                     "position": {"type": "keyword", "value": "absolute"},
-                     "left": {"type": "length", "value": 0, "unit": "dp"},
-                     "top": {"type": "length", "value": 0, "unit": "dp"},
-                     "width": {"type": "length", "value": 100, "unit": "%"},
-                     "height": {"type": "length", "value": 100, "unit": "%"}
-                    },
-                    "paths": [
-                     {
-                      "id": "thumb",
-                      "commands": [
-                       {"id": "p0", "op": "move", "points": [[1, 0]]},
-                       {"id": "p1", "op": "line", "points": [[7, 0]]},
-                       {"id": "p2", "op": "line", "points": [[7, {"fraction": 1}]]},
-                       {"id": "p3", "op": "line", "points": [[1, {"fraction": 1}]]},
-                       {"id": "close", "op": "close"}
-                      ],
-                      "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.9]}}
-                     }
-                    ]
-                   }
-                  ]
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
                  }
                 ]
                }
@@ -140155,10 +139858,10 @@
              }
             ],
             "control": {
-             "role": "choice",
+             "role": "toggle",
              "label": "#str_200139",
-             "action": "set.m_pitch",
-             "value": {"state": "cvar.m_pitch"},
+             "action": "flag.m_pitch",
+             "value": {"op": "==", "args": [{"state": "cvar.m_pitch"}, "-0.022"]},
              "states": {
               "default": "controls_invertmouse.default",
               "hover": "controls_invertmouse.hover",
@@ -140166,46 +139869,7 @@
               "pressed": "controls_invertmouse.pressed",
               "disabled": "controls_invertmouse.disabled"
              },
-             "parts": {
-              "popup": "controls_invertmouse-popup",
-              "viewport": "controls_invertmouse-viewport",
-              "content": "controls_invertmouse-content",
-              "value": "controls_invertmouse-value"
-             },
-             "visibleRows": 2,
-             "options": [
-              {
-               "id": "controls_invertmouse-option-0",
-               "node": "controls_invertmouse-option-0",
-               "label": "#str_200059",
-               "value": "0.022",
-               "parts": {
-                "label": "controls_invertmouse-option-0-label",
-                "selected": "controls_invertmouse-option-0-selected",
-                "highlight": "controls_invertmouse-option-0-highlight"
-               },
-               "labelIndex": 0
-              },
-              {
-               "id": "controls_invertmouse-option-1",
-               "node": "controls_invertmouse-option-1",
-               "label": "#str_200059",
-               "value": "-0.022",
-               "parts": {
-                "label": "controls_invertmouse-option-1-label",
-                "selected": "controls_invertmouse-option-1-selected",
-                "highlight": "controls_invertmouse-option-1-highlight"
-               },
-               "labelIndex": 1
-              }
-             ],
-             "placementBounds": "screen",
-             "scrollbar": {
-              "track": "controls_invertmouse-scroll-track",
-              "thumb": "controls_invertmouse-scroll-thumb",
-              "lineStep": 22.0,
-              "minimumThumb": 24
-             }
+             "parts": {"checked": "controls_invertmouse-checked"}
             }
            },
            {
@@ -141469,9 +141133,9 @@
               "pressed": "controls_msensitivity.pressed",
               "disabled": "controls_msensitivity.disabled"
              },
-             "minimum": 0.01,
+             "minimum": 0.1,
              "maximum": 30,
-             "step": 0.01,
+             "step": 0.1,
              "decimals": 2,
              "orientation": "horizontal",
              "parts": {
@@ -152518,7 +152182,7 @@
                  },
                  {
                   "id": "tick1",
-                  "commands": [{"id": "p0", "op": "move", "points": [[4.16, 9.8]]}, {"id": "p1", "op": "line", "points": [[4.16, 16.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[5.2, 9.75]]}, {"id": "p1", "op": "line", "points": [[5.2, 16.25]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152529,7 +152193,7 @@
                  },
                  {
                   "id": "tick2",
-                  "commands": [{"id": "p0", "op": "move", "points": [[8.32, 9.6]]}, {"id": "p1", "op": "line", "points": [[8.32, 16.4]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[10.4, 9.5]]}, {"id": "p1", "op": "line", "points": [[10.4, 16.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152540,7 +152204,7 @@
                  },
                  {
                   "id": "tick3",
-                  "commands": [{"id": "p0", "op": "move", "points": [[12.48, 9.4]]}, {"id": "p1", "op": "line", "points": [[12.48, 16.6]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[15.6, 9.25]]}, {"id": "p1", "op": "line", "points": [[15.6, 16.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152551,17 +152215,6 @@
                  },
                  {
                   "id": "tick4",
-                  "commands": [{"id": "p0", "op": "move", "points": [[16.64, 9.2]]}, {"id": "p1", "op": "line", "points": [[16.64, 16.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick5",
                   "commands": [{"id": "p0", "op": "move", "points": [[20.8, 9.0]]}, {"id": "p1", "op": "line", "points": [[20.8, 17.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -152572,8 +152225,19 @@
                   }
                  },
                  {
+                  "id": "tick5",
+                  "commands": [{"id": "p0", "op": "move", "points": [[26.0, 8.75]]}, {"id": "p1", "op": "line", "points": [[26.0, 17.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick6",
-                  "commands": [{"id": "p0", "op": "move", "points": [[24.96, 8.8]]}, {"id": "p1", "op": "line", "points": [[24.96, 17.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[31.2, 8.5]]}, {"id": "p1", "op": "line", "points": [[31.2, 17.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152584,7 +152248,7 @@
                  },
                  {
                   "id": "tick7",
-                  "commands": [{"id": "p0", "op": "move", "points": [[29.12, 8.6]]}, {"id": "p1", "op": "line", "points": [[29.12, 17.4]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[36.4, 8.25]]}, {"id": "p1", "op": "line", "points": [[36.4, 17.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152595,28 +152259,6 @@
                  },
                  {
                   "id": "tick8",
-                  "commands": [{"id": "p0", "op": "move", "points": [[33.28, 8.4]]}, {"id": "p1", "op": "line", "points": [[33.28, 17.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick9",
-                  "commands": [{"id": "p0", "op": "move", "points": [[37.44, 8.2]]}, {"id": "p1", "op": "line", "points": [[37.44, 17.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick10",
                   "commands": [{"id": "p0", "op": "move", "points": [[41.6, 8.0]]}, {"id": "p1", "op": "line", "points": [[41.6, 18.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -152627,8 +152269,30 @@
                   }
                  },
                  {
+                  "id": "tick9",
+                  "commands": [{"id": "p0", "op": "move", "points": [[46.8, 7.75]]}, {"id": "p1", "op": "line", "points": [[46.8, 18.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick10",
+                  "commands": [{"id": "p0", "op": "move", "points": [[52.0, 7.5]]}, {"id": "p1", "op": "line", "points": [[52.0, 18.5]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick11",
-                  "commands": [{"id": "p0", "op": "move", "points": [[45.76, 7.8]]}, {"id": "p1", "op": "line", "points": [[45.76, 18.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[57.2, 7.25]]}, {"id": "p1", "op": "line", "points": [[57.2, 18.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152639,39 +152303,6 @@
                  },
                  {
                   "id": "tick12",
-                  "commands": [{"id": "p0", "op": "move", "points": [[49.92, 7.6]]}, {"id": "p1", "op": "line", "points": [[49.92, 18.4]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick13",
-                  "commands": [{"id": "p0", "op": "move", "points": [[54.08, 7.4]]}, {"id": "p1", "op": "line", "points": [[54.08, 18.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick14",
-                  "commands": [{"id": "p0", "op": "move", "points": [[58.24, 7.2]]}, {"id": "p1", "op": "line", "points": [[58.24, 18.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick15",
                   "commands": [{"id": "p0", "op": "move", "points": [[62.4, 7.0]]}, {"id": "p1", "op": "line", "points": [[62.4, 19.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -152682,51 +152313,40 @@
                   }
                  },
                  {
+                  "id": "tick13",
+                  "commands": [{"id": "p0", "op": "move", "points": [[67.6, 6.75]]}, {"id": "p1", "op": "line", "points": [[67.6, 19.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick14",
+                  "commands": [{"id": "p0", "op": "move", "points": [[72.8, 6.5]]}, {"id": "p1", "op": "line", "points": [[72.8, 19.5]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick15",
+                  "commands": [{"id": "p0", "op": "move", "points": [[78.0, 6.25]]}, {"id": "p1", "op": "line", "points": [[78.0, 19.75]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick16",
-                  "commands": [{"id": "p0", "op": "move", "points": [[66.56, 6.8]]}, {"id": "p1", "op": "line", "points": [[66.56, 19.2]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick17",
-                  "commands": [{"id": "p0", "op": "move", "points": [[70.72, 6.6]]}, {"id": "p1", "op": "line", "points": [[70.72, 19.4]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick18",
-                  "commands": [{"id": "p0", "op": "move", "points": [[74.88, 6.4]]}, {"id": "p1", "op": "line", "points": [[74.88, 19.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick19",
-                  "commands": [{"id": "p0", "op": "move", "points": [[79.04, 6.2]]}, {"id": "p1", "op": "line", "points": [[79.04, 19.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick20",
                   "commands": [{"id": "p0", "op": "move", "points": [[83.2, 6.0]]}, {"id": "p1", "op": "line", "points": [[83.2, 20.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -152737,8 +152357,8 @@
                   }
                  },
                  {
-                  "id": "tick21",
-                  "commands": [{"id": "p0", "op": "move", "points": [[87.36, 5.8]]}, {"id": "p1", "op": "line", "points": [[87.36, 20.2]]}],
+                  "id": "tick17",
+                  "commands": [{"id": "p0", "op": "move", "points": [[88.4, 5.75]]}, {"id": "p1", "op": "line", "points": [[88.4, 20.25]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152748,8 +152368,8 @@
                   }
                  },
                  {
-                  "id": "tick22",
-                  "commands": [{"id": "p0", "op": "move", "points": [[91.52, 5.6]]}, {"id": "p1", "op": "line", "points": [[91.52, 20.4]]}],
+                  "id": "tick18",
+                  "commands": [{"id": "p0", "op": "move", "points": [[93.6, 5.5]]}, {"id": "p1", "op": "line", "points": [[93.6, 20.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152759,8 +152379,8 @@
                   }
                  },
                  {
-                  "id": "tick23",
-                  "commands": [{"id": "p0", "op": "move", "points": [[95.68, 5.4]]}, {"id": "p1", "op": "line", "points": [[95.68, 20.6]]}],
+                  "id": "tick19",
+                  "commands": [{"id": "p0", "op": "move", "points": [[98.8, 5.25]]}, {"id": "p1", "op": "line", "points": [[98.8, 20.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -152770,18 +152390,7 @@
                   }
                  },
                  {
-                  "id": "tick24",
-                  "commands": [{"id": "p0", "op": "move", "points": [[99.84, 5.2]]}, {"id": "p1", "op": "line", "points": [[99.84, 20.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick25",
+                  "id": "tick20",
                   "commands": [{"id": "p0", "op": "move", "points": [[104.0, 5.0]]}, {"id": "p1", "op": "line", "points": [[104.0, 21.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -152905,7 +152514,7 @@
              },
              "minimum": 0,
              "maximum": 1,
-             "step": 0.01,
+             "step": 0.05,
              "decimals": 2,
              "orientation": "horizontal",
              "parts": {
@@ -155768,7 +155377,7 @@
                  },
                  {
                   "id": "tick1",
-                  "commands": [{"id": "p0", "op": "move", "points": [[4.16, 9.8]]}, {"id": "p1", "op": "line", "points": [[4.16, 16.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[5.2, 9.75]]}, {"id": "p1", "op": "line", "points": [[5.2, 16.25]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -155779,7 +155388,7 @@
                  },
                  {
                   "id": "tick2",
-                  "commands": [{"id": "p0", "op": "move", "points": [[8.32, 9.6]]}, {"id": "p1", "op": "line", "points": [[8.32, 16.4]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[10.4, 9.5]]}, {"id": "p1", "op": "line", "points": [[10.4, 16.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -155790,7 +155399,7 @@
                  },
                  {
                   "id": "tick3",
-                  "commands": [{"id": "p0", "op": "move", "points": [[12.48, 9.4]]}, {"id": "p1", "op": "line", "points": [[12.48, 16.6]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[15.6, 9.25]]}, {"id": "p1", "op": "line", "points": [[15.6, 16.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -155801,17 +155410,6 @@
                  },
                  {
                   "id": "tick4",
-                  "commands": [{"id": "p0", "op": "move", "points": [[16.64, 9.2]]}, {"id": "p1", "op": "line", "points": [[16.64, 16.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick5",
                   "commands": [{"id": "p0", "op": "move", "points": [[20.8, 9.0]]}, {"id": "p1", "op": "line", "points": [[20.8, 17.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -155822,8 +155420,19 @@
                   }
                  },
                  {
+                  "id": "tick5",
+                  "commands": [{"id": "p0", "op": "move", "points": [[26.0, 8.75]]}, {"id": "p1", "op": "line", "points": [[26.0, 17.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick6",
-                  "commands": [{"id": "p0", "op": "move", "points": [[24.96, 8.8]]}, {"id": "p1", "op": "line", "points": [[24.96, 17.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[31.2, 8.5]]}, {"id": "p1", "op": "line", "points": [[31.2, 17.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -155834,7 +155443,7 @@
                  },
                  {
                   "id": "tick7",
-                  "commands": [{"id": "p0", "op": "move", "points": [[29.12, 8.6]]}, {"id": "p1", "op": "line", "points": [[29.12, 17.4]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[36.4, 8.25]]}, {"id": "p1", "op": "line", "points": [[36.4, 17.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -155845,28 +155454,6 @@
                  },
                  {
                   "id": "tick8",
-                  "commands": [{"id": "p0", "op": "move", "points": [[33.28, 8.4]]}, {"id": "p1", "op": "line", "points": [[33.28, 17.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick9",
-                  "commands": [{"id": "p0", "op": "move", "points": [[37.44, 8.2]]}, {"id": "p1", "op": "line", "points": [[37.44, 17.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick10",
                   "commands": [{"id": "p0", "op": "move", "points": [[41.6, 8.0]]}, {"id": "p1", "op": "line", "points": [[41.6, 18.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -155877,8 +155464,30 @@
                   }
                  },
                  {
+                  "id": "tick9",
+                  "commands": [{"id": "p0", "op": "move", "points": [[46.8, 7.75]]}, {"id": "p1", "op": "line", "points": [[46.8, 18.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick10",
+                  "commands": [{"id": "p0", "op": "move", "points": [[52.0, 7.5]]}, {"id": "p1", "op": "line", "points": [[52.0, 18.5]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick11",
-                  "commands": [{"id": "p0", "op": "move", "points": [[45.76, 7.8]]}, {"id": "p1", "op": "line", "points": [[45.76, 18.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[57.2, 7.25]]}, {"id": "p1", "op": "line", "points": [[57.2, 18.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -155889,39 +155498,6 @@
                  },
                  {
                   "id": "tick12",
-                  "commands": [{"id": "p0", "op": "move", "points": [[49.92, 7.6]]}, {"id": "p1", "op": "line", "points": [[49.92, 18.4]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick13",
-                  "commands": [{"id": "p0", "op": "move", "points": [[54.08, 7.4]]}, {"id": "p1", "op": "line", "points": [[54.08, 18.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick14",
-                  "commands": [{"id": "p0", "op": "move", "points": [[58.24, 7.2]]}, {"id": "p1", "op": "line", "points": [[58.24, 18.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick15",
                   "commands": [{"id": "p0", "op": "move", "points": [[62.4, 7.0]]}, {"id": "p1", "op": "line", "points": [[62.4, 19.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -155932,51 +155508,40 @@
                   }
                  },
                  {
+                  "id": "tick13",
+                  "commands": [{"id": "p0", "op": "move", "points": [[67.6, 6.75]]}, {"id": "p1", "op": "line", "points": [[67.6, 19.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick14",
+                  "commands": [{"id": "p0", "op": "move", "points": [[72.8, 6.5]]}, {"id": "p1", "op": "line", "points": [[72.8, 19.5]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick15",
+                  "commands": [{"id": "p0", "op": "move", "points": [[78.0, 6.25]]}, {"id": "p1", "op": "line", "points": [[78.0, 19.75]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick16",
-                  "commands": [{"id": "p0", "op": "move", "points": [[66.56, 6.8]]}, {"id": "p1", "op": "line", "points": [[66.56, 19.2]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick17",
-                  "commands": [{"id": "p0", "op": "move", "points": [[70.72, 6.6]]}, {"id": "p1", "op": "line", "points": [[70.72, 19.4]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick18",
-                  "commands": [{"id": "p0", "op": "move", "points": [[74.88, 6.4]]}, {"id": "p1", "op": "line", "points": [[74.88, 19.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick19",
-                  "commands": [{"id": "p0", "op": "move", "points": [[79.04, 6.2]]}, {"id": "p1", "op": "line", "points": [[79.04, 19.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick20",
                   "commands": [{"id": "p0", "op": "move", "points": [[83.2, 6.0]]}, {"id": "p1", "op": "line", "points": [[83.2, 20.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -155987,8 +155552,8 @@
                   }
                  },
                  {
-                  "id": "tick21",
-                  "commands": [{"id": "p0", "op": "move", "points": [[87.36, 5.8]]}, {"id": "p1", "op": "line", "points": [[87.36, 20.2]]}],
+                  "id": "tick17",
+                  "commands": [{"id": "p0", "op": "move", "points": [[88.4, 5.75]]}, {"id": "p1", "op": "line", "points": [[88.4, 20.25]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -155998,8 +155563,8 @@
                   }
                  },
                  {
-                  "id": "tick22",
-                  "commands": [{"id": "p0", "op": "move", "points": [[91.52, 5.6]]}, {"id": "p1", "op": "line", "points": [[91.52, 20.4]]}],
+                  "id": "tick18",
+                  "commands": [{"id": "p0", "op": "move", "points": [[93.6, 5.5]]}, {"id": "p1", "op": "line", "points": [[93.6, 20.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -156009,8 +155574,8 @@
                   }
                  },
                  {
-                  "id": "tick23",
-                  "commands": [{"id": "p0", "op": "move", "points": [[95.68, 5.4]]}, {"id": "p1", "op": "line", "points": [[95.68, 20.6]]}],
+                  "id": "tick19",
+                  "commands": [{"id": "p0", "op": "move", "points": [[98.8, 5.25]]}, {"id": "p1", "op": "line", "points": [[98.8, 20.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -156020,18 +155585,7 @@
                   }
                  },
                  {
-                  "id": "tick24",
-                  "commands": [{"id": "p0", "op": "move", "points": [[99.84, 5.2]]}, {"id": "p1", "op": "line", "points": [[99.84, 20.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick25",
+                  "id": "tick20",
                   "commands": [{"id": "p0", "op": "move", "points": [[104.0, 5.0]]}, {"id": "p1", "op": "line", "points": [[104.0, 21.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -156152,7 +155706,7 @@
              },
              "minimum": 0,
              "maximum": 100,
-             "step": 1,
+             "step": 5,
              "decimals": 0,
              "orientation": "horizontal",
              "parts": {
@@ -157597,7 +157151,7 @@
                  },
                  {
                   "id": "tick1",
-                  "commands": [{"id": "p0", "op": "move", "points": [[4.16, 9.8]]}, {"id": "p1", "op": "line", "points": [[4.16, 16.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[5.2, 9.75]]}, {"id": "p1", "op": "line", "points": [[5.2, 16.25]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157608,7 +157162,7 @@
                  },
                  {
                   "id": "tick2",
-                  "commands": [{"id": "p0", "op": "move", "points": [[8.32, 9.6]]}, {"id": "p1", "op": "line", "points": [[8.32, 16.4]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[10.4, 9.5]]}, {"id": "p1", "op": "line", "points": [[10.4, 16.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157619,7 +157173,7 @@
                  },
                  {
                   "id": "tick3",
-                  "commands": [{"id": "p0", "op": "move", "points": [[12.48, 9.4]]}, {"id": "p1", "op": "line", "points": [[12.48, 16.6]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[15.6, 9.25]]}, {"id": "p1", "op": "line", "points": [[15.6, 16.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157630,17 +157184,6 @@
                  },
                  {
                   "id": "tick4",
-                  "commands": [{"id": "p0", "op": "move", "points": [[16.64, 9.2]]}, {"id": "p1", "op": "line", "points": [[16.64, 16.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick5",
                   "commands": [{"id": "p0", "op": "move", "points": [[20.8, 9.0]]}, {"id": "p1", "op": "line", "points": [[20.8, 17.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -157651,8 +157194,19 @@
                   }
                  },
                  {
+                  "id": "tick5",
+                  "commands": [{"id": "p0", "op": "move", "points": [[26.0, 8.75]]}, {"id": "p1", "op": "line", "points": [[26.0, 17.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick6",
-                  "commands": [{"id": "p0", "op": "move", "points": [[24.96, 8.8]]}, {"id": "p1", "op": "line", "points": [[24.96, 17.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[31.2, 8.5]]}, {"id": "p1", "op": "line", "points": [[31.2, 17.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157663,7 +157217,7 @@
                  },
                  {
                   "id": "tick7",
-                  "commands": [{"id": "p0", "op": "move", "points": [[29.12, 8.6]]}, {"id": "p1", "op": "line", "points": [[29.12, 17.4]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[36.4, 8.25]]}, {"id": "p1", "op": "line", "points": [[36.4, 17.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157674,28 +157228,6 @@
                  },
                  {
                   "id": "tick8",
-                  "commands": [{"id": "p0", "op": "move", "points": [[33.28, 8.4]]}, {"id": "p1", "op": "line", "points": [[33.28, 17.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick9",
-                  "commands": [{"id": "p0", "op": "move", "points": [[37.44, 8.2]]}, {"id": "p1", "op": "line", "points": [[37.44, 17.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick10",
                   "commands": [{"id": "p0", "op": "move", "points": [[41.6, 8.0]]}, {"id": "p1", "op": "line", "points": [[41.6, 18.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -157706,8 +157238,30 @@
                   }
                  },
                  {
+                  "id": "tick9",
+                  "commands": [{"id": "p0", "op": "move", "points": [[46.8, 7.75]]}, {"id": "p1", "op": "line", "points": [[46.8, 18.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick10",
+                  "commands": [{"id": "p0", "op": "move", "points": [[52.0, 7.5]]}, {"id": "p1", "op": "line", "points": [[52.0, 18.5]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick11",
-                  "commands": [{"id": "p0", "op": "move", "points": [[45.76, 7.8]]}, {"id": "p1", "op": "line", "points": [[45.76, 18.2]]}],
+                  "commands": [{"id": "p0", "op": "move", "points": [[57.2, 7.25]]}, {"id": "p1", "op": "line", "points": [[57.2, 18.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157718,39 +157272,6 @@
                  },
                  {
                   "id": "tick12",
-                  "commands": [{"id": "p0", "op": "move", "points": [[49.92, 7.6]]}, {"id": "p1", "op": "line", "points": [[49.92, 18.4]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick13",
-                  "commands": [{"id": "p0", "op": "move", "points": [[54.08, 7.4]]}, {"id": "p1", "op": "line", "points": [[54.08, 18.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick14",
-                  "commands": [{"id": "p0", "op": "move", "points": [[58.24, 7.2]]}, {"id": "p1", "op": "line", "points": [[58.24, 18.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick15",
                   "commands": [{"id": "p0", "op": "move", "points": [[62.4, 7.0]]}, {"id": "p1", "op": "line", "points": [[62.4, 19.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -157761,51 +157282,40 @@
                   }
                  },
                  {
+                  "id": "tick13",
+                  "commands": [{"id": "p0", "op": "move", "points": [[67.6, 6.75]]}, {"id": "p1", "op": "line", "points": [[67.6, 19.25]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick14",
+                  "commands": [{"id": "p0", "op": "move", "points": [[72.8, 6.5]]}, {"id": "p1", "op": "line", "points": [[72.8, 19.5]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
+                  "id": "tick15",
+                  "commands": [{"id": "p0", "op": "move", "points": [[78.0, 6.25]]}, {"id": "p1", "op": "line", "points": [[78.0, 19.75]]}],
+                  "stroke": {
+                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
+                   "widthDp": 1,
+                   "minimumPixels": 1,
+                   "join": "miter",
+                   "cap": "butt"
+                  }
+                 },
+                 {
                   "id": "tick16",
-                  "commands": [{"id": "p0", "op": "move", "points": [[66.56, 6.8]]}, {"id": "p1", "op": "line", "points": [[66.56, 19.2]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick17",
-                  "commands": [{"id": "p0", "op": "move", "points": [[70.72, 6.6]]}, {"id": "p1", "op": "line", "points": [[70.72, 19.4]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick18",
-                  "commands": [{"id": "p0", "op": "move", "points": [[74.88, 6.4]]}, {"id": "p1", "op": "line", "points": [[74.88, 19.6]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick19",
-                  "commands": [{"id": "p0", "op": "move", "points": [[79.04, 6.2]]}, {"id": "p1", "op": "line", "points": [[79.04, 19.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick20",
                   "commands": [{"id": "p0", "op": "move", "points": [[83.2, 6.0]]}, {"id": "p1", "op": "line", "points": [[83.2, 20.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -157816,8 +157326,8 @@
                   }
                  },
                  {
-                  "id": "tick21",
-                  "commands": [{"id": "p0", "op": "move", "points": [[87.36, 5.8]]}, {"id": "p1", "op": "line", "points": [[87.36, 20.2]]}],
+                  "id": "tick17",
+                  "commands": [{"id": "p0", "op": "move", "points": [[88.4, 5.75]]}, {"id": "p1", "op": "line", "points": [[88.4, 20.25]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157827,8 +157337,8 @@
                   }
                  },
                  {
-                  "id": "tick22",
-                  "commands": [{"id": "p0", "op": "move", "points": [[91.52, 5.6]]}, {"id": "p1", "op": "line", "points": [[91.52, 20.4]]}],
+                  "id": "tick18",
+                  "commands": [{"id": "p0", "op": "move", "points": [[93.6, 5.5]]}, {"id": "p1", "op": "line", "points": [[93.6, 20.5]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157838,8 +157348,8 @@
                   }
                  },
                  {
-                  "id": "tick23",
-                  "commands": [{"id": "p0", "op": "move", "points": [[95.68, 5.4]]}, {"id": "p1", "op": "line", "points": [[95.68, 20.6]]}],
+                  "id": "tick19",
+                  "commands": [{"id": "p0", "op": "move", "points": [[98.8, 5.25]]}, {"id": "p1", "op": "line", "points": [[98.8, 20.75]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
                    "widthDp": 1,
@@ -157849,18 +157359,7 @@
                   }
                  },
                  {
-                  "id": "tick24",
-                  "commands": [{"id": "p0", "op": "move", "points": [[99.84, 5.2]]}, {"id": "p1", "op": "line", "points": [[99.84, 20.8]]}],
-                  "stroke": {
-                   "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
-                   "widthDp": 1,
-                   "minimumPixels": 1,
-                   "join": "miter",
-                   "cap": "butt"
-                  }
-                 },
-                 {
-                  "id": "tick25",
+                  "id": "tick20",
                   "commands": [{"id": "p0", "op": "move", "points": [[104.0, 5.0]]}, {"id": "p1", "op": "line", "points": [[104.0, 21.0]]}],
                   "stroke": {
                    "paint": {"type": "solid", "color": {"type": "color", "value": [1, 1, 1, 0.45]}},
@@ -157981,7 +157480,7 @@
              },
              "minimum": 0,
              "maximum": 100,
-             "step": 1,
+             "step": 5,
              "decimals": 0,
              "orientation": "horizontal",
              "parts": {
@@ -160865,10 +160364,7 @@
              "role": "slider",
              "label": "#str_232709",
              "action": "set.in_joystickYawSpeed",
-             "value": {
-              "op": "/",
-              "args": [{"op": "round", "args": [{"op": "*", "args": [{"state": "cvar.in_joystickYawSpeed"}, 10]}]}, 10]
-             },
+             "value": {"state": "cvar.in_joystickYawSpeed"},
              "states": {
               "default": "controls_turnspeed.default",
               "hover": "controls_turnspeed.hover",
@@ -160878,8 +160374,8 @@
              },
              "minimum": 30,
              "maximum": 720,
-             "step": 5,
-             "decimals": 1,
+             "step": 10,
+             "decimals": 0,
              "orientation": "horizontal",
              "parts": {
               "track": "controls_turnspeed-track",
@@ -161382,10 +160878,7 @@
              "role": "slider",
              "label": "#str_232710",
              "action": "set.in_joystickPitchSpeed",
-             "value": {
-              "op": "/",
-              "args": [{"op": "round", "args": [{"op": "*", "args": [{"state": "cvar.in_joystickPitchSpeed"}, 10]}]}, 10]
-             },
+             "value": {"state": "cvar.in_joystickPitchSpeed"},
              "states": {
               "default": "controls_pitchspeed.default",
               "hover": "controls_pitchspeed.hover",
@@ -161395,8 +160888,8 @@
              },
              "minimum": 30,
              "maximum": 720,
-             "step": 5,
-             "decimals": 1,
+             "step": 10,
+             "decimals": 0,
              "orientation": "horizontal",
              "parts": {
               "track": "controls_pitchspeed-track",
@@ -173387,7 +172880,7 @@
              "action": "set.in_touchpadSensitivity",
              "value": {
               "op": "/",
-              "args": [{"op": "round", "args": [{"op": "*", "args": [{"state": "cvar.in_touchpadSensitivity"}, 100]}]}, 100]
+              "args": [{"op": "round", "args": [{"op": "*", "args": [{"state": "cvar.in_touchpadSensitivity"}, 10]}]}, 10]
              },
              "states": {
               "default": "controls_touchpadsensitivity.default",
@@ -173398,8 +172891,8 @@
              },
              "minimum": 0,
              "maximum": 8,
-             "step": 0.05,
-             "decimals": 2,
+             "step": 0.1,
+             "decimals": 1,
              "orientation": "horizontal",
              "parts": {
               "track": "controls_touchpadsensitivity-track",

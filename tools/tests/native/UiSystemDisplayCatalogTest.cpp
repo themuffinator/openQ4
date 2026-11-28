@@ -64,6 +64,13 @@ static void Open(View& v,const char* row) {
 }
 static std::string Highlight(View& v,const char* row,MenuInput key){v.Key(key);v.Frame();return v.runtime.GetWidgetState(row)->highlight;}
 static void Close(View& v,const char* row){v.Key(MenuInput::Back);v.Frame();Check(!v.runtime.GetWidgetState(row)->popupOpen&&v.runtime.TakeActions().empty(),"Back closes without a proposal");}
+// Expand Across Displays is a check box: whether it reads checked, and Accept
+// on it, which proposes the other setting.
+static bool Checked(View& v){const auto w=v.runtime.GetWidgetState(Span);Check(w.has_value(),"the span check box has a state");
+ return w&&std::holds_alternative<bool>(w->accepted)&&std::get<bool>(w->accepted);}
+static bool SpanUsable(View& v){return v.runtime.CanActivateControl(Span,v.time);}
+static ControlAction Pick(View& v);
+static ControlAction ToggleSpan(View& v){Check(v.Focus(Span),"the span check box focuses");v.Frame();return Pick(v);}
 static ControlAction Pick(View& v) {
  v.Key(MenuInput::Accept);auto actions=v.runtime.TakeActions();
  Check(actions.size()==1&&actions[0].proposal&&actions[0].proposalToken,"one typed proposal");return actions[0];
@@ -116,7 +123,7 @@ static void Stale(View& v) {
  Publish(v,{true,false,1,{"1: Primary monitor","Display 2 (not connected)","Display 3 (not connected)"}});
  Check(Shown(v,Device)=="block"&&Shown(v,Span)=="block","a stale display or span shows its row on one display");
  Check(ClosedText(v,Device)==Encoded("Display 3 (not connected)"),"the closed choice names the missing display");
- Check(ClosedText(v,Span)==Encoded(Segment(v,"#str_200059",1)),"the closed choice names the span");
+ Check(Checked(v),"the span check box reads checked");
  Open(v,Device);
  Check(Highlight(v,Device,MenuInput::Home)==Option(Device,0),"Auto leads the device list");
  Check(Highlight(v,Device,MenuInput::End)==Option(Device,1),"a display that is not connected cannot be picked");
@@ -131,9 +138,8 @@ static void Stale(View& v) {
  // The service writes r_screen; the readback precedes the acknowledgment.
  Draft(v,{{"r_screen",0.0}});Check(v.runtime.AcknowledgeControlProposal(Device,pick.proposalToken,true),"the readback acknowledges the pick");v.Frame();
  Check(Shown(v,Device)=="block","the pick keeps its row until it is applied");
- Open(v,Span);
- Check(Highlight(v,Span,MenuInput::End)==Option(Span,0),"a span the lists cannot offer cannot be picked");
- pick=Pick(v);Check(SettingsValueEqual(*pick.proposal,0.0),"the primary display alone is proposed");
+ Check(SpanUsable(v),"a span the lists cannot offer can still be turned off");
+ pick=ToggleSpan(v);Check(SettingsValueEqual(*pick.proposal,false),"unchecking proposes the primary display alone");
  invocation=Resolve(v,pick);
  Check(invocation.operation=="settings.system.edit"&&invocation.arguments==StateValues({{"r_multiScreen",0.0}}),"the span edits only r_multiScreen");
  Draft(v,{{"r_multiScreen",0.0}});Check(v.runtime.AcknowledgeControlProposal(Span,pick.proposalToken,true),"the readback acknowledges the span");v.Frame();
@@ -147,7 +153,7 @@ static void Several(View& v) {
  Draft(v,{{"r_screen",-1.0},{"r_multiScreen",0.0},{"r_fullscreen",false},{"r_borderless",false},{"r_fullscreenDesktop",false}});
  Check(Shown(v,Device)=="block"&&Shown(v,Span)=="block","several displays show both rows");
  Check(ClosedText(v,Device)==Encoded(v.host.strings.at("#str_229914")),"Auto reads its localized label");
- Check(ClosedText(v,Span)==Encoded(Segment(v,"#str_200059",0)),"the primary display alone reads its localized label");
+ Check(!Checked(v),"the primary display alone reads unchecked");
  Open(v,Device);
  Check(Highlight(v,Device,MenuInput::End)==Option(Device,2),"the list ends at the last display");
  Check(v.Element(Id(Option(Device,2).c_str(),"-label").c_str())->GetInnerRML()==Encoded(Two[1]),"a slot reads its published label");
@@ -186,19 +192,18 @@ static void Spanning(View& v) {
   Check(Shown(v,Reason)==(offered?"none":"block"),"a line says why spanning is unavailable, and only then");
   const auto reason=v.runtime.PresentedValue(Reason,"text");
   Check(reason&&reason->text==(available?"#str_230088":"#str_230089"),"the line names the missing window mode or the displays");
-  Open(v,Span);
-  Check(std::abs(Strength(v,Option(Span,1))-(offered?.90:.40))<.01,"Yes reads as unavailable exactly when it is");
-  Check(Highlight(v,Span,MenuInput::End)==Option(Span,offered?1:0),"the span is offered only where it can apply");
-  if(!offered){Close(v,Span);continue;}
-  auto pick=Pick(v);Check(SettingsValueEqual(*pick.proposal,1.0),"the span is proposed");
+  Check(SpanUsable(v)==offered,"the check box can be checked exactly where the span can apply");
+  const auto opacity=v.runtime.PresentedValue(Span,"opacity");
+  Check(opacity&&std::abs(opacity->data[0]-(offered?1.f:.45f))<.01,"it reads as unavailable exactly when it is");
+  if(!offered)continue;
+  auto pick=ToggleSpan(v);Check(SettingsValueEqual(*pick.proposal,true),"the span is proposed");
   const auto invocation=Resolve(v,pick);
   Check(invocation.operation=="settings.system.edit"&&invocation.arguments==StateValues({{"r_multiScreen",1.0}}),"the span edits only r_multiScreen");
   Check(v.runtime.AcknowledgeControlProposal(Span,pick.proposalToken,false),"decline the span");v.Frame();
  }
  // A drafted span stays named while it cannot apply, and can be turned off.
  Draft(v,{{"r_fullscreen",true},{"r_fullscreenDesktop",false},{"r_borderless",false},{"r_multiScreen",1.0}});
- Check(ClosedText(v,Span)==Encoded(Segment(v,"#str_200059",1)),"an unoffered span still names itself");
- Open(v,Span);Check(Highlight(v,Span,MenuInput::Home)==Option(Span,0),"the primary display alone stays pickable");Close(v,Span);
+ Check(Checked(v)&&SpanUsable(v),"an unoffered span still reads checked and can be turned off");
  // Exclusive Fullscreen switches one display's mode and cannot span, so
  // Window Mode offers it only while the draft keeps to one display.
  constexpr const char* Mode="settings_window_mode";
@@ -282,8 +287,13 @@ static void Guards(View& v) {
   Check(!v.runtime.CanActivateControl(Resolution,v.time)&&!v.runtime.CanActivateControl(Refresh,v.time),"size and rate picks wait for competing workflows");
   Check(v.runtime.SetState({{"page.discardVisible",false}},v.error,v.time),"clear the local discard dialog");
  }
- v.Sync();v.Frame();Check(v.runtime.CanActivateControl(Device,v.time)&&v.runtime.CanActivateControl(Span,v.time),"both rows act again");
+ v.Sync();v.Frame();Check(v.runtime.CanActivateControl(Device,v.time),"the display row acts again");
  Check(v.runtime.CanActivateControl(Resolution,v.time)&&v.runtime.CanActivateControl(Refresh,v.time),"the size and rate rows act again");
+ // Expand Across Displays' check box acts again in a mode that can span:
+ // exclusive fullscreen, which the size and rate rows need, cannot.
+ Check(!v.runtime.CanActivateControl(Span,v.time),"exclusive fullscreen cannot be spanned");
+ Draft(v,{{"r_fullscreenDesktop",true}});Check(v.runtime.CanActivateControl(Span,v.time),"the span check box acts again");
+ Draft(v,{{"r_fullscreenDesktop",false}});
 }
 // A long name and every slot: cards and popups fit and stay revealed.
 static void Fit(View& v,const char* locale,float expansion) {
@@ -307,13 +317,19 @@ static void Fit(View& v,const char* locale,float expansion) {
   Publish(v,{true,true,8,labels});PublishSizes(v,full);
   Draft(v,{{"r_screen",c.longName?1.0:0.0},{"r_multiScreen",0.0},{"r_fullscreenDesktop",false}});
   for(const auto* row:{Device,Span,Resolution,Refresh}) {
-   Check(v.runtime.FocusControl("settings_vsync",v.time),"focus leaves the display row");v.Frame();
-   Check(v.runtime.FocusControl(row,v.time),"the display row receives focus");v.Frame();
+   // Expand Across Displays is a check box, with no value text, and waits
+   // while the draft is exclusive fullscreen: it is measured beside the
+   // focused display row before it.
+   const bool box=row==Span;
+   if(!box){
+    Check(v.runtime.FocusControl("settings_vsync",v.time),"focus leaves the display row");v.Frame();
+    Check(v.runtime.FocusControl(row,v.time),"the display row receives focus");v.Frame();
+   }
    // Every row keeps its 36 dp slot: the whole row stays in the pages' bounds and on screen.
    const auto card=v.Box(row);
    Inside(card,v.Box("settings-body"),"the focused display row stays in the pages' bounds");
    Inside(card,{0,0,float(c.width),float(c.height)},"the focused display row stays on screen");
-   RowTextFits(v,Id(row,"-label").c_str());RowTextFits(v,Id(row,"-value").c_str());
+   RowTextFits(v,Id(row,"-label").c_str());if(!box)RowTextFits(v,Id(row,"-value").c_str());
   }
   Open(v,Device);
   Inside(v.Box(Id(Device,"-popup").c_str()),v.Box("settings-body"),"the device popup unfolds within the pages' bounds");

@@ -378,8 +378,7 @@ static bool Session_RetainedValueRequest( const char *request, const char *const
 static const char *const RETAINED_AUDIO_GUI = "guis/menu/settings/audio.rui";
 static const char *const RETAINED_AUDIO_VERBS[] = {
 	"audioVolume", "audioMusic", "audioDialogue", "audioBackend", "audioDevice", "audioEax", "audioSpeakers", "audioHrtf",
-	"audioRetailUpsampling",
-	"audioSubtitles", "audioSubtitleSize", "audioSubtitleBackground", "audioSubtitleSpeakers", "audioSubtitleUntranscribed"
+	"audioRetailUpsampling"
 };
 static const int RETAINED_AUDIO_VERB_COUNT = sizeof( RETAINED_AUDIO_VERBS ) / sizeof( RETAINED_AUDIO_VERBS[0] );
 static const int RETAINED_AUDIO_DEVICES = 16;
@@ -2671,10 +2670,10 @@ void idSessionLocal::ReturnRetainedAudio() {
 idSessionLocal::PublishRetainedAudio
 
 The AUDIO page's values as the session reads them back: the three volumes
-and the subtitle size and background as whole percents, the sound system,
-the device (the row of s_deviceName in the device list, which it publishes
-too, read as a device's text), EAX, the speakers' choice (Auto, 2 or 6),
-HRTF and the three subtitle switches (on, speaker names, untranscribed speech).
+as whole percents, the sound system, the device (the row of s_deviceName in
+the device list, which it publishes too, read as a device's text), EAX, the
+speakers' choice (Auto, 2 or 6), HRTF and Original Game Sound. The dialogue
+subtitles are GAME OPTIONS' rows (settings.player.set).
 ===============
 */
 void idSessionLocal::PublishRetainedAudio( idUserInterface *gui ) {
@@ -2717,11 +2716,6 @@ void idSessionLocal::PublishRetainedAudio( idUserInterface *gui ) {
 	gui->SetStateInt( "audio.speakers", speakers );
 	gui->SetStateInt( "audio.hrtf", idMath::ClampInt( 0, 2, cvarSystem->GetCVarInteger( "s_openALHRTF" ) ) );
 	gui->SetStateBool( "audio.retailUpsampling", cvarSystem->GetCVarBool( "s_retailUpsampling" ) );
-	gui->SetStateBool( "audio.subtitles", cvarSystem->GetCVarBool( "ui_subtitles" ) );
-	gui->SetStateInt( "audio.subtitleSize", percent( "ui_subtitleScale", 100.0f ) );
-	gui->SetStateInt( "audio.subtitleBackground", percent( "ui_subtitleBackground", 100.0f ) );
-	gui->SetStateBool( "audio.subtitleSpeakers", cvarSystem->GetCVarBool( "ui_subtitleSpeakers" ) );
-	gui->SetStateBool( "audio.subtitleUntranscribed", cvarSystem->GetCVarBool( "ui_subtitleUntranscribed" ) );
 	gui->StateChanged( common->GetPresentationTime() );
 #endif
 }
@@ -2785,11 +2779,6 @@ void idSessionLocal::HandleRetainedAudioRequest( idUserInterface *gui, const cha
 			cvarSystem->SetCVarBool( "s_retailUpsampling", value != 0 );
 			HandleMainMenuCommands( "sound drivar" );
 			break;
-		case 9: cvarSystem->SetCVarBool( "ui_subtitles", value != 0 ); break;
-		case 10: cvarSystem->SetCVarFloat( "ui_subtitleScale", idMath::ClampInt( 100, 200, value ) / 100.0f ); break;
-		case 11: cvarSystem->SetCVarFloat( "ui_subtitleBackground", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
-		case 12: cvarSystem->SetCVarBool( "ui_subtitleSpeakers", value != 0 ); break;
-		case 13: cvarSystem->SetCVarBool( "ui_subtitleUntranscribed", value != 0 ); break;
 		default: return;
 	}
 	PublishRetainedAudio( gui );

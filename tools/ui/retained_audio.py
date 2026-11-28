@@ -1,14 +1,18 @@
 """The retained AUDIO settings page (docs/dev/ui-visual-design.md sections 7,
 9 and 13.7; UI-01): the stock page's rows (guis/menu/settings/audio.gui),
-LEVELS, DEVICES, EFFECTS and SUBTITLES, in the settings sub-page
+LEVELS, DEVICES and EFFECTS, in the settings sub-page
 (retained_settings_rows). They fit one screen, so the page has no tabs:
-LEVELS and DEVICES in the first column, EFFECTS and SUBTITLES in the second,
-under Create Server's header band. The subtitle rows have their own heading:
-under EFFECTS they read as sound effects.
+LEVELS and DEVICES in the first column, EFFECTS in the second, under Create
+Server's header band. The dialogue subtitles are GAME OPTIONS'
+ACCESSIBILITY rows (retained_game).
+
+The master volume runs from 0 to 200 %: s_volume 1 is full scale and 0.5
+its default, and Quake 4's own slider ran from 0 to 2 in steps of 0.1
+(docs/dev/audio-volume-parity.md).
 
 The page applies each change at once, as the stock page does, through the
 session (session.menuValue verbs, idSessionLocal::HandleRetainedAudioRequest):
-the three volumes and the subtitle size and background as whole percents,
+the three volumes as whole percents,
 the sound system, device, EAX, speakers, HRTF and Original Game Sound with the stock page's own
 commands (sound drivar, sound eax, sound speakers), which restart the sound
 system and may ask with the stock message box. The session publishes the
@@ -43,31 +47,20 @@ SECTIONS = (
         # Original Game Sound (s_retailUpsampling): samples repeated to 44.1 kHz, as Quake 4's mixer did
         ("toggle", "audio_retail", "#str_233572", "audioRetailUpsampling", "audio.retailUpsampling", None),
     )),
-    ("subtitles", "#str_232554", (
-        ("toggle", "audio_subtitles", "#str_231308", "audioSubtitles", "audio.subtitles", None),
-        ("slider", "audio_subtitle_size", "#str_231309", "audioSubtitleSize", "audio.subtitleSize", (100, 200, 10)),
-        ("slider", "audio_subtitle_background", "#str_231310", "audioSubtitleBackground", "audio.subtitleBackground", (0, 100, 10)),
-        ("toggle", "audio_subtitle_speakers", "#str_231311", "audioSubtitleSpeakers", "audio.subtitleSpeakers", None),
-        ("toggle", "audio_subtitle_untranscribed", "#str_231313", "audioSubtitleUntranscribed", "audio.subtitleUntranscribed", None),
-    )),
 )
 VERBS = tuple(row[3] for _section, _heading, rows in SECTIONS for row in rows)
 
 
 # The rows another setting turns off (retained_settings_rows.requires), each
-# the condition under which it does anything: the subtitle options with
-# Subtitles off (the game draws no subtitle, Subtitles.inl), and the speakers
-# while Headphone HRTF is On, which takes stereo HRTF output whatever they
-# say (AL_SoundHardware.cpp openQ4_GetRequestedOutputMode).
-SUBTITLES_ON = {"state": "audio.subtitles"}
+# the condition under which it does anything: the speakers while Headphone
+# HRTF is On, which takes stereo HRTF output whatever they say
+# (AL_SoundHardware.cpp openQ4_GetRequestedOutputMode).
 DEPENDENCIES = {
-    **{ident: SUBTITLES_ON for ident in ("audio_subtitle_size", "audio_subtitle_background", "audio_subtitle_speakers",
-                                         "audio_subtitle_untranscribed")},
     "audio_speakers": {"op": "!=", "args": [{"state": "audio.hrtf"}, 2]},
 }
 
 # The columns: the sections each holds, by their place in SECTIONS.
-COLUMNS = ((0, 1), (2, 3))
+COLUMNS = ((0, 1), (2,))
 
 
 def audio_document(touch: bool = False) -> dict:
@@ -77,11 +70,7 @@ def audio_document(touch: bool = False) -> dict:
         "audio.dialogue": {"type": "number", "initial": 0}, "audio.backend": {"type": "number", "initial": 1},
         "audio.device": {"type": "number", "initial": 0}, "audio.device.count": {"type": "number", "initial": 0},
         "audio.eax": {"type": "boolean", "initial": False}, "audio.speakers": {"type": "number", "initial": 0},
-        "audio.hrtf": {"type": "number", "initial": 0}, "audio.subtitles": {"type": "boolean", "initial": False},
-        "audio.retailUpsampling": {"type": "boolean", "initial": False},
-        "audio.subtitleSize": {"type": "number", "initial": 100}, "audio.subtitleBackground": {"type": "number", "initial": 0},
-        "audio.subtitleSpeakers": {"type": "boolean", "initial": False},
-        "audio.subtitleUntranscribed": {"type": "boolean", "initial": False},
+        "audio.hrtf": {"type": "number", "initial": 0}, "audio.retailUpsampling": {"type": "boolean", "initial": False},
     })
     for row in range(DEVICES):
         doc.state[f"audio.device.{row}.label"] = {"type": "string", "initial": ""}

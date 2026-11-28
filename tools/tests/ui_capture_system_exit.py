@@ -91,11 +91,7 @@ def trace(mode='sp',renderer='gl'):
                 if value is None: value=request if field=='request' else 14.5
                 lines.append(f'GUI_VALUE {field}={value}')
             for i,control in enumerate(capture.CONTROLS):
-                lines.append(f'RETAINED_GUI_WIDGET id={control} role={(2,3)[i]} type=0 accepted={stage["values"][6+i*2]} pending=0 proposed=0 rejected=0 token=0 popup=0 firstVisible=0')
-            if stage['name'] in ('display_draft','display_dialog','keep_draft','keep_dialog'):
-                lines.append('RETAINED_GUI_CHOICE_SCROLL id=settings_vsync open=0 opening=0 revision=81 offsetDp=0 available=1 usable=0 density=1.25 viewport=147.5 range=0 offset=0 track=147.5 thumb=147.5 position=0 travel=0 geometry=15')
-            else:
-                lines.append('RETAINED_GUI_CHOICE_SCROLL id=settings_vsync open=0 opening=0 revision=0 offsetDp=0 available=0 usable=0 density=1 viewport=0 range=0 offset=0 track=0 thumb=0 position=0 travel=0 geometry=0')
+                lines.append(f'RETAINED_GUI_WIDGET id={control} role={(2,1)[i]} type={(0,1)[i]} accepted={stage["values"][6+i*2]} pending=0 proposed=0 rejected=0 token=0 popup=0 firstVisible=0')
             focus=('discard_keep_editing' if stage['values'][5] else 'settings_revert' if stage['values'][11]
                    else 'settings_back' if stage['name']=='continued' else 'settings_brightness')
             lines.append(f'RETAINED_GUI path={capture.PAGE} focus={focus} revision=7 active=1 brightness={stage["live"]} shadows=1 contexts=1')
@@ -159,29 +155,15 @@ class ExitOracleTests(unittest.TestCase):
                 self.reject(log.replace('RETAINED_GUI_OPERATION number passed',replacement,1))
         self.reject(log)
 
-    def test_closed_choice_geometry(self):
-        log=trace();line=next(row for row in log.splitlines() if row.startswith('RETAINED_GUI_CHOICE_SCROLL '))
-        for pair in line.split()[1:]:
-            key,value=pair.split('=')
-            for replacement in ('99','nan','',value+' extra=0'):
-                self.reject(log.replace(line,line.replace(pair,key+'='+replacement),1))
-
     def test_capture_timeout_bounds(self):
         for timeout in (True,0,29,1801,240.5):
             with self.assertRaisesRegex(ValueError,'Timeout'):
                 capture.capture(SimpleNamespace(output=ROOT/'.tmp/unused-exit-capture',runtime=ROOT/'.install',timeout=timeout))
 
-    def test_cached_choice_geometry(self):
-        log=trace();line=next(row for row in log.splitlines() if row.startswith('RETAINED_GUI_CHOICE_SCROLL ') and 'available=1' in row)
-        for old,new in (('open=0','open=1'),('opening=0','opening=1'),('available=1','available=0'),('usable=0','usable=1'),
-                        ('revision=81','revision=0'),('revision=81','revision=-1'),('density=1.25','density=nan'),
-                        ('density=1.25','density=0'),('viewport=147.5','viewport=0'),('viewport=147.5','viewport=721'),
-                        ('range=0','range=1'),('offset=0','offset=1'),('track=147.5','track=100'),('thumb=147.5','thumb=100'),
-                        ('geometry=15','geometry=0'),('revision=81','revision=82'),('geometry=15','geometry=16')):
-            self.reject(log.replace(line,line.replace(old,new),1))
-        # Other valid measured sizes are allowed, without inventing a single
-        # font/density-specific rectangle for every captured production page.
-        self.assertTrue(capture.qualify(log.replace('density=1.25','density=1.5').replace('147.5','177'),'sp','gl')['passed'])
+    def test_no_choice_scroll(self):
+        # The probed V-Sync row is a check box: a list's scroll report is refused.
+        log=trace();line=next(row for row in log.splitlines() if row.startswith('RETAINED_GUI_WIDGET id=settings_vsync '))
+        self.reject(log.replace(line,line+'\nRETAINED_GUI_CHOICE_SCROLL id=settings_vsync open=0 opening=0 revision=0 offsetDp=0 available=0 usable=0 density=1 viewport=0 range=0 offset=0 track=0 thumb=0 position=0 travel=0 geometry=0',1))
 
     def test_every_required_observation_missing_or_replayed(self):
         original=trace().splitlines()
@@ -264,7 +246,7 @@ class ExitOracleTests(unittest.TestCase):
             ('remaining=14.5','remaining=nan'),('remaining=14.5','remaining=0'),('remaining=14.5','remaining=16'),
             ('GUI_VALUE request=101','GUI_VALUE request=99'),('GUI_VALUE dirty=1','GUI_VALUE dirty=true'),
             ('pending=0','pending=1'),('rejected=0','rejected=1'),('token=0','token=12'),('popup=0','popup=1'),
-            ('role=3','role=2'),('type=0','type=1'),('accepted=1.1','accepted=1'),('contexts=1','contexts=2'),
+            ('role=1','role=3'),('type=0','type=1'),('type=1','type=0'),('accepted=1.1','accepted=1'),('contexts=1','contexts=2'),
             ('brightness=1 shadows=1 contexts','brightness=1.1 shadows=1 contexts')]:
             with self.subTest(before=before): self.reject(trace().replace(before,after,1))
         self.reject(trace().replace('GUI_VALUE open=1','GUI_VALUE open=1 extra=0',1))
@@ -452,7 +434,7 @@ class ExitOracleTests(unittest.TestCase):
             raise AssertionError('missing canonical node')
         mutations=[
             lambda model: node(model,'settings_brightness')['control'].update(step=.2),
-            lambda model: node(model,'settings_vsync')['control']['options'][0].update(value=2),
+            lambda model: node(model,'settings_vsync')['control'].update(action='edit.r_swapInterval'),
             lambda model: node(model,'discard_apply_changes')['control'].update(event='discard'),
             lambda model: model['actions']['cancel'].update(operation='settings.system.apply'),
             lambda model: model['aliases']['draftVSync'].update(variable=model['aliases']['baselineVSync']['variable']),

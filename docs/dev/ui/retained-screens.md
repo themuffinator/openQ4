@@ -2499,6 +2499,65 @@ CONTROLS check also had stale binding indices from Last Weapon (11-17),
 which made it stop at its first assertion. The capture harness's
 `settings-tree` scenario screenshots every tab of every page.
 
+## Check boxes, subtitles on ACCESSIBILITY and slider steps (28 November 2026)
+
+A settings round from play feedback:
+
+- **A press on the page's background lets go of the focus.** A click away
+  from every control (a heading, a column's empty space, a disabled row)
+  clears the focused row's rail and the Select prompt that acted on it
+  (`Interaction::Pointer`). The next navigation key resumes on the row it
+  left (`lostFocus`), so a mouse user can deselect without the keyboard
+  losing its place. A dialog keeps its focus, since it always holds one,
+  and a press away from an open list still only closes the list.
+- **Every on/off row is a check box.** V-Sync and Expand Across Displays on
+  SYSTEM's SCREEN tab were No/Yes lists, and so was Invert Mouse on CONTROLS'
+  MOUSE tab. V-Sync and Expand Across Displays edit their 0-or-1 CVars
+  through `edit.r_swapInterval-on` and `edit.r_multiScreen-on`, Boolean
+  actions as Ambient Light's. Expand Across Displays can be checked only in
+  a mode that can span (a borderless window or desktop fullscreen, with the
+  displays to span); otherwise it is dimmed and its reason line says why,
+  and a span that is already on can always be unchecked. Invert Mouse is a
+  `flag` row (`retained_settings_rows.flag`): checked while `m_pitch` reads
+  `-0.022`, and a change sets the other text. Its `flag.m_pitch` action picks
+  one of two literal values with the control's Boolean, which the adapter
+  allows only where both are values the setting takes (`ValidOperation`).
+  Lists of two named alternatives (Left/Right hand, Snap/Smooth turning,
+  TGA/PNG, Radial/Per Axis and the like) stay lists.
+- **The dialogue subtitles moved to GAME OPTIONS' ACCESSIBILITY tab**, as a
+  SUBTITLES section under VISIBILITY: Dialogue Subtitles, Subtitle Size (1 to
+  2, steps of 0.1), Subtitle Background (0 to 1, steps of 0.1), Speaker Names
+  and Untranscribed Speech, the four options greyed while subtitles are off.
+  They are an aid to hearing, not a sound setting. They set their
+  `ui_subtitle*` CVars with `settings.player.set`, whose allowlist now takes
+  them; the AUDIO page's five subtitle verbs are gone from the session and
+  the adapter. The stock-style AUDIO page (`ui_retained 0`) keeps its rows.
+- **Slider steps match what each setting needs.** A step should reach a
+  useful value in a few presses and a fine one by typing:
+  - Mouse Sensitivity steps 0.1 from 0.1 to 30 (was 0.01 from 0.01, 2999
+    presses end to end); its typed number still takes two places.
+  - Trigger Threshold steps 0.05 (was 0.01); the low-battery rumble
+    threshold and notice step 5% (were 1%).
+  - Controller Turn and Look Speed step 10 degrees per second, shown whole
+    (were 5, shown to one place); Touchpad Sensitivity steps 0.1 (was 0.05).
+  - The gun's X, Y and Z offsets step 0.1 (were 0.05, 200 steps with a typed
+    number); 100 steps now, the gun's presets being whole numbers.
+  - The rest were already sensible and stay: fine values such as Mouse
+    Accel (0.01) keep their typed number, and the 0 to 1 comfort sliders
+    step 0.1.
+  - Volume stays 0 to 200% in steps of 10%. `s_volume` 1 is the mixer's full
+    scale and 0.5 its default; Quake 4's own slider ran from 0 to 2 in steps
+    of 0.1, and openQ4 matches it (`docs/dev/audio-volume-parity.md`). The
+    readout is the CVar times 100, so the default reads 50.
+
+`openq4-ui-modal-interaction` checks the background press; the retained
+screens test checks the check boxes, the moved rows and the steps;
+`openq4-ui-system-display-catalog-*` checks when the span check box can be
+checked; `ui_retained_adapter.py` checks the flag action's allowlist; and
+the capture harness's `settings-checkboxes` and `settings-checkboxes-system`
+scenarios drive them in the client. `capture_system_exit.py` probes V-Sync
+as a check box, which reports no list geometry.
+
 ## The AUDIO page (25 October 2026)
 
 The settings screen's AUDIO button opens a retained AUDIO page while the
@@ -2512,12 +2571,17 @@ the stock order and with the stock text:
 | --- | --- |
 | LEVELS | Volume, 0 to 200% as the stock slider's 0 to 2; Music Volume and Dialogue Volume, 0 to 100% |
 | DEVICES | Sound System (Default, OpenAL) and Sound Device, the sound system's devices (up to 16) |
-| EFFECTS | EAX ADVANCED HD; Surround Speakers and Headphone HRTF (Auto, Off, On); Dialogue Subtitles; Subtitle Size, 100 to 200%; Subtitle Background, 0 to 100%; Speaker Names; Untranscribed Speech (AUD-07, 13 November 2026) |
+| EFFECTS | EAX ADVANCED HD; Surround Speakers and Headphone HRTF (Auto, Off, On); Original Game Sound |
+
+The dialogue subtitles (AUD-07) stood under EFFECTS, then under their own
+SUBTITLES heading, until 28 November 2026, when they moved to GAME OPTIONS'
+ACCESSIBILITY tab (see
+[Check boxes, subtitles on ACCESSIBILITY and slider steps](#check-boxes-subtitles-on-accessibility-and-slider-steps-28-november-2026)).
 
 Each row asks the session with its own value verb (`audioVolume` through
-`audioSubtitleUntranscribed`, allowed by the adapter's `SessionMenuValueCommand`),
+`audioRetailUpsampling`, allowed by the adapter's `SessionMenuValueCommand`),
 and the session applies the value at once, as the stock controls do. The
-levels and subtitle rows set their CVars. Sound System, Sound Device and
+level rows set their CVars. Sound System, Sound Device and
 Headphone HRTF run the stock page's `sound drivar`, EAX `sound eax` and
 Surround Speakers `sound speakers`, which restart the sound system and may
 answer with the stock message box. The session then publishes every value

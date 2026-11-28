@@ -28,15 +28,15 @@ With `ui_retained 1` (the default) the Settings screen opens the retained SETTIN
 | Game Options | General | Gameplay: Auto Reload, Auto Switch, Show Decals, Corpse Sink, Corpse Time, Enhanced Physics, Auto Skip Cinematics | Interface: Language, Console Access, Screenshot Format. Items and Players: Pickup Style, Opponent Weapon Style, Force Model. Video Capture: Video Format, Video Quality, Video Frame Rate, Video Resolution, Record Sound, Video Timing |
 | Game Options | HUD | HUD: Layout, Size, Width, Safe Area Inset, Opacity, Toggle Objectives, Damage Direction, Pickup Messages, Weapon Strip | Crosshair: Custom Crosshair, the crosshair, Size, Color, Hit Marker, Animated Crosshair |
 | Game Options | View Weapon | Show Gun, Gun Position, Weapon X/Y/Z Offset | Weapon FOV, Weapon FOV Aspect, Weapon Kick |
-| Game Options | Accessibility | Motion: View Kick, Screen Shake, Cinematic Shake | Visibility: Reduced Flashing, Opaque Menu Backing |
+| Game Options | Accessibility | Motion: View Kick, Screen Shake, Cinematic Shake | Visibility: Reduced Flashing, Opaque Menu Backing, Menu Tooltips. Subtitles: Dialogue Subtitles, Subtitle Size, Subtitle Background, Speaker Names, Untranscribed Speech |
 | Game Options | Virtual Reality | VR Mode to Room Scale | Aim Laser to Headset 3D Audio. Stereoscopic 3D: Stereoscopic 3D, Stereo Depth, Stereo Convergence, Swap Eyes |
 | Display | Graphics | Performance Preset, Auto-Detect, Rendering Backend and Device, Renderer Fallback, Restart Renderer | Interface: UI Scale, Text Size, UI Aspect, Reset UI Sizes |
 | Display | Screen | Display: Display Device, Expand Across Displays, Window Mode, V-Sync, Frame Rate Cap | Display Sizing: window size, Display Resolution, custom fullscreen size, Refresh Rate |
 | Display | Image Quality | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering | Rendering: Specular, Bump Mapping, Sky, Ambient Light, Ambient Brightness |
 | Display | Effects | Lighting: Shadows, Character Self-Shadows, Irradiance Volumes, Preload Light Grids | Post-Processing: Bloom, Ambient Occlusion, Tone Mapping, Motion Blur, CRT Filter |
-| Audio | (one page) | Levels, Devices | Effects: EAX, Surround Speakers, Headphone HRTF, Original Game Sound. Subtitles: the five subtitle rows |
+| Audio | (one page) | Levels, Devices | Effects: EAX, Surround Speakers, Headphone HRTF, Original Game Sound |
 
-The retained pages also offer rows the classic page lacks: Frame Rate Cap (`com_maxfps`: 30, 60, 75, 90, 120, 144, 165, 240, 360 or Unlimited), Anisotropic Filtering (`image_anisotropy`: Off, 2x, 4x, 8x, 16x), Shadows as one list over the presets' shadow ladder (Off, Original and four shadow-map levels; see below) and Motion Blur (`r_motionBlur`), all of which the performance presets set; Character Self-Shadows needs a shadow-map level. VR Mode, Room Scale, Two-Handed Grip and Physical Crouch are toggles there. The rest of this document describes the classic pages (`ui_retained 0`), whose layout is unchanged.
+The retained pages also offer rows the classic page lacks: Frame Rate Cap (`com_maxfps`: 30, 60, 75, 90, 120, 144, 165, 240, 360 or Unlimited), Anisotropic Filtering (`image_anisotropy`: Off, 2x, 4x, 8x, 16x), Shadows as one list over the presets' shadow ladder (Off, Original and four shadow-map levels; see below) and Motion Blur (`r_motionBlur`), all of which the performance presets set; Character Self-Shadows needs a shadow-map level. Every on/off row there is a check box: VR Mode's Room Scale, Two-Handed Grip and Physical Crouch, V-Sync, Expand Across Displays and Invert Mouse among them. The dialogue subtitles are on Game Options' Accessibility tab there rather than on Audio, as an aid to hearing. The rest of this document describes the classic pages (`ui_retained 0`), whose layout is unchanged.
 
 ### Shadows and the presets
 
@@ -75,7 +75,7 @@ The retained Display page's **Window Mode** (#264) replaces the classic page's F
 | Game Options | Custom crosshair picker | Custom Crosshair is on | Unchanged. |
 | Game Options | Record Sound | Video Format is not GIF | A GIF has no sound track. |
 | Game Options | Stereo Depth, Stereo Convergence, Swap Eyes | Stereoscopic 3D is not Off | They shape a stereo frame, which needs a layout. |
-| Audio | Subtitle Size, Subtitle Background, Speaker Names, Untranscribed Speech | Subtitles is on | No subtitle is drawn with them off. |
+| Game Options (retained), Audio (classic) | Subtitle Size, Subtitle Background, Speaker Names, Untranscribed Speech | Subtitles is on | No subtitle is drawn with them off. |
 | Audio | Surround Speakers | Headphone HRTF is not On | HRTF On always outputs stereo HRTF. |
 
 Checked and left enabled because the setting still has an effect: the gun's X/Y/Z offsets, Gun Position and Weapon Kick with Show Gun off (they move the hidden weapon, whose barrel some weapons fire from); Preload Light Grids with Irradiance Volumes off (it still uploads the grids); Corpse Time with Corpse Sink off; the crosshair size and colour with the custom crosshair off. No menu row depends on vertex buffers: only GPU skinning (`r_gpuSkinning`, console only) needs them, and `r_renderer` Best and ARB2 select the same path on desktop OpenGL.

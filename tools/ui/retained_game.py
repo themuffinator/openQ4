@@ -4,7 +4,7 @@ sections 7, 9 and 13.7; UI-01): the stock page's rows
 (retained_settings_rows), in eleven sections on five tabs of at most two
 columns: GENERAL (gameplay | interface, items and players, video capture),
 HUD (HUD | crosshair), VIEW WEAPON (its place | its view), ACCESSIBILITY
-(motion | visibility) and VIRTUAL REALITY (its rows | the rest of them,
+(motion | visibility, subtitles) and VIRTUAL REALITY (its rows | the rest of them,
 stereoscopic 3D). In VR (retained_vr) the page opens on VIRTUAL REALITY,
 whose Comfort Setup row opens the VR SETUP dialog and Look for Headset asks
 the runtime (vr_detect), and the desktop-only rows (the gun's flat place and
@@ -17,7 +17,7 @@ The stock page grouped its rows by where they were added; the tabs group
 them by what they change (the settings tree audit of 20 November 2026). The
 comfort settings that were spread over three sections (view kick, screen and
 cinematic shake, reduced flashing, the opaque menu backing) share
-ACCESSIBILITY; Show Gun and Gun Position join the view weapon's offsets and
+ACCESSIBILITY, as do the dialogue subtitles, which were the AUDIO page's; Show Gun and Gun Position join the view weapon's offsets and
 field of view; Language, Console Access and Screenshot Format leave the
 gameplay rows for INTERFACE.
 
@@ -101,9 +101,9 @@ SECTIONS = (
     ("viewweapon", "#str_229952", (
         toggle("game_showgun", "#str_200138", "ui_showGun"),
         verb_choice("game_gunposition", "#str_223007", "gameGunPosition", "#str_223008", 3),
-        slider("game_gunx", "#str_229956", "cl_gun_x", -5, 5, 0.05, 2),
-        slider("game_guny", "#str_229957", "cl_gun_y", -5, 5, 0.05, 2),
-        slider("game_gunz", "#str_229958", "cl_gun_z", -5, 5, 0.05, 2),
+        slider("game_gunx", "#str_229956", "cl_gun_x", -5, 5, 0.1, 1),
+        slider("game_guny", "#str_229957", "cl_gun_y", -5, 5, 0.1, 1),
+        slider("game_gunz", "#str_229958", "cl_gun_z", -5, 5, 0.1, 1),
         slider("game_gunfov", "#str_229953", "cl_gunfov", 0, 179, 1),
         choice("game_gunfovadjust", "#str_229954", "cl_gunfov_adjust", "#str_229955", (0, 1)),
         toggle("game_weaponkick", "#str_229982", "g_weaponMuzzleKick"),
@@ -117,6 +117,16 @@ SECTIONS = (
         toggle("game_reducedflashing", "#str_231274", "ui_reducedFlashing"),
         toggle("game_opaquebacking", "#str_231592", "ui_retainedOpaqueBacking"),
         toggle("game_tooltips", "#str_233000", "ui_tooltips"),
+    )),
+    # Dialogue subtitles (AUD-07, ui_subtitle*), drawn by the game over any
+    # page: an aid to hearing, so beside the other comfort settings rather
+    # than among the sound levels.
+    ("subtitles", "#str_232554", (
+        toggle("game_subtitles", "#str_231308", "ui_subtitles"),
+        slider("game_subtitlesize", "#str_231309", "ui_subtitleScale", 1, 2, 0.1, 1),
+        slider("game_subtitlebackground", "#str_231310", "ui_subtitleBackground", 0, 1, 0.1, 1),
+        toggle("game_subtitlespeakers", "#str_231311", "ui_subtitleSpeakers"),
+        toggle("game_subtitleuntranscribed", "#str_231313", "ui_subtitleUntranscribed"),
     )),
     # On and off settings are toggles here as everywhere else; the stock
     # page listed them as Disabled and Enabled.
@@ -183,7 +193,7 @@ TABS = (
     ("general", "#str_231542", (("gameplay",), ("interface", "players", "video"))),
     ("hud", "#str_231235", (("hud",), ("crosshair",))),
     ("viewweapon", "#str_229952", (("viewweapon", 0, VIEW_PLACE), ("viewweapon", VIEW_PLACE, None))),
-    ("accessibility", "#str_232542", (("motion",), ("visibility",))),
+    ("accessibility", "#str_232542", (("motion",), ("visibility", "subtitles"))),
     ("vr", "#str_230120", (("vr", 0, 9), (("vr", 9, None), "stereo"))),
 )
 
@@ -212,7 +222,9 @@ def dependencies() -> dict:
       session), Snap Turn Angle with smooth turning, and the Aim Laser and
       Two-Handed Grip with head aim;
     - Record Sound while the video format is GIF, which has no sound;
-    - the stereo depth, convergence and eye swap with Stereoscopic 3D off.
+    - the stereo depth, convergence and eye swap with Stereoscopic 3D off;
+    - the subtitle options with Dialogue Subtitles off (the game draws no
+      subtitle, Subtitles.inl).
     The gun's offsets, position and kick stay: they still move the hidden
     weapon, whose barrel some weapons fire from."""
     layout = _cvar("ui_hudLayout")
@@ -233,6 +245,8 @@ def dependencies() -> dict:
         "game_videoaudio": {"op": "!=", "args": [_cvar("com_videoFormat"), "gif"]},
         **{ident: {"op": "!=", "args": [_cvar("r_stereo3D"), 0]}
            for ident in ("game_stereodepth", "game_stereoconvergence", "game_stereoswap")},
+        **{ident: _cvar("ui_subtitles") for ident in ("game_subtitlesize", "game_subtitlebackground", "game_subtitlespeakers",
+                                                      "game_subtitleuntranscribed")},
     }
 
 

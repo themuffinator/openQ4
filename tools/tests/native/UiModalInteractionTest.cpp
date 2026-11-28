@@ -419,7 +419,27 @@ static void PromptButtonDocumentContract() {
 	Check(!load((R"({"role":"button","label":"#str_1","input":"next","focusable":false,)" + states + "}").c_str()),"only accept and back replay");
 }
 #endif
+// A press on the page's background, off every control, lets go of the focus,
+// and the next navigation key resumes on the control it left. A dialog, which
+// always holds a focus, keeps it.
+static void BackgroundPressReleasesFocus() {
+	Fixture f;
+	const auto press = [&](const char* id) { f.interaction.PointerPart(id); f.interaction.Pointer(true); f.interaction.Pointer(false); };
+	press("");
+	Check(f.interaction.Focused().empty(),"a press off every control releases the focus");
+	Check(f.Actions().empty(),"releasing the focus dispatches nothing");
+	f.Key(MenuInput::Down);
+	Check(f.interaction.Focused() == "page.opener","the next key resumes on the control it left");
+	press("page.first");
+	Check(f.interaction.Focused() == "page.first","a press on a control still takes the focus");
+	f.Actions();
+	f.Sync({"a"});
+	Check(f.interaction.Focused() == "a.safe","the dialog takes its focus");
+	press("");
+	Check(f.interaction.Focused() == "a.safe" && f.Actions().empty(),"a press beside a dialog's controls keeps its focus");
+}
 int main() {
+	BackgroundPressReleasesFocus();
 	PreviousFocusAndFreshLayout(); DefaultEligibilityAndAsyncChanges(); NestedAndDisjointScopes();
 	HeldSourcesAndRepeats(); IndependentNavigationPulse(); BackIdentityAndNoImplicitDismiss(); PendingSnapshotRestoration(); ActivationOwnership();
 	InvalidLayoutAndEmptyRestoration(); ManualScopeCompatibility(); PromptButtonsReplayKeys();

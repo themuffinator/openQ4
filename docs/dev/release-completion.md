@@ -12,6 +12,32 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Check boxes for on/off settings, and subtitles under Accessibility, 28 November 2026
+
+- **Clicking empty space in a settings page deselects the row you had
+  selected.** The next arrow key or controller press picks up from that row
+  again, so the keyboard does not lose its place.
+- **On/off settings are check boxes everywhere.** V-Sync and Expand Across
+  Displays (Settings, Display, Screen) and Invert Mouse (Settings, Controls,
+  Mouse) were No/Yes lists. Expand Across Displays can be ticked only in a
+  window mode that can span your displays; the line under it says why.
+- **Dialogue subtitles moved to Settings, Game Options, Accessibility**,
+  beside the other comfort settings, under their own Subtitles heading. Your
+  subtitle settings are kept. The classic menus keep them on the Audio page.
+- **Sliders step by useful amounts.** Mouse Sensitivity moves 0.1 a step (it
+  was 0.01, so crossing the range took thousands of presses) and still takes
+  two decimal places typed. Controller Turn and Look Speed move 10 a step,
+  Trigger Threshold 0.05, Touchpad Sensitivity 0.1, the low-battery rumble
+  settings 5%, and the weapon's X, Y and Z offsets 0.1. Mouse Sensitivity's
+  slider now starts at 0.1; a lower value set in the console is kept.
+- **Volume still goes to 200%**, as in Quake 4: 50% is the default, 100% plays
+  sounds at their recorded level, and above that quieter sounds get louder.
+- Evidence: the retained screens, display catalog, interaction and adapter
+  tests, and the `settings-checkboxes` capture scenarios in the hidden client
+  (a click on the page's background clears the focus and Down restores it;
+  the check boxes set `ui_subtitles`, `m_pitch` and the V-Sync draft).
+  [Check boxes, subtitles on ACCESSIBILITY and slider steps](ui/retained-screens.md#check-boxes-subtitles-on-accessibility-and-slider-steps-28-november-2026).
+
 ## Servers you host play like dedicated servers, 28 November 2026
 
 - **Hosted servers use multiplayer's player collision.** A server started from

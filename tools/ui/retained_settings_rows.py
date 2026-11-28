@@ -220,6 +220,13 @@ def slider(ident: str, label_key: str, cvar: str, minimum: float, maximum: float
     return ("slider", ident, label_key, cvar, (minimum, maximum, step, decimals))
 
 
+def flag(ident: str, label_key: str, cvar: str, values: tuple) -> tuple:
+    """A check box over a CVar that takes one of two texts, `values` (off,
+    on): Invert Mouse's m_pitch sign. It is checked while the CVar reads `on`,
+    as the stock list compared the text, and a change sets the other text."""
+    return ("flag", ident, label_key, cvar, values)
+
+
 def choice(ident: str, label_key: str, cvar: str, key: str, values: tuple) -> tuple:
     """A list whose values are numbers, or text where a value has a fraction:
     a float CVar reads back inexactly (0.022 as 0.0219999...), its text
@@ -227,7 +234,7 @@ def choice(ident: str, label_key: str, cvar: str, key: str, values: tuple) -> tu
     return ("choice", ident, label_key, cvar, (key, values))
 
 
-CVAR_KINDS = ("toggle", "slider", "choice")
+CVAR_KINDS = ("toggle", "flag", "slider", "choice")
 FINE_STEPS = 100                          # a slider with more steps than this takes a typed number too
 
 
@@ -270,6 +277,13 @@ def cvar_row(doc: Document, row: tuple, value_x: float) -> dict:
     if kind == "toggle":
         return setting_row(doc, ident, label_key, "toggle", value_x, value=cvar_state(doc, cvar, "boolean"),
                            action=setting_action(doc, cvar, "boolean"))
+    if kind == "flag":
+        off, on = extra
+        action = f"flag.{cvar}"
+        doc.actions[action] = {"operation": "settings.player.set", "input": "boolean",
+                               "arguments": {"cvar": cvar, "value": {"op": "select", "args": [{"input": "value"}, on, off]}}}
+        checked = {"op": "==", "args": [cvar_state(doc, cvar, "string"), on]}
+        return setting_row(doc, ident, label_key, "toggle", value_x, value=checked, action=action)
     if kind == "slider":
         minimum, maximum, step, decimals = extra
         shown = cvar_state(doc, cvar, "number")
