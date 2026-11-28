@@ -12,6 +12,26 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Skipping a cinematic answers at once, 28 November 2026
+
+- **Pressing Esc to skip a cinematic turns the screen black straight away.**
+  The game played out the rest of the scene in one long frame with the last
+  picture frozen and the sound cut, so the press seemed to do nothing for a
+  second or more: 1.3 s for Air Defense 1's three-minute opening on a fast PC,
+  longer on slower ones. It now catches up a little between frames behind a
+  black screen, and you take control after about the same wait (some 40 ms
+  longer).
+- **The level you land in is the same.** The skip still runs every game frame
+  of the scene and ends on the same one.
+- Auto Skip Cinematics at the start of a level still finishes behind the
+  loading screen. VR and demo playback keep the held picture, and
+  `g_cinematicSkipFrameMsec 0` brings back the old behaviour.
+- Evidence: the Air Defense 1 skip probe on hidden, input-free clients, the
+  old and new behaviour alternating (same final frame and game time, 39-40
+  black frames presented instead of none), a black mid-skip screenshot and an
+  unchanged load-time auto skip.
+  [Skipping the intro in play](airdefense1-optimization-evidence.md#2026-11-28-skipping-the-intro-in-play).
+
 ## The Awakening's finale finishes what it starts, 28 November 2026
 
 - **Boarding the dropship completes "Escape Cryo Facility"** (m09). The

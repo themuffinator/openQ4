@@ -247,6 +247,8 @@ In the new interface, every option on the **Settings** pages (Game Options, Disp
 
 **Settings → Game Options → General → Auto Skip Cinematics** (`g_autoSkipCinematics 1`) skips every cinematic as soon as it starts, which is handy for replays and speed runs. It is off by default and affects the next cinematic, not one already playing. **Cinematic Shake** (**Settings → Game Options → Accessibility**; **General** in 0.14.1) scales the extra camera movement added to cinematics (`ui_cinematicShake`, `0` none to `1` full); VR always turns it off.
 
+Press **Esc** (or the controller's **Menu** button) to skip the cinematic that is playing. The screen goes black at once and stays black and silent while the game plays out the rest of the scene behind it, then you take control. A long scene takes a moment: the three-minute opening of Air Defense 1 takes about a second and a half on a fast PC. In VR the last picture holds instead of going black.
+
 ### Camera kick and screen shake
 
 **Settings → Game Options → Accessibility → View Kick** (**General** in 0.14.1; `g_viewKick`) sets how much the camera jerks when you fire: the kick every single-player weapon gives the view, the lightning gun's shake while it fires, and the kick of vehicle guns. `0` keeps the view still and `1` (the default) is the original kick; the new interface's slider goes in tenths, the classic page offers Off, Low and Full. Your weapons behave exactly as before: shots still go where the crosshair points, and spread, damage and rate of fire do not change. **Weapon Kick** moves only the gun on screen, so turn both off for a completely steady view. Being hit still jolts the view.
@@ -341,6 +343,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `ui_autoSwitch` | `2` | Weapon pickups: `0` never switch, `1` always switch (Quake 4), `2` smart. **New in 0.15.0:** Quake 4's switch was `0` or `1`, default `1`. |
 | `g_fov` | `90` | Field of view, measured on a 4:3 screen. |
 | `g_autoSkipCinematics` | `0` | `1` skips cinematics as they start. |
+| `g_cinematicSkipFrameMsec` | `33` | While a skipped cinematic catches up behind the black screen, how many milliseconds of it run between two frames; `0` catches up in one frame with the last picture frozen, as Quake 4 did. |
 | `ui_cinematicShake` | `1` | Extra cinematic camera movement, `0` to `1`. |
 | `g_viewKick` | `1` | Camera kick and shake when you fire, `0` to `1`; aim is unchanged. |
 | `g_screenShake` | `1` | Screen shake from explosions, machinery and vehicles (single-player), `0` to `1`. |

@@ -67,6 +67,57 @@ A final diagnostic capture showed CPU P50/P95/P99 of
 on this system. The optimization targets simulation/presentation and setup
 work instead of lowering GPU image quality.
 
+## 2026-11-28 skipping the intro in play
+
+Pressing Esc during the opening fast-forwards the rest of the intro: 186 s of
+scripted scene, 11,624 game frames. They all ran inside one
+`idGameLocal::RunFrame`, so nothing was presented meanwhile and the last
+cinematic frame stayed on screen, frozen and silent, for the whole skip. The
+press seemed to do nothing for 1.3-1.4 s.
+
+The skip now spreads over host frames. `RunFrame` stops fast-forwarding once
+`g_cinematicSkipFrameMsec` (33 ms) of wall time has passed and returns with
+`syncNextGameFrame` set, which makes the session run exactly one game frame per
+host frame, and continues in the next call. While it continues,
+`idGameLocal::Draw` presents black: the fast-forward never poses the
+intermediate states (`UpdateRenderEntity` and `idAnimator::CreateFrame` return
+early during a skip), so there is no picture worth showing. Sound stays muted
+until the last slice, and each slice re-asserts the mute in case a focus change
+lifted it. The original single-call skip remains where it is wanted:
+
+- a level load's settle frames (no frame of the map drawn yet), so
+  `g_autoSkipCinematics` at a level start still finishes behind the loading
+  screen;
+- demo playback and timedemos, a VR headset (where a black world is worse than
+  a held frame) and multiplayer;
+- `g_cinematicSkipFrameMsec 0`.
+
+Measured with the existing `g_airdefense1SkipProbe` (it calls the player's ESC
+handler one second into the intro; no input is injected) on hidden,
+input-free clients with the null OpenAL backend, two runs each, alternating:
+
+| Measurement | Single call (`0`) | Spread (`33`) |
+|---|---:|---:|
+| ESC to the player taking control | 1,318 / 1,345 ms | 1,369 / 1,372 ms |
+| Frames presented during the skip | 0 | 40 / 39 |
+| First frame after the press | after the whole skip | within 33 ms |
+| Final frame and game time | 11,688, 187.008 s | 11,688, 187.008 s |
+
+Frames presented are the `syncNextGameFrame requested by game code` lines
+(`com_showFramePacing 2`) between the probe's `intro-end-trigger` and
+`spawn-live` stages. A screenshot taken mid-skip (`g_cinematicSkipFrameMsec 1`
+to stretch the skip, `g_autoScreenshot`) is black in every pixel, with no HUD
+or interface drawn over it. With `g_autoSkipCinematics 1` and no probe the
+whole skip still runs in the first settle frame (1,468 ms of a 1,492 ms settle
+phase) and no game frame after the load asks for a resync.
+
+The skip's own cost is unchanged: 0.12 ms a game frame, of which the probe's
+profile puts 0.78 s in entity think and 0.58 s in events and scripts across the
+skip, with no single entity above 38 ms (`npc_metcalf`, `vehicle_walker_1`).
+Making it cheaper is the open lead; a slowed skip
+(`g_cinematicSkipFrameMsec 1`, about 20 s of the same work) is long enough to
+sample with a CPU profiler.
+
 ## Advanced screen-space load
 
 With froxel volumetrics, SSR, and SSGI enabled together, real gameplay passed

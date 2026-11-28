@@ -316,6 +316,7 @@ idCVar g_forceMarineModel(			"g_forceMarineModel",		"",			CVAR_GAME | CVAR_ARCHI
 idCVar g_fixedHorizFOV(				"r_fixedHorizFOV",			"0",			CVAR_RENDERER | CVAR_BOOL, "vertical stretch for letterboxed cinematics authored for 4:3 aspect" );
 idCVar g_cinematic(					"g_cinematic",				"1",			CVAR_GAME | CVAR_BOOL, "skips updating entities that aren't marked 'cinematic' '1' during cinematics" );
 idCVar g_cinematicMaxSkipTime(		"g_cinematicMaxSkipTime",	"600",			CVAR_GAME | CVAR_FLOAT, "# of seconds to allow game to run when skipping cinematic.  prevents lock-up when cinematic doesn't end.", 0, 3600 );
+idCVar g_cinematicSkipFrameMsec(	"g_cinematicSkipFrameMsec",	"33",			CVAR_GAME | CVAR_INTEGER, "milliseconds of a skipped cinematic to fast-forward per presented frame, with the screen black meanwhile, so a skip answers at once; 0 runs the whole skip in one frame", 0, 1000 );
 idCVar g_autoSkipCinematics(		"g_autoSkipCinematics",		"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "automatically skips cinematics as soon as they start" );
 idCVar g_objectivesToggle(			"g_objectivesToggle",		"0",			CVAR_GAME | PC_CVAR_ARCHIVE | CVAR_BOOL, "the objectives display: 0 shows it while the scores button is held, 1 opens and closes it with each press" );
 idCVar g_allowAssetlessStartup(		"g_allowAssetlessStartup",	"0",			CVAR_GAME | CVAR_BOOL, "allow renderer validation startup without shipped game decls" );

@@ -3026,6 +3026,13 @@ are not yet measured.
   (longest gap 23-43 ms, Cryofac included). Still open in this class: building a
   retained document (50-80 ms, not divisible), single large reads and
   animations (40-60 ms), and a multiplayer client's first frame (120-240 ms).
+  Progress, 28 November: skipping a cinematic in play froze the last picture
+  for the whole fast-forward (1.3 s for Air Defense 1's opening, 11,624 game
+  frames in one `RunFrame`). The skip now runs 33 ms of it between presented
+  black frames and ends on the same game frame, about 40 ms later in all
+  ([skipping the intro in play](airdefense1-optimization-evidence.md#2026-11-28-skipping-the-intro-in-play)).
+  The fast-forward's own cost, 0.12 ms a game frame in entity think and
+  scripts, is still open.
 - [ ] **FPS-08 — P2, implementation: CPU-side renderer and game cost.** The HF-07
   attribution found the Quality frame CPU-bound on one thread (tic, scene front end and
   Vulkan recording in turn); the render-thread prototype's first stage gained 0.5 ms

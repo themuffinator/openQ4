@@ -724,6 +724,11 @@ public:
 	int						cinematicMaxSkipTime;	// time to end cinematic when skipping.  there's a possibility of an infinite loop if the map isn't set up right.
 	bool					inCinematic;			// game is playing cinematic (player controls frozen)
 	bool					skipCinematic;
+	// openQ4: a skip spread over several frames (g_cinematicSkipFrameMsec) is still
+	// running, so Draw presents black; neither is saved. A skip may spread only once
+	// this map has drawn a frame: the level load's settle frames finish theirs at once.
+	bool					cinematicSkipSpread;
+	bool					cinematicSkipMapDrawn;
 
 													// are kept up to date with changes to serverInfo
 	int						framenum;

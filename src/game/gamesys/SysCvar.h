@@ -63,6 +63,7 @@ extern idCVar	developer;
 
 extern idCVar	g_cinematic;
 extern idCVar	g_cinematicMaxSkipTime;
+extern idCVar	g_cinematicSkipFrameMsec;
 extern idCVar	g_autoSkipCinematics;
 extern idCVar	g_objectivesToggle;
 extern idCVar	g_allowAssetlessStartup;

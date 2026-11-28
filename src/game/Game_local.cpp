@@ -770,6 +770,8 @@ void idGameLocal::Clear( void ) {
 	mapMediaPrecacheSkips = 0;
 	gamestate = GAMESTATE_UNINITIALIZED;
 	skipCinematic = false;
+	cinematicSkipSpread = false;
+	cinematicSkipMapDrawn = false;
 	influenceActive = false;
 
 	localClientNum = 0;
@@ -2426,6 +2428,8 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 // RAVEN END
 
 	skipCinematic = false;
+	cinematicSkipSpread = false;
+	cinematicSkipMapDrawn = false;
 	inCinematic = false;
 	cinematicSkipTime = 0;
 	cinematicStopTime = 0;
@@ -2523,6 +2527,8 @@ void idGameLocal::LocalMapRestart( int instance ) {
 	spawnCount = INITIAL_SPAWN_COUNT;
 
 	gamestate = GAMESTATE_STARTUP;
+	cinematicSkipSpread = false;
+	cinematicSkipMapDrawn = false;
 
 	program.Restart();
 
@@ -2992,6 +2998,8 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 	Printf( "-------------- Game Map Init ----------------\n" );
 
 	gamestate = GAMESTATE_STARTUP;
+	cinematicSkipSpread = false;
+	cinematicSkipMapDrawn = false;
 
 	gameRenderWorld = renderWorld;
 	if ( !gameLocal.IsMultiplayerMode() ) {
@@ -3176,6 +3184,8 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	Printf( "---------- Game Map Init SaveGame -----------\n" );
 
 	gamestate = GAMESTATE_STARTUP;
+	cinematicSkipSpread = false;
+	cinematicSkipMapDrawn = false;
 
 	gameRenderWorld = renderWorld;
 	// Ensure render targets/material handles are fresh for each map transition.
@@ -5000,6 +5010,20 @@ idGameLocal::RunFrame
 */
 // RAVEN BEGIN
 gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEditors, bool lastCatchupFrame, int serverGameFrame ) {
+	// openQ4: a skipped cinematic fast-forwards up to g_cinematicSkipFrameMsec of
+	// wall time in this call and continues in the next one, so the frames between
+	// present (black, see Draw) instead of freezing on the cinematic for the
+	// whole skip. Not inside a level load's settle frames (no frame drawn yet),
+	// demos or a headset, which keep the original whole skip in one call.
+	const int cinematicSkipStartMsec = Sys_Milliseconds();
+	const int cinematicSkipFrameMsec = g_cinematicSkipFrameMsec.GetInteger();
+	const bool cinematicSkipMaySpread = !isMultiplayer && cinematicSkipFrameMsec > 0 && cinematicSkipMapDrawn &&
+		GetDemoState() == DEMO_NONE && !IsTimeDemo() && !( vrSystem != NULL && vrSystem->IsActive() );
+	cinematicSkipSpread = false;
+	if ( skipCinematic && !isMultiplayer && soundSystem != NULL ) {
+		// a skip that continues from the last call stays silent (a focus change can unmute)
+		soundSystem->SetMute( true );
+	}
 	// openQ4: one physics telemetry sample per game frame (no-op unless physicsStats is recording)
 	OpenQ4Physics::GetTelemetry().FrameTick( framenum + 1 );
 	idEntity *	ent;
@@ -5711,12 +5735,19 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		// the loading screen keeps presenting.
 		if ( skipCinematic ) {
 			common->LoadingCheckpoint();
+			if ( cinematicSkipMaySpread && ( inCinematic || time < cinematicStopTime ) &&
+				Sys_Milliseconds() - cinematicSkipStartMsec >= cinematicSkipFrameMsec ) {
+				// present a frame and continue the skip in the next call; the
+				// session runs one game frame per host frame while syncNextGameFrame is set
+				cinematicSkipSpread = true;
+				break;
+			}
 		}
 
 	} while( ( inCinematic || ( time < cinematicStopTime ) ) && skipCinematic );
 
 	ret.syncNextGameFrame = skipCinematic;
-	if ( skipCinematic ) {
+	if ( skipCinematic && !cinematicSkipSpread ) {
 		//soundSystem->EndCinematic();
 		soundSystem->SetMute( false );
 		skipCinematic = false;		
@@ -5999,6 +6030,23 @@ bool idGameLocal::Draw( int clientNum, bool menuPaused ) {
 
 	if ( !player ) {
 		return false;
+	}
+
+	if ( gamestate == GAMESTATE_ACTIVE ) {
+		cinematicSkipMapDrawn = true;
+	}
+	if ( cinematicSkipSpread && skipCinematic ) {
+		// openQ4: the skip is fast-forwarding over several frames (RunFrame); its
+		// intermediate states are never posed, so present black until it ends
+		const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
+		renderSystem->SetUseUIViewportFor2D( false );
+		renderSystem->SetColor4( 0.0f, 0.0f, 0.0f, 1.0f );
+		renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
+		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
+		renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
+		CheckAutoScreenshot();
+		CheckAutoExecAfterMapLoad();
+		return true;
 	}
 
 	PreparePlayerSceneForRender( player, menuPaused );
