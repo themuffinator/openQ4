@@ -35,6 +35,30 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   and the [matrix rehearsal](presentation-owners.md#automated-240-hz-matrix-rehearsal-28-november-2026).
   Physical VSync/VRR, sensor latency and the by-eye review remain open.
 
+## The Awakening's prison, 28 November 2026
+
+- **Losing Tak fails the mission** (m04). Tak becomes mortal while you hold
+  the turret for him; if the Strogg killed him, the level carried on without
+  the tech who opens every door that follows. It now ends with "Objective
+  failed: Rescue Strauss", as losing Darnell on the bridge already did.
+- **"Locate mainframe control room" appears when Tak says you need it.** The
+  level completed this objective at the control room but never gave it.
+- **Prisoners look like prisoners.** The captured marines in the cellblocks
+  kneel wounded or wave for help instead of standing idle, and the marines
+  in the conveyor's tubes float unconscious, as the level asked. Five
+  prisoners whose sitting or lying pose never shipped keep standing.
+- **Two cellblocks have their last prisoner.** Each had one marine who never
+  appeared in the bottom cell.
+- **More of the squad's recorded lines:** Tak radios while you cross the heat
+  exchanger alone, Markswell urges you out of the control room, and Mitchell
+  warns that something is coming up the lift at the end.
+- Fresh starts only: a save keeps the mission revision it was made with.
+- Evidence: hidden, input-free scene probes before and after on a null audio
+  device, Tak killed in the turret defence, the cellblock evacuation with
+  posed prisoners, fresh and original saves restored, and
+  `awakening_content_repairs.py` with seven negative controls.
+  [M04 revision 4](awakening-missions.md#m04-revision-4--28-november-2026).
+
 ## The Awakening's bio-processing facility, 28 November 2026
 
 - **Mitchell keeps up after the service lift** (m05). If he missed the ride

@@ -2071,3 +2071,129 @@ pacing. From the player's spot the hang is partly hidden above the window's
 view; lowering her would put her claws at the floor. Saves made before this
 change keep their revision; a save made on revision 5 keeps the old hang.
 Vulkan, Linux and macOS were not run.
+
+## M04 revision 4 — 28 November 2026
+
+The user asked for the prison to be scrutinised for bugs and for gaps in what
+its developers meant. The [4 November review](#m03-and-m04-review-4-november-2026)
+and its follow-ups repaired the encounter callbacks, the alarms, the cameras
+and the security console. This pass cross-checked the rest of the level in
+the same way as [M09 revision 5](#m09-revision-5--28-november-2026):
+
+- every entity the level script names, against the map;
+- every `call`, `script_*`, `spawn_script_init`, target and door key;
+- every entity that waits to be triggered, against whatever can fire it;
+- all 209 scripted animations and activation poses, against the actors'
+  model declarations;
+- the writers' line list (`m04_prison_vo.def`), against what the level plays.
+
+It then staged each affected scene as a hidden, input-free probe, before and
+after the change.
+
+### Fixed
+
+Fresh M04 starts compile `maps/game/m04_prison.openq4-v4.script`; the
+revision 1 to 3 callback repairs and helper scripts are unchanged and still
+apply. A save keeps the revision it was made with. Each edit must match the
+installed script exactly once, or the level keeps its installed behaviour.
+
+| Defect | Evidence | Repair |
+| --- | --- | --- |
+| Tak's death does not fail the mission. | Tak is undying except while the player holds the turret for him (`manTheTurret` gives him 200 health). His `script_death`, `takDies`, triggers `item_objectivefailed_3`, which the map does not contain. In the probe he died, the thread ended on "Entity not found", and the level went on without the tech who opens every later door. Darnell's death on the bridge triggers its own failure item, which exists. | `takDies` spawns a failure under the mission's own title, "Rescue Strauss" (captured from `item_objective_2` at the start, before collecting removes it), and triggers it once. The probe shows the failure item activated and the map shut down to the game-over flow. No new display string. |
+| "Locate mainframe control room" is completed but never given. | The map places `objective_controlroom` and `objectivecomplete_controlroom`. Only the completion is wired, to `trigger_once_130` at the control room. Tak's line in `lostStraussDialog` is "We have to find the central control room". | That line gives the objective. The probe shows it listed after the line and gone after `trigger_once_130`. |
+| Tak's radio reminders through the heat exchanger never play. | `secRoomNag` loops Tak's "We've got to get going…" and "That alarm is bound to bring more attention…" every 30 seconds until the security console is used; `gotSpecs` kills it. Nothing starts it. | `darnellAtHatch`, where Darnell sends Dekard into the tunnel alone, starts it unless the console is already done. The probe heard both lines 30 and 60 seconds later, and the console's "That's it, Dekard" stopped them. A save made during the loop restores it, and the next line plays on time. |
+| Markswell's three urgings are unplayed. | "Dekard, get going!", "Are you hard of hearing, marine…" and "…we can't hold this position forever, go!" are recorded and declared on Markswell. His last scripted line is "Get moving Dekard, now!" | After that line, he says the three in the writers' order, 20 seconds apart, while he is still in the level; he leaves with the squad when Dekard locks the control room. The interval is openQ4's, after the level's own reminder loops (10 and 30 seconds). |
+| Mitchell's lift warning is silent. | `liftOperative` has `$mitchell` say "There's something coming up that lift". That Mitchell was removed when Dekard left the control room; the one at the lift is the Viper squad's `mitchell_RS`, the same class with the same line. | `mitchell_RS` says it. The probe hears it start. |
+| Each cellblock's seventh prisoner never appears. | `cellblock2_prisoners` and `cellblock3_prisoners` trigger prisoners 1 to 6. Prisoner 7 of each block shares the bottom cell with prisoner 6 and has an activation pose like the others. | Both lists trigger the seventh. |
+| The prisoners and tube marines stand idle. | Twenty-eight marines name the pose they take when triggered in `on_activate`. That is a Doom 3 key: no Quake 4 code reads it (neither the SDK nor the expansion's game library), and the script's matching `aiScriptedAnimLoop` calls are commented out. The prisoners were placed as retail `char_marine_unarmed`, whose model lacks the poses. The conveyor's three marines, named `char_marine_naked_1` to `_3`, are the same clothed class and stood upright in their pods. | On fresh starts a prisoner whose pose the expansion's own unarmed-marine model has (`waving_down_tram`, `ad_wounded_on_knee_loop`) uses that model, which is the same mesh (`char_q4x_marine_unarmed` is exactly this class with it), and holds the pose once triggered until a script moves him on. The tube marines become retail's naked marine, the only model with `med_tube_float`, with no talk name. Retail's non-AI `env_tube_marines` cannot be used: its model names an animation that never shipped, so it fails to load. |
+
+Twenty prisoners now kneel or wave, and the three tube marines float. The
+three `lay_loop_2a` and two `idle_sitting_2` prisoners keep standing: both
+poses are commented out of both marine models; only the fatigues marine,
+another mesh, has a sitting take. Strauss and the working scientist, the
+level's other two `on_activate` keys, already play theirs.
+
+The pose is held through `State_WakeUp`, where a repair-only key,
+`oq4_activatePose`, plays a looping scripted animation, as `trigger_anim`
+plays a one-shot. A waving prisoner settles up to about 25 units on his first
+cycle, then stays put (sampled over 90 seconds). A released Cellblock 1
+prisoner leaves the pose for his escape run.
+
+`awakening_content_repairs.py` pins the repairs and, with the content present,
+checks each against the installed map, script and models: every anchor
+matches once, the failure item and the given objective are still missing,
+the seventh prisoners and `secRoomNag` are still unstarted, Markswell's lines
+are recorded and unplayed, the lift's two Mitchells share a class, and the
+poses are on the models revision 4 uses and not on the retail one. Seven
+negative controls were each rejected. The test's comment stripper is now a
+single left-to-right pass: M04's `//****` banners had opened a block comment
+in the old one and hidden `lostStraussDialog` from it.
+
+### Checked and left alone
+
+- **The cellblock medics are visible.** `CB1_marine_medic_upr` and `_lwr` are
+  hidden actors nothing triggers, but `idAI::ScriptedBegin` wakes and shows
+  an actor, so they appear when their first scripted move starts.
+- **`cleanupBridgeSpawns` is never called, and need not be.** `ai_avoid`
+  entities register their zone and delete themselves when they spawn, so its
+  `remove` calls had nothing left to remove.
+- **`trigger_leave_controlroom`** (re-show "Rescue Strauss" after 10 seconds,
+  set objective beacon 1 after 5) is never fired. The objective is already
+  held and the beacon has nothing on screen, so wiring it would change
+  nothing a player sees.
+- **`tubeTransportSystem2` starts twice** (from `main` and `trigger_once_36`),
+  but the second start is after the conveyors are switched off and returns
+  at once.
+- **Broken links nothing relies on**, all content gaps with nothing to
+  restore: the scientist `cellblock2_prisoners` names
+  (`monster_scientist_7`; the thread ends there after the prisoners are
+  triggered), a turret-room spawn point (`spawner2_pos_7`), two door wake-ups
+  (`monster_tactical_blaster_2`, `monster_tactical_mgun_3`), a scientist
+  (`monster_scientist_3`), two death targets (`trigger_relay_23`,
+  `trigger_once_133`) and the abandoned ending cinematic, already described
+  in the 4 November review. The exit lift's console ends the level as before.
+- **Tak's and Darnell's "busy" lines** ("Ready when you are, Sarge…") are
+  reached through `lipsync_busy_*` when the player talks to them during a
+  scene; they are not unplayed.
+- Debug helpers (`controlRoomCheat`) and the `development` give-all
+  (`target_give_1`, active only under `developer`) stay as they are.
+
+### Not placed
+
+Of the recorded lines nothing plays, these stay unplaced; no scene, speaker
+or trigger exists for them:
+
+- Lieutenant Rose's "Where are you, Falcon squad…", "Falcon squad, double
+  time it!", "Keep these squibs offa' us!" and "Damnit, we need cover!", and
+  Klauson's "More Strogg, take 'em down!": combat calls with no authored
+  moment;
+- Navajas's offer of the lightning gun, an alternate of Markswell's, which
+  plays;
+- Strauss's muffled line;
+- Tak's door lines 3 to 6, whose scenes are commented out.
+
+### Validation
+
+The tests ran on Windows x64 OpenGL with the user-supplied alpha content, as
+hidden, input-free clients with `developer 1` and `fs_awakeningpath`
+pointing at the content. The runtime is `.tmp/runtime/awakening-m05` (the
+client, renderers and packs of 28 November 11:12). The baseline module is
+HEAD's (`3b98561bf`, SHA-256 `1689a9bc…`); the candidate is `builddir` with
+this change (`1aa4ce71…`). Logs are in `.tmp/awk-m04/runs/<probe>`.
+
+| Probe | Result |
+| --- | --- |
+| `poses_base`, `poses_cand`, `poses_cand2` | Baseline: tube marines and prisoners in `unarmed_idle`, `cellblock2_prisoner_7` hidden, Tak killed in `manTheTurret` with no failure. Candidate: "mission corrections v4 enabled", tube marines in `med_tube_float`, prisoners in their poses or standing, prisoner 7 shown, a released prisoner running, and `takDies` activating the failure item. |
+| `takfail_cand` | Tak killed during the turret wave: the failure item fires and the map shuts down to the game-over flow. |
+| `sway` | Waving prisoners settle once and keep the same origin for 90 seconds. |
+| `lines_base`, `lines_cand` (sound on OpenAL's null device) | Candidate only: the control-room objective after "We have to find the central control room" and its completion at `trigger_once_130`; Tak's two reminders 30 and 60 seconds after the hatch and none after the console; Markswell's three urgings; `vo_mitch_theresome` starting from `liftOperative`. |
+| `rl_base`, `rl_cand` (four simulation tics a frame, attackers near the cells periodically killed, as in `awakening_chapter_followup.py`'s rescue) | Both builds complete the evacuation: all six prisoners removed, the last grid open, both medics alive. In the candidate the posed prisoners kneel or wave until their grid opens, then run out. In both builds a medic's scripted move stalls behind the fight and the movement watchdog lets the script continue; the baseline finished two samples sooner in this pair. A shorter pair (`rescue_base`, `rescue_cand`) finished in neither build; in the candidate the lower medic died in the doorway and blocked prisoner 5, which is the combat variance the 4 November review describes, not the pose. |
+| `save_orig`, `load_orig`, `save_v4`, `load_v4`, `load_v4s` | A baseline save restores with the candidate in a fresh process, recompiles `maps/game/m04_prison.script` and resaves; its prisoners stay as they were. A candidate save restores, recompiles `m04_prison.openq4-v4.script`, keeps the poses, the naked tube marines and the running `secRoomNag`, resaves, and plays the next reminder on time. |
+
+Limits. Console calls and kills stood in for walking and fighting, and each
+scene was staged out of order. No route was played with player movement, and
+no one has watched the poses or heard the lines in play. The `.install`
+harnesses (`awakening_prison_runtime.py`, `awakening_chapter_followup.py`)
+were not rerun: they require `.install` to match `builddir`, which a peer had
+staged, so the rescue fixture ran in the kit instead. Vulkan, Linux and
+macOS were not run.

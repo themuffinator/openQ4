@@ -122,6 +122,28 @@ M05_V3_ANCHORS = (
 )
 # Tak's tracking lines radioBattle1 plays, in order
 M05_TAK_LINES = ("vo_tak_gotalok", "vo_tak_keepmvcls", "vo_tak_closingin", "vo_tak_straussdsnt")
+# Revision 4 of the prison (MissionM04.inl; docs/dev/awakening-missions.md,
+# "M04 revision 4"): each anchor as the installed script spells it, which must
+# match exactly once.
+M04_SCRIPT = "maps/game/m04_prison.script"
+M04_MAP = "maps/game/m04_prison"
+M04_V4_ANCHORS = (
+    "\tvoid straussCinematicOver();",
+    "\t\tsys.trigger( $cellblock2_prisoner_6 );\n",
+    "\t\tsys.trigger( $cellblock3_prisoner_6 );\n",
+    '\t\tsys.killthread( "darnellNagHatch" );\n',
+    "\tvoid takDies()\n\t{\n\t\tsys.trigger( $item_objectivefailed_3 );\n\t}",
+    '\t\taiSpeakWait( $tak, "lipsync_tak_wehavefindcent" );\n',
+    "\tvoid controlRoomSeq2()\n\t{",
+    '\t\taiSpeakWait( $markswell, "lipsync_marks_getnow" );\n',
+    '\t\taiSpeak( $mitchell, "lipsync_mitch_theresome" );',
+    "\tvoid main()\n\t{\n",
+)
+# Markswell's recorded urging, in the order revision 4 plays it
+M04_MARKSWELL_LINES = ("lipsync_marks_dekgetgoing", "lipsync_marks_areyouhard", "lipsync_marks_holdposition")
+# prisoner poses revision 4 can hold: pose -> the model that has it
+M04_POSES = {"waving_down_tram": "model_char_q4x_marine", "ad_wounded_on_knee_loop": "model_char_q4x_marine",
+             "med_tube_float": "model_char_marine_naked"}
 M01_RADIO = "src/game/awakening/M01Radio.inl"
 M01_RADIO_SCRIPT = "content/baseoq4/pak0/scripts/openq4/awakening/m01_radio.script"
 M01_DRAFT_SCRIPT = "scripts/maps/m04_stranarus_trench_intro.script"
@@ -342,6 +364,35 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     require(m05, 'args.Set( "def_persona", "persona_marine_5_helmet" );', "Toalson's persona")
     require(m05, 'args.Set( "override_head", args.GetString( "def_head" ) );', "Toalson keeps his helmet")
 
+    # The prison's revision 4.
+    m04 = read(ROOT / "src/game/awakening/MissionM04.inl")
+    missions = read(ROOT / "src/game/awakening/MissionScripts.inl")
+    require(missions, '#include "MissionM04.inl"', "MissionScripts.inl")
+    require(missions, "if ( Awakening_LoadM04MissionScript( filename, source ) ) {", "saves recompile revision 4")
+    require(missions, "filename = Awakening_M04MissionScriptName( filename );", "fresh M04 starts compile revision 4")
+    require(m04, '"maps/game/m04_prison.openq4-v4.script"', "MissionM04.inl")
+    for anchor in M04_V4_ANCHORS:
+        escaped = anchor.replace("\\", "\\\\").replace('"', '\\"').replace("\t", "\\t").replace("\n", "\\n")
+        require(m04, '{ "' + escaped + '"', "revision 4 anchors")
+    require(m04, "sys.trigger( $cellblock2_prisoner_7 );", "the seventh prisoners")
+    require(m04, "sys.trigger( $cellblock3_prisoner_7 );", "the seventh prisoners")
+    require(m04, "thread secRoomNag();", "Tak's radio reminders")
+    require(m04, 'failure = sys.spawn( \\"item_objectivefailed\\" );', "Tak's death fails the mission")
+    require(m04, 'openq4TakFailTitle = $item_objective_2.getKey( \\"objectivetitle\\" );', "the failure's title")
+    require(m04, "sys.trigger( $objective_controlroom );", "the control-room objective")
+    for line in M04_MARKSWELL_LINES:
+        require(m04, f'aiSpeakWait( $markswell, \\"{line}\\" );', "Markswell's urging")
+    require(m04, 'aiSpeak( $mitchell_RS, \\"lipsync_mitch_theresome\\" );', "the lift warning")
+    campaign = read(ROOT / "src/game/awakening/CampaignRepairs.inl")
+    require(campaign, "\t\tAwakening_RepairPrisonerPose( args );", "chapter 4 repairs the prisoners' poses")
+    require(campaign, 'const char *modelName = tube ? "model_char_marine_naked" : "model_char_q4x_marine";', "poses")
+    require(campaign, 'args.Set( "classname", "char_marine_naked" );', "the tube marines")
+    require(campaign, 'args.Set( "oq4_activatePose", pose );', "poses")
+    require(read(ROOT / "src/game/ai/AI_States.cpp"),
+            'spawnArgs.GetString ( "oq4_activatePose", "", &triggerAnim ) && *triggerAnim && '
+            'HasAnim ( ANIMCHANNEL_TORSO, triggerAnim ) ) {\n\t\tScriptedAnim ( triggerAnim, 4, true, false );',
+            "a triggered actor holds its repaired pose")
+
     # The Awakening is single player only. One game module serves both modes
     # (CORE-07), so every repair runs behind a guard that refuses network play.
     if (ROOT / "src/mpgame").exists():
@@ -356,8 +407,12 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
 # ---- the player's content ----------------------------------------------------
 
 def strip_comments(text: str) -> str:
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    return re.sub(r"//[^\n]*", "", text)
+    # One left-to-right pass: a "//****" banner opens no block comment, and
+    # comment markers inside strings stay text.
+    def keep(match: re.Match) -> str:
+        token = match.group(0)
+        return token if token.startswith('"') else "\n" * token.count("\n")
+    return re.sub(r'//[^\n]*|/\*.*?\*/|"(?:[^"\\\n]|\\.)*"', keep, text, flags=re.S)
 
 
 def block(text: str, start: int) -> str:
@@ -503,6 +558,69 @@ def check_m05_revision3(content: "Content") -> None:
         raise AssertionError(f"{toalson['classname']}: no class head for Toalson to keep")
 
 
+def model_anims(content: "Content", model: str) -> set[str]:
+    names: set[str] = set()
+    seen: set[str] = set()
+    model = model.lower()
+    while model and model not in seen and model in content.models:
+        seen.add(model)
+        names.update(name.lower() for name in re.findall(r"^\s*anim\s+(\S+)", content.models[model]["body"], re.M))
+        model = content.models[model]["inherit"]
+    return names
+
+
+def check_m04_revision4(content: "Content") -> None:
+    """Each repair still meets the content it was written for."""
+    script = read(content.awakening / M04_SCRIPT).replace("\r\n", "\n")
+    for anchor in M04_V4_ANCHORS:
+        if script.count(anchor) != 1:
+            raise AssertionError(f"{M04_SCRIPT}: revision 4 anchor {anchor!r} matches {script.count(anchor)} times")
+    live = strip_comments(script)
+    text = read(content.awakening / f"{M04_MAP}.map")
+
+    def triggered(name: str) -> bool:
+        return bool(re.search(r'"target\d*" "' + re.escape(name) + '"', text, re.I) or
+                    re.search(r"sys\.trigger\(\s*\$" + re.escape(name) + r"\s*\)", live, re.I))
+
+    if '"name" "item_objectivefailed_3"' in text:
+        raise AssertionError(f"{M04_MAP}: Tak's failure item exists now; revision 4's is obsolete")
+    tak = content.map_entity(M04_MAP, "tak")
+    if tak.get("script_death") != "takDies":
+        raise AssertionError(f"{M04_MAP}: Tak's death no longer calls takDies")
+    if content.map_entity(M04_MAP, "item_objective_2").get("classname") != "item_objective":
+        raise AssertionError(f"{M04_MAP}: item_objective_2 is no longer the mission's objective")
+    if content.map_entity(M04_MAP, "objective_controlroom").get("classname") != "item_objective" or \
+            triggered("objective_controlroom") or not triggered("objectivecomplete_controlroom"):
+        raise AssertionError(f"{M04_MAP}: the control-room objective is given, or no longer completed")
+    for block_name in ("cellblock2", "cellblock3"):
+        seventh = content.map_entity(M04_MAP, f"{block_name}_prisoner_7")
+        if seventh.get("hide") != "1" or triggered(f"{block_name}_prisoner_7") or not triggered(f"{block_name}_prisoner_6"):
+            raise AssertionError(f"{M04_MAP}: {block_name}_prisoner_7 is released already, or the sixth no longer is")
+    if re.search(r"\bthread\s+secRoomNag\b|\bsecRoomNag\s*\(\s*\)\s*;", live) or \
+            'sys.killthread( "secRoomNag" );' not in live:
+        raise AssertionError(f"{M04_SCRIPT}: something starts secRoomNag, or nothing stops it")
+    for line in M04_MARKSWELL_LINES:
+        if line in live or line in text:
+            raise AssertionError(f"{M04_MAP}: something plays {line} already")
+        sound = content.keys("char_marine_npc_markswell_prison1").get(line)
+        if not sound or not content.has_sample(sound):
+            raise AssertionError(f"{M04_MAP}: Markswell's {line} has no recording")
+    if "$mitchell.remove();" not in live or content.map_entity(M04_MAP, "mitchell_RS").get("classname") != \
+            content.map_entity(M04_MAP, "mitchell").get("classname"):
+        raise AssertionError(f"{M04_MAP}: the lift warning's Mitchell changed")
+    stock = model_anims(content, content.keys("char_marine_unarmed").get("model", ""))
+    for pose, model in M04_POSES.items():
+        if pose not in model_anims(content, model):
+            raise AssertionError(f"{model}: no longer has the {pose} pose")
+        if pose in stock:
+            raise AssertionError(f"char_marine_unarmed: has {pose} itself now; the model repair is obsolete")
+    if content.keys("char_q4x_marine_unarmed").get("model", "").lower() != "model_char_q4x_marine":
+        raise AssertionError("char_q4x_marine_unarmed: no longer the expansion's model for the unarmed marine")
+    posed = re.findall(r'"classname" "char_marine_unarmed"[^}]*?"on_activate" "(\w+)"', text)
+    if len([pose for pose in posed if pose in M04_POSES]) < 20:
+        raise AssertionError(f"{M04_MAP}: fewer posed prisoners than revision 4 was written for")
+
+
 def check_m09_taunts(content: "Content") -> None:
     """The fight's taunts are global speakers nothing else plays, each recorded."""
     text = read(content.awakening / f"{M09_MAP}.map")
@@ -645,6 +763,7 @@ def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, ret
     check_m09_finale(awakening)
     content = Content(awakening, retail)
     check_m05_revision3(content)
+    check_m04_revision4(content)
     check_m09_taunts(content)
 
     for map_name, entity, key, source in tables["dialogue"]:

@@ -5061,6 +5061,18 @@ Completion substeps must keep three forms of evidence distinct:
   to marine 5's. v2 and v3 saves restore. A dead Viper tech was shown not to
   block the bridge; the 36 other unplayed lines are listed, not placed. See
   [M05 revision 3](awakening-m05-m06.md#m05-revision-3--28-november-2026).
+  M04 revision 4, 28 November: the same cross-check of the prison, plus all
+  209 scripted and activation animations against their models. Fresh starts
+  fail the mission when Tak dies in the turret defence (his death called a
+  missing failure item, and the level went on without the tech who opens its
+  doors), give the "Locate mainframe control room" objective that the level
+  completes but never gave, start Tak's radio reminders through the heat
+  exchanger, play Markswell's three recorded urgings and the Viper Mitchell's
+  lift warning, release each cellblock's seventh prisoner, and hold the
+  prisoners' and tube marines' authored poses (a Doom 3 `on_activate` key no
+  Quake 4 code reads). Fresh and original saves restore. Fox Squad's five
+  combat calls and the abandoned ending cinematic are listed, not placed. See
+  [M04 revision 4](awakening-missions.md#m04-revision-4--28-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented

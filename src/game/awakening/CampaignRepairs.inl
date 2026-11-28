@@ -53,6 +53,40 @@ static int Awakening_PrepareCampaignRepairs( idMapFile *map ) {
 	return chapter;
 }
 
+// The prisoners and the conveyor's tube marines name the pose they hold once
+// triggered in on_activate, a Doom 3 key no Quake 4 code reads; the script's
+// matching aiScriptedAnimLoop calls are commented out. They were placed as
+// retail unarmed marines, whose model lacks the poses. The expansion's own
+// unarmed marine (char_q4x_marine_unarmed) is that class with the same mesh
+// and a model that has the kneeling and waving poses; a pose it lacks keeps
+// the authored idle. The conveyor's marines float in their pods as retail's
+// naked marine, the only model with the floating pose. (Retail's non-AI
+// env_tube_marines cannot be used: its model names an anim that never shipped.)
+static void Awakening_RepairPrisonerPose( idDict &args ) {
+	const char *pose = args.GetString( "on_activate" );
+	if ( !*pose || idStr::Icmp( args.GetString( "classname" ), "char_marine_unarmed" ) ||
+		args.FindKey( "model" ) || args.FindKey( "oq4_activatePose" ) ) {
+		return;
+	}
+	const bool tube = !idStr::Icmp( pose, "med_tube_float" ) &&
+		!idStr::Icmpn( args.GetString( "bind" ), "transport_pod_", 14 );
+	const char *modelName = tube ? "model_char_marine_naked" : "model_char_q4x_marine";
+	const idDeclModelDef *model = static_cast<const idDeclModelDef *>(
+		declManager->FindType( DECL_MODELDEF, modelName, false ) );
+	if ( model == NULL || !model->GetAnim( pose ) ||
+		( tube && gameLocal.FindEntityDef( "char_marine_naked", false ) == NULL ) ) {
+		return;
+	}
+	if ( tube ) {
+		// Its definition names a placeholder talker; these marines are unconscious.
+		args.Set( "classname", "char_marine_naked" );
+		args.Set( "npc_name", "" );
+	} else {
+		args.Set( "model", modelName );
+	}
+	args.Set( "oq4_activatePose", pose );
+}
+
 static void Awakening_RepairMapArgs( int chapter, idDict &args ) {
 	const char *name = args.GetString( "name" );
 	if ( chapter == 3 && !idStr::Icmp( name, "forwardgui" ) &&
@@ -99,6 +133,7 @@ static void Awakening_RepairMapArgs( int chapter, idDict &args ) {
 			gameLocal.FindEntityDef( "weaponmod_goobgun_burst", false ) == NULL ) {
 			args.Delete( "item13" );
 		}
+		Awakening_RepairPrisonerPose( args );
 	}
 }
 
