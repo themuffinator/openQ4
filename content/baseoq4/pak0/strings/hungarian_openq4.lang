@@ -2213,4 +2213,6 @@
 	"#str_233567"	"FŐELLENSÉG"
 	"#str_233570"	"3D hang a headsetben"
 	"#str_233571"	"A headsetben a hangok onnan szólnak, ahol a fejed körül vannak. Kikapcsolva a hangbeállítások Fejhallgató-HRTF beállítását követi."
+	"#str_233572"	"Az eredeti játék hangja"
+	"#str_233573"	"A Quake 4 22 kHz-es hangjait a minták ismétlésével emeli a keverési frekvenciára, ahogy az eredeti játék tette: fényesebb és érdesebb. Több hangmemóriát használ, és váltáskor újraindítja a hangot."
 }

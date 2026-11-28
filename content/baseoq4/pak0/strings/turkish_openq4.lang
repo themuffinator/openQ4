@@ -2213,4 +2213,6 @@
 	"#str_233567"	"BOSS"
 	"#str_233570"	"Başlıkta 3D ses"
 	"#str_233571"	"Başlık takılıyken sesler, başının çevresinde bulundukları yerden gelir. Kapalı, Ses ayarlarındaki Kulaklık HRTF seçeneğine uyar."
+	"#str_233572"	"Özgün oyun sesi"
+	"#str_233573"	"Quake 4'ün 22 kHz seslerini, özgün oyunun yaptığı gibi örnekleri yineleyerek karıştırma hızına çıkarır: daha parlak ve daha pürüzlü. Daha fazla ses belleği kullanır ve değiştirildiğinde sesi yeniden başlatır."
 }

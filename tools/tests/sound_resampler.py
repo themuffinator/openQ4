@@ -24,6 +24,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 
@@ -251,6 +252,27 @@ def main():
     checks['repeat_resident_buffer'] = (
         'openalRepeat = repeat;' in sample and 'openalReserved = uploadSize;' in sample and
         'alBufferData( openalBuffer, GetOpenALBufferFormat(), repeated, uploadSize, format.basic.samplesPerSec * repeat );' in sample)
+
+    # the player's switch: Original Game Sound on the Audio page, retained and stock, in every language
+    menu = (ROOT / 'src/framework/Session_menu.cpp').read_text(encoding='utf-8', errors='replace')
+    retained = (ROOT / 'tools/ui/retained_audio.py').read_text(encoding='utf-8')
+    stock = (ROOT / 'content/baseoq4/pak0/guis/menu/settings/audio.gui').read_text(encoding='utf-8', errors='replace')
+    checks['row_retained'] = '("toggle", "audio_retail", "#str_233572", "audioRetailUpsampling", "audio.retailUpsampling", None),' in retained
+    checks['row_tooltip'] = '"audio_retail": "#str_233573",' in (ROOT / 'tools/ui/retained_tooltips.py').read_text(encoding='utf-8')
+    # the session sets the setting and restarts the sound system, so every sample is uploaded the chosen way
+    checks['row_session'] = ('cvarSystem->SetCVarBool( "s_retailUpsampling", value != 0 );\n\t\t\tHandleMainMenuCommands( "sound drivar" );' in menu.replace('\r\n', '\n') and
+                             'gui->SetStateBool( "audio.retailUpsampling", cvarSystem->GetCVarBool( "s_retailUpsampling" ) );' in menu)
+    checks['row_stock'] = re.search(r'choiceDef set_audio_retail_val\s*\{[^}]*cvar\ts_retailUpsampling\b[^}]*\}\s*onActionRelease \{\s*set "cmd" "sound drivar" ;', stock) is not None
+    for document in ('audio.rui', 'audio_awakening.rui'):
+        page = (ROOT / 'content/baseoq4/pak0/guis/menu/settings' / document).read_text(encoding='utf-8')
+        checks[f'row_generated_{document}'] = '"audio_retail"' in page and 'audioRetailUpsampling' in page and '#str_233573' in page
+    for language in ('brazilian', 'czech', 'english', 'french', 'german', 'hungarian', 'italian', 'polish', 'russian', 'spanish',
+                     'turkish', 'ukrainian'):
+        table = (ROOT / f'content/baseoq4/pak0/strings/{language}_openq4.lang').read_text(encoding='utf-8')
+        label = re.search(r'^\t"#str_233572"\t"([^"\n]+)"$', table, re.M)
+        tip = re.search(r'^\t"#str_233573"\t"([^"\n]+)"$', table, re.M)
+        # the page generator wraps labels only at spaces
+        checks[f'row_strings_{language}'] = label is not None and ' ' in label.group(1) and tip is not None and len(tip.group(1)) > 20
 
     report = {'checks': checks, 'values': values, 'provider': None,
               'choice_sha256': hashlib.sha256((ROOT / 'src/sound/SoundResampler.h').read_bytes()).hexdigest(),

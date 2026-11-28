@@ -2213,4 +2213,6 @@
 	"#str_233567"	"JEFE"
 	"#str_233570"	"Audio 3D en el casco"
 	"#str_233571"	"Con el casco, los sonidos llegan desde donde están alrededor de tu cabeza. Desactivado sigue la opción HRTF auriculares de Audio."
+	"#str_233572"	"Sonido del juego original"
+	"#str_233573"	"Lleva los sonidos de 22 kHz de Quake 4 a la frecuencia de mezcla repitiendo muestras, como hacía el juego original: más brillante y áspero. Usa más memoria de sonido y reinicia el sonido al cambiar."
 }

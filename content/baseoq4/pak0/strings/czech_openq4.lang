@@ -2213,4 +2213,6 @@
 	"#str_233567"	"BOSS"
 	"#str_233570"	"3D zvuk v headsetu"
 	"#str_233571"	"S headsetem zvuky přicházejí z míst, kde jsou kolem vaší hlavy. Vypnuto se řídí volbou HRTF pro sluchátka v nastavení zvuku."
+	"#str_233572"	"Zvuk původní hry"
+	"#str_233573"	"Zvuky Quake 4 s 22 kHz převádí na směšovací frekvenci opakováním vzorků, jako původní hra: jasnější a drsnější. Zabere více zvukové paměti a při změně restartuje zvuk."
 }

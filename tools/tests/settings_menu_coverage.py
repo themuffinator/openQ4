@@ -1153,6 +1153,7 @@ def main() -> None:
         "s_useEAXReverb",
         "s_numberOfSpeakers",
         "s_openALHRTF",
+        "s_retailUpsampling",
         "s_musicVolume",
         "s_dialogueVolume",
         "ui_subtitles",
@@ -1173,7 +1174,7 @@ def main() -> None:
         "#str_229962",
         "#str_229963",
         "rect\t0,104,640,250",
-        "rect\t-24,-84,640,498",
+        "rect\t-24,-84,640,522",
         "rect\t245,142,361,20",
         "rect\t245,318,361,20",
     ):
@@ -1191,6 +1192,7 @@ def main() -> None:
         "windowDef set_audio_eax",
         "windowDef set_audio_speakers",
         "windowDef set_audio_hrtf",
+        "windowDef set_audio_retail",
     )
     last_position = -1
     for token in audio_order:

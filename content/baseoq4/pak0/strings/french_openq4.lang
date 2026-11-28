@@ -2222,4 +2222,6 @@
 	"#str_233567"	"BOSS"
 	"#str_233570"	"Audio 3D du casque"
 	"#str_233571"	"Avec le casque RV, les sons viennent de là où ils se trouvent autour de votre tête. Désactivé suit l'option HRTF casque des réglages audio."
+	"#str_233572"	"Son du jeu d'origine"
+	"#str_233573"	"Amène les sons 22 kHz de Quake 4 à la fréquence de mixage en répétant les échantillons, comme le jeu d'origine : plus brillant et plus rugueux. Utilise plus de mémoire audio et redémarre le son au changement."
 }

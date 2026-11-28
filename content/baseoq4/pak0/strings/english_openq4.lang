@@ -2213,4 +2213,6 @@
 	"#str_233567"	"BOSS"
 	"#str_233570"	"Headset 3D Audio"
 	"#str_233571"	"Sounds come from where they are around your head while you wear the headset. Off follows Headphone HRTF in the Audio settings."
+	"#str_233572"	"Original Game Sound"
+	"#str_233573"	"Brings Quake 4's 22 kHz sounds up to the mixing rate by repeating samples, as the original game did: brighter and grittier. Uses more sound memory, and restarts the sound when changed."
 }

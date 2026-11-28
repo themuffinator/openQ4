@@ -17,6 +17,7 @@
   "audio.speakers": {"type": "number", "initial": 0},
   "audio.hrtf": {"type": "number", "initial": 0},
   "audio.subtitles": {"type": "boolean", "initial": false},
+  "audio.retailUpsampling": {"type": "boolean", "initial": false},
   "audio.subtitleSize": {"type": "number", "initial": 100},
   "audio.subtitleBackground": {"type": "number", "initial": 0},
   "audio.subtitleSpeakers": {"type": "boolean", "initial": false},
@@ -93,6 +94,11 @@
    "operation": "session.menuValue",
    "input": "number",
    "arguments": {"command": "audioHrtf", "value": {"input": "value"}}
+  },
+  "audioRetailUpsampling": {
+   "operation": "session.menuValue",
+   "input": "boolean",
+   "arguments": {"command": "audioRetailUpsampling", "value": {"input": "value"}}
   },
   "audioSubtitles": {
    "operation": "session.menuValue",
@@ -8304,18 +8310,18 @@
    }
   },
   {
-   "id": "tall.audio-audio-head-1-3.width",
-   "node": "audio-audio-head-1-3",
+   "id": "tall.audio_retail.width",
+   "node": "audio_retail",
    "property": "width",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     837.5488,
+     880.5,
      {
       "op": "*",
       "args": [
-       409.5,
+       430.5,
        {
         "op": "max",
         "args": [
@@ -8329,8 +8335,8 @@
    }
   },
   {
-   "id": "tall.audio-audio-head-1-3.height",
-   "node": "audio-audio-head-1-3",
+   "id": "tall.audio_retail.height",
+   "node": "audio_retail",
    "property": "height",
    "value": {
     "op": "select",
@@ -8354,18 +8360,18 @@
    }
   },
   {
-   "id": "tall.audio-audio-head-1-3.padding-left",
-   "node": "audio-audio-head-1-3",
-   "property": "padding-left",
+   "id": "tall.audio_retail-focus.width",
+   "node": "audio_retail-focus",
+   "property": "width",
    "value": {
     "op": "select",
     "args": [
      {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
-     42.9512,
+     8.1812,
      {
       "op": "*",
       "args": [
-       21.0,
+       4,
        {
         "op": "max",
         "args": [
@@ -8379,8 +8385,108 @@
    }
   },
   {
-   "id": "tall.audio-audio-head-1-3.font-size",
-   "node": "audio-audio-head-1-3",
+   "id": "tall.audio_retail-focus.height",
+   "node": "audio_retail-focus",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-head.left",
+   "node": "audio_retail-head",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {
+      "op": "*",
+      "args": [
+       21,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-head.width",
+   "node": "audio_retail-head",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     326.4272,
+     {
+      "op": "*",
+      "args": [
+       159.599,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-head.height",
+   "node": "audio_retail-head",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-label.font-size",
+   "node": "audio_retail-label",
    "property": "font-size",
    "value": {
     "op": "select",
@@ -8410,8 +8516,345 @@
    }
   },
   {
-   "id": "tall.audio-audio-head-1-3.line-height",
-   "node": "audio-audio-head-1-3",
+   "id": "tall.audio_retail-label.line-height",
+   "node": "audio_retail-label",
+   "property": "line-height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [26.5889, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         13.0,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-box.left",
+   "node": "audio_retail-box",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {
+      "op": "*",
+      "args": [
+       188.599,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-box.top",
+   "node": "audio_retail-box",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {
+      "op": "*",
+      "args": [
+       11.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-box.width",
+   "node": "audio_retail-box",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {
+      "op": "*",
+      "args": [
+       14,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-box.height",
+   "node": "audio_retail-box",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {
+      "op": "*",
+      "args": [
+       14,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-checked.left",
+   "node": "audio_retail-checked",
+   "property": "left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     385.7408,
+     {
+      "op": "*",
+      "args": [
+       188.599,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-checked.top",
+   "node": "audio_retail-checked",
+   "property": "top",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     22.4983,
+     {
+      "op": "*",
+      "args": [
+       11.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-checked.width",
+   "node": "audio_retail-checked",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {
+      "op": "*",
+      "args": [
+       14,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio_retail-checked.height",
+   "node": "audio_retail-checked",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     28.6341,
+     {
+      "op": "*",
+      "args": [
+       14,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio-audio-head-1-4.width",
+   "node": "audio-audio-head-1-4",
+   "property": "width",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     837.5488,
+     {
+      "op": "*",
+      "args": [
+       409.5,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio-audio-head-1-4.height",
+   "node": "audio-audio-head-1-4",
+   "property": "height",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     73.6307,
+     {
+      "op": "*",
+      "args": [
+       36.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio-audio-head-1-4.padding-left",
+   "node": "audio-audio-head-1-4",
+   "property": "padding-left",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     42.9512,
+     {
+      "op": "*",
+      "args": [
+       21.0,
+       {
+        "op": "max",
+        "args": [
+         {"state": "view.text"},
+         {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio-audio-head-1-4.font-size",
+   "node": "audio-audio-head-1-4",
+   "property": "font-size",
+   "value": {
+    "op": "select",
+    "args": [
+     {"op": "<", "args": [{"state": "view.aspect"}, 0.76]},
+     {"op": "/", "args": [28.6341, {"state": "view.text"}]},
+     {
+      "op": "/",
+      "args": [
+       {
+        "op": "*",
+        "args": [
+         14,
+         {
+          "op": "max",
+          "args": [
+           {"state": "view.text"},
+           {"op": "min", "args": [2, {"op": "max", "args": [1, {"op": "/", "args": [{"state": "view.target"}, 36.0]}]}]}
+          ]
+         }
+        ]
+       },
+       {"state": "view.text"}
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "tall.audio-audio-head-1-4.line-height",
+   "node": "audio-audio-head-1-4",
    "property": "line-height",
    "value": {
     "op": "select",
@@ -12569,6 +13012,150 @@
     },
     {
      "node": "audio_hrtf-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "audio_retail-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "audio_retail-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_retail-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_retail-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_retail-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -19982,7 +20569,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "audio_device", "up": "audio_dialogue", "right": "audio_subtitles", "left": "audio_backend"},
+                 "navigation": {"down": "audio_device", "up": "audio_dialogue", "right": "audio_retail", "left": "audio_backend"},
                  "tooltip": "#str_233113"
                 }
                },
@@ -21801,7 +22388,7 @@
                   "lineStep": 22.0,
                   "minimumThumb": 24
                  },
-                 "navigation": {"down": "audio_eax", "up": "audio_backend", "right": "audio_subtitle_size", "left": "audio_device"},
+                 "navigation": {"down": "audio_eax", "up": "audio_backend", "right": "audio_subtitles", "left": "audio_device"},
                  "tooltip": "#str_233114"
                 }
                }
@@ -23348,12 +23935,234 @@
                  ],
                  "placementBounds": "screen",
                  "scrollbar": {"track": "audio_hrtf-scroll-track", "thumb": "audio_hrtf-scroll-thumb", "lineStep": 22.0, "minimumThumb": 24},
-                 "navigation": {"down": "audio_subtitles", "up": "audio_speakers", "left": "audio_dialogue", "right": "audio_hrtf"},
+                 "navigation": {"down": "audio_retail", "up": "audio_speakers", "left": "audio_dialogue", "right": "audio_hrtf"},
                  "tooltip": "#str_233117"
                 }
                },
                {
-                "id": "audio-audio-head-1-3",
+                "id": "audio_retail",
+                "type": "group",
+                "properties": {
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "width": {"type": "length", "value": 430.5, "unit": "dp"},
+                 "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                 "opacity": {"type": "number", "value": 1},
+                 "flex-shrink": {"type": "number", "value": 0}
+                },
+                "children": [
+                 {
+                  "id": "audio_retail-plate",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"}
+                  },
+                  "paths": [
+                   {
+                    "id": "plate",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                     "widthDp": 1,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_retail-wash",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 100, "unit": "%"},
+                   "height": {"type": "length", "value": 100, "unit": "%"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "wash",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.013937}, {"fraction": 0.027778}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "p4", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {
+                     "type": "linear",
+                     "from": [{"fraction": 0.0}, {"fraction": 0.0}],
+                     "to": [{"fraction": 1}, {"fraction": 0.0}],
+                     "stops": [
+                      {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                      {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                     ]
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_retail-focus",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 0, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 4, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "opacity": {"type": "number", "value": 0}
+                  },
+                  "paths": [
+                   {
+                    "id": "rail",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.0}, {"fraction": 0.194444}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.027778}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 1.5}, {"fraction": 0.972222}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.0}, {"fraction": 0.972222}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_retail-head",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 21, "unit": "dp"},
+                   "top": {"type": "length", "value": 0, "unit": "dp"},
+                   "width": {"type": "length", "value": 159.599, "unit": "dp"},
+                   "height": {"type": "length", "value": 36.0, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "flex"},
+                   "flex-direction": {"type": "keyword", "value": "row"},
+                   "align-items": {"type": "keyword", "value": "center"}
+                  },
+                  "children": [
+                   {
+                    "id": "audio_retail-label",
+                    "type": "text",
+                    "properties": {
+                     "text": {"type": "text", "value": "#str_233572"},
+                     "position": {"type": "keyword", "value": "relative"},
+                     "display": {"type": "keyword", "value": "block"},
+                     "flex-shrink": {"type": "number", "value": 1},
+                     "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                     "font-family": {"type": "font", "value": "lowpixel"},
+                     "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                     "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                     "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                     "white-space": {"type": "keyword", "value": "normal"},
+                     "overflow": {"type": "keyword", "value": "hidden"}
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_retail-box",
+                  "type": "vector",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 188.599, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"}
+                  },
+                  "paths": [
+                   {
+                    "id": "box",
+                    "commands": [
+                     {"id": "p0", "op": "move", "points": [[{"fraction": 0.053571}, {"fraction": 0.053571}]]},
+                     {"id": "p1", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.053571}]]},
+                     {"id": "p2", "op": "line", "points": [[{"fraction": 0.946429}, {"fraction": 0.946429}]]},
+                     {"id": "p3", "op": "line", "points": [[{"fraction": 0.053571}, {"fraction": 0.946429}]]},
+                     {"id": "close", "op": "close"}
+                    ],
+                    "stroke": {
+                     "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                     "widthDp": 1.5,
+                     "minimumPixels": 1,
+                     "join": "miter",
+                     "cap": "butt"
+                    }
+                   }
+                  ]
+                 },
+                 {
+                  "id": "audio_retail-checked",
+                  "type": "group",
+                  "properties": {
+                   "position": {"type": "keyword", "value": "absolute"},
+                   "left": {"type": "length", "value": 188.599, "unit": "dp"},
+                   "top": {"type": "length", "value": 11.0, "unit": "dp"},
+                   "width": {"type": "length", "value": 14, "unit": "dp"},
+                   "height": {"type": "length", "value": 14, "unit": "dp"},
+                   "display": {"type": "keyword", "value": "none"}
+                  },
+                  "children": [
+                   {
+                    "id": "audio_retail-mark",
+                    "type": "vector",
+                    "properties": {
+                     "position": {"type": "keyword", "value": "absolute"},
+                     "left": {"type": "length", "value": 0, "unit": "dp"},
+                     "top": {"type": "length", "value": 0, "unit": "dp"},
+                     "width": {"type": "length", "value": 100, "unit": "%"},
+                     "height": {"type": "length", "value": 100, "unit": "%"}
+                    },
+                    "paths": [
+                     {
+                      "id": "mark",
+                      "commands": [
+                       {"id": "p0", "op": "move", "points": [[{"fraction": 0.25}, {"fraction": 0.25}]]},
+                       {"id": "p1", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.25}]]},
+                       {"id": "p2", "op": "line", "points": [[{"fraction": 0.75}, {"fraction": 0.75}]]},
+                       {"id": "p3", "op": "line", "points": [[{"fraction": 0.25}, {"fraction": 0.75}]]},
+                       {"id": "close", "op": "close"}
+                      ],
+                      "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                     }
+                    ]
+                   }
+                  ]
+                 }
+                ],
+                "control": {
+                 "role": "toggle",
+                 "label": "#str_233572",
+                 "action": "audioRetailUpsampling",
+                 "value": {"state": "audio.retailUpsampling"},
+                 "states": {
+                  "default": "audio_retail.default",
+                  "hover": "audio_retail.hover",
+                  "focus": "audio_retail.focus",
+                  "pressed": "audio_retail.pressed",
+                  "disabled": "audio_retail.disabled"
+                 },
+                 "parts": {"checked": "audio_retail-checked"},
+                 "navigation": {"down": "audio_subtitles", "up": "audio_hrtf", "left": "audio_backend", "right": "audio_retail"},
+                 "tooltip": "#str_233573"
+                }
+               },
+               {
+                "id": "audio-audio-head-1-4",
                 "type": "text",
                 "properties": {
                  "text": {"type": "text", "value": "#str_232554"},
@@ -23592,7 +24401,7 @@
                   "disabled": "audio_subtitles.disabled"
                  },
                  "parts": {"checked": "audio_subtitles-checked"},
-                 "navigation": {"down": "audio_subtitle_size", "up": "audio_hrtf", "left": "audio_backend", "right": "audio_subtitles"},
+                 "navigation": {"down": "audio_subtitle_size", "up": "audio_retail", "left": "audio_device", "right": "audio_subtitles"},
                  "tooltip": "#str_233118"
                 }
                },

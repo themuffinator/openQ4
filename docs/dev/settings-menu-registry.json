@@ -1324,6 +1324,29 @@
       "accessibility": "Standard focusable choiceDef row."
     },
     {
+      "id": "audio.original_game_sound",
+      "pane": "Audio",
+      "section": "Effects",
+      "path": "Settings > Audio > Effects > Original Game Sound",
+      "source": "audio",
+      "container": "set_audio_retail",
+      "widgets": [
+        "set_audio_retail_val"
+      ],
+      "widget_type": "choice",
+      "label_key": "#str_233572",
+      "choices_key": "#str_200059",
+      "values": [
+        "0",
+        "1"
+      ],
+      "target_type": "cvar",
+      "target": "s_retailUpsampling",
+      "default": "0",
+      "restart_required": false,
+      "accessibility": "Standard focusable choiceDef row. Restarts the sound system on release, as the device rows do."
+    },
+    {
       "id": "audio.music_volume",
       "pane": "Audio",
       "section": "Levels",

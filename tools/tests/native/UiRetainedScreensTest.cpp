@@ -309,7 +309,7 @@ static const std::set<std::string> SessionValueCommands = {"mpVoteMap","mpVoteGa
 	"createQuadHog","createVampiric","createFrenzy","createWeaponArena","createPowerups","createSelfDamage","createKnockback",
 	"createFallDamage","createWeaponRespawn","createPreset","createMapRotation","createMapQueue","createItemTimers",
 		"createTimeouts","createSpectatorLock","createInactivity","createMaxBrightskin","createForcedModels","weaponOrderEnable",
-	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
+	"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf","audioRetailUpsampling",
 	"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 	"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 // The player settings the multiplayer card's Settings and Voice pages and the
@@ -5313,7 +5313,7 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	CheckSessionActions(document);
 	const std::pair<const char*,const char*> rows[] = {{"audio_volume","audioVolume"},{"audio_music","audioMusic"},
 		{"audio_dialogue","audioDialogue"},{"audio_backend","audioBackend"},{"audio_device","audioDevice"},{"audio_eax","audioEax"},
-		{"audio_speakers","audioSpeakers"},{"audio_hrtf","audioHrtf"},{"audio_subtitles","audioSubtitles"},
+		{"audio_speakers","audioSpeakers"},{"audio_hrtf","audioHrtf"},{"audio_retail","audioRetailUpsampling"},{"audio_subtitles","audioSubtitles"},
 		{"audio_subtitle_size","audioSubtitleSize"},{"audio_subtitle_background","audioSubtitleBackground"},
 		{"audio_subtitle_speakers","audioSubtitleSpeakers"},{"audio_subtitle_untranscribed","audioSubtitleUntranscribed"}};
 	for (const auto& [control, verb] : rows) {
@@ -5351,7 +5351,7 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	// 5.1 speakers and the subtitles at 150%.
 	Check(runtime.SetState({{"audio.volume",140.0},{"audio.music",40.0},{"audio.dialogue",100.0},{"audio.backend",1.0},
 		{"audio.device.count",3.0},{"audio.device.0.label",std::string("Default device")},{"audio.device.1.label",std::string("Speakers")},
-		{"audio.device.2.label",std::string("Headset")},{"audio.device",1.0},{"audio.eax",true},{"audio.speakers",2.0},{"audio.hrtf",0.0},
+		{"audio.device.2.label",std::string("Headset")},{"audio.device",1.0},{"audio.eax",true},{"audio.speakers",2.0},{"audio.hrtf",0.0},{"audio.retailUpsampling",false},
 		{"audio.subtitles",true},{"audio.subtitleSize",150.0},{"audio.subtitleBackground",30.0},{"audio.subtitleSpeakers",false},
 		{"audio.subtitleUntranscribed",true}},error,0.1),
 		"the session publishes the values");
@@ -5382,6 +5382,9 @@ static void CheckAudioPage(ScreenHost& host, const char* path) {
 	press(MenuInput::Accept,0.71);
 	invocation = taken("audioEax");
 	Check(!std::get<bool>(invocation.arguments.at("value")),"Accept asks the session to turn EAX off");
+	Check(runtime.FocusControl("audio_retail",0.72),"focus Original Game Sound");
+	press(MenuInput::Accept,0.725);
+	Check(std::get<bool>(taken("audioRetailUpsampling").arguments.at("value")),"Accept asks the session for the original game's upsampling");
 	Check(runtime.FocusControl("audio_subtitle_speakers",0.73),"focus Speaker Names");
 	press(MenuInput::Accept,0.74);
 	Check(std::get<bool>(taken("audioSubtitleSpeakers").arguments.at("value")),"Accept asks the session to name the speakers");

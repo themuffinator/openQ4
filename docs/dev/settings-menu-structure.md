@@ -34,7 +34,7 @@ With `ui_retained 1` (the default) the Settings screen opens the retained SETTIN
 | Display | Screen | Display: Display Device, Expand Across Displays, Window Mode, V-Sync, Frame Rate Cap | Display Sizing: window size, Display Resolution, custom fullscreen size, Refresh Rate |
 | Display | Image Quality | Brightness, Resolution Scale, MSAA, Post AA Mode, Anisotropic Filtering | Rendering: Specular, Bump Mapping, Sky, Ambient Light, Ambient Brightness |
 | Display | Effects | Lighting: Shadows, Character Self-Shadows, Irradiance Volumes, Preload Light Grids | Post-Processing: Bloom, Ambient Occlusion, Tone Mapping, Motion Blur, CRT Filter |
-| Audio | (one page) | Levels, Devices | Effects: EAX, Surround Speakers, Headphone HRTF. Subtitles: the five subtitle rows |
+| Audio | (one page) | Levels, Devices | Effects: EAX, Surround Speakers, Headphone HRTF, Original Game Sound. Subtitles: the five subtitle rows |
 
 The retained pages also offer rows the classic page lacks: Frame Rate Cap (`com_maxfps`: 30, 60, 75, 90, 120, 144, 165, 240, 360 or Unlimited), Anisotropic Filtering (`image_anisotropy`: Off, 2x, 4x, 8x, 16x), Shadows as one list over the presets' shadow ladder (Off, Original and four shadow-map levels; see below) and Motion Blur (`r_motionBlur`), all of which the performance presets set; Character Self-Shadows needs a shadow-map level. VR Mode, Room Scale, Two-Handed Grip and Physical Crouch are toggles there. The rest of this document describes the classic pages (`ui_retained 0`), whose layout is unchanged.
 
@@ -436,6 +436,7 @@ The Audio pane is `p_settings_audio`, included from `content/baseoq4/pak0/guis/m
 | Effects | EAX Reverb | `choiceDef` | `set_audio_eax_val` | `s_useEAXReverb` | `No;Yes` | Disabled when OpenAL is off or failed to load. Runs `sound eax` on release. |
 | Effects | Surround Speakers | `choiceDef` | `set_audio_speakers_val` | `s_numberOfSpeakers` | `0 Auto`, `2 Off`, `6 On` | Displayed through `Auto;Off;On` (`#str_229980`, shared with Headphone HRTF). `Auto` (default) sends no output-mode request, so OpenAL Soft uses the device's own layout; `Off`/`On` request stereo or 5.1 through `ALC_SOFT_output_mode` when available. Runs `sound speakers` on release. |
 | Effects | Headphone HRTF | `choiceDef` | `set_audio_hrtf_val` | `s_openALHRTF` | `0 Auto`, `1 Off`, `2 On` | `Off` is the default since 27 November 2026. Requests OpenAL Soft HRTF through `ALC_SOFT_HRTF` when available; `Auto` sends no request, and the runtime then turns HRTF on for an endpoint the system labels headphones. Runs `sound drivar` on release. |
+| Effects | Original Game Sound | `choiceDef` | `set_audio_retail_val` | `s_retailUpsampling` | `No;Yes` (`#str_200059`) | Off by default. On repeats samples to bring 11 and 22 kHz sounds up to 44.1 kHz, as Quake 4's own mixer did ([audio record](audio-modernization.md#the-original-mixers-upsampling-as-an-option-november-27)). Runs `sound drivar` on release, which restarts the sound system so every sample is uploaded the chosen way. |
 
 ## Dynamic Lists
 

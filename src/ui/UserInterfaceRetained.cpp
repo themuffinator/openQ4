@@ -362,7 +362,7 @@ bool SessionMenuValueCommand(const std::string& command) {
 		"createQuadHog","createVampiric","createFrenzy","createWeaponArena","createPowerups","createSelfDamage","createKnockback",
 		"createFallDamage","createWeaponRespawn","createPreset","createMapRotation","createMapQueue","createItemTimers",
 		"createTimeouts","createSpectatorLock","createInactivity","createMaxBrightskin","createForcedModels","weaponOrderEnable",
-		"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf",
+		"audioVolume","audioMusic","audioDialogue","audioBackend","audioDevice","audioEax","audioSpeakers","audioHrtf","audioRetailUpsampling",
 		"audioSubtitles","audioSubtitleSize","audioSubtitleBackground","audioSubtitleSpeakers","audioSubtitleUntranscribed",
 		"gameGunPosition","gameForceModel","gameCrosshair","gameCorpseTime","gameLanguage"};
 	return commands.contains(command);

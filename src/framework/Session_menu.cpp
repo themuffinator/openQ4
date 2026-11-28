@@ -91,7 +91,7 @@ idCVar gui_set_sys_scroll( "gui_set_sys_scroll", "0", CVAR_GUI | CVAR_INTEGER, "
 // (SSAO, HBAO, GTAO). SyncMainMenuAmbientOcclusionChoice keeps it in step with
 // r_ssao and r_ssaoMethod, which the presets and the console also change.
 idCVar gui_set_sys_ao( "gui_set_sys_ao", "0", CVAR_GUI | CVAR_INTEGER, "display menu ambient occlusion choice: 0 off, 1 SSAO, 2 HBAO, 3 GTAO", 0, 3 );
-idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 7 );
+idCVar gui_set_audio_scroll( "gui_set_audio_scroll", "0", CVAR_GUI | CVAR_INTEGER, "audio menu scroll step", 0, 8 );
 idCVar gui_set_game_scroll( "gui_set_game_scroll", "0", CVAR_GUI | CVAR_INTEGER, "game menu scroll step", 0, 97 );
 // The opt-ins are unarchived, so each lasts until the player quits, and
 // CVAR_NOCHEAT, because the engine counts any other unarchived CVar as a
@@ -378,6 +378,7 @@ static bool Session_RetainedValueRequest( const char *request, const char *const
 static const char *const RETAINED_AUDIO_GUI = "guis/menu/settings/audio.rui";
 static const char *const RETAINED_AUDIO_VERBS[] = {
 	"audioVolume", "audioMusic", "audioDialogue", "audioBackend", "audioDevice", "audioEax", "audioSpeakers", "audioHrtf",
+	"audioRetailUpsampling",
 	"audioSubtitles", "audioSubtitleSize", "audioSubtitleBackground", "audioSubtitleSpeakers", "audioSubtitleUntranscribed"
 };
 static const int RETAINED_AUDIO_VERB_COUNT = sizeof( RETAINED_AUDIO_VERBS ) / sizeof( RETAINED_AUDIO_VERBS[0] );
@@ -2715,6 +2716,7 @@ void idSessionLocal::PublishRetainedAudio( idUserInterface *gui ) {
 	}
 	gui->SetStateInt( "audio.speakers", speakers );
 	gui->SetStateInt( "audio.hrtf", idMath::ClampInt( 0, 2, cvarSystem->GetCVarInteger( "s_openALHRTF" ) ) );
+	gui->SetStateBool( "audio.retailUpsampling", cvarSystem->GetCVarBool( "s_retailUpsampling" ) );
 	gui->SetStateBool( "audio.subtitles", cvarSystem->GetCVarBool( "ui_subtitles" ) );
 	gui->SetStateInt( "audio.subtitleSize", percent( "ui_subtitleScale", 100.0f ) );
 	gui->SetStateInt( "audio.subtitleBackground", percent( "ui_subtitleBackground", 100.0f ) );
@@ -2778,11 +2780,16 @@ void idSessionLocal::HandleRetainedAudioRequest( idUserInterface *gui, const cha
 			cvarSystem->SetCVarInteger( "s_openALHRTF", idMath::ClampInt( 0, 2, value ) );
 			HandleMainMenuCommands( "sound drivar" );
 			break;
-		case 8: cvarSystem->SetCVarBool( "ui_subtitles", value != 0 ); break;
-		case 9: cvarSystem->SetCVarFloat( "ui_subtitleScale", idMath::ClampInt( 100, 200, value ) / 100.0f ); break;
-		case 10: cvarSystem->SetCVarFloat( "ui_subtitleBackground", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
-		case 11: cvarSystem->SetCVarBool( "ui_subtitleSpeakers", value != 0 ); break;
-		case 12: cvarSystem->SetCVarBool( "ui_subtitleUntranscribed", value != 0 ); break;
+		case 8:
+			// Original Game Sound: the sound system restarts, so every sample is uploaded the chosen way
+			cvarSystem->SetCVarBool( "s_retailUpsampling", value != 0 );
+			HandleMainMenuCommands( "sound drivar" );
+			break;
+		case 9: cvarSystem->SetCVarBool( "ui_subtitles", value != 0 ); break;
+		case 10: cvarSystem->SetCVarFloat( "ui_subtitleScale", idMath::ClampInt( 100, 200, value ) / 100.0f ); break;
+		case 11: cvarSystem->SetCVarFloat( "ui_subtitleBackground", idMath::ClampInt( 0, 100, value ) / 100.0f ); break;
+		case 12: cvarSystem->SetCVarBool( "ui_subtitleSpeakers", value != 0 ); break;
+		case 13: cvarSystem->SetCVarBool( "ui_subtitleUntranscribed", value != 0 ); break;
 		default: return;
 	}
 	PublishRetainedAudio( gui );
@@ -5766,10 +5773,10 @@ static const mainMenuSettingsScrollPage_t MAINMENU_SETTINGS_SCROLL_PAGES[] = {
 		NULL,
 		36,
 		0,
-		7,
+		8,
 		-24,
 		-84,
-		498,
+		522,
 		24.0f
 	},
 	{

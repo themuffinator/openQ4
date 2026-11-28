@@ -2213,4 +2213,6 @@
 	"#str_233567"	"BOSS"
 	"#str_233570"	"3D-Klang im Headset"
 	"#str_233571"	"Mit dem Headset kommen Geräusche von dort, wo sie rings um deinen Kopf sind. Aus folgt der Einstellung Kopfhörer-HRTF unter Audio."
+	"#str_233572"	"Klang des Originalspiels"
+	"#str_233573"	"Bringt die 22-kHz-Sounds von Quake 4 durch Wiederholen von Samples auf die Mischrate, wie das Originalspiel: heller und rauer. Braucht mehr Soundspeicher und startet den Sound bei Änderung neu."
 }

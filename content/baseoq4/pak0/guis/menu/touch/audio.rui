@@ -16,6 +16,7 @@
   "audio.speakers": {"type": "number", "initial": 0},
   "audio.hrtf": {"type": "number", "initial": 0},
   "audio.subtitles": {"type": "boolean", "initial": false},
+  "audio.retailUpsampling": {"type": "boolean", "initial": false},
   "audio.subtitleSize": {"type": "number", "initial": 100},
   "audio.subtitleBackground": {"type": "number", "initial": 0},
   "audio.subtitleSpeakers": {"type": "boolean", "initial": false},
@@ -84,6 +85,11 @@
    "operation": "session.menuValue",
    "input": "number",
    "arguments": {"command": "audioHrtf", "value": {"input": "value"}}
+  },
+  "audioRetailUpsampling": {
+   "operation": "session.menuValue",
+   "input": "boolean",
+   "arguments": {"command": "audioRetailUpsampling", "value": {"input": "value"}}
   },
   "audioSubtitles": {
    "operation": "session.menuValue",
@@ -1397,6 +1403,150 @@
     },
     {
      "node": "audio_hrtf-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.default",
+   "durationMs": 300,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [{"atMs": 0, "value": {"type": "number", "value": 0}}, {"atMs": 300, "value": {"type": "number", "value": 0}}]
+    },
+    {
+     "node": "audio_retail-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}},
+      {"atMs": 300, "value": {"type": "color", "value": [1, 1, 1, 0.85]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.hover",
+   "durationMs": 1,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0.6}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "number", "value": 0.6}}
+     ]
+    },
+    {
+     "node": "audio_retail-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 1]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 1, "value": {"type": "color", "value": [1, 1, 1, 1]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.focus",
+   "durationMs": 80,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_retail-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 80, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.pressed",
+   "durationMs": 60,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 1}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "number", "value": 1}}
+     ]
+    },
+    {
+     "node": "audio_retail-label",
+     "property": "color",
+     "keys": [
+      {"atMs": 0, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 60, "value": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+     ]
+    }
+   ]
+  },
+  {
+   "id": "audio_retail.disabled",
+   "durationMs": 150,
+   "tracks": [
+    {
+     "node": "audio_retail-focus",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_retail-wash",
+     "property": "opacity",
+     "keys": [
+      {"atMs": 0, "value": {"type": "number", "value": 0}, "easing": [0.16, 1, 0.3, 1]},
+      {"atMs": 150, "value": {"type": "number", "value": 0}}
+     ]
+    },
+    {
+     "node": "audio_retail-label",
      "property": "color",
      "keys": [
       {"atMs": 0, "value": {"type": "color", "value": [1, 1, 1, 0.85]}, "easing": [0.16, 1, 0.3, 1]},
@@ -8108,7 +8258,230 @@
             }
            },
            {
-            "id": "audio-audio-head-1-3",
+            "id": "audio_retail",
+            "type": "group",
+            "properties": {
+             "position": {"type": "keyword", "value": "relative"},
+             "display": {"type": "keyword", "value": "block"},
+             "width": {"type": "length", "value": 368.0, "unit": "dp"},
+             "height": {"type": "length", "value": 56.0, "unit": "dp"},
+             "opacity": {"type": "number", "value": 1},
+             "flex-shrink": {"type": "number", "value": 0},
+             "margin-left": {"type": "length", "value": 4, "unit": "dp"},
+             "margin-right": {"type": "length", "value": 4, "unit": "dp"},
+             "margin-bottom": {"type": "length", "value": 8, "unit": "dp"}
+            },
+            "children": [
+             {
+              "id": "audio_retail-plate",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"}
+              },
+              "paths": [
+               {
+                "id": "plate",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[6, 1]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                 {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                 {"id": "p4", "op": "line", "points": [[0, 7]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.12]}},
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.32]}},
+                 "widthDp": 1,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "audio_retail-wash",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 100, "unit": "%"},
+               "height": {"type": "length", "value": 100, "unit": "%"},
+               "opacity": {"type": "number", "value": 0}
+              },
+              "paths": [
+               {
+                "id": "wash",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[6, 1]]},
+                 {"id": "p1", "op": "line", "points": [[{"fraction": 1}, 1]]},
+                 {"id": "p2", "op": "line", "points": [[{"fraction": 1}, {"fraction": 1, "dp": -1}]]},
+                 {"id": "p3", "op": "line", "points": [[0, {"fraction": 1, "dp": -1}]]},
+                 {"id": "p4", "op": "line", "points": [[0, 7]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {
+                 "type": "linear",
+                 "from": [0, 0],
+                 "to": [{"fraction": 1}, 0],
+                 "stops": [
+                  {"at": 0, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.45]}},
+                  {"at": 1, "color": {"type": "color", "value": [0.5451, 0.5882, 0.2941, 0.1]}}
+                 ]
+                }
+               }
+              ]
+             },
+             {
+              "id": "audio_retail-focus",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 0, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 4, "unit": "dp"},
+               "height": {"type": "length", "value": 56.0, "unit": "dp"},
+               "opacity": {"type": "number", "value": 0}
+              },
+              "paths": [
+               {
+                "id": "rail",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0, 7]]},
+                 {"id": "p1", "op": "line", "points": [[6, 1]]},
+                 {"id": "p2", "op": "line", "points": [[6, 55.0]]},
+                 {"id": "p3", "op": "line", "points": [[0, 55.0]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "fill": {"type": "solid", "color": {"type": "color", "value": [0.8902, 0.5373, 0.0, 1.0]}}
+               }
+              ]
+             },
+             {
+              "id": "audio_retail-head",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 21, "unit": "dp"},
+               "top": {"type": "length", "value": 0, "unit": "dp"},
+               "width": {"type": "length", "value": 159.599, "unit": "dp"},
+               "height": {"type": "length", "value": 56.0, "unit": "dp"},
+               "display": {"type": "keyword", "value": "flex"},
+               "flex-direction": {"type": "keyword", "value": "row"},
+               "align-items": {"type": "keyword", "value": "center"}
+              },
+              "children": [
+               {
+                "id": "audio_retail-label",
+                "type": "text",
+                "properties": {
+                 "text": {"type": "text", "value": "#str_233572"},
+                 "position": {"type": "keyword", "value": "relative"},
+                 "display": {"type": "keyword", "value": "block"},
+                 "flex-shrink": {"type": "number", "value": 1},
+                 "min-width": {"type": "length", "value": 0, "unit": "dp"},
+                 "font-family": {"type": "font", "value": "lowpixel"},
+                 "font-size": {"type": "length", "value": 14, "unit": "dp"},
+                 "line-height": {"type": "length", "value": 13.0, "unit": "dp"},
+                 "color": {"type": "color", "value": [1, 1, 1, 0.85]},
+                 "white-space": {"type": "keyword", "value": "normal"},
+                 "overflow": {"type": "keyword", "value": "hidden"}
+                }
+               }
+              ]
+             },
+             {
+              "id": "audio_retail-box",
+              "type": "vector",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 188.599, "unit": "dp"},
+               "top": {"type": "length", "value": 21.0, "unit": "dp"},
+               "width": {"type": "length", "value": 14, "unit": "dp"},
+               "height": {"type": "length", "value": 14, "unit": "dp"}
+              },
+              "paths": [
+               {
+                "id": "box",
+                "commands": [
+                 {"id": "p0", "op": "move", "points": [[0.75, 0.75]]},
+                 {"id": "p1", "op": "line", "points": [[13.25, 0.75]]},
+                 {"id": "p2", "op": "line", "points": [[13.25, 13.25]]},
+                 {"id": "p3", "op": "line", "points": [[0.75, 13.25]]},
+                 {"id": "close", "op": "close"}
+                ],
+                "stroke": {
+                 "paint": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}},
+                 "widthDp": 1.5,
+                 "minimumPixels": 1,
+                 "join": "miter",
+                 "cap": "butt"
+                }
+               }
+              ]
+             },
+             {
+              "id": "audio_retail-checked",
+              "type": "group",
+              "properties": {
+               "position": {"type": "keyword", "value": "absolute"},
+               "left": {"type": "length", "value": 188.599, "unit": "dp"},
+               "top": {"type": "length", "value": 21.0, "unit": "dp"},
+               "width": {"type": "length", "value": 14, "unit": "dp"},
+               "height": {"type": "length", "value": 14, "unit": "dp"},
+               "display": {"type": "keyword", "value": "none"}
+              },
+              "children": [
+               {
+                "id": "audio_retail-mark",
+                "type": "vector",
+                "properties": {
+                 "position": {"type": "keyword", "value": "absolute"},
+                 "left": {"type": "length", "value": 0, "unit": "dp"},
+                 "top": {"type": "length", "value": 0, "unit": "dp"},
+                 "width": {"type": "length", "value": 100, "unit": "%"},
+                 "height": {"type": "length", "value": 100, "unit": "%"}
+                },
+                "paths": [
+                 {
+                  "id": "mark",
+                  "commands": [
+                   {"id": "p0", "op": "move", "points": [[3.5, 3.5]]},
+                   {"id": "p1", "op": "line", "points": [[10.5, 3.5]]},
+                   {"id": "p2", "op": "line", "points": [[10.5, 10.5]]},
+                   {"id": "p3", "op": "line", "points": [[3.5, 10.5]]},
+                   {"id": "close", "op": "close"}
+                  ],
+                  "fill": {"type": "solid", "color": {"type": "color", "value": [1.0, 0.7451, 0.1373, 1.0]}}
+                 }
+                ]
+               }
+              ]
+             }
+            ],
+            "control": {
+             "role": "toggle",
+             "label": "#str_233572",
+             "action": "audioRetailUpsampling",
+             "value": {"state": "audio.retailUpsampling"},
+             "states": {
+              "default": "audio_retail.default",
+              "hover": "audio_retail.hover",
+              "focus": "audio_retail.focus",
+              "pressed": "audio_retail.pressed",
+              "disabled": "audio_retail.disabled"
+             },
+             "parts": {"checked": "audio_retail-checked"}
+            }
+           },
+           {
+            "id": "audio-audio-head-1-4",
             "type": "text",
             "properties": {
              "text": {"type": "text", "value": "#str_232554"},

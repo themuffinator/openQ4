@@ -2222,4 +2222,6 @@
 	"#str_233567"	"BOSS"
 	"#str_233570"	"Audio 3D nel visore"
 	"#str_233571"	"Con il visore, i suoni arrivano da dove si trovano attorno alla tua testa. Disattivato segue l'opzione HRTF cuffie in Audio."
+	"#str_233572"	"Audio del gioco originale"
+	"#str_233573"	"Porta i suoni a 22 kHz di Quake 4 alla frequenza di missaggio ripetendo i campioni, come faceva il gioco originale: più brillante e ruvido. Usa più memoria audio e riavvia l'audio al cambio."
 }

@@ -2686,7 +2686,7 @@ int main() {
         audioDeviceValues = "\"__OPENQ4_DEFAULT_AUDIO_DEVICE__\";\"Speakers (Realtek)\";\"Headset \\\"Pro\\\";USB\"";
         for (const auto& [cvar, value] : std::map<std::string, std::string>{{"s_volume", "0.7"}, {"s_musicVolume", "0.4"},
                  {"s_dialogueVolume", "1"}, {"s_useOpenAL", "1"}, {"s_deviceName", "Headset \"Pro\";USB"}, {"s_useEAXReverb", "1"},
-                 {"s_numberOfSpeakers", "6"}, {"s_openALHRTF", "2"}, {"ui_subtitles", "1"}, {"ui_subtitleScale", "1.5"},
+                 {"s_numberOfSpeakers", "6"}, {"s_openALHRTF", "2"}, {"s_retailUpsampling", "1"}, {"ui_subtitles", "1"}, {"ui_subtitleScale", "1.5"},
                  {"ui_subtitleBackground", "0.3"}, {"ui_subtitleSpeakers", "0"},
                  {"ui_subtitleUntranscribed", "1"}}) cvarSystemObject.strings[cvar] = value;
         auto* settings = s.guiMainMenu; s.guiHandle = reinterpret_cast<HandleGuiCommand_t>(&audioDeviceNames);
@@ -2698,7 +2698,7 @@ int main() {
               page->state["audio.backend"] == "1" && page->state["audio.device.count"] == "3" && page->state["audio.device"] == "2" &&
               page->state["audio.device.1.label"] == "Speakers" && page->state["audio.device.2.label"] == "Headset \"Pro\"" &&
               page->state["audio.device.3.label"] == "" &&
-              page->state["audio.eax"] == "1" && page->state["audio.speakers"] == "2" && page->state["audio.hrtf"] == "2" &&
+              page->state["audio.eax"] == "1" && page->state["audio.speakers"] == "2" && page->state["audio.hrtf"] == "2" && page->state["audio.retailUpsampling"] == "1" &&
               page->state["audio.subtitles"] == "1" && page->state["audio.subtitleSize"] == "150" &&
               page->state["audio.subtitleBackground"] == "30" && page->state["audio.subtitleSpeakers"] == "0" &&
               page->state["audio.subtitleUntranscribed"] == "1");
@@ -2719,6 +2719,8 @@ int main() {
         s.HandleRetainedSessionRequest(page, "audioBackend 0");
         CHECK(cvarSystemObject.strings["s_useOpenAL"] == "0" && s.played.back() == "sound drivar" && page->state["audio.backend"] == "0");
         s.HandleRetainedSessionRequest(page, "audioHrtf 1"); CHECK(cvarSystemObject.strings["s_openALHRTF"] == "1" && s.played.back() == "sound drivar");
+        s.played.clear(); s.HandleRetainedSessionRequest(page, "audioRetailUpsampling 0");
+        CHECK(cvarSystemObject.strings["s_retailUpsampling"] == "0" && s.played.back() == "sound drivar" && page->state["audio.retailUpsampling"] == "0");
         s.HandleRetainedSessionRequest(page, "audioSubtitleSize 250"); CHECK(cvarSystemObject.strings["ui_subtitleScale"] == "2");
         s.HandleRetainedSessionRequest(page, "audioSubtitleBackground 50"); CHECK(cvarSystemObject.strings["ui_subtitleBackground"] == "0.5");
         s.HandleRetainedSessionRequest(page, "audioSubtitles 0"); s.HandleRetainedSessionRequest(page, "audioSubtitleSpeakers 1");
@@ -5695,7 +5697,7 @@ def main() -> int:
     sys.path.insert(0, str(ROOT / 'tools' / 'ui'))
     import retained_audio
     adapter_audio = [verb for verb in cpp_allowlist(adapter, 'bool SessionMenuValueCommand(') if verb.startswith('audio')]
-    assert set(adapter_audio) == set(audio_verbs) and len(adapter_audio) == len(audio_verbs) == 13
+    assert set(adapter_audio) == set(audio_verbs) and len(adapter_audio) == len(audio_verbs) == 14
     assert [verb for _section, _heading, rows in retained_audio.SECTIONS for _kind, _ident, _label, verb, _state, _extra in rows] == audio_verbs
     audio_document = json.loads(re.sub(r'^\s*//.*$', '', (ROOT / 'content/baseoq4/pak0/guis/menu/settings/audio.rui').read_text(encoding='utf-8'), flags=re.M))
     assert audio_document['canvas']['height'] == 720 and audio_document['actions']['back'] == {'operation': 'session.menu', 'arguments': {'command': 'audioBack'}}

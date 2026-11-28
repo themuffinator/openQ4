@@ -9,7 +9,7 @@ under EFFECTS they read as sound effects.
 The page applies each change at once, as the stock page does, through the
 session (session.menuValue verbs, idSessionLocal::HandleRetainedAudioRequest):
 the three volumes and the subtitle size and background as whole percents,
-the sound system, device, EAX, speakers and HRTF with the stock page's own
+the sound system, device, EAX, speakers, HRTF and Original Game Sound with the stock page's own
 commands (sound drivar, sound eax, sound speakers), which restart the sound
 system and may ask with the stock message box. The session publishes the
 values it reads back (audio.*) and the device list (audio.device.<i>.label,
@@ -40,6 +40,8 @@ SECTIONS = (
          (("#str_229980", 0, 0), ("#str_229980", 1, 1), ("#str_229980", 2, 2))),
         ("choice", "audio_hrtf", "#str_229981", "audioHrtf", "audio.hrtf",
          (("#str_229980", 0, 0), ("#str_229980", 1, 1), ("#str_229980", 2, 2))),
+        # Original Game Sound (s_retailUpsampling): samples repeated to 44.1 kHz, as Quake 4's mixer did
+        ("toggle", "audio_retail", "#str_233572", "audioRetailUpsampling", "audio.retailUpsampling", None),
     )),
     ("subtitles", "#str_232554", (
         ("toggle", "audio_subtitles", "#str_231308", "audioSubtitles", "audio.subtitles", None),
@@ -76,6 +78,7 @@ def audio_document(touch: bool = False) -> dict:
         "audio.device": {"type": "number", "initial": 0}, "audio.device.count": {"type": "number", "initial": 0},
         "audio.eax": {"type": "boolean", "initial": False}, "audio.speakers": {"type": "number", "initial": 0},
         "audio.hrtf": {"type": "number", "initial": 0}, "audio.subtitles": {"type": "boolean", "initial": False},
+        "audio.retailUpsampling": {"type": "boolean", "initial": False},
         "audio.subtitleSize": {"type": "number", "initial": 100}, "audio.subtitleBackground": {"type": "number", "initial": 0},
         "audio.subtitleSpeakers": {"type": "boolean", "initial": False},
         "audio.subtitleUntranscribed": {"type": "boolean", "initial": False},

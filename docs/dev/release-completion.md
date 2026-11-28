@@ -56,9 +56,9 @@ main thread. openPR06 fixed both in 21ec144b1; this ports it to openQ4.
   and adds a bright, gritty edge above it that is not in the recordings. openQ4
   reproduces the recordings cleanly by default; with this setting it repeats
   samples exactly as the original did.
-- **How to use it:** enter `s_retailUpsampling 1` and then `s_restart` in the
-  console, or put `+set s_retailUpsampling 1` on the command line. It is kept
-  between sessions. There is no menu row yet.
+- **How to use it:** turn on **Original Game Sound** in Settings, Audio. The
+  sound restarts for a moment, and the choice is kept between sessions. From
+  the console it is `s_retailUpsampling 1` and then `s_restart`.
 - **Cost:** those sounds take twice the sound memory (four times for the few
   recorded at 11 kHz). Air Defense holds 213 MiB instead of 139 MiB, inside the
   256 MiB sound budget. Music and other 44 kHz sounds are unchanged.

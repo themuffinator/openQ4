@@ -191,6 +191,7 @@ TOOLTIPS = {
     "audio_eax": "#str_233115",
     "audio_speakers": "#str_233116",
     "audio_hrtf": "#str_233117",
+    "audio_retail": "#str_233573",
     "audio_subtitles": "#str_233118",
     "audio_subtitle_size": "#str_233119",
     "audio_subtitle_background": "#str_233120",

@@ -2213,4 +2213,6 @@
 	"#str_233567"	"CHEFE"
 	"#str_233570"	"Áudio 3D no headset"
 	"#str_233571"	"Com o headset, os sons vêm de onde estão ao redor da sua cabeça. Desativado segue a opção HRTF para fones, em Áudio."
+	"#str_233572"	"Som do jogo original"
+	"#str_233573"	"Eleva os sons de 22 kHz de Quake 4 à taxa de mixagem repetindo amostras, como o jogo original fazia: mais brilhante e áspero. Usa mais memória de som e reinicia o som ao mudar."
 }

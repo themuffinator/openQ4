@@ -2269,4 +2269,6 @@
 	"#str_233567"	"BOSS"
 	"#str_233570"	"Dźwięk 3D w goglach"
 	"#str_233571"	"W goglach dźwięki dochodzą stamtąd, gdzie są wokół twojej głowy. Wyłączone stosuje ustawienie HRTF dla słuchawek z opcji dźwięku."
+	"#str_233572"	"Dźwięk oryginalnej gry"
+	"#str_233573"	"Podnosi dźwięki 22 kHz z Quake 4 do częstotliwości miksowania przez powtarzanie próbek, jak oryginalna gra: jaśniej i bardziej szorstko. Zużywa więcej pamięci dźwięku i po zmianie restartuje dźwięk."
 }

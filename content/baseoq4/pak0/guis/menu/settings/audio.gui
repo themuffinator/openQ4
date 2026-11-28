@@ -18,7 +18,7 @@
 					noclip	0
 					windowDef set_audio_content
 					{
-						rect	-24,-84,640,498
+						rect	-24,-84,640,522
 						visible	1
 				windowDef set_audio_cat_levels
 				{
@@ -404,16 +404,51 @@
 						set "cmd" "sound drivar" ;
 					}
 				}
+				windowDef set_audio_b9
+				{
+					rect	228,352,377,25
+					visible	1
+					background	"gfx/guis/mainmenu/b3_light"
+					matcolor	0.545,0.588,0.294,0.4
+				}
+				windowDef set_audio_retail
+				{
+					rect	259,354,172,18
+					visible	1
+					forecolor	1,1,1,0.8
+					text	"#str_233572"
+					textscale	0.24
+					font	"fonts/lowpixel"
+				}
+				choiceDef set_audio_retail_val
+				{
+					rect	468,354,160,15
+					visible	1
+					forecolor	1,0.745,0.137,0.8
+					choiceType	0
+					choices	"#str_200059"
+					cvar	s_retailUpsampling
+					textscale	0.24
+					font	"fonts/lowpixel"
+
+					onAction {
+						set "cmd" "play main_menu_selection" ;
+					}
+
+					onActionRelease {
+						set "cmd" "sound drivar" ;
+					}
+				}
 				windowDef	set_audio_subtitles_bg
                 {
-					rect	228,374,377,25
+					rect	228,398,377,25
 					visible	1
 					background	"gfx/guis/mainmenu/b3_light"
 					matcolor	0.545,0.588,0.294,0.4
                 }
 				windowDef	set_audio_subtitles
                 {
-					rect	259,376,205,18
+					rect	259,400,205,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_231308"
@@ -422,7 +457,7 @@
                 }
 				choiceDef	set_audio_subtitles_val
                 {
-					rect	468,376,160,18
+					rect	468,400,160,18
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	0
@@ -434,14 +469,14 @@
                 }
 				windowDef	set_audio_subtitle_size_bg
                 {
-					rect	228,398,377,25
+					rect	228,422,377,25
 					visible	1
 					background	"gfx/guis/mainmenu/b3_light"
 					matcolor	0.545,0.588,0.294,0.4
                 }
 				windowDef	set_audio_subtitle_size
                 {
-					rect	259,400,205,18
+					rect	259,424,205,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_231309"
@@ -450,7 +485,7 @@
                 }
 				sliderDef	set_audio_subtitle_size_slider
                 {
-					rect	472,405,71,8
+					rect	472,429,71,8
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					matcolor	1,0.745,0.137,0.8
@@ -463,7 +498,7 @@
                 }
 				editDef	set_audio_subtitle_size_value
                 {
-					rect	550,400,70,18
+					rect	550,424,70,18
 					visible	1
 					cvar	ui_subtitleScale
 					textscale	0.24
@@ -475,14 +510,14 @@
                 }
 				windowDef	set_audio_subtitle_background_bg
                 {
-					rect	228,422,377,25
+					rect	228,446,377,25
 					visible	1
 					background	"gfx/guis/mainmenu/b3_light"
 					matcolor	0.545,0.588,0.294,0.4
                 }
 				windowDef	set_audio_subtitle_background
                 {
-					rect	259,424,205,18
+					rect	259,448,205,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_231310"
@@ -491,7 +526,7 @@
                 }
 				sliderDef	set_audio_subtitle_background_slider
                 {
-					rect	472,429,71,8
+					rect	472,453,71,8
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					matcolor	1,0.745,0.137,0.8
@@ -504,7 +539,7 @@
                 }
 				editDef	set_audio_subtitle_background_value
                 {
-					rect	550,424,70,18
+					rect	550,448,70,18
 					visible	1
 					cvar	ui_subtitleBackground
 					textscale	0.24
@@ -516,14 +551,14 @@
                 }
 				windowDef	set_audio_subtitle_speakers_bg
                 {
-					rect	228,446,377,25
+					rect	228,470,377,25
 					visible	1
 					background	"gfx/guis/mainmenu/b3_light"
 					matcolor	0.545,0.588,0.294,0.4
                 }
 				windowDef	set_audio_subtitle_speakers
                 {
-					rect	259,448,205,18
+					rect	259,472,205,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_231311"
@@ -532,7 +567,7 @@
                 }
 				choiceDef	set_audio_subtitle_speakers_val
                 {
-					rect	468,448,160,18
+					rect	468,472,160,18
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	0
@@ -544,14 +579,14 @@
                 }
 				windowDef	set_audio_subtitle_untranscribed_bg
                 {
-					rect	228,470,377,25
+					rect	228,494,377,25
 					visible	1
 					background	"gfx/guis/mainmenu/b3_light"
 					matcolor	0.545,0.588,0.294,0.4
                 }
 				windowDef	set_audio_subtitle_untranscribed
                 {
-					rect	259,472,205,18
+					rect	259,496,205,18
 					visible	1
 					forecolor	1,1,1,0.8
 					text	"#str_231313"
@@ -560,7 +595,7 @@
                 }
 				choiceDef	set_audio_subtitle_untranscribed_val
                 {
-					rect	468,472,160,18
+					rect	468,496,160,18
 					visible	1
 					forecolor	1,0.745,0.137,0.8
 					choiceType	0
@@ -580,7 +615,7 @@
 					forecolor	1,1,1,0.8
 					matcolor	1,1,1,0.4
 					low	0
-					high	7
+					high	8
 					step	1
 					vertical	1
 					scrollbar	1

@@ -835,7 +835,14 @@ loop of two seconds of 1 kHz and two of 3 kHz, cut off by `s_testDeviceInterrupt
 four seconds before and after, in both modes, which is the check on the
 positions given to OpenAL. `sound_resampler.py` compiles the rule, pins the
 wiring and repeats the tone measurement on the OpenAL library (26 checks).
-Nobody has compared it by ear with retail, and there is no menu row.
+Nobody has compared it by ear with retail.
+
+**The menu row.** Original Game Sound, a toggle after Headphone HRTF under
+EFFECTS on the retained Audio page and on the stock one, with a tooltip, in all
+12 languages (the translations are not reviewed by native speakers). Changing
+it runs the stock page's `sound drivar`, as the device rows do, so the sound
+system restarts and every sample is uploaded the chosen way. The retained row
+is the session verb `audioRetailUpsampling`.
 
 ## Deferred
 
