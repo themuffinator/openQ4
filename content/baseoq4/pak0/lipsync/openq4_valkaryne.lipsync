@@ -1,0 +1,187 @@
+// Captions for sound/openq4_valkaryne.sndshd: the original lines' text,
+// written by tools/assets/elevenlabs_voice.py (install).
+
+lipSync subtitle/oq4_vo_valk_useless
+{
+	text	"...Useless..."
+}
+
+lipSync subtitle/oq4_vo_valk_nohope
+{
+	text	"...There is no hope for you..."
+}
+
+lipSync subtitle/oq4_vo_valk_racewill
+{
+	text	"...Your race will become ours..."
+}
+
+lipSync subtitle/oq4_vo_valk_defeat
+{
+	text	"...Defeat is inevitable..."
+}
+
+lipSync subtitle/oq4_vo_valk_yield
+{
+	text	"...You will yield or you will die..."
+}
+
+lipSync subtitle/oq4_vo_valk_behold
+{
+	text	"...Behold our perfection..."
+}
+
+lipSync subtitle/oq4_vo_valk_allis
+{
+	text	"...All is Strogg..."
+}
+
+lipSync subtitle/oq4_vo_valk_deathserv
+{
+	text	"...In death you will serve..."
+}
+
+lipSync subtitle/oq4_vo_valk_makronrs
+{
+	text	"...The Makron will rise..."
+}
+
+lipSync subtitle/oq4_vo_valk_iseeyou2
+{
+	text	"... I see you..."
+}
+
+lipSync subtitle/oq4_vo_valk_timedie2
+{
+	text	"...Time to Die..."
+}
+
+lipSync subtitle/oq4_vo_valk_toolate2
+{
+	text	"...Too Late..."
+}
+
+lipSync subtitle/oq4_vo_valk_iamthestrg2
+{
+	text	"...I am the Strogg..."
+}
+
+lipSync subtitle/oq4_vo_valk_youhum2
+{
+	text	"...You are human..."
+}
+
+lipSync subtitle/oq4_vo_valk_youwillserv2
+{
+	text	"...You will serve me..."
+}
+
+lipSync subtitle/oq4_vo_valk_laff2
+{
+	text	"...(menacing laughter)..."
+}
+
+lipSync subtitle/oq4_vo_valk_witnesso2
+{
+	text	"...Witness your oblivion..."
+}
+
+lipSync subtitle/oq4_vo_valk_behold2
+{
+	text	"...Behold Strogg glory..."
+}
+
+lipSync subtitle/oq4_vo_valk_persist2
+{
+	text	"...Your persistence is your weakness..."
+}
+
+lipSync subtitle/oq4_vo_valk_suffer2
+{
+	text	"...Suffer..."
+}
+
+lipSync subtitle/oq4_vo_valk_pain2
+{
+	text	"...Pain..."
+}
+
+lipSync subtitle/oq4_vo_valk_conq2
+{
+	text	"...Conquest..."
+}
+
+lipSync subtitle/oq4_vo_valk_human2
+{
+	text	"...Humanity is mine..."
+}
+
+lipSync subtitle/oq4_vo_valk_power2
+{
+	text	"...My power is beyond limits..."
+}
+
+lipSync subtitle/oq4_vo_valk_yousee2
+{
+	text	"...You see my power..."
+}
+
+lipSync subtitle/oq4_vo_valk_youpowstrgg
+{
+	text	"...You see the power of the Strogg..."
+}
+
+lipSync subtitle/oq4_vo_valk_advanevo
+{
+	text	"...advancement... ...evolution... ...perfection..."
+}
+
+lipSync subtitle/oq4_vo_valk_etern2
+{
+	text	"...Eternal..."
+}
+
+lipSync subtitle/oq4_vo_valk_impstrgg2
+{
+	text	"...Impossible...  ...We are Strogg..."
+}
+
+lipSync subtitle/oq4_vo_valk_iseeyou
+{
+	text	"... I see you..."
+}
+
+lipSync subtitle/oq4_vo_valk_timedie
+{
+	text	"...Time to Die..."
+}
+
+lipSync subtitle/oq4_vo_valk_youcntstop
+{
+	text	"... You cannot stop us ..."
+}
+
+lipSync subtitle/oq4_vo_valk_reborn
+{
+	text	"...Reborn...."
+}
+
+lipSync subtitle/oq4_vo_valk_stroggetern
+{
+	text	"...The Strogg are eternal..."
+}
+
+lipSync subtitle/oq4_vo_valk_makrons
+{
+	text	"...The Makrons..."
+}
+
+lipSync subtitle/oq4_vo_valk_immort
+{
+	text	"...Are Immortal..."
+}
+
+lipSync subtitle/oq4_vo_valk_racedies
+{
+	text	"...Your race dies here..."
+}

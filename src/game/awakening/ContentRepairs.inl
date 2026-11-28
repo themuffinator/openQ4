@@ -134,6 +134,67 @@ void Awakening_RestoreActivationPose( idDict &args ) {
 	}
 }
 
+/*
+===============================================================================
+
+	The Valkaryne's voice
+
+	openQ4's own voice for her (docs/dev/voice-generation-breakdown.md, "The
+	Valkaryne re-voiced"): original audio in content/baseoq4/pak0, declared in
+	sound/openq4_valkaryne.sndshd as oq4_<name> for each of her sounds it
+	replaces, with the original's distances, volume and caption. Her sounds
+	reach the game by a speaker's s_shader, a radio call and her definition's
+	snd_* keys, so each of those asks here. Content without an oq4_ declaration
+	for a sound keeps the alpha's recording.
+
+===============================================================================
+*/
+
+static idCVar g_awakeningValkaryneVoice( "g_awakeningValkaryneVoice", "1", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL,
+	"The Valkaryne's voice in The Awakening: 1 openQ4's synthesized voice, 0 the alpha's recordings. "
+	"Speakers and her own sounds follow it when a level starts, radio lines at once" );
+
+static const char *Awakening_ValkaryneSound( const char *sound ) {
+	if ( !sound || !sound[ 0 ] || gameLocal.isMultiplayer || !g_awakeningValkaryneVoice.GetBool() || !FS_AwakeningActive() ||
+		( idStr::Icmpn( sound, "vo_valk_", 8 ) != 0 && idStr::Icmpn( sound, "valkaryne_", 10 ) != 0 ) ) {
+		return sound;
+	}
+	const idDecl *decl = declManager->FindType( DECL_SOUND, va( "oq4_%s", sound ), false );
+	if ( decl == NULL || decl->IsImplicit() || decl->GetState() == DS_DEFAULTED ) {
+		return sound;
+	}
+	return decl->GetName();
+}
+
+// A speaker's sound, and her definition's sound keys, set on the map entity:
+// the definition's defaults never override a key the entity already has.
+static void Awakening_SwapValkaryneSounds( idDict &args ) {
+	const idKeyValue *speaker = args.FindKey( "s_shader" );
+	if ( speaker != NULL ) {
+		const char *swapped = Awakening_ValkaryneSound( speaker->GetValue().c_str() );
+		if ( swapped != speaker->GetValue().c_str() ) {
+			args.Set( "s_shader", swapped );
+		}
+	}
+	const char *classname = args.GetString( "classname" );
+	if ( idStr::Icmp( classname, "monster_q4x_valkaryne" ) != 0 ) {
+		return;
+	}
+	const idDeclEntityDef *def = gameLocal.FindEntityDef( classname, false );
+	if ( def == NULL ) {
+		return;
+	}
+	for ( const idKeyValue *kv = def->dict.MatchPrefix( "snd_" ); kv != NULL; kv = def->dict.MatchPrefix( "snd_", kv ) ) {
+		if ( args.FindKey( kv->GetKey() ) != NULL ) {
+			continue;
+		}
+		const char *swapped = Awakening_ValkaryneSound( kv->GetValue().c_str() );
+		if ( swapped != kv->GetValue().c_str() ) {
+			args.Set( kv->GetKey(), swapped );
+		}
+	}
+}
+
 typedef struct awakeningRadioLine_s {
 	const char *stale;		// the sound the mission script names
 	const char *recorded;	// the same line under the name it was recorded as
@@ -157,6 +218,8 @@ static const awakeningRadioLine_t awakeningRadioLines[] = {
 };
 
 const char *Awakening_RecordedLine( const char *sound ) {
+	// her radio lines (Cryofac's monitor) follow the voice setting as they play
+	sound = Awakening_ValkaryneSound( sound );
 	if ( !sound || !sound[ 0 ] || !Awakening_ContentRepairsActive() ) {
 		return sound;
 	}
@@ -225,6 +288,7 @@ static const awakeningEntitySound_t awakeningEntitySounds[] = {
 };
 
 void Awakening_CorrectEntitySounds( idDict &args ) {
+	Awakening_SwapValkaryneSounds( args );
 	if ( !Awakening_ContentRepairsActive() ) {
 		return;
 	}

@@ -10,7 +10,11 @@ nothing is installed: a chosen take is integrated by hand.
   python tools/assets/elevenlabs_voice.py design --voice valkaryne [--seed N] [--previews-only]
   python tools/assets/elevenlabs_voice.py create --voice valkaryne --preview <generated_voice_id> [--name NAME]
   python tools/assets/elevenlabs_voice.py speak  --voice valkaryne [--takes 3] [--only ID ...] [--dry-run]
-  python tools/assets/elevenlabs_voice.py process --voice valkaryne [--input DIR] [--only ID ...]
+  python tools/assets/elevenlabs_voice.py process --voice valkaryne [--input DIR] [--only ID ...] [--all-takes]
+  python tools/assets/elevenlabs_voice.py install --voice valkaryne [--awakening DIR]
+
+install copies the processed takes into content/baseoq4/pak0/ and writes their
+declarations (sound/openq4_<voice>.sndshd); the game swaps them in.
 
 design, create and speak call the API and spend the account's credits; they
 read the key from ELEVENLABS_API_KEY, or else from the file
@@ -452,10 +456,105 @@ def cmd_process(args) -> None:
           + ("" if done else f" (no takes in {source}; picks.json maps an id to its chosen take)"))
 
 
+PACK = ROOT / "content" / "baseoq4" / "pak0"
+
+
+def original_shaders(awakening: Path) -> dict[str, str]:
+    """The installed content's sound declarations: name -> body. Inside a sound
+    folder the "sound" keyword is optional, and valkaryne.sndshd omits it."""
+    import re
+    shaders: dict[str, str] = {}
+    for path in sorted((awakening / "sound").glob("*.sndshd")):
+        text = path.read_text(encoding="cp1252", errors="replace")
+        text = re.sub(r"//[^\n]*", "", re.sub(r"/\*.*?\*/", "", text, flags=re.S))
+        for match in re.finditer(r"^\s*(?:sound\s+)?([A-Za-z0-9_]+)\s*\{(.*?)^\s*\}", text, re.M | re.S):
+            shaders[match.group(1).lower()] = match.group(2)
+    return shaders
+
+
+def cmd_install(args) -> None:
+    """Copy the processed takes into pak0 and declare them as oq4_<shader>."""
+    import re
+    profile, lines = load(args.voice)
+    awakening = Path(args.awakening) if args.awakening else ROOT / ".home" / "q4xbase"
+    shaders = original_shaders(awakening)
+    if not shaders:
+        sys.exit(f"no Awakening sound declarations under {awakening}: give --awakening")
+    processed = out_dir(args.voice) / "processed"
+    groups: dict[str, list[dict]] = {}
+    for line in lines:
+        if line.get("install", True):
+            groups.setdefault(line["shader"], []).append(line)
+    declarations = []
+    for shader, members in groups.items():
+        body = shaders.get(shader.lower())
+        if body is None:
+            sys.exit(f"{shader}: the installed content does not declare it")
+        for line in members:
+            source = processed / f"{line['id']}.wav"
+            if not source.exists():
+                sys.exit(f"{source}: run process first")
+            target = PACK / line["target"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(source.read_bytes())
+        # keep the original's distances, volume and flags; replace its samples
+        kept = []
+        for raw in body.splitlines():
+            entry = raw.strip()
+            if not entry or re.match(r"(?i)sound/|description\b", entry):
+                continue
+            kept.append(entry)
+        description = re.search(r'description\s+"([^"]*)"', body)
+        caption = (description.group(1) if description else "").translate(
+            {0x2026: "...", 0x2018: "'", 0x2019: "'", 0x201C: "'", 0x201D: "'", 0x2013: "-", 0x2014: "-"})
+        caption = caption.encode("ascii", "ignore").decode("ascii")
+        lines_out = [f"sound oq4_{shader} {{"]
+        if caption:
+            lines_out.append(f'\tdescription\t"{caption}"')
+        lines_out += [f"\t{entry}" for entry in kept]
+        lines_out += [f"\t{line['target']}" for line in members]
+        lines_out.append("}")
+        declarations.append("\n".join(lines_out))
+    header = (f"// The {args.voice.capitalize()}'s openQ4 voice: original audio generated with ElevenLabs\n"
+              f"// from the profile in docs/dev/voice-generation-lines.json and processed by\n"
+              f"// tools/assets/elevenlabs_voice.py, which writes this file (install).\n"
+              f"// Each oq4_<name> replaces the Awakening's <name> while g_awakeningValkaryneVoice is 1;\n"
+              f"// distances, volume and captions are the original declarations'.\n")
+    out = PACK / "sound" / f"openq4_{args.voice}.sndshd"
+    out.write_text(header + "\n" + "\n\n".join(declarations) + "\n", encoding="ascii", newline="\n")
+    # Captions: the originals take theirs from a lip-sync declaration named like
+    # the shader. A single-sample shader's authored caption is subtitle/<shader>.
+    lipsyncs = {}
+    for path in sorted((awakening / "lipsync").glob("*.lipsync")):
+        text = path.read_text(encoding="cp1252", errors="replace")
+        for match in re.finditer(r"^\s*lipSync\s+(\S+)\s*\{(.*?)^\s*\}", text, re.M | re.S):
+            said = re.search(r'\btext\s+"([^"]*)"', match.group(2))
+            if said:
+                lipsyncs[match.group(1).lower()] = said.group(1)
+    captions = []
+    for shader, members in groups.items():
+        said = lipsyncs.get(shader.lower())
+        if said is None or len(members) != 1:
+            continue
+        said = said.translate({0x2026: "...", 0x2018: "'", 0x2019: "'", 0x201C: "'", 0x201D: "'",
+                               0x2013: "-", 0x2014: "-"}).encode("ascii", "ignore").decode("ascii")
+        captions.append(f'lipSync subtitle/oq4_{shader}\n{{\n\ttext\t"{said}"\n}}')
+    caption_file = PACK / "lipsync" / f"openq4_{args.voice}.lipsync"
+    caption_file.parent.mkdir(parents=True, exist_ok=True)
+    caption_file.write_text("// Captions for sound/openq4_" + args.voice + ".sndshd: the original lines' text,\n"
+                            "// written by tools/assets/elevenlabs_voice.py (install).\n\n"
+                            + "\n\n".join(captions) + "\n", encoding="ascii", newline="\n")
+    files = sum(len(m) for m in groups.values())
+    folders = sorted({str(Path(l["target"]).parent) for m in groups.values() for l in m})
+    print(f"{files} files into {PACK.relative_to(ROOT)} ({', '.join(folders)}), "
+          f"{len(groups)} declarations in {out.relative_to(ROOT)}, {len(captions)} captions in "
+          f"{caption_file.relative_to(ROOT)}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("list", "design", "create", "speak", "process"):
+    for name in ("list", "design", "create", "speak", "process", "install"):
         p = sub.add_parser(name)
         p.add_argument("--voice", default="valkaryne")
         if name == "design":
@@ -479,9 +578,11 @@ def main() -> int:
             p.add_argument("--input", help="a folder of <id>.wav or <id>.takeN.wav files (local auditions)")
             p.add_argument("--all-takes", action="store_true",
                            help="process every take into processed/takes/, to choose between them")
+        if name == "install":
+            p.add_argument("--awakening", help="the expansion's q4xbase folder (default .home/q4xbase)")
     args = parser.parse_args()
     {"list": cmd_list, "design": cmd_design, "create": cmd_create, "speak": cmd_speak,
-     "process": cmd_process}[args.command](args)
+     "process": cmd_process, "install": cmd_install}[args.command](args)
     return 0
 
 

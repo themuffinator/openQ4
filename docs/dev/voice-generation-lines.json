@@ -1535,7 +1535,9 @@
    "hive": false,
    "reference_seconds": 0.93,
    "original": "sound/vo_english/M09_Valk/valk_useless.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_useless.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_useless.wav",
+   "shader": "vo_valk_useless",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1549,7 +1551,9 @@
    "hive": false,
    "reference_seconds": 1.82,
    "original": "sound/vo_english/M09_Valk/valk_nohope.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_nohope.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_nohope.wav",
+   "shader": "vo_valk_nohope",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1563,7 +1567,9 @@
    "hive": true,
    "reference_seconds": 1.86,
    "original": "sound/vo_english/M09_Valk/valk_racewill.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_racewill.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_racewill.wav",
+   "shader": "vo_valk_racewill",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1577,7 +1583,9 @@
    "hive": false,
    "reference_seconds": 1.4,
    "original": "sound/vo_english/M09_Valk/valk_defeat.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_defeat.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_defeat.wav",
+   "shader": "vo_valk_defeat",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1591,7 +1599,9 @@
    "hive": false,
    "reference_seconds": 2.45,
    "original": "sound/vo_english/M09_Valk/valk_yield.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_yield.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_yield.wav",
+   "shader": "vo_valk_yield",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1605,7 +1615,9 @@
    "hive": true,
    "reference_seconds": 1.74,
    "original": "sound/vo_english/M09_Valk/valk_behold.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_behold.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_behold.wav",
+   "shader": "vo_valk_behold",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1619,7 +1631,9 @@
    "hive": true,
    "reference_seconds": 1.77,
    "original": "sound/vo_english/M09_Valk/valk_allis.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_allis.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_allis.wav",
+   "shader": "vo_valk_allis",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1633,7 +1647,9 @@
    "hive": false,
    "reference_seconds": 1.79,
    "original": "sound/vo_english/M09_Valk/valk_deathserv.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_deathserv.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_deathserv.wav",
+   "shader": "vo_valk_deathserv",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1647,7 +1663,9 @@
    "hive": false,
    "reference_seconds": 1.93,
    "original": "sound/vo_english/M09_Valk/valk_makronrs.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_makronrs.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_makronrs.wav",
+   "shader": "vo_valk_makronrs",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1661,7 +1679,9 @@
    "hive": false,
    "reference_seconds": 4.92,
    "original": "sound/vo_english/M09_Valk/valk_iseeyou2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_iseeyou2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_iseeyou2.wav",
+   "shader": "vo_valk_iseeyou2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1675,7 +1695,9 @@
    "hive": false,
    "reference_seconds": 4.76,
    "original": "sound/vo_english/M09_Valk/valk_timedie2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_timedie2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_timedie2.wav",
+   "shader": "vo_valk_timedie2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1689,7 +1711,9 @@
    "hive": false,
    "reference_seconds": 3.67,
    "original": "sound/vo_english/M09_Valk/valk_toolate2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_toolate2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_toolate2.wav",
+   "shader": "vo_valk_toolate2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1703,7 +1727,9 @@
    "hive": true,
    "reference_seconds": 5.41,
    "original": "sound/vo_english/M09_Valk/valk_iamthestrg2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_iamthestrg2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_iamthestrg2.wav",
+   "shader": "vo_valk_iamthestrg2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1717,7 +1743,9 @@
    "hive": false,
    "reference_seconds": 4.71,
    "original": "sound/vo_english/M09_Valk/valk_youhum2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_youhum2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_youhum2.wav",
+   "shader": "vo_valk_youhum2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1731,7 +1759,9 @@
    "hive": false,
    "reference_seconds": 5.13,
    "original": "sound/vo_english/M09_Valk/valk_youwillserv2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_youwillserv2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_youwillserv2.wav",
+   "shader": "vo_valk_youwillserv2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1745,7 +1775,9 @@
    "hive": false,
    "reference_seconds": 5.32,
    "original": "sound/vo_english/M09_Valk/valk_laff2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_laff2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_laff2.wav",
+   "shader": "vo_valk_laff2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1759,7 +1791,9 @@
    "hive": false,
    "reference_seconds": 5.78,
    "original": "sound/vo_english/M09_Valk/valk_witnesso2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_witnesso2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_witnesso2.wav",
+   "shader": "vo_valk_witnesso2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1773,7 +1807,9 @@
    "hive": true,
    "reference_seconds": 5.55,
    "original": "sound/vo_english/M09_Valk/valk_behold2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_behold2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_behold2.wav",
+   "shader": "vo_valk_behold2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1787,7 +1823,9 @@
    "hive": false,
    "reference_seconds": 6.41,
    "original": "sound/vo_english/M09_Valk/valk_persist2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_persist2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_persist2.wav",
+   "shader": "vo_valk_persist2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1801,7 +1839,9 @@
    "hive": false,
    "reference_seconds": 3.55,
    "original": "sound/vo_english/M09_Valk/valk_suffer2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_suffer2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_suffer2.wav",
+   "shader": "vo_valk_suffer2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1815,7 +1855,9 @@
    "hive": false,
    "reference_seconds": 2.9,
    "original": "sound/vo_english/M09_Valk/valk_pain2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_pain2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_pain2.wav",
+   "shader": "vo_valk_pain2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1829,7 +1871,9 @@
    "hive": false,
    "reference_seconds": 3.48,
    "original": "sound/vo_english/M09_Valk/valk_conq2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_conq2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_conq2.wav",
+   "shader": "vo_valk_conq2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1843,7 +1887,9 @@
    "hive": false,
    "reference_seconds": 5.22,
    "original": "sound/vo_english/M09_Valk/valk_human2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_human2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_human2.wav",
+   "shader": "vo_valk_human2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1857,7 +1903,9 @@
    "hive": false,
    "reference_seconds": 5.64,
    "original": "sound/vo_english/M09_Valk/valk_power2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_power2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_power2.wav",
+   "shader": "vo_valk_power2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1871,7 +1919,9 @@
    "hive": false,
    "reference_seconds": 5.43,
    "original": "sound/vo_english/M09_Valk/valk_yousee2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_yousee2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_yousee2.wav",
+   "shader": "vo_valk_yousee2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1885,7 +1935,9 @@
    "hive": true,
    "reference_seconds": 6.22,
    "original": "sound/vo_english/M09_Valk/valk_youpowstrgg.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_youpowstrgg.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_youpowstrgg.wav",
+   "shader": "vo_valk_youpowstrgg",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1899,7 +1951,9 @@
    "hive": false,
    "reference_seconds": 8.03,
    "original": "sound/vo_english/M09_Valk/valk_advanevo.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_advanevo.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_advanevo.wav",
+   "shader": "vo_valk_advanevo",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1913,7 +1967,9 @@
    "hive": false,
    "reference_seconds": 3.69,
    "original": "sound/vo_english/M09_Valk/valk_etern2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_etern2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_etern2.wav",
+   "shader": "vo_valk_etern2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1927,7 +1983,9 @@
    "hive": true,
    "reference_seconds": 6.92,
    "original": "sound/vo_english/M09_Valk/valk_impstrgg2.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_impstrgg2.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_impstrgg2.wav",
+   "shader": "vo_valk_impstrgg2",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1941,7 +1999,9 @@
    "hive": false,
    "reference_seconds": 3.81,
    "original": "sound/vo_english/M08_Cryo/valk_iseeyou.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_iseeyou.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_iseeyou.wav",
+   "shader": "vo_valk_iseeyou",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1955,7 +2015,9 @@
    "hive": false,
    "reference_seconds": 4.88,
    "original": "sound/vo_english/M08_Cryo/valk_timedie.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_timedie.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_timedie.wav",
+   "shader": "vo_valk_timedie",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1969,7 +2031,9 @@
    "hive": true,
    "reference_seconds": 5.2,
    "original": "sound/vo_english/M08_Cryo/valk_youcntstop.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_youcntstop.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_youcntstop.wav",
+   "shader": "vo_valk_youcntstop",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1983,7 +2047,9 @@
    "hive": false,
    "reference_seconds": 1.21,
    "original": "sound/vo_english/M08_Cryo/valk_reborn.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_reborn.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_reborn.wav",
+   "shader": "vo_valk_reborn",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -1997,7 +2063,9 @@
    "hive": true,
    "reference_seconds": 1.6,
    "original": "sound/vo_english/M08_Cryo/valk_stroggetern.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_stroggetern.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_stroggetern.wav",
+   "shader": "vo_valk_stroggetern",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2011,7 +2079,9 @@
    "hive": false,
    "reference_seconds": 1.1,
    "original": "sound/vo_english/M08_Cryo/valk_makrons.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_makrons.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_makrons.wav",
+   "shader": "vo_valk_makrons",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2025,7 +2095,9 @@
    "hive": true,
    "reference_seconds": 0.93,
    "original": "sound/vo_english/M08_Cryo/valk_immort.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_immort.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_immort.wav",
+   "shader": "vo_valk_immort",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2039,7 +2111,9 @@
    "hive": false,
    "reference_seconds": 1.53,
    "original": "sound/vo_english/M08_Cryo/valk_racedies.wav",
-   "target": "sound/vo_english/openq4_valkaryne/valk_racedies.wav"
+   "target": "sound/vo_openq4/valkaryne/valk_racedies.wav",
+   "shader": "vo_valk_racedies",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2047,13 +2121,15 @@
    "voice": "valkaryne (sound effect)",
    "text": "Slow mechanical breathing of a female cyborg war machine: hydraulic intake, hissing exhale, low servo hum, synthetic and cold, seamless loop.",
    "tier": "optional",
-   "notes": "vocalisation for snd_idle, snd_plugin, snd_crouch; replaces sound/strogg/valkaryne/valkaryne_idle_breath.ogg; listen to the original first",
+   "notes": "vocalisation for snd_idle, snd_plugin, snd_crouch; replaces sound/strogg/valkaryne/valkaryne_idle_breath.ogg; listen to the original first; not installed: her docked idle restarts snd_plugin every 350 ms, which would cut a 4 s breath to its first third of a second",
    "kind": "sfx",
    "duration_seconds": 4.0,
    "loop": true,
    "preset": "creature",
    "hive": false,
-   "target": "sound/strogg/openq4_valkaryne/valkaryne_idle_breath.wav"
+   "target": "sound/openq4/valkaryne/valkaryne_idle_breath.wav",
+   "shader": "valkaryne_idle",
+   "install": false
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2067,7 +2143,9 @@
    "loop": false,
    "preset": "creature",
    "hive": false,
-   "target": "sound/strogg/openq4_valkaryne/valkaryne_pain_one.wav"
+   "target": "sound/openq4/valkaryne/valkaryne_pain_one.wav",
+   "shader": "valkaryne_pain",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2081,7 +2159,9 @@
    "loop": false,
    "preset": "creature",
    "hive": false,
-   "target": "sound/strogg/openq4_valkaryne/valkaryne_pain_two.wav"
+   "target": "sound/openq4/valkaryne/valkaryne_pain_two.wav",
+   "shader": "valkaryne_pain",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2095,7 +2175,9 @@
    "loop": false,
    "preset": "creature",
    "hive": false,
-   "target": "sound/strogg/openq4_valkaryne/valkaryne_pain_three.wav"
+   "target": "sound/openq4/valkaryne/valkaryne_pain_three.wav",
+   "shader": "valkaryne_pain",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2109,7 +2191,9 @@
    "loop": false,
    "preset": "creature",
    "hive": false,
-   "target": "sound/strogg/openq4_valkaryne/valkaryne_pain_four.wav"
+   "target": "sound/openq4/valkaryne/valkaryne_pain_four.wav",
+   "shader": "valkaryne_pain",
+   "install": true
   },
   {
    "group": "Awakening Valkaryne re-voiced",
@@ -2123,7 +2207,9 @@
    "loop": false,
    "preset": "creature",
    "hive": false,
-   "target": "sound/strogg/openq4_valkaryne/valkaryne_death.wav"
+   "target": "sound/openq4/valkaryne/valkaryne_death.wav",
+   "shader": "valkaryne_death",
+   "install": true
   }
  ]
 }

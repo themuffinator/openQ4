@@ -1,0 +1,319 @@
+// The Valkaryne's openQ4 voice: original audio generated with ElevenLabs
+// from the profile in docs/dev/voice-generation-lines.json and processed by
+// tools/assets/elevenlabs_voice.py, which writes this file (install).
+// Each oq4_<name> replaces the Awakening's <name> while g_awakeningValkaryneVoice is 1;
+// distances, volume and captions are the original declarations'.
+
+sound oq4_vo_valk_useless {
+	description	"<Valkaryne:> ...Useless..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_useless.wav
+}
+
+sound oq4_vo_valk_nohope {
+	description	"<Valkaryne:> ...There is no hope for you..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_nohope.wav
+}
+
+sound oq4_vo_valk_racewill {
+	description	"<Valkaryne:> ...Your race will become ours..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_racewill.wav
+}
+
+sound oq4_vo_valk_defeat {
+	description	"<Valkaryne:> ...Defeat is inevitable..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_defeat.wav
+}
+
+sound oq4_vo_valk_yield {
+	description	"<Valkaryne:> ...You will yield or you will die..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_yield.wav
+}
+
+sound oq4_vo_valk_behold {
+	description	"<Valkaryne:> ...Behold our perfection..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_behold.wav
+}
+
+sound oq4_vo_valk_allis {
+	description	"<Valkaryne:> ...All is Strogg..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_allis.wav
+}
+
+sound oq4_vo_valk_deathserv {
+	description	"<Valkaryne:> ...In death you will serve..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_deathserv.wav
+}
+
+sound oq4_vo_valk_makronrs {
+	description	"<Valkaryne:> ...The Makron will rise..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_makronrs.wav
+}
+
+sound oq4_vo_valk_iseeyou2 {
+	description	"<Valkaryne:> ... I see you..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_iseeyou2.wav
+}
+
+sound oq4_vo_valk_timedie2 {
+	description	"<Valkaryne:> ...Time to Die..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_timedie2.wav
+}
+
+sound oq4_vo_valk_toolate2 {
+	description	"<Valkaryne:> ...Too Late..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_toolate2.wav
+}
+
+sound oq4_vo_valk_iamthestrg2 {
+	description	"<Valkaryne:> ...I am the Strogg..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_iamthestrg2.wav
+}
+
+sound oq4_vo_valk_youhum2 {
+	description	"<Valkaryne:> ...You are human..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_youhum2.wav
+}
+
+sound oq4_vo_valk_youwillserv2 {
+	description	"<Valkaryne:> ...You will serve me..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_youwillserv2.wav
+}
+
+sound oq4_vo_valk_laff2 {
+	description	"<Valkaryne:> ...(menacing laughter)..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_laff2.wav
+}
+
+sound oq4_vo_valk_witnesso2 {
+	description	"<Valkaryne:> ...Witness your oblivion..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_witnesso2.wav
+}
+
+sound oq4_vo_valk_behold2 {
+	description	"<Valkaryne:> ...Behold Strogg glory..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_behold2.wav
+}
+
+sound oq4_vo_valk_persist2 {
+	description	"<Valkaryne:> ...Your persistence is your weakness..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_persist2.wav
+}
+
+sound oq4_vo_valk_suffer2 {
+	description	"<Valkaryne:> ...Suffer..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_suffer2.wav
+}
+
+sound oq4_vo_valk_pain2 {
+	description	"<Valkaryne:> ...Pain..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_pain2.wav
+}
+
+sound oq4_vo_valk_conq2 {
+	description	"<Valkaryne:> ...Conquest..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_conq2.wav
+}
+
+sound oq4_vo_valk_human2 {
+	description	"<Valkaryne:> ...Humanity is mine..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_human2.wav
+}
+
+sound oq4_vo_valk_power2 {
+	description	"<Valkaryne:> ...My power is beyond limits..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_power2.wav
+}
+
+sound oq4_vo_valk_yousee2 {
+	description	"<Valkaryne:> ...You see my power..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_yousee2.wav
+}
+
+sound oq4_vo_valk_youpowstrgg {
+	description	"<Valkaryne:> ...You see the power of the Strogg..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_youpowstrgg.wav
+}
+
+sound oq4_vo_valk_advanevo {
+	description	"<Valkaryne:> ...advancement... ...evolution... ...perfection..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_advanevo.wav
+}
+
+sound oq4_vo_valk_etern2 {
+	description	"<Valkaryne:> ...Eternal..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_etern2.wav
+}
+
+sound oq4_vo_valk_impstrgg2 {
+	description	"<Valkaryne:> ...Impossible...  ...We are Strogg..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_impstrgg2.wav
+}
+
+sound oq4_vo_valk_iseeyou {
+	description	"<Valkaryne:> ... I see you..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_iseeyou.wav
+}
+
+sound oq4_vo_valk_timedie {
+	description	"<Valkaryne:> ...Time to Die..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_timedie.wav
+}
+
+sound oq4_vo_valk_youcntstop {
+	description	"<Valkaryne:> ... You cannot stop us ..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_youcntstop.wav
+}
+
+sound oq4_vo_valk_reborn {
+	description	"<Valkaryne:> ...Reborn...."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_reborn.wav
+}
+
+sound oq4_vo_valk_stroggetern {
+	description	"<Valkaryne:> ...The Strogg are eternal..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_stroggetern.wav
+}
+
+sound oq4_vo_valk_makrons {
+	description	"<Valkaryne:> ...The Makrons..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_makrons.wav
+}
+
+sound oq4_vo_valk_immort {
+	description	"<Valkaryne:> ...Are Immortal..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_immort.wav
+}
+
+sound oq4_vo_valk_racedies {
+	description	"<Valkaryne:> ...Your race dies here..."
+	minDistance 80
+	maxDistance 900
+	volumeDb 0
+	sound/vo_openq4/valkaryne/valk_racedies.wav
+}
+
+sound oq4_valkaryne_pain {
+	minDistance	1393
+	maxDistance	1984
+	volumeDb	0
+	sound/openq4/valkaryne/valkaryne_pain_one.wav
+	sound/openq4/valkaryne/valkaryne_pain_two.wav
+	sound/openq4/valkaryne/valkaryne_pain_three.wav
+	sound/openq4/valkaryne/valkaryne_pain_four.wav
+}
+
+sound oq4_valkaryne_death {
+	description	"death to the valkaryne"
+	minDistance	1393
+	maxDistance	2377
+	volumeDb	0
+	sound/openq4/valkaryne/valkaryne_death.wav
+}

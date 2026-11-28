@@ -23,17 +23,55 @@ import argparse
 import json
 import re
 import sys
+import wave
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 LINES = ROOT / "docs/dev/voice-generation-lines.json"
 DOC = ROOT / "docs/dev/voice-generation-breakdown.md"
 TOOL = ROOT / "tools/assets/elevenlabs_voice.py"
+PACK = ROOT / "content/baseoq4/pak0"
+SHADERS = PACK / "sound/openq4_valkaryne.sndshd"
+CAPTIONS = PACK / "lipsync/openq4_valkaryne.lipsync"
+REPAIRS = ROOT / "src/game/awakening/ContentRepairs.inl"
 VALK = "Awakening Valkaryne re-voiced"
 
 
 def fail(message: str) -> None:
     raise AssertionError(message)
+
+
+def check_installed_voice(valk: list[dict]) -> None:
+    """The installed voice in pak0 and the game's swap (ContentRepairs.inl)."""
+    installed = [l for l in valk if l.get("install")]
+    shaders: dict[str, list[str]] = {}
+    for line in installed:
+        shaders.setdefault(line["shader"], []).append(line["target"])
+        wav = PACK / line["target"]
+        if not wav.is_file():
+            fail(f"{wav.relative_to(ROOT)}: not installed (run elevenlabs_voice.py install)")
+        with wave.open(str(wav)) as audio:
+            if (audio.getframerate(), audio.getnchannels(), audio.getsampwidth()) != (44100, 1, 2):
+                fail(f"{wav.name}: the game's voice format is 44.1 kHz, mono, 16-bit")
+    declared = SHADERS.read_text(encoding="ascii")
+    for shader, targets in shaders.items():
+        body = re.search(r"^sound oq4_" + re.escape(shader) + r" \{(.*?)^\}", declared, re.M | re.S)
+        if not body or sorted(re.findall(r"sound/\S+\.wav", body.group(1))) != sorted(targets):
+            fail(f"{SHADERS.name}: oq4_{shader} does not declare exactly its installed takes")
+    captions = CAPTIONS.read_text(encoding="ascii")
+    for line in installed:
+        if line.get("kind") != "sfx" and f"lipSync subtitle/oq4_{line['shader']}\n" not in captions:
+            fail(f"{CAPTIONS.name}: no caption for oq4_{line['shader']}")
+    repairs = REPAIRS.read_text(encoding="utf-8")
+    if 'g_awakeningValkaryneVoice( "g_awakeningValkaryneVoice", "1", CVAR_GAME | CVAR_ARCHIVE | CVAR_BOOL' not in repairs:
+        fail(f"{REPAIRS.name}: the voice setting must default to openQ4's voice and be saved")
+    entity = repairs[repairs.find("void Awakening_CorrectEntitySounds("):]
+    radio = repairs[repairs.find("const char *Awakening_RecordedLine("):]
+    # the swap must not depend on the content-repair switch
+    if entity.find("Awakening_SwapValkaryneSounds( args );") > entity.find("Awakening_ContentRepairsActive()"):
+        fail(f"{REPAIRS.name}: speakers and her keys must swap before the content-repair gate")
+    if radio.find("Awakening_ValkaryneSound( sound );") > radio.find("Awakening_ContentRepairsActive()"):
+        fail(f"{REPAIRS.name}: radio lines must swap before the content-repair gate")
 
 
 def main() -> int:
@@ -73,15 +111,21 @@ def main() -> int:
     for line in speech:
         if line["preset"] not in ("nexus", "monitor") or not isinstance(line.get("hive"), bool):
             fail(f"{line['id']}: preset must be nexus or monitor, with a hive flag")
-        if not line["target"].startswith("sound/vo_english/openq4_valkaryne/"):
-            fail(f"{line['id']}: target outside openQ4's own folder")
+        # sound/vo_<name>/ is the engine's dialogue path (captions, Dialogue
+        # Volume) that its sound/vo/ language remap leaves alone
+        if not line["target"].startswith("sound/vo_openq4/valkaryne/"):
+            fail(f"{line['id']}: speech must live under sound/vo_openq4/valkaryne/")
+        if line.get("shader") != line["id"] or line.get("install") is not True:
+            fail(f"{line['id']}: speech replaces its own shader")
         if not line["id"].startswith("vo_valk_") or not line.get("original"):
             fail(f"{line['id']}: not one of her recorded lines")
     for line in effects:
         if not 0.5 <= float(line.get("duration_seconds", 0)) <= 30 or line.get("preset") != "creature":
             fail(f"{line['id']}: a sound effect needs 0.5-30 s and the creature preset")
-        if not line["target"].startswith("sound/strogg/openq4_valkaryne/"):
+        if not line["target"].startswith("sound/openq4/valkaryne/"):
             fail(f"{line['id']}: target outside openQ4's own folder")
+        if line.get("shader") not in ("valkaryne_idle", "valkaryne_pain", "valkaryne_death"):
+            fail(f"{line['id']}: not one of her creature shaders")
 
     doc = DOC.read_text(encoding="utf-8")
     table = doc[doc.find("#### " + VALK):]
@@ -95,6 +139,8 @@ def main() -> int:
     for preset in {l["preset"] for l in valk}:
         if preset != "nexus" and f'preset == "{preset}"' not in tool:
             fail(f"{TOOL.name}: no processing for preset {preset}")
+
+    check_installed_voice(valk)
 
     awakening = args.awakening or ROOT / ".home" / "q4xbase"
     have = (awakening / "sound").is_dir()

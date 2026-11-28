@@ -186,6 +186,7 @@ These guides describe 0.15.0. Anything new in 0.15.0 is marked **New in 0.15.0**
 - **id Software's official Doom 3 and Doom 3 BFG source releases**: retained idTech 4 source lineage; see the [source-provenance inventory](docs/dev/source-provenance.md)
 - **id Software** and **Raven Software**: Quake 4 and the underlying technology
 - **Raven Software** and **Ritual Entertainment**: Quake 4: The Awakening, the unreleased expansion
+- **[ElevenLabs](https://elevenlabs.io)**: speech and sound synthesis for the Valkaryne's openQ4 voice in The Awakening, an original voice designed for openQ4 rather than cloned from a performer
 - **Chris Robinson and the [OpenAL Soft](https://openal-soft.org/) contributors**: cross-platform OpenAL runtime bundled in macOS packages
 - **Sam Lantinga and the [SDL contributors](https://github.com/libsdl-org/SDL/tree/release-3.4.18)**: cross-platform window, input and microphone support, including the dummy audio driver used in automated voice tests; SDL uses the zlib licence
 - **Jean-loup Gailly, Mark Adler and the [zlib-ng contributors](https://github.com/zlib-ng/zlib-ng/tree/2.3.3)**: zlib-licensed inflate and CRC-32 for reading PK4 packs, with run-time SIMD selection; [licence notice](LICENSES/zlib-ng.txt)

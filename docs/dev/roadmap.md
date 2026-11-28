@@ -5037,8 +5037,12 @@ Completion substeps must keep three forms of evidence distinct:
   twelve unused Valkaryne taunts play through the boss fight, in the writers'
   order (timing checked without a sound device; not yet heard), and her two
   never-used docked volleys (twin railguns, grenades) share her platform with
-  the death ray, one in three each. Other unwired content is listed, not
-  placed. See
+  the death ray, one in three each. Her voice is re-made at the user's
+  request: original ElevenLabs audio swapped in for all 37 of her lines and
+  her pain and death (`g_awakeningValkaryneVoice`; see
+  [The Valkaryne re-voiced](voice-generation-breakdown.md#the-valkaryne-re-voiced)),
+  measured but not yet listened to in full. Other unwired content is listed,
+  not placed. See
   [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026).
   M08 revision 5, 28 November: the same cross-check of Cryofac found two
   gaps; fresh starts now complete "Cryogenic Security Station and Deep

@@ -12,6 +12,24 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The Valkaryne gets a machine voice, 28 November 2026
+
+- **The Awakening's Valkaryne speaks with a new, synthesized voice**: every
+  line in Cryofac (m08) and the finale (m09), plus her pain and death cries. It
+  is original openQ4 audio, made with ElevenLabs from a designed voice (not a
+  clone of the alpha's actor) and processed into a metallic, inhuman delivery.
+  Her lines keep their captions and follow Dialogue Volume.
+- **The alpha's recordings stay one setting away:** `g_awakeningValkaryneVoice
+  0`, before starting the map.
+- **pak0 grows by about 8 MB** (17.2 to 25.5 MB) with the new audio.
+- Evidence: hidden probes with the sound device at zero volume. The finale's
+  speakers, Cryofac's radio and her pain and death play the new sounds as
+  dialogue with captions, the setting at 0 restores the originals, and a save
+  restores with the new voice. `voice_generation_lines.py` covers it. The full
+  set has been measured, not listened to; confirm the ElevenLabs plan's usage
+  rights before publishing.
+  [The Valkaryne re-voiced](voice-generation-breakdown.md#the-valkaryne-re-voiced).
+
 ## Frame-rate targets declared, and where the Quality floor stands, 28 November 2026
 
 - **HF-07 budgets declared:** `docs/dev/performance-budgets.json` now carries

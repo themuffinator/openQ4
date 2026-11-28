@@ -195,24 +195,70 @@ sound-effect takes. None was silent, and every speech take runs 0.64-4.40 s.
 - **The idle breath** loops in the game, so it must go in without the reverb
   tail and trim the processing adds.
 
-The audio stays local under `.tmp/voice/valkaryne/` until takes are chosen and
-the in-game redirect exists. Only the pilot has been listened to, by the user.
+The takes stay under `.tmp/voice/valkaryne/`; `install` copies the chosen
+ones into the game (below). Only the pilot has been listened to, by the user.
 
-### Putting it in the game (not done)
+### In the game (28 November 2026)
 
-The new takes are original openQ4 content and ship in a pack under
-`content/baseoq4/` (the `target` paths: `sound/vo_english/openq4_valkaryne/`
-and `sound/strogg/openq4_valkaryne/`). Her lines reach the game three ways:
+`install` copies the processed takes into `pak0` and writes their
+declarations; the game swaps them in.
 
-- speakers' `s_shader`;
-- radio calls (`radioChatterPlay`);
-- her definition's `snd_*` keys.
+- **Audio.** 37 lines go under `sound/vo_openq4/valkaryne/`. A `sound/vo_<name>/`
+  folder is the engine's dialogue path, so the lines get captions and follow
+  Dialogue Volume, and the `sound/vo/` language remap leaves the folder alone.
+  The four pains and the death go under `sound/openq4/valkaryne/`. Together
+  they add about 8 MB to `pak0`, from 17.2 to 25.5 MB, which every package and
+  dedicated server carries; moving them to a client-only pack would need a
+  content generation.
+- **Declarations.** `sound/openq4_valkaryne.sndshd` declares `oq4_<name>` for
+  each of her 37 line shaders, `valkaryne_pain` (four takes) and
+  `valkaryne_death`, keeping the original's distances and volume.
+  `lipsync/openq4_valkaryne.lipsync` gives each line an authored caption,
+  `subtitle/oq4_<shader>`, with the original line's text, the laugh included.
+- **The swap** (`ContentRepairs.inl`, "The Valkaryne's voice") runs while
+  `g_awakeningValkaryneVoice` is 1, the saved default. It changes a name only
+  when its `oq4_` declaration exists, and it does not depend on
+  `g_awakeningContentRepairs`. Her sounds reach the game three ways, and each
+  asks the swap:
+  - a speaker's `s_shader`, at spawn and media precache;
+  - her definition's `snd_*` keys, set on her map entities, which the
+    definition's defaults never override;
+  - a radio call (`Awakening_RecordedLine`), as it plays.
+- **Not swapped.** Her idle breath stays the alpha's. Her docked idle is a
+  2-frame animation that restarts `snd_plugin` every 350 ms (measured), so a
+  4-second breath would be cut to its first third of a second. A breath worth
+  replacing needs its own looping channel. Her body and weapon sounds stay too
+  (see above).
 
-So the swap belongs in one redirect from her `vo_valk_*` and creature sound
-names to openQ4 declarations, behind a setting that keeps the original voice
-available. Her captions keep the content's text. The new takes must fit the
-scenes timed around them: Cryofac's monitor waits on each line, and the finale's
-taunts allow 7 seconds a line.
+Validation, on a hidden Windows x64 runtime built from this tree (the client
+with the new `pak0`'s digest), sound device at zero volume, `s_showStartSound`
+and `s_logSpeech`:
+
+| Probe | Result |
+| --- | --- |
+| `m09swap_1` / `m09swap_cap` | The intro, a taunt, the laugh, undock and death lines play `oq4_vo_valk_*` from `sound/vo_openq4/`, classed as dialogue with authored captions; her pains and death play `oq4_valkaryne_pain`/`_death`. |
+| `m09swap_0` | `g_awakeningValkaryneVoice 0`: the same moments play the alpha's `vo_valk_*`, `valkaryne_pain` and `valkaryne_death`. |
+| `m08radio` | Cryofac's `FinalValkaryne` plays `oq4_vo_valk_reborn`, `_stroggetern`, `_makrons`, `_immort` and `_racedies` over the radio, as dialogue with captions. |
+| `m09vsave` / `m09vload` | A save restored in a fresh process: a speaker still plays its new line, with its caption. |
+
+`tools/tests/voice_generation_lines.py` checks the installed WAVs (44.1 kHz,
+mono, 16-bit), that each `oq4_` declaration names exactly its installed takes,
+a caption for every line, and that the swap runs before the content-repair
+gate. Three negative controls were each rejected.
+
+**Limits.**
+
+- Only the three pilot lines have been heard, by the user; the full set has
+  been measured, not listened to.
+- The takes are each line's take 0 until `picks.json` changes them; then run
+  `process` and `install`, and rebuild `pak0`.
+- A save keeps the speakers and her keys as they were when its level started.
+- **Usage rights.** Whether generated audio may be distributed depends on the
+  ElevenLabs plan it was made on. ElevenLabs grants commercial use on paid
+  plans; the free plan requires attribution. Confirm the plan before
+  publishing.
+- The setting is console-only, like the other Awakening options.
+- Vulkan, Linux and macOS were not run.
 
 ## Decisions before generating
 
