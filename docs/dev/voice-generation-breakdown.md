@@ -253,10 +253,10 @@ gate. Three negative controls were each rejected.
 - The takes are each line's take 0 until `picks.json` changes them; then run
   `process` and `install`, and rebuild `pak0`.
 - A save keeps the speakers and her keys as they were when its level started.
-- **Usage rights.** Whether generated audio may be distributed depends on the
-  ElevenLabs plan it was made on. ElevenLabs grants commercial use on paid
-  plans; the free plan requires attribution. Confirm the plan before
-  publishing.
+- **Usage rights.** The audio was generated on a paid ElevenLabs plan (the
+  user confirmed this, 28 November 2026), which grants commercial use. The
+  free plan would have required attribution. Future generations need a paid
+  plan too, and the README credits ElevenLabs either way.
 - The setting is console-only, like the other Awakening options.
 - Vulkan, Linux and macOS were not run.
 

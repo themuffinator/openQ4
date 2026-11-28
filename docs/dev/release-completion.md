@@ -26,8 +26,8 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   speakers, Cryofac's radio and her pain and death play the new sounds as
   dialogue with captions, the setting at 0 restores the originals, and a save
   restores with the new voice. `voice_generation_lines.py` covers it. The full
-  set has been measured, not listened to; confirm the ElevenLabs plan's usage
-  rights before publishing.
+  set has been measured, not listened to. The audio was generated on a paid
+  ElevenLabs plan, which grants commercial use.
   [The Valkaryne re-voiced](voice-generation-breakdown.md#the-valkaryne-re-voiced).
 
 ## Frame-rate targets declared, and where the Quality floor stands, 28 November 2026
