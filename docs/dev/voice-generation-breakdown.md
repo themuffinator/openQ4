@@ -6,7 +6,11 @@ voices, the consent questions, the cost and the work around it. Audited on 16
 November 2026 from the source, the installed Awakening content (`q4xbase`), the
 retail Quake 4 assets and the Steam paks. The machine-readable list is
 [`voice-generation-lines.json`](voice-generation-lines.json), one entry per line
-with its group, ID, voice, text, tier and notes.
+with its group, ID, voice, text, tier and notes. Schema 2 adds `voices`, the
+profiles `tools/assets/elevenlabs_voice.py` designs and speaks with, and
+optional per-line fields (`caption`, `preset`, `hive`, `reference_seconds`,
+`original`, `target`, and `kind`/`duration_seconds`/`loop` for sound
+effects).
 
 ## Summary
 
@@ -19,8 +23,9 @@ with its group, ID, voice, text, tier and notes.
 | Multiplayer announcer: end-game award names | 10 | 90 | optional | the announcer |
 | Multiplayer quick chat | 16 | 156 | optional | a Marine and a Strogg player voice |
 | Multiplayer announcer: the stock set re-voiced | 70 | 988 | only with a new announcer voice | the announcer |
-| **Required** | **80** | **2,170** | | |
-| **Everything** | **207** | **3,764** | | |
+| Awakening Valkaryne re-voiced | 37 (+6 sound effects) | 723 | required (2 optional), decided 28 November | the Valkaryne (designed, machine) |
+| **Required** | **115** | **2,862** | | |
+| **Everything** | **244 (+6 sound effects)** | **4,487** | | |
 
 Not counted: the 100 m01 draft lines whose scenes the shipped maps do not have
 (their scenes must exist first; see the
@@ -30,6 +35,162 @@ names).
 
 The stock Quake 4 campaign has nothing to commission: every reachable retail
 line that is missing is also missing its text, so retail is silent there too.
+
+## The Valkaryne re-voiced
+
+**Decision (the user, 28 November 2026).** The Valkaryne gets a new voice
+for every line she has. She is visibly mechanical and soulless, so the voice is
+heavily synthesised and menacing, and must not seem human. The alpha's takes are a
+natural alto with a light metallic comb on the long ones. Next to a machine voice
+they would sound like another character, so none of them is kept. They are a real
+actor's performance: nothing is cloned, remixed or derived from them for shipping.
+
+### Her sounds
+
+The inventory reads the installed Awakening content: sound declarations,
+including the entries `valkaryne.sndshd` declares without the `sound` keyword;
+her definition's `snd_*` keys and the frame commands that play them; her
+effects; and every speaker, radio call and script that plays a line.
+
+**Voice: 37 lines, all recorded, all re-voiced.** Every one is listed under
+[the lines](#awakening-valkaryne-re-voiced-37-clips-6-sound-effects-723-characters)
+with its synthesis text, preset and where it plays. In summary:
+
+| Where | Lines | How they play | Preset |
+| --- | --- | --- | --- |
+| m08 Cryofac, the core monitor | `vo_valk_iseeyou` | Radio on the monitor (`$valkaryne_voice`) in `CoreMonitor` | monitor |
+| m08 Cryofac, Tak's death | `vo_valk_reborn`, `_stroggetern`, `_makrons`, `_immort`, `_racedies` | Radio on the monitor in `FinalValkaryne` | monitor |
+| m08, placed nowhere | `vo_valk_timedie`, `vo_valk_youcntstop` | None: the monitor scene holds the screen 9 s, and the two need 13.9 s ([Cryofac, not placed](awakening-missions.md#not-placed)) | monitor (optional) |
+| m09, through the level | `vo_valk_useless` to `vo_valk_youhum2` (`valk_speaker_1`-`_14`) | Global speakers fired by the level's triggers and scripts | nexus |
+| m09, the boss fight | `vo_valk_youwillserv2` to `vo_valk_youpowstrgg` (`valk_speaker_15`-`_26`) | Revision 5's `openq4_valkTaunts` | nexus |
+| m09, the boss's own | `vo_valk_advanevo` (intro), `_etern2` (undock), `_impstrgg2` (death) | `valkIntro`, `valkaryne_undock`, `valkDead` | nexus |
+
+Lines spoken for the hive ("our", "we", "the Strogg", "All is Strogg") carry
+`hive`, and the processing adds the collective to them. Two pairs share their
+words, so each line is generated separately: `vo_valk_iseeyou` and
+`vo_valk_timedie` for the monitors, and `_iseeyou2` and `_timedie2` for the
+finale.
+
+**Creature vocalisations: six candidates (optional).** These are sound effects,
+not speech. Listen to each original before replacing it; nothing here has been
+heard.
+
+| Original | Plays as | Plays when |
+| --- | --- | --- |
+| `valkaryne_idle_breath.ogg` | `snd_idle`, `snd_plugin`, `snd_crouch` | Idle, docked, crouching |
+| `valkaryne_pain_one` to `_four.ogg` | `snd_pain` | `pain1`-`pain6`, the docked flinches |
+| `valkaryne_death.ogg` | `snd_death` | `death` |
+
+**Body and weapons: kept.** These are machine sounds already, and nothing in
+the request asks for them. They are footsteps (`snd_step`), walking, running
+and turning servos, docking (`plugin`, `plugintoidle`, `runtoplugin`), evades,
+the leans, melee and leap attacks, and weapon charges and shots
+(`valkaryne_plugin_range`, `_plugin_range_big`, `_range_one`/`_two`, whose
+files also serve `snd_range_fire_one`/`_two`). Also kept are the shockwave and
+projectile spread, which belong to the cut attack. Her melee, leap and lean
+sounds may be vocal efforts; listen before deciding. Her effects borrow the
+Tank's railgun sounds (`tank_railgun`, `tank_chargerailgun`) and impact and
+explosion sounds from the Gladiator and the player's weapons. Thirteen more
+`valkaryne_*` declarations (machine gun, nail gun, missiles, growl, breathe,
+swing) name files that were never made, and nothing plays them.
+
+### The voice
+
+The profile is `voices.valkaryne` in the line list:
+
+- **Description** (499 characters, Voice Design's limit is 500): "A soulless
+  machine intelligence speaking through a cybernetic war body; nothing human
+  remains. Heavily synthesized, robotic voice: vocoded, metallic and resonant,
+  flat controlled pitch, no breath, warmth or emotion. Low layered tones with a
+  cold digital edge and faint electronic distortion. Slow, deliberate delivery;
+  every word clipped and final. Unnerving, menacing calm, like a hive mind
+  passing judgment. Feminine only in contour, never in warmth. Clean recording,
+  no music or background noise."
+- **Preview text:** original lines in her register, about 270 characters.
+- **Models:** `eleven_ttv_v3` to design, `eleven_v3` to speak,
+  `eleven_text_to_sound_v2` for the effects. Speech uses stability 0.7,
+  similarity 0.8, style 0 and speed 0.85, for a slow and even delivery.
+  `vo_valk_laff2` uses v3's `[menacing laughter]` tag; if a take comes out
+  wrong, generate the laugh as a sound effect instead.
+
+The character brief behind the description is her role in the content: the
+Makron Guardian and data conduit, a pale human face sealed into a crowned war
+machine. Her recordings were analysed for this brief on 28 November.
+
+### Generating
+
+`tools/assets/elevenlabs_voice.py` runs the whole pipeline. It reads the key
+from `ELEVENLABS_API_KEY` or, failing that, from a file holding only the key:
+`~/.elevenlabs/api_key`, outside the repository (`ELEVENLABS_API_KEY_FILE` names
+another path). You set the key yourself, and the tool never prints it. It writes
+only under `.tmp/voice/valkaryne/`. Voice ids are kept there too, because they
+belong to the account. A voice already designed in the ElevenLabs app skips
+steps 1 and 2: record its id as `{"voice_id": "..."}` in `voice.json`, as was
+done for the Valkaryne's voice on 28 November.
+
+1. `design`: about three previews from the description (`design/*.mp3`,
+   recorded with their `generated_voice_id`). Listen, and repeat with
+   `--seed N` until one is right.
+2. `create --preview <generated_voice_id>` saves it as a voice in the account.
+3. `speak --takes 3 [--sfx]` writes three takes of each line (`dry/<id>.takeN.wav`).
+   It requests 24 kHz PCM, which every plan has, and resamples to the game's
+   44.1 kHz; `--format pcm_44100` needs Pro. `--dry-run` prints the text and the
+   character count without a request.
+4. Write `picks.json` (`{"vo_valk_useless": 2, ...}`) with the chosen takes,
+   then run `process` (`processed/<id>.wav`).
+
+**Cost.** 723 characters × 3 takes is 2,169 characters for the speech. Add the
+Voice Design previews, and, with `--sfx`, six sound effects × 3, billed by the
+account's sound-effect pricing. Check the plan's credits first (see
+[Cost](#cost)).
+
+**Processing** (the `process` command). Each step is tied to her design or to
+her original recordings:
+
+| Step | Setting | Why |
+| --- | --- | --- |
+| Lowered core | −5 semitones | Her finale takes sit 4-7 semitones under her spoken ones. |
+| Vocoder, about 70% of the mix | 28 bands from 80 Hz to 9 kHz; carrier a sawtooth root, fifth and octave following her pitch lowered 5 semitones with 35% of its movement, plus noise above 3 kHz | Synthesised and flat: "feminine only in contour". |
+| Sub-octave | −12 semitones, at 0.4 | Weight and menace. |
+| Ring modulation | 45 Hz, 30% depth, on the core | An electrical buzz under every word. |
+| Metal | Comb at 0.84 ms, feedback 0.65 | The one machine trait her alpha takes had (measured), made stronger. |
+| Grit | 2-8 kHz band crushed to 6 bits, held 4 samples, at 0.12 | Nexus data. |
+| Hive (hive lines) | Three copies at +15, −20 and +25 cents, delayed 12, 19 and 27 ms | The Strogg speak through her. |
+| Space | nexus: dark 1.3 s tail, 28% wet. monitor: 300 Hz-3.5 kHz speaker and a 0.3 s room | Global voice; Cryofac's screens. |
+| Level | About −13 dBFS while speaking, soft ceiling −0.5 dBFS | Her originals' levels. |
+
+The `creature` preset keeps the metal, the ring modulation and the grit, with
+no vocoder, for the sound effects.
+
+**Checked so far (no key).** `list` and `speak --dry-run` read all 43 entries.
+`process --input` on five of the alpha's takes (`behold`, `youwillserv2`,
+`impstrgg2`, `laff2` and the monitor line `racedies`) writes 44.1 kHz mono WAVs
+to `.tmp/voice/valkaryne/audition/`, for a local listen only:
+
+- the comb rises from 8 to 21-22 dB at 0.84 ms;
+- the voice centres 4-7 semitones lower, and the sub-octave rises from −25 to
+  −31 dB up to −10 to −17 dB;
+- the laugh's pitch movement flattens to 1.5 semitones;
+- speech lands at −13.1 to −13.4 dBFS (the monitor line at −14.7, after its
+  band), with peaks −1.1 to −2.2 dBFS.
+
+No line has been generated and nothing has been listened to.
+
+### Putting it in the game (not done)
+
+The new takes are original openQ4 content and ship in a pack under
+`content/baseoq4/` (the `target` paths: `sound/vo_english/openq4_valkaryne/`
+and `sound/strogg/openq4_valkaryne/`). Her lines reach the game three ways:
+
+- speakers' `s_shader`;
+- radio calls (`radioChatterPlay`);
+- her definition's `snd_*` keys.
+
+So the swap belongs in one redirect from her `vo_valk_*` and creature sound
+names to openQ4 declarations, behind a setting that keeps the original voice
+available. Her captions keep the content's text. The new takes must fit the
+scenes timed around them: Cryofac's monitor waits on each line, and the finale's
+taunts allow 7 seconds a line.
 
 ## Decisions before generating
 
@@ -348,3 +509,51 @@ retakes and voice design.** Either can be cancelled after the month.
 | `stock_tourney_arena_6` | announcer | Join arena six | exact retail words unconfirmed: no transcripts ship; listen before recording |
 | `stock_tourney_arena_7` | announcer | Join arena seven | exact retail words unconfirmed: no transcripts ship; listen before recording |
 | `stock_tourney_arena_8` | announcer | Join arena eight | exact retail words unconfirmed: no transcripts ship; listen before recording |
+
+#### Awakening Valkaryne re-voiced (37 clips, 6 sound effects, 723 characters)
+
+| ID | Voice | Text | Notes |
+| --- | --- | --- | --- |
+| `vo_valk_useless` | valkaryne | Useless. | nexus; required; original 0.93 s; m09: speaker valk_speaker_1 <- moveIceCubeDown |
+| `vo_valk_nohope` | valkaryne | There is no hope for you. | nexus; required; original 1.82 s; m09: speaker valk_speaker_2 <- trigger_once_10 |
+| `vo_valk_racewill` | valkaryne | Your race will become ours. | nexus, hive; required; original 1.86 s; m09: speaker valk_speaker_3 <- trigger_once_11 |
+| `vo_valk_defeat` | valkaryne | Defeat is inevitable. | nexus; required; original 1.4 s; m09: speaker valk_speaker_4 <- trigger_once_68 |
+| `vo_valk_yield` | valkaryne | You will yield... or you will die. | nexus; required; original 2.45 s; m09: speaker valk_speaker_5 <- trigger_relay_24 |
+| `vo_valk_behold` | valkaryne | Behold our perfection. | nexus, hive; required; original 1.74 s; m09: speaker valk_speaker_6 <- trigger_relay_25 |
+| `vo_valk_allis` | valkaryne | All is Strogg. | nexus, hive; required; original 1.77 s; m09: speaker valk_speaker_7 <- trigger_once_70 |
+| `vo_valk_deathserv` | valkaryne | In death, you will serve. | nexus; required; original 1.79 s; m09: speaker valk_speaker_8 <- trigger_once_71 |
+| `vo_valk_makronrs` | valkaryne | The Makron will rise. | nexus; required; original 1.93 s; m09: speaker valk_speaker_9 <- trigger_once_15 |
+| `vo_valk_iseeyou2` | valkaryne | I see you. | nexus; required; original 4.92 s; m09: speaker valk_speaker_10 <- trigger_once_16 |
+| `vo_valk_timedie2` | valkaryne | Time to die. | nexus; required; original 4.76 s; m09: speaker valk_speaker_11 <- trigger_once_72 |
+| `vo_valk_toolate2` | valkaryne | Too late. | nexus; required; original 3.67 s; m09: speaker valk_speaker_12 <- trigger_once_73 |
+| `vo_valk_iamthestrg2` | valkaryne | I am... the Strogg. | nexus, hive; required; original 5.41 s; m09: speaker valk_speaker_13 <- trigger_once_30 |
+| `vo_valk_youhum2` | valkaryne | You are human. | nexus; required; original 4.71 s; m09: speaker valk_speaker_14 <- trigger_once_19 |
+| `vo_valk_youwillserv2` | valkaryne | You will serve me. | nexus; required; original 5.13 s; m09: speaker valk_speaker_15 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_laff2` | valkaryne | [menacing laughter] Ha... ha... ha... ha. | nexus; required; original 5.32 s; m09: speaker valk_speaker_16 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_witnesso2` | valkaryne | Witness... your oblivion. | nexus; required; original 5.78 s; m09: speaker valk_speaker_17 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_behold2` | valkaryne | Behold... Strogg glory. | nexus, hive; required; original 5.55 s; m09: speaker valk_speaker_18 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_persist2` | valkaryne | Your persistence... is your weakness. | nexus; required; original 6.41 s; m09: speaker valk_speaker_19 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_suffer2` | valkaryne | Suffer. | nexus; required; original 3.55 s; m09: speaker valk_speaker_20 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_pain2` | valkaryne | Pain. | nexus; required; original 2.9 s; m09: speaker valk_speaker_21 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_conq2` | valkaryne | Conquest. | nexus; required; original 3.48 s; m09: speaker valk_speaker_22 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_human2` | valkaryne | Humanity... is mine. | nexus; required; original 5.22 s; m09: speaker valk_speaker_23 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_power2` | valkaryne | My power... is beyond limits. | nexus; required; original 5.64 s; m09: speaker valk_speaker_24 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_yousee2` | valkaryne | You see my power. | nexus; required; original 5.43 s; m09: speaker valk_speaker_25 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_youpowstrgg` | valkaryne | You see the power... of the Strogg. | nexus, hive; required; original 6.22 s; m09: speaker valk_speaker_26 <- openq4_valkTaunts (M09 revision 5) |
+| `vo_valk_advanevo` | valkaryne | Advancement... Evolution... Perfection. | nexus; required; original 8.03 s; m09: speaker valk_speaker_27 <- valkIntro |
+| `vo_valk_etern2` | valkaryne | Eternal. | nexus; required; original 3.69 s; m09: speaker valk_speaker_28 <- valkaryne_undock |
+| `vo_valk_impstrgg2` | valkaryne | Impossible... We are Strogg. | nexus, hive; required; original 6.92 s; m09: speaker valk_speaker_29 <- valkDead |
+| `vo_valk_iseeyou` | valkaryne | I see you. | monitor; required; original 3.81 s; m08: monitor/radio $valkaryne_voice <- CoreMonitor |
+| `vo_valk_timedie` | valkaryne | Time to die. | monitor; optional; original 4.88 s; m08: recorded, placed nowhere (the monitor scene holds the screen 9 s; with vo_valk_timedie this needs 13.9 s) |
+| `vo_valk_youcntstop` | valkaryne | You cannot stop us. | monitor, hive; optional; original 5.2 s; m08: recorded, placed nowhere (the monitor scene holds the screen 9 s; with vo_valk_timedie this needs 13.9 s) |
+| `vo_valk_reborn` | valkaryne | Reborn. | monitor; required; original 1.21 s; m08: monitor/radio $valkaryne_voice <- FinalValkaryne |
+| `vo_valk_stroggetern` | valkaryne | The Strogg are eternal. | monitor, hive; required; original 1.6 s; m08: monitor/radio $valkaryne_voice <- FinalValkaryne |
+| `vo_valk_makrons` | valkaryne | The Makrons... | monitor; required; original 1.1 s; m08: monitor/radio $valkaryne_voice <- FinalValkaryne |
+| `vo_valk_immort` | valkaryne | ...are immortal. | monitor, hive; required; original 0.93 s; m08: monitor/radio $valkaryne_voice <- FinalValkaryne |
+| `vo_valk_racedies` | valkaryne | Your race dies here. | monitor; required; original 1.53 s; m08: monitor/radio $valkaryne_voice <- FinalValkaryne |
+| `valkaryne_idle_breath` | valkaryne (sound effect) | Slow mechanical breathing of a female cyborg war machine: hydraulic intake, hissing exhale, low servo hum, synthetic and cold, seamless loop. | sound effect, 4 s, loop; vocalisation for snd_idle, snd_plugin, snd_crouch; replaces sound/strogg/valkaryne/valkaryne_idle_breath.ogg; listen to the original first |
+| `valkaryne_pain_one` | valkaryne (sound effect) | Short distorted shriek of a synthetic female cyborg in pain, metallic, electronic glitch, no human breath. | sound effect, 1 s; vocalisation for snd_pain (pain1-6, plugin_pain1/2); replaces sound/strogg/valkaryne/valkaryne_pain_one.ogg; listen to the original first |
+| `valkaryne_pain_two` | valkaryne (sound effect) | Sharp mechanical female screech of pain, vocoded and metallic, abrupt. | sound effect, 1 s; vocalisation for snd_pain; replaces sound/strogg/valkaryne/valkaryne_pain_two.ogg; listen to the original first |
+| `valkaryne_pain_three` | valkaryne (sound effect) | Guttural synthetic female growl of pain with digital distortion and servo whine. | sound effect, 1 s; vocalisation for snd_pain; replaces sound/strogg/valkaryne/valkaryne_pain_three.ogg; listen to the original first |
+| `valkaryne_pain_four` | valkaryne (sound effect) | Electronic female cry of pain breaking into static, metallic resonance. | sound effect, 1 s; vocalisation for snd_pain; replaces sound/strogg/valkaryne/valkaryne_pain_four.ogg; listen to the original first |
+| `valkaryne_death` | valkaryne (sound effect) | Dying female cyborg machine: a long vocoded scream collapsing into electronic static and a falling power-down whine. | sound effect, 3 s; vocalisation for snd_death; replaces sound/strogg/valkaryne/valkaryne_death.ogg; listen to the original first |

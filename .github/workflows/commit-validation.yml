@@ -114,6 +114,7 @@ jobs:
             tools/build/write_pak_manifest.py \
             src/sys/linux/pk4/id_utils.py \
             tools/analysis/clang_tidy_input_safety.py \
+            tools/assets/elevenlabs_voice.py \
             tools/assets/pack_pbr_orm.py \
             tools/validation/audit_source_provenance.py \
             tools/validation/generate_pbr_fixture.py \
@@ -298,6 +299,7 @@ jobs:
             tools/tests/awakening_speeder_physics_contract.py \
             tools/tests/awakening_gameplay_contract.py \
             tools/tests/awakening_content_repairs.py \
+            tools/tests/voice_generation_lines.py \
             tools/tests/mp_buying_rules_contract.py \
             tools/tests/mp_classic_grapple_contract.py \
             tools/tests/mp_casual_match_flow_contract.py \
@@ -929,6 +931,7 @@ jobs:
           python tools/tests/awakening_speeder_physics_contract.py
           python tools/tests/awakening_gameplay_contract.py
           python tools/tests/awakening_content_repairs.py
+          python tools/tests/voice_generation_lines.py
           python tools/tests/mp_buying_rules_contract.py
           python tools/tests/mp_classic_grapple_contract.py
           python tools/tests/mp_casual_match_flow_contract.py
