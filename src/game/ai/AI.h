@@ -483,6 +483,9 @@ public:
 public:
 
 	idLinkList<idAI>		simpleThinkNode;
+	// openQ4: spawnArgs "noSimpleThink", read at spawn and restore rather than
+	// looked up in the dictionary on every think (not saved)
+	bool					noSimpleThinkArg;
 
 	// navigation
 	idAAS*					aas;

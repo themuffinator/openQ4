@@ -111,12 +111,50 @@ or interface drawn over it. With `g_autoSkipCinematics 1` and no probe the
 whole skip still runs in the first settle frame (1,468 ms of a 1,492 ms settle
 phase) and no game frame after the load asks for a resync.
 
-The skip's own cost is unchanged: 0.12 ms a game frame, of which the probe's
-profile puts 0.78 s in entity think and 0.58 s in events and scripts across the
-skip, with no single entity above 38 ms (`npc_metcalf`, `vehicle_walker_1`).
-Making it cheaper is the open lead; a slowed skip
-(`g_cinematicSkipFrameMsec 1`, about 20 s of the same work) is long enough to
-sample with a CPU profiler.
+The skip's own cost is unchanged: 0.12 ms a game frame, with no single entity
+above 38 ms across it (`npc_metcalf`, `vehicle_walker_1`).
+
+### Where the skip's time goes
+
+A slowed skip does not help a sampling profiler: with 1 ms slices the client
+idles most of each frame (the VS collector took 11 samples in 10 s). The
+in-tree stall sampler does, on the load-time skip, which runs the same
+fast-forward inside the level load: `g_autoSkipCinematics 1`,
+`com_loadingFrameTrace 2`, `com_loadingStallMsec 5` and
+`com_loadingStallFocus <function>`, which ranks only the samples inside that
+function. Shares of the samples inside `idGameLocal::RunFrame`, one focused run
+each (the sampler stretches the skip to 2-7 s, so only shares are meaningful):
+
+| Inside the fast-forward | Share |
+|---|---:|
+| `rvClientEffect::Think`: effect servicing, particle spawning and particle physics | 17-25% |
+| The loading screen presenting between skipped frames (load-time skip only) | 14-23% |
+| `idEntity::RunPhysics`: articulated figures, movers, projectiles, collision | 14-18% |
+| `idAI::Think` | 8-16% |
+| AI and head animation controllers (look-at, IK, head joints copied from the body) | about 6% + 3% |
+| `idGameLocal::InPlayerConnectedArea` for bound effects | about 3% |
+| `idEvent::ServiceEvents`: scripts | under 2% |
+| `rvAIManager::IsSimpleThink`'s `noSimpleThink` dictionary lookup | about 1.3% |
+
+Only the last was waste. `IsSimpleThink` looked the spawn argument up in the
+actor's dictionary on every think, in every level, not only during skips; the
+actor now reads it at spawn and restore (`idAI::noSimpleThinkArg`, not saved).
+The skip still ends on frame 11,688 at 187.008 s.
+
+The rest is simulation the level depends on afterwards, so it stays:
+
+- Effects can't stop spawning during a skip. Particles carry physics and
+  collisions, spawn impact and timeout effects (decals among them) and start
+  effect sounds, and a looping effect would come out of the skip empty and
+  build up again in front of the player. `InPlayerConnectedArea` feeds the same
+  impact and timeout spawning (`EFLAG_IN_CONNECTED_AREA`), so it can't be held
+  across the skip either.
+- Animation controllers keep state between frames (head focus rate), and the
+  joints they set are read by later thinks.
+
+Cutting the skip further means a cheaper particle runtime for every frame (the
+end-time-ordered particle list, `rvSegment::LinkUsedParticle`, is a quarter of
+effect time), not a shortcut for skips.
 
 ## Advanced screen-space load
 

@@ -3031,8 +3031,10 @@ are not yet measured.
   frames in one `RunFrame`). The skip now runs 33 ms of it between presented
   black frames and ends on the same game frame, about 40 ms later in all
   ([skipping the intro in play](airdefense1-optimization-evidence.md#2026-11-28-skipping-the-intro-in-play)).
-  The fast-forward's own cost, 0.12 ms a game frame in entity think and
-  scripts, is still open.
+  The fast-forward's own cost (0.12 ms a game frame) is attributed: effects
+  17-25%, physics 14-18%, AI 8-16%, scripts under 2%; the only waste, a
+  per-think dictionary lookup (about 1%), is removed. The rest is simulation the
+  level needs after the skip, so further cuts belong to the particle runtime.
 - [ ] **FPS-08 — P2, implementation: CPU-side renderer and game cost.** The HF-07
   attribution found the Quality frame CPU-bound on one thread (tic, scene front end and
   Vulkan recording in turn); the render-thread prototype's first stage gained 0.5 ms

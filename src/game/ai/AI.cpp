@@ -53,6 +53,7 @@ idAI::idAI
 */
 idAI::idAI ( void ) {
 	projectile_height_to_distance_ratio = 1.0f;
+	noSimpleThinkArg		= false;
 
 	freezeFactor			= 0.0f;
 	frozenSolidTime			= -1;
@@ -731,6 +732,7 @@ void idAI::Restore( idRestoreGame *savefile ) {
 	LinkCombat();
 
 	RestoreAwakeningState( savefile );
+	noSimpleThinkArg = spawnArgs.GetBool( "noSimpleThink" );
 }
 
 /*
@@ -772,6 +774,7 @@ idAI::Spawn
 void idAI::Spawn( void ) {
 // openQ4 BEGIN
 	liquidCanBreathe	= spawnArgs.GetBool( "canBreatheLiquid", "0" );
+	noSimpleThinkArg	= spawnArgs.GetBool( "noSimpleThink" );
 	liquidImmune		= spawnArgs.GetBool( "liquidImmune", "0" );
 	liquidAirTics		= pm_waterAirTics.GetInteger();
 	// the settle frames at the end of a map load must not burn a monster that starts in lava

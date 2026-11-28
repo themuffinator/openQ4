@@ -34,6 +34,7 @@ SCRIPT_DIR = PAK0 / "scripts" / "openq4" / "awakening"
 V6 = SCRIPT_DIR / "m01_dropship-v6.script"
 CINEMATIC = ROOT / "src" / "game" / "awakening" / "M01Cinematic.inl"
 MANAGER = ROOT / "src" / "game" / "ai" / "AI_Manager.cpp"
+AI_CPP = ROOT / "src" / "game" / "ai" / "AI.cpp"
 SKINS = PAK0 / "skins" / "openq4_awakening_m01.skin"
 MATERIALS = PAK0 / "materials" / "awakening_nameplates_openq4.mtr"
 PLATES = PAK0 / "models" / "openq4" / "awakening" / "dropship"
@@ -72,7 +73,11 @@ def main() -> int:
         check(f"boardLane(${name}," in script, f"{name} does not board along the lane")
     check('args.Set( "walkRange", "24" )' in cinematic and 'args.Set( "noSimpleThink", "1" )' in cinematic,
           "lane marines need a short walk range and full thinks")
-    check('spawnArgs.GetBool( "noSimpleThink" )' in MANAGER.read_text(encoding="utf-8"),
+    # read once at spawn and restore (not on every think), then consulted per think
+    ai_source = AI_CPP.read_text(encoding="utf-8", errors="replace")
+    check(ai_source.count('noSimpleThinkArg = spawnArgs.GetBool( "noSimpleThink" );') == 1 and
+          'noSimpleThinkArg	= spawnArgs.GetBool( "noSimpleThink" );' in ai_source and
+          "ai->noSimpleThinkArg" in MANAGER.read_text(encoding="utf-8"),
           "rvAIManager::IsSimpleThink must honour noSimpleThink")
     check("thread m04_stranarus_trench::moveMarkswell();" in script, "Markswell keeps his authored route")
 
