@@ -76,6 +76,8 @@ MEMORY = re.compile(r'^Audio memory: CPU=(\d+) KiB OpenAL=(\d+) KiB pending-inpu
 STREAMING = re.compile(r'^Vorbis streaming: reserved=(\d+) KiB', re.M)
 VOICE = re.compile(r'^SOUND_VOICE source=\d+ state=(\w+) routed=\d queued=(\d) serial=\d+ offsetMs=[\d.-]+ sample=(\S+)', re.M)
 PROCESS = re.compile(r'^Process memory: private=(\d+) KiB resident=(\d+) KiB', re.M)
+MEMORY_CLASS = re.compile(r'^AUDIO_MEMORY_CLASS class=(\S+) source=(\S+) ramMB=(-?\d+) payloadMB=(\d+) decodeMB=(\d+) '
+                          r'streamMB=(\d+) providerMB=(\d+)', re.M)
 STEP = re.compile(r'SCENE_STEP (\S+) (\d+) (\S+)\s*$', re.M)
 KILLS = re.compile(r'KILL_HOSTILES killed=(\d+) survived=(\d+) protected=(\d+)\s*$', re.M)
 SURVIVOR = re.compile(r'KILL_HOSTILE name=(\S+) class=(\S+) result=(survived|protected)\s*$', re.M)
@@ -347,6 +349,7 @@ def launch(args, root, entries, walk=None, blocked_exits=None):
         's_asyncSampleDecode': '1' if args.decode_mode == 'worker' else '0',
         's_asyncStreamDecode': '1' if getattr(args, 'stream_decode', 'worker') == 'worker' else '0',
         's_decodeMemoryMB': str(args.decode_memory_mb), 's_audioMemoryMB': str(args.audio_memory_mb),
+        's_audioMemoryClass': args.memory_class,
         'com_showLevelLoadTimes': '1',
         'com_skipLoadingContinue': '1', 'com_maxfps': '60', 'ui_autoJoin': '0', 'ui_retained': '1', 'sys_lang': 'english',
         'g_autoExecAfterMapLoad': 'scene-0.cfg', 'g_autoExecAfterMapLoadDelayMs': '2000',
@@ -499,10 +502,16 @@ def audit(log, labels):
             tail = segment[at.end():]
             # The totals cover every sample; the filter only empties the per-sample listing.
             admission, totals, streaming = ADMISSION.search(tail), MEMORY.search(tail), STREAMING.search(tail)
-            process = PROCESS.search(tail)
+            process, memory_class = PROCESS.search(tail), MEMORY_CLASS.search(tail)
             if process:
                 # Present with s_noSound too, where the audio figures are absent.
                 memory = {'process_private_kib': int(process[1]), 'process_resident_kib': int(process[2])}
+            if memory_class:
+                # The device class and the budgets in force (SoundMemoryClass.h).
+                memory |= {'memory_class': memory_class[1], 'memory_class_source': memory_class[2],
+                           'system_ram_mib': int(memory_class[3]), 'payload_budget_mib': int(memory_class[4]),
+                           'decode_budget_mib': int(memory_class[5]), 'stream_budget_mib': int(memory_class[6]),
+                           'provider_allowance_mib': int(memory_class[7])}
             if admission and totals:
                 queued = VOICE.findall(tail)
                 memory |= {'reserved_kib': int(admission[1]), 'payload_peak_kib': int(admission[2]),
@@ -577,8 +586,12 @@ def main():
                         help='Pin asynchronous or main-thread sample decoding for loading comparisons')
     parser.add_argument('--stream-decode', choices=['worker', 'inline'], default='worker',
                         help='Decode streamed blocks on job workers (default) or on the main thread')
-    parser.add_argument('--decode-memory-mb', type=int, default=64, help='Pending decode budget (16-1024 MiB)')
-    parser.add_argument('--audio-memory-mb', type=int, default=256, help='Aggregate payload budget (32-2048 MiB)')
+    parser.add_argument('--decode-memory-mb', type=int, default=0,
+                        help="Pending decode budget (16-1024 MiB; 0, the default, is the device class's)")
+    parser.add_argument('--audio-memory-mb', type=int, default=0,
+                        help="Aggregate payload budget (32-2048 MiB; 0, the default, is the device class's)")
+    parser.add_argument('--memory-class', choices=['auto', 'desktop', 'mobile', 'constrained-mobile'], default='auto',
+                        help='Audio memory class whose budgets apply (s_audioMemoryClass; auto follows the device)')
     parser.add_argument('--timeout', type=int, default=0)
     args = parser.parse_args()
     args.repeat = max(1, args.repeat)
@@ -593,8 +606,9 @@ def main():
         parser.error('--fight requires --progress')
     if args.seconds < 1 or args.interval < 1 or args.step_msec < 1 or args.tail < 0:
         parser.error('seconds, interval and step-msec must be positive; tail must be nonnegative')
-    if not 16 <= args.decode_memory_mb <= 1024 or not 32 <= args.audio_memory_mb <= 2048:
-        parser.error('decode-memory-mb must be 16-1024 and audio-memory-mb must be 32-2048')
+    if not (args.decode_memory_mb == 0 or 16 <= args.decode_memory_mb <= 1024) or \
+            not (args.audio_memory_mb == 0 or 32 <= args.audio_memory_mb <= 2048):
+        parser.error('decode-memory-mb must be 0 or 16-1024 and audio-memory-mb must be 0 or 32-2048')
     verify_runtime_is_current(ROOT / '.install')
     maps = [m.strip() for m in args.maps.split(',')] if args.maps else (AWAKENING_MAPS if args.awakening else STOCK_MAPS)
     entries = scene_entries(maps, args.repeat)
@@ -684,6 +698,11 @@ def main():
             beyond = sorted(c['beyond_payloads_kib'] for c in cost.values())
             total.update({'beyond_payloads_median_kib': beyond[len(beyond) // 2], 'beyond_payloads_max_kib': beyond[-1],
                           'audio_private_max_kib': max(c['audio_private_kib'] for c in cost.values())})
+            # The class declares what the provider and metadata may add beyond the payloads.
+            allowance = {scenes[n]['memory'].get('provider_allowance_mib') for n in cost}
+            if len(allowance) == 1 and None not in allowance:
+                total['provider_allowance_kib'] = allowance.pop() * 1024
+                checks['beyond_payloads_within_provider_allowance'] = beyond[-1] <= total['provider_allowance_kib']
     if args.repeat > 1:
         # A long session: an opening played again holds no more audio, voices or
         # stream reservations than its first pass, beyond what one opening varies by.
@@ -715,6 +734,7 @@ def main():
         'passed': all(checks.values()), 'checks': checks, 'totals': dict(total), 'scenes': scenes,
         'maps': maps, 'repeat': args.repeat, 'seconds_per_map': args.seconds, 'probe_interval_ms': args.interval, 'run_seconds': seconds,
         'decode_mode': args.decode_mode, 'stream_decode': args.stream_decode, 'decode_memory_mb': args.decode_memory_mb, 'audio_memory_mb': args.audio_memory_mb,
+        'memory_class': args.memory_class,
         'walk': {level: [entity for _, entity in steps] for level, steps in walk.items()} if walk else None,
         'step_msec': args.step_msec if walk else None,
         'progress': args.progress, 'fight': args.fight, 'suppressed_level_exits': blocked_exits,

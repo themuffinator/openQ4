@@ -152,6 +152,55 @@ class AndroidBuildTests(unittest.TestCase):
         self.assertEqual(probe.report['ro.opengles.version'], '131072')
         self.assertNotIn('install', [args[0] for args in calls])
 
+    def test_emulator_memory_assessment_reads_trims_budgets_and_clock(self) -> None:
+        """--mode memory (AUD-03): the engine's own report lines decide the checks."""
+        def memory(refused: int = 0) -> str:
+            return ('AUDIO_MEMORY_CLASS class=constrained-mobile source=detected ramMB=3923 payloadMB=192 decodeMB=48 '
+                    'streamMB=24 providerMB=48 classPayloadMB=192 classDecodeMB=48 classStreamMB=24\n'
+                    f'Audio admission: reserved=90000 KiB peak=95000 KiB budget=192 MiB refused={refused} fixed=20480 KiB (x)\n'
+                    'Vorbis admission: pending=0 KiB peak=9000 KiB budget=48 MiB waits=0 (x)\n'
+                    'Vorbis streaming: reserved=4896 KiB peak=4896 KiB budget=24 MiB rejected=0 decode=4096 frames\n'
+                    'Process memory: private=1400000 KiB resident=1500000 KiB\n')
+        def voice(offset: float, streamed: int = 1) -> str:
+            return f'SOUND_VOICE source=7 state=playing routed=0 queued={streamed} serial=3 offsetMs={offset} sample=sound/music.ogg\n'
+        def trim(idle: int, level: int, loading: int, active: int = 9) -> str:
+            return (f'AUDIO_TRIM reason=os low-memory idle={idle} freed=3 freedKiB=900 copies=0 copyKiB=0 '
+                    f'active={active} level={level} loading={loading}\n')
+        def world(time_ms: int, now: int) -> str:
+            return f'SOUND_WORLD id=1 paused=0 time={time_ms} active=1 channels=4 stamp=0 now={now}\n'
+        def playing(pitch: float) -> str:
+            return f'Audible OpenAL voices\n  0     12  0.800  {pitch:.3f} sound/ambience.ogg\n  1     14  0.500  {pitch:.3f} sound/hum.wav\n'
+        log = ('48000 msec to load game/hangar1\n'
+               'EMULATOR_GAMEPLAY_READY\nEMULATOR_MEMORY_BASELINE\n' + memory() + voice(500.0) +
+               'EMULATOR_TRIM_REQUEST_RUNNING_MODERATE\n' + trim(-1, 5, 0) + 'EMULATOR_MEMORY_AFTER_MODERATE\n' +
+               'EMULATOR_TRIM_REQUEST_RUNNING_CRITICAL\n' + trim(0, 15, 0) + 'EMULATOR_MEMORY_AFTER_CRITICAL\n' + memory() +
+               voice(9000.0) + 'EMULATOR_CLOCK_FULL\n' + world(1000, 5000) + playing(1.0) + world(5000, 9000) +
+               'EMULATOR_CLOCK_HALF\n' + world(5000, 9000) + playing(0.5) + world(9000, 13000) + 'EMULATOR_CLOCK_END\n'
+               'EMULATOR_MEMORY_LOAD_START\n' + trim(-1, 20, 1) + trim(0, 80, 1) + '52000 msec to load game/airdefense1\n'
+               'EMULATOR_MEMORY_SECOND_READY\n' + memory() + voice(800.0) +
+               'EMULATOR_SAVE_RESTORED\nEMULATOR_MEMORY_RESTORED\n' + voice(12000.0) + memory() + 'EMULATOR_SMOKE_COMPLETE\n')
+        with tempfile.TemporaryDirectory(dir=ROOT / '.tmp') as directory:
+            probe = android_emulator_smoke.Probe.__new__(android_emulator_smoke.Probe)
+            probe.out, probe.pid, probe.report = Path(directory), '4242', {'ro.build.version.sdk': '35'}
+            probe.trims = [{'level': 'COMPLETE', 'when': 'background, map loading', 'loaded_while_away': False,
+                            'answered_in_background': trim(0, 80, 1).strip()}]
+            (probe.out / 'exit-info.txt').write_text('pid=4242 realUid=10123\n  reason=1 (EXIT_SELF) status=0\n')
+            (probe.out / 'openq4.log').write_text(log)
+            probe.assess_memory()
+            self.assertEqual(probe.report['status'], 'pass')
+            self.assertEqual(probe.report['pitch_ratio_half_to_full'], [0.5, 0.5])
+            self.assertEqual([t['level'] for t in probe.report['system_hidden_notice']], [20])
+            # A refused payload, a trim answered only on return, or a doubled notice fails.
+            for broken in (log.replace('refused=0', 'refused=2', 1), log.replace(trim(0, 15, 0), trim(0, 15, 0) * 2),
+                           log.replace(playing(0.5), playing(1.0))):
+                (probe.out / 'openq4.log').write_text(broken)
+                with self.assertRaisesRegex(ValueError, 'Memory checks failed'):
+                    probe.assess_memory()
+            (probe.out / 'openq4.log').write_text(log)
+            probe.trims[0]['answered_in_background'] = None
+            with self.assertRaisesRegex(ValueError, 'background_notice_answered_while_away'):
+                probe.assess_memory()
+
     def test_emulator_pose_reader_allows_draw_messages_but_not_later_measurements(self) -> None:
         sample = 'origin: (-5122.8 2847.2 -5819.8) angles: (4.3 -7.2 0.0)\n'
         log = 'EMULATOR_SAVE_RESTORED \nDeferred GenerateAllInteractions (RunFrame)\n' + sample + 'EMULATOR_SMOKE_COMPLETE\n'

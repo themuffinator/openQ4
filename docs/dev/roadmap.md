@@ -7618,7 +7618,7 @@ the non-verbal remainder is marked for players rather than counted as covered.
 | --- | --- | --- |
 | AUD-01 — Partial | 54 emitter/OpenAL distance measurements validate current map-unit curves; no speculative unit conversion needed. A rendered retail/openQ4 comparison harness is implemented; openQ4's rendered half follows the authored curve within 0.6 dB and is silent at and beyond the maximum. | One focused run of the retail half (retail mutes itself while unfocused) passing the comparison. |
 | AUD-02 — Partial | Simulated endpoint recovery, scene-clock save/load repair, Linux checks and repeated-map audio residency evidence exist. | Physical endpoint loss/hotplug, audible pause/cinematics, long sessions and target-OS breadth including macOS. |
-| AUD-03 — Partial | Aggregate payload budgets/backpressure, bounded compressed streaming, recycled-source fix and exactly-once low-memory trim implemented; Windows/Linux measurements recorded. | Real mobile OS low-memory callbacks, device/provider process-memory budgets, thermal/loading/cancellation behavior and device breadth. |
+| AUD-03 — Partial | Aggregate payload budgets/backpressure, bounded compressed streaming, recycled-source fix and exactly-once low-memory trim implemented; Windows/Linux measurements recorded. Android notices are answered in the background at their `onTrimMemory` level, per-device-class payload/decode/stream budgets and provider allowances are declared and reported, and the Android emulator qualifies a mid-load background trim, foreground trims, time scale and save/restore. Engineering complete. | Physical phones only: a genuine low-memory `onTrimMemory` on a 4 GiB-or-less phone and a larger one, provider memory there under the silent baseline, loading time at the phone decode budget, thermal behavior (AND-02 sustain) and device breadth beyond the Galaxy S25. |
 | AUD-04 — Partial | Center routing, HRTF/stereo fallback, live layout changes and mod wet-send rolloff measured with loopback audio; real-device harness passes on real stereo endpoints, including a forced layout and a mid-line device switch. | Run `audio_surround_endpoint.py` on a real 5.1/7.1 endpoint and listen on speakers; preserve positional mix and stock zero-rolloff behavior. |
 | AUD-05 — Partial | Consent/PTT/capture pipeline, codec/transport/moderation and bounded playback pass multi-process Windows/Linux and clock/loss tests. | Physical microphone/capture hotplug, independent-machine clocks and OS/device breadth. Existing 1:59:29 run is not a two-hour pass; cancelled rerun is not silently reinstated. |
 | AUD-06 — Partial | Localized dialogue gain, complete installed-reference routing audit, extensive scripted-scene mute/save checks and a 42-map progression sweep with fights (1,052 kills, no mute leak) exist. | Ordered human play, including `walker` past the step where the probe player dies, and physical listening/device checks; retain effects/music separation. |
@@ -7814,6 +7814,32 @@ the non-verbal remainder is marked for players rather than counted as covered.
   pass every check on a quiet machine; at 2 fps only this change keeps streams
   playing.
   [Evidence](audio-voice-evidence.md#streams-across-long-frames-and-output-changes-23-november-2026).
+  November 28: a real Android notice reached the trim, but one sent while the app
+  was in the background waited for its return, because SDL's pump blocks the engine
+  thread there; those are the notices Android sends before it ends a process. The
+  watcher now answers a notice on the engine thread at once. The activity hands its
+  `onTrimMemory` level to the engine, which SDL's event drops: a trip to the home
+  screen (`UI_HIDDEN`) frees only earlier levels' samples, `RUNNING_LOW` and
+  `BACKGROUND` also this level's idle ones, and `RUNNING_CRITICAL`, `MODERATE` and
+  `COMPLETE` every sample no channel uses. Budgets are declared per device class
+  (`SoundMemoryClass.h`): desktops keep 256/64/32 MiB of payloads, decode and
+  streams; phones above 4 GiB keep 256 MiB of payloads with 48 MiB of decode; phones
+  with 4 GiB or less get 192, 48 and 24 MiB; each class declares a provider
+  allowance (64 or 48 MiB), which the silent-baseline scene audit now checks. The
+  budget cvars default to 0 (the class) and `listSounds` reports class and budgets.
+  The payload bound holds without streaming. On the API 35 emulator (3,919 MiB, the
+  constrained class), `android_emulator_smoke.py --mode memory` passes all 17 checks
+  with Android's own notices: `RUNNING_CRITICAL` in play freed 532 idle samples
+  (46 MiB, and 48 MiB of process memory) while every voice and stream played on;
+  during a cold level load in the background, `UI_HIDDEN` and `COMPLETE` were
+  answered before the return and kept the loading level; half time scale halved
+  every voice's pitch; a save restored after the trims with streams resuming;
+  nothing was refused. Only physical
+  phones remain: a genuine low-memory `onTrimMemory` (not `am send-trim-memory`) on a
+  phone with 4 GiB or less and on a larger one, their provider memory under the silent
+  baseline, loading time at the phone decode budget, AND-02's sustain phase for
+  thermal behavior, and devices beyond the Galaxy S25.
+  [Evidence](audio-voice-evidence.md#android-memory-notices-and-device-budgets-28-november-2026).
 - [ ] **AUD-04 — P2, implementation and qualification: surround and mod reverb.**
   Resolve `SSF_CENTER`/VO placement on 5.1 with stereo/HRTF fallback and nonzero mod
   room-rolloff unit handling. Keep stock zero-rolloff behavior intact.

@@ -10,7 +10,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def main():
     source = (ROOT / 'src/sound/OpenAL/AL_SoundSample.cpp').read_text()
-    production = source[source.index('static bool SoundSample_AdmitDecode('):source.index('void idSoundSample_OpenAL::PrintDecodeMemoryInfo()')]
+    production = body(source, 'static int SoundMemory_DecodeMB()')
+    production += source[source.index('static bool SoundSample_AdmitDecode('):source.index('void idSoundSample_OpenAL::PrintDecodeMemoryInfo()')]
     production += body(source, 'void idSoundSample_OpenAL::FinishDecode()')
     production += body(source, 'void idSoundSample_OpenAL::CancelDecode()')
     harness = r'''
@@ -21,7 +22,10 @@ def main():
 #include <memory>
 #include <vector>
 #include "src/sound/SoundMemoryBudget.h"
+#include "src/sound/SoundMemoryClass.h"
 using uint64 = uint64_t;
+static SoundMemoryClass testClass = SoundMemoryClass::Desktop;
+static SoundMemoryClass SoundMemory_Class() { return testClass; }
 constexpr uint64 MiB = 1024 * 1024;
 static void Check(bool ok) { if (!ok) std::abort(); }
 template<class T> T Max(T a, T b) { return std::max(a, b); }
@@ -155,6 +159,7 @@ int main() {
     cpp = scratch / 'trim.cpp'
     cpp.write_text((ROOT / 'tools/tests/native/SoundMemoryTrimRuntimeTest.cpp').read_text().replace(
         '// @PRODUCTION@', body(system, 'void idSoundSystemLocal::TrimMemory(') + '\n' +
+        body(system, 'void S_TrimMemory(') + '\n' +
         body(system, 'void idSoundSystemLocal::EndLevelLoad(') + '\n' +
         body(source, 'static void SoundMemoryReclaim() {')))
     exe = scratch / 'trim.exe'

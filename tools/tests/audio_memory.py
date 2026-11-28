@@ -15,6 +15,7 @@ def main():
     roq = body(source, 'bool idSoundSample_OpenAL::LoadRoQ(')
     harness = r'''
 #include "src/sound/SoundMemoryBudget.h"
+#include "src/sound/SoundMemoryClass.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
@@ -33,6 +34,9 @@ constexpr uint64 MiB=1024*1024;
 template<class T> T Min(T a,T b){return std::min(a,b);}
 struct idMath { static constexpr int INT_MAX=2147483647; static int ClampInt(int a,int b,int c){return std::clamp(c,a,b);} };
 struct Cvar { int value=32; int GetInteger()const{return value;} } s_audioMemoryMB;
+struct NameCvar { const char* value="auto"; const char* GetString()const{return value;} } s_audioMemoryClass;
+static int systemRam=16384, ramQueries=0;
+static int Sys_GetSystemRam(){++ramQueries;return systemRam;}
 struct idLib { static void Warning(const char*,...){} };
 static int reclaims=0;
 @ADMISSION@
@@ -93,6 +97,15 @@ static void Chunk(int type,const std::vector<byte>& data,int argument=0){
     fixture.insert(fixture.end(),data.begin(),data.end());
 }
 int main(){
+    // A budget of 0 follows the device class; any other value is the player's.
+    s_audioMemoryMB.value=0;
+    assert(SoundMemory_Class()==SoundMemoryClass::Desktop&&SoundMemory_PayloadMB()==256&&ramQueries==1);
+    s_audioMemoryClass.value="constrained-mobile";assert(SoundMemory_PayloadMB()==192);
+    s_audioMemoryClass.value="mobile";assert(SoundMemory_PayloadMB()==256);
+    s_audioMemoryClass.value="handheld";assert(SoundMemory_Class()==SoundMemoryClass::Desktop&&ramQueries==1);
+    s_audioMemoryClass.value="constrained-mobile";s_audioMemoryMB.value=8;assert(SoundMemory_PayloadMB()==32);
+    s_audioMemoryMB.value=4096;assert(SoundMemory_PayloadMB()==2048);
+    s_audioMemoryClass.value="auto";s_audioMemoryMB.value=32;
     // Overflow, exact saturation, budget reduction and concurrent worker release.
     SoundMemoryBudget budget;
     assert(!budget.Acquire(UINT64_MAX,16*MiB));

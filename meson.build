@@ -522,7 +522,8 @@ if get_option('build_native_tests')
   android_lifecycle_source = custom_target(
     'openq4-android-lifecycle-source',
     output: 'AndroidLifecycle.cpp',
-    depend_files: files('src/sys/sdl3/sdl3_backend.cpp', 'src/framework/Session.cpp', 'src/framework/KeyInput.cpp'),
+    depend_files: files('src/sys/sdl3/sdl3_backend.cpp', 'src/framework/Session.cpp', 'src/framework/KeyInput.cpp',
+      'src/sound/SoundMemoryTrim.h'),
     command: [py, files('tools/tests/android_lifecycle.py'), '--generate-native', '@OUTPUT@'],
   )
   android_async_source = custom_target(
@@ -571,7 +572,7 @@ if get_option('build_native_tests')
 
     android_lifecycle_test = executable(
       'openq4-android-lifecycle-' + platform, android_lifecycle_source,
-      cpp_args: platform == 'android' ? ['-D__ANDROID__=1'] : [], install: false,
+      cpp_args: platform == 'android' ? ['-D__ANDROID__=1'] : [], include_directories: root_include_dir, install: false,
     )
     test('openq4-android-lifecycle-' + platform, android_lifecycle_test, timeout: 30)
 

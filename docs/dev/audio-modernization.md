@@ -290,7 +290,8 @@ and tests.
   `jobs_enable 0`, the main thread decodes as before. A failed decode takes the normal
   synchronous probe, so fallbacks to other variants and the default are unchanged.
   The October 21 follow-up also reserves compressed input, fixed decoder arenas and pending PCM against
-  `s_decodeMemoryMB` (64 MiB by default). Admission joins older work before growing
+  `s_decodeMemoryMB` (64 MiB by default on desktops and 48 MiB on phones since November 28; see
+  [Android memory notices and device classes](#android-memory-notices-and-device-classes-november-28)). Admission joins older work before growing
   a reservation. Reservations survive worker completion until join/cancellation;
   oversized individual samples warn and follow normal loader fallback. This is a
   transient Vorbis allocation bound, not a limit on resident OpenAL data. Long
@@ -320,7 +321,7 @@ and tests.
 Ogg tracks above 512 KiB of decoded PCM now use the engine filesystem directly,
 including PK4 members and localized voice fallback. Each playing voice owns a
 2 MiB decoder arena, 64 KiB input cache and three 4,096-frame PCM buffers. The
-`s_streamMemoryMB` admission limit defaults to 32 MiB and includes conservative
+`s_streamMemoryMB` admission limit defaults to 32 MiB (24 MiB on phones with 4 GiB or less) and includes conservative
 VFS and scratch reservations. Stop, cancellation and sample purge release them.
 `s_streamThresholdKB` controls selection on load; zero restores full decoding.
 
@@ -844,6 +845,35 @@ it runs the stock page's `sound drivar`, as the device rows do, so the sound
 system restarts and every sample is uploaded the chosen way. The retained row
 is the session verb `audioRetailUpsampling`.
 
+### Android memory notices and device classes (November 28)
+
+**Notices.** Android's `onTrimMemory(level)` reaches the engine as SDL's
+`SDL_EVENT_LOW_MEMORY`, which carries no level. `OpenQ4Activity.onTrimMemory`
+first hands the level to the engine (`nativeTrimMemoryLevel`, an atomic store
+safe on the UI thread), then lets SDL queue the event; levels reported before the
+engine answers fold to the most severe (`SoundTrimFoldLevel`). SDL's Android pump
+sends the event on the engine thread and, in the background, stays blocked there
+until the app returns, so the lifecycle watcher answers a notice it sees on the
+engine thread at once instead of flagging it for a pump that will not run. The
+queued copy does not trim again. The level decides what goes
+(`SoundTrimIdleSecondsForLevel` in `SoundMemoryTrim.h`): `UI_HIDDEN` and
+`RUNNING_MODERATE` free earlier levels' samples and CPU copies only;
+`RUNNING_LOW` and `BACKGROUND` also this level's samples idle for
+`s_trimIdleSeconds`; `RUNNING_CRITICAL`, `MODERATE` and `COMPLETE` every sample no
+channel uses. A notice with no level (iOS, `testLowMemoryNotice` without one)
+keeps the earlier behavior. `AUDIO_TRIM` lines report the level and whether a load
+was in progress.
+
+**Device classes.** `SoundMemoryClass.h` declares payload, decode and stream
+budgets and a provider allowance for desktops, phones above 4 GiB and phones with
+4 GiB or less (256/64/32 MiB with 64 MiB of provider allowance; 256/48/32 with 48;
+192/48/24 with 48). `s_audioMemoryMB`, `s_decodeMemoryMB` and `s_streamMemoryMB`
+default to `0`, the class's figure; `s_audioMemoryClass` overrides the detected
+class. The payload budget bounds a phone with or without streaming, and 48 MiB of
+decode admits the largest track whole. `listSounds` prints the class
+(`AUDIO_MEMORY_CLASS`). Measurements and the emulator run:
+[Android memory notices and device budgets](audio-voice-evidence.md#android-memory-notices-and-device-budgets-28-november-2026).
+
 ## Deferred
 
 - **Listening in a headset.** `vr_hrtf` has its row (Headset 3D Audio, on the
@@ -900,6 +930,9 @@ is the session verb `audioRetailUpsampling`.
   `tools/tests/sound_screen_shake.py` (camera strength, range and aggregation),
   `tools/tests/macos_openal_provider_policy.py`, `tools/tests/ui_performance_presets.py` and the
   in-engine `performancePresetSelfTest`.
+- `tools/tests/audio_memory_class.py` (device classes, budgets, Android trim levels and the
+  activity's hand-over) and `tools/tests/android_emulator_smoke.py --mode memory` (real
+  activity-manager notices on the emulator, one sent mid-load in the background).
 - `tools/tests/sound_resampler.py` (the resampler `auto` picks on each OpenAL Soft release, and
   on the staged library the treble it keeps at 22.05 kHz, with the short sinc as a control).
 - The log reports `OpenAL voices: source radius on, direct stereo on (remixed), resampler 23rd

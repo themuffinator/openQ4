@@ -117,10 +117,11 @@ void S_SetDevicePaused( bool paused )
 }
 
 // Engine/platform lifecycle hook for an operating-system low-memory notice
-// (SDL_EVENT_LOW_MEMORY, delivered on Android and iOS).
-void S_TrimMemory( const char* reason )
+// (SDL_EVENT_LOW_MEMORY, delivered on Android and iOS). osLevel is Android's
+// onTrimMemory level, which decides how much goes (SoundTrimIdleSecondsForLevel).
+void S_TrimMemory( const char* reason, int osLevel )
 {
-	soundSystemLocal.TrimMemory( reason, s_trimIdleSeconds.GetInteger() );
+	soundSystemLocal.TrimMemory( reason, SoundTrimIdleSecondsForLevel( osLevel, s_trimIdleSeconds.GetInteger() ), osLevel );
 }
 
 static const int SOUND_RUMBLE_DURATION_MSEC = 120;
@@ -1490,7 +1491,7 @@ this level's samples no sound has started for that long. Nothing a channel
 references is touched, and a freed sample reloads when a sound starts it again.
 ========================
 */
-void idSoundSystemLocal::TrimMemory( const char* reason, int idleSeconds )
+void idSoundSystemLocal::TrimMemory( const char* reason, int idleSeconds, int osLevel )
 {
 	// Decide what to keep before joining work. Finishing every pending decode here
 	// used to upload more PCM under memory pressure, even for samples about to be
@@ -1567,8 +1568,8 @@ void idSoundSystemLocal::TrimMemory( const char* reason, int idleSeconds )
 	}
 	common->Printf( "Audio memory trim (%s): freed %d samples (%.1f MB) and %d CPU copies (%.1f MB); %d samples in use kept\n",
 		reason, freed, freedBytes / ( 1024.0 * 1024.0 ), copies, copyBytes / ( 1024.0 * 1024.0 ), kept );
-	common->Printf( "AUDIO_TRIM reason=%s idle=%d freed=%d freedKiB=%lld copies=%d copyKiB=%lld active=%d\n", reason, idleSeconds,
-		freed, static_cast<long long>( freedBytes / 1024 ), copies, static_cast<long long>( copyBytes / 1024 ), kept );
+	common->Printf( "AUDIO_TRIM reason=%s idle=%d freed=%d freedKiB=%lld copies=%d copyKiB=%lld active=%d level=%d loading=%d\n", reason, idleSeconds,
+		freed, static_cast<long long>( freedBytes / 1024 ), copies, static_cast<long long>( copyBytes / 1024 ), kept, osLevel, insideLevelLoad ? 1 : 0 );
 }
 
 /*

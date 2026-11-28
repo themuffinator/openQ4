@@ -930,6 +930,7 @@ def run_python_tests(args: argparse.Namespace, root: Path, env: dict[str, str]) 
         (root / "tools" / "tests" / 'sound_vr_hrtf.py', []),
         (root / "tools" / "tests" / 'audio_decode_budget.py', []),
         (root / "tools" / "tests" / 'audio_memory.py', []),
+        (root / "tools" / "tests" / 'audio_memory_class.py', []),
         (root / "tools" / "tests" / 'audio_stream_budget.py', []),
         (root / "tools" / "tests" / 'audio_subtitles.py', []),
         (root / "tools" / "tests" / 'physics_enhanced_solver.py', []),

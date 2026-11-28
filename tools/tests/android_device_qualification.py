@@ -212,10 +212,17 @@ def audio_residency(log: str) -> list[dict]:
                              ('cpu_kib', r'(\d+) kB held in CPU memory'), ('openal_kib', r'\((\d+) kB released to OpenAL\)'),
                              ('streamed_kib', r'(\d+) kB decoded track size streamed'),
                              ('process_private_kib', r'Process memory: private=(\d+) KiB'),
-                             ('process_resident_kib', r'resident=(\d+) KiB')):
-            m = re.search(pattern, block[:2000])
+                             ('process_resident_kib', r'resident=(\d+) KiB'),
+                             ('payload_budget_mib', r'AUDIO_MEMORY_CLASS [^\n]*? payloadMB=(\d+)'),
+                             ('provider_allowance_mib', r'AUDIO_MEMORY_CLASS [^\n]*? providerMB=(\d+)'),
+                             ('refused', r'Audio admission: [^\n]*? refused=(\d+)')):
+            m = re.search(pattern, block[:4000])
             if m:
                 entry[key] = int(m.group(1))
+        memory_class = re.search(r'AUDIO_MEMORY_CLASS class=(\S+)', block[:4000])
+        if memory_class:
+            # The device class whose budgets applied (SoundMemoryClass.h).
+            entry['memory_class'] = memory_class.group(1)
         if entry:
             out.append(entry)
     return out

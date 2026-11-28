@@ -119,6 +119,24 @@ public final class OpenQ4Activity extends SDLActivity {
         }
     }
 
+    /** Records the trim level for the engine; only stores an atomic, so it is safe on the UI thread. */
+    private static native void nativeTrimMemoryLevel(int level);
+
+    @Override
+    public void onTrimMemory(int level) {
+        // SDL turns every level into the same SDL_EVENT_LOW_MEMORY. Record which one
+        // it was first, so the engine can tell a trip to the background
+        // (TRIM_MEMORY_UI_HIDDEN) from a process about to be killed.
+        if (!mBrokenLibraries) {
+            try {
+                nativeTrimMemoryLevel(level);
+            } catch (UnsatisfiedLinkError missing) {
+                Log.w("openQ4", "Engine has no trim-level entry point", missing);
+            }
+        }
+        super.onTrimMemory(level);
+    }
+
     @Override
     protected void onDestroy() {
         try { super.onDestroy(); }

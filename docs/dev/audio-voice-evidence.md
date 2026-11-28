@@ -2006,6 +2006,161 @@ buffer". `audio_decode_budget.py`, `audio_memory.py`, `audio_payload_restore.py`
 `sound_settings.py`, `sound_retail_reverb_contract.py`,
 `stock_media_fallbacks.py` and `linux_arm64_source_portability.py` pass.
 
+## Android memory notices and device budgets, 28 November 2026
+
+### How a real notice reached the engine
+
+Android calls `onTrimMemory(level)` on the activity. SDL's `SDLActivity` turns
+every level into one `nativeLowMemory()`, which queues a lifecycle event; SDL's
+Android pump, on the engine thread, sends `SDL_EVENT_LOW_MEMORY` through the
+event watchers. openQ4's watcher only flagged it, and the engine trimmed at its
+next pump. Two things were missing:
+
+- **A notice in the background waited for the return.** While the app is in the
+  background, SDL's pump blocks the engine thread inside `SDL_PumpEvents` until it
+  comes back. The background, moderate and complete levels are the ones Android
+  sends to a backgrounded process it may end next, so the trim ran after the
+  system had already chosen. The watcher now answers a notice it receives on the
+  engine thread at once, as it already did for the background transition, and
+  flags only notices from other threads. The queued copy no longer trims again.
+- **Every level looked the same.** `TRIM_MEMORY_UI_HIDDEN` arrives at every trip
+  to the home screen; with the level lost, each one freed this level's idle
+  sounds, which reload on the main thread when played. `OpenQ4Activity` now hands
+  the level to the engine (`nativeTrimMemoryLevel`) before SDL queues the notice.
+  Levels reported before the engine answers fold to the most severe; equal
+  severities keep the newer.
+
+| Level | Severity | What the trim frees |
+| --- | --- | --- |
+| none (iOS, `testLowMemoryNotice`) | normal | earlier levels' samples, CPU copies, this level's samples idle for `s_trimIdleSeconds` |
+| `RUNNING_MODERATE` (5), `UI_HIDDEN` (20) | light | earlier levels' samples and CPU copies only |
+| `RUNNING_LOW` (10), `BACKGROUND` (40) | normal | as with no level |
+| `RUNNING_CRITICAL` (15), `MODERATE` (60), `COMPLETE` (80) | severe | every sample no channel uses (`s_trimIdleSeconds -1` still keeps this level's) |
+
+Nothing a channel uses is freed at any level, and a trim during a level load keeps
+every loaded sample, as before. Android's required memory bound does not depend on
+streaming: the payload budget below holds with `s_streamThresholdKB 0`, and the
+phone decode budget admits the largest track whole.
+
+### Device classes
+
+`SoundMemoryClass.h` declares the budgets. A budget cvar of `0`, the new default,
+follows the class; any other value is the player's. `s_audioMemoryClass` picks a
+class by hand.
+
+| Class | Payloads (`s_audioMemoryMB`) | Decode (`s_decodeMemoryMB`) | Streams (`s_streamMemoryMB`) | Provider allowance |
+| --- | ---: | ---: | ---: | ---: |
+| Desktop | 256 MiB | 64 MiB | 32 MiB | 64 MiB |
+| Phone above 4 GiB | 256 MiB | 48 MiB | 32 MiB | 48 MiB |
+| Phone with 4 GiB or less (or unknown) | 192 MiB | 48 MiB | 24 MiB | 48 MiB |
+
+The payload budget covers CPU and OpenAL sample data, envelopes, decoder arenas
+and the fixed voice queues; the openings above keep up to 242 MiB and peak at
+255.7 MiB across a level change, and a Galaxy S25 held 253 MiB at `mcc_landing`,
+so a phone with room keeps 256 MiB. 48 MiB of decode is above the largest stock or
+Awakening input and PCM pair; decoding at 16 MiB refused no track while long tracks
+stream. Every recorded log in this checkout peaks at 17,136 KiB of stream
+reservations (seven streams of 2,448 KiB), so 24 MiB holds nine. The provider
+allowance is what OpenAL's mixer, effects and device buffers and the sample
+metadata may add beyond the payloads. It is declared, not enforced:
+`audio_scene_audit.py --silent-baseline` now checks the measured remainder against
+it (`beyond_payloads_within_provider_allowance`); on Windows that remainder was at
+most about 60 MiB. `listSounds` prints the class, its source, the system memory
+and the budgets in force (`AUDIO_MEMORY_CLASS`), and the AND-02 device harness
+records them with each residency snapshot.
+
+A configuration saved by an earlier build holds 256, 64 and 32, which still
+apply; the emulator run below sets the three to `0`.
+
+### Emulator run
+
+`android_emulator_smoke.py --mode memory` on the AOSP API 35 x86_64 AVD (headless,
+`-no-audio`, SwiftShader; 3,919 MiB reported, so the constrained phone class;
+OpenAL Soft on OpenSL), APK `2e2eafbf…170c0062` built from `b60d36457` plus these
+changes, with other sessions' uncommitted edits held at HEAD. Every notice is
+Android's own, through the activity manager or the home screen; there is no input.
+The activity manager refuses a level below the one the process already holds
+("Unable to set a higher trim level than current level"), which failed the first
+ordering, so the run sends rising levels.
+
+| Step | Notice | Answered | What the trim did |
+| --- | --- | --- | --- |
+| Hangar 1, playing | `RUNNING_MODERATE` (5) | in play | light: freed nothing, 88 samples in use |
+| Hangar 1, playing | `RUNNING_CRITICAL` (15) | in play | freed 532 idle samples (46,077 KiB), kept 85 in use |
+| Air Defense 1 loading, app sent home | Android's own `UI_HIDDEN` (20) | in the background | light, `loading=1`: kept everything |
+| the same, 3 s later | `COMPLETE` (80) | in the background, before the return | severe, `loading=1`: kept every loaded sample |
+
+The critical trim took the managed reservation from 92,678 to 47,351 KiB, and the
+process's private memory fell from 1,221,908 to 1,173,232 KiB: on Android the freed
+sound memory goes back to the system. In an earlier run the same trim freed 531
+samples (45,937 KiB) and private memory fell by 47,148 KiB. Air Defense 1 finished
+loading after the return (42.2 s), and the Hangar 1 save, whose samples the level
+change had released, restored in 25.2 s.
+
+| Snapshot | Managed reservation (peak) | Refused | Streams reserved | Decode peak | Process private |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Hangar 1 opening | 92,678 KiB (95,325) | 0 | 2,592 KiB | 15,990 KiB | 1,221,908 KiB |
+| after the critical trim | 47,351 KiB | 0 | 2,592 KiB | | 1,173,232 KiB |
+| Air Defense 1 after the background trip | 120,770 KiB (149,088) | 0 | 5,184 KiB | 33,423 KiB | 1,365,148 KiB |
+| Hangar 1 save restored | 92,641 KiB (157,268) | 0 | 2,592 KiB | | 1,276,724 KiB |
+
+All 14 voices played at the opening and all 8 after the critical trim, the streamed
+battle loop among them. 13 of 14 voices played on Air Defense 1, with two streams.
+At `timescale 0.5` all eight audible voices played at pitch 0.500 against 1.000, the
+same sources, while the sound world's clock kept wall time (1.00 against 0.99), as
+slow time is meant to. The restored save's streams resumed 200 ms into their loop
+with eight voices playing. The streamed loops stayed in the playing state through
+every trim and the background trip; the run counts no underruns (that message needs
+`s_debugHardware 1`), so stream starvation at the emulator's few frames a second is
+covered by the 23 November queue fix and its tests, not measured here. Nothing was refused under the 192, 48 and 24 MiB
+budgets, decode waited for nothing, and the engine exited itself
+(`EXIT_SELF`, status 0). Reports: `.tmp/aud03/emu-memory-4/report.json` (pass, all
+17 checks) and the earlier `emu-memory-1` to `-3`, whose failures were the harness's
+(an adb read timing out under load, falling trim levels, a warm reload too short
+for a background trip) and whose background trims matched this run.
+
+This is an emulator under `am send-trim-memory` with a silent output device, not a
+phone under real memory pressure; it qualifies the notice path, the trim policy,
+the budgets on a 4 GiB-class system and audio continuity, not a device's provider
+memory, loading time or thermals.
+
+### Native tests
+
+- `audio_memory_class.py` compiles both headers: classing (desktop at any memory,
+  phones by memory, unknown counted as constrained), every class's budgets within
+  their cvars' ranges and holding nine streams and the largest track, overrides and
+  clamping, every trim level's severity, folding (including `RUNNING_CRITICAL`
+  outranking the numerically higher `UI_HIDDEN`), and that the activity hands the
+  level over before `super.onTrimMemory` through the symbol the backend exports.
+- `android_lifecycle.py` runs the production watcher on its Android and desktop
+  branches: a notice on another thread waits for the main thread and trims once at
+  the folded level; on Android a notice on the engine thread, as SDL's paused pump
+  sends it, trims at once and the queued copy does not trim again; on the desktop
+  it waits for the pump; a later notice with no level is answered at none.
+- `audio_decode_budget.py` runs `S_TrimMemory` over the production traversal: a
+  sample played 100 ms ago survives `UI_HIDDEN` (which still frees an earlier
+  level's) and `BACKGROUND`, and `COMPLETE` frees it.
+- `audio_memory.py` runs the production admission at a class budget (0 follows the
+  class: 256, 192, 256 by class name; an unknown name follows the device; 8 and
+  4096 clamp to 32 and 2048). `audio_stream_budget.py` and `audio_decode_budget.py`
+  compile the class helpers with their production slices. `audio_streaming.py`'s
+  queue test has the same stand-in, but it does not build at the base revision
+  either: its voice stand-ins predate Original Game Sound (`SampleRepeat`,
+  `SoundVoice_BufferData`), a separate defect.
+- `android_host_storage.py` compiles the real `OpenQ4Activity`: `onTrimMemory`
+  reaches SDL with libraries broken and with no engine entry point (this JVM has
+  none, which it reports). `android_build.py` checks the emulator memory mode's
+  assessment on a synthetic log, including that a refusal, a doubled notice or a
+  notice answered only on return fails it.
+
+### What remains
+
+Only physical-device qualification: a real phone's `onTrimMemory` under genuine
+memory pressure (not `am send-trim-memory`) on at least one 4 GiB-or-less phone and
+one larger one, the provider allowance measured there with the silent baseline,
+loading time at the phone decode budget, thermal behavior through a long session
+(AND-02's sustain phase), and device breadth beyond the Galaxy S25.
+
 ## Other verification and limitations
 
 ### PR #212 merge qualification, 4 November 2026

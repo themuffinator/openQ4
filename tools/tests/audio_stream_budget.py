@@ -4,6 +4,7 @@ with counted VFS/decoder ownership and a deferring job system."""
 from pathlib import Path
 import os
 import subprocess
+from sound_settings import body
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -13,7 +14,8 @@ def production_stream():
     header = (ROOT / 'src/sound/OpenAL/AL_SoundSample.h').read_text()
     declaration = header[header.index('struct idSoundOggStreamShape {'):header.index('class idSoundSample_OpenAL\n')]
     source = (ROOT / 'src/sound/OpenAL/AL_SoundSample.cpp').read_text()
-    implementation = source[source.index('static uint64 soundStreamBytes'):source.index('/*\n========================\nRoQAudioDelta')]
+    implementation = body(source, 'static int SoundMemory_StreamMB()')
+    implementation += source[source.index('static uint64 soundStreamBytes'):source.index('/*\n========================\nRoQAudioDelta')]
     return declaration, implementation
 
 
@@ -26,6 +28,7 @@ def main():
 #include <cstdio>
 #include <limits>
 #include "src/sound/SoundMemoryBudget.h"
+#include "src/sound/SoundMemoryClass.h"
 #include "src/sound/SoundQueue.h"
 #include "tools/tests/native/SoundStreamJobStubs.h"
 #undef INT_MAX
@@ -34,6 +37,8 @@ template<class T> T Max(T a,T b){return std::max(a,b);}
 template<class T> T Min(T a,T b){return std::min(a,b);}
 struct idMath { static const int INT_MAX=2147483647; static int ClampInt(int a,int b,int c){return std::clamp(c,a,b);} };
 idCVar s_streamMemoryMB("s_streamMemoryMB","8",0,"");
+static SoundMemoryClass testClass=SoundMemoryClass::Desktop;
+static SoundMemoryClass SoundMemory_Class(){return testClass;}
 idCVar s_debugHardware("s_debugHardware","0",0,"");
 static int warnings=0;
 struct idLib { static void Printf(const char*,...){} static void Warning(const char*,...){++warnings;} };

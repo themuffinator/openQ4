@@ -160,6 +160,8 @@ public class SDLActivity {
     public static android.view.ViewGroup mLayout;
     protected void onCreate(android.os.Bundle savedInstanceState) {}
     protected void onDestroy() {}
+    public final java.util.List<Integer> trimLevels = new java.util.ArrayList<>();
+    public void onTrimMemory(int level) { trimLevels.add(level); }
     public static Runnable nativeWork;
     protected void main() { if (nativeWork != null) nativeWork.run(); }
     public static final java.util.List<Integer> keys = new java.util.ArrayList<>();
@@ -253,6 +255,7 @@ public final class Log {
     public static final java.util.List<String> lines = new java.util.ArrayList<>();
     public static int i(String tag, String message) { lines.add("I " + message); return 0; }
     public static int e(String tag, String message, Throwable error) { lines.add("E " + message); return 0; }
+    public static int w(String tag, String message, Throwable error) { lines.add("W " + message); return 0; }
 }
 ''',
             "android/widget/Toast.java": r'''
@@ -373,6 +376,14 @@ public final class StorageTest {
         SDLActivity.mLayout = new android.view.ViewGroup();
         activity.onCreate(null);
         require(SDLActivity.mLayout.listener == null, "failed SDL startup installed cutout handling");
+        // A trim notice reaches SDL whether or not the engine library loaded; with no
+        // engine entry point (this JVM has none) the level is dropped, never the notice.
+        activity.onTrimMemory(20);
+        SDLActivity.mBrokenLibraries = false;
+        activity.onTrimMemory(80);
+        require(activity.trimLevels.equals(java.util.Arrays.asList(20, 80)), "onTrimMemory did not reach SDL");
+        require(android.util.Log.lines.contains("W Engine has no trim-level entry point"), "missing entry point was not reported");
+        SDLActivity.mBrokenLibraries = true;
         SDLActivity.mBrokenLibraries = false;
         SDLActivity.mLayout = null;
         activity.onCreate(null);

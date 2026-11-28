@@ -55,12 +55,17 @@ along with Doom 3 Source Code.  If not, see <http://www.gnu.org/licenses/>.
 #include "../../renderer/tr_local.h"
 #include "../../renderer/RenderModuleAPI.h"
 #include "../../renderer/RendererModule.h"
+#include "../../sound/SoundMemoryTrim.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 
 #include <cmath>
 #include <cstdint>
+
+#if defined(__ANDROID__)
+#include <jni.h>
+#endif
 
 #if defined(OPENQ4_SDL3_DARWIN_HOST)
 #include "../macos/macos_common.h"
@@ -485,8 +490,12 @@ static bool s_touchscreenFingerActive = false;
 static SDL_FingerID s_touchscreenFingerId = 0;
 static SDL_TouchID s_touchscreenDeviceId = 0;
 static bool s_sdlAppInBackground = false;
-// Frees the audio a low-memory notice may take; main thread only.
-void S_TrimMemory(const char *reason);
+// Frees the audio a low-memory notice may take; main thread only. osLevel is
+// Android's onTrimMemory level, SOUND_TRIM_LEVEL_UNKNOWN elsewhere.
+void S_TrimMemory(const char *reason, int osLevel);
+// The onTrimMemory level reported with the notice not yet answered, folded to the
+// most severe (SoundTrimFoldLevel); SDL's event itself carries no level.
+static SDL_AtomicInt s_sdlTrimMemoryLevel = { SOUND_TRIM_LEVEL_UNKNOWN };
 #if defined(__ANDROID__)
 // Main-thread state consumed outside SDL's pump, before gameplay/audio resume.
 static bool s_sdlAppSuspendedSinceQuery = false;
@@ -3570,6 +3579,31 @@ static bool SDL3_TakeLifecyclePendingFlag(int flag) {
 
 static void SDL3_HandleAppBackgroundTransition(int eventTime, const char *reason);
 
+static void SDL3_ReportTrimMemoryLevel(int level) {
+	for (;;) {
+		const int pending = SDL_GetAtomicInt(&s_sdlTrimMemoryLevel);
+		const int folded = SoundTrimFoldLevel(pending, level);
+		if (folded == pending || SDL_CompareAndSwapAtomicInt(&s_sdlTrimMemoryLevel, pending, folded)) {
+			return;
+		}
+	}
+}
+
+#if defined(__ANDROID__)
+// OpenQ4Activity.onTrimMemory records the level here, on Android's UI thread,
+// before SDL queues the notice it turns that level into.
+extern "C" JNIEXPORT void JNICALL Java_com_darkmatter_openq4_OpenQ4Activity_nativeTrimMemoryLevel(JNIEnv *, jclass, jint level) {
+	SDL3_ReportTrimMemoryLevel(static_cast<int>(level));
+}
+#endif
+
+// Answers one low-memory notice on the main thread, at the level reported with it.
+static void SDL3_AnswerLowMemoryNotice(const char *source) {
+	const int level = SDL_SetAtomicInt(&s_sdlTrimMemoryLevel, SOUND_TRIM_LEVEL_UNKNOWN);
+	common->Printf("SDL3: low-memory event received from %s (trim level %d).\n", source, level);
+	S_TrimMemory("os low-memory", level);
+}
+
 static bool SDLCALL SDL3_LifecycleEventWatch(void *userdata, SDL_Event *event) {
 	(void)userdata;
 
@@ -3598,6 +3632,16 @@ static bool SDLCALL SDL3_LifecycleEventWatch(void *userdata, SDL_Event *event) {
 			break;
 
 		case SDL_EVENT_LOW_MEMORY:
+#if defined(__ANDROID__)
+			// SDL's Android pump sends onTrimMemory's notice on the engine thread and,
+			// while the app is in the background, stays blocked there until it
+			// returns. A pending flag waited for that return, long after the system
+			// had chosen which process to kill; answer it now instead.
+			if (Posix_IsMainThread()) {
+				SDL3_AnswerLowMemoryNotice("android lifecycle");
+				break;
+			}
+#endif
 			SDL3_SetLifecyclePendingFlag(SDL3_LIFECYCLE_PENDING_LOW_MEMORY);
 			break;
 
@@ -3725,8 +3769,7 @@ static void SDL3_ProcessPendingLifecycleEvents(int eventTime) {
 	}
 
 	if ((pendingFlags & SDL3_LIFECYCLE_PENDING_LOW_MEMORY) != 0) {
-		common->Printf("SDL3: low-memory event received from lifecycle event watch.\n");
-		S_TrimMemory("os low-memory");
+		SDL3_AnswerLowMemoryNotice("lifecycle event watch");
 	}
 	if ((pendingFlags & SDL3_LIFECYCLE_PENDING_BACKGROUND) != 0) {
 		SDL3_HandleAppBackgroundTransition(eventTime, "event watch");
@@ -5385,7 +5428,11 @@ static void SDL3_WindowFocusTest_f(const idCmdArgs &args) {
 
 // Pushes the event an operating system sends under memory pressure (Android, iOS)
 // through SDL's queue and event watchers, so the response is testable anywhere.
+// An optional Android onTrimMemory level is recorded first, as the activity does.
 static void SDL3_TestLowMemoryNotice_f(const idCmdArgs &args) {
+	if (args.Argc() > 1) {
+		SDL3_ReportTrimMemoryLevel(atoi(args.Argv(1)));
+	}
 	SDL_Event event;
 	SDL_zero(event);
 	event.type = SDL_EVENT_LOW_MEMORY;
@@ -6823,8 +6870,7 @@ bool Sys_SDL_PumpEvents(void) {
 				// at the top of this pump has usually answered it already; trimming again
 				// here ran every notice twice. Answer it only if that pass has not.
 				if (SDL3_TakeLifecyclePendingFlag(SDL3_LIFECYCLE_PENDING_LOW_MEMORY) || !s_sdlLifecycleEventWatchRegistered) {
-					common->Printf("SDL3: low-memory event received from OS.\n");
-					S_TrimMemory("os low-memory");
+					SDL3_AnswerLowMemoryNotice("OS");
 				}
 				break;
 
@@ -8430,7 +8476,7 @@ static bool SDL3_WindowServices_PrepareWindowSystem(void) {
 		cmdSystem->AddCommand("sdl3MouseCaptureDiagnostics", SDL3_MouseCaptureDiagnostics_f, CMD_FL_SYSTEM, "toggles SDL3 mouse capture and prints backend state; optional repeat count is clamped to 1..8");
 		cmdSystem->AddCommand("windowMinimizeTest", SDL3_WindowMinimizeTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "development: minimize the game window, as leaving full screen does, so the frame cap of a window that shows nothing can be measured without input; requires cheats");
 		cmdSystem->AddCommand("windowFocusTest", SDL3_WindowFocusTest_f, CMD_FL_SYSTEM | CMD_FL_CHEAT, "development: request foreground focus once for an already visible windowed game window, or use report to identify it without changing focus; requires cheats and separate permission when automated");
-		cmdSystem->AddCommand("testLowMemoryNotice", SDL3_TestLowMemoryNotice_f, CMD_FL_SYSTEM, "pushes an operating-system low-memory event through SDL, as Android and iOS deliver one");
+		cmdSystem->AddCommand("testLowMemoryNotice", SDL3_TestLowMemoryNotice_f, CMD_FL_SYSTEM, "pushes an operating-system low-memory event through SDL, as Android and iOS deliver one; an optional Android onTrimMemory level goes with it");
 		s_sdlDiagnosticCommandsRegistered = true;
 	}
 

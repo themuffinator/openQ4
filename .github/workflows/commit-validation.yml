@@ -608,6 +608,7 @@ jobs:
             tools/tests/audio_dialogue.py \
             tools/tests/audio_dialogue_coverage.py \
             tools/tests/audio_memory.py \
+            tools/tests/audio_memory_class.py \
             tools/tests/audio_memory_runtime.py \
             tools/tests/audio_mod_reverb.py \
             tools/tests/audio_output_recovery_runtime.py \
@@ -1191,6 +1192,7 @@ jobs:
           python tools/tests/sound_vr_hrtf.py
           python tools/tests/audio_decode_budget.py
           python tools/tests/audio_memory.py
+          python tools/tests/audio_memory_class.py
           python tools/tests/audio_stream_budget.py
           python tools/tests/audio_subtitles.py
           python tools/tests/physics_enhanced_solver.py

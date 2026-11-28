@@ -31,6 +31,20 @@ and captures its grazing view with r_parallaxOcclusion 0 and 1. The GLES
 renderer has no native PBR owner, so heightMap materials must draw their
 classic stages either way: the two captures are identical, the report follows
 the cvar with no parallax draws, and nothing warns about the materials.
+
+--mode memory (AUD-03) plays Hangar 1 with sound on the AVD's silent OpenSL
+output and sends Android's own memory notices through the activity manager
+(`am send-trim-memory`), never input. Android accepts only rising levels for a
+process, so in play it sends RUNNING_MODERATE (a light trim) and then
+RUNNING_CRITICAL (every idle sample) and checks that playing voices and streams
+carry on and that half time scale halves their pitch. It then saves and changes
+to Air Defense 1; while that cold load runs it sends the app to the background,
+where SDL blocks the engine thread: Android's own UI_HIDDEN arrives, and the
+harness adds TRIM_MEMORY_COMPLETE. The engine must answer both while still in the
+background, keeping everything the load may use, and finish the load on return.
+Last it loads the Hangar 1 save, whose samples the level change released, and
+checks that its streams resume past their start. It records the audio memory class and budgets (listSounds) and
+the process memory at each step. This qualifies the emulator only, never a phone.
 """
 from __future__ import annotations
 
@@ -95,6 +109,63 @@ echo EMULATOR_PARALLAX_END
 echo EMULATOR_SMOKE_COMPLETE
 quit
 """
+MEMORY_SLOT = "AudioMemory"
+MEMORY_SECOND_MAP = "game/airdefense1"
+# Memory mode: each EMULATOR_TRIM_REQUEST_<level> asks the harness for that
+# notice; the engine waits after it, then reports what the trim left playing.
+MEMORY_GAMEPLAY = f"""god
+notarget
+waitMsec 3000
+echo EMULATOR_GAMEPLAY_READY
+echo EMULATOR_MEMORY_BASELINE
+listSounds
+listSoundVoices
+echo EMULATOR_TRIM_REQUEST_RUNNING_MODERATE
+waitMsec 25000
+echo EMULATOR_MEMORY_AFTER_MODERATE
+listSoundVoices
+echo EMULATOR_TRIM_REQUEST_RUNNING_CRITICAL
+waitMsec 25000
+echo EMULATOR_MEMORY_AFTER_CRITICAL
+listSounds
+listSoundVoices
+echo EMULATOR_CLOCK_FULL
+s_soundWorlds
+listPlayingSounds
+waitMsec 4000
+s_soundWorlds
+set timescale 0.5
+waitMsec 1500
+echo EMULATOR_CLOCK_HALF
+s_soundWorlds
+listPlayingSounds
+waitMsec 4000
+s_soundWorlds
+set timescale 1
+echo EMULATOR_CLOCK_END
+saveGame {MEMORY_SLOT}
+waitMsec 700
+set g_autoExecAfterMapLoad emulator_memory_second.cfg
+echo EMULATOR_MEMORY_LOAD_START
+map {MEMORY_SECOND_MAP}
+"""
+MEMORY_SECOND = f"""waitMsec 3000
+echo EMULATOR_MEMORY_SECOND_READY
+listSounds
+listSoundVoices
+set g_autoExecAfterMapLoad emulator_memory_restored.cfg
+loadGame {MEMORY_SLOT}
+"""
+MEMORY_RESTORED = """echo EMULATOR_SAVE_RESTORED
+waitMsec 4000
+echo EMULATOR_MEMORY_RESTORED
+listSoundVoices
+listSounds
+echo EMULATOR_SMOKE_COMPLETE
+quit
+"""
+TRIM_LEVELS = {"RUNNING_MODERATE": 5, "RUNNING_LOW": 10, "RUNNING_CRITICAL": 15, "HIDDEN": 20,
+               "BACKGROUND": 40, "MODERATE": 60, "COMPLETE": 80}
 LIFECYCLE_TAIL = """echo EMULATOR_BACKGROUND_REQUEST
 waitMsec 600000
 """
@@ -346,6 +417,20 @@ devmap game/airdefense1""")
             "set in_touchControls 1\n", "set in_touchControls 0\nset r_parallaxOcclusion 0\n").replace(
             "devmap game/hangar1", f"devmap {PARALLAX_MAP}")
         scripts["emulator_smoke.cfg"] = PARALLAX_GAMEPLAY
+    elif mode == "memory":
+        scripts.pop("emulator_restored.cfg")
+        # Sound on, at the device class's budgets: an archived figure from an
+        # earlier build would otherwise replace them.
+        scripts["autoexec.cfg"] = scripts["autoexec.cfg"].replace("set s_noSound 1\n", """set s_noSound 0
+set s_audioMemoryClass auto
+set s_audioMemoryMB 0
+set s_decodeMemoryMB 0
+set s_streamMemoryMB 0
+set s_trimIdleSeconds 30
+""")
+        scripts["emulator_smoke.cfg"] = MEMORY_GAMEPLAY
+        scripts["emulator_memory_second.cfg"] = MEMORY_SECOND
+        scripts["emulator_memory_restored.cfg"] = MEMORY_RESTORED
     elif mode != "sp":
         raise ValueError("Unknown emulator game mode")
     scripts["emulator_smoke.cfg"] = "com_activeGameModule\n" + scripts["emulator_smoke.cfg"]
@@ -446,18 +531,20 @@ class Probe:
         self.mode = args.mode
         self.scripts = scripts_for_mode(self.mode, getattr(args, "server", None))
         self.captures = {"sp": CAPTURES, "rotate": ROTATE_CAPTURES, "lifecycle": LIFECYCLE_CAPTURES,
-                         "resume": (), "vr": (), "parallax": PARALLAX_CAPTURES}.get(
+                         "resume": (), "vr": (), "parallax": PARALLAX_CAPTURES, "memory": ()}.get(
                              self.mode, (*CAPTURES[:2], "emulator-neutral.tga"))
         self.lab_files = parallax_lab_files(getattr(args, "lab", None)) if self.mode == "parallax" else {}
         self.xr_files = vr_runtime_files() if self.mode == "vr" else {}
         self.xr_markers = ("vr_marker_ingame.txt", "vr_marker_turn.txt") if self.mode == "vr" else ()
-        slot = SUSPEND_SLOT if self.mode == "lifecycle" else SLOT
+        slot = SUSPEND_SLOT if self.mode == "lifecycle" else MEMORY_SLOT if self.mode == "memory" else SLOT
         self.save_names = (tuple(f"savegames/{slot}.{ext}" for ext in ("save", "txt", "tga"))
-                           if self.mode in ("sp", "rotate", "lifecycle") else ())
+                           if self.mode in ("sp", "rotate", "lifecycle", "memory") else ())
+        self.trims = []
         self.pids = []
         self.lifecycle = {}
         self.report = {"status": "running", "serial": args.serial, "package": PACKAGE, "mode": self.mode,
-                       "capture_method": "engine screenshot", "audio": "disabled",
+                       "capture_method": "engine screenshot",
+                       "audio": "OpenSL on the AVD's silent output (-no-audio)" if args.mode == "memory" else "disabled",
                        "input": "engine diagnostic commands; no OS input",
                        "launch": "internal native Activity from rooted diagnostic AVD",
                        "started_utc": datetime.datetime.now(datetime.timezone.utc).isoformat()}
@@ -474,8 +561,20 @@ class Probe:
 
     def adb(self, *arguments: str, check: bool = True, timeout: int = 30,
             input_data: bytes | None = None) -> subprocess.CompletedProcess:
-        result = subprocess.run([str(self.args.adb), "-s", self.args.serial, *arguments],
-                                capture_output=True, input=input_data, timeout=timeout)
+        # Reads and process queries may run long while the AVD loads a level with
+        # sound on; retry those, never a command that changes the device.
+        attempts = 3 if input_data is None and arguments[:2] in (("shell", "run-as"), ("shell", "pidof")) \
+            and not any(word in arguments for word in ("rm", "mkdir", "chown")) else 1
+        for attempt in range(attempts):
+            try:
+                result = subprocess.run([str(self.args.adb), "-s", self.args.serial, *arguments],
+                                        capture_output=True, input=input_data, timeout=timeout)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt + 1 == attempts:
+                    raise
+                self.report.setdefault("adb_read_retries", 0)
+                self.report["adb_read_retries"] += 1
         if check and result.returncode:
             raise RuntimeError(f"adb {arguments!r}: {result.stdout.decode(errors='replace')}"
                                f"{result.stderr.decode(errors='replace')}")
@@ -635,6 +734,48 @@ class Probe:
         (self.out / "return.log").write_bytes(result.stdout + result.stderr)
         self.lifecycle["returned_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
         self.lifecycle["away_seconds"] = self.args.away
+
+    def send_trim(self, level: str, when: str) -> dict:
+        """Android's own memory notice for this process, through the activity manager."""
+        result = self.adb("shell", "am", "send-trim-memory", PACKAGE, level, check=False, timeout=30)
+        entry = {"level": level, "value": TRIM_LEVELS[level], "when": when,
+                 "utc": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                 "am_result": (result.stdout + result.stderr).decode(errors="replace").strip(), "am_exit": result.returncode}
+        self.trims.append(entry)
+        self.report["trims_sent"] = self.trims
+        return entry
+
+    def background_trim_during_load(self):
+        """Memory: background the app mid-load, send TRIM_MEMORY_COMPLETE, require the answer while away, return."""
+        loaded = f"msec to load {MEMORY_SECOND_MAP}".encode()
+        time.sleep(self.args.load_delay)
+        data = self.read("logs/openq4.log") or b""
+        if loaded in data:
+            raise ValueError("The second map finished loading before the background trip; lower --load-delay")
+        before = data.count(b"AUDIO_TRIM ")
+        at, _ = self.go_home()
+        self.lifecycle["backgrounded_utc"] = at
+        time.sleep(3)
+        entry = self.send_trim("COMPLETE", "background, map loading")
+        deadline = time.monotonic() + 40
+        answered = None
+        while time.monotonic() < deadline:
+            data = self.read("logs/openq4.log") or b""
+            lines = re.findall(rb"AUDIO_TRIM [^\n]*", data)[before:]
+            answered = next((l.decode() for l in lines if b" level=80 " in l), None)
+            if answered:
+                break
+            time.sleep(1)
+        entry["answered_in_background"] = answered
+        entry["background_trims"] = [l.decode() for l in re.findall(rb"AUDIO_TRIM [^\n]*", data)[before:]]
+        entry["loaded_while_away"] = loaded in data
+        (self.out / "background-during-load.log").write_bytes(data)
+        state = self.adb("shell", "dumpsys", "activity", "processes", PACKAGE, check=False).stdout.decode(errors="replace")
+        (self.out / "background-process-state.txt").write_text(state, encoding="utf-8")
+        result = self.adb("shell", "am", "start", "-W", "-n", PACKAGE + "/com.darkmatter.openq4.OpenQ4Activity", timeout=60)
+        (self.out / "return.log").write_bytes(result.stdout + result.stderr)
+        self.lifecycle["returned_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        self.report["trims_sent"] = self.trims
 
     def set_rotation(self, rotation: int):
         self.adb("shell", "settings", "put", "system", "user_rotation", str(rotation))
@@ -856,13 +997,19 @@ class Probe:
                 raise ValueError("Engine reported a fatal error; inspect openq4.log")
             markers = re.findall(rb"EMULATOR_(?:GAMEPLAY_READY|ROTATE_PORTRAIT|ROTATE_LANDSCAPE|TOUCH_RELEASED"
                                  rb"|SAVE_RESTORED|SUSPEND_RESTORED|BACKGROUND_REQUEST|RECONNECTED|VR_READY|VR_STATUS"
-                                 rb"|SMOKE_COMPLETE)", data)
+                                 rb"|MEMORY_LOAD_START|TRIM_REQUEST_[A-Z_]+|SMOKE_COMPLETE)", data)
             if markers and markers[-1].decode() != last_marker:
                 last_marker = markers[-1].decode()
                 print(last_marker, flush=True)
                 # The engine waits after each request; turn the AVD at once.
                 if self.mode == "rotate" and last_marker in requests:
                     self.set_rotation(requests.pop(last_marker))
+                if self.mode == "memory" and last_marker == "EMULATOR_MEMORY_LOAD_START" and "backgrounded_utc" not in self.lifecycle:
+                    self.background_trim_during_load()
+                if self.mode == "memory" and last_marker.startswith("EMULATOR_TRIM_REQUEST_"):
+                    level = last_marker[len("EMULATOR_TRIM_REQUEST_"):]
+                    if not any(t["level"] == level and t["when"] == "foreground, playing" for t in self.trims):
+                        self.send_trim(level, "foreground, playing")
                 if (last_marker == "EMULATOR_BACKGROUND_REQUEST" and self.mode == "resume"
                         and "backgrounded_utc" not in self.lifecycle and b"#str_04320" in data):
                     # A slow join (a loaded host) can outlast the server's time-out
@@ -1018,6 +1165,8 @@ class Probe:
             return self.assess_vr()
         if self.mode == "parallax":
             return self.assess_parallax()
+        if self.mode == "memory":
+            return self.assess_memory()
         log = (self.out / "openq4.log").read_text(errors="replace")
         for marker in ("EMULATOR_GAMEPLAY_READY", "EMULATOR_TOUCH_RELEASED", "EMULATOR_SMOKE_COMPLETE",
                        *(("EMULATOR_SAVE_RESTORED",) if self.mode != "mp" else ()),
@@ -1076,6 +1225,114 @@ class Probe:
                            + (" and same-build save/load" if self.mode != "mp" else "; local listen server, no remote peers")
                            + ("; AVD rotation setting, landscape-portrait-landscape mid-match" if self.mode == "rotate" else "")
                            + "; visual review separate")
+
+    def assess_memory(self):
+        """AUD-03 on the AVD: real notices, a background trim mid-load, and audio state through them."""
+        log = (self.out / "openq4.log").read_text(errors="replace")
+        for marker in ("EMULATOR_GAMEPLAY_READY", "EMULATOR_MEMORY_AFTER_CRITICAL", "EMULATOR_CLOCK_END",
+                       "EMULATOR_MEMORY_LOAD_START", "EMULATOR_MEMORY_SECOND_READY", "EMULATOR_SAVE_RESTORED",
+                       "EMULATOR_MEMORY_RESTORED", "EMULATOR_SMOKE_COMPLETE"):
+            if marker not in log:
+                raise ValueError(f"Missing engine completion marker: {marker}")
+        if re.search(r"(?:^|\n)(?:ERROR:|FATAL|Fatal)", log):
+            raise ValueError("Engine reports a fatal error")
+
+        def section(start: str, end: str) -> str:
+            return log.split(start, 1)[1].split(end, 1)[0]
+
+        def voices(text: str) -> list[dict]:
+            return [{"state": m[0], "streamed": m[1] == "1", "offset_ms": float(m[2]), "sample": m[3]} for m in re.findall(
+                r"SOUND_VOICE source=\d+ state=(\w+) routed=\d queued=(\d) serial=\d+ offsetMs=([\d.-]+) sample=(\S+)", text)]
+
+        def memory(text: str) -> dict:
+            out = {}
+            c = re.search(r"AUDIO_MEMORY_CLASS class=(\S+) source=(\S+) ramMB=(-?\d+) payloadMB=(\d+) decodeMB=(\d+) "
+                          r"streamMB=(\d+) providerMB=(\d+) classPayloadMB=(\d+) classDecodeMB=(\d+) classStreamMB=(\d+)", text)
+            if c:
+                out.update(memory_class=c[1], source=c[2], system_ram_mib=int(c[3]), payload_mib=int(c[4]), decode_mib=int(c[5]),
+                           stream_mib=int(c[6]), provider_allowance_mib=int(c[7]),
+                           class_budgets_mib=[int(c[8]), int(c[9]), int(c[10])])
+            a = re.search(r"Audio admission: reserved=(\d+) KiB peak=(\d+) KiB budget=(\d+) MiB refused=(\d+)", text)
+            if a:
+                out.update(reserved_kib=int(a[1]), payload_peak_kib=int(a[2]), budget_mib=int(a[3]), refused=int(a[4]))
+            v = re.search(r"Vorbis streaming: reserved=(\d+) KiB peak=(\d+) KiB budget=(\d+) MiB rejected=(\d+)", text)
+            if v:
+                out.update(stream_reserved_kib=int(v[1]), stream_peak_kib=int(v[2]), stream_rejected=int(v[4]))
+            d = re.search(r"Vorbis admission: pending=(\d+) KiB peak=(\d+) KiB budget=(\d+) MiB waits=(\d+)", text)
+            if d:
+                out.update(decode_peak_kib=int(d[2]), decode_waits=int(d[4]))
+            pm = re.search(r"Process memory: private=(\d+) KiB resident=(\d+) KiB", text)
+            if pm:
+                out.update(process_private_kib=int(pm[1]), process_resident_kib=int(pm[2]))
+            return out
+
+        def pitches(text: str) -> dict[str, float]:
+            return {m[0]: float(m[1]) for m in re.findall(r"(?m)^\s*\d+\s+(\d+)\s+[\d.]+\s+([\d.]+)\s+\S", text)}
+
+        def clock(text: str) -> float | None:
+            worlds = re.findall(r"SOUND_WORLD id=\d+ paused=(\d) time=(\d+) active=1 channels=\d+ stamp=-?\d+ now=(\d+)", text)
+            if len(worlds) < 2:
+                return None
+            (_, t0, n0), (_, t1, n1) = worlds[0], worlds[-1]
+            return (int(t1) - int(t0)) / max(1, int(n1) - int(n0))
+
+        trims = [dict(zip(("reason", "idle", "freed", "freed_kib", "copies", "copy_kib", "active", "level", "loading"), m))
+                 for m in re.findall(r"AUDIO_TRIM reason=(.+?) idle=(-?\d+) freed=(\d+) freedKiB=(\d+) copies=(\d+) "
+                                     r"copyKiB=(\d+) active=(\d+) level=(-?\d+) loading=(\d)", log)]
+        trims = [{k: (v if k == "reason" else int(v)) for k, v in t.items()} for t in trims]
+        baseline = section("EMULATOR_MEMORY_BASELINE", "EMULATOR_TRIM_REQUEST_RUNNING_MODERATE")
+        after = section("EMULATOR_MEMORY_AFTER_CRITICAL", "EMULATOR_CLOCK_FULL")
+        restored = section("EMULATOR_MEMORY_RESTORED", "EMULATOR_SMOKE_COMPLETE")
+        full_text, half_text = section("EMULATOR_CLOCK_FULL", "EMULATOR_CLOCK_HALF"), section("EMULATOR_CLOCK_HALF", "EMULATOR_CLOCK_END")
+        full, half = clock(full_text), clock(half_text)
+        # Slow time lowers every game voice's pitch with it (audio_dialogue's
+        # slow_motion_pitch); the sound world's clock keeps wall time.
+        pitch_full, pitch_half = pitches(full_text), pitches(half_text)
+        pitch_ratio = sorted(pitch_half[s] / pitch_full[s] for s in pitch_full if s in pitch_half and pitch_full[s] > 0)
+        background = next((t for t in self.trims if t["when"].startswith("background")), {})
+        second = section("EMULATOR_MEMORY_SECOND_READY", "EMULATOR_SAVE_RESTORED")
+        states = {"baseline": voices(baseline), "after_critical": voices(after), "second_map": voices(second),
+                  "restored": voices(restored)}
+        budgets = {"baseline": memory(baseline), "after_critical": memory(after), "second_map": memory(second),
+                   "restored": memory(restored)}
+        expected_class = "constrained-mobile" if budgets["baseline"].get("system_ram_mib", 0) <= 4096 else "mobile"
+        checks = {
+            "class_follows_device": budgets["baseline"].get("memory_class") == expected_class
+                and budgets["baseline"].get("source") == "detected",
+            "class_budgets_in_force": [budgets["baseline"].get(k) for k in ("payload_mib", "decode_mib", "stream_mib")]
+                == budgets["baseline"].get("class_budgets_mib"),
+            "background_notice_answered_while_away": bool(background.get("answered_in_background")),
+            "background_trim_kept_the_loading_level": "loading=1" in (background.get("answered_in_background") or "")
+                and not background.get("loaded_while_away", True),
+            "load_finished_after_return": f"msec to load {MEMORY_SECOND_MAP}" in log.split("EMULATOR_MEMORY_LOAD_START", 1)[1],
+            "moderate_trim_was_light": any(t["level"] == 5 and t["idle"] == -1 for t in trims),
+            "critical_trim_freed_idle_samples": any(t["level"] == 15 and t["idle"] == 0 and t["active"] > 0 for t in trims),
+            "trim_once_per_notice": sum(t["level"] == 15 for t in trims) == 1 and sum(t["level"] == 5 for t in trims) == 1,
+            # Each foreground notice was answered inside the wait the engine gave it.
+            "trims_answered_before_checks": " level=5 " in section("EMULATOR_TRIM_REQUEST_RUNNING_MODERATE", "EMULATOR_MEMORY_AFTER_MODERATE")
+                and " level=15 " in section("EMULATOR_TRIM_REQUEST_RUNNING_CRITICAL", "EMULATOR_MEMORY_AFTER_CRITICAL"),
+            "voices_play_through_trims": any(v["state"] == "playing" for v in states["after_critical"]),
+            "streams_play_through_trims": any(v["streamed"] and v["state"] == "playing" for v in states["after_critical"])
+                or not any(v["streamed"] for v in states["baseline"]),
+            "no_payload_refusals": all(b.get("refused", 1) == 0 for b in budgets.values()),
+            "no_stream_refusals": all(b.get("stream_rejected", 1) == 0 for b in budgets.values()),
+            "half_time_scale_halves_pitch": bool(pitch_ratio) and abs(pitch_ratio[len(pitch_ratio) // 2] - 0.5) <= 0.05,
+            "save_restores_playing_voices": any(v["state"] == "playing" for v in states["restored"]),
+            "restored_streams_resume_past_start": all(v["offset_ms"] > 0 for v in states["restored"] if v["streamed"] and v["state"] == "playing"),
+        }
+        if int(self.report["ro.build.version.sdk"]) >= 30:
+            exit_info = (self.out / "exit-info.txt").read_text(errors="replace")
+            checks["native_self_exit"] = bool(re.search(r"pid=" + re.escape(self.pid) + r"\b[^\n]*\n[^\n]*reason=1 \(EXIT_SELF\)[^\n]*status=0\b", exit_info))
+        self.report.update(memory_checks=checks, audio_trims=trims, voices=states, audio_memory=budgets,
+                           clock_rate={"full": full, "half": half}, pitch_ratio_half_to_full=pitch_ratio,
+                           system_hidden_notice=[t for t in trims if t["level"] == 20],
+                           notice_sources=re.findall(r"SDL3: low-memory event received from ([^\n]*)", log))
+        failed = [name for name, ok in checks.items() if not ok]
+        if failed:
+            raise ValueError("Memory checks failed: " + ", ".join(failed))
+        self.report.update(status="pass", engine_pid=self.pid,
+                           scope="Native SP with sound on the AVD's silent OpenSL output; activity-manager memory notices "
+                                 "(background during a map load, foreground in play); emulator only, not a phone")
 
     def assess_parallax(self):
         """GLES declines parallax cleanly: same image off and on, no parallax draws."""
@@ -1244,6 +1501,8 @@ class Probe:
             self.collect()
         else:
             self.report["forced_stop"] = False
+            if self.mode == "memory":
+                self.collect()
         self.collect_xr_runtime()
         retired = {}
         for name, expected in self.created.items():
@@ -1280,7 +1539,9 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--version", required=True)
-    parser.add_argument("--mode", choices=("sp", "mp", "rotate", "lifecycle", "resume", "vr", "parallax"), default="sp")
+    parser.add_argument("--mode", choices=("sp", "mp", "rotate", "lifecycle", "resume", "vr", "parallax", "memory"), default="sp")
+    parser.add_argument("--load-delay", type=int, default=3,
+                        help="memory mode: seconds after the second map's load starts (as the harness sees it) before the background trip")
     parser.add_argument("--lab", type=Path,
                         help="parallax mode: a parallax laboratory runtime prepared by renderer_parallax_occlusion.py")
     parser.add_argument("--xr-runtime", type=Path,
@@ -1322,7 +1583,8 @@ def main():
     scope = {"sp": "SP gameplay/save", "mp": "MP gameplay", "rotate": "SP rotation/portrait deck/save",
              "lifecycle": "SP touch layout/suspension save/process death/restore", "resume": "MP background/resume",
              "vr": "OpenXR stereo on the test runtime",
-             "parallax": "parallax laboratory (GLES declines cleanly)"}[args.mode]
+             "parallax": "parallax laboratory (GLES declines cleanly)",
+             "memory": "audio memory notices, mid-load background trim and playback through trims"}[args.mode]
     print(f"PASS: silent emulator {scope} probe; inspect the retained engine captures.", flush=True)
 
 

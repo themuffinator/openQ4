@@ -282,7 +282,16 @@ relaunches it and loads that save, which must restore the player where the app
 was left. `--mode resume --server <IPv4>:<port> --away <seconds>` joins a
 dedicated server the emulator can reach, stays in the background for the given
 time and returns the same process: a stay shorter than the 40-second time-out
-must keep its connection, a longer one must reconnect at once. Captures come from the engine's
+must keep its connection, a longer one must reconnect at once. `--mode memory`
+(AUD-03) plays with sound on and sends Android's own memory notices with `am
+send-trim-memory`: `RUNNING_MODERATE` and `RUNNING_CRITICAL` in play, then
+`COMPLETE` while the save made after them loads in the background
+(`--load-delay` seconds into the load), which the engine must answer before it
+returns. It checks the audio memory class and budgets, that voices and streams
+keep playing through the trims, that half time scale halves their pitch and that
+the save restores with its streams playing. The activity manager refuses a level
+below the one the process already holds ("Unable to set a higher trim level than
+current level"), so the levels are sent in rising order. Captures come from the engine's
 `screenshot` command. The probe starts the internal game Activity from the
 rooted AVD, so it does not qualify setup navigation or physical input. It refuses
 physical-device serials and an already running diagnostic app, preserves existing

@@ -36,6 +36,7 @@ If you have questions concerning this license or the applicable additional terms
 #include <stdint.h>
 #include "../SoundVorbisStream.h"
 #include "../SoundMemoryBudget.h"
+#include "../SoundMemoryClass.h"
 #include "../SoundQueue.h"
 #include "../SoundSampleRepeat.h"
 static_assert( SoundVorbisStream::ChunkFrames == SOUND_QUEUE_DECODE_FRAMES,
@@ -70,9 +71,33 @@ static std::atomic<bool> openQ4_openALBufferAllocationWarningIssued( false );
 
 extern idCVar sys_lang;
 
-idCVar s_audioMemoryMB( "s_audioMemoryMB", "256", CVAR_SOUND | CVAR_ARCHIVE | CVAR_INTEGER,
-	"MiB cap for managed audio payloads, decoders and conservative queue/scratch reservations; excludes provider internals and metadata", 32, 2048 );
+idCVar s_audioMemoryMB( "s_audioMemoryMB", "0", CVAR_SOUND | CVAR_ARCHIVE | CVAR_INTEGER,
+	"MiB cap for managed audio payloads, decoders and conservative queue/scratch reservations; excludes provider internals and metadata; 0 follows s_audioMemoryClass", 0, 2048 );
+idCVar s_audioMemoryClass( "s_audioMemoryClass", "auto", CVAR_SOUND,
+	"device class whose audio memory budgets apply where a budget cvar is 0: auto, desktop, mobile or constrained-mobile (listSounds reports them)" );
 static SoundMemoryBudget soundMemory;
+// Admission also runs on decode workers, so the first reader may be one of them.
+static std::atomic<int> soundMemorySystemRamMB( -1 );
+static int SoundMemory_SystemRamMB() {
+	int ram = soundMemorySystemRamMB.load( std::memory_order_relaxed );
+	if( ram < 0 ) {
+		ram = Sys_GetSystemRam();
+		soundMemorySystemRamMB.store( ram, std::memory_order_relaxed );
+	}
+	return ram;
+}
+static SoundMemoryClass SoundMemory_Class() {
+	SoundMemoryClass memoryClass = SoundMemoryClass::Desktop;
+	if( SoundMemoryClassFromName( s_audioMemoryClass.GetString(), memoryClass ) ) return memoryClass;
+#if defined(__ANDROID__)
+	return SoundMemoryClassify( true, SoundMemory_SystemRamMB() );
+#else
+	return SoundMemoryClassify( false, SoundMemory_SystemRamMB() );
+#endif
+}
+static int SoundMemory_PayloadMB() {
+	return SoundMemoryBudgetMB( s_audioMemoryMB.GetInteger(), SoundMemoryClassBudgets( SoundMemory_Class() ).payloadMB, 32, 2048 );
+}
 // All 96 hardware voices can retain three queue buffers of one 4096-frame 5.1
 // block each (SOUND_QUEUE_BUFFER_BYTES; mono and stereo fit more frames), and the
 // deep centre-routed slots their larger buffers plus routing scratch (asserted
@@ -84,7 +109,7 @@ static uint64 soundMemoryRejected = 0;
 static bool soundMemoryReclaiming = false;
 static void SoundMemoryReclaim();
 static bool SoundMemoryAcquire( uint64 bytes ) {
-	const uint64 limit = static_cast<uint64>( idMath::ClampInt( 32, 2048, s_audioMemoryMB.GetInteger() ) ) * 1024 * 1024 - SOUND_MEMORY_FIXED_BYTES;
+	const uint64 limit = static_cast<uint64>( SoundMemory_PayloadMB() ) * 1024 * 1024 - SOUND_MEMORY_FIXED_BYTES;
 	if( soundMemory.Acquire( bytes, limit ) ) return true;
 	if( !soundMemoryReclaiming ) {
 		soundMemoryReclaiming = true;
@@ -92,7 +117,7 @@ static bool SoundMemoryAcquire( uint64 bytes ) {
 		soundMemoryReclaiming = false;
 		if( soundMemory.Acquire( bytes, limit ) ) return true;
 	}
-	if( soundMemoryRejected++ == 0 ) idLib::Warning( "Audio payload budget exhausted (s_audioMemoryMB=%d); retaining active audio and refusing new allocations. Further refusals are counted by listSounds.", s_audioMemoryMB.GetInteger() );
+	if( soundMemoryRejected++ == 0 ) idLib::Warning( "Audio payload budget exhausted (%d MiB); retaining active audio and refusing new allocations. Further refusals are counted by listSounds.", SoundMemory_PayloadMB() );
 	return false;
 }
 static void SoundMemoryRelease( uint64 bytes ) { soundMemory.Release( bytes ); }
@@ -119,8 +144,11 @@ static_assert( MAX_HARDWARE_VOICES * 2ULL * MAX_QUEUED_BUFFERS * SOUND_QUEUE_BUF
 	SOUND_QUEUE_DEEP_ROUTED_VOICES * static_cast<uint64>( MAX_QUEUED_BUFFERS ) * ( SOUND_QUEUE_DEEP_ROUTED_BUFFER_BYTES - SOUND_QUEUE_BUFFER_BYTES ) +
 	SOUND_QUEUE_MAX_FRAMES * 7ULL * sizeof( short ) + 2 * 1024 * 1024 <= SOUND_MEMORY_FIXED_BYTES,
 	"the fixed audio reservation must cover every voice queue, the deep routed slots and their scratch" );
-idCVar s_streamMemoryMB( "s_streamMemoryMB", "32", CVAR_SOUND | CVAR_ARCHIVE | CVAR_INTEGER,
-	"MiB reserved for active Vorbis decoders, input caches, three PCM queue buffers and three decoded blocks per voice", 8, 256 );
+idCVar s_streamMemoryMB( "s_streamMemoryMB", "0", CVAR_SOUND | CVAR_ARCHIVE | CVAR_INTEGER,
+	"MiB reserved for active Vorbis decoders, input caches, three PCM queue buffers and three decoded blocks per voice; 0 follows s_audioMemoryClass", 0, 256 );
+static int SoundMemory_StreamMB() {
+	return SoundMemoryBudgetMB( s_streamMemoryMB.GetInteger(), SoundMemoryClassBudgets( SoundMemory_Class() ).streamMB, 8, 256 );
+}
 static uint64 soundStreamBytes = 0, soundStreamPeakBytes = 0;
 static unsigned int soundStreamRejected = 0;
 // Includes the decode/routing scratch, the three OpenAL queue buffers (each at
@@ -178,7 +206,7 @@ bool idSoundOggStream::Open( const char* filename, const idSoundOggStreamShape& 
 	shape = expected;
 	state = BLOCK_FAILED;
 	if( shape.channels < 1 || shape.channels > 2 || shape.rate <= 0 || shape.frames == 0 ) return false;
-	const uint64 budget = static_cast<uint64>( idMath::ClampInt( 8, 256, s_streamMemoryMB.GetInteger() ) ) * 1024 * 1024;
+	const uint64 budget = static_cast<uint64>( SoundMemory_StreamMB() ) * 1024 * 1024;
 	if( soundStreamBytes > budget || SOUND_STREAM_BYTES > budget - soundStreamBytes ) {
 		++soundStreamRejected;
 		return false;
@@ -380,7 +408,7 @@ int idSoundOggStream::ReleasedCount() { return soundStreamReleased.Num(); }
 void idSoundOggStream::PrintMemoryInfo() {
 	idLib::Printf( "Vorbis streaming: reserved=%llu KiB peak=%llu KiB budget=%d MiB rejected=%u decode=%d frames\n",
 		static_cast<unsigned long long>( soundStreamBytes / 1024 ), static_cast<unsigned long long>( soundStreamPeakBytes / 1024 ),
-		s_streamMemoryMB.GetInteger(), soundStreamRejected, SoundVorbisStream::ChunkFrames );
+		SoundMemory_StreamMB(), soundStreamRejected, SoundVorbisStream::ChunkFrames );
 	idLib::Printf( "Vorbis stream blocks: worker=%u inline=%u opens=%u first-block wait avg=%.1f ms max=%d ms, decode avg=%.1f ms max=%d ms, over %u starts, released-pending=%d\n",
 		soundStreamWorkerBlocks, soundStreamInlineBlocks, soundStreamStarts,
 		soundStreamFirstBlocks ? static_cast<double>( soundStreamStartWaitTotalMs ) / soundStreamFirstBlocks : 0.0, soundStreamStartWaitMaxMs,
@@ -1505,10 +1533,14 @@ static void SoundSample_AccumulateEnvelope( const short* pcm, int count, int cha
 }
 
 idCVar s_asyncSampleDecode( "s_asyncSampleDecode", "1", CVAR_BOOL, "decode the Ogg samples a level load references on job workers, while the rest of the level loads" );
-// The largest installed retail/Awakening input+PCM pair is below 48 MiB.
-// A lower mobile default must wait for compressed streaming of those tracks.
-idCVar s_decodeMemoryMB( "s_decodeMemoryMB", "64", CVAR_SOUND | CVAR_ARCHIVE | CVAR_INTEGER,
-	"maximum MiB of compressed input, pending Vorbis PCM and fixed decoder arenas; excludes resident/OpenAL data", 16, 1024 );
+// The largest installed retail/Awakening input+PCM pair is below 48 MiB, the
+// phone classes' default (SoundMemoryClass.h), so a phone admits every track even
+// with streaming off.
+idCVar s_decodeMemoryMB( "s_decodeMemoryMB", "0", CVAR_SOUND | CVAR_ARCHIVE | CVAR_INTEGER,
+	"maximum MiB of compressed input, pending Vorbis PCM and fixed decoder arenas; excludes resident/OpenAL data; 0 follows s_audioMemoryClass", 0, 1024 );
+static int SoundMemory_DecodeMB() {
+	return SoundMemoryBudgetMB( s_decodeMemoryMB.GetInteger(), SoundMemoryClassBudgets( SoundMemory_Class() ).decodeMB, 16, 1024 );
+}
 
 // Decodes this many samples at once at most; beyond it LoadSample decodes on the
 // main thread, which keeps the job queue open for the rest of the level load. A
@@ -1528,7 +1560,7 @@ static uint64 soundSampleDecodeWaits = 0;
 // cannot release the reservation: its PCM still belongs to an unjoined sample.
 static bool SoundSample_AdmitDecode( const uint64 bytes )
 {
-	const uint64 budget = static_cast<uint64>( idMath::ClampInt( 16, 1024, s_decodeMemoryMB.GetInteger() ) ) * 1024 * 1024;
+	const uint64 budget = static_cast<uint64>( SoundMemory_DecodeMB() ) * 1024 * 1024;
 	if( bytes > budget )
 	{
 		return false;
@@ -1574,9 +1606,23 @@ private:
 
 void idSoundSample_OpenAL::PrintDecodeMemoryInfo()
 {
+	// The device class and the budgets in force (SoundMemoryClass.h); a budget cvar
+	// other than 0 replaces the class's figure.
+	SoundMemoryClass named = SoundMemoryClass::Desktop;
+	const bool classSet = SoundMemoryClassFromName( s_audioMemoryClass.GetString(), named );
+	const SoundMemoryClass memoryClass = SoundMemory_Class();
+	const SoundMemoryBudgets automatic = SoundMemoryClassBudgets( memoryClass );
+	const int systemRamMB = SoundMemory_SystemRamMB();
+	idLib::Printf( "Audio memory class: %s (%s; system memory %d MiB): payloads %d MiB, decode %d MiB, streams %d MiB, provider allowance %d MiB beyond the payloads\n",
+		SoundMemoryClassName( memoryClass ), classSet ? "s_audioMemoryClass" : "detected", systemRamMB,
+		SoundMemory_PayloadMB(), SoundMemory_DecodeMB(), SoundMemory_StreamMB(), automatic.providerMB );
+	idLib::Printf( "AUDIO_MEMORY_CLASS class=%s source=%s ramMB=%d payloadMB=%d decodeMB=%d streamMB=%d providerMB=%d classPayloadMB=%d classDecodeMB=%d classStreamMB=%d\n",
+		SoundMemoryClassName( memoryClass ), classSet ? "cvar" : "detected", systemRamMB,
+		SoundMemory_PayloadMB(), SoundMemory_DecodeMB(), SoundMemory_StreamMB(), automatic.providerMB,
+		automatic.payloadMB, automatic.decodeMB, automatic.streamMB );
 	idLib::Printf( "Audio admission: reserved=%llu KiB peak=%llu KiB budget=%d MiB refused=%llu fixed=%llu KiB (managed payloads; excludes provider internals and metadata)\n",
 		static_cast<unsigned long long>( ( soundMemory.Used() + SOUND_MEMORY_FIXED_BYTES ) / 1024 ),
-		static_cast<unsigned long long>( ( soundMemory.Peak() + SOUND_MEMORY_FIXED_BYTES ) / 1024 ), s_audioMemoryMB.GetInteger(),
+		static_cast<unsigned long long>( ( soundMemory.Peak() + SOUND_MEMORY_FIXED_BYTES ) / 1024 ), SoundMemory_PayloadMB(),
 		static_cast<unsigned long long>( soundMemoryRejected ), static_cast<unsigned long long>( SOUND_MEMORY_FIXED_BYTES / 1024 ) );
 	uint64 cpu = 0, uploaded = 0, compressedPending = 0, envelopes = 0, decoderArenas = 0;
 	for( int i = 0; i < soundSystemLocal.samples.Num(); ++i )
@@ -1610,7 +1656,7 @@ void idSoundSample_OpenAL::PrintDecodeMemoryInfo()
 		static_cast<unsigned long long>( soundStreamBytes / 1024 ) );
 	idLib::Printf( "Vorbis admission: pending=%llu KiB peak=%llu KiB budget=%d MiB waits=%llu (includes decoder arenas; excludes OpenAL internals)\n",
 		static_cast<unsigned long long>( soundSamplePendingDecodeBytes / 1024 ), static_cast<unsigned long long>( soundSampleDecodePeakBytes / 1024 ),
-		s_decodeMemoryMB.GetInteger(), static_cast<unsigned long long>( soundSampleDecodeWaits ) );
+		SoundMemory_DecodeMB(), static_cast<unsigned long long>( soundSampleDecodeWaits ) );
 	idSoundOggStream::PrintMemoryInfo();
 }
 
@@ -2174,7 +2220,7 @@ bool idSoundSample_OpenAL::BeginOggLoad( const idStr& filename, idSoundSampleDec
 		// Missing granule length: count with fixed scratch, then rewind and decode
 		// once into the final allocation. Never use stb's unbounded doubling helper.
 		short scratch[8192];
-		const uint64 budget = static_cast<uint64>( idMath::ClampInt( 16, 1024, s_decodeMemoryMB.GetInteger() ) ) * 1024 * 1024;
+		const uint64 budget = static_cast<uint64>( SoundMemory_DecodeMB() ) * 1024 * 1024;
 		uint64 frames = 0;
 		bool valid = reservation.Grow( static_cast<uint64>( fileLen ) + sizeof( scratch ) + SoundVorbisStream::ArenaBytes );
 		while( valid )

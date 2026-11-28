@@ -38,6 +38,51 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   the check boxes set `ui_subtitles`, `m_pitch` and the V-Sync draft).
   [Check boxes, subtitles on ACCESSIBILITY and slider steps](ui/retained-screens.md#check-boxes-subtitles-on-accessibility-and-slider-steps-28-november-2026).
 
+## Android memory warnings reach the sound system in time, 28 November 2026
+
+- **A phone short of memory now gets sound memory back while openQ4 is in the
+  background.** Android warns an app before it ends it to free memory. openQ4
+  frees sounds nothing is playing when warned, but a warning that arrived while
+  the game was in the background waited until you came back, after Android had
+  already chosen what to end. It is now answered at once, even in the middle of
+  loading a level, which keeps everything that level needs.
+- **The response follows how hard Android is pressed.** Going to the home screen
+  frees only earlier levels' sounds, so coming back does not reload this level's.
+  A warning that memory is low also frees this level's sounds unused for 30
+  seconds (`s_trimIdleSeconds`), and a critical one every sound not playing. Freed
+  sounds load again when next played.
+- **Sound memory budgets now suit the device.** Phones with more than 4 GiB of
+  memory keep the desktop's 256 MiB for sounds; phones with 4 GiB or less use
+  192 MiB, and on those the busiest levels may leave a few rarely heard sounds
+  out (they are tried again when played; nothing playing is ever dropped).
+  Phones decode with 48 MiB instead of 64 MiB, which can lengthen level loads a
+  little. Desktops are unchanged. `listSounds` reports the device class and the
+  budgets in force.
+- **Upgrade note:** `s_audioMemoryMB`, `s_decodeMemoryMB` and `s_streamMemoryMB`
+  now default to `0`, which follows the device. A configuration saved by an
+  earlier build holds the old figures (256, 64 and 32), which still apply; set
+  the three to `0` to follow the device. `s_audioMemoryClass` (`auto`, `desktop`,
+  `mobile` or `constrained-mobile`) picks a class by hand. Original Game Sound
+  (`s_retailUpsampling 1`) roughly doubles sound memory, so on a 4 GiB phone more
+  sounds may be left out with it on.
+- For developers: Android's `onTrimMemory` level reaches the engine through
+  `OpenQ4Activity.nativeTrimMemoryLevel` before SDL turns it into
+  `SDL_EVENT_LOW_MEMORY`; levels reported before the engine answers fold to the
+  most severe (`src/sound/SoundMemoryTrim.h`). The device
+  classes are in `src/sound/SoundMemoryClass.h`.
+  `testLowMemoryNotice <level>` sends a notice at a level on any platform.
+- Evidence: `audio_memory_class.py`, `android_lifecycle.py` (Android and desktop
+  branches), `audio_decode_budget.py` (production trim with Android levels),
+  `audio_memory.py`, `audio_stream_budget.py`, `android_host_storage.py` and
+  `android_build.py` pass. On the API 35 emulator (a 4 GiB-class system),
+  `android_emulator_smoke.py --mode memory` passes all 17 checks: a critical
+  warning in play freed 46 MiB of idle sounds (and 48 MiB of process memory) with
+  every voice playing on, warnings during a level load in the background were
+  answered before the return, and nothing was refused
+  ([audio and voice evidence](audio-voice-evidence.md#android-memory-notices-and-device-budgets-28-november-2026)).
+  The fixed Android build break (`SDL_IsTablet`) is a separate commit. No phone has
+  run this build; AUD-03 stays open for physical devices.
+
 ## Servers you host play like dedicated servers, 28 November 2026
 
 - **Hosted servers use multiplayer's player collision.** A server started from

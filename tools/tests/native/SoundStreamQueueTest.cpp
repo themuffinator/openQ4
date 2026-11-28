@@ -3,6 +3,7 @@
 // decoder. The fixture compares every submitted PCM sample across loop seams.
 #include "src/sound/SoundVorbisStream.h"
 #include "src/sound/SoundSurround.h"
+#include "src/sound/SoundMemoryClass.h"
 #include "src/sound/SoundQueue.h"
 #include "tools/tests/native/SoundStreamJobStubs.h"
 #include <climits>
@@ -90,6 +91,7 @@ static uint64 memoryUsed = 0;
 static bool SoundMemoryAcquire(uint64 bytes) { memoryUsed += bytes; return true; }
 static void SoundMemoryRelease(uint64 bytes) { memoryUsed -= bytes; }
 idCVar s_streamMemoryMB("s_streamMemoryMB", "32", 0, "");
+static SoundMemoryClass SoundMemory_Class() { return SoundMemoryClass::Desktop; }
 
 // @STREAM@
 

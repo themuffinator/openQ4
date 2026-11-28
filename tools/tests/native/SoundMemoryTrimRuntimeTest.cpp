@@ -46,10 +46,11 @@ struct idSoundSystemLocal {
     int finishPasses = 0;
     struct Reverb { void LoadLevel(const char*, void*) {} } reverb;
     void FinishSampleDecodes(bool) { ++finishPasses; for (auto* sample : decodingSamples) sample->FinishDecode(); decodingSamples.clear(); }
-    void TrimMemory(const char*, int);
+    void TrimMemory(const char*, int, int = SOUND_TRIM_LEVEL_UNKNOWN);
     void EndLevelLoad(const char*);
 };
 static idSoundSystemLocal soundSystemLocal;
+struct Cvar { int value = 30; int GetInteger() const { return value; } } s_trimIdleSeconds;
 
 // @PRODUCTION@
 
@@ -102,5 +103,17 @@ int main() {
     Check(discardedMap.cancelled == 1 && discardedMap.joined == 0);
     Check(retainedMap.joined == 1 && menuMap.joined == 1 && !retainedMap.freed && !menuMap.freed);
     Check(!system.insideLevelLoad && system.decodingSamples.Num() == 0 && system.finishPasses == 1);
+    // An Android level picks what goes (S_TrimMemory): a trip to the background
+    // keeps this level's samples, a process about to be killed frees every idle one.
+    idSoundSample hidden, earlier;
+    hidden.level = true; hidden.played = 99900; hidden.copy = true;
+    soundSystemLocal.insideLevelLoad = false;
+    soundSystemLocal.soundWorlds = {}; soundSystemLocal.samples = {&hidden, &earlier}; soundSystemLocal.decodingSamples = {};
+    S_TrimMemory("os low-memory", SOUND_TRIM_LEVEL_UI_HIDDEN);
+    Check(!hidden.freed && hidden.copies == 1 && earlier.freed == 1);
+    S_TrimMemory("os low-memory", SOUND_TRIM_LEVEL_BACKGROUND);
+    Check(!hidden.freed); // idle 100 ms, below s_trimIdleSeconds
+    S_TrimMemory("os low-memory", SOUND_TRIM_LEVEL_COMPLETE);
+    Check(hidden.freed == 1);
     std::puts("PASS: low-memory traversal cancels disposable jobs without uploads; active, loop, menu and loading ownership preserved");
 }

@@ -33,6 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "WaveFile.h"
 #include "SoundReverbCore.h"
+#include "SoundMemoryTrim.h"
 
 // Maximum number of voices we can have allocated
 #define MAX_HARDWARE_VOICES 48
@@ -773,8 +774,8 @@ public:
 	// loads a sample referenced outside a level load; a streamed envelope joins later
 	void						LoadSampleOutsideLevelLoad( idSoundSample* sample );
 	// frees the audio a low-memory notice may take (SoundMemoryTrim.h); idleSeconds < 0
-	// keeps the current level's samples
-	void						TrimMemory( const char* reason, int idleSeconds );
+	// keeps the current level's samples; osLevel is the notice's Android trim level
+	void						TrimMemory( const char* reason, int idleSeconds, int osLevel = SOUND_TRIM_LEVEL_UNKNOWN );
 
 	//-------------------------
 

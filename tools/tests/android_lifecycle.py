@@ -25,6 +25,7 @@ SUPPORT = r'''
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include "src/sound/SoundMemoryTrim.h"
 #if defined(TEST_ANDROID)
 #define __ANDROID__ 1
 #endif
@@ -37,6 +38,7 @@ struct SDL_Event {int type;};
 struct SDL_AtomicInt {int value=0;};
 static SDL_AtomicInt s_sdlLifecyclePending;
 static SDL_AtomicInt s_sdlAppBackgrounded;
+static SDL_AtomicInt s_sdlTrimMemoryLevel{SOUND_TRIM_LEVEL_UNKNOWN};
 static int SDL_GetAtomicInt(SDL_AtomicInt* value){return value->value;}
 static int SDL_SetAtomicInt(SDL_AtomicInt* value,int replacement){int old=value->value;value->value=replacement;return old;}
 static bool SDL_CompareAndSwapAtomicInt(SDL_AtomicInt* value,int expected,int replacement){if(value->value!=expected)return false;value->value=replacement;return true;}
@@ -68,8 +70,8 @@ struct idAsyncNetwork {static bool active;static AsyncClient client;static bool 
 bool idAsyncNetwork::active=false;AsyncClient idAsyncNetwork::client;
 static void Session_AppForeground(int ms){require(engineThread,"client resume off the main thread");if(idAsyncNetwork::client.IsActive())idAsyncNetwork::client.ApplicationResumed(ms);}
 static void S_SetDevicePaused(bool paused){devicePaused=paused;if(!paused)++resumes;actions.push_back(paused?"pause":"resume");}
-static int trims=0;
-static void S_TrimMemory(const char* reason){require(!std::strcmp(reason,"os low-memory"),"wrong trim reason");require(engineThread,"audio trimmed off the main thread");++trims;}
+static int trims=0,trimLevel=-2;
+static void S_TrimMemory(const char* reason,int level){require(!std::strcmp(reason,"os low-memory"),"wrong trim reason");require(engineThread,"audio trimmed off the main thread");++trims;trimLevel=level;}
 struct {bool activeApp=true,movingWindow=false;} win32;
 namespace openq4 {static void NativeInputBeforeWindowChange(){}}
 struct Key {bool down=false;};static Key keyStorage[MAX_KEYS];static Key* keys=keyStorage;
@@ -184,11 +186,27 @@ int main(){try {
     sessionValue.HandleAppResume(false);require(!menus && !resumes && !s_sdlAppInBackground,"desktop acquired Android resume behavior");
     require(touchReleases==0 && suspendSaves==0,"desktop invoked Android touch controls or the suspension save");
 #endif
-    // A low-memory notice from any thread trims audio once, on the main thread.
-    reset();trims=0;engineThread=false;send(SDL_EVENT_LOW_MEMORY);
+    // A low-memory notice from another thread trims audio once, on the main thread,
+    // at the most severe Android level reported with it.
+    reset();trims=0;engineThread=false;
+    SDL3_ReportTrimMemoryLevel(SOUND_TRIM_LEVEL_UI_HIDDEN);SDL3_ReportTrimMemoryLevel(SOUND_TRIM_LEVEL_COMPLETE);
+    SDL3_ReportTrimMemoryLevel(SOUND_TRIM_LEVEL_UI_HIDDEN);send(SDL_EVENT_LOW_MEMORY);
     require(!trims,"low-memory watch trimmed audio before the main thread ran");
     engineThread=true;SDL3_ProcessPendingLifecycleEvents(105);require(trims==1,"pending low-memory notice did not trim audio");
+    require(trimLevel==SOUND_TRIM_LEVEL_COMPLETE,"folded trim level lost");
     SDL3_ProcessPendingLifecycleEvents(106);require(trims==1,"one low-memory notice trimmed audio twice");
+    // SDL's Android pump sends the notice on the engine thread, and blocks there while
+    // the app is in the background: the watch must answer it then, not on return.
+    reset();trims=0;SDL3_ReportTrimMemoryLevel(SOUND_TRIM_LEVEL_BACKGROUND);send(SDL_EVENT_LOW_MEMORY);
+#if defined(__ANDROID__)
+    require(trims==1 && trimLevel==SOUND_TRIM_LEVEL_BACKGROUND,"Android notice waited for the blocked pump");
+#else
+    require(!trims,"desktop watch trimmed inside SDL's pump");
+#endif
+    SDL3_ProcessPendingLifecycleEvents(107);require(trims==1,"one engine-thread notice trimmed audio twice");
+    // A later notice with no level reported is answered at the unknown level.
+    reset();trims=0;send(SDL_EVENT_LOW_MEMORY);SDL3_ProcessPendingLifecycleEvents(108);
+    require(trims==1 && trimLevel==SOUND_TRIM_LEVEL_UNKNOWN,"a stale level carried into the next notice");
     reset();keys=nullptr;idKeyInput::ClearStates();require(!usercmdClears,"uninitialized input touched usercmd state");
     keys=keyStorage;idKeyInput::ClearStates();require(inputReleases==2 && usercmdClears==1,"live input clearing changed");
     keys=nullptr;idKeyInput::ClearStates();
@@ -210,6 +228,7 @@ def source():
     code = function_body((ROOT/'src/framework/KeyInput.cpp').read_text(), 'void idKeyInput::ClearStates(')
     code += '\n'.join(function_body(backend, signature) for signature in (
         'static void SDL3_ReleaseFocusInputState(', 'static void SDL3_SetLifecyclePendingFlag(',
+        'static void SDL3_ReportTrimMemoryLevel(', 'static void SDL3_AnswerLowMemoryNotice(',
         'static bool SDLCALL SDL3_LifecycleEventWatch(',
         'static void SDL3_HandleAppBackgroundTransition(int eventTime, const char *reason) {',
         'static void SDL3_HandleAppForegroundTransition(int eventTime, const char *reason) {',
@@ -250,7 +269,7 @@ def main():
         for platform in ('android', 'desktop', 'sigmatouch'):
             defines = ['-D__ANDROID__=1'] if platform != 'desktop' else []
             if platform == 'sigmatouch': defines.append('-DOPENQ4_SIGMATOUCH=1')
-            subprocess.run([compiler, '-std=c++17', *defines, str(cpp), '-o', str(exe)], check=True)
+            subprocess.run([compiler, '-std=c++17', '-I', str(ROOT), *defines, str(cpp), '-o', str(exe)], check=True)
             print(platform, flush=True)
             subprocess.run([str(exe)], check=True)
     return 0
