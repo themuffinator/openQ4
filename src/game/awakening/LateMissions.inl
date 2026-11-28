@@ -15,6 +15,7 @@ static const char * const awakeningM09Version1 = "maps/game/m09_valkaryne.openq4
 static const char * const awakeningM09Version2 = "maps/game/m09_valkaryne.openq4-v2.script";
 static const char * const awakeningM09Version3 = "maps/game/m09_valkaryne.openq4-v3.script";
 static const char * const awakeningM09Version4 = "maps/game/m09_valkaryne.openq4-v4.script";
+static const char * const awakeningM09Version5 = "maps/game/m09_valkaryne.openq4-v5.script";
 static idCVar g_awakeningLateMissions( "g_awakeningLateMissions", "1", CVAR_GAME | CVAR_BOOL,
 	"Use openQ4 M08/M09 mission corrections on fresh starts; saves retain their selected revision" );
 
@@ -94,7 +95,8 @@ static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source
 	const bool cryoVersion4 = path.Icmp( awakeningM08Version4 ) == 0;
 	const bool cryoVersion3 = cryoVersion4 || path.Icmp( awakeningM08Version3 ) == 0;
 	const bool cryo = cryoVersion3 || path.Icmp( awakeningM08Version1 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
-	const bool version4 = path.Icmp( awakeningM09Version4 ) == 0;
+	const bool version5 = path.Icmp( awakeningM09Version5 ) == 0;
+	const bool version4 = version5 || path.Icmp( awakeningM09Version4 ) == 0;
 	const bool version3 = version4 || path.Icmp( awakeningM09Version3 ) == 0;
 	const bool version2 = cryoVersion3 || version3 || path.Icmp( awakeningM09Version2 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
 	if ( !Awakening_LateCampaignActive() || ( !cryo && !version2 && path.Icmp( awakeningM09Version1 ) != 0 ) ) {
@@ -315,6 +317,37 @@ void exitDoorOneDisable()
 		};
 		if ( !Awakening_ApplyCorrections( source, fourthFinaleEdits, sizeof( fourthFinaleEdits ) / sizeof( fourthFinaleEdits[0] ) ) ) { return false; }
 	}
+	if ( version5 ) {
+		source.Replace( "namespace oq4_m09_v4", "namespace oq4_m09_v5" );
+		static const awakeningCorrection_t fifthFinaleEdits[] = {
+			// The map places "Escape Cryo Facility" as a completion item beside
+			// its objective, and nothing ever collected it: the campaign ended
+			// with its last objective still open. Boarding is the escape; the
+			// guard above has already reserved it.
+			{ "\tPLAYER_ON_DROPSHIP = true;\n", "\tPLAYER_ON_DROPSHIP = true;\n\tthread m10_completeObjective( 2 );\n", 1 },
+			// The second refinery tower waited on the first tower's part, which
+			// is at rest, so its light faded while its own part still moved.
+			{ "$steamer_2_part_2.move( DOWN, 60 );\n\t\tsys.waitFor( $steamer_1_part_2 );",
+			  "$steamer_2_part_2.move( DOWN, 60 );\n\t\tsys.waitFor( $steamer_2_part_2 );", 1 },
+			// Two entry points start the shaft explosions: the 15-second
+			// timeout below and the trigger on the lift ride. A second run
+			// toggles every trigger_hurt it reaches back off. Run it once.
+			{ "void escapeSeqExplosions()\n{", "float openq4_escapeExplosions = 0;\n\nvoid escapeSeqExplosions()\n{\n"
+			  "\tif ( openq4_escapeExplosions ) { return; }\n\topenq4_escapeExplosions = 1;", 1 },
+			// trigger_once_77 is the first shaft's retreat: the fourth spline
+			// takes her down the tunnel. The four triggers share one counter,
+			// so a player who skipped an earlier one made the retreat replay an
+			// earlier spline, and she stayed to fire on the exit pipes.
+			// Past the counter's range, a skipped trigger reached later leaves
+			// her at the tunnel instead of restarting a spline.
+			{ "void valk01_attacks_player()\n{", "void openq4_valk01_retreat()\n{\n"
+			  "\tintValk01_moving = 5;\n\t$mvr_valk01.time( 6 );\n\t$mvr_valk01.accelTime( 0.5 );\n"
+			  "\t$mvr_valk01.decelTime( 0.5 );\n\t$valkaryne01.becomePassive( 1 );\n"
+			  "\t$mvr_valk01.startSpline( $spline_valk04 );\n\tsys.waitFor( $mvr_valk01 );\n}\n\n"
+			  "void valk01_attacks_player()\n{", 1 },
+		};
+		if ( !Awakening_ApplyCorrections( source, fifthFinaleEdits, sizeof( fifthFinaleEdits ) / sizeof( fifthFinaleEdits[0] ) ) ) { return false; }
+	}
 	return true;
 }
 
@@ -344,13 +377,13 @@ void Awakening_PrepareLateMission( idDict &worldArgs ) {
 	// A custom sidecar owns the map; do not layer our revision over it.
 	if ( fileSystem->ReadFile( "maps/game/m09_valkaryne.script", NULL, NULL ) > 0 ) { return; }
 	idStr source;
-	if ( !Awakening_LoadLateMissionScript( awakeningM09Version4, source ) ) {
+	if ( !Awakening_LoadLateMissionScript( awakeningM09Version5, source ) ) {
 		gameLocal.Warning( "Awakening M09: unrecognized script; keeping installed mission behaviour" );
 		return;
 	}
-	gameLocal.program.CompileFile( awakeningM09Version4 );
-	worldArgs.Set( "call", "oq4_m09_v4::main" );
-	gameLocal.Printf( "Awakening M09: mission corrections v4 enabled\n" );
+	gameLocal.program.CompileFile( awakeningM09Version5 );
+	worldArgs.Set( "call", "oq4_m09_v5::main" );
+	gameLocal.Printf( "Awakening M09: mission corrections v5 enabled\n" );
 }
 
 // True on Cryofac while it runs one of the corrected programs above.
@@ -402,7 +435,10 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 	map.BackSlashesToSlashes();
 	map.StripFileExtension();
 	const bool correctedCryo = Awakening_CorrectedCryofac();
-	const char *finaleNamespace = gameLocal.program.FindFunction( "oq4_m09_v4::main" ) ? "oq4_m09_v4::" :
+	const bool finaleVersion5 = gameLocal.program.FindFunction( "oq4_m09_v5::main" ) != NULL;
+	const bool finaleVersion4 = finaleVersion5 || gameLocal.program.FindFunction( "oq4_m09_v4::main" ) != NULL;
+	const char *finaleNamespace = finaleVersion5 ? "oq4_m09_v5::" :
+		gameLocal.program.FindFunction( "oq4_m09_v4::main" ) ? "oq4_m09_v4::" :
 		gameLocal.program.FindFunction( "oq4_m09_v3::main" ) ? "oq4_m09_v3::" :
 		gameLocal.program.FindFunction( "oq4_m09_v2::main" ) ? "oq4_m09_v2::" : "oq4_m09_v1::";
 	const bool correctedFinale = map.Icmp( "maps/game/m09_valkaryne" ) == 0 &&
@@ -436,11 +472,31 @@ void Awakening_DirectLateMissionEntity( idDict &args ) {
 		}
 	}
 	if ( correctedFinale ) {
-		if ( gameLocal.program.FindFunction( "oq4_m09_v4::main" ) && !idStr::Icmpn( args.GetString( "team" ), "tunneldoors", 11 ) ) {
+		if ( finaleVersion4 && !idStr::Icmpn( args.GetString( "team" ), "tunneldoors", 11 ) ) {
 			args.SetBool( "no_touch", true );
 			args.Set( "wait", "-1" );
 		}
-		if ( ( gameLocal.program.FindFunction( "oq4_m09_v4::main" ) != NULL || gameLocal.program.FindFunction( "oq4_m09_v3::main" ) != NULL ) &&
+		if ( finaleVersion5 ) {
+			// The lift call panel fires both relays on every press: its
+			// ambush (dude1 walks back to the ledge and jumps again, in the
+			// middle of the timed defence) and the third taunt (lights out,
+			// the real panel hidden for 3.5 seconds). The puzzle's other
+			// relays (trigger_relay_3/4/22/23) already fire once.
+			if ( ( !idStr::Icmp( args.GetString( "name" ), "trigger_relay_7" ) &&
+				   !idStr::Icmp( args.GetString( "call" ), "map_m09::domeRoomJump1" ) ) ||
+				 ( !idStr::Icmp( args.GetString( "name" ), "trigger_relay_26" ) &&
+				   !idStr::Icmp( args.GetString( "call" ), "map_m09::valktauntThree" ) ) ) {
+				if ( args.FindKey( "wait" ) == NULL ) {
+					args.Set( "wait", "-1" );
+				}
+			}
+			// The retreat trigger always sends the first Valkaryne away.
+			if ( !idStr::Icmp( args.GetString( "name" ), "trigger_once_77" ) &&
+				 !idStr::Icmp( args.GetString( "call" ), "map_m09::valk01_moves" ) ) {
+				args.Set( "call", "oq4_m09_v5::openq4_valk01_retreat" );
+			}
+		}
+		if ( ( finaleVersion4 || gameLocal.program.FindFunction( "oq4_m09_v3::main" ) != NULL ) &&
 			!idStr::Icmp( args.GetString( "name" ), "trigger_once_15" ) ) {
 			// Both surviving actors lost their old leading underscore in the
 			// recovered map; the trigger still points at the obsolete names.

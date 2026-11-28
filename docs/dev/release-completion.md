@@ -12,6 +12,25 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## The Awakening's finale finishes what it starts, 28 November 2026
+
+- **Boarding the dropship completes "Escape Cryo Facility"** (m09). The
+  level placed the objective's completion and nothing collected it, so the
+  campaign ended with its last objective still open.
+- **The lift call panel's ambush and taunt happen once.** Pressing the panel
+  again while the lift travelled sent the first jumping Strogg back to the
+  ledge mid-fight and replayed the Valkaryne's lights-out taunt.
+- **The Valkaryne always retreats down the first shaft's tunnel** at her
+  retreat point, even on a route that skipped her earlier moves; before, she
+  could stay behind to fire on the exit pipes.
+- **The exit shaft's explosions run once**, and a refinery tower's light no
+  longer fades while its part still moves.
+- Fresh starts only: a save keeps the mission revision it was made with.
+- Evidence: hidden, input-free probes on the rebuilt module (revision 5
+  loads, retreat, once-only relay, objective completion, the Patton ending,
+  v4 and v5 save restores) and `awakening_content_repairs.py`.
+  [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026).
+
 ## Check boxes for on/off settings, and subtitles under Accessibility, 28 November 2026
 
 - **Clicking empty space in a settings page deselects the row you had

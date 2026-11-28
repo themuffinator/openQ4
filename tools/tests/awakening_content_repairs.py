@@ -62,6 +62,27 @@ CRYOFAC_REPLIES = (
     ("nava_sorryserg", "tak", "tak_darnman"),
     ("tak_die", "navajas", "nava_takthatbitch"),
 )
+# Revision 5 of the finale (LateMissions.inl): each anchor as the C++ string
+# literal spells it, and a token its replacement adds.
+M09_SCRIPT = "scripts/maps/m09_valkaryne.script"
+M09_MAP = "maps/game/m09_valkaryne"
+M09_V5_EDITS = (
+    (r'"\tPLAYER_ON_DROPSHIP = true;\n"', "thread m10_completeObjective( 2 );"),
+    (r'"$steamer_2_part_2.move( DOWN, 60 );\n\t\tsys.waitFor( $steamer_1_part_2 );"',
+     r"sys.waitFor( $steamer_2_part_2 );"),
+    (r'"void escapeSeqExplosions()\n{"', r"if ( openq4_escapeExplosions ) { return; }"),
+    (r'"void valk01_attacks_player()\n{"', r"$mvr_valk01.startSpline( $spline_valk04 );"),
+)
+# the installed script each anchor must match exactly once (as the loader
+# compares it, after the v1-v4 edits, none of which touch these lines)
+M09_V5_ANCHORS = (
+    "\tPLAYER_ON_DROPSHIP = true;\n",
+    "$steamer_2_part_2.move( DOWN, 60 );\n\t\tsys.waitFor( $steamer_1_part_2 );",
+    "void escapeSeqExplosions()\n{",
+    "void valk01_attacks_player()\n{",
+)
+# relays the lift call panel fires on every press: (relay, its call)
+M09_ONCE_RELAYS = (("trigger_relay_7", "domeRoomJump1"), ("trigger_relay_26", "valktauntThree"))
 M01_RADIO = "src/game/awakening/M01Radio.inl"
 M01_RADIO_SCRIPT = "content/baseoq4/pak0/scripts/openq4/awakening/m01_radio.script"
 M01_DRAFT_SCRIPT = "scripts/maps/m04_stranarus_trench_intro.script"
@@ -232,6 +253,23 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     if len(tables["m01lines"]) != len(set(tables["m01lines"])):
         raise AssertionError(f"{M01_RADIO_SCRIPT}: a draft line is placed twice")
 
+    # The finale's revision 5 (docs/dev/awakening-missions.md, "M09 revision 5").
+    require(late, 'awakeningM09Version5 = "maps/game/m09_valkaryne.openq4-v5.script"', "LateMissions.inl")
+    require(late, "gameLocal.program.CompileFile( awakeningM09Version5 );", "Awakening_PrepareLateMission")
+    require(late, 'worldArgs.Set( "call", "oq4_m09_v5::main" );', "Awakening_PrepareLateMission")
+    require(late, "const bool version4 = version5 || path.Icmp( awakeningM09Version4 ) == 0;",
+            "revision 5 builds on revision 4")
+    for before, after in M09_V5_EDITS:
+        require(late, before, "LateMissions.inl v5 anchors")
+        require(late, after, "LateMissions.inl v5 edits")
+    require(late, 'args.Set( "call", "oq4_m09_v5::openq4_valk01_retreat" );', "trigger_once_77")
+    for relay, call in M09_ONCE_RELAYS:
+        require(late, f'!idStr::Icmp( args.GetString( "name" ), "{relay}" )', "call-panel relays")
+        require(late, f'!idStr::Icmp( args.GetString( "call" ), "map_m09::{call}" )', "call-panel relays")
+    require(details, 'args.Set( "call", va( "%s::%s", finaleNamespace, panel.callback ) );',
+            "seal panels call the compiled revision")
+    require(details, 'gameLocal.program.FindFunction( "oq4_m09_v5::main" ) ? "oq4_m09_v5"', "seal panels")
+
     # The Awakening is single player only. One game module serves both modes
     # (CORE-07), so every repair runs behind a guard that refuses network play.
     if (ROOT / "src/mpgame").exists():
@@ -350,7 +388,55 @@ class Content:
         raise AssertionError(f"No mesh for model {model}")
 
 
+def check_m09_finale(awakening: Path) -> None:
+    """Each revision 5 repair still answers the installed finale."""
+    script = read(awakening / M09_SCRIPT).replace("\r\n", "\n")
+    for anchor in M09_V5_ANCHORS:
+        if script.count(anchor) != 1:
+            raise AssertionError(f"{M09_SCRIPT}: revision 5 anchor {anchor!r} matches {script.count(anchor)} times")
+    live = strip_comments(script)
+    text = read(awakening / f"{M09_MAP}.map")
+    entities = []
+    for match in re.finditer(r"^\{\n(.*?)^\}", text, re.S | re.M):
+        head = match.group(1).split("\n{", 1)[0]       # an entity's keys precede its brushes
+        entities.append({key: value for key, value in re.findall(r'^"([^"]*)" "([^"]*)"$', head, re.M)})
+    named = {entity.get("name"): entity for entity in entities if "name" in entity}
+
+    def sources(name: str) -> list[str]:
+        return [entity.get("name", "?") for entity in entities
+                for key, value in entity.items() if value == name and key != "name"]
+
+    # the escape's completion item matches its objective, and nothing collects it
+    given, done = named.get("item_objective_2"), named.get("item_objectivecomplete_2")
+    if not given or not done or given.get("objectivetitle") != done.get("objectivetitle"):
+        raise AssertionError(f"{M09_MAP}: no completion item for item_objective_2's title")
+    if sources("item_objectivecomplete_2") or re.search(r"item_objectivecomplete_2\b", live):
+        raise AssertionError(f"{M09_MAP}: item_objectivecomplete_2 is collected already; the repair is obsolete")
+    if not re.search(r'sys\.getEntity\(\s*"item_objectivecomplete_"\s*\+\s*m\s*\)', live):
+        raise AssertionError(f"{M09_SCRIPT}: m10_completeObjective no longer names item_objectivecomplete_<m>")
+    # the call panel's relays repeat; the puzzle's own relays already fire once
+    panel = named.get("func_elevator_1_call_1", {})
+    for relay, call in M09_ONCE_RELAYS:
+        entity = named.get(relay, {})
+        if relay not in panel.values() or entity.get("call") != f"map_m09::{call}" or "wait" in entity:
+            raise AssertionError(f"{M09_MAP}: {relay} is not the call panel's repeating {call} relay")
+    for relay in ("trigger_relay_3", "trigger_relay_4", "trigger_relay_22", "trigger_relay_23"):
+        if named.get(relay, {}).get("wait") != "-1":
+            raise AssertionError(f"{M09_MAP}: {relay} should fire once")
+    # the retreat trigger shares the counter, and its spline is the fourth
+    if named.get("trigger_once_77", {}).get("call") != "map_m09::valk01_moves" or "spline_valk04" not in named:
+        raise AssertionError(f"{M09_MAP}: trigger_once_77 is not the retreat through spline_valk04")
+    # (the second tower's typo is its anchor above) both entry points of the
+    # shaft explosions
+    for trigger, call in (("trigger_once_44", "escapeSeqExplosions"), ("trigger_once_51", "esc_playerEnteredShaft")):
+        if named.get(trigger, {}).get("call") != f"map_m09::{call}":
+            raise AssertionError(f"{M09_MAP}: {trigger} no longer calls {call}")
+    if not re.search(r"esc_playerEnteredShaft\(\)\s*\{[^}]*thread escapeSeqExplosions\(\);", live, re.S):
+        raise AssertionError(f"{M09_SCRIPT}: the shaft timeout no longer starts the explosions")
+
+
 def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, retail: Path) -> None:
+    check_m09_finale(awakening)
     content = Content(awakening, retail)
 
     for map_name, entity, key, source in tables["dialogue"]:

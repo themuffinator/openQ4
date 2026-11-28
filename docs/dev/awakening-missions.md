@@ -1710,3 +1710,109 @@ opening thread; that is the probe's shortcut, not a map fault.
 Limits. This confirms the hazard's timing, reach and damage, not a descent made
 with player movement against it, the Valkaryne's attacks, or balance. Hard and
 Nightmare were not run, and neither were Vulkan, Linux or macOS.
+
+## M09 revision 5 — 28 November 2026
+
+The user asked for the final level to be scrutinised for bugs and for gaps in
+what its developers meant. This pass cross-checked every entity the recovered
+`m09_valkaryne.script` names against the map, every `call`, `target` and door
+`triggerOpened`/`triggerClosed` key against the script and the map, and every
+triggered-only entity (relays, timers, spawners, effects, speakers, objective
+items) against whatever can fire it. It then reran the boss with the current
+unified game module.
+
+### Fixed
+
+Fresh M09 starts compile `maps/game/m09_valkaryne.openq4-v5.script` into
+`oq4_m09_v5`. Revisions 1 to 4 are unchanged, and a save keeps the revision it
+was made with. Each edit must match the installed script exactly once, or the
+level keeps its installed behaviour.
+
+| Defect | Evidence | Repair |
+| --- | --- | --- |
+| The escape objective never completes. | The map places `item_objectivecomplete_2`, titled "Escape Cryo Facility" like `item_objective_2`. Nothing targets it, and the script's `m10_completeObjective( m )` helper is called only for objective 1. The campaign ended with its last objective open. | Boarding the dropship (`youAreTehWinnar`, after its v1 guard reserves the outcome) completes objective 2. |
+| The lift call panel re-runs its ambush and taunt on every press. | `func_elevator_1_call_1` targets `elevator_1`, `trigger_relay_7` (`domeRoomJump1`) and `trigger_relay_26` (`valktauntThree`). Neither relay has a `wait`, so each repeats; the puzzle's other relays (`trigger_relay_3`, `_4`, `_22`, `_23`) carry `wait -1`. The lift takes about 25 seconds to arrive, so a second press is ordinary. It sent the first jumper back to the ledge to jump again in the middle of the timed defence and replayed the lights-out taunt, hiding the real panel for 3.5 seconds. | Both relays fire once (`wait -1`), only where the map still has them without a `wait`. |
+| The first Valkaryne can stay to fire on the exit. | `trigger_once_93`, `_106`, `_107` and `_77` all call `valk01_moves`, which advances one shared counter. `_77` is her retreat: the fourth spline takes her down the tunnel and makes her passive. A player who skipped an earlier trigger made the retreat play an earlier spline, and she stayed aggressive over the exit pipes. | `trigger_once_77` calls `openq4_valk01_retreat`, which plays the fourth spline and moves the counter past its range, so a skipped trigger reached later leaves her at the tunnel. |
+| The shaft explosions can run twice. | `escapeSeqExplosions` starts from `trigger_once_44` on the lift ride and from `esc_playerEnteredShaft`'s 15-second timeout. Every `sys.trigger` on its hurt volumes and effects toggles them, so a second run switched each hurt volume it reached back off. | The sequence runs once. |
+| The second refinery tower's light fades early. | `steamersLoop` moves `steamer_2_part_2`, then waits on `steamer_1_part_2`, which is at rest; the copy for the first tower waits on its own part. | It waits on `steamer_2_part_2`. |
+
+`awakening_content_repairs.py` pins the five repairs and, with the content
+present, checks each against the installed map and script: every anchor
+matches once, the completion item is still uncollected, the two relays still
+repeat beside the puzzle's once-only ones, and both explosion entry points
+remain. Three negative controls (the typo already fixed, the item already
+collected, the relay already once-only) were each rejected.
+
+### Checked and left alone
+
+- **The docked Valkaryne stays docked.** Her class falls through to the
+  generic AI actions while docked, which include evades, a jump back and a
+  leap. Under 15 seconds of explosive spike fire at her, docked in the arena,
+  she stayed at `dock` (-3520 -376 -4778) facing 90 and chose only her
+  death-ray volley, as in the 4 November checks.
+- **Her mobile turns face her target.** After the sphere died she undocked in
+  6.5 seconds, and her 90-degree turns took her from yaw 93 to -0.7 towards a
+  player due east of her: the turn animations carry the rotation the code
+  asks for.
+- **The streamer threads** for the dome, lift and boss rooms trigger the Nexus
+  room's hex effects (a copy of Raven's code). Each room's own hexes are
+  driven by its own loop; the copies only add effects in a room the player
+  has left. Not changed.
+
+### Not placed
+
+None of these has a scene or trigger the content supplies, so nothing was
+invented for them.
+
+- **Twelve Valkaryne taunts.** `valk_speaker_15` to `_26` are global speakers
+  numbered in the writers' order between `_14` (the dome room) and `_27` (the
+  boss introduction): "You will serve me", her laugh, "Witness your
+  oblivion", "Behold Strogg glory", "Your persistence is your weakness",
+  "Suffer", "Pain", "Conquest", "Humanity is mine", "My power is beyond
+  limits", "You see my power" and "You see the power of the Strogg". All are
+  declared and recorded. Nothing in the map, the script or the older
+  `m10_valkaryne.script` plays them, and no trigger is missing a speaker.
+- **Machine sounds in the dome room.** `machine_2_stop_spk`,
+  `machine_3_stop_spk` and `machine_4_stop_spk` wait for a trigger beside the
+  running loops `machine_2_spk` to `_4`. `machine_N_off` only fades the light.
+  Two of the three "stop" sounds are themselves loops of other machine
+  sounds, so how they were meant to replace the running loops is not clear.
+- **Effects nothing fires.** Steam relays `almostthere_relay_3`/`_4` (their
+  doors are gone), `spray_28`/`_29`, `dusty`, `outro_speaker_4` (evil laughter
+  for the commented-out `valk_awakens` ending), `fx_beam01_impact` (the
+  commented-out `beam_breaks01`) and the dropship thrusters, whose triggers
+  are commented out in `m10_valkaryne.script` too. `esc_dropBeamTwo` and the
+  second shaft's iris doors (`operate_4door`) have no caller.
+- **Encounters the developers switched off or left unlinked.** First-shaft
+  gunners `monster_gunner_1`/`_2` and the sentries `sentry01` to `_05` are
+  triggered only by commented-out lines. `monster_iron_maiden_2` and its
+  casket, `monster_gladiator_2` (a gunner) and `monster_scientist_2` wait for
+  a trigger no entity sends. `trigger_once_30` targets the absent
+  `q4x_grunt01`, and `trigger_once_61` the absent `_monster_makron_5`, `_6`,
+  `_8` and `_10` of the cut factory flyover. Forty-odd steam effects bind to
+  the absent `vents_low_south` and stay where they are placed.
+
+### Validation
+
+Windows x64 OpenGL, hidden, no input, `developer 1`, the user-supplied alpha
+content, `fs_awakeningpath` pointing at it. The runtime is
+`.tmp/runtime/awakening-missions`: `.install`'s client, renderers and packs
+of 28 November 11:12 with the rebuilt `game_x64.dll` (SHA-256 `055f392f…`).
+Logs are in `.tmp/awk/runs/<probe>`.
+
+| Probe | Result |
+| --- | --- |
+| `m09dock_base`, `m09dock_base2` (before) | "mission corrections v4 enabled"; the docked and mobile results above. |
+| `m09v5` | "mission corrections v5 enabled". `trigger trigger_once_77` takes `valkaryne01` from (176 264 1208) along the fourth spline to (-1325 -828 120) in six seconds; firing `trigger_once_93` afterwards leaves her there. A second `trigger trigger_relay_7` finds no entity: the relay fired once and removed itself. Calling the explosion sequence twice leaves its run flag at 1. |
+| `m09v5board` | With objective 2 given, `trigger trigger_once_82` (boarding): `item_objectivecomplete_2` is gone 9 seconds later, the completion item's own clean-up after it completes the objective. |
+| `m09v5end` | The same boarding: the player rides the dropship, is placed in the Patton bay scene, and the ending runs for about 78 seconds with no script warning. |
+| `m09v5save`, `m09v5load` | A save after the retreat restores in a fresh process, recompiling `m09_valkaryne.openq4-v5.script`. |
+| `m09v4save`, `m09v4load` | A save made with the previous module (revision 4) restores with the new one and keeps revision 4. |
+
+Limits. Console triggers stood in for walking into the triggers and pressing
+the panel; no route was played with player movement, so the call panel's
+repeat was established from the map's keys and the relay's once-only firing,
+not by pressing the panel twice in play. The end-of-game hand-off after the
+Patton scene was not separately logged (`g_nightmare` was already 1 in the
+shared probe profile). Saves made before this change keep their revision and
+its behaviour. Vulkan, Linux and macOS were not run.

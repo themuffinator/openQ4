@@ -67,7 +67,11 @@ void Awakening_StartLateMissionDetails() {
 		Awakening_StartCryofacDetails();
 		return;
 	}
-	if ( !Awakening_LateCampaignActive() || !gameLocal.program.FindFunction( "oq4_m09_v4::main" ) ||
+	// Revision 5 keeps revision 4's panels; their callbacks live in whichever
+	// revision this map compiled.
+	const char *finaleNamespace = gameLocal.program.FindFunction( "oq4_m09_v5::main" ) ? "oq4_m09_v5" :
+		gameLocal.program.FindFunction( "oq4_m09_v4::main" ) ? "oq4_m09_v4" : NULL;
+	if ( !Awakening_LateCampaignActive() || !finaleNamespace ||
 		idStr::Icmp( gameLocal.GetMapName(), "maps/game/m09_valkaryne" ) ) { return; }
 	struct sealPanel_t { const char *name; const char *door; const char *team; const char *origin; const char *angle; const char *callback; };
 	static const sealPanel_t panels[] = {
@@ -86,7 +90,7 @@ void Awakening_StartLateMissionDetails() {
 		idDict args;
 		args.Set( "classname", "trigger_relay" );
 		args.Set( "name", relayName );
-		args.Set( "call", va( "oq4_m09_v4::%s", panel.callback ) );
+		args.Set( "call", va( "%s::%s", finaleNamespace, panel.callback ) );
 		args.Set( "origin", panel.origin );
 		if ( !gameLocal.SpawnEntityDef( args ) ) { continue; }
 		args.Clear();

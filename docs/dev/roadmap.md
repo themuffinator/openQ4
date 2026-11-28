@@ -4984,6 +4984,15 @@ Completion substeps must keep three forms of evidence distinct:
   finale's resting slab. A descent made against it with player movement, the
   other skills and the other platforms remain. See
   [M09 frost hazard](awakening-missions.md#m09-frost-hazard--21-november-2026).
+  M09 revision 5, 28 November: a cross-check of every entity, callback and
+  speaker the finale's map and script name found four defects and one gap;
+  fresh starts now complete the escape objective on boarding, fire the lift
+  call panel's ambush and taunt once, always send the first Valkaryne down
+  the tunnel at her retreat trigger, run the shaft explosions once and time
+  the second refinery tower on its own part. Docked and mobile boss behaviour
+  rechecked unchanged; v4 and v5 saves restore. Twelve unused Valkaryne taunts
+  and other unwired content are listed, not placed. See
+  [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented
