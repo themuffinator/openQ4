@@ -39,6 +39,7 @@ really present, so a table row cannot rot into a guess:
 from __future__ import annotations
 
 import argparse
+import math
 import re
 import sys
 from pathlib import Path
@@ -71,6 +72,13 @@ M08_V5_EDITS = (
      r"if ( $item_objectivecomplete_3 ) { sys.trigger( $item_objectivecomplete_3 ); }"),
     ('aiScriptedAnimWait( $navajas, "cr_ladder_descend", 0, 0 );',
      r"if ( $exit_trigger ) { sys.trigger( $exit_trigger ); }"),
+)
+# Cryofac revision 6, the ceiling drop: (anchor in the installed script, a
+# token its replacement adds, as LateMissions.inl spells it)
+M08_V6_EDITS = (
+    ("void StartValkaryne()\n{", "valk.bind( $darnell_pos_6 );"),
+    ('aiScriptedAnim( $valkaryne, "cr_idle_upside_down", 0, 0 );', "openq4_valkCeilingHang();"),
+    ('aiScriptedAnimWait( $darnell, "pain1", 0, 1 );', "thread openq4_valkCeilingDrop();\\n\\tsys.wait( 2.9 );"),
 )
 # Revision 5 of the finale (LateMissions.inl): each anchor as the C++ string
 # literal spells it, and a token its replacement adds.
@@ -207,7 +215,17 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
     late = read(ROOT / "src/game/awakening/LateMissions.inl")
     require(late, 'awakeningM08Version4 = "maps/game/m08_cryofac.openq4-v4.script"', "LateMissions.inl")
     require(late, 'awakeningM08Version5 = "maps/game/m08_cryofac.openq4-v5.script"', "LateMissions.inl")
-    require(late, "return awakeningM08Version5;", "LateMissions.inl")
+    require(late, 'awakeningM08Version6 = "maps/game/m08_cryofac.openq4-v6.script"', "LateMissions.inl")
+    require(late, "return awakeningM08Version6;", "LateMissions.inl")
+    require(late, "cryoProgram.Icmp( awakeningM08Version6 ) == 0", "LateMissions.inl")
+    require(late, "const bool cryoVersion5 = cryoVersion6 || path.Icmp( awakeningM08Version5 ) == 0;",
+            "Cryofac revision 6 builds on revision 5")
+    # revision 6: the Valkaryne's ceiling drop in the freezer
+    for before, after in M08_V6_EDITS:
+        require(late, '{ "%s",' % before.replace('"', '\\"').replace("\n", "\\n"), "LateMissions.inl M08 v6 anchors")
+        require(late, after, "LateMissions.inl M08 v6 edits")
+    require(late, '!idStr::Cmp( args.GetString( "origin" ), "-1552 -584 -832" )', "the freezer Valkaryne's facing")
+    require(late, 'args.Set( "angle", "111" );', "the freezer Valkaryne's facing")
     require(late, "cryoProgram.Icmp( awakeningM08Version4 ) == 0", "LateMissions.inl")
     require(late, "cryoProgram.Icmp( awakeningM08Version5 ) == 0", "LateMissions.inl")
     require(late, "const bool cryoVersion4 = cryoVersion5 || path.Icmp( awakeningM08Version4 ) == 0;",
@@ -520,8 +538,38 @@ def check_m08_cryofac(awakening: Path) -> None:
         raise AssertionError(f"{M08_SCRIPT}: Navajas no longer goes down the ladder in FinalValkaryne")
 
 
+def check_m08_ceiling_drop(awakening: Path) -> None:
+    """The freezer's Valkaryne still has the drop revision 6 gives her."""
+    script = read(awakening / M08_SCRIPT).replace("\r\n", "\n")
+    for anchor, _ in M08_V6_EDITS:
+        if script.count(anchor) != 1:
+            raise AssertionError(f"{M08_SCRIPT}: revision 6 anchor {anchor!r} matches {script.count(anchor)} times")
+    live = strip_comments(script)
+    for take in ("cr_idle_land_attack", "cr_ceiling_idle"):
+        if take in live:
+            raise AssertionError(f"{M08_SCRIPT}: {take} is played already; the drop is obsolete")
+    named = map_entities(awakening / f"{M08_MAP}.map")
+    valk, mark = named.get("valkaryne", {}), named.get("darnell_pos_6", {})
+    if valk.get("classname") != "monster_q4x_valkaryne" or valk.get("origin") != "-1552 -584 -832" or "angle" in valk:
+        raise AssertionError(f"{M08_MAP}: the freezer Valkaryne is not the recovered placement the repair expects")
+    if not mark:
+        raise AssertionError(f"{M08_MAP}: no darnell_pos_6 to face and hold her")
+    vx, vy, _ = map(float, valk["origin"].split())
+    mx, my, _ = map(float, mark["origin"].split())
+    yaw = math.degrees(math.atan2(my - vy, mx - vx))
+    if round(yaw) != 111:
+        raise AssertionError(f"{M08_MAP}: darnell_pos_6 lies at yaw {yaw:.1f} from her, not 111")
+    model = read(awakening / "def/ai/monster_q4x_valkaryne.def")
+    for take, last in (("cr_idle_land_attack", 193), ("cr_ceiling_idle", 66)):
+        body = re.search(r"anim\s+" + take + r"\s+\S+\s*\{(.*?)\}", model, re.S)
+        if not body or not re.search(r"frame\s+1\s+disableGravity", body.group(1)) or \
+                not re.search(r"frame\s+%d\s+enableGravity" % last, body.group(1)):
+            raise AssertionError(f"monster_q4x_valkaryne: {take} no longer lifts her off gravity for its length")
+
+
 def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, retail: Path) -> None:
     check_m08_cryofac(awakening)
+    check_m08_ceiling_drop(awakening)
     check_m09_finale(awakening)
     content = Content(awakening, retail)
     check_m09_taunts(content)

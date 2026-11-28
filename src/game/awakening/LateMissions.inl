@@ -11,6 +11,7 @@ static const char * const awakeningM08Version2 = "maps/game/m08_cryofac.openq4-v
 static const char * const awakeningM08Version3 = "maps/game/m08_cryofac.openq4-v3.script";
 static const char * const awakeningM08Version4 = "maps/game/m08_cryofac.openq4-v4.script";
 static const char * const awakeningM08Version5 = "maps/game/m08_cryofac.openq4-v5.script";
+static const char * const awakeningM08Version6 = "maps/game/m08_cryofac.openq4-v6.script";
 static const char * const awakeningM09Source = "scripts/maps/m09_valkaryne.script";
 static const char * const awakeningM09Version1 = "maps/game/m09_valkaryne.openq4-v1.script";
 static const char * const awakeningM09Version2 = "maps/game/m09_valkaryne.openq4-v2.script";
@@ -93,7 +94,8 @@ static bool Awakening_CorrectColdBreath( idStr &source ) {
 static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source ) {
 	idStr path = filename;
 	path.BackSlashesToSlashes();
-	const bool cryoVersion5 = path.Icmp( awakeningM08Version5 ) == 0;
+	const bool cryoVersion6 = path.Icmp( awakeningM08Version6 ) == 0;
+	const bool cryoVersion5 = cryoVersion6 || path.Icmp( awakeningM08Version5 ) == 0;
 	const bool cryoVersion4 = cryoVersion5 || path.Icmp( awakeningM08Version4 ) == 0;
 	const bool cryoVersion3 = cryoVersion4 || path.Icmp( awakeningM08Version3 ) == 0;
 	const bool cryo = cryoVersion3 || path.Icmp( awakeningM08Version1 ) == 0 || path.Icmp( awakeningM08Version2 ) == 0;
@@ -280,6 +282,63 @@ static bool Awakening_LoadLateMissionScript( const char *filename, idStr &source
 		};
 		if ( !Awakening_ApplyCorrections( source, fifthCryoEdits, sizeof( fifthCryoEdits ) / sizeof( fifthCryoEdits[0] ) ) ) { return false; }
 	}
+	if ( cryoVersion6 ) {
+		// docs/dev/awakening-missions.md, "Cryofac's ceiling drop". The
+		// Valkaryne's Cryofac takes share one hanging pose: cr_idle_land_attack
+		// holds it 235.2 units higher and 8.6 further forward than the
+		// cr_idle_upside_down loop, then drops 51 units (feet 485 -> 434 above
+		// its origin) and strikes below. Nothing played the drop, and the loop
+		// hung her 70 units under the freezer's ceiling. She now hangs from the
+		// real ceiling, facing the mark Darnell falls back to, and drops on him;
+		// his death waits for her first thrust (frames 68-72, 2.8-3.0 s).
+		// Both takes switch her collision and gravity back on (frames 193 and
+		// 66), so she is held by a bind instead of by physics.
+		static const awakeningCorrection_t sixthCryoEdits[] = {
+			{ "void StartValkaryne()\n{", R"script(vector openq4_valkLandOrigin;
+
+void openq4_valkCeilingHang()
+{
+	entity valk;
+	vector origin;
+	vector forward;
+	valk = sys.getEntity( "valkaryne" );
+	if ( !valk ) { return; }
+	origin = valk.getWorldOrigin();
+	forward = sys.angToForward( valk.getAngles() );
+	sys.trace( origin, origin + '0 0 1024', '0 0 0', '0 0 0', 1, valk );
+	// after the drop her feet meet the ceiling
+	openq4_valkLandOrigin = sys.getTraceEndPos() - '0 0 434' - forward * 8.6;
+	valk.disableClip();
+	valk.setOrigin( openq4_valkLandOrigin + forward * 8.6 + '0 0 235.2' );
+	valk.bind( $darnell_pos_6 );
+}
+
+void openq4_valkCeilingDrop()
+{
+	entity valk;
+	valk = sys.getEntity( "valkaryne" );
+	if ( !valk ) { return; }
+	valk.unbind();
+	valk.setOrigin( openq4_valkLandOrigin );
+	valk.bind( $darnell_pos_6 );
+	aiScriptedAnim( valk, "cr_idle_land_attack", 0, 0 );
+	while ( 1 ) {
+		sys.waitFrame();
+		if ( !sys.getEntity( "valkaryne" ) ) { return; }
+		if ( valk.scriptedDone() ) { break; }
+	}
+	aiScriptedAnimLoop( valk, "cr_ceiling_idle", 4 );
+}
+
+void StartValkaryne()
+{)script", 1 },
+			{ "aiScriptedAnim( $valkaryne, \"cr_idle_upside_down\", 0, 0 );",
+			  "openq4_valkCeilingHang();\n\taiScriptedAnim( $valkaryne, \"cr_idle_upside_down\", 0, 0 );", 1 },
+			{ "aiScriptedAnimWait( $darnell, \"pain1\", 0, 1 );",
+			  "thread openq4_valkCeilingDrop();\n\tsys.wait( 2.9 );\n\taiScriptedAnimWait( $darnell, \"pain1\", 0, 1 );", 1 },
+		};
+		if ( !Awakening_ApplyCorrections( source, sixthCryoEdits, sizeof( sixthCryoEdits ) / sizeof( sixthCryoEdits[0] ) ) ) { return false; }
+	}
 	if ( version3 ) {
 		static const awakeningCorrection_t thirdFinaleEdits[] = {
 			// The bomb is ready at this warning. The ensuing scripted death must
@@ -423,9 +482,9 @@ static const char *Awakening_LateMissionScriptName( const char *filename ) {
 	path.BackSlashesToSlashes();
 	if ( g_awakeningLateMissions.GetBool() && Awakening_LateCampaignActive() && path.Icmp( awakeningM08Source ) == 0 ) {
 		idStr source;
-		if ( Awakening_LoadLateMissionScript( awakeningM08Version5, source ) ) {
-			gameLocal.Printf( "Awakening M08: mission corrections v5 enabled\n" );
-			return awakeningM08Version5;
+		if ( Awakening_LoadLateMissionScript( awakeningM08Version6, source ) ) {
+			gameLocal.Printf( "Awakening M08: mission corrections v6 enabled\n" );
+			return awakeningM08Version6;
 		}
 		gameLocal.Warning( "Awakening M08: unrecognized script; keeping installed mission behaviour" );
 	}
@@ -464,7 +523,7 @@ static bool Awakening_CorrectedCryofac() {
 	cryoProgram.BackSlashesToSlashes();
 	return cryoProgram.Icmp( awakeningM08Version1 ) == 0 || cryoProgram.Icmp( awakeningM08Version2 ) == 0 ||
 		cryoProgram.Icmp( awakeningM08Version3 ) == 0 || cryoProgram.Icmp( awakeningM08Version4 ) == 0 ||
-		cryoProgram.Icmp( awakeningM08Version5 ) == 0;
+		cryoProgram.Icmp( awakeningM08Version5 ) == 0 || cryoProgram.Icmp( awakeningM08Version6 ) == 0;
 }
 
 // Cryofac placements the recovered map gets wrong. Each repair names the
@@ -494,6 +553,14 @@ static void Awakening_CorrectCryofacEntity( idDict &args ) {
 		!idStr::Icmp( args.GetString( "gui" ), "guis/common/strogg/generic_seal.gui" );
 	if ( cryodoorSeal && args.FindKey( "target" ) == NULL ) {
 		args.SetBool( "gui_noninteractive", true );
+	}
+	// Revision 6's ceiling drop: she faces darnell_pos_6, the mark Darnell
+	// falls back to, from her recovered spot (yaw 111 = atan2( 104, -40 )),
+	// so her land attack's thrusts reach him. Spawn facing sets both her
+	// current and ideal yaw; a scripted turn would play while inverted.
+	if ( !name.Icmp( "valkaryne" ) && !idStr::Cmp( args.GetString( "origin" ), "-1552 -584 -832" ) &&
+		args.FindKey( "angle" ) == NULL && gameLocal.program.FindFunction( "openq4_valkCeilingDrop" ) != NULL ) {
+		args.Set( "angle", "111" );
 	}
 }
 

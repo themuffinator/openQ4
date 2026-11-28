@@ -5047,6 +5047,12 @@ Completion substeps must keep three forms of evidence distinct:
   left open into M09, and the cut gravity-gun objectives and other unwired
   content are listed, not placed. See
   [M08 revision 5](awakening-missions.md#m08-revision-5--28-november-2026).
+  Cryofac revision 6, 28 November, at the user's request: the freezer's
+  Valkaryne hangs from the real ceiling and drops on Darnell with her unused
+  `cr_idle_land_attack`, then loops `cr_ceiling_idle`. Saves before and
+  during the drop restore. Watched only in captures from a console-staged
+  scene; its look and pacing remain to judge in play. See
+  [Cryofac's ceiling drop](awakening-missions.md#cryofacs-ceiling-drop--28-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented

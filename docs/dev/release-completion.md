@@ -50,6 +50,13 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   corrections off, the exit alert fires only once armed, v4 and v5 save
   restores) and `awakening_content_repairs.py`.
   [M08 revision 5](awakening-missions.md#m08-revision-5--28-november-2026).
+- **The Valkaryne drops on Darnell from the freezer's ceiling** (m08). She
+  hangs from the ceiling itself (before, she floated beneath it) and, as
+  Darnell falls back, drops and slashes with both claws. This is the ambush
+  animation the alpha made for the scene and never played. Fresh starts
+  only. Evidence: scene probes with real speech timing, captures, and saves
+  made before and during the drop, restored in a fresh process.
+  [Cryofac's ceiling drop](awakening-missions.md#cryofacs-ceiling-drop--28-november-2026).
 
 ## Skipping a cinematic answers at once, 28 November 2026
 

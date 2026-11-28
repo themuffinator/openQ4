@@ -1988,3 +1988,86 @@ start), and the final scene ran with the marines placed at their marks; no
 route was played with player movement. The HUD's exit marker was proved
 through its trigger, not seen on screen. Saves made before this change keep
 their revision. Vulkan, Linux and macOS were not run.
+
+## Cryofac's ceiling drop — 28 November 2026
+
+The user asked for the Valkaryne's unused ceiling drop to be implemented in
+full. The freezer scene (`StartValkaryne`, after the fireteam's two Iron
+Maidens die) shows her hanging upside down while Darnell dies from scripted
+pain animations. Its commented-out lines show the developers trying a run,
+strafes and a leap attack there; none of them was finished.
+
+### What the content holds
+
+The model's `cr_` takes are Cryofac scene animations. Their root and joint
+motion, read from the md5anims at 24 fps:
+
+| Take | Length | What it does |
+| --- | --- | --- |
+| `cr_idle_upside_down` | 161 frames | Hanging inverted: body 160 units above the origin, feet 250. The scene plays it. |
+| `cr_idle_land_attack` | 194 frames (source frames 0-193) | The same hang 235.2 units higher and 8.6 further forward, still for 2.5 s. Then she drops 51 units (feet 485 to 434) and attacks: both claws thrust down and forward at 2.8-3.0 s (about 120-175 ahead, chest height); low sweeps to both sides at 3.2-4.2 s; she rears with claws raised; a second lunge, a 273-unit jab and a low sweep at 6.0-7.3 s; then back to the raised hang. Its frame commands switch off her pain, gravity and collision on frame 1 and switch them back on at frame 193. |
+| `cr_ceiling_idle` | 67 frames (source frames 194-260) | The raised hang, looping. Gravity and collision off from frame 1 to 66. |
+| `cr_idle` | 161 frames | Standing idle. Not used here. |
+
+The two hang poses match exactly once offset by (8.6, 0, 235.2): the
+upside-down loop is the land attack's opening hang, lowered. The freezer is
+384 units tall (floor −896, ceiling −512, by trace). The recovered placement
+at z −832 left her feet 70 units under the ceiling, hanging from nothing.
+
+### What revision 6 does
+
+Fresh starts of m08 compile `maps/game/m08_cryofac.openq4-v6.script`.
+Revisions 1 to 5 are unchanged, and saves keep their revision.
+
+- **Facing.** Only where the map still has the recovered spawn (`-1552 -584
+  -832`, no angle) and the program is revision 6, she spawns facing yaw 111:
+  `darnell_pos_6`, the mark Darnell falls back to. A spawn facing sets both
+  her current and her ideal yaw; a scripted turn would play while she is
+  inverted.
+- **Hang.** `openq4_valkCeilingHang` traces up from her origin to the ceiling.
+  It places the land attack's origin 434 below the ceiling, so her feet meet
+  the ceiling after the drop, and the upside-down loop 235.2 above that. Her
+  claws then reach a standing marine's chest, and her feet grip the ceiling
+  through the hang (51 units into it before the drop).
+- **Hold.** Both takes switch her collision and gravity back on at their last
+  frame, with her origin 50 units under the floor. She is bound to
+  `darnell_pos_6` for the scene instead of relying on physics.
+- **Drop.** Darnell's death waits for her. `openq4_valkCeilingDrop` plays the
+  land attack and then loops the ceiling idle until the scene removes her as
+  before. Darnell's pain animations start 2.9 seconds into the drop, as her
+  first thrust lands; at that frame her claw tips are 30 to 60 units from his
+  mark, at chest height.
+
+Nothing else in the scene changes: its lines, the window break and her
+removal are the content's. The attack has no sound of its own, and none was
+added.
+
+### Validation
+
+Windows x64 OpenGL, hidden, no input, the user-supplied alpha content,
+`.tmp/runtime/awakening-missions` with the rebuilt `game_x64.dll`. The scene
+was reached through its own triggers (`trigger_once_7`, then damage to both
+Maidens). The probes that show it set the first-thaw latch from the console,
+so they make no saves.
+
+| Probe | Result |
+| --- | --- |
+| `m08drop` (silent) | "mission corrections v6 enabled". She hangs at origin z −711.05, drops to (−1548.92 −592.03 −946.25), and Darnell dies after the thrust. |
+| `m08drop2` (sound device at zero volume, so speech takes its real length) | She appears 35.1 s in and hangs for 2.3 s. She drops at 37.4 s, Darnell dies at 41.5 s, and the scene removes her at 47.1 s, after the full 8-second attack. Screenshots from inside the freezer show her feet at the ceiling through the vent's steam, then her claws spread over his mark. |
+| `m08window` | From outside the freezer window, the frosting glass and the vent steam veil her, as they veiled the original placement. She now hangs near the top of the window's view and shows most clearly once she drops. |
+| `m08dropsave`, `m08dropload` | A save made before she appears restores in a fresh process, recompiles revision 6 and plays the hang and drop. |
+| `m08dropsave2`, `m08dropload2` | A save made 1.4 s into the drop restores. She stays bound at her drop position and the scene removes her on schedule; no script warning. |
+
+`awakening_content_repairs.py` pins the revision and checks it against the
+content. Each anchor must match once, no script may already play the two
+takes, and the recovered spawn, the yaw to `darnell_pos_6` and the takes'
+gravity commands must all still be there. Three negative controls were each
+rejected: the drop already scripted, the spawn moved, and the gravity
+commands gone.
+
+Limits. The scene was set up from the console rather than played into, and
+it was watched in captures, not in motion; no one has judged its look or
+pacing. From the player's spot the hang is partly hidden above the window's
+view; lowering her would put her claws at the floor. Saves made before this
+change keep their revision; a save made on revision 5 keeps the old hang.
+Vulkan, Linux and macOS were not run.
