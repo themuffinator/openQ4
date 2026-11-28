@@ -725,10 +725,15 @@ public:
 	bool					inCinematic;			// game is playing cinematic (player controls frozen)
 	bool					skipCinematic;
 	// openQ4: a skip spread over several frames (g_cinematicSkipFrameMsec) is still
-	// running, so Draw presents black; neither is saved. A skip may spread only once
-	// this map has drawn a frame: the level load's settle frames finish theirs at once.
+	// running, so Draw presents the cinematic's last picture, softened, with a
+	// spinner; none of these is saved. A skip may spread only once this map has
+	// drawn a frame: the level load's settle frames finish theirs at once. Its first
+	// slice runs one game frame, so that picture is captured (cinematicSkipCaptured)
+	// before the fast-forward moves anything.
 	bool					cinematicSkipSpread;
 	bool					cinematicSkipMapDrawn;
+	bool					cinematicSkipSliced;
+	bool					cinematicSkipCaptured;
 
 													// are kept up to date with changes to serverInfo
 	int						framenum;

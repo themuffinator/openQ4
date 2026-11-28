@@ -4988,6 +4988,16 @@ bool idMaterial::SetDefaultText( void ) {
 			"shaderTexture Source nearest clamp nopicmip %s } }",GetName(),idStr::Cmp(slot,"0")==0 ? "_white" : va("_retainedLayerImage%s",slot)));
 		return true;
 	}
+	// openQ4: a skipped cinematic's captured picture and its blurred copy, added
+	// in weighted taps over black (idPlayerView::DrawCinematicSkip)
+	if ( idStr::Icmp( GetName(), "_cinematicSkipScene" ) == 0 ) {
+		SetText( "material _cinematicSkipScene { sort gui twoSided { blend gl_one, gl_one colored nopicmip linear clamp map _cinematicSkipSceneImage } }" );
+		return true;
+	}
+	if ( idStr::Icmp( GetName(), "_cinematicSkipBlur" ) == 0 ) {
+		SetText( "material _cinematicSkipBlur { sort gui twoSided { blend gl_one, gl_one colored nopicmip linear clamp map _cinematicSkipBlurImage } }" );
+		return true;
+	}
 	if ( idStr::Icmp( GetName(), "_retainedPauseScene" ) == 0 ) {
 		SetText( "material _retainedPauseScene { sort gui twoSided { blend gl_one, gl_zero vertexColor nopicmip nearest clamp map _retainedPauseSceneImage } }" );
 		return true;

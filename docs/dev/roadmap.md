@@ -3062,7 +3062,8 @@ are not yet measured.
   Progress, 28 November: skipping a cinematic in play froze the last picture
   for the whole fast-forward (1.3 s for Air Defense 1's opening, 11,624 game
   frames in one `RunFrame`). The skip now runs 33 ms of it between presented
-  black frames and ends on the same game frame, about 40 ms later in all
+  frames, which show the last picture softened with a small spinner, and ends
+  on the same game frame, about 40 ms later in all
   ([skipping the intro in play](airdefense1-optimization-evidence.md#2026-11-28-skipping-the-intro-in-play)).
   The fast-forward's own cost (0.12 ms a game frame) is attributed: effects
   17-25%, physics 14-18%, AI 8-16%, scripts under 2%; the only waste, a

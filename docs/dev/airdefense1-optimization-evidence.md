@@ -78,10 +78,35 @@ press seemed to do nothing for 1.3-1.4 s.
 The skip now spreads over host frames. `RunFrame` stops fast-forwarding once
 `g_cinematicSkipFrameMsec` (33 ms) of wall time has passed and returns with
 `syncNextGameFrame` set, which makes the session run exactly one game frame per
-host frame, and continues in the next call. While it continues,
-`idGameLocal::Draw` presents black: the fast-forward never poses the
+host frame, and continues in the next call. The fast-forward never poses its
 intermediate states (`UpdateRenderEntity` and `idAnimator::CreateFrame` return
-early during a skip), so there is no picture worth showing. Sound stays muted
+early during a skip), so `idGameLocal::Draw` does not render them. It shows
+the picture the skip started from instead, softened and dimmed, with a small
+spinner so the wait reads as loading (`idPlayerView::DrawCinematicSkip`,
+`gamesys/CinematicSkipView.inl`):
+
+- The first slice runs a single game frame, so the first frame Draw sees is
+  still the shot the player was watching. Draw renders it once more without
+  the HUD or subtitles and captures it, adds 13 weighted, offset copies of the
+  capture over black (a disc blur of 0.5% of the screen height) and captures
+  that too. Each later frame draws a wider disc blur (1.1%) of the blurred copy,
+  easing over 180 ms from the sharp capture, at 65% brightness.
+- Each image is written once and read after that write, the order the
+  double-vision effect already uses, so neither renderer samples an image it
+  then overwrites in the same frame. The copies are added (`blend gl_one,
+  gl_one`) because a captured frame's alpha is unreliable, and the stages are
+  `colored`: the 2D pass passes `SetColor` as shader parameters
+  (`idGuiModel`), and a `vertexColor` stage drew every tap at full weight.
+- The spinner is twelve dashes on a ring in the bottom-right corner, sized in
+  pixels so it stays round, the lead dash brightest and turning once a second,
+  in the interface's value colour (`marine.value`, or The Awakening's ice blue
+  when `fs_awakeningActive`). `ui_retainedReducedMotion` holds the ring still
+  and the picture softens without easing.
+- `_cinematicSkipScene` and `_cinematicSkipBlur` are generated in
+  `idMaterial::SetDefaultText`, like `_retainedPauseScene`, and exempt from the
+  non-precached warning, since their images exist only once a skip starts.
+
+Sound stays muted
 until the last slice, and each slice re-asserts the mute in case a focus change
 lifted it. The original single-call skip remains where it is wanted:
 
@@ -105,9 +130,13 @@ input-free clients with the null OpenAL backend, two runs each, alternating:
 
 Frames presented are the `syncNextGameFrame requested by game code` lines
 (`com_showFramePacing 2`) between the probe's `intro-end-trigger` and
-`spawn-live` stages. A screenshot taken mid-skip (`g_cinematicSkipFrameMsec 1`
-to stretch the skip, `g_autoScreenshot`) is black in every pixel, with no HUD
-or interface drawn over it. With `g_autoSkipCinematics 1` and no probe the
+`spawn-live` stages. Screenshots taken mid-skip (`g_cinematicSkipFrameMsec 1`
+to stretch the skip, `g_autoScreenshot`, and `g_airdefense1SkipProbeAt 20` to
+skip on a lit shot rather than the opening's starfield) show the softened
+picture and the spinner, identical on OpenGL and Vulkan, with no warnings in
+either log. The view adds nothing measurable: 1,382 ms with 41 frames drawn
+on a quiet run, against 1,369-1,372 ms before it (other sessions' clients made
+most runs that hour noisy, 1.3-5.5 s for both behaviours). With `g_autoSkipCinematics 1` and no probe the
 whole skip still runs in the first settle frame (1,468 ms of a 1,492 ms settle
 phase) and no game frame after the load asks for a resync.
 

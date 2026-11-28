@@ -4403,14 +4403,15 @@ void idDeclLocal::ParseLocal( bool noCaching ) {
 
 	// These are generated render resources, created on demand for retained
 	// geometry (including its multiply blend), its layers and soft-focus
-	// blur passes, and font pages. Ordinary
+	// blur passes, a skipped cinematic's captured picture and its blur, and font
+	// pages. Ordinary
 	// image/material assets, including retained picture wrappers, still require
 	// precaching; an explicit declaration using this name is not exempt.
 	// tr_fontTTF creates Latin slots as _ttfatlas_ and extended Unicode pages
 	// as _ttfatlasx_; retained output-size pages use _ttfatlasr_. All exist
 	// only after runtime rasterization.
 	const bool generatedRetainedResource = type == DECL_MATERIAL && generatedDefaultText && IsImplicit() &&
-		( name.Icmp("_retainedsolid") == 0 || name.Icmp("_retainedmultiply") == 0 || name.Icmp("_retainedPauseScene") == 0 || name.Icmpn("_retained/_ttfatlas_",20) == 0 || name.Icmpn("_retained/_ttfatlasx_",21) == 0 || name.Icmpn("_retained/_ttfatlasr_",21) == 0 || name.Icmpn("_retainedLayer/",15) == 0 || name.Icmpn("_retainedMask/",14) == 0 || name.Icmpn("_retainedLinearMask/",20) == 0 || name.Icmpn("_retainedBlur/",14) == 0 || name.Icmpn("_retainedAtlas/",15) == 0 || name.Icmpn("_retainedMultiplyAtlas/",23) == 0 || name.Icmpn("_retainedModel/",15) == 0 || name.Icmpn("_retainedModelResolve/",22) == 0 );
+		( name.Icmp("_retainedsolid") == 0 || name.Icmp("_retainedmultiply") == 0 || name.Icmp("_retainedPauseScene") == 0 || name.Icmp("_cinematicSkipScene") == 0 || name.Icmp("_cinematicSkipBlur") == 0 || name.Icmpn("_retained/_ttfatlas_",20) == 0 || name.Icmpn("_retained/_ttfatlasx_",21) == 0 || name.Icmpn("_retained/_ttfatlasr_",21) == 0 || name.Icmpn("_retainedLayer/",15) == 0 || name.Icmpn("_retainedMask/",14) == 0 || name.Icmpn("_retainedLinearMask/",20) == 0 || name.Icmpn("_retainedBlur/",14) == 0 || name.Icmpn("_retainedAtlas/",15) == 0 || name.Icmpn("_retainedMultiplyAtlas/",23) == 0 || name.Icmpn("_retainedModel/",15) == 0 || name.Icmpn("_retainedModelResolve/",22) == 0 );
 	if ( common->IsInitialized() && !declManagerLocal.GetInsideLoad() && !declManagerLocal.IsRemounting() &&
 			!openQ4_IsAnyToolActive() && !generatedRetainedResource ) {
 		common->Warning( "Loading non pre-cached %s decl %s", declManagerLocal.GetDeclNameFromType( type ), name.c_str() );

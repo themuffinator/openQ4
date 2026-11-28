@@ -53,21 +53,23 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
 ## Skipping a cinematic answers at once, 28 November 2026
 
-- **Pressing Esc to skip a cinematic turns the screen black straight away.**
-  The game played out the rest of the scene in one long frame with the last
-  picture frozen and the sound cut, so the press seemed to do nothing for a
-  second or more: 1.3 s for Air Defense 1's three-minute opening on a fast PC,
-  longer on slower ones. It now catches up a little between frames behind a
-  black screen, and you take control after about the same wait (some 40 ms
-  longer).
+- **Pressing Esc to skip a cinematic answers straight away.** The game
+  played out the rest of the scene in one long frame with the last picture
+  frozen and the sound cut, so the press seemed to do nothing for a second or
+  more: 1.3 s for Air Defense 1's three-minute opening on a fast PC, longer on
+  slower ones. Now the picture softens and dims at once and a small spinner
+  turns in the corner while the scene catches up a little each frame, and you
+  take control after about the same wait (some 40 ms longer). With reduced
+  motion (`ui_retainedReducedMotion 1`) the spinner holds still.
 - **The level you land in is the same.** The skip still runs every game frame
   of the scene and ends on the same one.
 - Auto Skip Cinematics at the start of a level still finishes behind the
   loading screen. VR and demo playback keep the held picture, and
   `g_cinematicSkipFrameMsec 0` brings back the old behaviour.
 - Evidence: the Air Defense 1 skip probe on hidden, input-free clients, the
-  old and new behaviour alternating (same final frame and game time, 39-40
-  black frames presented instead of none), a black mid-skip screenshot and an
+  old and new behaviour alternating (same final frame and game time, 39-41
+  frames presented instead of none), mid-skip screenshots on OpenGL and Vulkan
+  showing the softened picture and the spinner with no warnings, and an
   unchanged load-time auto skip.
   [Skipping the intro in play](airdefense1-optimization-evidence.md#2026-11-28-skipping-the-intro-in-play).
 

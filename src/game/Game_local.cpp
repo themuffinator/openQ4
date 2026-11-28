@@ -175,6 +175,7 @@ void rvNormalizeProjectedRenderLight( renderLight_t &light, const char *ownerNam
 }
 
 idCVar g_airdefense1SkipProbe( "g_airdefense1SkipProbe", "0", CVAR_GAME | CVAR_BOOL, "temporary: auto-skip airdefense1 after one second using the ESC cinematic-skip path, log intro-to-spawn timings, and quit one frame after the player becomes live" );
+idCVar g_airdefense1SkipProbeAt( "g_airdefense1SkipProbeAt", "1", CVAR_GAME | CVAR_FLOAT, "temporary: game seconds into the airdefense1 intro at which g_airdefense1SkipProbe skips it", 1, 180 );
 idCVar g_airdefense1SkipProbeProfile( "g_airdefense1SkipProbeProfile", "0", CVAR_GAME | CVAR_BOOL, "temporary: when g_airdefense1SkipProbe is enabled, collect coarse skip profiling buckets and top entity think totals" );
 idCVar g_openQ4Convoy2bNoActors( "g_openQ4Convoy2bNoActors", "0", CVAR_GAME | CVAR_BOOL, "openQ4 debug: suppress actor spawns on convoy2b for the unlocked hovertank launch variant" );
 
@@ -772,6 +773,8 @@ void idGameLocal::Clear( void ) {
 	skipCinematic = false;
 	cinematicSkipSpread = false;
 	cinematicSkipMapDrawn = false;
+	cinematicSkipSliced = false;
+	cinematicSkipCaptured = false;
 	influenceActive = false;
 
 	localClientNum = 0;
@@ -2430,6 +2433,8 @@ void idGameLocal::LoadMap( const char *mapName, int randseed ) {
 	skipCinematic = false;
 	cinematicSkipSpread = false;
 	cinematicSkipMapDrawn = false;
+	cinematicSkipSliced = false;
+	cinematicSkipCaptured = false;
 	inCinematic = false;
 	cinematicSkipTime = 0;
 	cinematicStopTime = 0;
@@ -2529,6 +2534,8 @@ void idGameLocal::LocalMapRestart( int instance ) {
 	gamestate = GAMESTATE_STARTUP;
 	cinematicSkipSpread = false;
 	cinematicSkipMapDrawn = false;
+	cinematicSkipSliced = false;
+	cinematicSkipCaptured = false;
 
 	program.Restart();
 
@@ -3000,6 +3007,8 @@ void idGameLocal::InitFromNewMap( const char *mapName, idRenderWorld *renderWorl
 	gamestate = GAMESTATE_STARTUP;
 	cinematicSkipSpread = false;
 	cinematicSkipMapDrawn = false;
+	cinematicSkipSliced = false;
+	cinematicSkipCaptured = false;
 
 	gameRenderWorld = renderWorld;
 	if ( !gameLocal.IsMultiplayerMode() ) {
@@ -3186,6 +3195,8 @@ bool idGameLocal::InitFromSaveGame( const char *mapName, idRenderWorld *renderWo
 	gamestate = GAMESTATE_STARTUP;
 	cinematicSkipSpread = false;
 	cinematicSkipMapDrawn = false;
+	cinematicSkipSliced = false;
+	cinematicSkipCaptured = false;
 
 	gameRenderWorld = renderWorld;
 	// Ensure render targets/material handles are fresh for each map transition.
@@ -5012,14 +5023,18 @@ idGameLocal::RunFrame
 gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEditors, bool lastCatchupFrame, int serverGameFrame ) {
 	// openQ4: a skipped cinematic fast-forwards up to g_cinematicSkipFrameMsec of
 	// wall time in this call and continues in the next one, so the frames between
-	// present (black, see Draw) instead of freezing on the cinematic for the
-	// whole skip. Not inside a level load's settle frames (no frame drawn yet),
+	// present (the softened last picture, see Draw) instead of freezing on the
+	// cinematic for the whole skip. Not inside a level load's settle frames (no frame drawn yet),
 	// demos or a headset, which keep the original whole skip in one call.
 	const int cinematicSkipStartMsec = Sys_Milliseconds();
 	const int cinematicSkipFrameMsec = g_cinematicSkipFrameMsec.GetInteger();
 	const bool cinematicSkipMaySpread = !isMultiplayer && cinematicSkipFrameMsec > 0 && cinematicSkipMapDrawn &&
 		GetDemoState() == DEMO_NONE && !IsTimeDemo() && !( vrSystem != NULL && vrSystem->IsActive() );
 	cinematicSkipSpread = false;
+	if ( !skipCinematic ) {
+		cinematicSkipSliced = false;
+		cinematicSkipCaptured = false;
+	}
 	if ( skipCinematic && !isMultiplayer && soundSystem != NULL ) {
 		// a skip that continues from the last call stays silent (a focus change can unmute)
 		soundSystem->SetMute( true );
@@ -5182,7 +5197,7 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds, int activeEdito
 			s_openq4AirDefense1SkipProbe.lastSkipActive = skipCinematic;
 
 			if ( !s_openq4AirDefense1SkipProbe.skipRequested ) {
-				if ( player != NULL && inCinematic && time >= SEC2MS( 1.0f ) && time >= cinematicSkipTime ) {
+				if ( player != NULL && inCinematic && time >= SEC2MS( g_airdefense1SkipProbeAt.GetFloat() ) && time >= cinematicSkipTime ) {
 					const bool handledEsc = player->HandleESC();
 					if ( handledEsc && skipCinematic ) {
 						s_openq4AirDefense1SkipProbe.skipRequested = true;
@@ -5736,10 +5751,13 @@ TIME_THIS_SCOPE("idGameLocal::RunFrame - gameDebug.BeginFrame()");
 		if ( skipCinematic ) {
 			common->LoadingCheckpoint();
 			if ( cinematicSkipMaySpread && ( inCinematic || time < cinematicStopTime ) &&
-				Sys_Milliseconds() - cinematicSkipStartMsec >= cinematicSkipFrameMsec ) {
+				( !cinematicSkipSliced || Sys_Milliseconds() - cinematicSkipStartMsec >= cinematicSkipFrameMsec ) ) {
 				// present a frame and continue the skip in the next call; the
-				// session runs one game frame per host frame while syncNextGameFrame is set
+				// session runs one game frame per host frame while syncNextGameFrame
+				// is set. The first slice stops after one game frame, so the picture
+				// Draw captures is still the one the player was watching.
 				cinematicSkipSpread = true;
+				cinematicSkipSliced = true;
 				break;
 			}
 		}
@@ -6037,13 +6055,10 @@ bool idGameLocal::Draw( int clientNum, bool menuPaused ) {
 	}
 	if ( cinematicSkipSpread && skipCinematic ) {
 		// openQ4: the skip is fast-forwarding over several frames (RunFrame); its
-		// intermediate states are never posed, so present black until it ends
-		const bool previousUIViewportMode = renderSystem->GetUseUIViewportFor2D();
-		renderSystem->SetUseUIViewportFor2D( false );
-		renderSystem->SetColor4( 0.0f, 0.0f, 0.0f, 1.0f );
-		renderSystem->DrawStretchPic( 0, 0, 640, 480, 0, 0, 1, 1, declManager->FindMaterial( "_white" ) );
-		renderSystem->SetColor4( 1.0f, 1.0f, 1.0f, 1.0f );
-		renderSystem->SetUseUIViewportFor2D( previousUIViewportMode );
+		// intermediate states are never posed, so present the picture it started
+		// from, softened, with a spinner, until it ends
+		player->playerView.DrawCinematicSkip( !cinematicSkipCaptured );
+		cinematicSkipCaptured = true;
 		CheckAutoScreenshot();
 		CheckAutoExecAfterMapLoad();
 		return true;

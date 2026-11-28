@@ -11,6 +11,7 @@
 #include "VRWristDisplay.h"
 #include "gamesys/RetainedViewEffects.inl"
 #include "gamesys/Subtitles.inl"
+#include "gamesys/CinematicSkipView.inl"
 #include "awakening/M01Feedback.inl"
 
 #if defined(_XENON) && (defined(_PROFILE) || defined(_DEBUG))
