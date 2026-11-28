@@ -77,7 +77,7 @@ idCVar				idAsyncNetwork::serverDrawClient( "net_serverDrawClient", "-1", CVAR_S
 idCVar				idAsyncNetwork::serverRemoteConsolePassword( "net_serverRemoteConsolePassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private remote console password (rcon2 requires at least 12 bytes)" );
 // openQ4 (MP-18): the admin password is the game module's to check, and is declared here so
 // it is private from the moment the engine starts: a game cvar is unknown, and so not yet
-// private, while the other game module is loaded (the main menu runs the single-player one).
+// private, until the game module loads and registers it, and the configs run before that.
 idCVar				idAsyncNetwork::serverAdminPassword( "net_serverAdminPassword", "", CVAR_SYSTEM | CVAR_NOCHEAT | CVAR_PRIVATE | CVAR_CASE_SENSITIVE, "private password trusted players log in with as admins ('admin'); read when a map starts and then cleared, none leaves admin logins off" );
 // The referee password (competitive matches) is older and keeps its game-cvar name; the game module
 // declares it as well, and reads and clears it. Declared here for the same reason: private from startup.

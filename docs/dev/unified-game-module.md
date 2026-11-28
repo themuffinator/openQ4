@@ -113,7 +113,7 @@ merged code follows, and the compatibility guarantees and their evidence.
 | Network demos (`.netdemo`, retail `.ndmo85`) and MVDs | Play as before | Read paths keep the multiplayer text; MVD schema versioning is independent of the API version. |
 | Render demos (`.demo`) | Unaffected | Recorded and played by the engine. |
 | Configurations | Same cvars, same archived values | Mode-specific defaults are `idModeCVar`s; every cvar now registers in both modes, so the other mode's settings are no longer bare console cvars between sessions. |
-| Mods with their own game code | Must rebuild | The single `game_<arch>` name and the current game API (64 added the mode; 65 since 25 November). A mod that still ships only `game-sp_<arch>`/`game-mp_<arch>` runs on `baseoq4`'s module, and the console warns once, naming the file. Content-only mods are unaffected. |
+| Mods with their own game code | Must rebuild | The single `game_<arch>` name and the current game API (`GAME_API_VERSION` in `src/game/Game.h`; 64 added the mode, and later interface changes raise it, 66 on 27 November). A mod that still ships only `game-sp_<arch>`/`game-mp_<arch>` runs on `baseoq4`'s module, and the console warns once, naming the file. Content-only mods are unaffected. |
 
 ## Build and packaging
 

@@ -10,7 +10,7 @@
 // Stock behaviour is untouched while the ruleset is off.  The weapon, ammo
 // and item numbers are an overlay on the shipped entity definitions, applied
 // when a Classic map loads and taken back off when it unloads, so no
-// replacement content ships and the single-player module never sees it.
+// replacement content ships and the campaign (game_sp) never sees it.
 //----------------------------------------------------------------
 
 #ifndef __GAME_MP_CLASSICRULES_H__

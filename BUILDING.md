@@ -79,7 +79,8 @@ remain available in `builddir/baseoq4/` and are staged into `.install/baseoq4/`.
 The compatibility `build_gamelibs.ps1` entry point builds this engine checkout;
 `OPENQ4_BUILD_GAMELIBS` no longer starts a companion build.
 
-Awakening single-player classes are always included in `game_sp`. The old
+Awakening single-player classes are always built into `game_<arch>` and are
+active only when it runs as `game_sp`. The old
 `awakening` Meson option is deprecated and has no effect. No `q4xbase` game modules
 are built or packaged, and no expansion multiplayer layer is imported. Assets
 are user-supplied and mounted only while the Awakening campaign is selected.
