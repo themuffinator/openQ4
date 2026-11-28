@@ -48,6 +48,29 @@ main thread. openPR06 fixed both in 21ec144b1; this ports it to openQ4.
 - **Not tested:** the `s_restart` branch, because no preset's speaker layout
   or EFX differs from the Minimum bootstrap; Android; macOS.
 
+## The original game's sound as an option, 27 November 2026
+
+- **`s_retailUpsampling 1` makes the game sound the way Quake 4's own mixer
+  did.** Most of its sounds are recorded at 22 kHz. The original brought them up
+  to its mixing rate by repeating each sample, which keeps a little more treble
+  and adds a bright, gritty edge above it that is not in the recordings. openQ4
+  reproduces the recordings cleanly by default; with this setting it repeats
+  samples exactly as the original did.
+- **How to use it:** enter `s_retailUpsampling 1` and then `s_restart` in the
+  console, or put `+set s_retailUpsampling 1` on the command line. It is kept
+  between sessions. There is no menu row yet.
+- **Cost:** those sounds take twice the sound memory (four times for the few
+  recorded at 11 kHz). Air Defense holds 213 MiB instead of 139 MiB, inside the
+  256 MiB sound budget. Music and other 44 kHz sounds are unchanged.
+- Evidence: test signals through the hidden game show the level and the mirror
+  images that sample repetition predicts, within 0.5 dB, for ordinary and
+  streamed sounds at 22 and 11 kHz, and nothing of the kind with the setting
+  off. A sound restarted part-way after a simulated device interruption resumes
+  in place. `sound_resampler.py` checks the rule, its wiring and the same
+  measurement on the OpenAL library. Nobody has compared it by ear with the
+  original game.
+  [The original mixer's upsampling](audio-modernization.md#the-original-mixers-upsampling-as-an-option-november-27).
+
 ## Pack seeks, background animation caches and no config rewrite at launch, from openPR06, 27 November 2026
 
 The third openPR06 port round: danperisse-hue's pull requests #53-#81 and
@@ -141,8 +164,8 @@ issues #61-#78, reviewed from openPR06 eae938d69 to 181cd5749.
   their top octave back too.
 - **Nothing to change.** `s_resampler auto`, the default, picks the new filter
   after an update. If you set `s_resampler` yourself, your choice is kept.
-  `s_resampler default` gives a slightly brighter, grittier sound closer to the
-  original game's mixer, and `listResamplers` lists every choice.
+  `listResamplers` lists every choice, and `s_retailUpsampling 1` gives the
+  original game's brighter, grittier sound (see the entry above).
 - Reported by a player as sounds seeming compressed or low in quality.
 - Evidence: test signals played through the hidden game and captured from the
   mix show the old filter's loss and the new one's flat response; 371 stock

@@ -387,6 +387,9 @@ protected:
 	ALuint			openalBuffer;
 	bool			openalBufferUploadFailed;
 	uint64			openalReserved;
+	// How many times each sample is repeated in openalBuffer (s_retailUpsampling): sample
+	// positions given to OpenAL for that buffer are multiplied by it.
+	int				openalRepeat = 1;
 
 	int				playBegin;
 	int				playLength;

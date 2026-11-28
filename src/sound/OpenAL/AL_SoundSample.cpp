@@ -37,6 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../SoundVorbisStream.h"
 #include "../SoundMemoryBudget.h"
 #include "../SoundQueue.h"
+#include "../SoundSampleRepeat.h"
 static_assert( SoundVorbisStream::ChunkFrames == SOUND_QUEUE_DECODE_FRAMES,
 	"voice queues fill a buffer in decoder-sized reads" );
 static_assert( SoundVorbisStream::ChunkFrames * 6 * sizeof( short ) == SOUND_QUEUE_BUFFER_BYTES,
@@ -1128,14 +1129,39 @@ void idSoundSample_OpenAL::CreateOpenALBuffer()
 			{
 				SoundSample_BuildAmplitudeEnvelope( static_cast<const int16*>( buffer ), bufferSize, NumChannels(), format.basic.samplesPerSec, amplitude, amplitudeReserved );
 			}
-			if( !SoundMemoryAcquire( bufferSize ) ) {
+			// s_retailUpsampling: the buffer holds each sample repeated, at 44.1 kHz
+			const int frameBytes = Max( 1, NumChannels() ) * static_cast<int>( sizeof( short ) );
+			int repeat = soundSystemLocal.hardware.SampleRepeat( format.basic.samplesPerSec );
+			if( bufferSize % frameBytes != 0 || bufferSize > ( 0x7fffffffu / 4 ) )
+			{
+				repeat = 1;
+			}
+			const uint32 uploadSize = bufferSize * repeat;
+			short* repeated = repeat > 1 ? static_cast<short*>( AllocBuffer( uploadSize, GetName() ) ) : NULL;
+			if( repeat > 1 && repeated == NULL )
+			{
+				repeat = 1;
+			}
+			if( !SoundMemoryAcquire( repeat > 1 ? uploadSize : bufferSize ) ) {
+				FreeBuffer( repeated );
 				alDeleteBuffers( 1, &openalBuffer );
 				openalBuffer = 0;
 				openalBufferUploadFailed = true;
 				return; // CPU bytes remain available to the bounded queue fallback.
 			}
-			openalReserved = bufferSize;
-			alBufferData( openalBuffer, GetOpenALBufferFormat(), buffer, bufferSize, format.basic.samplesPerSec );
+			openalRepeat = repeat;
+			if( repeat > 1 )
+			{
+				openalReserved = uploadSize;
+				SoundRepeatFrames( static_cast<const short*>( buffer ), static_cast<int>( bufferSize / frameBytes ), frameBytes / static_cast<int>( sizeof( short ) ), repeat, repeated );
+				alBufferData( openalBuffer, GetOpenALBufferFormat(), repeated, uploadSize, format.basic.samplesPerSec * repeat );
+				FreeBuffer( repeated );
+			}
+			else
+			{
+				openalReserved = bufferSize;
+				alBufferData( openalBuffer, GetOpenALBufferFormat(), buffer, bufferSize, format.basic.samplesPerSec );
+			}
 		}
 
 		const ALenum uploadError = CheckALErrors();

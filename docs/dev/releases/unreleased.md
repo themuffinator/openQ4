@@ -614,8 +614,11 @@ the [development roadmap](../roadmap.md) for current scope.
   recorded at 22 kHz, and the filter that converts them to your sound device's
   rate was too short: it removed most of what they have above 6 kHz, which made
   them dull, as if heavily compressed. A longer filter keeps it, still without
-  adding distortion. Nothing to change; `s_resampler default` gives a slightly
-  brighter, grittier sound closer to the original game's mixer.
+  adding distortion. Nothing to change.
+- `s_retailUpsampling 1` gives the original game's sound instead: it repeats
+  samples to bring 22 kHz sounds up to the mixing rate, as Quake 4's own mixer
+  did, which adds a bright, gritty edge the recordings do not have. Enter it in
+  the console with `s_restart`. Those sounds take twice the sound memory.
 - **Headphone HRTF** no longer switches itself on when your system says the
   output is headphones, which many laptop and front-panel outputs do whatever
   is plugged in. It thinned the bass of every sound in the world beside your

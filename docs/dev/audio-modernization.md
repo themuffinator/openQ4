@@ -43,7 +43,7 @@ a protected master bus, streaming), not with any one game's tuning, which is not
 | Unpositioned sounds | Equal to every speaker | Non-spatialized | Rendered as a point straight ahead | Full spread around the listener |
 | Stereo and music | Straight to left and right | Non-diegetic bus | Virtual speakers, so through HRTF on headphones | Direct channels (`s_directStereo`) |
 | Speaker layout and HRTF | XAudio2 device channels | Endpoint layout, binaural option | 5.1 forced everywhere; `s_openALHRTF 1` ignored | Device layout by default; HRTF a choice, off by default; reopen keeps both |
-| Resampling | XAudio2 SRC | High-quality SRC | OpenAL Soft cubic spline | 23rd order sinc (`s_resampler`) |
+| Resampling | XAudio2 SRC | High-quality SRC | OpenAL Soft cubic spline | 23rd order sinc (`s_resampler`); the original mixer's sample repetition as an option (`s_retailUpsampling`) |
 | Master bus | XAudio2 mastering voice | Limiter / HDR | No limiter on float devices | OpenAL Soft limiter (`s_outputLimiter`) |
 | Distance filtering | None | Attenuation low-pass | None | Air absorption from the room preset (`s_airAbsorption`) |
 | Gain headroom | Unclamped sounds above unity | Bus headroom | Clamped to 1 by `AL_MAX_GAIN` | 16x headroom |
@@ -709,9 +709,10 @@ the 47th adds 0.3 dB for several times the mixing cost and stays available by
 name. A runtime with neither keeps its own default, never a short sinc.
 
 Retail's mixer upsampled by repeating samples (`UpSamplePCMTo44kHz` in the SDK),
-which keeps the treble and adds strong images above 11 kHz. `Nearest` and the
-runtime default are the nearest equivalents for players who want that brighter,
-grittier sound. The default stays the filter that reproduces the files.
+which keeps the treble and adds strong images above 11 kHz. The default stays
+the filter that reproduces the files;
+[`s_retailUpsampling`](#the-original-mixers-upsampling-as-an-option-november-27) does what retail did for players who want that
+brighter, grittier sound.
 
 **What the audit cleared.**
 
@@ -776,6 +777,65 @@ both, and the suites pass again (38,423 and 44,969 checks, every mutant killed).
 Evidence and the probes are in `.tmp/audio-quality/` (`probe.py`,
 `stock_spectrum.py`, `resampler_cost.py`, `scene.py`). Timings are from a shared
 machine and vary by a factor of two between runs.
+
+### The original mixer's upsampling as an option (November 27)
+
+`s_retailUpsampling 1` (off by default, archived, applied on `s_restart`) brings
+11.025 and 22.05 kHz sounds up to 44.1 kHz by repeating each sample four times
+or twice, which is what Quake 4's mixer did (`idSIMD_Generic::UpSamplePCMTo44kHz`
+and `UpSampleOGGTo44kHz` in the SDK). `s_resampler` then only takes 44.1 kHz to
+the output rate. OpenAL Soft's `Nearest` resampler is not the same thing: it
+holds samples straight to a 48 kHz output, which folds the images above 24 kHz
+back into the audible band as inharmonic noise retail never had.
+
+Repeating a sample L times is an L-sample average at 44.1 kHz. For 22.05 kHz
+that is `cos(pi f / 44100)`: the sound keeps a little more of its own treble
+than the 23rd order sinc leaves it (-1.9 dB at 9 kHz against -3.8 dB), and its
+mirror image above 11.025 kHz stands only a few dB under it (-2.5 dB at
+13.05 kHz for a 9 kHz tone). That image is the bright, gritty edge of the
+original game.
+
+**Where it happens.** At the two places PCM is handed to OpenAL, and nowhere
+else (`SoundSampleRepeat.h`):
+
+- a resident sample's buffer is uploaded repeated, at 44.1 kHz, and remembers
+  its factor (`idSoundSample_OpenAL::openalRepeat`); the two sample positions the
+  voice gives OpenAL for such a buffer are multiplied by it;
+- every queue buffer (streamed Ogg blocks, the CPU-resident fallback, centre
+  routing) goes through `SoundVoice_BufferData`, and the queue sizes its blocks
+  by the repeated bytes, so each still fits the buffer the reservations count.
+
+Everything the engine keeps stays at the sound's own rate: lengths, offsets,
+envelopes, stream positions, saved games. The hardware latches the setting when
+the device starts (`idSoundHardware_OpenAL::SampleRepeat`), and each resident
+buffer carries its own factor, so a device reset cannot mix the two. Other
+rates are left to the resampler, as retail accepted no others.
+
+**Cost.** The repeated copy is what OpenAL holds, so 22 kHz sounds take twice
+their sound memory and 11 kHz sounds four times. Air Defense's opening reserves
+213 MiB of managed audio instead of 139 MiB (peak 228 against 181), inside the
+256 MiB `s_audioMemoryMB` budget with nothing refused. A sample the budget does
+refuse plays from its CPU copy through the queue, repeated the same way.
+
+**Measured in the engine** (`.tmp/audio-quality/retail_probe.py`, hidden, the
+mix captured through the wave writer), off and on:
+
+| Signal | Off | On | Repetition predicts |
+| --- | --- | --- | --- |
+| 9 kHz tone at 22.05 kHz, against 1 kHz | -3.7 dB | -1.9 dB | -1.9 dB |
+| its image at 13.05 kHz, against 1 kHz | -75 dB | -4.5 dB | -4.4 dB |
+| the same from a streamed 16 s Ogg | -3.8, -75 dB | -1.6, -4.2 dB | -1.9, -4.4 dB |
+| 4 kHz tone at 11.025 kHz; images at 7.0 and 15.0 kHz | 0, -70, -90 dB | -1.8, -6.1, -11.3 dB | -1.7, -6.4, -11.6 dB |
+| 22.05 kHz noise: 7.7-9.9 kHz against 1.1-3.3 kHz; image band | -2.7, -66 dB | -1.7, -2.8 dB | -1.7, -2.8 dB |
+| 44.1 kHz noise, 12-16 kHz | 0.0 dB | 0.0 dB | unchanged |
+
+The streamed tone holds its level within 0.1 dB over the window (no gaps). A
+loop of two seconds of 1 kHz and two of 3 kHz, cut off by `s_testDeviceInterruption
+400` and restarted at the scene clock, switches tones at the same place in its
+four seconds before and after, in both modes, which is the check on the
+positions given to OpenAL. `sound_resampler.py` compiles the rule, pins the
+wiring and repeats the tone measurement on the OpenAL library (26 checks).
+Nobody has compared it by ear with retail, and there is no menu row.
 
 ## Deferred
 
