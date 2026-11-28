@@ -7664,6 +7664,9 @@ the non-verbal remainder is marked for players rather than counted as covered.
   The dry path, reverb, air absorption and limiter measured clean. Retail's
   mixer repeated samples, which is brighter and adds images; the levels above
   do not compare that, and the focused retail run still decides this item.
+  `s_retailUpsampling 1` now does the same repetition for players who want it
+  (off by default); its droop and images match repetition within 0.5 dB in the
+  engine, for resident and streamed sounds.
   [Fidelity audit](audio-modernization.md#resampler-passband-and-a-fidelity-audit-november-27).
 - [ ] **AUD-02 — P1, qualification: physical device and timing lifecycle.** Test
   default/selected endpoint loss and return, hotplug, pause/resume/slow motion,

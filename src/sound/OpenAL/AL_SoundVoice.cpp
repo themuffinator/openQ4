@@ -30,6 +30,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../snd_local.h"
 #include "../SoundSurround.h"
 #include "../SoundQueue.h"
+#include "../SoundSampleRepeat.h"
 #include "../SoundOutputRecovery.h"
 
 extern idCVar s_warnOnMissingSamples;
@@ -95,6 +96,30 @@ static int soundDeepRoutedQueueVoices = 0;
 #if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
 static short soundRoutedQueueScratch[SOUND_QUEUE_MAX_FRAMES * 6];
 #endif
+
+/*
+========================
+SoundVoice_BufferData
+
+Every queue buffer's PCM goes to OpenAL through here. With s_retailUpsampling an 11 or
+22 kHz block is written with each frame repeated, at 44.1 kHz (SoundSampleRepeat.h); the
+queue sizes its blocks by the repeated bytes, so they fit the buffer the reservations count.
+========================
+*/
+static short soundRepeatQueueScratch[SOUND_QUEUE_MAX_FRAMES * 6];
+
+static void SoundVoice_BufferData( ALuint buffer, ALenum alFormat, const short* pcm, int frames, int channels, int sampleRate )
+{
+	const int repeat = soundSystemLocal.hardware.SampleRepeat( sampleRate );
+	const int samples = frames * channels;
+	if( repeat > 1 && samples > 0 && samples <= static_cast<int>( sizeof( soundRepeatQueueScratch ) / sizeof( short ) ) / repeat )
+	{
+		SoundRepeatFrames( pcm, frames, channels, repeat, soundRepeatQueueScratch );
+		alBufferData( buffer, alFormat, soundRepeatQueueScratch, samples * repeat * sizeof( short ), sampleRate * repeat );
+		return;
+	}
+	alBufferData( buffer, alFormat, pcm, samples * sizeof( short ), sampleRate );
+}
 static_assert( idSoundOggStream::AHEAD_BLOCKS >= MAX_QUEUED_BUFFERS,
 	"a streamed voice refills every queue buffer in one frame from blocks decoded ahead" );
 
@@ -467,7 +492,7 @@ int idSoundVoice_OpenAL::RoutedQueueFrames( int sampleRate )
 		deepRoutedQueue = true;
 		++soundDeepRoutedQueueVoices;
 	}
-	return SoundQueueFrames( sampleRate, SOUND_QUEUE_ROUTED_FRAME_BYTES,
+	return SoundQueueFrames( sampleRate, SOUND_QUEUE_ROUTED_FRAME_BYTES * soundSystemLocal.hardware.SampleRepeat( sampleRate ),
 		deepRoutedQueue ? SOUND_QUEUE_DEEP_ROUTED_BUFFER_BYTES : SOUND_QUEUE_BUFFER_BYTES );
 }
 
@@ -939,7 +964,7 @@ int idSoundVoice_OpenAL::RestartAt( int offsetSamples )
 				alSourcei( openalSource, AL_LOOPING, ( sample == loopingSample && loopingSample != NULL ? AL_TRUE : AL_FALSE ) );
 				if( bufferOffset > 0 )
 				{
-					alSourcei( openalSource, AL_SAMPLE_OFFSET, startSample );
+					alSourcei( openalSource, AL_SAMPLE_OFFSET, startSample * sample->openalRepeat );
 				}
 				if( CheckALErrors() != AL_NO_ERROR )
 				{
@@ -999,7 +1024,7 @@ int idSoundVoice_OpenAL::SubmitBuffer( idSoundSample_OpenAL* sample, int bufferN
 		alSourceQueueBuffers( openalSource, 1, &staticBuffer );
 		if( offset > 0 )
 		{
-			alSourcei( openalSource, AL_SAMPLE_OFFSET, offset );
+			alSourcei( openalSource, AL_SAMPLE_OFFSET, offset * sample->openalRepeat );
 		}
 		if( CheckALErrors() != AL_NO_ERROR )
 		{
@@ -1073,7 +1098,7 @@ int idSoundVoice_OpenAL::SubmitBuffer( idSoundSample_OpenAL* sample, int bufferN
 	}
 
 	const byte* audioData = reinterpret_cast<const byte*>( sampleBuffer.buffer ) + byteOffset;
-	int queueFrames = SoundQueueChunkFrames( sample->SampleRate(), bytesPerSample );
+	int queueFrames = SoundQueueChunkFrames( sample->SampleRate(), bytesPerSample * soundSystemLocal.hardware.SampleRepeat( sample->SampleRate() ) );
 #if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
 	if( centerRouting )
 	{
@@ -1094,11 +1119,11 @@ int idSoundVoice_OpenAL::SubmitBuffer( idSoundSample_OpenAL* sample, int bufferN
 #if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
 	if( centerRouting ) {
 		SoundRouteMonoToCenter( reinterpret_cast<const short*>( audioData ), submitSamples, centerChannel, soundRoutedQueueScratch );
-		alBufferData( streamBuffer, AL_FORMAT_51CHN16, soundRoutedQueueScratch, submitSamples * 6 * sizeof( short ), sample->SampleRate() );
+		SoundVoice_BufferData( streamBuffer, AL_FORMAT_51CHN16, soundRoutedQueueScratch, submitSamples, 6, sample->SampleRate() );
 	} else
 #endif
 	{
-		alBufferData( streamBuffer, sample->GetOpenALBufferFormat(), audioData, audioBytes, sample->SampleRate() );
+		SoundVoice_BufferData( streamBuffer, sample->GetOpenALBufferFormat(), reinterpret_cast<const short*>( audioData ), submitSamples, bytesPerSample / static_cast<int>( sizeof( short ) ), sample->SampleRate() );
 	}
 	if( CheckALErrors() != AL_NO_ERROR )
 	{
@@ -1119,7 +1144,7 @@ int idSoundVoice_OpenAL::StreamBlockFrames( idSoundSample_OpenAL* sample, int of
 	// Three independent buffers of about a third of a second each, irrespective
 	// of track length; the decoder hands out at most 4096 frames per call.
 	const int channels = Max( 1, sample->NumChannels() );
-	int queueFrames = SoundQueueChunkFrames( sample->SampleRate(), channels * static_cast<int>( sizeof( short ) ) );
+	int queueFrames = SoundQueueChunkFrames( sample->SampleRate(), channels * static_cast<int>( sizeof( short ) ) * soundSystemLocal.hardware.SampleRepeat( sample->SampleRate() ) );
 	int decodeCapacity = static_cast<int>( SOUND_QUEUE_BUFFER_BYTES / sizeof( short ) ) / channels;
 #if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
 	if( centerRouting ) {
@@ -1204,11 +1229,11 @@ bool idSoundVoice_OpenAL::QueueNextBuffer( ALuint streamBuffer )
 #if OPENQ4_OPENAL_CENTER_ROUTING_SUPPORTED
 		if( centerRouting ) {
 			SoundRouteMonoToCenter( pcm, frames, centerChannel, soundRoutedQueueScratch );
-			alBufferData( streamBuffer, AL_FORMAT_51CHN16, soundRoutedQueueScratch, frames * 6 * sizeof( short ), sample->SampleRate() );
+			SoundVoice_BufferData( streamBuffer, AL_FORMAT_51CHN16, soundRoutedQueueScratch, frames, 6, sample->SampleRate() );
 		} else
 #endif
 		{
-			alBufferData( streamBuffer, sample->GetOpenALBufferFormat(), pcm, frames * channels * sizeof( short ), sample->SampleRate() );
+			SoundVoice_BufferData( streamBuffer, sample->GetOpenALBufferFormat(), pcm, frames, channels, sample->SampleRate() );
 		}
 		if( CheckALErrors() != AL_NO_ERROR ) { ResetQueuedBufferState(); return false; }
 		alSourceQueueBuffers( openalSource, 1, &streamBuffer );

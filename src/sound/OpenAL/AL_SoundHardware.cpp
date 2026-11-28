@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "../VoiceChat.h"
 #include "../SoundSettings.h"
 #include "../SoundResampler.h"
+#include "../SoundSampleRepeat.h"
 #if defined(USE_DOOMCLASSIC)
 	#include "../../../doomclassic/doom/i_sound.h"
 #endif
@@ -43,6 +44,7 @@ idCVar s_device( "s_device", "-1", CVAR_INTEGER | CVAR_ARCHIVE, "Which audio dev
 idCVar s_showPerfData( "s_showPerfData", "0", CVAR_BOOL, "Show sound backend performance data" );
 idCVar s_outputLimiter( "s_outputLimiter", "1", CVAR_ARCHIVE | CVAR_BOOL, "soft-limit the final mix so loud scenes compress instead of clipping" );
 idCVar s_resampler( "s_resampler", "auto", CVAR_ARCHIVE, "OpenAL resampler for every voice: auto (a 23rd order sinc when the runtime has one, which keeps the treble of 22 kHz sounds), default (the runtime's own, brighter and grittier), or a name or number from listResamplers; takes effect on s_restart" );
+idCVar s_retailUpsampling( "s_retailUpsampling", "0", CVAR_ARCHIVE | CVAR_BOOL, "bring 11 and 22 kHz sounds up to 44.1 kHz by repeating samples, as the original game's mixer did: brighter and grittier than the resampler alone, and those sounds take two to four times the sound memory; takes effect on s_restart" );
 extern idCVar s_useEAXReverb;
 idCVar s_reverbIdleSlots( "s_reverbIdleSlots", "1", CVAR_SOUND | CVAR_BOOL, "let an area reverb slot no voice has fed for longer than its tail hold the null effect, which the OpenAL mixer skips; 0 keeps all four reverbs running" );
 idCVar s_reverbPanStep( "s_reverbPanStep", "0.05", CVAR_SOUND | CVAR_FLOAT, "while the view turns, resend a reverb slot's panning only once it moved this far (0.05 is about 3 degrees); it settles exactly when the view stops. 0 resends every change", 0.0f, 0.5f );
@@ -1678,6 +1680,9 @@ void idSoundHardware_OpenAL::DetectVoiceFeatures()
 		alcIsExtensionPresent( openalDevice, "ALC_SOFT_output_mode" ) == ALC_TRUE;
 	idStr resamplerName;
 	sourceResampler = openQ4_SelectResampler( resamplerName );
+	// Latched here, with the device: buffers uploaded from now on carry it, and each static
+	// buffer remembers the factor it was uploaded with (idSoundSample_OpenAL::openalRepeat).
+	retailUpsampling = s_retailUpsampling.GetBool();
 
 	// Doom units are inches, and OpenAL reads AL_SPEED_OF_SOUND in the units of the
 	// velocities it is given, so its 343.3 default meant 343 inches a second.
@@ -1689,6 +1694,20 @@ void idSoundHardware_OpenAL::DetectVoiceFeatures()
 		sourceRadiusAvailable ? "on" : "unavailable",
 		directChannelsAvailable ? ( directChannelsMode == AL_TRUE ? "on" : "on (remixed)" ) : "unavailable",
 		resamplerName.c_str() );
+	if( retailUpsampling )
+	{
+		common->Printf( "OpenAL upsampling: 11 and 22 kHz sounds repeat samples to 44.1 kHz, as the original mixer did (s_retailUpsampling)\n" );
+	}
+}
+
+/*
+========================
+idSoundHardware_OpenAL::SampleRepeat
+========================
+*/
+int idSoundHardware_OpenAL::SampleRepeat( int sampleRate ) const
+{
+	return retailUpsampling ? SoundRetailRepeat( sampleRate ) : 1;
 }
 
 void listDevices_f( const idCmdArgs& args )

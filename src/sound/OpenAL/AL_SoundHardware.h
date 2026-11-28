@@ -142,6 +142,9 @@ public:
 	{
 		return sourceResampler;
 	}
+	// s_retailUpsampling as the sound system started with it: how many times each sample of
+	// a sound at this rate is repeated on its way into an OpenAL buffer (SoundSampleRepeat.h)
+	int				SampleRepeat( int sampleRate ) const;
 
 	// Retail area reverb slots (idSoundReverb). Slot 0 is auxEffectSlot, whose
 	// lifetime the checked settings path owns; slots 1-3 exist while it does.
@@ -279,6 +282,7 @@ private:
 	bool				directChannelsAvailable;
 	ALint				directChannelsMode;
 	ALint				sourceResampler;
+	bool				retailUpsampling = false;
 	idStr				openedRequestedDeviceName;
 	idStr				openedActiveDeviceName;
 	idStr				openedDefaultDeviceName;

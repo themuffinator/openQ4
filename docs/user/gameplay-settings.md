@@ -232,7 +232,8 @@ These are on by default and rarely need changing. Each takes effect after `s_res
 
 - `s_sourceRadiusScale 0.5`: gives each sound a size, so standing next to a machine or a fire surrounds you instead of jumping from ear to ear as you turn, and your own footsteps and weapons play evenly. `0` makes every positioned sound a point.
 - `s_directStereo 1`: music and other stereo sounds play straight to your speakers or headphones instead of through 3D headphone audio, which narrowed and quietened them.
-- `s_resampler auto`: most Quake 4 sounds are recorded at 22 kHz and are converted to your sound device's rate as they play. `auto` uses a long filter that keeps their full treble and adds no distortion. `default` uses OpenAL's own short one, which is a little brighter and grittier, closer to the original game's mixer. `listResamplers` lists every choice.
+- `s_resampler auto`: most Quake 4 sounds are recorded at 22 kHz and are converted to your sound device's rate as they play. `auto` uses a long filter that keeps their full treble and adds no distortion. `default` uses OpenAL's own short one, and `listResamplers` lists every choice.
+- `s_retailUpsampling 0`: set it to `1` for the original game's sound. Quake 4's own mixer brought its 11 and 22 kHz sounds up to 44.1 kHz by repeating each sample, which keeps a little more treble and adds a bright, gritty edge above it that the recordings themselves do not have. With `1`, openQ4 does exactly that, and `s_resampler` then only converts 44.1 kHz to your device's rate. Those sounds take twice the sound memory (four times at 11 kHz): Air Defense holds 213 MiB instead of 139 MiB, of a 256 MiB budget that `s_audioMemoryMB` sets. 44 kHz sounds and music are unchanged.
 - `s_outputLimiter 1`: loud scenes compress instead of clipping.
 - `s_airAbsorption 1`: distant sounds lose a little treble, as each room's reverb sets.
 
@@ -364,6 +365,7 @@ All of these are saved automatically. Type them in the console, or put them in a
 | `s_sourceRadiusScale` | `0.5` | Sound size; `0` makes every sound a point. |
 | `s_directStereo` | `1` | Stereo sounds bypass 3D headphone audio. |
 | `s_resampler` | `auto` | Upsampling filter; `listResamplers` lists the choices. |
+| `s_retailUpsampling` | `0` | `1` repeats samples to bring 11 and 22 kHz sounds up to 44.1 kHz, as the original game's mixer did; takes effect on `s_restart`. |
 | `s_outputLimiter` | `1` | Compresses loud scenes instead of clipping. |
 | `s_airAbsorption` | `1` | Distant sounds lose a little treble. |
 | `ui_subtitles` | `0` | `1` shows dialogue subtitles. |
