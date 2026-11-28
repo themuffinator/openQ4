@@ -1787,6 +1787,33 @@ the relay already once-only, a taunt already targeted) were each rejected.
   driven by its own loop; the copies only add effects in a room the player
   has left. Not changed.
 
+### Her docked volleys
+
+Her model defines three docked attacks: `plugin_range_attack1` (two railgun
+shots from each of two barrels, 20 damage each with a small splash),
+`plugin_range_attack2` (two grenades, 60 direct and 80 splash) and
+`plugin_range_attack_big` (the death ray: twenty hits from each of two
+barrels at 60). Her one docked action, `action_pluginAttackBig`, draws its
+animation from the numbered two. The expansion's state ignored that draw and
+always played the death ray, and openQ4's did the same, so the railgun and
+grenade volleys never played. At the user's request,
+`State_Torso_PluginAttackBig` now plays the action's own draw two times in
+three and the death ray the third time. That ratio is openQ4's choice. The
+content authored the three takes and the action's draw; nothing records how
+often the developers meant the death ray to fire. Every volley commits its
+aim at the start of the windup, the rule set on 4 November for the death ray.
+Her class's save layout is unchanged. The choice uses the action's draw,
+which is already saved, and restored saves get the mix too.
+
+Probe `m09volleys2` (module `c98bf742…`, hidden, no input, god mode on the
+entrance ledge): 21 volleys in 103 seconds docked: 8 railgun, 6 grenade and
+7 death ray, in no fixed order. They fired 32 railgun, 12 grenade and 280
+death-ray attacks (40 a death ray). `m09volleys` is the rejected first form,
+which played the draw every time: 19 volleys, none of them the death ray.
+Damage to the player per volley was not measured (god mode zeroes it), so
+the change to the docked phase's pressure is not qualified.
+`awakening_gameplay_contract.py` pins the mix and the windup lock.
+
 ### Not placed
 
 None of these has a scene or trigger the content supplies, so nothing was

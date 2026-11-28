@@ -91,6 +91,14 @@ def check_valkaryne() -> None:
                            "Monster_Valkaryne.cpp")
     require_order(lookup, ("gameLocal.program.FindFunction( name )", "ev_namespace", '"::"'),
                   "FindScriptFunctionAnyNamespace")
+    # Docked, she fires all three authored volleys: the action's own draw of
+    # the numbered two, or the death ray one time in three; the windup lock holds.
+    volley = function_body(source, "stateResult_t riMonsterValkaryne::State_Torso_PluginAttackBig(",
+                           "Monster_Valkaryne.cpp")
+    require_order(volley, ("animator.GetAnim( actionAnimNum )", '"plugin_range_attack", 19',
+                           "gameLocal.random.RandomInt( 3 ) != 0", '"plugin_range_attack_big"',
+                           "PlayAnim( ANIMCHANNEL_TORSO, volley", "enemy.fl.lockOrigin = true;"),
+                  "riMonsterValkaryne::State_Torso_PluginAttackBig")
 
 
 def check_target_filter() -> None:

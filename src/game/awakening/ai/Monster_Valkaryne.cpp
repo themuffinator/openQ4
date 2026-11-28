@@ -10,8 +10,9 @@
 	moves her between two modes with docked() and undock():
 
 	Docked: plugged into her platform. She idles on "plugin", cannot move and
-	takes no damage, and her only attack is the long "plugin_range_attack_big"
-	death-ray volley (action_pluginAttackBig).
+	takes no damage. Her one action (action_pluginAttackBig) fires one of
+	three docked volleys at random: twin railguns, grenades or the long
+	death ray (the expansion fired only the death ray).
 
 	Undocked: undock() plays "plugin_to_idle" and hands her her ranged and
 	melee attacks back. She now turns only in 90 degree steps
@@ -401,9 +402,22 @@ stateResult_t riMonsterValkaryne::State_Torso_PluginAttackBig( const stateParms_
 		STAGE_WAIT
 	};
 	switch ( parms.stage ) {
-		case STAGE_INIT:
+		case STAGE_INIT: {
+			// Three docked volleys are authored: twin railguns
+			// (plugin_range_attack1), grenades (2) and the death ray (_big).
+			// Her definition's action draws only from the numbered two; the
+			// expansion's code ignored that draw and always fired the death
+			// ray. openQ4 fires all three, one in three each: PerformAction's
+			// saved draw (actionAnimNum) for two of them, the death ray for
+			// the third. A draw that is not a docked volley keeps the ray.
+			const idAnim *chosen = actionAnimNum > 0 ? animator.GetAnim( actionAnimNum ) : NULL;
+			const char *volley = chosen && !idStr::Icmpn( chosen->FullName(), "plugin_range_attack", 19 ) &&
+				gameLocal.random.RandomInt( 3 ) != 0 ? chosen->FullName() : "plugin_range_attack_big";
+			if ( DebugActions() ) {
+				gameLocal.Printf( "%d %s:   volley %s\n", gameLocal.time, name.c_str(), volley );
+			}
 			OverrideAnim( ANIMCHANNEL_LEGS );
-			PlayAnim( ANIMCHANNEL_TORSO, "plugin_range_attack_big", parms.blendFrames );
+			PlayAnim( ANIMCHANNEL_TORSO, volley, parms.blendFrames );
 			// Commit the beam to the position telegraphed by its windup. The
 			// recovered clip locks at frame 70 and fires at 96 at double rate:
 			// only about half a second to escape its wide spread. At the
@@ -411,8 +425,10 @@ stateResult_t riMonsterValkaryne::State_Torso_PluginAttackBig( const stateParms_
 			// even while running. Keep the damage and burst, but give the whole
 			// windup to move out of the aimed area. This flag and the recorded
 			// enemy positions already survive saves and reset when actions end.
+			// The two short volleys follow the same rule.
 			enemy.fl.lockOrigin = true;
 			return SRESULT_STAGE( STAGE_WAIT );
+		}
 
 		case STAGE_WAIT:
 			return AnimDone( ANIMCHANNEL_TORSO, parms.blendFrames ) ? SRESULT_DONE : SRESULT_WAIT;

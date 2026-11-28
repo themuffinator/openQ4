@@ -89,11 +89,18 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   power of the Strogg") now play once each, in the writers' order, about
   every 20 seconds, holding back around her undock line and stopping when
   she dies.
-- Fresh starts only: a save keeps the mission revision it was made with.
+- **Her docked volleys vary.** Docked, she fired only her death ray. Her
+  twin-railgun and grenade volleys, animated for the platform and never used,
+  now take turns with it at random, about one in three each; every volley
+  still commits its aim at the start of its windup.
+- Fresh starts only, except the volleys: a save keeps the mission revision it
+  was made with, while the volleys are the Valkaryne's own behaviour and
+  apply to saves too.
 - Evidence: hidden, input-free probes on the rebuilt module (revision 5
   loads, retreat, once-only relay, objective completion, the Patton ending,
-  v4 and v5 save restores, taunt timing through the fight) and
-  `awakening_content_repairs.py`.
+  v4 and v5 save restores, taunt timing through the fight, 21 docked volleys:
+  8 railgun, 6 grenade, 7 death ray), `awakening_content_repairs.py` and
+  `awakening_gameplay_contract.py`.
   [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026).
 
 ## Check boxes for on/off settings, and subtitles under Accessibility, 28 November 2026

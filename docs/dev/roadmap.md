@@ -5034,8 +5034,10 @@ Completion substeps must keep three forms of evidence distinct:
   the second refinery tower on its own part. Docked and mobile boss behaviour
   rechecked unchanged; v4 and v5 saves restore. At the user's request the
   twelve unused Valkaryne taunts play through the boss fight, in the writers'
-  order (timing checked without a sound device; not yet heard). Other unwired
-  content is listed, not placed. See
+  order (timing checked without a sound device; not yet heard), and her two
+  never-used docked volleys (twin railguns, grenades) share her platform with
+  the death ray, one in three each. Other unwired content is listed, not
+  placed. See
   [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026).
   M08 revision 5, 28 November: the same cross-check of Cryofac found two
   gaps; fresh starts now complete "Cryogenic Security Station and Deep
