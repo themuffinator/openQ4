@@ -123,6 +123,117 @@ to trigger it, terminating that thread with a missing-entity warning. Invasion
 v3 checks the destruction flag, surviving core/health and spawner before the late
 activation. The regression now treats missing script-event entities as failures.
 
+## M05 revision 3 — 28 November 2026
+
+The user asked for M05 to be scrutinised for bugs and for gaps in what its
+developers meant. The three earlier reviews covered the Pain Lord, the rescue,
+the medic and the freight lift. This pass cross-checked the rest of the level
+in the same way as [M09 revision 5](awakening-missions.md#m09-revision-5--28-november-2026):
+
+- every entity the level and Pain Lord scripts name, against the map;
+- every `call`, `script_death`, `script_onclick`, target and door key;
+- every entity that waits to be triggered, against whatever can fire it;
+- all 71 scripted animations, against the actors' model declarations;
+- the writers' line list (`m05_bio_vo.script`), against what the level plays.
+
+It then ran the first half of the level (the descent to the service lift) and
+the Viper squad's half (the lift to the bridge) as hidden, input-free scene
+probes.
+
+### Fixed
+
+Fresh M05 starts compile `maps/game/m05_bio.openq4-v3.script`. Revisions 1 and
+2 are unchanged, and a save keeps the revision it was made with. Each edit must
+match the installed script exactly once, or the level keeps its installed
+behaviour.
+
+| Defect | Evidence | Repair |
+| --- | --- | --- |
+| Mitchell can be left behind at the service lift. | He follows the player again only if he rode the lift down. If he misses it, `gotob1` teleports him to the bottom (`REDSHIRT2_NEED_TELEPORT`), but nothing gives him back his leader. In the probe he stood at the foot of the lift for 12 seconds while the player walked away. He did not move again until the Viper meeting moved him by script. | `getGuysOffEl2` gives him the player as leader on both paths; only the line he says after the ride still needs the ride. In the same probe he walked from (-584 1344) to the player at (-320 792). |
+| The grunt's entrance has no music. | `throwGuy` comments out `sys.trigger( $gruntintro_speaker )` with the note "WHY DON'T YOU WORK". The speaker waits for that trigger, and its retail stinger (`airdefense_grunt_through_pipes`, `stinger02`) is installed. | The trigger is restored. A sound-enabled probe on OpenAL's null device logs the stinger starting as the grunt appears. |
+| Tak's radio guidance to Strauss is silent. | `radioBattle1` starts as the player leaves the service lift and stops at the pre-boss checkpoint. That is the same pattern as `radioBattle2`, Tak's radio lines through the fight. Its body is commented out, because it named retail battle chatter (`vo_6_2_*`). The writers' list holds seven recorded, declared Tak lines for this stretch, and nothing plays them. | `radioBattle1` plays four of them, in their written order and on the developer's timing: 21 to 50 seconds after the lift, then 61 to 90 seconds apart. The lines are "I've got a lock on Strauss", "Keep moving, Dekard. You're getting closer", "You're closing in on him, Dekard" and "Strauss doesn't have much time". Each waits until neither radio is busy and Mitchell and the Viper pair are not speaking. "Straight ahead", "Check the right" and "He's to the left" are left out, because a timer cannot make them true. The choice of lines and the waits are openQ4's. |
+| Toalson's persona does not exist. | `redshirt1` names `persona_marine_5_helmet_tech`. Neither the expansion nor retail declares it: only marines 1 and 3 have a helmeted tech persona. He therefore lost marine 5's voice set (pain, death and squad chatter). | A fresh start gives him `persona_marine_5_helmet` and keeps his class's tech helmet through `override_head`. `listSpawnArgs` shows marine 5's chatter keys, and his head entity is still `char_marinehead_helmet_tech`. |
+
+`awakening_content_repairs.py` pins the four repairs. With the content present,
+it also checks each one against the installed map and script:
+
+- every anchor matches once;
+- `radioBattle1` still has no body, and its start, its stop and Mitchell's
+  teleport are still there;
+- the stinger speaker still waits for a trigger, has its recording, and nothing
+  else plays it;
+- each Tak line is Tak's in the writers' list, is recorded, and is unplayed;
+- the persona is still missing, and its marine 5 counterpart is present.
+
+Five negative controls were each rejected: the stinger already uncommented, a
+body in `radioBattle1`, a Tak line already played, the persona already
+corrected, and the persona declared.
+
+### Checked and left alone
+
+- **The Viper tech's death does not block the level.** Stark (`squadx2`) is
+  the only one who can unlock the bridge, and nothing makes him undying or
+  fails the mission when he dies. Killed before the defence, his body stays.
+  The three waves, the debrief trigger, the flamethrower mod, the bridge panel
+  and the bridge all still complete. His lines and animations are simply
+  skipped.
+- **Broken links nothing relies on.** These names are missing from the map:
+  - the Viper marine's `enemy` (`monster_q4x_strogg_marine_1`);
+  - the first room's third spawn (`monster_strogg_marine_15`; the relay's
+    other two spawns still come);
+  - the clamp door's `discToggleTrigger_3`, so its disc does not spin;
+  - three light targets.
+
+  None of them is on the route, and the content holds nothing to restore.
+- **Music.** The Pain Lord's track plays after his death, through the outro.
+  Two unused speakers at the room entrance repeat that track and an unused
+  "Strauss is taken" cue from an earlier draft. These are the map's choices.
+- **Toalson's stand-in** for the shot through the glass says "Hades Squad"
+  where Toalson says "Fox Squad". The label can show only in that cut, so it
+  is left alone.
+- **Items in solid.** Thirty-three pickups sit partly in the floor. They are
+  placed that way in the map and can still be collected.
+- Locked prison doors that nothing opens are scenery. The debug variables
+  (`CUT_THE_CRAP`, `DISABLE_QUICKSAVES`) are off. The `development`
+  give-all (`target_give_1`) fires only under `developer`.
+
+### Not placed
+
+Of the 40 recorded lines nothing played, 36 stay unplaced. There is no scene,
+speaker or trigger for them, so nothing was invented for them:
+
+- earlier drafts of the Strauss scenes (`mitch_therestrss`, `_dektrystop`,
+  `_budge`, `_gethim`, `_needfollw`, `_therestrss2`, `_gotletout`);
+- Mitchell's ten combat callouts;
+- screaming marines 2 to 6, whose cells have no speakers;
+- Strauss's muffled line;
+- Darnell's `roomclr`, `evlift` and `ahwhthell`, Tak's `givsec`, Viper 1's
+  `incstrgg` and Mitchell's `nothinggd`;
+- Tak's three directional lines.
+
+### Validation
+
+The tests ran on Windows x64 OpenGL with the user-supplied alpha content, as
+hidden, input-free clients with `developer 1` and `fs_awakeningpath` pointing
+at the content. The runtime is `.tmp/runtime/awakening-m05`: hard links of
+`.install`'s client, renderers and packs of 28 November 11:12. The baseline
+module is the shared Awakening runtime's game module (SHA-256 `654a73ae…`).
+The candidate is `builddir` at 14:09 (SHA-256 `1689a9bc…`). Logs are in
+`.tmp/awk-m05/runs/<probe>`.
+
+| Probe | Result |
+| --- | --- |
+| `half1`, `half1b` (baseline) | From the descent through the slimes, the generator, the throw, the scanner, the slow door and the lift setup, with enemies killed by name: no script-event errors, and Toalson and Mitchell reach their marks. In `half1` the probe stood the player in the doorway the two marines path through. Their scripted moves failed, and `half1b` repeated the run with the player clear of it. |
+| `half2a_base`, `half2b` | The lift fallback, the Viper meeting, the storage room, the three waves, the debrief and the bridge. Baseline: Mitchell stays at the lift. Candidate: "mission corrections v3", he follows, and the radio fires at 33, 125 and 198 seconds after the lift, between the Viper call at 18 seconds and the defence. The bridge panel shows and the bridge extends. |
+| `half2kb_base` | The same run with Stark killed before the defence: the level completes it as described above. |
+| `stinger` (sound on the null device) | The stinger starts at the throw, `vo_tak_gotalok` plays on the radio channel, and Toalson's persona and head are as described. |
+| `save_v2`, `load_v2`, `save_v3`, `load_v3` | A save made with the baseline module restores with the candidate in a fresh process, recompiles `m05_bio.openq4-v2.script` and resaves. A save made with the candidate restores, recompiles `m05_bio.openq4-v3.script` and resaves. Both restores bring back the level's eleven light threads and Mitchell unchanged. |
+
+Limits. Console triggers and kills stood in for walking and fighting, and the
+probe placed the player near each scene. No route was played with player
+movement. The radio waits were checked only against the scenes the probes
+staged, and the lines have not been heard.
+
 ## Save and campaign boundaries
 
 Fresh starts compile corrected copies of the installed scripts into private
@@ -133,7 +244,7 @@ The harvester's installed animation frame callback deliberately keeps its
 original `m06b::TURRET_DEAD` flag; the corrected encounter waits for that flag.
 
 Saved corrected programs recompile the same virtual version, regardless of the
-fresh-start toggle. Fresh starts use v2 for M05 and MCC arrival, and v3 for MCC invasion. The
+fresh-start toggle. Fresh starts use v3 for M05 and MCC invasion, and v2 for MCC arrival. The
 v1/v2 generated script statements remain unchanged for their existing saves. Unknown
 source anchors, a changed world callback, or a mapper's
 map sidecar leave the original mission in control. Missing source on a corrected
@@ -145,7 +256,8 @@ Retail and multiplayer receive no mission-script substitution. The payload
 format is unchanged. The third review leaves both v1 and v2 script statements
 unchanged. AI improvements apply to existing saves; restart a map to adopt its
 corrected entity panels, lights and monitor assignments. Restart MCC invasion
-to adopt the v3 delayed-activation guard.
+to adopt the v3 delayed-activation guard, and M05 to adopt its revision 3
+(Mitchell after the lift, the stinger, Tak's radio and Toalson's persona).
 
 ## Validation
 

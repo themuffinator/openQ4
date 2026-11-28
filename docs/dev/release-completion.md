@@ -35,6 +35,29 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   and the [matrix rehearsal](presentation-owners.md#automated-240-hz-matrix-rehearsal-28-november-2026).
   Physical VSync/VRR, sensor latency and the by-eye review remain open.
 
+## The Awakening's bio-processing facility, 28 November 2026
+
+- **Mitchell keeps up after the service lift** (m05). If he missed the ride
+  down, the level moved him to the bottom but left him standing there until
+  the next scripted scene; now he follows you as he does after riding it.
+- **The grunt's entrance has its music sting.** The level's script had the
+  cue switched off with a note that it would not play; it now plays.
+- **Tak guides you to Strauss over the radio.** Between the service lift and
+  the Pain Lord, four of his recorded lines ("I've got a lock on Strauss" to
+  "Strauss doesn't have much time") now play on the level's own timing, a
+  minute or so apart, waiting while anyone else is talking. Nothing had
+  played them.
+- **Toalson has his own voice for pain and squad chatter.** His character
+  named a voice set that does not exist; he now uses the one it meant. He
+  looks the same.
+- Fresh starts only: a save keeps the mission revision it was made with.
+- Evidence: hidden, input-free scene probes from the descent to the bridge,
+  before and after (the lift fallback, the radio timing, the stinger and the
+  radio line starting on a null audio device), a run with the Viper tech
+  killed that still completes the bridge, v2 and v3 save restores, and
+  `awakening_content_repairs.py`.
+  [M05 revision 3](awakening-m05-m06.md#m05-revision-3--28-november-2026).
+
 ## Cryofac's last objectives, 28 November 2026
 
 - **"Cryogenic Security Station and Deep Freeze Laboratory" completes**

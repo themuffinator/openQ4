@@ -152,6 +152,37 @@ static const awakeningMissionCorrection_t awakeningBioV2[] = {
 	  "$dekard_boss_cinematic.remove();\n\t\tsys.waitFrame();\n\t\tsys.trigger( $teleport_postboss );" },
 };
 
+// Revision 3 (28 November 2026). Fresh starts only; v1/v2 saves keep theirs.
+static const awakeningMissionCorrection_t awakeningBioV3[] = {
+	// The developer's grunt stinger, commented out as "WHY DON'T YOU WORK".
+	// Its speaker is waiting for this trigger and its retail sound exists.
+	{ "//sys.trigger( $gruntintro_speaker ); // WHY DON'T YOU WORK", "sys.trigger( $gruntintro_speaker );" },
+	// Mitchell followed the player only if he rode the lift down. When he
+	// misses it, gotob1 teleports him to the bottom and he was left behind.
+	{ "\t\t\taiSpeakWait( $redshirt2, \"lipsync_mitch_whatdonestrg\" );\n\t\t\t$redshirt2.setLeader( $player1 );\n\t\t}",
+	  "\t\t\taiSpeakWait( $redshirt2, \"lipsync_mitch_whatdonestrg\" );\n\t\t}\n\t\t$redshirt2.setLeader( $player1 );" },
+	// radioBattle1 runs from the service lift to the Pain Lord, as radioBattle2
+	// runs through the fight, but its body was commented out: it named retail
+	// lines. Tak's recorded tracking lines for this stretch were never played.
+	// Keep the developer's timing; wait for the radios and nearby speakers.
+	{ "\tvoid radioBattle1() // elevator -> strauss\n\t{",
+	  "\tvoid openq4_takTracksStrauss( string line )\n\t{\n"
+	  "\t\twhile ( $func_radiochatter_cin_1.isActive() || $func_radiochatter_ancillary.isActive() ||\n"
+	  "\t\t\t$redshirt2.isSpeaking() || $squadx1.isSpeaking() || $squadx2.isSpeaking() ) {\n"
+	  "\t\t\tsys.wait( 0.5 );\n\t\t}\n"
+	  "\t\tradioChatterPlayWait( $func_radiochatter_ancillary, line );\n\t}\n\n"
+	  "\tvoid radioBattle1() // elevator -> strauss\n\t{\n"
+	  "\t\tfloat openq4_t;\n"
+	  "\t\topenq4_t = randomRoundFloat( 1, 30 ) + 20;\n\t\tsys.wait( openq4_t );\n"
+	  "\t\topenq4_takTracksStrauss( \"vo_tak_gotalok\" );\n"
+	  "\t\topenq4_t = randomRoundFloat( 1, 30 ) + 60;\n\t\tsys.wait( openq4_t );\n"
+	  "\t\topenq4_takTracksStrauss( \"vo_tak_keepmvcls\" );\n"
+	  "\t\topenq4_t = randomRoundFloat( 1, 30 ) + 60;\n\t\tsys.wait( openq4_t );\n"
+	  "\t\topenq4_takTracksStrauss( \"vo_tak_closingin\" );\n"
+	  "\t\topenq4_t = randomRoundFloat( 1, 30 ) + 60;\n\t\tsys.wait( openq4_t );\n"
+	  "\t\topenq4_takTracksStrauss( \"vo_tak_straussdsnt\" );" },
+};
+
 static bool Awakening_CorrectTeleporterV2( idStr &source, const char *flag, const char *monitor,
 	const char *spin, const char *core, const char *broken, const char *spawner ) {
 	const idStr entry = va( "void %s()\n\t{", monitor );
@@ -185,7 +216,8 @@ static const awakeningMissionCorrection_t awakeningInvasionV3[] = {
 static bool Awakening_LoadM05M06Script( const char *filename, idStr &source ) {
 	idStr file = filename;
 	file.BackSlashesToSlashes();
-	const bool version3 = file.Icmp( "maps/game/m06_mcc_invasion.openq4-v3.script" ) == 0;
+	const bool bioVersion3 = file.Icmp( "maps/game/m05_bio.openq4-v3.script" ) == 0;
+	const bool version3 = bioVersion3 || file.Icmp( "maps/game/m06_mcc_invasion.openq4-v3.script" ) == 0;
 	const bool version2 = version3 || file.Find( ".openq4-v2.script", false ) >= 0;
 	if ( version3 ) {
 		file.Replace( ".openq4-v3.script", ".openq4-v1.script" );
@@ -207,6 +239,10 @@ static bool Awakening_LoadM05M06Script( const char *filename, idStr &source ) {
 				sizeof( awakeningPainLordV2 ) / sizeof( awakeningPainLordV2[0] ) ) ||
 			!Awakening_CorrectSource( level, awakeningBioV2,
 				sizeof( awakeningBioV2 ) / sizeof( awakeningBioV2[0] ) ) ) ) {
+			return false;
+		}
+		if ( bioVersion3 && !Awakening_CorrectSource( level, awakeningBioV3,
+				sizeof( awakeningBioV3 ) / sizeof( awakeningBioV3[0] ) ) ) {
 			return false;
 		}
 		source = boss + "\n" + level;
@@ -266,7 +302,7 @@ void Awakening_PrepareM05M06( idDict &worldArgs ) {
 	if ( fileSystem->ReadFile( map + ".script", NULL, NULL ) > 0 ) {
 		return;
 	}
-	const int versionNumber = map.Icmp( "maps/game/m06_mcc_invasion" ) == 0 ? 3 : 2;
+	const int versionNumber = ( map.Icmp( "maps/game/m06_mcc_invasion" ) == 0 || map.Icmp( "maps/game/m05_bio" ) == 0 ) ? 3 : 2;
 	idStr version = map + va( ".openq4-v%d.script", versionNumber );
 	idStr source;
 	if ( !Awakening_LoadM05M06Script( version, source ) ) {
@@ -299,6 +335,18 @@ void Awakening_CorrectM05M06Entity( idDict &args ) {
 		idStr::Cmp( args.GetString( "target" ), "func_elevator_1" ) == 0 ) {
 		args.Delete( "target" );
 		args.SetBool( "gui_noninteractive", true );
+	}
+	// Toalson names a helmeted tech persona the content never declares; only
+	// marines 1 and 3 have one. Give him marine 5's helmeted voice set, which
+	// the name asks for, and keep the tech helmet his class already wears.
+	if ( gameLocal.program.FindFunction( "oq4_m05::main" ) != NULL &&
+		idStr::Cmp( args.GetString( "name" ), "redshirt1" ) == 0 &&
+		idStr::Cmp( args.GetString( "def_persona" ), "persona_marine_5_helmet_tech" ) == 0 &&
+		args.GetString( "override_head", NULL ) == NULL && args.GetString( "def_head", NULL ) != NULL &&
+		gameLocal.FindEntityDefDict( "persona_marine_5_helmet_tech", false ) == NULL &&
+		gameLocal.FindEntityDefDict( "persona_marine_5_helmet", false ) != NULL ) {
+		args.Set( "override_head", args.GetString( "def_head" ) );
+		args.Set( "def_persona", "persona_marine_5_helmet" );
 	}
 	if ( gameLocal.program.FindFunction( "oq4_m05::main" ) != NULL &&
 		idStr::Cmp( args.GetString( "classname" ), "light" ) == 0 &&

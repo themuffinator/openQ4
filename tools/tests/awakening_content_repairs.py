@@ -109,6 +109,19 @@ M09_V5_ANCHORS = (
 )
 # relays the lift call panel fires on every press: (relay, its call)
 M09_ONCE_RELAYS = (("trigger_relay_7", "domeRoomJump1"), ("trigger_relay_26", "valktauntThree"))
+# Revision 3 of the bio-processing facility (MissionM05M06.inl, awakeningBioV3;
+# docs/dev/awakening-m05-m06.md, "Revision 3"): each anchor as the installed
+# script spells it, which must match exactly once.
+M05_SCRIPT = "scripts/maps/m05_bio.script"
+M05_VO_SCRIPT = "scripts/maps/m05_bio_vo.script"
+M05_MAP = "maps/game/m05_bio"
+M05_V3_ANCHORS = (
+    "//sys.trigger( $gruntintro_speaker ); // WHY DON'T YOU WORK",
+    '\t\t\taiSpeakWait( $redshirt2, "lipsync_mitch_whatdonestrg" );\n\t\t\t$redshirt2.setLeader( $player1 );\n\t\t}',
+    "\tvoid radioBattle1() // elevator -> strauss\n\t{",
+)
+# Tak's tracking lines radioBattle1 plays, in order
+M05_TAK_LINES = ("vo_tak_gotalok", "vo_tak_keepmvcls", "vo_tak_closingin", "vo_tak_straussdsnt")
 M01_RADIO = "src/game/awakening/M01Radio.inl"
 M01_RADIO_SCRIPT = "content/baseoq4/pak0/scripts/openq4/awakening/m01_radio.script"
 M01_DRAFT_SCRIPT = "scripts/maps/m04_stranarus_trench_intro.script"
@@ -313,6 +326,22 @@ def check_sources() -> dict[str, list[tuple[str, ...]]]:
             "seal panels call the compiled revision")
     require(details, 'gameLocal.program.FindFunction( "oq4_m09_v5::main" ) ? "oq4_m09_v5"', "seal panels")
 
+    # The bio-processing facility's revision 3.
+    m05 = read(ROOT / "src/game/awakening/MissionM05M06.inl")
+    require(m05, 'const bool bioVersion3 = file.Icmp( "maps/game/m05_bio.openq4-v3.script" ) == 0;', "MissionM05M06.inl")
+    require(m05, "if ( bioVersion3 && !Awakening_CorrectSource( level, awakeningBioV3,", "revision 3 builds on 1 and 2")
+    require(m05, '( map.Icmp( "maps/game/m06_mcc_invasion" ) == 0 || map.Icmp( "maps/game/m05_bio" ) == 0 ) ? 3 : 2;',
+            "fresh M05 starts compile revision 3")
+    require(m05, '{ "//sys.trigger( $gruntintro_speaker ); // WHY DON\'T YOU WORK", "sys.trigger( $gruntintro_speaker );" }',
+            "the grunt stinger")
+    require(m05, r'"\t\t\taiSpeakWait( $redshirt2, \"lipsync_mitch_whatdonestrg\" );\n\t\t}\n\t\t$redshirt2.setLeader( $player1 );" }',
+            "Mitchell follows after the lift either way")
+    for line in M05_TAK_LINES:
+        require(m05, f'openq4_takTracksStrauss( \\"{line}\\" );', "radioBattle1")
+    require(m05, "$redshirt2.isSpeaking() || $squadx1.isSpeaking() || $squadx2.isSpeaking()", "radioBattle1 waits")
+    require(m05, 'args.Set( "def_persona", "persona_marine_5_helmet" );', "Toalson's persona")
+    require(m05, 'args.Set( "override_head", args.GetString( "def_head" ) );', "Toalson keeps his helmet")
+
     # The Awakening is single player only. One game module serves both modes
     # (CORE-07), so every repair runs behind a guard that refuses network play.
     if (ROOT / "src/mpgame").exists():
@@ -429,6 +458,49 @@ class Content:
                 raise AssertionError(f"{model}: mesh {info['mesh']} not found")
             model = info["inherit"]
         raise AssertionError(f"No mesh for model {model}")
+
+
+def check_m05_revision3(content: "Content") -> None:
+    """Each repair still meets the content it was written for."""
+    script = read(content.awakening / M05_SCRIPT).replace("\r\n", "\n")
+    for anchor in M05_V3_ANCHORS:
+        if script.count(anchor) != 1:
+            raise AssertionError(f"{M05_SCRIPT}: revision 3 anchor {anchor!r} matches {script.count(anchor)} times")
+    live = strip_comments(script)
+    body = block(script, script.index(M05_V3_ANCHORS[2]) + len(M05_V3_ANCHORS[2]))
+    if strip_comments(body).strip():
+        raise AssertionError(f"{M05_SCRIPT}: radioBattle1 has a body again; revision 3 would replace it")
+    for token in ("thread radioBattle1();", 'sys.killthread( "map_m05::radioBattle1" );',
+                  "$redshirt2.setOrigin( $tar_redshirt2_el2_bottom.getOrigin() );"):
+        if token not in live:
+            raise AssertionError(f"{M05_SCRIPT}: no longer has {token!r}")
+    text = read(content.awakening / f"{M05_MAP}.map")
+    speaker = content.map_entity(M05_MAP, "gruntintro_speaker")
+    if speaker.get("classname") != "speaker" or speaker.get("s_waitfortrigger") != "1":
+        raise AssertionError(f"{M05_MAP}: gruntintro_speaker no longer waits for a trigger")
+    shader = speaker.get("s_shader", "").lower()
+    samples = re.findall(r"^\s*(sound/\S+)", content.sounds.get(shader, ""), re.M)
+    if not samples or not any((root / sample).with_suffix(ext).is_file()
+                              for root in content.roots for sample in samples for ext in (".ogg", ".wav")):
+        raise AssertionError(f"{M05_MAP}: the grunt stinger {shader!r} has no recording")
+    if re.search(r'"target\d*" "gruntintro_speaker"', text) or "$gruntintro_speaker" in live:
+        raise AssertionError(f"{M05_MAP}: something plays gruntintro_speaker already")
+    writers = read(content.awakening / M05_VO_SCRIPT)
+    for line in M05_TAK_LINES:
+        stem = line[3:]
+        if not re.search(r"void\s+VO_" + stem + r"\s*\([^)]*\)\s*\{\s*//Tak:", writers):
+            raise AssertionError(f"{M05_VO_SCRIPT}: {stem} is not one of Tak's lines")
+        if not content.has_sample(line):
+            raise AssertionError(f"{M05_MAP}: {line} has no recording")
+        if stem in live or stem in text:
+            raise AssertionError(f"{M05_MAP}: something plays {line} already")
+    toalson = content.map_entity(M05_MAP, "redshirt1")
+    if toalson.get("def_persona") != "persona_marine_5_helmet_tech":
+        raise AssertionError(f"{M05_MAP}: redshirt1's persona changed; the repair is obsolete")
+    if "persona_marine_5_helmet_tech" in content.defs or "persona_marine_5_helmet" not in content.defs:
+        raise AssertionError("persona.def: marine 5's helmeted personas changed")
+    if not content.keys(toalson["classname"]).get("def_head"):
+        raise AssertionError(f"{toalson['classname']}: no class head for Toalson to keep")
 
 
 def check_m09_taunts(content: "Content") -> None:
@@ -572,6 +644,7 @@ def check_content(tables: dict[str, list[tuple[str, ...]]], awakening: Path, ret
     check_m08_ceiling_drop(awakening)
     check_m09_finale(awakening)
     content = Content(awakening, retail)
+    check_m05_revision3(content)
     check_m09_taunts(content)
 
     for map_name, entity, key, source in tables["dialogue"]:

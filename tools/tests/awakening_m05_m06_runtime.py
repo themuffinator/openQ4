@@ -193,7 +193,7 @@ def main():
     log=path.read_text(errors='replace') if path.exists() else ''
     if process.returncode!=0 or ERROR.search(log) or log.count('M56_DONE')!=1:
         failures.append('runtime error, exit status or missing completion marker')
-    version = 3 if MAPS[args.case] == 'm06_mcc_invasion' else 2
+    version = 3 if MAPS[args.case] in ('m06_mcc_invasion', 'm05_bio') else 2
     if not args.input and not args.baseline and f'Awakening mission corrections v{version}:' not in log:failures.append('corrections not enabled')
     if args.input and 'Game Map Init SaveGame' not in log:failures.append('input not restored')
     if args.case in ('failure', 'processing'):
@@ -239,7 +239,7 @@ def main():
         if log.count('PROCESSING HAS BEEN FINISHED') != 3 or 'STRAUSS DIES' not in log:
             failures.append('uninterrupted processing did not finish all three cycles')
     if args.case=='boss':
-        corrected_boss = not args.input or 'm05_bio.openq4-v2.script' in log
+        corrected_boss = not args.input or re.search(r'm05_bio\.openq4-v[23]\.script', log) is not None
         if corrected_boss and "telefragged 'dekard_boss_cinematic'" in log:
             failures.append('rescue teleport hit the cinematic stand-in')
         if not args.input:

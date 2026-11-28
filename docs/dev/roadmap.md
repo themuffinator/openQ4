@@ -5053,6 +5053,14 @@ Completion substeps must keep three forms of evidence distinct:
   during the drop restore. Watched only in captures from a console-staged
   scene; its look and pacing remain to judge in play. See
   [Cryofac's ceiling drop](awakening-missions.md#cryofacs-ceiling-drop--28-november-2026).
+  M05 revision 3, 28 November: the same cross-check of the bio-processing
+  facility, with scene probes from the descent to the bridge. Fresh starts
+  now let Mitchell follow after missing the service lift, play the grunt
+  stinger its script had commented out, give Tak's four recorded tracking
+  lines to the empty `radioBattle1`, and resolve Toalson's undeclared persona
+  to marine 5's. v2 and v3 saves restore. A dead Viper tech was shown not to
+  block the bridge; the 36 other unplayed lines are listed, not placed. See
+  [M05 revision 3](awakening-m05-m06.md#m05-revision-3--28-november-2026).
 - [ ] **Q4-05 — P1, decision and implementation: save failure recovery.** Preserve
   approved v2/v3/v4 compatibility readers, the v5 portable reader and corruption
   checks. Explicit recovery after semantic object-restore failure is implemented
