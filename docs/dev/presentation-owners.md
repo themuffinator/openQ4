@@ -236,6 +236,22 @@ Declared targets, pending physical qualification:
 | --- | --- | --- |
 | 240 Hz, supported target | 4.17 ms | p95 ≤ 4.6 ms, p99 ≤ 6.3 ms frame interval; engine input-to-draw ≤ 1 ms with late look; no missed tick at p99 |
 | 360 Hz, experimental | 2.78 ms | Reported only; not a release promise |
+| Quality floor, 150 Hz | 6.67 ms | p99 ≤ 6.67 ms, mean ≥ 150 FPS; maximum reported, not judged |
+
+Scenes and settings (declared 28 November 2026, recorded in
+`docs/dev/performance-budgets.json` under `frameRateTargets`). The 240 Hz
+and 360 Hz targets are judged in the reference suite's `pacing` case:
+`game/airdefense1`, a noclip view turning at 220°/s with late look on, at the
+Enhanced preset with `com_maxfps` raised to the case's cap, both renderers,
+native full screen. Enhanced is the tier a fresh configuration detects on
+the reference-class laptop, and the top tier built for the 144 Hz class;
+Quality and above are 100 Hz-class tiers (FPS-02) and are not held to 240.
+The six FPS-01 scenes are reported beside it, not judged. The Quality floor
+is `airdefense_performance.py`: the same map's starting-position rotations at
+Quality with its cap lifted and the Remastered HUD, three runs per renderer.
+Qualifying hardware is the Windows x64 desktop reference in an operator's
+`--reference` run; the RTX 4060 Laptop (i7-13700H, 2560 x 1440 240 Hz panel)
+runs the automation and its results are reported, not qualifying.
 
 Cases to qualify: caps 30/60/120/144/165/240/360 and `0`, vsync and VRR where
 available, low-FPS catch-up (fewer draws than ticks), menus and loading, hidden
@@ -2037,3 +2053,113 @@ The worker does not skip the block's first samples to catch up, so an onset
 is never cut. `listSounds` reports worker and inline blocks, the first-block
 wait and decode times and the slowest start, and `s_debugHardware 1` logs
 each start.
+
+### Where the Quality floor stands, 28 November 2026
+
+The p99 floor was re-measured on current `main` (`99a53e175`, `builddir`
+debugoptimized, staged into `.install`) with `airdefense_performance.py`:
+native 2560 x 1440 fullscreen Quality with its cap lifted, the Remastered
+HUD, `game/airdefense1` starting-position rotations. Every run started after
+three consecutive checks found no other openQ4 client, ninja or compiler, CPU
+under 30% and GPU under 20%, and no other client appeared during any of them.
+Audio was muted (`s_volume 0`; the mix still runs). Times in milliseconds:
+
+| Runs (3 each) | Mean FPS | p50 | p95 | p99 | Max |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Vulkan, `r_vkRenderThread 0` (default) | 187.3–196.9 | 5.00–5.30 | 5.85–6.55 | 7.30–8.40 | 17.28–27.59 |
+| Vulkan, `r_vkRenderThread 1` | 189.6–194.6 | 5.10–5.20 | 6.15–6.85 | 7.55–8.85 | 17.98–18.02 |
+| OpenGL | 175.7–179.9 | 5.40 | 7.45–8.35 | 9.25–10.90 | 21.86–24.77 |
+
+Every workload check passes (preset readback, HUD warm-up, effects drawn,
+MSAA/SMAA at native scale, camera position, one uncapped sampling window of
+more than 1,000 frames); only the p99 fails. The mean is no longer the
+problem: since 5 November it fell from about 9.5 ms to 5.1 ms on Vulkan,
+through half-resolution SSAO, the portal-sky mask, the Vulkan depth-capture
+layout fix and the FPS-03/FPS-08 rounds. What remains is the tail: 2–5% of
+Vulkan frames and 5–13% of OpenGL frames take longer than 6.67 ms, where the
+p99 allows 1%. Vulkan is 0.6–1.7 ms over the floor at p99, OpenGL 2.6–4.2 ms.
+`r_vkRenderThread 1` no longer helps in quiet runs; its default stays 0. The
+harness's Quality readback predated the shadow ladder (Quality is the medium
+level: cascades for sunlight and distant sources, none for spotlights) and is
+corrected; the preset itself applied correctly in every run.
+
+Attribution, from fullscreen probes of the same rotation
+(`.tmp/hf07-floor/probe.py`, `work`, `frames`, `phases` and `hitch` modes):
+
+- **The long frames are one part of the turn.** Binned by view angle, the
+  over-budget frames gather in the sector from about 180° to 320° past the
+  start yaw, where the mean interval rises to 6–7 ms (OpenGL) or about 6 ms
+  (Vulkan); elsewhere it is 4.8–5.4 ms.
+- **On Vulkan the GPU is not the limit.** A 2,048-frame `r_vkGpuPhaseProfile`
+  puts the GPU frame at 4.67 ms (main view 3.86, portal sky 0.66, resolve
+  0.14); per-frame GPU timers never exceed 6.0 ms. Every Vulkan frame over
+  6.67 ms is a CPU frame: frame building (game draw and render front end)
+  reaches p95 4.6 and p99 5.8 ms, and the longest frames build for 6.5–6.9 ms.
+- **On OpenGL both sides are over.** GPU p95/p99 6.7/7.8 ms and CPU p95/p99
+  6.9/8.8 ms per frame; 87% of the frames over the floor also ran a game tic,
+  which adds about 1.1 ms of session work to a frame.
+- **What grows in the heavy sector** (main-thread stack samples, share of
+  wall time inside the sector against outside it): model surfaces and light
+  interactions 14.0% against 7.9%, effect area culling (`R_CullEffectByArea`,
+  `BoundsInAreas`) 2.8% against 0.5%, ambient draw surfaces 2.6% against
+  0.4%, light-interaction creation 1.8% against 0.5%, and entity updates,
+  mostly from presentation poses, which free and rebuild an animated entity's
+  interactions every rendered frame, 2.4% against 0.9%.
+- **What the main thread spends everywhere:** BSE effects are about 30% of
+  its busy time (particle geometry, envelope lookups, per-particle
+  rotations), the HUD about 17% (the stock HUD's expression walk on each new
+  tic, the Remastered and retained drawing, the animated crosshair), the game
+  tic about 10%.
+
+One candidate was measured and dropped. The OpenGL frame's end reads the
+error flag (`glGetError`), and on NVIDIA's threaded driver that read waits
+for the driver thread: it held 17% of the OpenGL main thread's wall time. A
+switch that skipped it while errors are ignored changed nothing in an
+interleaved A/B over four pairs of rotations (means 5.41–6.27 ms off, 5.43–
+5.84 ms on, p99 within the same spread): the wait moved to the next point
+that needs the driver, so the read is not a cost of its own. It was not
+landed.
+
+Meeting the floor therefore needs one of three things. The first is about
+1.5 ms less main-thread work in the heavy views: effect geometry off the main
+thread or on the GPU (FPS-08's GPU-particle estimate is 1–1.3 ms), interaction
+reuse across presentation-pose updates, and cheaper effect area tests. The
+second is a cheaper OpenGL GPU frame in the same views. The third is a
+decision on the Quality workload. None of the three is an exact reordering
+this round could land. Evidence: `.tmp/hf07-floor/` (`gate-vk0`, `gate-vk1`,
+`gate-gl`, `base-*`, `runs/work-*`, `runs/frames-*`, `runs/phases-vk1`,
+`runs/ab-glerr`, `samp-*.cpu.json`, `quiet-log.jsonl`).
+
+### Automated 240 Hz matrix rehearsal, 28 November 2026
+
+`presentation_reference_suite.py --skip-sensor --skip-review`, without
+`--reference`, full screen on the development laptop (RTX 4060 Laptop, 240 Hz
+panel), same build and quiet checks. A fresh configuration auto-detected
+Enhanced, the 240 Hz target's declared settings. All 24 pacing runs and the
+policy cases completed. The hidden window presented 60.0 Hz and the
+minimized one 59.4 Hz (cap 60). The menu and both stall (catch-up) cases drew
+no gameplay and logged no errors. Drawn intervals in milliseconds:
+
+| Case | OpenGL Hz | OpenGL p95/p99 | Vulkan Hz | Vulkan p95/p99 (presented) |
+| --- | ---: | --- | ---: | --- |
+| Cap 30 | 30.0 | 34.94/36.13 | 30.0 | 34.52/35.72 (37.33/44.06) |
+| Cap 60 | 60.0 | 17.38/18.51 | 60.0 | 17.39/18.08 (19.35/23.56) |
+| Cap 120 | 125.1 | 10.44/11.32 | 130.2 | 10.52/11.05 (11.15/13.72) |
+| Cap 144 | 144.3 | 8.97/9.93 | 143.9 | 9.10/11.93 (9.41/12.28) |
+| Cap 165 | 165.7 | 8.33/10.06 | 164.8 | 7.77/9.27 (9.22/10.64) |
+| Cap 240 | 234.3 | 8.37/9.94 | 212.4 | 7.24/9.59 (6.72/8.45) |
+| Cap 360 | 224.2 | 8.50/9.55 | 226.1 | 6.35/7.29 (6.44/8.28) |
+| Uncapped | 218.2 | 8.67/10.70 | 220.6 | 6.39/7.89 (6.48/8.14) |
+| Vsync, cap 240 | 165.3 | 9.48/12.09 | 205.8 | 7.93/10.38 (8.66/13.10) |
+| Adaptive vsync, cap 240 | 197.0 | 8.32/10.17 | 188.4 | 10.34/14.40 (9.20/13.75) |
+| Vsync, cap 237 (VRR case) | 173.3 | 7.84/10.66 | 174.6 | 8.82/10.36 (8.76/13.28) |
+
+The caps hold from 30 to 165 Hz. At 240 the laptop reaches 212–234 Hz, but
+p95 and p99 stay over the 4.6/6.3 ms budget on both renderers. Interval
+distributions this wide around a 4.2 ms mean are frames that ran a game tic
+or the turn's heavy views, as in the Quality floor. Vsync on this hybrid-
+graphics laptop does not lock to the panel's 240 Hz, and variable refresh is
+not enabled on its internal panel. Neither verdict qualifies: this is not the
+reference desktop and no operator declared the window. The sensor session,
+the by-eye review and the physical VRR check remain the operator's.
+Evidence: `.tmp/hf07-floor/suite/` (`reference-summary.md`, `suite.json`).

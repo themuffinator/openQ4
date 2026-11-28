@@ -12,6 +12,29 @@ does not restore the withdrawn release. See
 protocol 2.42 and render demo v14 do not interoperate with 0.14.1. Its
 player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 
+## Frame-rate targets declared, and where the Quality floor stands, 28 November 2026
+
+- **HF-07 budgets declared:** `docs/dev/performance-budgets.json` now carries
+  `frameRateTargets`. The Quality floor is p99 ≤ 6.67 ms. The supported 240 Hz
+  target is p95 ≤ 4.6 ms, p99 ≤ 6.3 ms, ≤ 1 ms engine input-to-draw and no
+  missed tick at p99. It is judged in the reference suite's airdefense1 turn
+  at Enhanced with the cap raised, on the operator's desktop reference only.
+  360 Hz is reported only. The block also carries the loading, menu,
+  background and preset-cap policy. `performance_suite.py budgets` keeps the
+  block when it rewrites the file.
+- **Quality floor measured, not met:** native 1440p fullscreen Quality with
+  the Remastered HUD now averages 187–197 FPS on Vulkan and 176–180 FPS on
+  OpenGL. The p99 is 7.30–8.40 ms and 9.25–10.90 ms, against 6.67 ms. The long
+  frames are one heavy sector of the turn: main-thread scene building on
+  Vulkan, both GPU and CPU on OpenGL. No player-visible change.
+- **Gate harness:** `airdefense_performance.py` checks Quality's shadow
+  settings as the shadow ladder defines them and mutes audio during the run.
+- Evidence: three quiet fullscreen runs per renderer and mode, fullscreen
+  attribution probes and an automated run of the whole 240 Hz matrix; see
+  [where the floor stands](presentation-owners.md#where-the-quality-floor-stands-28-november-2026)
+  and the [matrix rehearsal](presentation-owners.md#automated-240-hz-matrix-rehearsal-28-november-2026).
+  Physical VSync/VRR, sensor latency and the by-eye review remain open.
+
 ## Cryofac's last objectives, 28 November 2026
 
 - **"Cryogenic Security Station and Deep Freeze Laboratory" completes**

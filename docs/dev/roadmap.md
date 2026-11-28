@@ -56,7 +56,7 @@ exact; the estimate column is deliberately approximate.
 | Category / task family | Estimated completion | Tasks closed | Principal remaining work |
 | --- | ---: | ---: | --- |
 | [Governance and baseline evidence](#governance-and-baseline-evidence) — GOV | **100%** | 3 / 3 | Maintain evidence/default alignment as later changes land. |
-| [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **80%** | 6 / 9 | Reference pacing, physical latency, visual motion review and a physical high-polling-rate input check. |
+| [High refresh presentation and input](#high-refresh-presentation-and-input) — HF | **82%** | 6 / 9 | The Quality p99 floor, reference pacing, physical latency, visual motion review and a physical high-polling-rate input check. |
 | [Vulkan rendering](#vulkan-rendering) — VK | **60%** | 1 / 8 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks; HDR display output (VK-08, not started). |
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **65%** | 5 / 13 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, partial). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026; temporal AA and dynamic resolution (REN-04) closed 23 November 2026; depth of field (REN-12, partial) 23 November, with scripted cinematic focus to follow (REN-13). |
@@ -329,9 +329,10 @@ Sources: [historical high-refresh scope](archive/2026-10-18/high-framerate-rende
 
 ### HF completion checkpoints
 
-**Estimate: 80%; 6/9 tasks closed.** Presentation implementation is mature within
+**Estimate: 82%; 6/9 tasks closed.** Presentation implementation is mature within
 its declared exclusions. The remaining work includes a failing performance target,
-not merely paperwork or a final screenshot.
+not merely paperwork or a final screenshot: the Quality p99 floor misses by
+0.6–1.7 ms on Vulkan and 2.6–4.2 ms on OpenGL (28 November).
 
 | Task / state | Completed points and evidence | Remaining subpoints / closure boundary |
 | --- | --- | --- |
@@ -341,7 +342,7 @@ not merely paperwork or a final screenshot.
 | HF-04 — Closed | View lights, debris/trails and active ragdoll draw ownership implemented; other categories have explicit dispositions. | Keep authoritative events unchanged; human motion review remains HF-08. |
 | HF-05 — Closed | Alternate/spectator cameras interpolate with cut/reset rules; vehicle and remote-body policies documented. | Playing clients' remote bodies remain on the tick; do not silently broaden this closure. |
 | HF-06 — Closed | Cross-system probes cover exactly-once gameplay, TAA, shadows, save/load, restart, demos, AVI and simulated stereo. | Physical motion/headset review remains HF-08/VR-02. |
-| HF-07 — Partial | Cap/policy matrix, precise wait, pacing histograms, present timing, reference runner and CPU attribution exist. | Meet the Quality every-frame floor and declared 240 Hz budgets; run foreground reference, VSync/VRR and physical display checks. 360 Hz remains experimental. |
+| HF-07 — Partial | Cap/policy matrix, precise wait, pacing histograms, present timing, reference runner and CPU attribution exist. The 240 Hz budgets name their hardware, scene and settings (`frameRateTargets`). On 28 November the Quality mean was inside the floor (Vulkan 187–197 FPS, OpenGL 176–180) and the automated matrix ran end to end. | Quality p99 ≤ 6.67 ms: Vulkan 7.30–8.40 ms (main-thread heavy views), OpenGL 9.25–10.90 ms (GPU and CPU); 240 Hz p95/p99 on the reference desktop; foreground VSync/VRR and physical display checks. 360 Hz remains experimental. |
 | HF-08 — Partial | Loopback host/client, zoom, lift, loss/jitter, rapid-turn and cockpit probes pass; sensor/review tooling exists. | Measure click-to-photon latency; review cuts, weapons/TAA, debris and ragdolls in motion; retain vehicle late-look exclusion. |
 | HF-09 — Partial | Runs of mouse reports join into one event below the per-event clamp; the active controller's axes are read once per SDL poll cycle; IME area and radial-stick writes happen only on change; queue overflow reports once per burst. Production code is compiled against a model SDL queue with mutants; a live client with a virtual pad read 12 axis events of one cycle once, and the controller runtime scenarios pass. | A physical 1–8 kHz mouse and a fast-reporting controller in play (`inputStats`). |
 
@@ -590,6 +591,38 @@ not merely paperwork or a final screenshot.
   Normalized to bloom under heavy GPU contention, the GPU frame fell 16% (about
   1.1 ms); the CPU cost of the early world draw still needs a quiet run. See
   the [portal-sky mask](presentation-owners.md#portal-sky-mask-5-november-2026).
+  **Re-measured, 28 November** (quiet host, three fullscreen runs each, on
+  `99a53e175`): the mean is now inside the floor, so the p99 tail is what is
+  left. Vulkan averages 187–197 FPS (p95 5.85–6.55 ms) with p99 7.30–8.40 ms
+  in the default `r_vkRenderThread 0`; mode 1 gives 7.55–8.85 ms and no longer
+  helps. OpenGL averages 176–180 FPS with p99 9.25–10.90 ms. Every workload
+  check passes; the harness's Quality readback was corrected for the shadow
+  ladder, and the gate now mutes audio. The long frames gather in one sector
+  of the turn (about 180–320°). On Vulkan they are main-thread frames: the GPU
+  frame is 4.67 ms and never exceeds 6.0 ms, while frame building reaches
+  6.5–6.9 ms there (model surfaces and interactions, effect area tests, ambient
+  surfaces, and presentation-pose entity updates that rebuild interactions
+  every rendered frame). On OpenGL both the GPU (p99 7.8 ms) and the CPU
+  (p99 8.8 ms) are over, and 87% of the long frames also ran a tic. A
+  candidate that skipped OpenGL's end-of-frame error read (17% of that main
+  thread, waiting on the driver thread) changed nothing in an interleaved
+  A/B and was not landed. No exact change this round closes the 0.6–1.7 ms
+  (Vulkan) and 2.6–4.2 ms (OpenGL) gaps. That needs effect geometry off the
+  main thread or on the GPU (FPS-08), interaction reuse across pose updates,
+  a cheaper OpenGL GPU frame in the heavy views, or a Quality workload
+  decision; see [where the floor stands](presentation-owners.md#where-the-quality-floor-stands-28-november-2026).
+  The 240 Hz budgets now name their hardware, scene and settings: the
+  suite's `pacing` turn at Enhanced with the cap raised, judged only on the
+  operator's desktop reference; 360 Hz stays reported only. They are recorded
+  with the Quality floor and the frame-rate policy under `frameRateTargets` in
+  `docs/dev/performance-budgets.json`. An automated rehearsal of the whole
+  matrix (`presentation_reference_suite.py`, full screen, not `--reference`)
+  ran all 24 pacing runs and the policy cases. Caps hold from 30 to 165 Hz; at
+  240 the laptop draws 212–234 Hz with p95 7.2–8.4 ms, over budget. Hidden and
+  minimized windows present 60.0 and 59.4 Hz, and the menu and catch-up cases
+  are clean. See the [matrix rehearsal](presentation-owners.md#automated-240-hz-matrix-rehearsal-28-november-2026).
+  The sensor session, the by-eye review and the physical VSync/VRR checks on
+  the reference desktop remain.
 - [ ] **HF-08 — P1, qualification: late look and alternate views in play.**
   Run late look in live MP (listen host and remote client, prediction recovery),
   zoomed, on lifts and trams and through rapid turns, and measure physical

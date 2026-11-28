@@ -958,5 +958,53 @@
    "limit_mean_ms": 3.675,
    "limit_p99_ms": 4.466
   }
- ]
+ ],
+ "frameRateTargets": {
+  "declared": "2026-11-28",
+  "owner": "HF-07 (docs/dev/roadmap.md, docs/dev/presentation-owners.md)",
+  "note": "Declared by hand, not measured by `performance_suite.py budgets`, which keeps this block when it rewrites the file. Frame intervals are the engine's presentation intervals (framePacingSnapshot, 50 us bins, a percentile reports its bin's upper edge), uncapped unless a cap is named, vsync off, native 2560x1440 full screen in the foreground. A hidden, occluded or windowed capture never qualifies.",
+  "hardware": {
+   "qualifying": "Windows x64 desktop reference: the operator's foreground run of presentation_reference_suite.py --reference, which records the host",
+   "automation": "RTX 4060 Laptop reference above (i7-13700H, 2560x1440 240 Hz panel, hybrid graphics); results there are reported, not qualifying"
+  },
+  "targets": [
+   {
+    "id": "quality-floor-150",
+    "status": "gate",
+    "hz": 150,
+    "interval_ms": 6.67,
+    "scene": "game/airdefense1 starting position, 720-degree view rotation over 24 s after a 360-degree warm-up (airdefense_performance.py)",
+    "settings": "Quality preset with its 144 FPS cap lifted (com_maxfps 0), Remastered HUD, both renderers; Vulkan records r_vkRenderThread",
+    "budget": {"p99_interval_ms": 6.67, "mean_fps_min": 150, "max_interval_ms": "reported, not judged (user decision, 5 November 2026)"},
+    "runs": 3
+   },
+   {
+    "id": "supported-240",
+    "status": "supported target, pending physical qualification",
+    "hz": 240,
+    "interval_ms": 4.17,
+    "scene": "presentation_look_runtime.py --scenario pacing: game/airdefense1, noclip view turning at 220 degrees/s with late look on (in_presentationView 1); the six FPS-01 scenes are reported against it, not judged",
+    "settings": "Enhanced preset with com_maxfps 240 (its 144 cap raised), both renderers; Quality and above are 100 Hz-class tiers (FPS-02) and are not held to 240",
+    "budget": {"p95_interval_ms": 4.6, "p99_interval_ms": 6.3, "engine_input_to_draw_ms": 1.0, "missed_ticks_at_p99": 0},
+    "cases": ["caps 30/60/120/144/165/240/360/uncapped", "vsync on at 240 and uncapped", "adaptive vsync at 240", "variable refresh at refresh-3 Hz", "hidden", "minimized", "menu", "hitch (low-FPS catch-up)"]
+   },
+   {
+    "id": "experimental-360",
+    "status": "experimental, reported only",
+    "hz": 360,
+    "interval_ms": 2.78,
+    "scene": "as supported-240",
+    "settings": "as supported-240",
+    "budget": {}
+   }
+  ],
+  "policy": {
+   "loading": "steady cadence at the display refresh or its largest whole divisor of at most 90 Hz, never faster than com_maxfps",
+   "background": "a window that shows nothing (hidden, minimized, not yet created, app in the background) presents at most 60 Hz, uncapped included",
+   "menus": "follow com_maxfps",
+   "presetCaps": {"minimum": 30, "lowpower": 30, "low": 60, "performance": 60, "balanced": 120, "enhanced": 144, "quality": 144, "ultra": 240, "maximum": 240},
+   "automaticRecommendation": "caps at the whole-hertz refresh of the window's display (30-1000 Hz), keeping the tier cap when unknown and on power-limited devices",
+   "steamDeck": "starts on performance"
+  }
+ }
 }

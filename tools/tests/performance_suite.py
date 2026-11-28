@@ -47,6 +47,7 @@ for smoke tests of the scripts (hidden windows are capped at 60 Hz by design).
 from __future__ import annotations
 
 import argparse
+import contextlib
 import csv
 import datetime as dt
 import hashlib
@@ -1649,6 +1650,13 @@ def cmd_budgets(args: argparse.Namespace) -> int:
     }
     out = Path(args.out) if Path(args.out).is_absolute() else REPO_ROOT / args.out
     out.parent.mkdir(parents=True, exist_ok=True)
+    # HF-07's frame-rate targets live in the same file but are declared by hand,
+    # not measured here: keep them across a re-declaration.
+    if out.exists():
+        with contextlib.suppress(ValueError, OSError):
+            previous = json.loads(out.read_text(encoding="utf-8"))
+            if "frameRateTargets" in previous:
+                doc["frameRateTargets"] = previous["frameRateTargets"]
     out.write_text(json.dumps(doc, indent=1) + "\n", encoding="utf-8")
     md = budget_markdown(doc)
     if args.markdown:

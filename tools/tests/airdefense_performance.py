@@ -62,7 +62,10 @@ ULTRA_QUALITY = {
     "com_performancePreset": "ultra", "r_multiSamples": 4,
     "r_shadowMapPointSize": 512, "r_shadowMapPointFilterTaps": 9,
     "r_shadowMapPointFilterMode": 0, "r_shadowMapAtlasSize": 8192,
-    "r_shadowMapCSM": 0, "r_motionBlur": 0, "r_motionBlurSamples": 8,
+    # The shadow ladder's high and medium levels cascade sunlight and distant
+    # sources only; spotlights keep one map (PerformancePreset.cpp).
+    "r_shadowMapCSM": 1, "r_shadowMapProjectedCSM": 0,
+    "r_motionBlur": 0, "r_motionBlurSamples": 8,
 }
 QUALITY = {
     **ULTRA_QUALITY,
@@ -193,6 +196,8 @@ def main(argv: list[str]) -> int:
                     "image_usePrecompressedTextures")}, "r_hiddenWindow": 0,
                 "r_ignoreGLErrors": 1,  # Runtime defaults; correctness runs use the diagnostic harness.
                 "r_vkRenderThread": args.render_thread,
+                # Muted: the mix still runs, so the workload is unchanged.
+                "s_volume": 0,
             }.items():
                 command += ["--set-launch-cvar", f"{name}={value}"]
             for name, value in {
