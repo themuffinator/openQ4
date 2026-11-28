@@ -5,7 +5,10 @@
 Updated 8 November 2026 with the frame-rate recovery category (FPS),
 21 November 2026 with the controller experience category (PAD) and a staged
 splitscreen plan (MP-25), and 22 November 2026 with a gap review of the
-ray-tracing category (RT). The progress
+ray-tracing category (RT). On 28 November 2026 the dashboard's task counts,
+UI register counts and the FPS, PAD and PKG rows were reconciled with the task
+checkboxes, the register and each category's dated checkpoints, which carry
+progress through 27 November; nothing was retested for that. The progress
 review below otherwise dates from 4 November and uses the integrated source and
 recorded evidence through `c09500893cea22bd7becd7a1b6ece5439c408cde`. The MP-02
 closeout and task counts additionally include its later integrated safety
@@ -23,11 +26,11 @@ multiplayer and audio are furthest along among the unfinished workstreams. Full
 campaign progression, physical-device qualification, rendering performance and the
 UI toolkit/editor/corpus remain major completion gates.
 
-| Progress measure, 15 November 2026 | Current result | Meaning |
+| Progress measure, reconciled 28 November 2026 | Current result | Meaning |
 | --- | --- | --- |
-| Formally closed roadmap tasks | **46 / 170 (27.1%)** | **124 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-10 and PAD-01 through PAD-10, not partial substeps. |
+| Formally closed roadmap tasks | **46 / 171 (26.9%)** | **125 remain open**. Counts all stable top-level task checkboxes, including Q4-01 through Q4-09, FPS-01 through FPS-10 and PAD-01 through PAD-10, not partial substeps. |
 | Estimated category progress | **21 categories: 2 at 100%, 17 partial, 2 at 0%** | Governance (GOV) and developer map tools (TOOL) are complete; engine loading (CORE) reopened on 24 November 2026 for the unified game module (CORE-07); the detailed estimates follow. |
-| UI active requirements | **0 / 312 verified; 117 partial, 195 pending** | Excludes 40 superseded rows from the 352-row register. |
+| UI active requirements | **0 / 317 verified; 120 partial, 197 pending** | Excludes 46 superseded rows from the 363-row register. |
 | UI corpus and final gates | **0 / 358 migration variants accepted; 0 / 7 final gates accepted** | Working screens and passing checkpoint validators do not grant product acceptance. |
 | Quality frame-time reference | **Gate still failing** | Recorded Vulkan reference: 8.76 ms mean, 13.80 ms p99, 24.08 ms maximum against **every frame <=6.67 ms**. Later prototype runs do not close it. |
 | Ultra frame rate at 2560x1440 | **91-188 fps on GL, 96-188 fps on Vulkan, on the reference laptop; every tier meets its refresh class** | FPS-02 re-tiered the presets to refresh classes (Enhanced 144/90, Quality 100/60, Ultra 75/45 average/1% low) and all three meet them in every scene on both backends; the previous everything-on Ultra (19-58 fps on GL) is now the Maximum preset with no frame-rate target. Budgets are in [`performance-budgets.json`](performance-budgets.json). See the FPS category and the [performance report](performance-report.md). |
@@ -57,7 +60,7 @@ exact; the estimate column is deliberately approximate.
 | [Vulkan rendering](#vulkan-rendering) — VK | **60%** | 1 / 8 | Driver breadth, visible pacing, material/HDR/capture combinations and resource soaks; HDR display output (VK-08, not started). |
 | [Vulkan ray tracing](#vulkan-ray-tracing) — RT | **0%** | 0 / 7 | Scope, budget and licence decisions, acceleration structures, hybrid effects, path tracing, denoising and qualification. |
 | [Modern rendering engine](#modern-rendering-engine) — REN | **65%** | 5 / 13 | Aggregate lighting ownership, combined-effect/performance qualification and platform breadth; shadowed volumetrics (REN-09, partial). GTAO (REN-10) and parallax occlusion mapping (REN-11) closed 21 November 2026; temporal AA and dynamic resolution (REN-04) closed 23 November 2026; depth of field (REN-12, partial) 23 November, with scripted cinematic focus to follow (REN-13). |
-| [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **40%** | 4 / 9 | Shadow-map cost, equal-settings regressions (the retained HUD's composition and most of the Vulkan depth capture removed 22 November, unmeasured in fullscreen), hitches, front-end cost and the release gate. |
+| [Frame-rate recovery and performance budgets](#frame-rate-recovery-and-performance-budgets) — FPS | **40%** | 4 / 10 | Shadow-map cost, equal-settings regressions (the retained HUD's composition and most of the Vulkan depth capture removed 22 November, unmeasured in fullscreen), hitches, front-end cost, the release gate and the low tiers on low-end PCs (FPS-10). |
 | [Virtual reality](#virtual-reality) — VR | **74%** | 4 / 9 | Real-headset gameplay, comfort and frame budgets; standalone Quest needs a headset (AND-05); desktop stereoscopic 3D on physical stereo displays (VR-07); headset detection on real runtimes (VR-08) and the VR menus read in a headset (VR-09). |
 | [Android and mobile rendering](#android-and-mobile-rendering) — AND | **70%** | 1 / 5 | Device/lifecycle breadth, setup upgrades, mobile UI qualification and Quest on a headset. |
 | [iOS, iPadOS and visionOS](#ios-ipados-and-visionos) — IOS | **5%** | 0 / 6 | Adoption decisions, patch integration, platform builds and hardware acceptance. |
@@ -66,9 +69,9 @@ exact; the estimate column is deliberately approximate.
 | [Enhanced rigid-body and ragdoll physics](#rigid-body-and-ragdoll-physics) — PHYS | **90%** | 3 / 6 | CPU overruns on two of five workloads per platform (bounds proposed as exceptions, not accepted; `sp-ragdolls` on Linux now 65 %); the full Linux pass repeated on the build with exact math (cut short on 17 November); a windowed review in motion and the default decision. |
 | [Multiplayer, bots, Arena and demos](#multiplayer-bots-arena-and-demos) — MP | **55%** | 3 / 26 | Human play, physical workflows and deferred peer qualification; the 15 November reference-parity items (casual match flow, pools, modifiers, HUD, spectating, identity, moderation, discovery, movement), the demo container, workflow, storage and robustness items, MP-25 splitscreen and MP-26 Horde; retain MP-02's accepted timing caveat. |
 | [Audio and voice](#audio-and-voice) — AUD | **80%** | 0 / 7 | Listening/microphone/device checks, mobile memory and dialogue/subtitle coverage. |
-| [Controller experience](#controller-experience) — PAD | **65%** | 0 / 10 | Built and qualified with in-process virtual controllers: the active controller chosen by use, stick aim in degrees per second with presets, aim assistance, gyro in its own units, context buttons, layouts and separate resets, trigger and light feedback. Open: the on-screen keyboard, the setup panel, stock-menu rows, multiplayer captures, the feel reviews and every physical run; PAD-10 optional. |
+| [Controller experience](#controller-experience) — PAD | **75%** | 0 / 10 | Built and qualified with in-process virtual controllers: the active controller chosen by use, stick aim in degrees per second with presets, aim assistance, gyro in its own units, context buttons, layouts and separate resets, trigger and light feedback. Open: the on-screen keyboard, the setup panel, stock-menu rows, multiplayer captures, the feel reviews and every physical run; PAD-10 optional. |
 | [Desktop platforms](#desktop-platforms-and-packaging) — PLAT | **55%** | 0 / 5 | Deck/ARM64/macOS physical signoff and package/device lifecycle breadth. |
-| [Packaging improvements](#pkg-completion-checkpoints) — PKG | **10%** | 0 / 6 | Update archives, pack split/trim, overlays and delta delivery. |
+| [Packaging improvements](#pkg-completion-checkpoints) — PKG | **92%** | 4 / 6 | Update archives, the pak1 split, runtime-only packs and overlays are closed; the next release's per-channel update-download measurements (PKG-05) and the first in-place update between two signed releases (PKG-06). |
 | [Steam integration](#steam-integration) — STEAM | **0%** | 0 / 6 | Identity/licence/distribution decisions before implementation. |
 | [Engine loading, safety and compilers](#engine-loading-safety-and-developer-tools) — CORE | **95%** | 6 / 7 | CORE-07: the unified game module on macOS, an Android emulator or device run, and a human session across both modes. |
 | [Developer map tools](#tool-completion-checkpoints) — TOOL | **100%** | 4 / 4 | None; macOS evidence stays with the platform gate. |
@@ -214,7 +217,7 @@ The #209 entry was separately refreshed from GitHub and its supplied maps on
 | Temporal rendering | Automatic TAAU supports subnative bilinear/bicubic scaling and dynamic resolution on eligible desktop GL/Vulkan paths; crop/nearest modes are excluded, and VR takes only explicit per-eye TAA (`r_temporalAA 1`), without dynamic resolution. Rigid, skinned and first-person weapon motion vectors and reactive effect coverage exist. Dynamic resolution and GPU skinning remain opt-in. GLES has no temporal resolve. |
 | VR | The active source implements PC OpenXR on OpenGL (GLX/WGL, and EGL on Wayland) and Vulkan, headset submission without desktop presentation, stereo, tracked input, room scale, standing/seated play spaces, crouch, two-handed aiming, world-GUI pointing, per-eye TAA, haptics, comfort controls and vehicle views, all qualified on the simulated runtime. A standalone Meta Quest flavor (AND-05) is integrated and checked on the emulator's simulated headset; real-headset qualification remains open ([checklist](vr-headset-qualification.md)). |
 | Android | Experimental ARM64/API 24+ GLES3 client, SDLActivity host, in-tree game modules, signed APK/release verification and dependency licensing are implemented. Onboarding/import/export, touch, the per-orientation touch layout editor, the background suspension save and multiplayer resume are integrated with scoped S25/emulator evidence. A Meta Quest flavor (OpenXR on the GLES renderer) is integrated with emulator evidence only. Physical device/lifecycle breadth stays open under AND-01 through AND-05. |
-| UI | Many retained screens and HUDs now run by default. The register preserves 352 rows, 312 active requirements and 40 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
+| UI | Many retained screens and HUDs now run by default. The register preserves 363 rows, 317 active requirements and 46 superseded rows. UI-10 reconciled retail/base/Awakening mounts to 358 source/include-bound variants; all remain unaccepted for migration. Historical hashes and invalidated inventory acceptance are preserved. |
 | Retail and Awakening | Canonical SP/MP sources and BSE are in-tree. Awakening is additive SP content under `q4xbase`, not a separate multiplayer module. Retail decl/BSE audits, stock transition chains and selected Awakening-state probes have scoped evidence; full playthroughs remain open. Saves now write portable v5 with Windows/Linux cross-load evidence while retaining legacy readers; other target qualification remains Q4-06/Q4-07. |
 | Multiplayer | Dual-stack networking, pure asset checks and bounded rcon2 exist. Actual MP defaults are `net_mpLagCompensation 0` and `net_mpPredictMode 0`. Clients advertise bounded remote extrapolation, and server rewind subtracts it from the displayed pose age; the coupled implementation and remaining peer qualification are recorded under MP-07. Retail 2.85 interoperability is outside the current openQ4 2.42 protocol contract. |
 | Platforms | Windows x64 and Linux x64/Steam Deck are first-class platform targets; macOS arm64 and Linux ARM64 are previews; Windows ARM64 and Android are experimental. iOS, iPadOS and visionOS run only in an external port pinned to withdrawn `v0.14.000`; integration is IOS-01 through IOS-06. Renderer tiers are separate from platform tiers. |
@@ -4023,7 +4026,7 @@ The [visual specification](ui-visual-design.md),
 [product register](ui/product-requirements.md),
 [machine-readable requirements](ui/product-requirements.json) and
 [migration manifest](ui/migration-manifest.json) retain the full product contract.
-This roadmap adopts all **312 active requirements, 358 current source/include-bound
+This roadmap adopts all **317 active requirements, 358 current source/include-bound
 migration variants and seven final gates**. UI-10 reconciled retail/base/Awakening
 mounts while preserving the historical 271-entry manifest. The denominator follows
 effective source changes; it is not a fixed completion target. Scope contradictions
@@ -4037,7 +4040,7 @@ archived provenance; new scheduling belongs here.
 **Estimate: 30%; 1/11 tasks closed.** The full product denominator includes
 runtime/toolkit, editor, artwork, source-bound migration and platform acceptance,
 not just the visible menu pages. The current [register](ui/product-requirements.json)
-has **117 partial and 195 pending active requirements**, with none verified;
+has **120 partial and 197 pending active requirements**, with none verified;
 the [manifest](ui/migration-manifest.json) has **358 pending variants** and all
 seven final gates remain pending.
 
@@ -8392,10 +8395,10 @@ it waits for an in-place update between two signed releases. Evidence:
 
 | Task / state | Completed points and evidence | Remaining completion subpoints |
 | --- | --- | --- |
-| PKG-01 — Complete | Rootless per-platform update archives, Windows `-symbols.zip`, `content-packs.json`, release-note pack status, localized missing/mismatched-pack report (12 languages), patch releases refuse bulk changes; `verify-update` and `verify-identity` proved on consecutive Windows candidates and wired into the release job. | None. |
-| PKG-02 — Complete | `content_packs.json` drives engine, Meson, packagers, installer, verifiers and Android; pak0/pak1/pak2 split; packs built once per release and reused by source digest; `-text` checkout makes Windows and Linux packs identical; client-only packs `PURE_NEVER` and optional on servers; retired packs skipped and deleted. | None. |
-| PKG-03 — Complete | Software DXT decode for renderers without S3TC; 51/51 packs accepted with every area resident on GL, GL software decode and Vulkan; atlases and `core2` metadata trimmed (pak1 267.5 → 96.4 MB); `waste` re-baked; loadscreen format decided: keep TGA + DDS. | None. |
-| PKG-04 — Complete | Content generations, overlays pak3–pak9 rebuilt from changed files with the base kept byte-identical from the generation's blobs, size budget, generation bump folding; one-file fix shipped as a verified 153 KB overlay. | None. |
+| PKG-01 — Closed | Rootless per-platform update archives, Windows `-symbols.zip`, `content-packs.json`, release-note pack status, localized missing/mismatched-pack report (12 languages), patch releases refuse bulk changes; `verify-update` and `verify-identity` proved on consecutive Windows candidates and wired into the release job. | None. |
+| PKG-02 — Closed | `content_packs.json` drives engine, Meson, packagers, installer, verifiers and Android; pak0/pak1/pak2 split; packs built once per release and reused by source digest; `-text` checkout makes Windows and Linux packs identical; client-only packs `PURE_NEVER` and optional on servers; retired packs skipped and deleted. | None. |
+| PKG-03 — Closed | Software DXT decode for renderers without S3TC; 51/51 packs accepted with every area resident on GL, GL software decode and Vulkan; atlases and `core2` metadata trimmed (pak1 267.5 → 96.4 MB); `waste` re-baked; loadscreen format decided: keep TGA + DDS. | None. |
+| PKG-04 — Closed | Content generations, overlays pak3–pak9 rebuilt from changed files with the base kept byte-identical from the generation's blobs, size budget, generation bump folding; one-file fix shipped as a verified 153 KB overlay. | None. |
 | PKG-05 — Implemented, measurement open | Installer downloads only missing or different bulk packs, SHA-256 and release URL compiled in; AppImages embed `gh-releases-zsync` information and publish `.zsync`; itch.io declined. | Measure update downloads for each channel on the next release (maintainer decision, 6 November). |
 | PKG-06 — Implemented, first in-place update open | In-game updater under the recorded constraints (#227): Ed25519-signed `openq4-update.json` with the key compiled in, compiled release URL, WinHTTP / system libcurl, staged `.update/` swapped by `openQ4-updater` after exit with backup and rollback, per-user installs only; macOS, AppImage, Flatpak, Snap, Android and development builds get the release page. Native, helper and manifest-tool tests. | Key generated and `OPENQ4_UPDATE_SIGNING_KEY` set (16 November). Update the first signed release in place to the next one on Windows and Linux (only builds carrying the key trust it). |
 
@@ -8626,7 +8629,7 @@ than CORE-01.
 | CORE-04 — Closed | Strict strings; configure warnings fixed (RmlUi's not reproduced); diagnostics reviewed; collision contents decoding fixed; MSVC ASan gameplay (dedicated tour, SP combat, compilers, malformed and fuzzed AAS data) with no report; T-junction ASan/UBSan fixture. | — |
 | CORE-05 — Closed | `hub2` sliver and silhouette repairs; #209's maps profiled and compiling in minutes with byte-identical output; collision contents decoded as retail; rebuilt maps load, render and navigate (AI take cover) in SP with compile memory recorded. | — |
 | CORE-06 — Closed | Tactical features generated as Quake 4 does (98.8% of 7,422 retail features reproduced exactly); `runAASTactical`; rebuilt `airdefense1` AI takes cover as on retail data; malformed data dropped or rejected, fuzzed. | — |
-| CORE-07 — Open | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64 (65 since 25 November); campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. Linux x64: dedicated, client-demo, save and mode-switch smokes, saves cross-loading with Windows, the module really unloaded at each mode change. Linux ARM64 cross build validated and packaged; Android build and verified APK. Every official map A/B against the pre-merge build; eleven cross-mode leaks gated. Third review (25 November): cvars, commands and every merged hunk against both old trees; seven minor leaks gated, five masked regression tests repaired, mode cvars safe in a kept image, retired modules retired by the updater. | macOS build and smoke; an Android emulator or device run; a human session across both modes; then the follow-ups below. |
+| CORE-07 — Partial | One game tree and one library (`game_<arch>`) serve the campaign and network play, game API 64 (65 since 25 November); campaign saves, the network protocol, network demos and MVDs unchanged and cross-loaded with the pre-merge build; mode switches in one process; Windows x64 tests and smokes. Linux x64: dedicated, client-demo, save and mode-switch smokes, saves cross-loading with Windows, the module really unloaded at each mode change. Linux ARM64 cross build validated and packaged; Android build and verified APK. Every official map A/B against the pre-merge build; eleven cross-mode leaks gated. Third review (25 November): cvars, commands and every merged hunk against both old trees; seven minor leaks gated, five masked regression tests repaired, mode cvars safe in a kept image, retired modules retired by the updater. | macOS build and smoke; an Android emulator or device run; a human session across both modes; then the follow-ups below. |
 
 ### CORE task evidence and acceptance
 
