@@ -19,7 +19,10 @@ and passes when
   * pm_usecylinder, which nothing in the run sets, also takes each mode's
     default as its value, so the listen server uses network play's cylinder
     rather than the campaign's box;
-  * nothing logs an error, and no mode cvar is reported as declared twice.
+  * nothing logs an error, and no mode cvar is reported as declared twice;
+  * the config the run leaves holds no pm_usecylinder 0 carried over from the
+    campaign (network play archives the cvar; the campaign must not save the
+    box it follows into it).
 
 With --loader-trace on Linux the dynamic loader's log must also show the module
 initialised three times and finalised at both mode changes, so each mode starts
@@ -100,7 +103,11 @@ def cvar_default(block: str, name: str) -> str | None:
     return cvar_field(block, name, "default")
 
 
-def evaluate(text: str, binary: str, loader: dict | None = None) -> dict:
+def archived_shapes(config: str) -> list[str]:
+    return re.findall(r'^\s*seta\s+pm_usecylinder\s+"?([^"\s]*)"?', config, re.M | re.I)
+
+
+def evaluate(text: str, binary: str, loader: dict | None = None, config: str | None = None) -> dict:
     modules = re.findall(r"Selected game module: logical='(\w+)' binary='([\w-]+)'", text)
     # map loads only; the collision world logs its own "msec to load collision"
     loads = re.findall(r"msec to load (\S+/\S+)", text)
@@ -141,10 +148,14 @@ def evaluate(text: str, binary: str, loader: dict | None = None) -> dict:
         failures.append(f"errors: {errors[:3]}")
     if twice:
         failures.append(f"mode cvars declared twice: {twice[:3]}")
+    saved = archived_shapes(config) if config is not None else None
+    if saved and saved[-1] == "0":
+        failures.append("the config saved the campaign's pm_usecylinder 0")
     if loader is not None and (loader.get("init") != 3 or loader.get("fini", 0) < 2):
         failures.append(f"loader trace init {loader.get('init')} fini {loader.get('fini')}")
     return {"passed": not failures, "failures": failures, "modules": modules, "loads": loads,
             "phases": phases, "gameInits": inits, "modeCvarDefaults": defaults, "shapes": shapes,
+            "savedShapes": saved,
             "loader": loader}
 
 
@@ -223,12 +234,15 @@ def run(args: argparse.Namespace) -> int:
                     os.killpg(proc.pid, signal.SIGKILL)
             proc.wait()
     loader = read_loader_trace(home, f"{binary}.so") if args.loader_trace and not win else None
-    report = evaluate(gather(game), binary, loader)
+    config_path = game / "openQ4Config.cfg"
+    config = config_path.read_text(encoding="latin-1", errors="replace") if config_path.is_file() else ""
+    report = evaluate(gather(game), binary, loader, config)
     report["seconds"] = round(time.monotonic() - started, 1)
     report["exitCode"] = proc.returncode
     (home / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps({k: report[k] for k in ("passed", "failures", "seconds", "modules", "loads",
-                                             "phases", "gameInits", "modeCvarDefaults", "shapes")}))
+                                             "phases", "gameInits", "modeCvarDefaults", "shapes",
+                                             "savedShapes")}))
     return 0 if report["passed"] else 1
 
 
@@ -270,6 +284,10 @@ def self_test() -> int:
     assert not evaluate(synthetic_log().replace("si_map = mp/q4dm1", ""), "game_x64")["passed"]
     assert not evaluate(synthetic_log(), "game_x64", {"init": 1, "fini": 0})["passed"], "loader trace not checked"
     assert evaluate(synthetic_log(), "game_x64", {"init": 3, "fini": 2})["passed"]
+    assert evaluate(synthetic_log(), "game_x64", config='seta ui_name "x"\nseta pm_usecylinder "1"\n')["passed"]
+    assert evaluate(synthetic_log(), "game_x64", config='seta ui_name "x"\n')["passed"]
+    assert not evaluate(synthetic_log(), "game_x64", config='seta pm_usecylinder "0"\n')["passed"], \
+        "the carried-over box in the config not checked"
     print("simulated pass")
     return 0
 

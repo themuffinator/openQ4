@@ -87,10 +87,13 @@ merged code follows, and the compatibility guarantees and their evidence.
   archives whichever default its session had. A value the server synced to a
   client, or a demo played, is not the player's either: the module notes each
   client session (`NoteClientSession`) and lets the value follow the mode again
-  at the next load. `si_pure` keeps its value across a mode change, because the
-  Create Server page shows it and sets it, so a server starts with the value
-  the page showed. `unified_game_mode_parity_contract.py` runs these cases
-  against a stand-in cvar system.
+  at the next load. A mode whose declaration does not archive the cvar (the
+  campaign) drops the archive mark an earlier load left on a value it follows,
+  so the campaign never saves the box into the config network play reads; a
+  value the player set keeps the mark. `si_pure` keeps its value across a mode
+  change, because the Create Server page shows it and sets it, so a server
+  starts with the value the page showed. `unified_game_mode_parity_contract.py`
+  runs these cases against a stand-in cvar system.
 - Code the campaign always ran through the multiplayer game object
   (`idMultiplayerGame::Reset`, `Precache`, `Shutdown`) keeps network-play-only
   work behind the mode: the match session, evidence and live-event logs,
@@ -461,8 +464,9 @@ comparison with openPR06, the PREY port that also runs one game library.
   mode until the player sets it (see the game-side contract above), and a
   config holding either mode's default is read as that default, which also
   repairs the configs that archived the box. The checks, on Windows x64:
-  - The mode-switch smoke now also requires the value to be 0, then 1, then 0.
-    It passes, where the earlier build gave the listen server 0.
+  - The mode-switch smoke now also requires the value to be 0, then 1, then 0,
+    and the config the run leaves to hold no carried-over 0. It passes, where
+    the earlier build gave the listen server 0 and saved it.
   - Seeded with `seta pm_usecylinder "0"`, the listen server uses 1.
   - Seeded with `seta pm_usecylinder "12"`, all three phases keep 12.
   - `mp_client_demo_smoke` passes (a dedicated server, a joined client and its

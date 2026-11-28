@@ -158,8 +158,10 @@ struct CVarSystem {
 	std::map<std::string, Registered> vars;
 	std::map<std::string, idCVar *> handles;
 	int declaredTwice = 0;
+	bool configDirty = false;	// an archived cvar changed: the config is written again
 	void Register( idCVar *cvar );
 	idCVar *Find( const char *name );
+	void SetModifiedFlags( int flags ) { if ( flags & CVAR_ARCHIVE ) { configDirty = true; } }
 	// the console, a cfg, a server this process hosts
 	void Set( const char *name, const char *value ) {
 		Registered &r = vars[ name ];
@@ -252,7 +254,8 @@ static void Unload() {
 }
 static std::string Value( const char *name ) { return cvars.vars[ name ].value; }
 // a new process: the cvar system starts empty (the image stays, as dyld keeps it)
-static void NewProcess() { cvars.vars.clear(); }
+static void NewProcess() { cvars.vars.clear(); cvars.configDirty = false; }
+static bool Archived( const char *name ) { return ( cvars.vars[ name ].flags & CVAR_ARCHIVE ) != 0; }
 int main() {
 	// a fresh process loads the campaign
 	Init( false );
@@ -276,6 +279,9 @@ int main() {
 	assert( pure.Default() == std::string( "0" ) && !( pure.Flags() & CVAR_ARCHIVE ) );
 	assert( cvars.vars[ "si_pure" ].registrations == 3 );
 	assert( Value( "pm_usecylinder" ) == "0" );
+	// the campaign does not save the box it follows: network play's archive
+	// mark is gone, and the config is written again without it
+	assert( !Archived( "pm_usecylinder" ) && cvars.configDirty );
 	// a mode's own default is never reported as a second declaration
 	assert( cvars.declaredTwice == 0 );
 	// ...while the registration is static again once a declaration arrived
@@ -288,6 +294,7 @@ int main() {
 	Unload();
 	Init( false );
 	assert( Value( "pm_usecylinder" ) == "0" );
+	assert( Archived( "pm_usecylinder" ) );	// the player's value is still saved
 	Unload();
 	Init( true );
 	assert( Value( "pm_usecylinder" ) == "0" );
@@ -314,6 +321,8 @@ int main() {
 	cvarSystem->Create( "pm_usecylinder", "0", CVAR_ARCHIVE );
 	Init( false );
 	assert( Value( "pm_usecylinder" ) == "0" );
+	// the config's carried-over box is written out of it
+	assert( !Archived( "pm_usecylinder" ) && cvars.configDirty );
 	Unload();
 	Init( true );
 	assert( Value( "pm_usecylinder" ) == "1" );
@@ -322,14 +331,14 @@ int main() {
 	NewProcess();
 	cvarSystem->Create( "pm_usecylinder", "1", CVAR_ARCHIVE );
 	Init( false );
-	assert( Value( "pm_usecylinder" ) == "0" );
+	assert( Value( "pm_usecylinder" ) == "0" && !Archived( "pm_usecylinder" ) );
 	Unload();
 
 	// any other archived value, and the command line, are the player's
 	NewProcess();
 	cvarSystem->Create( "pm_usecylinder", "12", CVAR_ARCHIVE );
 	Init( false );
-	assert( Value( "pm_usecylinder" ) == "12" );
+	assert( Value( "pm_usecylinder" ) == "12" && Archived( "pm_usecylinder" ) );
 	Unload();
 	Init( true );
 	assert( Value( "pm_usecylinder" ) == "12" );

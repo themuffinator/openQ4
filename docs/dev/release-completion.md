@@ -21,8 +21,9 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
   use multiplayer's collision, as dedicated servers always did, and the
   campaign keeps its own.
 - **Upgrade note:** if your settings saved the campaign's collision, they are
-  read as the default and corrected automatically. A different value you set
-  yourself with `pm_usecylinder` is kept. Nothing to reinstall.
+  read as the default and the setting is removed from your config the next
+  time you play the campaign. A different value you set yourself with
+  `pm_usecylinder` is kept and saved. Nothing to reinstall.
 - For developers: `pm_usecylinder`'s value follows the mode (`game_sp` or
   `game_mp`) until the player sets it. A value synced by a server, or an
   archived default, does not count as set. `si_pure` keeps its value, because
@@ -31,6 +32,8 @@ player-facing notes are [releases/v0.15.0.md](releases/v0.15.0.md).
 - Evidence, Windows x64: `game_mode_switch_smoke.py` (campaign, listen server,
   campaign in one process: 0, 1, 0); seeded configs with the campaign's `0`
   (the listen server uses 1) and a custom `12` (kept in all three phases);
+  the config a campaign, listen server and campaign run leaves holds no `0`;
+  `windows_dedicated_server_smoke.py`;
   `mp_client_demo_smoke.py`; `unified_game_mode_parity_contract.py`, whose
   fixture fails on the previous rule.
 

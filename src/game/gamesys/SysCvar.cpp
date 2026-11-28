@@ -1241,6 +1241,11 @@ idModeCVar::ApplyModeDefaults
 
 Gives every mode cvar the player never set this mode's default, and clears its
 modified mark, so the next load can tell whether anything set it since.
+
+A mode whose declaration does not archive the cvar also drops the archive mark
+an earlier load's declaration left on it, so the campaign does not save the
+box it follows into the config network play reads. A value the player set
+keeps the mark and is saved.
 ================
 */
 void idModeCVar::ApplyModeDefaults( void ) {
@@ -1250,6 +1255,11 @@ void idModeCVar::ApplyModeDefaults( void ) {
 		}
 		cvar->SetModeValue( cvar->value );
 		cvar->ClearModified();
+		if ( !( cvar->flags & CVAR_ARCHIVE ) && ( cvar->GetFlags() & CVAR_ARCHIVE ) ) {
+			cvar->RemoveFlag( CVAR_ARCHIVE );
+			// rewrite the config without it
+			cvarSystem->SetModifiedFlags( CVAR_ARCHIVE );
+		}
 	}
 }
 
