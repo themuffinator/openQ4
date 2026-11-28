@@ -12,6 +12,18 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8765", "--bind", "127.0.0.1", "--directory", "C:\\Users\\djdac\\AppData\\Local\\Temp\\claude\\E--Repositories-openQ4\\9d69ba20-e94d-4b60-96ab-69c71e47873f\\scratchpad\\atlas"],
       "port": 8765
+    },
+    {
+      "name": "moddb-layouts",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8767", "--bind", "127.0.0.1", "--directory", "E:\\Repositories\\openQ4\\.work\\moddb\\03-layouts"],
+      "port": 8767
+    },
+    {
+      "name": "awakening-unused",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8768", "--bind", "127.0.0.1", "--directory", "E:\\Repositories\\openQ4\\.work"],
+      "port": 8768
     }
   ]
 }

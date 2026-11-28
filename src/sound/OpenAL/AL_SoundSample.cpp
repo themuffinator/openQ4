@@ -2393,6 +2393,28 @@ void idSoundSample_OpenAL::LoadResourceAsync()
 
 /*
 ========================
+idSoundSample_OpenAL::LoadResourceDeferringEnvelope
+
+LoadResource for a sample referenced outside a level load (the menus, a sound
+a script reaches for mid-level). Everything loads here as before, except the
+60 Hz envelope of a streamed track: that full pass over the file decoded the
+main-menu music on the main thread at every start (openPR06 issue #61). It
+builds on a job worker instead, as it does for a level load. The track streams
+from its file meanwhile, so it plays and starts exactly as before; only its
+amplitude (lip sync, shakes, sound-driven lights) reads silent until the job
+is done. The sound system joins the job from its frame
+(idSoundSystemLocal::Render) once the worker has finished.
+========================
+*/
+void idSoundSample_OpenAL::LoadResourceDeferringEnvelope()
+{
+	deferStreamEnvelope = s_asyncSampleDecode.GetBool();
+	LoadResource();
+	deferStreamEnvelope = false;
+}
+
+/*
+========================
 idSoundSample_OpenAL::FinishDecode
 
 Waits for an outstanding decode and uploads the sample. Does nothing without one.
@@ -2438,28 +2460,6 @@ void idSoundSample_OpenAL::FinishDecode()
 		return;
 	}
 	CreateOpenALBuffer();
-}
-
-/*
-========================
-idSoundSample_OpenAL::LoadResourceDeferringEnvelope
-
-LoadResource for a sample referenced outside a level load (the menus, a sound
-a script reaches for mid-level). Everything loads here as before, except the
-60 Hz envelope of a streamed track: that full pass over the file decoded the
-main-menu music on the main thread at every start (openPR06 issue #61). It
-builds on a job worker instead, as it does for a level load. The track streams
-from its file meanwhile, so it plays and starts exactly as before; only its
-amplitude (lip sync, shakes, sound-driven lights) reads silent until the job
-is done. The sound system joins the job from its frame
-(idSoundSystemLocal::Render) once the worker has finished.
-========================
-*/
-void idSoundSample_OpenAL::LoadResourceDeferringEnvelope()
-{
-	deferStreamEnvelope = s_asyncSampleDecode.GetBool();
-	LoadResource();
-	deferStreamEnvelope = false;
 }
 
 /*
