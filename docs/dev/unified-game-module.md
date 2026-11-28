@@ -402,10 +402,60 @@ commands and the multiplayer main menu.
   fields neither build initialises. The dedicated-server smoke and the
   campaign, network play and campaign switch pass.
 
+### Fourth check (28 November 2026)
+
+An audit of the tree, the build, the loader, packaging, the updater, the launch
+generator and the tests for anything that still assumes two modules, and a
+comparison with openPR06, the PREY port that also runs one game library.
+
+- **Leftovers.** No compile-time mode switch, second idlib flavour or second
+  game tree remains, and every tool that names `game-sp_<arch>` or
+  `game-mp_<arch>` does so to retire or reject them. Four places still
+  described the split and now describe the one module: `BUILDING.md`'s
+  Awakening note, two source comments and this document's game API number
+  (66 since the VR menu pointer on 27 November).
+- **A checked-in mode-switch smoke.** The campaign, network play and campaign
+  sequence in one process had only run from scratch scripts.
+  `tools/tests/game_mode_switch_smoke.py` now drives one hidden, silent client
+  through airdefense1, a listen server on q4dm1 and hub1, and passes when the
+  loader selects `game_sp`, `game_mp`, `game_sp` from `game_<arch>`, every
+  phase runs in gameplay (the network phase on a live server), the mode cvars
+  take each mode's default, and nothing logs an error or a mode cvar declared
+  twice. On Linux, `--loader-trace` also requires the module to be loaded
+  fresh in each mode. Its `--self-test` runs in local validation and CI. It
+  passes on Windows x64 in 34 seconds, and the dedicated-server smoke passes
+  on the same stage.
+- **openPR06.** PREY shipped one game library, so openPR06 never merged two
+  trees and has no technique of its own for it. It loads one module named
+  `game` and **never reloads it between single-player and multiplayer**: the
+  game reads the mode from `isServer || isClient` at each map load and has no
+  state fixed for the module's lifetime. This is the first follow-up below.
+  For Quake 4 it waits on everything that reads `IsMultiplayerMode()` (`Init`,
+  precache, the menus, the script stack size and the `idModeCVar` defaults)
+  being redone per session. PREY needs no `idModeCVar` because its retail
+  library has one default per cvar. Quake 4's `pm_usecylinder` and `si_pure`
+  really differ between the retail libraries, so openQ4 keeps them.
+- **Mode cvar values carry across a switch.** A reload keeps every cvar's
+  value, so a listen server started after the campaign, or from the main menu
+  (which runs `game_sp`), keeps the campaign's `pm_usecylinder 0` (box
+  collision) although network play's default is 1 (cylinder). Network play
+  archives `pm_usecylinder`, so the first such session writes
+  `seta pm_usecylinder "0"` and every later one keeps the box. A dedicated
+  server starts in `game_mp` and uses the cylinder. `si_pure` carries over the
+  same way, but the Create Server page sets it. The pre-merge build behaves
+  the same, so this is not a CORE-07 regression. Changing it changes
+  listen-server play, so it is a follow-up below and is left as it is until
+  that is decided.
+
 ## Follow-ups
 
 - Keep one loaded library across a mode change instead of reloading it, once no
   module-lifetime state depends on the mode.
+- Decide whether a mode cvar the player never set should take the new
+  mode's default on a mode change (see the fourth check). The fix would
+  belong in `idModeCVar::ApplyModuleMode`. It would also need a one-time
+  migration for configs that already archive the campaign's
+  `pm_usecylinder 0`.
 - Remove engine-side workarounds for the split: the multiplayer menu cvars the
   engine declares for the single-player module (`Session_DeclareMultiplayerMenuGameCVars`)
   and the comments that explain the other module's settings as bare console cvars.

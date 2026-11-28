@@ -8838,6 +8838,19 @@ than CORE-01.
   human session across both modes. Follow-ups once closed: keep one
   loaded library across a mode change, and remove the engine's workarounds for
   the split (the multiplayer menu cvars it declares for the campaign module).
+  Fourth check, 28 November: the tree, build, loader, packaging, updater,
+  launch generator and tests hold no split-module assumption beyond four
+  stale descriptions, now corrected. The campaign, network play and campaign
+  switch in one process has a checked-in smoke,
+  `tools/tests/game_mode_switch_smoke.py`, which passes on Windows x64.
+  openPR06 (PREY, always one library) has no merge technique to adopt. It
+  never reloads its module between modes, which is the first follow-up here.
+  Found: a mode cvar's value survives a mode change, so a listen server
+  started after the campaign or from the main menu keeps the campaign's
+  `pm_usecylinder 0` (box collision) and archives it. A dedicated server uses
+  the cylinder. The pre-merge build does the same. Whether the mode default
+  should win for a value the player never set is a third follow-up, awaiting
+  a decision ([unified game module](unified-game-module.md#fourth-check-28-november-2026)).
 
 ### TOOL completion checkpoints
 
